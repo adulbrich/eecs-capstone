@@ -6,7 +6,14 @@ To run this application:
 
 ```bash
 npm install
+docker compose up -d
 npm run dev
+```
+
+To stop the database:
+
+```bash
+docker compose down
 ```
 
 # Building For Production
