@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { getSession } from "#/lib/auth-guards";
 
-export const Route = createFileRoute("/_authed/_admin")({
+export const Route = createFileRoute("/_authed/admin")({
   beforeLoad: async () => {
     const session = await getSession();
     if (!session?.user) {
