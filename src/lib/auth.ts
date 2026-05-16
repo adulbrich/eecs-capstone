@@ -20,6 +20,7 @@ export const auth = betterAuth({
   emailVerification: {
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
+    callbackURL: "/verify-email",
     sendVerificationEmail: async ({ user, url }) => {
       await emailSender.sendVerification({ to: user.email, url });
     },
