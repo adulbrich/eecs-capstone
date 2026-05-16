@@ -10,7 +10,7 @@ export async function getSession() {
 export async function requireUser() {
   const session = await getSession();
   if (!session?.user) {
-    throw redirect({ to: "/sign-in" as string });
+    throw redirect({ to: "/sign-in" });
   }
   return session.user;
 }
@@ -18,7 +18,7 @@ export async function requireUser() {
 export async function requireRole(roles: string[]) {
   const session = await getSession();
   if (!session?.user) {
-    throw redirect({ to: "/sign-in" as string });
+    throw redirect({ to: "/sign-in" });
   }
   if (!roles.includes(session.user.role ?? "")) {
     throw redirect({ to: "/" });
