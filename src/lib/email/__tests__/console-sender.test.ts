@@ -20,7 +20,9 @@ describe("ConsoleEmailSender", () => {
       to: "a@b.com",
       url: "https://x/verify?t=abc",
     });
-    const output = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    const output = stderrSpy.mock.calls
+      .map((c: unknown[]) => String(c[0]))
+      .join("");
     expect(output).toContain("VERIFY EMAIL");
     expect(output).toContain("a@b.com");
     expect(output).toContain("https://x/verify?t=abc");
@@ -32,7 +34,9 @@ describe("ConsoleEmailSender", () => {
       to: "a@b.com",
       url: "https://x/reset?t=abc",
     });
-    const output = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    const output = stderrSpy.mock.calls
+      .map((c: unknown[]) => String(c[0]))
+      .join("");
     expect(output).toContain("RESET PASSWORD");
     expect(output).toContain("a@b.com");
     expect(output).toContain("https://x/reset?t=abc");
