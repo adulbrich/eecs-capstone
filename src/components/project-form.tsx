@@ -1,6 +1,19 @@
 import { useForm } from "@tanstack/react-form";
+import { useState } from "react";
 import { z } from "zod";
 import { applyServerErrors } from "#/lib/apply-server-errors";
+
+const optionalUrl = z
+  .union([z.literal(""), z.string().url("Must be a valid URL").max(500)])
+  .default("");
+
+const optionalEmail = z
+  .union([z.literal(""), z.string().email("Must be a valid email").max(200)])
+  .default("");
+
+const optionalUuid = z
+  .union([z.literal(""), z.string().uuid("Must be a UUID")])
+  .default("");
 
 export const projectFormSchema = z.object({
   title: z.string().min(1, "Title is required").max(200),
@@ -9,12 +22,12 @@ export const projectFormSchema = z.object({
   objectives: z.string().max(5000).default(""),
   minQualifications: z.string().max(2000).default(""),
   prefQualifications: z.string().max(2000).default(""),
-  url: z.string().max(500).default(""),
-  contactEmail: z.string().max(200).default(""),
+  url: optionalUrl,
+  contactEmail: optionalEmail,
   contactName: z.string().max(200).default(""),
-  imageUrl: z.string().max(500).default(""),
+  imageUrl: optionalUrl,
   licenseRestrictions: z.string().max(1000).default(""),
-  programId: z.string().default(""),
+  programId: optionalUuid,
   notes: z.string().max(5000).default(""),
 });
 
@@ -33,6 +46,8 @@ export function ProjectForm({
   submitLabel,
   onSubmit,
 }: Props) {
+  const [formError, setFormError] = useState<string | null>(null);
+
   const form = useForm({
     defaultValues: {
       title: initial?.title ?? "",
@@ -62,6 +77,7 @@ export function ProjectForm({
       },
     },
     onSubmit: async ({ value }) => {
+      setFormError(null);
       try {
         await onSubmit(value);
       } catch (err) {
@@ -69,7 +85,9 @@ export function ProjectForm({
           form as unknown as Parameters<typeof applyServerErrors>[0],
           err,
         );
-        if (!handled) throw err;
+        if (!handled) {
+          setFormError((err as Error)?.message || "Save failed");
+        }
       }
     },
   });
@@ -78,6 +96,7 @@ export function ProjectForm({
     <form
       onSubmit={(e) => {
         e.preventDefault();
+        setFormError(null);
         void form.handleSubmit();
       }}
       className="space-y-4"
@@ -118,13 +137,19 @@ export function ProjectForm({
         textarea
         rows={2}
       />
-      <Field form={form} name="url" label="URL" />
+      <Field form={form} name="url" label="URL" placeholder="https://..." />
       <Field form={form} name="contactName" label="Contact name" />
-      <Field form={form} name="contactEmail" label="Contact email" />
+      <Field
+        form={form}
+        name="contactEmail"
+        label="Contact email"
+        placeholder="name@example.com"
+      />
       <Field
         form={form}
         name="imageUrl"
         label="Image URL (upload coming in Spec 4)"
+        placeholder="https://..."
       />
       <Field
         form={form}
@@ -146,6 +171,12 @@ export function ProjectForm({
           textarea
           rows={3}
         />
+      )}
+
+      {formError && (
+        <div className="border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          {formError}
+        </div>
       )}
 
       <form.Subscribe selector={(s) => [s.canSubmit, s.isSubmitting] as const}>
@@ -170,11 +201,12 @@ type FieldProps = {
   form: AnyForm;
   name: keyof ProjectFormValues;
   label: string;
+  placeholder?: string;
   textarea?: boolean;
   rows?: number;
 };
 
-function Field({ form, name, label, textarea, rows }: FieldProps) {
+function Field({ form, name, label, placeholder, textarea, rows }: FieldProps) {
   return (
     <form.Field name={name as never}>
       {(field: AnyForm) => (
@@ -190,6 +222,7 @@ function Field({ form, name, label, textarea, rows }: FieldProps) {
               onChange={(e) => field.handleChange(e.target.value)}
               onBlur={field.handleBlur}
               rows={rows}
+              placeholder={placeholder}
               className="mt-1 w-full border p-2"
             />
           ) : (
@@ -199,12 +232,19 @@ function Field({ form, name, label, textarea, rows }: FieldProps) {
               value={field.state.value as string}
               onChange={(e) => field.handleChange(e.target.value)}
               onBlur={field.handleBlur}
+              placeholder={placeholder}
               className="mt-1 w-full border p-2"
             />
           )}
           {field.state.meta.errors.length > 0 && (
             <p className="mt-1 text-red-600 text-sm">
-              {field.state.meta.errors.join(", ")}
+              {field.state.meta.errors
+                .map((e: unknown) =>
+                  typeof e === "string"
+                    ? e
+                    : ((e as { message?: string })?.message ?? String(e)),
+                )
+                .join(", ")}
             </p>
           )}
         </div>
