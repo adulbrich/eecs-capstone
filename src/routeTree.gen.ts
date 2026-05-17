@@ -22,6 +22,7 @@ import { Route as authResetPasswordRouteImport } from './routes/(auth)/reset-pas
 import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-password'
 import { Route as AuthedAdminIndexRouteImport } from './routes/_authed/admin/index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as AuthedProjectsNewRouteImport } from './routes/_authed/projects/new'
 
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
@@ -87,6 +88,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthedProjectsNewRoute = AuthedProjectsNewRouteImport.update({
+  id: '/projects/new',
+  path: '/projects/new',
+  getParentRoute: () => AuthedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -99,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof AuthedProfileRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/projects/new': typeof AuthedProjectsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin/': typeof AuthedAdminIndexRoute
 }
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/profile': typeof AuthedProfileRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/projects': typeof ProjectsIndexRoute
+  '/projects/new': typeof AuthedProjectsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin': typeof AuthedAdminIndexRoute
 }
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/_authed/profile': typeof AuthedProfileRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/_authed/projects/new': typeof AuthedProjectsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_authed/admin/': typeof AuthedAdminIndexRoute
 }
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/projects/$projectId'
     | '/projects/'
+    | '/projects/new'
     | '/api/auth/$'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/projects/$projectId'
     | '/projects'
+    | '/projects/new'
     | '/api/auth/$'
     | '/admin'
   id:
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/_authed/profile'
     | '/projects/$projectId'
     | '/projects/'
+    | '/_authed/projects/new'
     | '/api/auth/$'
     | '/_authed/admin/'
   fileRoutesById: FileRoutesById
@@ -282,6 +294,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authed/projects/new': {
+      id: '/_authed/projects/new'
+      path: '/projects/new'
+      fullPath: '/projects/new'
+      preLoaderRoute: typeof AuthedProjectsNewRouteImport
+      parentRoute: typeof AuthedRoute
+    }
   }
 }
 
@@ -300,11 +319,13 @@ const AuthedAdminRouteWithChildren = AuthedAdminRoute._addFileChildren(
 interface AuthedRouteChildren {
   AuthedAdminRoute: typeof AuthedAdminRouteWithChildren
   AuthedProfileRoute: typeof AuthedProfileRoute
+  AuthedProjectsNewRoute: typeof AuthedProjectsNewRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminRoute: AuthedAdminRouteWithChildren,
   AuthedProfileRoute: AuthedProfileRoute,
+  AuthedProjectsNewRoute: AuthedProjectsNewRoute,
 }
 
 const AuthedRouteWithChildren =
