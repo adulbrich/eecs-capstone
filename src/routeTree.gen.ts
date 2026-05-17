@@ -23,6 +23,7 @@ import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-p
 import { Route as AuthedAdminIndexRouteImport } from './routes/_authed/admin/index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AuthedProjectsNewRouteImport } from './routes/_authed/projects/new'
+import { Route as AuthedMyProjectsRouteImport } from './routes/_authed/my/projects'
 import { Route as AuthedProjectsProjectIdEditRouteImport } from './routes/_authed/projects/$projectId/edit'
 
 const AuthedRoute = AuthedRouteImport.update({
@@ -94,6 +95,11 @@ const AuthedProjectsNewRoute = AuthedProjectsNewRouteImport.update({
   path: '/projects/new',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedMyProjectsRoute = AuthedMyProjectsRouteImport.update({
+  id: '/my/projects',
+  path: '/my/projects',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedProjectsProjectIdEditRoute =
   AuthedProjectsProjectIdEditRouteImport.update({
     id: '/projects/$projectId/edit',
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof AuthedProfileRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/my/projects': typeof AuthedMyProjectsRoute
   '/projects/new': typeof AuthedProjectsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin/': typeof AuthedAdminIndexRoute
@@ -127,6 +134,7 @@ export interface FileRoutesByTo {
   '/profile': typeof AuthedProfileRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/projects': typeof ProjectsIndexRoute
+  '/my/projects': typeof AuthedMyProjectsRoute
   '/projects/new': typeof AuthedProjectsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin': typeof AuthedAdminIndexRoute
@@ -145,6 +153,7 @@ export interface FileRoutesById {
   '/_authed/profile': typeof AuthedProfileRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/_authed/my/projects': typeof AuthedMyProjectsRoute
   '/_authed/projects/new': typeof AuthedProjectsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_authed/admin/': typeof AuthedAdminIndexRoute
@@ -163,6 +172,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/projects/$projectId'
     | '/projects/'
+    | '/my/projects'
     | '/projects/new'
     | '/api/auth/$'
     | '/admin/'
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/projects/$projectId'
     | '/projects'
+    | '/my/projects'
     | '/projects/new'
     | '/api/auth/$'
     | '/admin'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
     | '/_authed/profile'
     | '/projects/$projectId'
     | '/projects/'
+    | '/_authed/my/projects'
     | '/_authed/projects/new'
     | '/api/auth/$'
     | '/_authed/admin/'
@@ -314,6 +326,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProjectsNewRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/my/projects': {
+      id: '/_authed/my/projects'
+      path: '/my/projects'
+      fullPath: '/my/projects'
+      preLoaderRoute: typeof AuthedMyProjectsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/projects/$projectId/edit': {
       id: '/_authed/projects/$projectId/edit'
       path: '/projects/$projectId/edit'
@@ -339,6 +358,7 @@ const AuthedAdminRouteWithChildren = AuthedAdminRoute._addFileChildren(
 interface AuthedRouteChildren {
   AuthedAdminRoute: typeof AuthedAdminRouteWithChildren
   AuthedProfileRoute: typeof AuthedProfileRoute
+  AuthedMyProjectsRoute: typeof AuthedMyProjectsRoute
   AuthedProjectsNewRoute: typeof AuthedProjectsNewRoute
   AuthedProjectsProjectIdEditRoute: typeof AuthedProjectsProjectIdEditRoute
 }
@@ -346,6 +366,7 @@ interface AuthedRouteChildren {
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminRoute: AuthedAdminRouteWithChildren,
   AuthedProfileRoute: AuthedProfileRoute,
+  AuthedMyProjectsRoute: AuthedMyProjectsRoute,
   AuthedProjectsNewRoute: AuthedProjectsNewRoute,
   AuthedProjectsProjectIdEditRoute: AuthedProjectsProjectIdEditRoute,
 }
