@@ -4,28 +4,52 @@ import { NotificationBell } from "./notification-bell";
 
 export function SiteHeader() {
   const { data: session, isPending } = authClient.useSession();
+  const signedIn = !!session?.user;
+  const role =
+    (session?.user as { role?: string | null } | undefined)?.role ?? null;
+  const isStaff = role === "admin" || role === "instructor";
 
   return (
     <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
-      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+      <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-4">
         <Link to="/" className="text-sm font-semibold">
           CS Capstone
         </Link>
 
-        <nav className="flex items-center gap-4 text-sm">
+        <nav className="flex flex-1 items-center gap-4 text-sm">
+          <Link to="/projects" className="hover:underline">
+            Projects
+          </Link>
+          {signedIn && (
+            <>
+              <Link to="/my/projects" className="hover:underline">
+                My projects
+              </Link>
+              <Link to="/projects/new" className="hover:underline">
+                New project
+              </Link>
+            </>
+          )}
+          {isStaff && (
+            <Link to="/admin" className="hover:underline">
+              Admin
+            </Link>
+          )}
+        </nav>
+
+        <div className="flex items-center gap-3 text-sm">
           {isPending ? (
             <div className="h-8 w-24 animate-pulse bg-neutral-100 dark:bg-neutral-800" />
-          ) : session?.user ? (
+          ) : signedIn ? (
             <SignedIn
               name={session.user.name}
               email={session.user.email}
               image={session.user.image}
-              role={(session.user as { role?: string | null }).role ?? null}
             />
           ) : (
             <SignedOut />
           )}
-        </nav>
+        </div>
       </div>
     </header>
   );
@@ -51,21 +75,13 @@ function SignedIn({
   name,
   email,
   image,
-  role,
 }: {
   name: string | null;
   email: string;
   image: string | null | undefined;
-  role: string | null;
 }) {
-  const isStaff = role === "admin" || role === "instructor";
   return (
     <>
-      {isStaff && (
-        <Link to="/admin" className="hover:underline">
-          Admin
-        </Link>
-      )}
       <NotificationBell />
       <Link to="/profile" className="flex items-center gap-2 hover:underline">
         {image ? (
