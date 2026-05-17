@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { authClient } from "#/lib/auth-client";
+import { NotificationBell } from "./notification-bell";
 
 export function SiteHeader() {
   const { data: session, isPending } = authClient.useSession();
@@ -65,6 +66,7 @@ function SignedIn({
           Admin
         </Link>
       )}
+      <NotificationBell />
       <Link to="/profile" className="flex items-center gap-2 hover:underline">
         {image ? (
           <img
