@@ -24,6 +24,7 @@ import { Route as AuthedAdminIndexRouteImport } from './routes/_authed/admin/ind
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AuthedProjectsNewRouteImport } from './routes/_authed/projects/new'
 import { Route as AuthedMyProjectsRouteImport } from './routes/_authed/my/projects'
+import { Route as AuthedAdminProjectsIndexRouteImport } from './routes/_authed/admin/projects/index'
 import { Route as AuthedProjectsProjectIdEditRouteImport } from './routes/_authed/projects/$projectId/edit'
 
 const AuthedRoute = AuthedRouteImport.update({
@@ -100,6 +101,12 @@ const AuthedMyProjectsRoute = AuthedMyProjectsRouteImport.update({
   path: '/my/projects',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAdminProjectsIndexRoute =
+  AuthedAdminProjectsIndexRouteImport.update({
+    id: '/projects/',
+    path: '/projects/',
+    getParentRoute: () => AuthedAdminRoute,
+  } as any)
 const AuthedProjectsProjectIdEditRoute =
   AuthedProjectsProjectIdEditRouteImport.update({
     id: '/projects/$projectId/edit',
@@ -123,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin/': typeof AuthedAdminIndexRoute
   '/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
+  '/admin/projects/': typeof AuthedAdminProjectsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -139,6 +147,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin': typeof AuthedAdminIndexRoute
   '/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
+  '/admin/projects': typeof AuthedAdminProjectsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -158,6 +167,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_authed/admin/': typeof AuthedAdminIndexRoute
   '/_authed/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
+  '/_authed/admin/projects/': typeof AuthedAdminProjectsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/admin/'
     | '/projects/$projectId/edit'
+    | '/admin/projects/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/admin'
     | '/projects/$projectId/edit'
+    | '/admin/projects'
   id:
     | '__root__'
     | '/'
@@ -211,6 +223,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/_authed/admin/'
     | '/_authed/projects/$projectId/edit'
+    | '/_authed/admin/projects/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -333,6 +346,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedMyProjectsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/projects/': {
+      id: '/_authed/admin/projects/'
+      path: '/projects'
+      fullPath: '/admin/projects/'
+      preLoaderRoute: typeof AuthedAdminProjectsIndexRouteImport
+      parentRoute: typeof AuthedAdminRoute
+    }
     '/_authed/projects/$projectId/edit': {
       id: '/_authed/projects/$projectId/edit'
       path: '/projects/$projectId/edit'
@@ -345,10 +365,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthedAdminRouteChildren {
   AuthedAdminIndexRoute: typeof AuthedAdminIndexRoute
+  AuthedAdminProjectsIndexRoute: typeof AuthedAdminProjectsIndexRoute
 }
 
 const AuthedAdminRouteChildren: AuthedAdminRouteChildren = {
   AuthedAdminIndexRoute: AuthedAdminIndexRoute,
+  AuthedAdminProjectsIndexRoute: AuthedAdminProjectsIndexRoute,
 }
 
 const AuthedAdminRouteWithChildren = AuthedAdminRoute._addFileChildren(
