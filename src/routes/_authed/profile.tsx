@@ -61,7 +61,7 @@ function Profile() {
 
   async function onSignOut() {
     await authClient.signOut();
-    router.navigate({ to: "/sign-in" });
+    window.location.href = "/sign-in";
   }
 
   return (

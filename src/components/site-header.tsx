@@ -82,8 +82,9 @@ function SignedIn({
       </Link>
       <button
         type="button"
-        onClick={() => {
-          void authClient.signOut();
+        onClick={async () => {
+          await authClient.signOut();
+          window.location.href = "/sign-in";
         }}
         className="border border-neutral-300 px-3 py-1.5 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
       >
