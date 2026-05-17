@@ -1,3 +1,4 @@
+import { BellAlertIcon, BellIcon } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useState } from "react";
 import {
   listMyNotifications,
@@ -73,9 +74,16 @@ export function NotificationBell() {
         aria-label="Notifications"
         className="relative px-2 py-1 hover:bg-neutral-100"
       >
-        <span aria-hidden>bell</span>
+        {unread > 0 ? (
+          <BellAlertIcon
+            className="h-5 w-5 text-amber-600"
+            aria-hidden="true"
+          />
+        ) : (
+          <BellIcon className="h-5 w-5" aria-hidden="true" />
+        )}
         {unread > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[1.25rem] bg-red-600 px-1 text-center text-white text-xs">
+          <span className="absolute -top-1 -right-1 min-w-[1.25rem] rounded-full bg-red-600 px-1 text-center text-white text-xs">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
