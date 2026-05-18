@@ -1,6 +1,5 @@
-import { config } from "dotenv";
-config({ path: [".env.local", ".env"] });
-
+// Run via `npm run db:seed:admin` (uses tsx --env-file=.env.local).
+// Direct invocation requires env vars set in the shell.
 import { eq } from "drizzle-orm";
 import { db } from "../src/db";
 import { user } from "../src/db/schema";

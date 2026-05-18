@@ -259,6 +259,19 @@ Long-term fix: use a separate `cs_capstone_test` database with its own `DATABASE
 
 ## Vitest test infrastructure
 
+### Scripts: dotenv inside the script does NOT work; use `tsx --env-file`
+
+ESM imports hoist above all statements. Writing `import { config } from "dotenv"; config({ path: ".env.local" }); import { db } from "..."` looks correct but is wrong: the `db` import runs at module-load time BEFORE the `config()` call ever fires, so `DATABASE_URL` is unset when `src/db/index.ts` evaluates and the script crashes.
+
+Pattern that works: pass `--env-file=.env.local` to `tsx` at the command line.
+
+```json
+"db:seed:dev": "tsx --env-file=.env.local scripts/seed-dev.ts",
+"db:seed:admin": "tsx --env-file=.env.local scripts/seed-admin.ts"
+```
+
+The seed scripts themselves should not import dotenv. A comment at the top of each script explains the invocation pattern.
+
 ### Integration tests need DATABASE_URL at config-load time
 
 `src/db/index.ts` reads `DATABASE_URL` at module-import time and throws if missing. Vitest setup files (`setupFiles`) run AFTER the test files start importing. So loading dotenv from `setup.integration.ts` is too late. Load it from `vitest.integration.config.ts` itself:
