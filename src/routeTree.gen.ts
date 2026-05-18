@@ -26,7 +26,9 @@ import { Route as AuthedProjectsNewRouteImport } from './routes/_authed/projects
 import { Route as AuthedMyProjectsRouteImport } from './routes/_authed/my/projects'
 import { Route as AuthedMyBookmarksRouteImport } from './routes/_authed/my/bookmarks'
 import { Route as AuthedAdminProjectsIndexRouteImport } from './routes/_authed/admin/projects/index'
+import { Route as AuthedAdminCategoriesIndexRouteImport } from './routes/_authed/admin/categories/index'
 import { Route as AuthedProjectsProjectIdEditRouteImport } from './routes/_authed/projects/$projectId/edit'
+import { Route as AuthedAdminCategoriesCategoryIdRouteImport } from './routes/_authed/admin/categories/$categoryId'
 
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
@@ -113,11 +115,23 @@ const AuthedAdminProjectsIndexRoute =
     path: '/projects/',
     getParentRoute: () => AuthedAdminRoute,
   } as any)
+const AuthedAdminCategoriesIndexRoute =
+  AuthedAdminCategoriesIndexRouteImport.update({
+    id: '/categories/',
+    path: '/categories/',
+    getParentRoute: () => AuthedAdminRoute,
+  } as any)
 const AuthedProjectsProjectIdEditRoute =
   AuthedProjectsProjectIdEditRouteImport.update({
     id: '/projects/$projectId/edit',
     path: '/projects/$projectId/edit',
     getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAdminCategoriesCategoryIdRoute =
+  AuthedAdminCategoriesCategoryIdRouteImport.update({
+    id: '/categories/$categoryId',
+    path: '/categories/$categoryId',
+    getParentRoute: () => AuthedAdminRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -136,7 +150,9 @@ export interface FileRoutesByFullPath {
   '/projects/new': typeof AuthedProjectsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin/': typeof AuthedAdminIndexRoute
+  '/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
   '/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
+  '/admin/categories/': typeof AuthedAdminCategoriesIndexRoute
   '/admin/projects/': typeof AuthedAdminProjectsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -154,7 +170,9 @@ export interface FileRoutesByTo {
   '/projects/new': typeof AuthedProjectsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin': typeof AuthedAdminIndexRoute
+  '/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
   '/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
+  '/admin/categories': typeof AuthedAdminCategoriesIndexRoute
   '/admin/projects': typeof AuthedAdminProjectsIndexRoute
 }
 export interface FileRoutesById {
@@ -175,7 +193,9 @@ export interface FileRoutesById {
   '/_authed/projects/new': typeof AuthedProjectsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_authed/admin/': typeof AuthedAdminIndexRoute
+  '/_authed/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
   '/_authed/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
+  '/_authed/admin/categories/': typeof AuthedAdminCategoriesIndexRoute
   '/_authed/admin/projects/': typeof AuthedAdminProjectsIndexRoute
 }
 export interface FileRouteTypes {
@@ -196,7 +216,9 @@ export interface FileRouteTypes {
     | '/projects/new'
     | '/api/auth/$'
     | '/admin/'
+    | '/admin/categories/$categoryId'
     | '/projects/$projectId/edit'
+    | '/admin/categories/'
     | '/admin/projects/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -214,7 +236,9 @@ export interface FileRouteTypes {
     | '/projects/new'
     | '/api/auth/$'
     | '/admin'
+    | '/admin/categories/$categoryId'
     | '/projects/$projectId/edit'
+    | '/admin/categories'
     | '/admin/projects'
   id:
     | '__root__'
@@ -234,7 +258,9 @@ export interface FileRouteTypes {
     | '/_authed/projects/new'
     | '/api/auth/$'
     | '/_authed/admin/'
+    | '/_authed/admin/categories/$categoryId'
     | '/_authed/projects/$projectId/edit'
+    | '/_authed/admin/categories/'
     | '/_authed/admin/projects/'
   fileRoutesById: FileRoutesById
 }
@@ -372,6 +398,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminProjectsIndexRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
+    '/_authed/admin/categories/': {
+      id: '/_authed/admin/categories/'
+      path: '/categories'
+      fullPath: '/admin/categories/'
+      preLoaderRoute: typeof AuthedAdminCategoriesIndexRouteImport
+      parentRoute: typeof AuthedAdminRoute
+    }
     '/_authed/projects/$projectId/edit': {
       id: '/_authed/projects/$projectId/edit'
       path: '/projects/$projectId/edit'
@@ -379,16 +412,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProjectsProjectIdEditRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/categories/$categoryId': {
+      id: '/_authed/admin/categories/$categoryId'
+      path: '/categories/$categoryId'
+      fullPath: '/admin/categories/$categoryId'
+      preLoaderRoute: typeof AuthedAdminCategoriesCategoryIdRouteImport
+      parentRoute: typeof AuthedAdminRoute
+    }
   }
 }
 
 interface AuthedAdminRouteChildren {
   AuthedAdminIndexRoute: typeof AuthedAdminIndexRoute
+  AuthedAdminCategoriesCategoryIdRoute: typeof AuthedAdminCategoriesCategoryIdRoute
+  AuthedAdminCategoriesIndexRoute: typeof AuthedAdminCategoriesIndexRoute
   AuthedAdminProjectsIndexRoute: typeof AuthedAdminProjectsIndexRoute
 }
 
 const AuthedAdminRouteChildren: AuthedAdminRouteChildren = {
   AuthedAdminIndexRoute: AuthedAdminIndexRoute,
+  AuthedAdminCategoriesCategoryIdRoute: AuthedAdminCategoriesCategoryIdRoute,
+  AuthedAdminCategoriesIndexRoute: AuthedAdminCategoriesIndexRoute,
   AuthedAdminProjectsIndexRoute: AuthedAdminProjectsIndexRoute,
 }
 
