@@ -27,7 +27,11 @@ function AdminHome() {
             Programs
           </Link>
         </li>
-        <li className="text-neutral-400">Users (coming in Spec 4)</li>
+        <li>
+          <Link to="/admin/users" className="text-blue-700 hover:underline">
+            Users
+          </Link>
+        </li>
       </ul>
     </div>
   );
