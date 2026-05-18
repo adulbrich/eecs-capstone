@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db } from "#/db";
 import {
   projectComments,
@@ -39,25 +39,6 @@ async function getViewer(): Promise<Viewer> {
   return session?.user
     ? { id: session.user.id, role: session.user.role ?? null }
     : null;
-}
-
-export async function listPublishedProjectsImpl(data: {
-  page: number;
-  pageSize: number;
-}) {
-  const offset = (data.page - 1) * data.pageSize;
-  const rows = await db
-    .select()
-    .from(projects)
-    .where(and(eq(projects.status, "published"), isNull(projects.deletedAt)))
-    .orderBy(desc(projects.publishedAt))
-    .limit(data.pageSize)
-    .offset(offset);
-  const [{ count }] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(projects)
-    .where(and(eq(projects.status, "published"), isNull(projects.deletedAt)));
-  return { rows, total: count, page: data.page, pageSize: data.pageSize };
 }
 
 export async function listMyProjectsImpl(data: { status: StatusFilter }) {

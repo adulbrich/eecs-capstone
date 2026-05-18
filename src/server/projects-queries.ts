@@ -11,11 +11,6 @@ const STATUS_FILTER_VALUES = [
   "archived",
 ] as const;
 
-const paginationSchema = z.object({
-  page: z.number().int().min(1).default(1),
-  pageSize: z.number().int().min(1).max(100).default(20),
-});
-
 const myProjectsSchema = z.object({
   status: z.enum(STATUS_FILTER_VALUES).default("all"),
 });
@@ -26,15 +21,6 @@ const adminListSchema = z.object({
 });
 
 const projectIdSchema = z.object({ id: z.string().uuid() });
-
-export const listPublishedProjects = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => paginationSchema.parse(data ?? {}))
-  .handler(async ({ data }) => {
-    const { listPublishedProjectsImpl } = await import(
-      "./_internal/projects-queries"
-    );
-    return listPublishedProjectsImpl(data);
-  });
 
 export const listMyProjects = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => myProjectsSchema.parse(data ?? {}))

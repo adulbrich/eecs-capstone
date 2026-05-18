@@ -13,7 +13,7 @@ type Props = {
 };
 
 export function ProjectsFilterBar({ q, categories, program }: Props) {
-  const navigate = useNavigate();
+  const navigate = useNavigate({ from: "/projects/" });
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [allPrograms, setAllPrograms] = useState<Program[]>([]);
   const [queryDraft, setQueryDraft] = useState(q);
