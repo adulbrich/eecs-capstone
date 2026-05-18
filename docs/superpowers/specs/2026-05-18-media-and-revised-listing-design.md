@@ -63,7 +63,8 @@ Sharp is server-only and never reaches the browser. The client uses the built-in
 ### 4.3 Existing files changed
 
 - `src/components/project-card.tsx`: render the image (when present) at top, 16:9, with a muted gradient fallback. Use `getPublicUrl(project.imageUrl)`.
-- `src/components/project-form.tsx`: replace the `imageUrl` text Field with `<ProjectImageUploader projectId={...} currentKey={values.imageUrl} ... />`. New project flow: image upload is disabled until the project is created (the uploader needs a projectId). After the form's onSubmit creates the draft, the page navigates to the detail; user uploads from there if desired. **OR** we upload to a temporary key first; this adds complexity. Recommendation: disable image upload on `/projects/new` with a hint "Save first, then add an image."
+- `src/components/project-form.tsx`: replace the `imageUrl` text Field with `<ProjectImageUploader projectId={projectId} currentKey={values.imageUrl} onUploaded={(key) => form.setFieldValue("imageUrl", key)} />`. The form takes a `projectId` prop; the new-project route generates one with `crypto.randomUUID()` and passes it; the edit route passes the row's existing id. The upload widget needs no special "save first" hint because the project id exists from the moment the form mounts. See Section 6.5.
+- `src/server/projects.ts`: extend `projectInputSchema` to accept an optional `id` field (`z.string().uuid().optional()`); the impl uses it when present, otherwise falls back to `defaultRandom()` via Drizzle. `updateProjectSchema` already has `id`; no change there. The server validates the id is a v4 UUID and that no row already exists with that id (race-condition guard).
 - `src/routes/_authed/profile.tsx`: mount `<AvatarUploader currentKey={user.image} ... />` near the top, between the heading and the form.
 - `src/routes/projects/index.tsx`: add `view: z.enum(["card","row"]).default("card")` to the search schema. Render `<ProjectListItem mode={view} ... />` per row.
 - `src/routes/projects/$projectId.tsx`: render the image (when present) using `getPublicUrl`.
@@ -380,7 +381,7 @@ Filter changes still reset `page` to 1; toggle changes leave page alone (differe
 | `/projects` | Add `view` to search schema; render via `<ProjectListItem mode={view}>`; mount `<ViewToggle>` in filter bar. |
 | `/projects/$projectId` | Render `getPublicUrl(project.imageUrl)` as a 16:9 hero image when present. |
 | `/projects/$projectId/edit` | Replace `<ProjectImageUploader projectId={...} />` (the form's existing imageUrl key is preloaded). |
-| `/projects/new` | Image upload disabled with a "Save first, then add an image" hint. |
+| `/projects/new` | Generates `projectId = crypto.randomUUID()` on mount, passes it to both `<ProjectImageUploader>` and (on submit) to `createProject({ data: { id: projectId, ... } })`. Image upload works immediately; user can upload before filling any other field. |
 | `/profile` | Mount `<AvatarUploader currentKey={user.image} ...>` near the top. |
 
 ## 10. Testing
@@ -403,7 +404,7 @@ No new browser/E2E tests. Manual smoke at Section 13.
 5. **Legacy text URLs.** Old rows holding full URLs (GitHub OAuth, DiceBear) keep working via the `startsWith("http")` passthrough in `getPublicUrl`. The column mixes keys and URLs forever; either is renderable. No data migration. Accept the small cognitive cost.
 6. **Orphan keys on update.** The impl best-effort-deletes the previous key after a successful new upload. If the delete fails (bucket eventual consistency, network hiccup), the orphan stays. Acceptable; rare; can be cleaned by a one-shot script later.
 7. **CORS on RustFS.** Direct browser GETs to `http://localhost:9000/cs-capstone/foo.webp` need the bucket to allow CORS from `http://localhost:3000`. RustFS defaults to open access in dev; documented in README + QUIRKS. AWS S3 prod requires an explicit `cors` config.
-8. **`new project` upload UX.** The uploader needs a `projectId` for the storage key. On `/projects/new` the project doesn't exist until save. We disable upload there with a hint. Alternative considered: upload to a temporary key first, rename on save. Rejected as too much complexity for the gain.
+8. **Optimistic projectId orphans.** `/projects/new` generates a client-side UUID and passes it to both the image upload and the `createProject` call. If the user uploads an image and then abandons the form (closes the tab, navigates away), the blob in the bucket has no owning row. This is an accepted trade-off for the much better UX of uploading immediately. Two protections: (a) `createProject` validates the id is a v4 UUID and refuses if a row already exists with that id; (b) a future one-shot script can sweep `projects/<id>/` keys whose `<id>` has no matching `projects.id` row. Not in scope for this spec.
 9. **`VITE_*` env var split.** Client and server use different sets (`S3_*` server, `VITE_STORAGE_PUBLIC_BASE` client). Vite only exposes `VITE_`-prefixed vars to the browser. Documented in `.env.example`.
 
 ## 12. Open questions
@@ -414,11 +415,13 @@ None at design time. User confirmed: client-side crop + canvas resize (no big cl
 
 1. **Bucket init.** `npm run storage:init` once. RustFS container UI at <http://localhost:9001> shows the `cs-capstone` bucket.
 2. **Avatar upload.** Sign in as `user@example.com`. Visit `/profile`. Avatar widget shows DiceBear identicon (current state). Click "Upload"; pick a large image; crop 1:1; confirm. The header avatar updates within a refresh. Network panel: the uploaded blob is well under 500KB.
-3. **Project image upload.** As admin, create a draft project (no upload yet). Save. Open `/projects/$id/edit`. Upload an image, crop 16:9. Save. The detail page shows the hero image. `/admin/projects` row still works.
-4. **Card vs row.** Visit `/projects` (signed out). See card grid with images. Click the row icon. See the row list with thumbnails. URL shows `?view=row`. Refresh, state persists.
-5. **Storage key vs URL.** In `db:studio`, change a `projects.imageUrl` to `https://placekitten.com/600/400`. Refresh the detail page. The kitten image renders. Legacy passthrough works.
-6. **Permission gate.** As a non-admin proposer, try to upload an image on another user's project (via devtools fetch). Server returns Forbidden.
-7. **Type / size validation.** Try uploading a `.pdf` file. The picker filters most, but if you bypass via devtools, the server rejects with "Unsupported image type". Try a 50MB image; client resize brings it under 1MB before upload, so the server's 10MB pre-resize limit is rarely hit.
+3. **Project image upload on new.** As admin, visit `/projects/new`. Without typing anything else, upload an image, crop 16:9, confirm. Network panel shows the upload completing to `projects/<uuid>/<uuid>.webp`. Fill in Title + Description. Save. Land on `/projects/<that-same-uuid>` with the hero image visible. The project row id matches the storage path uuid.
+4. **Project image replace on edit.** Open the same project's `/projects/$id/edit`. Upload a different image. Save. Detail page shows the new image. The old key in the bucket is best-effort-deleted (verify via RustFS console).
+5. **Card vs row.** Visit `/projects` (signed out). See card grid with images. Click the row icon. See the row list with thumbnails. URL shows `?view=row`. Refresh, state persists.
+6. **Storage key vs URL.** In `db:studio`, change a `projects.imageUrl` to `https://placekitten.com/600/400`. Refresh the detail page. The kitten image renders. Legacy passthrough works.
+7. **Permission gate.** As a non-admin proposer, try to upload an image on another user's project (via devtools fetch). Server returns Forbidden.
+8. **Type / size validation.** Try uploading a `.pdf` file. The picker filters most, but if you bypass via devtools, the server rejects with "Unsupported image type". Try a 50MB image; client resize brings it under 1MB before upload, so the server's 10MB pre-resize limit is rarely hit.
+9. **Abandoned-upload orphan.** As admin, visit `/projects/new`. Upload an image. Close the tab without saving. The blob persists in the bucket (RustFS console shows it under `projects/<uuid>/`); no row in `projects` references it. Acceptable per Risk #8.
 
 ## 14. Approval
 
