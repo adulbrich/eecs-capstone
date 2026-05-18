@@ -14,9 +14,20 @@ function AdminHome() {
             Projects
           </Link>
         </li>
-        <li className="text-neutral-400">Programs (coming in Spec 3)</li>
-        <li className="text-neutral-400">Categories (coming in Spec 3)</li>
-        <li className="text-neutral-400">Users (coming in Spec 3)</li>
+        <li>
+          <Link
+            to="/admin/categories"
+            className="text-blue-700 hover:underline"
+          >
+            Categories
+          </Link>
+        </li>
+        <li>
+          <Link to="/admin/programs" className="text-blue-700 hover:underline">
+            Programs
+          </Link>
+        </li>
+        <li className="text-neutral-400">Users (coming in Spec 4)</li>
       </ul>
     </div>
   );

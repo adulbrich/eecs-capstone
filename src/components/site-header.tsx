@@ -25,6 +25,9 @@ export function SiteHeader() {
               <Link to="/my/projects" className="hover:underline">
                 My projects
               </Link>
+              <Link to="/my/bookmarks" className="hover:underline">
+                Bookmarks
+              </Link>
               <Link to="/projects/new" className="hover:underline">
                 New project
               </Link>
