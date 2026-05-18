@@ -12,7 +12,7 @@ vi.mock("@tanstack/react-start/server", () => ({
 }));
 
 import { auth } from "#/lib/auth";
-import { requireRole, requireUser } from "../auth-guards.server";
+import { requireRole, requireUser } from "../_internal/auth-guards";
 
 describe("requireUser", () => {
   it("returns the user when a session exists", async () => {

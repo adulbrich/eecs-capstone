@@ -6,7 +6,7 @@ import {
   projectStatusHistory,
   projects,
 } from "#/db/schema";
-import { readSession } from "#/lib/auth-guards.server";
+import { readSession } from "#/lib/_internal/auth-guards";
 import {
   canSeeProject,
   filterCommentsForViewer,
@@ -111,6 +111,7 @@ export async function getProjectImpl(data: { id: string }) {
       history: [],
       canEdit: false,
       viewerIsStaff: false,
+      viewerIsOwner: false,
     };
   }
   if (!canSeeProject(project, viewer)) {
@@ -119,6 +120,7 @@ export async function getProjectImpl(data: { id: string }) {
       history: [],
       canEdit: false,
       viewerIsStaff: false,
+      viewerIsOwner: false,
     };
   }
 
@@ -137,10 +139,11 @@ export async function getProjectImpl(data: { id: string }) {
     .orderBy(asc(projectStatusHistory.createdAt));
 
   const viewerIsStaff = isStaff(viewer);
+  const viewerIsOwner = !!viewer && project.proposerId === viewer.id;
   const canEdit =
     !!viewer &&
     !project.deletedAt &&
-    (viewerIsStaff || project.proposerId === viewer.id) &&
+    (viewerIsStaff || viewerIsOwner) &&
     project.status !== "archived";
 
   return {
@@ -148,6 +151,7 @@ export async function getProjectImpl(data: { id: string }) {
     history,
     canEdit,
     viewerIsStaff,
+    viewerIsOwner,
   };
 }
 

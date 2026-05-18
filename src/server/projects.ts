@@ -42,7 +42,7 @@ const idOnlySchema = z.object({ id: z.string().uuid() });
 export const createProject = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => projectInputSchema.parse(data))
   .handler(async ({ data }) => {
-    const { requireUser } = await import("#/lib/auth-guards.server");
+    const { requireUser } = await import("#/lib/_internal/auth-guards");
     const { createProjectAs } = await import("./_internal/projects");
     const viewer = await requireUser();
     return createProjectAs(viewer, data);
@@ -51,7 +51,7 @@ export const createProject = createServerFn({ method: "POST" })
 export const updateProject = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => updateProjectSchema.parse(data))
   .handler(async ({ data }) => {
-    const { requireUser } = await import("#/lib/auth-guards.server");
+    const { requireUser } = await import("#/lib/_internal/auth-guards");
     const { updateProjectAs } = await import("./_internal/projects");
     const viewer = await requireUser();
     return updateProjectAs(viewer, data);
@@ -61,7 +61,7 @@ function makeTransition(target: Status) {
   return createServerFn({ method: "POST" })
     .inputValidator((data: unknown) => transitionInputSchema.parse(data))
     .handler(async ({ data }) => {
-      const { requireUser } = await import("#/lib/auth-guards.server");
+      const { requireUser } = await import("#/lib/_internal/auth-guards");
       const { performTransitionAs } = await import("./_internal/projects");
       const viewer = await requireUser();
       return performTransitionAs(viewer, data.id, target, data.comment);
@@ -79,7 +79,7 @@ export const restoreArchived = makeTransition("published");
 export const softDeleteProject = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => idOnlySchema.parse(data))
   .handler(async ({ data }) => {
-    const { requireUser } = await import("#/lib/auth-guards.server");
+    const { requireUser } = await import("#/lib/_internal/auth-guards");
     const { softDeleteProjectAs } = await import("./_internal/projects");
     const viewer = await requireUser();
     return softDeleteProjectAs(viewer, data.id);
@@ -88,7 +88,7 @@ export const softDeleteProject = createServerFn({ method: "POST" })
 export const restoreProject = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => idOnlySchema.parse(data))
   .handler(async ({ data }) => {
-    const { requireUser } = await import("#/lib/auth-guards.server");
+    const { requireUser } = await import("#/lib/_internal/auth-guards");
     const { restoreProjectAs } = await import("./_internal/projects");
     const viewer = await requireUser();
     return restoreProjectAs(viewer, data.id);
@@ -97,7 +97,7 @@ export const restoreProject = createServerFn({ method: "POST" })
 export const hardDeleteProject = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => idOnlySchema.parse(data))
   .handler(async ({ data }) => {
-    const { requireUser } = await import("#/lib/auth-guards.server");
+    const { requireUser } = await import("#/lib/_internal/auth-guards");
     const { hardDeleteProjectAs } = await import("./_internal/projects");
     const viewer = await requireUser();
     return hardDeleteProjectAs(viewer, data.id);

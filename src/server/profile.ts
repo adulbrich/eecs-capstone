@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db";
 import { user } from "#/db/schema";
-import { requireUser } from "#/lib/auth-guards.server";
+import { requireUser } from "#/lib/_internal/auth-guards";
 
 const profileSchema = z.object({
   name: z.string().min(1).max(120),

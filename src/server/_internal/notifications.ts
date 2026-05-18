@@ -1,7 +1,7 @@
 import { and, count, desc, eq } from "drizzle-orm";
 import { db } from "#/db";
 import { notifications } from "#/db/schema";
-import { requireUser } from "#/lib/auth-guards.server";
+import { requireUser } from "#/lib/_internal/auth-guards";
 
 export async function listMyNotificationsImpl() {
   const viewer = await requireUser();

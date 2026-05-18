@@ -13,7 +13,7 @@ export type AddCommentInput = z.infer<typeof addCommentSchema>;
 export const addComment = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => addCommentSchema.parse(data))
   .handler(async ({ data }) => {
-    const { requireUser } = await import("#/lib/auth-guards.server");
+    const { requireUser } = await import("#/lib/_internal/auth-guards");
     const { addCommentAs } = await import("./_internal/comments");
     const viewer = await requireUser();
     return addCommentAs(viewer, data);
