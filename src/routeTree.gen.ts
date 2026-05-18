@@ -26,8 +26,10 @@ import { Route as AuthedProjectsNewRouteImport } from './routes/_authed/projects
 import { Route as AuthedMyProjectsRouteImport } from './routes/_authed/my/projects'
 import { Route as AuthedMyBookmarksRouteImport } from './routes/_authed/my/bookmarks'
 import { Route as AuthedAdminProjectsIndexRouteImport } from './routes/_authed/admin/projects/index'
+import { Route as AuthedAdminProgramsIndexRouteImport } from './routes/_authed/admin/programs/index'
 import { Route as AuthedAdminCategoriesIndexRouteImport } from './routes/_authed/admin/categories/index'
 import { Route as AuthedProjectsProjectIdEditRouteImport } from './routes/_authed/projects/$projectId/edit'
+import { Route as AuthedAdminProgramsProgramIdRouteImport } from './routes/_authed/admin/programs/$programId'
 import { Route as AuthedAdminCategoriesCategoryIdRouteImport } from './routes/_authed/admin/categories/$categoryId'
 
 const AuthedRoute = AuthedRouteImport.update({
@@ -115,6 +117,12 @@ const AuthedAdminProjectsIndexRoute =
     path: '/projects/',
     getParentRoute: () => AuthedAdminRoute,
   } as any)
+const AuthedAdminProgramsIndexRoute =
+  AuthedAdminProgramsIndexRouteImport.update({
+    id: '/programs/',
+    path: '/programs/',
+    getParentRoute: () => AuthedAdminRoute,
+  } as any)
 const AuthedAdminCategoriesIndexRoute =
   AuthedAdminCategoriesIndexRouteImport.update({
     id: '/categories/',
@@ -126,6 +134,12 @@ const AuthedProjectsProjectIdEditRoute =
     id: '/projects/$projectId/edit',
     path: '/projects/$projectId/edit',
     getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAdminProgramsProgramIdRoute =
+  AuthedAdminProgramsProgramIdRouteImport.update({
+    id: '/programs/$programId',
+    path: '/programs/$programId',
+    getParentRoute: () => AuthedAdminRoute,
   } as any)
 const AuthedAdminCategoriesCategoryIdRoute =
   AuthedAdminCategoriesCategoryIdRouteImport.update({
@@ -151,8 +165,10 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin/': typeof AuthedAdminIndexRoute
   '/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
+  '/admin/programs/$programId': typeof AuthedAdminProgramsProgramIdRoute
   '/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
   '/admin/categories/': typeof AuthedAdminCategoriesIndexRoute
+  '/admin/programs/': typeof AuthedAdminProgramsIndexRoute
   '/admin/projects/': typeof AuthedAdminProjectsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -171,8 +187,10 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin': typeof AuthedAdminIndexRoute
   '/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
+  '/admin/programs/$programId': typeof AuthedAdminProgramsProgramIdRoute
   '/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
   '/admin/categories': typeof AuthedAdminCategoriesIndexRoute
+  '/admin/programs': typeof AuthedAdminProgramsIndexRoute
   '/admin/projects': typeof AuthedAdminProjectsIndexRoute
 }
 export interface FileRoutesById {
@@ -194,8 +212,10 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_authed/admin/': typeof AuthedAdminIndexRoute
   '/_authed/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
+  '/_authed/admin/programs/$programId': typeof AuthedAdminProgramsProgramIdRoute
   '/_authed/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
   '/_authed/admin/categories/': typeof AuthedAdminCategoriesIndexRoute
+  '/_authed/admin/programs/': typeof AuthedAdminProgramsIndexRoute
   '/_authed/admin/projects/': typeof AuthedAdminProjectsIndexRoute
 }
 export interface FileRouteTypes {
@@ -217,8 +237,10 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/admin/'
     | '/admin/categories/$categoryId'
+    | '/admin/programs/$programId'
     | '/projects/$projectId/edit'
     | '/admin/categories/'
+    | '/admin/programs/'
     | '/admin/projects/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -237,8 +259,10 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/admin'
     | '/admin/categories/$categoryId'
+    | '/admin/programs/$programId'
     | '/projects/$projectId/edit'
     | '/admin/categories'
+    | '/admin/programs'
     | '/admin/projects'
   id:
     | '__root__'
@@ -259,8 +283,10 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/_authed/admin/'
     | '/_authed/admin/categories/$categoryId'
+    | '/_authed/admin/programs/$programId'
     | '/_authed/projects/$projectId/edit'
     | '/_authed/admin/categories/'
+    | '/_authed/admin/programs/'
     | '/_authed/admin/projects/'
   fileRoutesById: FileRoutesById
 }
@@ -398,6 +424,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminProjectsIndexRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
+    '/_authed/admin/programs/': {
+      id: '/_authed/admin/programs/'
+      path: '/programs'
+      fullPath: '/admin/programs/'
+      preLoaderRoute: typeof AuthedAdminProgramsIndexRouteImport
+      parentRoute: typeof AuthedAdminRoute
+    }
     '/_authed/admin/categories/': {
       id: '/_authed/admin/categories/'
       path: '/categories'
@@ -412,6 +445,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProjectsProjectIdEditRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/programs/$programId': {
+      id: '/_authed/admin/programs/$programId'
+      path: '/programs/$programId'
+      fullPath: '/admin/programs/$programId'
+      preLoaderRoute: typeof AuthedAdminProgramsProgramIdRouteImport
+      parentRoute: typeof AuthedAdminRoute
+    }
     '/_authed/admin/categories/$categoryId': {
       id: '/_authed/admin/categories/$categoryId'
       path: '/categories/$categoryId'
@@ -425,14 +465,18 @@ declare module '@tanstack/react-router' {
 interface AuthedAdminRouteChildren {
   AuthedAdminIndexRoute: typeof AuthedAdminIndexRoute
   AuthedAdminCategoriesCategoryIdRoute: typeof AuthedAdminCategoriesCategoryIdRoute
+  AuthedAdminProgramsProgramIdRoute: typeof AuthedAdminProgramsProgramIdRoute
   AuthedAdminCategoriesIndexRoute: typeof AuthedAdminCategoriesIndexRoute
+  AuthedAdminProgramsIndexRoute: typeof AuthedAdminProgramsIndexRoute
   AuthedAdminProjectsIndexRoute: typeof AuthedAdminProjectsIndexRoute
 }
 
 const AuthedAdminRouteChildren: AuthedAdminRouteChildren = {
   AuthedAdminIndexRoute: AuthedAdminIndexRoute,
   AuthedAdminCategoriesCategoryIdRoute: AuthedAdminCategoriesCategoryIdRoute,
+  AuthedAdminProgramsProgramIdRoute: AuthedAdminProgramsProgramIdRoute,
   AuthedAdminCategoriesIndexRoute: AuthedAdminCategoriesIndexRoute,
+  AuthedAdminProgramsIndexRoute: AuthedAdminProgramsIndexRoute,
   AuthedAdminProjectsIndexRoute: AuthedAdminProjectsIndexRoute,
 }
 
