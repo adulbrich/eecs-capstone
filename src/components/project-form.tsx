@@ -4,6 +4,7 @@ import { z } from "zod";
 import { applyServerErrors } from "#/lib/apply-server-errors";
 import { CategoryMultiSelect } from "./category-multi-select";
 import { ProgramSelect } from "./program-select";
+import { ProjectImageUploader } from "./project-image-uploader";
 
 const optionalUrl = z
   .union([z.literal(""), z.string().url("Must be a valid URL").max(500)])
@@ -27,7 +28,7 @@ export const projectFormSchema = z.object({
   url: optionalUrl,
   contactEmail: optionalEmail,
   contactName: z.string().max(200).default(""),
-  imageUrl: optionalUrl,
+  imageUrl: z.union([z.literal(""), z.string().max(500)]).default(""),
   licenseRestrictions: z.string().max(1000).default(""),
   programId: optionalUuid,
   notes: z.string().max(5000).default(""),
@@ -36,6 +37,7 @@ export const projectFormSchema = z.object({
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
 
 type Props = {
+  projectId: string;
   initial?: Partial<ProjectFormValues>;
   initialCategoryIds?: string[];
   showNotes: boolean;
@@ -48,6 +50,7 @@ type Props = {
 };
 
 export function ProjectForm({
+  projectId,
   initial,
   initialCategoryIds,
   showNotes,
@@ -157,12 +160,23 @@ export function ProjectForm({
         label="Contact email"
         placeholder="name@example.com"
       />
-      <Field
-        form={form}
-        name="imageUrl"
-        label="Image URL (upload coming in Spec 4)"
-        placeholder="https://..."
-      />
+      <form.Field name="imageUrl">
+        {(field: AnyForm) => (
+          <div>
+            <p className="block font-medium text-sm">Image</p>
+            <div className="mt-1">
+              <ProjectImageUploader
+                projectId={projectId}
+                currentKey={(field.state.value as string) || null}
+                onUploaded={(key) => field.handleChange(key)}
+              />
+            </div>
+            <p className="mt-1 text-xs text-neutral-500">
+              Cropped to 16:9 and resized to max 1600x900 before upload.
+            </p>
+          </div>
+        )}
+      </form.Field>
       <Field
         form={form}
         name="licenseRestrictions"
