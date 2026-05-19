@@ -1,14 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { getPublicUrl } from "../storage";
 
-beforeAll(() => {
-  vi.stubGlobal("import.meta.env", {
-    VITE_STORAGE_PUBLIC_BASE: "http://localhost:9000/cs-capstone",
-  });
-});
-afterAll(() => {
-  vi.unstubAllGlobals();
-});
+// Note: VITE_STORAGE_PUBLIC_BASE is captured at module load. We assert the
+// fallback path here. End-to-end URL wiring is covered by integration tests
+// where the real env is loaded.
 
 describe("getPublicUrl", () => {
   it("returns null for null/undefined/empty", () => {
@@ -26,9 +21,19 @@ describe("getPublicUrl", () => {
     );
   });
 
-  it("prefixes the base for storage keys", () => {
-    expect(getPublicUrl("projects/abc/img.webp")).toMatch(
-      /\/projects\/abc\/img\.webp$/,
+  it("prefixes the public base and strips leading slashes", () => {
+    // In the test runner, VITE_STORAGE_PUBLIC_BASE is unset, so PUBLIC_BASE
+    // falls back to `/storage`. We assert against that exact value, not a
+    // suffix-only regex, so a future change to either the fallback or the
+    // join logic is caught.
+    expect(getPublicUrl("projects/abc/img.webp")).toBe(
+      "/storage/projects/abc/img.webp",
+    );
+    expect(getPublicUrl("/projects/abc/img.webp")).toBe(
+      "/storage/projects/abc/img.webp",
+    );
+    expect(getPublicUrl("///projects/abc/img.webp")).toBe(
+      "/storage/projects/abc/img.webp",
     );
   });
 });
