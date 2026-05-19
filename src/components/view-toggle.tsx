@@ -1,4 +1,4 @@
-import { Bars3Icon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import { LayoutGrid, List } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 
 type Props = {
@@ -29,7 +29,7 @@ export function ViewToggle({ current }: Props) {
         aria-pressed={current === "card"}
         className={`${base} ${current === "card" ? active : inactive}`}
       >
-        <Squares2X2Icon className="h-4 w-4" />
+        <LayoutGrid className="h-4 w-4" />
       </button>
       <button
         type="button"
@@ -38,7 +38,7 @@ export function ViewToggle({ current }: Props) {
         aria-pressed={current === "row"}
         className={`${base} -ml-px ${current === "row" ? active : inactive}`}
       >
-        <Bars3Icon className="h-4 w-4" />
+        <List className="h-4 w-4" />
       </button>
     </div>
   );

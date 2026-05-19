@@ -1,5 +1,4 @@
-import { BookmarkIcon as BookmarkOutline } from "@heroicons/react/24/outline";
-import { BookmarkIcon as BookmarkSolid } from "@heroicons/react/24/solid";
+import { Bookmark } from "lucide-react";
 import { useEffect, useState } from "react";
 import { authClient } from "#/lib/auth-client";
 import { addBookmark, isBookmarked, removeBookmark } from "#/server/bookmarks";
@@ -48,9 +47,9 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
       className="inline-flex items-center gap-1 border border-neutral-300 px-2 py-1 text-sm hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
     >
       {bookmarked ? (
-        <BookmarkSolid className="h-4 w-4 text-amber-600" />
+        <Bookmark className="h-4 w-4 fill-current text-amber-600" />
       ) : (
-        <BookmarkOutline className="h-4 w-4" />
+        <Bookmark className="h-4 w-4" />
       )}
       {bookmarked ? "Bookmarked" : "Bookmark"}
     </button>

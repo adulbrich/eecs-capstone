@@ -1,4 +1,4 @@
-import { TrashIcon } from "@heroicons/react/24/outline";
+import { Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import ReactCrop, {
   type Crop,
@@ -180,7 +180,7 @@ export function ImageUploader({
                 disabled={busy}
                 className="inline-flex items-center gap-1 border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50"
               >
-                <TrashIcon className="h-4 w-4" /> Remove
+                <Trash2 className="h-4 w-4" /> Remove
               </button>
             )}
           </div>
