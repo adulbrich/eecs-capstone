@@ -91,7 +91,7 @@ export async function uploadAvatarForCurrentUser(form: FormData) {
   const storage = getObjectStorage();
   await storage.put(key, buffer, contentType);
 
-  const previousImage = viewer.image as string | null | undefined;
+  const previousImage = viewer.image;
   await db
     .update(user)
     .set({ image: key, updatedAt: new Date() })
@@ -112,7 +112,7 @@ export async function uploadAvatarForCurrentUser(form: FormData) {
 
 export async function clearAvatarForCurrentUser() {
   const viewer = await requireUser();
-  const previousImage = viewer.image as string | null | undefined;
+  const previousImage = viewer.image;
   await db
     .update(user)
     .set({ image: null, updatedAt: new Date() })
@@ -125,7 +125,9 @@ export async function clearAvatarForCurrentUser() {
     const { getObjectStorage } = await import("#/lib/_internal/storage");
     getObjectStorage()
       .delete(previousImage)
-      .catch((e) => console.warn("clear avatar", e));
+      .catch((e) => {
+        console.warn(`Failed to delete previous avatar ${previousImage}:`, e);
+      });
   }
   return { ok: true as const };
 }
