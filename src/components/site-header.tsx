@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { authClient } from "#/lib/auth-client";
+import { getPublicUrl } from "#/lib/storage";
 import { NotificationBell } from "./notification-bell";
 
 export function SiteHeader() {
@@ -83,13 +84,14 @@ function SignedIn({
   email: string;
   image: string | null | undefined;
 }) {
+  const resolvedImage = getPublicUrl(image);
   return (
     <>
       <NotificationBell />
       <Link to="/profile" className="flex items-center gap-2 hover:underline">
-        {image ? (
+        {resolvedImage ? (
           <img
-            src={image}
+            src={resolvedImage}
             alt=""
             className="h-7 w-7 rounded-full"
             referrerPolicy="no-referrer"

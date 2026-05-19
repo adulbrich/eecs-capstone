@@ -1,5 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import { AvatarUploader } from "#/components/avatar-uploader";
 import { authClient } from "#/lib/auth-client";
 import { updateProfile } from "#/server/profile";
 
@@ -11,6 +12,7 @@ type ProfileUser = {
   id: string;
   email: string;
   name: string | null;
+  image?: string | null;
   role: string | null | undefined;
   affiliation?: string | null;
   linkedin?: string | null;
@@ -70,6 +72,16 @@ function Profile() {
       <p className="mt-2 text-sm text-neutral-600">
         {user.email} ({user.role ?? "user"})
       </p>
+
+      <div className="mt-6">
+        <h2 className="text-sm font-medium">Avatar</h2>
+        <div className="mt-2">
+          <AvatarUploader
+            currentKey={(user.image as string | null) ?? null}
+            onChanged={() => router.invalidate()}
+          />
+        </div>
+      </div>
 
       <form onSubmit={onSaveProfile} className="mt-6 space-y-3">
         <input
