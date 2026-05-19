@@ -5,6 +5,8 @@ import { projects, user } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { canEditProject } from "#/lib/project-visibility";
 
+type AuthUser = { id: string; role?: string | null | undefined };
+
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -26,8 +28,10 @@ function assertImageFile(file: unknown): asserts file is File {
   }
 }
 
-export async function uploadProjectImageForCurrentUser(form: FormData) {
-  const viewer = await requireUser();
+export async function uploadProjectImageAs(
+  viewer: AuthUser,
+  form: FormData,
+): Promise<{ key: string }> {
   const projectId = String(form.get("projectId") ?? "");
   if (!projectId) throw new Error("Missing projectId");
   const file = form.get("file");
@@ -72,6 +76,11 @@ export async function uploadProjectImageForCurrentUser(form: FormData) {
   }
 
   return { key };
+}
+
+export async function uploadProjectImageForCurrentUser(form: FormData) {
+  const viewer = await requireUser();
+  return uploadProjectImageAs(viewer, form);
 }
 
 export async function uploadAvatarForCurrentUser(form: FormData) {

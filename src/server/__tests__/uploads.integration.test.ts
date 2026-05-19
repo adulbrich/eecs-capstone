@@ -1,16 +1,24 @@
-import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { createProjectAs } from "#/server/_internal/projects";
-import { uploadProjectImageForCurrentUser } from "#/server/_internal/uploads";
+import { uploadProjectImageAs } from "#/server/_internal/uploads";
 
 const fixture = readFileSync(
-  path.join(__dirname, "..", "..", "lib", "__tests__", "fixtures", "sample.jpg"),
+  path.join(
+    __dirname,
+    "..",
+    "..",
+    "lib",
+    "__tests__",
+    "fixtures",
+    "sample.jpg",
+  ),
 );
 
 function s3Client() {
@@ -45,7 +53,7 @@ function fakeFile(name: string, bytes: Buffer, type = "image/jpeg") {
   throw new Error("File constructor not available");
 }
 
-describe("uploadProjectImageForCurrentUser", () => {
+describe("uploadProjectImageAs", () => {
   it("writes to the bucket and updates the project row", async () => {
     const admin = await makeUser(`u-${Date.now()}@x.com`, "admin");
     const viewer = { id: admin.id, role: admin.role };
@@ -69,7 +77,7 @@ describe("uploadProjectImageForCurrentUser", () => {
     form.append("projectId", projectId);
     form.append("file", fakeFile("sample.jpg", fixture));
 
-    const result = await uploadProjectImageForCurrentUser(form);
+    const result = await uploadProjectImageAs(viewer, form);
     expect(result.key).toMatch(new RegExp(`^projects/${projectId}/.+\\.webp$`));
 
     const client = s3Client();
