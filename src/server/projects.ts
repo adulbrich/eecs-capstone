@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 const projectInputSchema = z.object({
+  id: z.string().uuid().optional(),
   title: z.string().min(1).max(200),
   description: z.string().max(5000).nullable().optional(),
   problemStatement: z.string().max(5000).nullable().optional(),
@@ -17,7 +18,7 @@ const projectInputSchema = z.object({
     .optional()
     .or(z.literal("")),
   contactName: z.string().max(200).nullable().optional(),
-  imageUrl: z.string().url().max(500).nullable().optional().or(z.literal("")),
+  imageUrl: z.string().max(500).nullable().optional().or(z.literal("")),
   licenseRestrictions: z.string().max(1000).nullable().optional(),
   programId: z.string().uuid().nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
