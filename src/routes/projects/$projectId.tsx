@@ -7,6 +7,7 @@ import { OwnerProjectActions } from "#/components/owner-project-actions";
 import { StaffProjectPanel } from "#/components/staff-project-panel";
 import { StatusBadge } from "#/components/status-badge";
 import { StatusTimeline } from "#/components/status-timeline";
+import { getPublicUrl } from "#/lib/storage";
 import { listProjectCategories } from "#/server/categories";
 import { getProject, listProjectComments } from "#/server/projects-queries";
 
@@ -93,13 +94,17 @@ function ProjectDetail() {
         </div>
       )}
 
-      {project.imageUrl && (
-        <img
-          src={project.imageUrl as string}
-          alt=""
-          className="mt-4 max-h-72 w-full object-cover"
-        />
-      )}
+      {(() => {
+        const heroUrl = getPublicUrl(project.imageUrl as string | null);
+        if (!heroUrl) return null;
+        return (
+          <img
+            src={heroUrl}
+            alt=""
+            className="mt-4 aspect-[16/9] w-full object-cover"
+          />
+        );
+      })()}
 
       <Section
         label="Description"
