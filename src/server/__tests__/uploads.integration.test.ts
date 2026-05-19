@@ -48,7 +48,7 @@ async function makeUser(email: string, role: "user" | "admin" = "user") {
 
 function fakeFile(name: string, bytes: Buffer, type = "image/jpeg") {
   if (typeof File !== "undefined") {
-    return new File([bytes], name, { type });
+    return new File([new Uint8Array(bytes)], name, { type });
   }
   throw new Error("File constructor not available");
 }
