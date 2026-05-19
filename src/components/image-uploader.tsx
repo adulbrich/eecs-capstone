@@ -7,6 +7,12 @@ import ReactCrop, {
 } from "react-image-crop";
 import { getPublicUrl } from "#/lib/storage";
 
+function errorMessage(err: unknown): string {
+  return err instanceof Error
+    ? err.message
+    : "Upload failed. Please try again.";
+}
+
 type Props = {
   currentKey: string | null;
   aspect?: number;
@@ -85,7 +91,7 @@ export function ImageUploader({
       setSourceUrl(null);
       setCrop(null);
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -104,7 +110,7 @@ export function ImageUploader({
     try {
       await onCleared();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
