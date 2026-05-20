@@ -52,7 +52,7 @@ export function RoleSelect({ userId, initialRole, onChanged }: Props) {
           type="button"
           onClick={() => void onSave()}
           disabled={!dirty || saving}
-          className="bg-black px-3 py-1.5 text-sm text-white disabled:opacity-50"
+          className="bg-brand px-3 py-1.5 text-sm text-white disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save"}
         </button>

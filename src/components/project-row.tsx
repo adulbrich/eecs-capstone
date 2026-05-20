@@ -9,7 +9,11 @@ export function ProjectRow({ project }: { project: ProjectSummary }) {
     <Link
       to="/projects/$projectId"
       params={{ projectId: project.id }}
-      className="flex items-stretch gap-3 border border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+      className="flex items-stretch gap-3 rounded border border-[var(--line)] hover:border-[var(--brand-primary)]"
+      style={{
+        background: "var(--surface-raised)",
+        transition: "border-color 180ms ease",
+      }}
     >
       <ImageOrFallback
         src={src}
@@ -21,12 +25,15 @@ export function ProjectRow({ project }: { project: ProjectSummary }) {
           <StatusBadge status={project.status} />
         </div>
         {project.description && (
-          <p className="mt-1 line-clamp-1 text-sm text-neutral-600">
+          <p
+            className="mt-1 line-clamp-1 text-sm"
+            style={{ color: "var(--text-secondary)" }}
+          >
             {project.description}
           </p>
         )}
         {project.publishedAt && (
-          <p className="mt-1 text-xs text-neutral-500">
+          <p className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
             {new Date(project.publishedAt).toLocaleDateString()}
           </p>
         )}

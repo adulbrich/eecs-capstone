@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { authClient } from "#/lib/auth-client";
 import { getPublicUrl } from "#/lib/storage";
+import { InstitutionLogo } from "./institution-logo";
 import { NotificationBell } from "./notification-bell";
 
 export function SiteHeader() {
@@ -11,31 +12,34 @@ export function SiteHeader() {
   const isStaff = role === "admin" || role === "instructor";
 
   return (
-    <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
+    <header
+      className="border-b border-[var(--line)]"
+      style={{ background: "var(--header-bg)", backdropFilter: "blur(8px)" }}
+    >
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-4">
-        <Link to="/" className="text-sm font-semibold">
-          CS Capstone
+        <Link to="/">
+          <InstitutionLogo />
         </Link>
 
         <nav className="flex flex-1 items-center gap-4 text-sm">
-          <Link to="/projects" className="hover:underline">
+          <Link to="/projects" className="nav-link">
             Projects
           </Link>
           {signedIn && (
             <>
-              <Link to="/my/projects" className="hover:underline">
+              <Link to="/my/projects" className="nav-link">
                 My projects
               </Link>
-              <Link to="/my/bookmarks" className="hover:underline">
+              <Link to="/my/bookmarks" className="nav-link">
                 Bookmarks
               </Link>
-              <Link to="/projects/new" className="hover:underline">
+              <Link to="/projects/new" className="nav-link">
                 New project
               </Link>
             </>
           )}
           {isStaff && (
-            <Link to="/admin" className="hover:underline">
+            <Link to="/admin" className="nav-link">
               Admin
             </Link>
           )}
@@ -43,7 +47,7 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-3 text-sm">
           {isPending ? (
-            <div className="h-8 w-24 animate-pulse bg-neutral-100 dark:bg-neutral-800" />
+            <div className="h-8 w-24 animate-pulse rounded bg-[var(--surface-sunken)]" />
           ) : signedIn ? (
             <SignedIn
               name={session.user.name}
@@ -62,12 +66,12 @@ export function SiteHeader() {
 function SignedOut() {
   return (
     <>
-      <Link to="/sign-in" className="hover:underline">
+      <Link to="/sign-in" className="nav-link text-sm">
         Sign in
       </Link>
       <Link
         to="/sign-up"
-        className="bg-black px-3 py-1.5 text-white hover:bg-neutral-800"
+        className="bg-brand hover:bg-brand-dark rounded px-3 py-1.5 text-sm font-medium text-white"
       >
         Sign up
       </Link>
@@ -97,7 +101,7 @@ function SignedIn({
             referrerPolicy="no-referrer"
           />
         ) : (
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-200 text-xs font-medium dark:bg-neutral-700">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-xs font-medium">
             {(name ?? email).charAt(0).toUpperCase()}
           </div>
         )}
@@ -109,7 +113,7 @@ function SignedIn({
           await authClient.signOut();
           window.location.href = "/sign-in";
         }}
-        className="border border-neutral-300 px-3 py-1.5 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+        className="rounded border border-[var(--line)] px-3 py-1.5 text-sm hover:bg-[var(--surface-sunken)]"
       >
         Sign out
       </button>

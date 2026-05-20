@@ -35,7 +35,7 @@ function MyProjects() {
         <h1 className="text-2xl font-semibold">My projects</h1>
         <Link
           to="/projects/new"
-          className="bg-black px-3 py-1.5 text-sm text-white"
+          className="bg-brand px-3 py-1.5 text-sm text-white"
         >
           New project
         </Link>

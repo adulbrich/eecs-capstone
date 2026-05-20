@@ -94,7 +94,7 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
             onClick={() => void run(b.id)}
             className={
               b.primary
-                ? "bg-black px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                ? "bg-brand px-3 py-1.5 text-sm text-white disabled:opacity-50"
                 : b.destructive
                   ? "border border-red-300 px-3 py-1.5 text-red-700 text-sm hover:bg-red-50 disabled:opacity-50"
                   : "border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 disabled:opacity-50"

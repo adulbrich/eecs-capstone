@@ -104,7 +104,7 @@ function Profile() {
           type="url"
           className="w-full border p-2"
         />
-        <button type="submit" className="w-full bg-black px-4 py-2 text-white">
+        <button type="submit" className="w-full bg-brand px-4 py-2 text-white">
           Save
         </button>
       </form>
@@ -126,7 +126,7 @@ function Profile() {
           minLength={8}
           className="w-full border p-2"
         />
-        <button type="submit" className="w-full bg-black px-4 py-2 text-white">
+        <button type="submit" className="w-full bg-brand px-4 py-2 text-white">
           Change password
         </button>
       </form>

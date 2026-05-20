@@ -119,7 +119,7 @@ function ProgramEdit() {
         <div className="flex gap-2">
           <button
             type="submit"
-            className="bg-black px-3 py-2 text-sm text-white"
+            className="bg-brand px-3 py-2 text-sm text-white"
           >
             Save
           </button>

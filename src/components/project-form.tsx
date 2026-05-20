@@ -239,7 +239,7 @@ export function ProjectForm({
           <button
             type="submit"
             disabled={!canSubmit}
-            className="bg-black px-4 py-2 text-white disabled:opacity-50"
+            className="bg-brand px-4 py-2 text-white disabled:opacity-50"
           >
             {isSubmitting ? "Saving..." : submitLabel}
           </button>

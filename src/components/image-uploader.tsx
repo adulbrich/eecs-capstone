@@ -146,7 +146,7 @@ export function ImageUploader({
               type="button"
               onClick={() => void onConfirmCrop()}
               disabled={busy || !crop}
-              className="bg-black px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              className="bg-brand px-3 py-1.5 text-sm text-white disabled:opacity-50"
             >
               {busy ? "Processing..." : "Use image"}
             </button>

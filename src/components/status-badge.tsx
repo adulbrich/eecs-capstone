@@ -1,17 +1,27 @@
-const COLORS: Record<string, string> = {
-  draft: "bg-neutral-200 text-neutral-800",
-  submitted: "bg-blue-200 text-blue-900",
-  approved: "bg-purple-200 text-purple-900",
-  changes_requested: "bg-amber-200 text-amber-900",
-  published: "bg-green-200 text-green-900",
-  archived: "bg-neutral-300 text-neutral-700",
+const STATUS_STYLES: Record<string, { fg: string; bg: string }> = {
+  draft: { fg: "var(--status-neutral)", bg: "var(--status-neutral-bg)" },
+  submitted: { fg: "var(--status-info)", bg: "var(--status-info-bg)" },
+  approved: { fg: "var(--status-success)", bg: "var(--status-success-bg)" },
+  changes_requested: {
+    fg: "var(--status-warning)",
+    bg: "var(--status-warning-bg)",
+  },
+  published: { fg: "var(--brand-primary)", bg: "var(--brand-primary-tint)" },
+  archived: { fg: "var(--status-neutral)", bg: "var(--status-neutral-bg)" },
+  deleted: { fg: "var(--status-error)", bg: "var(--status-error-bg)" },
+};
+
+const FALLBACK = {
+  fg: "var(--status-neutral)",
+  bg: "var(--status-neutral-bg)",
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const className = COLORS[status] ?? "bg-neutral-200 text-neutral-800";
+  const { fg, bg } = STATUS_STYLES[status] ?? FALLBACK;
   return (
     <span
-      className={`inline-block px-2 py-0.5 text-xs font-medium ${className}`}
+      className="inline-block rounded px-2 py-0.5 text-xs font-medium"
+      style={{ color: fg, backgroundColor: bg }}
     >
       {status.replace(/_/g, " ")}
     </span>

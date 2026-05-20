@@ -113,7 +113,7 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
           type="button"
           onClick={() => void add()}
           disabled={!picked}
-          className="bg-black px-3 py-1.5 text-sm text-white disabled:opacity-50"
+          className="bg-brand px-3 py-1.5 text-sm text-white disabled:opacity-50"
         >
           Add
         </button>

@@ -73,7 +73,7 @@ function ProgramsAdmin() {
         <div className="md:col-span-3">
           <button
             type="submit"
-            className="bg-black px-3 py-2 text-sm text-white"
+            className="bg-brand px-3 py-2 text-sm text-white"
           >
             Create program
           </button>

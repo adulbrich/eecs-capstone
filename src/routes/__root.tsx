@@ -6,8 +6,10 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { BrandProvider } from "../components/brand-provider";
 import { SiteHeader } from "../components/site-header";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
+import { brand } from "../lib/brand";
 import appCss from "../styles.css?url";
 
 interface MyRouterContext {
@@ -25,7 +27,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "TanStack Start Starter",
+        title: `${brand.institutionName} ${brand.programName}`,
       },
     ],
     links: [
@@ -45,21 +47,23 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <SiteHeader />
-        {children}
-        <TanStackDevtools
-          config={{
-            position: "bottom-right",
-          }}
-          plugins={[
-            {
-              name: "Tanstack Router",
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-            TanStackQueryDevtools,
-          ]}
-        />
-        <Scripts />
+        <BrandProvider>
+          <SiteHeader />
+          {children}
+          <TanStackDevtools
+            config={{
+              position: "bottom-right",
+            }}
+            plugins={[
+              {
+                name: "Tanstack Router",
+                render: <TanStackRouterDevtoolsPanel />,
+              },
+              TanStackQueryDevtools,
+            ]}
+          />
+          <Scripts />
+        </BrandProvider>
       </body>
     </html>
   );

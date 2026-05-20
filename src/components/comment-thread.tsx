@@ -172,7 +172,7 @@ function NewCommentForm({
           Internal (staff only)
         </label>
       )}
-      <button type="submit" className="bg-black px-3 py-1.5 text-white">
+      <button type="submit" className="bg-brand px-3 py-1.5 text-white">
         Post comment
       </button>
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -244,7 +244,7 @@ function ReplyForm({
         </label>
       )}
       <div className="flex gap-2">
-        <button type="submit" className="bg-black px-2 py-1 text-xs text-white">
+        <button type="submit" className="bg-brand px-2 py-1 text-xs text-white">
           Post
         </button>
         <button

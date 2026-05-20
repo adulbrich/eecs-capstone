@@ -23,7 +23,11 @@ function ImageOrFallback({
   }
   return (
     <div
-      className={`${className} bg-gradient-to-br from-neutral-200 to-neutral-300 dark:from-neutral-800 dark:to-neutral-900`}
+      className={className}
+      style={{
+        background:
+          "linear-gradient(135deg, var(--surface-sunken), var(--surface-base))",
+      }}
     />
   );
 }
@@ -34,7 +38,11 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
     <Link
       to="/projects/$projectId"
       params={{ projectId: project.id }}
-      className="block overflow-hidden border border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+      className="block overflow-hidden rounded border border-[var(--line)] hover:border-[var(--brand-primary)] hover:shadow-sm"
+      style={{
+        background: "var(--surface-raised)",
+        transition: "border-color 180ms ease, box-shadow 180ms ease",
+      }}
     >
       <ImageOrFallback
         src={src}
@@ -42,16 +50,24 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
       />
       <div className="p-4">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="font-semibold">{project.title}</h3>
+          <h3
+            className="font-semibold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            {project.title}
+          </h3>
           <StatusBadge status={project.status} />
         </div>
         {project.description && (
-          <p className="mt-2 line-clamp-2 text-sm text-neutral-600">
+          <p
+            className="mt-2 line-clamp-2 text-sm"
+            style={{ color: "var(--text-secondary)" }}
+          >
             {project.description}
           </p>
         )}
         {project.publishedAt && (
-          <p className="mt-2 text-xs text-neutral-500">
+          <p className="mt-2 text-xs" style={{ color: "var(--text-tertiary)" }}>
             Published {new Date(project.publishedAt).toLocaleDateString()}
           </p>
         )}

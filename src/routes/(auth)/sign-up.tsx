@@ -62,7 +62,7 @@ function SignUp() {
           className="w-full border p-2"
         />
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button type="submit" className="w-full bg-black px-4 py-2 text-white">
+        <button type="submit" className="w-full bg-brand px-4 py-2 text-white">
           Sign up
         </button>
       </form>
