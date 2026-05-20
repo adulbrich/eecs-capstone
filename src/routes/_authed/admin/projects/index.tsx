@@ -49,7 +49,7 @@ function AdminProjects() {
   const { rows } = Route.useLoaderData();
   const { status, includeSoftDeleted } = Route.useSearch();
   return (
-    <div className="mx-auto max-w-4xl p-8">
+    <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
       <h1 className="text-2xl font-semibold">Admin: projects</h1>
       <div className="mt-4 flex items-end justify-between">
         <div className="flex border-b border-border text-sm">

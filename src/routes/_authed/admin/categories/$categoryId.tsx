@@ -66,7 +66,7 @@ function CategoryEdit() {
   }
 
   return (
-    <div className="mx-auto max-w-md p-8">
+    <div className="mx-auto max-w-md px-4 py-6 md:p-8">
       <h1 className="text-2xl font-semibold">Edit category</h1>
       <form onSubmit={onSave} className="mt-6 space-y-3">
         <div className="space-y-1.5">

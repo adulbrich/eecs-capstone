@@ -50,7 +50,7 @@ function ProgramsAdmin() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl p-8">
+    <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
       <h1 className="text-2xl font-semibold">Admin: programs</h1>
 
       <form onSubmit={onCreate} className="mt-6 grid gap-2 md:grid-cols-3">
@@ -82,8 +82,12 @@ function ProgramsAdmin() {
       <AdminTable columns={["Course ID", "Course name", ""]}>
         {rows.map((p) => (
           <tr key={p.id}>
-            <td className="border border-border p-2">{p.courseId}</td>
-            <td className="border border-border p-2">{p.courseName}</td>
+            <td data-label="Course ID" className="border border-border p-2">
+              {p.courseId}
+            </td>
+            <td data-label="Course name" className="border border-border p-2">
+              {p.courseName}
+            </td>
             <td className="border border-border p-2">
               <Link
                 to="/admin/programs/$programId"

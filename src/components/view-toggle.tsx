@@ -15,7 +15,8 @@ export function ViewToggle({ current }: Props) {
     });
   }
 
-  const base = "border border-border p-1.5 transition-colors";
+  const base =
+    "flex h-9 items-center border border-border px-2.5 transition-colors";
   const active = "bg-secondary";
   const inactive = "hover:bg-secondary";
 

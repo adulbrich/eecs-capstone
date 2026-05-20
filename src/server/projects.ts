@@ -1,5 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type { Status } from "#/lib/project-workflow";
+
+const STATUS_VALUES = [
+  "draft",
+  "submitted",
+  "changes_requested",
+  "approved",
+  "published",
+  "archived",
+] as const;
 
 const projectInputSchema = z.object({
   title: z.string().min(1).max(200),
@@ -148,4 +158,36 @@ export const hardDeleteProject = createServerFn({ method: "POST" })
       "./_internal/projects"
     );
     return hardDeleteProjectForCurrentUser(data.id);
+  });
+
+const statusTransitionSchema = z.object({
+  id: z.string().uuid(),
+  status: z.enum(STATUS_VALUES),
+  comment: z.string().max(2000).optional(),
+});
+
+export const performTransition = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => statusTransitionSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { performTransitionForCurrentUser } = await import(
+      "./_internal/projects"
+    );
+    return performTransitionForCurrentUser(
+      data.id,
+      data.status as Status,
+      data.comment,
+    );
+  });
+
+export const forceSetProjectStatus = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => statusTransitionSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { forceTransitionForCurrentUser } = await import(
+      "./_internal/projects"
+    );
+    return forceTransitionForCurrentUser(
+      data.id,
+      data.status as Status,
+      data.comment,
+    );
   });

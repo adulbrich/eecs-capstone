@@ -245,6 +245,50 @@ export async function hardDeleteProjectAs(
   return { id };
 }
 
+export async function forceTransitionAs(
+  viewer: AuthUser,
+  id: string,
+  target: Status,
+  comment?: string,
+): Promise<{ id: string; status: Status }> {
+  const visibility = viewerToVisibility(viewer);
+  if (!isStaff(visibility)) throw new Error("Forbidden");
+  const project = await loadProjectOr404(id);
+  if (project.status === target)
+    throw new Error("Project is already in that status.");
+
+  await db.transaction(async (tx) => {
+    const updates: Record<string, unknown> = {
+      status: target,
+      updatedAt: new Date(),
+    };
+    if (target === "published" && !project.publishedAt) {
+      updates.publishedAt = new Date();
+    }
+    if (target === "archived") {
+      updates.archivedAt = new Date();
+    }
+    await tx.update(projects).set(updates).where(eq(projects.id, id));
+
+    await tx.insert(projectStatusHistory).values({
+      projectId: id,
+      oldStatus: project.status,
+      newStatus: target,
+      changedBy: viewer.id,
+      comment: comment ?? null,
+    });
+
+    await recordStatusChangeNotifications(
+      tx,
+      { id: project.id, title: project.title, proposerId: project.proposerId },
+      target,
+      viewer.id,
+    );
+  });
+
+  return { id, status: target };
+}
+
 // Convenience wrappers that resolve the current user from the request
 // and delegate to the *As helpers. These are what the createServerFn
 // handlers in src/server/projects.ts call.
@@ -266,6 +310,15 @@ export async function performTransitionForCurrentUser(
 ) {
   const viewer = await requireUser();
   return performTransitionAs(viewer, id, target, comment);
+}
+
+export async function forceTransitionForCurrentUser(
+  id: string,
+  target: Status,
+  comment?: string,
+) {
+  const viewer = await requireUser();
+  return forceTransitionAs(viewer, id, target, comment);
 }
 
 export async function softDeleteProjectForCurrentUser(id: string) {

@@ -72,7 +72,7 @@ function Profile() {
   }
 
   return (
-    <div className="mx-auto max-w-md p-8">
+    <div className="mx-auto max-w-md px-4 py-6 md:p-8">
       <h1 className="text-2xl font-semibold">Profile</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         {user.email} ({user.role ?? "user"})

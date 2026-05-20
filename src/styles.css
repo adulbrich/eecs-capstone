@@ -376,6 +376,47 @@ a {
   background: color-mix(in oklab, var(--header-bg) 84%, transparent 16%);
 }
 
+/* Admin table: card layout on mobile */
+@media (max-width: 767px) {
+  .admin-table {
+    border: none;
+  }
+  .admin-table thead {
+    display: none;
+  }
+  .admin-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .admin-table tbody tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--card);
+  }
+  .admin-table tbody td {
+    display: flex;
+    align-items: baseline;
+    gap: 0.625rem;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem 0.75rem;
+  }
+  .admin-table tbody td:last-child {
+    border-bottom: none;
+  }
+  .admin-table tbody td[data-label]::before {
+    content: attr(data-label);
+    font-weight: 500;
+    min-width: 5.5rem;
+    color: var(--muted-foreground);
+    font-size: 0.8125rem;
+    flex-shrink: 0;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

@@ -73,7 +73,7 @@ function ProjectDetail() {
   if (!project) return null;
 
   return (
-    <div className="mx-auto max-w-3xl p-8">
+    <div className="mx-auto max-w-3xl px-4 py-6 md:p-8">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">{project.title as string}</h1>
         <StatusBadge status={project.status as string} />

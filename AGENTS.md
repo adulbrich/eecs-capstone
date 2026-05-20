@@ -167,3 +167,121 @@ style={s === status ? { borderBottomColor: "var(--brand-primary)" } : undefined}
 ### Pagination disabled state
 
 Disabled pagination links use `pointer-events-none text-muted-foreground/40`, not `text-neutral-300`.
+
+## Mobile-First Design
+
+This project is mobile-first. Write styles for small screens first, then add `md:` (768px+) overrides. Avoid `sm:` breakpoint overrides -- we use a two-tier system: mobile and desktop.
+
+### Page wrapper padding
+
+Every route page root element uses responsive padding:
+
+```tsx
+<div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
+```
+
+`px-4 py-6` gives comfortable touch-screen margins. `md:p-8` expands to the desktop-standard 32px all-around. Never use `p-8` alone on a page wrapper.
+
+### Interactive element height
+
+All inline form controls share `h-9` (36px) so adjacent elements align without magic numbers:
+
+| Component | How |
+|---|---|
+| `<Input>` | shadcn default is `h-9` |
+| `<Select>` (`<SelectTrigger>`) | shadcn default is `h-9` |
+| `<Button size="default">` | shadcn default is `h-9` |
+| `<ViewToggle>` | explicit `h-9` in component |
+
+When adding new controls that appear inline with an Input or Select, explicitly set `h-9` to stay aligned.
+
+### Mobile navigation
+
+The header uses a two-layout pattern. Desktop and mobile nodes both live in `SiteHeader` but only one is rendered at a time:
+
+```tsx
+{/* Desktop -- hidden on mobile */}
+<div className="hidden md:flex h-14 ...">...</div>
+
+{/* Mobile -- hidden on desktop */}
+<div className="flex h-14 md:hidden ...">...</div>
+```
+
+The mobile layout uses a **shadcn Sheet** (`side="left"`) as the navigation drawer, triggered by a hamburger `<Button variant="ghost">`. The Sheet is focus-trapped and accessible (Radix Dialog under the hood). Key rules:
+
+- Call `setOpen(false)` on every `<Link>` click so the drawer closes after navigation.
+- Keep the `SheetHeader` with a visible title (`Navigation`) for screen readers.
+- Notification bell renders outside the Sheet, directly in the mobile header bar, so it's always reachable.
+
+```tsx
+<Sheet open={open} onOpenChange={setOpen}>
+  <SheetTrigger asChild>
+    <Button variant="ghost" size="sm" aria-label="Open navigation">
+      <Menu className="h-5 w-5" />
+    </Button>
+  </SheetTrigger>
+  <SheetContent side="left" className="w-72 p-0">
+    ...
+  </SheetContent>
+</Sheet>
+```
+
+### Admin tables on mobile
+
+Admin tables (`<AdminTable>`) use the CSS `data-label` card pattern -- no JavaScript, no duplicated markup. On mobile, each row becomes a card and each cell shows its column heading inline.
+
+**Step 1 -- add `data-label` to every `<td>` that has a column heading:**
+
+```tsx
+<td data-label="Name" className="border border-border p-2">{row.name}</td>
+<td data-label="Type" className="border border-border p-2 text-muted-foreground">{row.type}</td>
+<td className="border border-border p-2">  {/* action cell -- no label */}
+  <Link to="...">Edit</Link>
+</td>
+```
+
+**Step 2 -- the `.admin-table` CSS class** (defined in `src/styles.css`) handles the rest automatically at `max-width: 767px`. It hides the `<thead>`, turns each `<tr>` into a card, and injects the label as a `::before` pseudo-element using `content: attr(data-label)`.
+
+Never use a `<table>` inside an admin page without wrapping it in `<AdminTable>` and adding `data-label` attributes.
+
+### Responsive steppers
+
+Multi-step progress indicators (like the staff status stepper) use a two-axis layout:
+
+```tsx
+{/* One item: vertical stack on mobile, horizontal row on desktop */}
+<div className="flex flex-col md:flex-row md:items-center">
+  {i > 0 && (
+    <>
+      {/* Connector line -- vertical on mobile */}
+      <div aria-hidden className="ml-3.5 h-4 w-px bg-border md:hidden" />
+      {/* Connector line -- horizontal on desktop */}
+      <div aria-hidden className="hidden h-px w-5 bg-border md:block" />
+    </>
+  )}
+  <button ...>{label}</button>
+</div>
+```
+
+The connector renders as a sibling of the pill button inside a `flex-col` container. On mobile the connector appears above the pill (vertical track). On desktop `md:flex-row` puts the connector to the left (horizontal track). The outer stepper container uses `md:overflow-x-auto` for long status lists.
+
+### Select with empty / "all" sentinel
+
+Radix UI `SelectItem` does not accept `value=""`. When a Select needs an "All" / unset option, use the `"_all_"` sentinel and convert it at the call site:
+
+```tsx
+<Select
+  value={filter ?? "_all_"}
+  onValueChange={(v) => setFilter(v === "_all_" ? null : v)}
+>
+  <SelectTrigger className="h-9 w-full">
+    <SelectValue placeholder="All" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="_all_">All</SelectItem>
+    {items.map((item) => (
+      <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+```

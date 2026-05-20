@@ -54,10 +54,6 @@
 
 ## Improvements
 
-- The Admin projects list page should be a list table, no massive cards. Look at how the list table is done in the general projects page and copy that.
-- The tabs for /my/projects and /admin/projects should look much better (right now hover gives a weird underline)
-- All pages should have a tab title is the format of "Page Name | {website title}", e.g. "Projects | Oregon State University CS Capstone". This is important for accessibility and SEO.
-
 ## Current Bugs
 
 - On the admin page, the "Users" link should not show for instructors.

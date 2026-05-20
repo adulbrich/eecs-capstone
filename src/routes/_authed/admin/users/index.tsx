@@ -74,7 +74,7 @@ function UsersAdmin() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <div className="mx-auto max-w-4xl p-8">
+    <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
       <h1 className="text-2xl font-semibold">Admin: users</h1>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
@@ -139,10 +139,16 @@ function UsersAdmin() {
       <AdminTable columns={["Email", "Name", "Role", "Banned", ""]}>
         {rows.map((u) => (
           <tr key={u.id}>
-            <td className="border border-border p-2">{u.email}</td>
-            <td className="border border-border p-2">{u.name ?? "(none)"}</td>
-            <td className="border border-border p-2">{u.role}</td>
-            <td className="border border-border p-2">
+            <td data-label="Email" className="border border-border p-2">
+              {u.email}
+            </td>
+            <td data-label="Name" className="border border-border p-2">
+              {u.name ?? "(none)"}
+            </td>
+            <td data-label="Role" className="border border-border p-2">
+              {u.role}
+            </td>
+            <td data-label="Banned" className="border border-border p-2">
               {u.banned ? "yes" : ""}
             </td>
             <td className="border border-border p-2">

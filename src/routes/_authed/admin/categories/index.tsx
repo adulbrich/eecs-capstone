@@ -57,7 +57,7 @@ function CategoriesAdmin() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl p-8">
+    <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
       <h1 className="text-2xl font-semibold">Admin: categories</h1>
 
       <form onSubmit={onCreate} className="mt-6 flex flex-wrap items-end gap-3">
@@ -97,8 +97,13 @@ function CategoriesAdmin() {
       <AdminTable columns={["Name", "Type", ""]}>
         {rows.map((c) => (
           <tr key={c.id}>
-            <td className="border border-border p-2">{c.name}</td>
-            <td className="border border-border p-2 text-muted-foreground">
+            <td data-label="Name" className="border border-border p-2">
+              {c.name}
+            </td>
+            <td
+              data-label="Type"
+              className="border border-border p-2 text-muted-foreground"
+            >
               {c.type}
             </td>
             <td className="border border-border p-2">

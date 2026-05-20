@@ -38,7 +38,7 @@ function UserDetail() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
       <h1 className="text-2xl font-semibold">{user.name ?? user.email}</h1>
       <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
       {isSelf && (

@@ -33,7 +33,7 @@ function MyProjects() {
   const { rows } = Route.useLoaderData();
   const { status } = Route.useSearch();
   return (
-    <div className="mx-auto max-w-3xl p-8">
+    <div className="mx-auto max-w-3xl px-4 py-6 md:p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">My Projects</h1>
         <Button asChild size="sm">

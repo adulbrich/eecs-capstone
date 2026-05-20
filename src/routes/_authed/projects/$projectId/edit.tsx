@@ -33,7 +33,7 @@ function EditProject() {
   if (!project) return null;
   const projectId = project.id as string;
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
       <h1 className="text-2xl font-semibold">Edit project</h1>
       <div className="mt-6">
         <ProjectForm

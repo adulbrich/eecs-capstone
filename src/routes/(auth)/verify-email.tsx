@@ -8,7 +8,7 @@ export const Route = createFileRoute("/(auth)/verify-email")({
 
 function VerifyEmail() {
   return (
-    <div className="mx-auto max-w-sm p-8">
+    <div className="mx-auto max-w-sm px-4 py-6 md:p-8">
       <h1 className="text-2xl font-semibold">Email verified</h1>
       <p className="mt-4 text-sm">
         Your account is active.{" "}

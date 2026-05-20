@@ -70,7 +70,7 @@ function ProgramEdit() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
       <h1 className="text-2xl font-semibold">Edit program</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         {projectCount} linked project{projectCount === 1 ? "" : "s"}

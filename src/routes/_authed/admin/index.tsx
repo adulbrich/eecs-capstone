@@ -8,7 +8,7 @@ export const Route = createFileRoute("/_authed/admin/")({
 
 function AdminHome() {
   return (
-    <div className="mx-auto max-w-md p-8">
+    <div className="mx-auto max-w-md px-4 py-6 md:p-8">
       <h1 className="text-2xl font-semibold">Admin</h1>
       <ul className="mt-4 space-y-2 text-sm">
         <li>

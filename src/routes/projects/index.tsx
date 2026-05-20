@@ -36,7 +36,7 @@ function ProjectsList() {
   const search = Route.useSearch();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   return (
-    <div className="mx-auto max-w-3xl p-8">
+    <div className="mx-auto max-w-3xl px-4 py-6 md:p-8">
       <h1 className="text-2xl font-semibold">Projects</h1>
       <div className="mt-4">
         <ProjectsFilterBar
