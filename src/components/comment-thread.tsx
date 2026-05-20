@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { addComment } from "#/server/comments";
+import { Button } from "./ui/button";
+import { Textarea } from "./ui/textarea";
 
 type Comment = {
   id: string;
@@ -74,15 +76,30 @@ function CommentNode({
       id={`comment-${comment.id}`}
       className={
         isInternal
-          ? "border-l-4 border-amber-400 bg-amber-50 p-3"
-          : "border-l-4 border-neutral-300 p-3"
+          ? "rounded-md border-l-4 p-3"
+          : "border-l-4 border-border p-3"
+      }
+      style={
+        isInternal
+          ? {
+              borderLeftColor: "var(--status-warning)",
+              background: "var(--status-warning-bg)",
+            }
+          : undefined
       }
     >
-      <div className="flex items-center gap-2 text-xs text-neutral-500">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span>{comment.authorId.slice(0, 8)}</span>
         <span>{new Date(comment.createdAt).toLocaleString()}</span>
         {isInternal && (
-          <span className="bg-amber-200 px-1.5 py-0.5 text-amber-900">
+          <span
+            className="rounded px-1.5 py-0.5 text-xs font-medium"
+            style={{
+              background: "var(--status-warning-bg)",
+              color: "var(--status-warning)",
+              border: "1px solid var(--status-warning)",
+            }}
+          >
             internal
           </span>
         )}
@@ -95,17 +112,26 @@ function CommentNode({
             <div
               key={r.id}
               id={`comment-${r.id}`}
-              className={
+              className="border-l-2 p-2"
+              style={
                 r.isInternal
-                  ? "border-l-2 border-amber-400 bg-amber-50 p-2"
-                  : "border-l-2 border-neutral-300 p-2"
+                  ? {
+                      borderLeftColor: "var(--status-warning)",
+                      background: "var(--status-warning-bg)",
+                    }
+                  : { borderLeftColor: "var(--line)" }
               }
             >
-              <div className="flex items-center gap-2 text-xs text-neutral-500">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>{r.authorId.slice(0, 8)}</span>
                 <span>{new Date(r.createdAt).toLocaleString()}</span>
                 {r.isInternal && (
-                  <span className="bg-amber-200 px-1.5 py-0.5 text-amber-900">
+                  <span
+                    className="rounded px-1.5 py-0.5 text-xs font-medium"
+                    style={{
+                      color: "var(--status-warning)",
+                    }}
+                  >
                     internal
                   </span>
                 )}
@@ -153,13 +179,15 @@ function NewCommentForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-4 space-y-2 border-t pt-4">
-      <textarea
+    <form
+      onSubmit={onSubmit}
+      className="mt-4 space-y-2 border-t border-border pt-4"
+    >
+      <Textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
         placeholder="Add a comment"
         required
-        className="w-full border p-2"
         rows={3}
       />
       {viewerIsStaff && (
@@ -172,10 +200,10 @@ function NewCommentForm({
           Internal (staff only)
         </label>
       )}
-      <button type="submit" className="bg-brand px-3 py-1.5 text-white">
+      <Button type="submit" size="sm">
         Post comment
-      </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      </Button>
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </form>
   );
 }
@@ -198,13 +226,15 @@ function ReplyForm({
 
   if (!open) {
     return (
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="xs"
+        className="mt-2"
         onClick={() => setOpen(true)}
-        className="mt-2 text-xs text-blue-700 hover:underline"
       >
         Reply
-      </button>
+      </Button>
     );
   }
 
@@ -225,12 +255,11 @@ function ReplyForm({
 
   return (
     <form onSubmit={onSubmit} className="mt-2 space-y-2 pl-4">
-      <textarea
+      <Textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
         placeholder="Reply"
         required
-        className="w-full border p-2 text-sm"
         rows={2}
       />
       {viewerIsStaff && (
@@ -244,18 +273,19 @@ function ReplyForm({
         </label>
       )}
       <div className="flex gap-2">
-        <button type="submit" className="bg-brand px-2 py-1 text-xs text-white">
+        <Button type="submit" size="xs">
           Post
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           onClick={() => setOpen(false)}
-          className="text-xs"
         >
           Cancel
-        </button>
+        </Button>
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </form>
   );
 }

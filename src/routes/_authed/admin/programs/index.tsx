@@ -6,6 +6,8 @@ import {
 } from "@tanstack/react-router";
 import { useState } from "react";
 import { AdminTable } from "#/components/admin-table";
+import { Button } from "#/components/ui/button";
+import { Input } from "#/components/ui/input";
 import { getSession } from "#/lib/auth-guards";
 import { createProgram, listPrograms } from "#/server/programs";
 
@@ -50,51 +52,40 @@ function ProgramsAdmin() {
       <h1 className="text-2xl font-semibold">Admin: programs</h1>
 
       <form onSubmit={onCreate} className="mt-6 grid gap-2 md:grid-cols-3">
-        <input
+        <Input
           value={courseId}
           onChange={(e) => setCourseId(e.target.value)}
           placeholder="Course ID (e.g., CS-462)"
           required
-          className="border p-2"
         />
-        <input
+        <Input
           value={courseName}
           onChange={(e) => setCourseName(e.target.value)}
           placeholder="Course name"
           required
-          className="border p-2"
         />
-        <input
+        <Input
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Description (optional)"
-          className="border p-2"
         />
         <div className="md:col-span-3">
-          <button
-            type="submit"
-            className="bg-brand px-3 py-2 text-sm text-white"
-          >
+          <Button type="submit" size="sm">
             Create program
-          </button>
+          </Button>
         </div>
       </form>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
 
       <AdminTable columns={["Course ID", "Course name", ""]}>
         {rows.map((p) => (
           <tr key={p.id}>
-            <td className="border border-neutral-200 p-2 dark:border-neutral-800">
-              {p.courseId}
-            </td>
-            <td className="border border-neutral-200 p-2 dark:border-neutral-800">
-              {p.courseName}
-            </td>
-            <td className="border border-neutral-200 p-2 dark:border-neutral-800">
+            <td className="border border-border p-2">{p.courseId}</td>
+            <td className="border border-border p-2">{p.courseName}</td>
+            <td className="border border-border p-2">
               <Link
                 to="/admin/programs/$programId"
                 params={{ programId: p.id }}
-                className="text-blue-700 hover:underline"
               >
                 Manage
               </Link>

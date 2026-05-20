@@ -5,6 +5,10 @@ import { applyServerErrors } from "#/lib/apply-server-errors";
 import { CategoryMultiSelect } from "./category-multi-select";
 import { ProgramSelect } from "./program-select";
 import { ProjectImageUploader } from "./project-image-uploader";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
 
 const optionalUrl = z
   .union([z.literal(""), z.string().url("Must be a valid URL").max(500)])
@@ -167,19 +171,17 @@ export function ProjectForm({
       <form.Field name="imageUrl">
         {(field: AnyForm) => (
           <div>
-            <p className="block font-medium text-sm">Image</p>
+            <Label>Image</Label>
             <div className="mt-1">
               <ProjectImageUploader
                 currentKey={(field.state.value as string) || null}
                 onChange={(file) => {
                   setPendingImage(file);
-                  // If user clicked Remove on an existing saved image,
-                  // clear the form field so submit persists the deletion.
                   if (file === null) field.handleChange("");
                 }}
               />
             </div>
-            <p className="mt-1 text-xs text-neutral-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               Cropped to 16:9 and resized to max 1600x900. Saved when you submit
               the form.
             </p>
@@ -196,9 +198,7 @@ export function ProjectForm({
       <form.Field name="programId">
         {(field: AnyForm) => (
           <div>
-            <label htmlFor="programId" className="block font-medium text-sm">
-              Program
-            </label>
+            <Label htmlFor="programId">Program</Label>
             <ProgramSelect
               id="programId"
               value={field.state.value as string}
@@ -218,7 +218,7 @@ export function ProjectForm({
       )}
       {showCategories && (
         <div>
-          <p className="block font-medium text-sm">Categories</p>
+          <Label>Categories</Label>
           <div className="mt-1">
             <CategoryMultiSelect
               value={categoryIds}
@@ -229,20 +229,16 @@ export function ProjectForm({
       )}
 
       {formError && (
-        <div className="border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
           {formError}
         </div>
       )}
 
       <form.Subscribe selector={(s) => [s.canSubmit, s.isSubmitting] as const}>
         {([canSubmit, isSubmitting]) => (
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="bg-brand px-4 py-2 text-white disabled:opacity-50"
-          >
+          <Button type="submit" disabled={!canSubmit}>
             {isSubmitting ? "Saving..." : submitLabel}
-          </button>
+          </Button>
         )}
       </form.Subscribe>
     </form>
@@ -266,11 +262,9 @@ function Field({ form, name, label, placeholder, textarea, rows }: FieldProps) {
     <form.Field name={name as never}>
       {(field: AnyForm) => (
         <div>
-          <label htmlFor={field.name} className="block font-medium text-sm">
-            {label}
-          </label>
+          <Label htmlFor={field.name}>{label}</Label>
           {textarea ? (
-            <textarea
+            <Textarea
               id={field.name}
               name={field.name}
               value={field.state.value as string}
@@ -278,21 +272,21 @@ function Field({ form, name, label, placeholder, textarea, rows }: FieldProps) {
               onBlur={field.handleBlur}
               rows={rows}
               placeholder={placeholder}
-              className="mt-1 w-full border p-2"
+              className="mt-1"
             />
           ) : (
-            <input
+            <Input
               id={field.name}
               name={field.name}
               value={field.state.value as string}
               onChange={(e) => field.handleChange(e.target.value)}
               onBlur={field.handleBlur}
               placeholder={placeholder}
-              className="mt-1 w-full border p-2"
+              className="mt-1"
             />
           )}
           {field.state.meta.errors.length > 0 && (
-            <p className="mt-1 text-red-600 text-sm">
+            <p className="mt-1 text-sm text-destructive">
               {field.state.meta.errors
                 .map((e: unknown) =>
                   typeof e === "string"

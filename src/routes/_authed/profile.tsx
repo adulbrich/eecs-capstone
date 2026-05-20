@@ -1,6 +1,9 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { AvatarUploader } from "#/components/avatar-uploader";
+import { Button } from "#/components/ui/button";
+import { Input } from "#/components/ui/input";
+import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
 import { updateProfile } from "#/server/profile";
 
@@ -69,7 +72,7 @@ function Profile() {
   return (
     <div className="mx-auto max-w-md p-8">
       <h1 className="text-2xl font-semibold">Profile</h1>
-      <p className="mt-2 text-sm text-neutral-600">
+      <p className="mt-2 text-sm text-muted-foreground">
         {user.email} ({user.role ?? "user"})
       </p>
 
@@ -84,63 +87,85 @@ function Profile() {
       </div>
 
       <form onSubmit={onSaveProfile} className="mt-6 space-y-3">
-        <input
-          name="name"
-          defaultValue={user.name ?? ""}
-          placeholder="Name"
-          required
-          className="w-full border p-2"
-        />
-        <input
-          name="affiliation"
-          defaultValue={user.affiliation ?? ""}
-          placeholder="Affiliation"
-          className="w-full border p-2"
-        />
-        <input
-          name="linkedin"
-          defaultValue={user.linkedin ?? ""}
-          placeholder="LinkedIn URL"
-          type="url"
-          className="w-full border p-2"
-        />
-        <button type="submit" className="w-full bg-brand px-4 py-2 text-white">
-          Save
-        </button>
+        <div className="space-y-1.5">
+          <Label htmlFor="name">Name</Label>
+          <Input
+            id="name"
+            name="name"
+            defaultValue={user.name ?? ""}
+            placeholder="Your name"
+            required
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="affiliation">Affiliation</Label>
+          <Input
+            id="affiliation"
+            name="affiliation"
+            defaultValue={user.affiliation ?? ""}
+            placeholder="University, company, ..."
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="linkedin">LinkedIn URL</Label>
+          <Input
+            id="linkedin"
+            name="linkedin"
+            defaultValue={user.linkedin ?? ""}
+            placeholder="https://linkedin.com/in/..."
+            type="url"
+          />
+        </div>
+        <Button type="submit" className="w-full">
+          Save profile
+        </Button>
       </form>
 
       <h2 className="mt-8 text-lg font-semibold">Change password</h2>
       <form onSubmit={onChangePassword} className="mt-3 space-y-3">
-        <input
-          name="current"
-          type="password"
-          placeholder="Current password"
-          required
-          className="w-full border p-2"
-        />
-        <input
-          name="next"
-          type="password"
-          placeholder="New password"
-          required
-          minLength={8}
-          className="w-full border p-2"
-        />
-        <button type="submit" className="w-full bg-brand px-4 py-2 text-white">
+        <div className="space-y-1.5">
+          <Label htmlFor="current">Current password</Label>
+          <Input
+            id="current"
+            name="current"
+            type="password"
+            placeholder="••••••••"
+            required
+            autoComplete="current-password"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="next">New password</Label>
+          <Input
+            id="next"
+            name="next"
+            type="password"
+            placeholder="••••••••"
+            required
+            minLength={8}
+            autoComplete="new-password"
+          />
+        </div>
+        <Button type="submit" className="w-full">
           Change password
-        </button>
+        </Button>
       </form>
 
-      {saved && <p className="mt-4 text-sm text-green-700">Saved.</p>}
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {saved && (
+        <p className="mt-4 text-sm" style={{ color: "var(--status-success)" }}>
+          Saved.
+        </p>
+      )}
+      {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <button
+      <Button
         type="button"
+        variant="outline"
+        className="mt-8 w-full"
         onClick={onSignOut}
-        className="mt-8 w-full border px-4 py-2"
       >
         Sign out
-      </button>
+      </Button>
     </div>
   );
 }

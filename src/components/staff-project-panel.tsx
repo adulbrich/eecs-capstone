@@ -13,6 +13,8 @@ import {
   submitProject,
 } from "#/server/projects";
 import { listProjectEditLog } from "#/server/projects-queries";
+import { Button } from "./ui/button";
+import { Textarea } from "./ui/textarea";
 
 type Project = {
   id: string;
@@ -179,8 +181,8 @@ export function StaffProjectPanel({
   ];
 
   return (
-    <div className="mt-8 border-2 border-purple-300 bg-purple-50 p-4">
-      <h2 className="font-semibold text-lg">Staff panel</h2>
+    <div className="mt-8 rounded-lg border-2 border-[var(--brand-primary-tint)] bg-card p-4">
+      <p className="island-kicker mb-2">Staff panel</p>
 
       {project.notes && (
         <section className="mt-3">
@@ -196,39 +198,39 @@ export function StaffProjectPanel({
         >
           Optional comment (added to status history)
         </label>
-        <textarea
+        <Textarea
           id="staff-action-comment"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           rows={2}
-          className="w-full border p-2"
         />
         <div className="flex flex-wrap gap-2">
           {buttons
             .filter((b) => b.show)
             .map((b) => (
-              <button
+              <Button
                 key={b.id}
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => void run(b.id)}
-                className="border px-3 py-1.5 text-sm hover:bg-neutral-100"
               >
                 {b.label}
-              </button>
+              </Button>
             ))}
         </div>
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </section>
 
       <section className="mt-6">
         <h3 className="font-medium text-sm">Edit log</h3>
         {editLog.length === 0 ? (
-          <p className="text-neutral-500 text-sm">No edits yet.</p>
+          <p className="text-sm text-muted-foreground">No edits yet.</p>
         ) : (
           <ul className="mt-2 space-y-2 text-sm">
             {editLog.map((row) => (
-              <li key={row.id} className="border-l-2 border-neutral-300 pl-2">
-                <div className="text-neutral-500 text-xs">
+              <li key={row.id} className="border-l-2 border-border pl-2">
+                <div className="text-xs text-muted-foreground">
                   {row.editorId.slice(0, 8)} at{" "}
                   {new Date(row.createdAt).toLocaleString()}
                 </div>

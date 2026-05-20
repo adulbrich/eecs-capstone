@@ -7,13 +7,13 @@ type Props = {
 
 export function AdminTable({ columns, children }: Props) {
   return (
-    <table className="mt-4 w-full border-collapse border border-neutral-200 text-sm dark:border-neutral-800">
-      <thead className="bg-neutral-100 dark:bg-neutral-900">
+    <table className="mt-4 w-full border-collapse border border-border text-sm">
+      <thead className="bg-secondary">
         <tr>
           {columns.map((c) => (
             <th
               key={c}
-              className="border border-neutral-200 p-2 text-left font-medium dark:border-neutral-800"
+              className="border border-border p-2 text-left font-medium"
             >
               {c}
             </th>

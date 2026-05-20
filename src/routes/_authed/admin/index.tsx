@@ -10,27 +10,16 @@ function AdminHome() {
       <h1 className="text-2xl font-semibold">Admin</h1>
       <ul className="mt-4 space-y-2 text-sm">
         <li>
-          <Link to="/admin/projects" className="text-blue-700 hover:underline">
-            Projects
-          </Link>
+          <Link to="/admin/projects">Projects</Link>
         </li>
         <li>
-          <Link
-            to="/admin/categories"
-            className="text-blue-700 hover:underline"
-          >
-            Categories
-          </Link>
+          <Link to="/admin/categories">Categories</Link>
         </li>
         <li>
-          <Link to="/admin/programs" className="text-blue-700 hover:underline">
-            Programs
-          </Link>
+          <Link to="/admin/programs">Programs</Link>
         </li>
         <li>
-          <Link to="/admin/users" className="text-blue-700 hover:underline">
-            Users
-          </Link>
+          <Link to="/admin/users">Users</Link>
         </li>
       </ul>
     </div>

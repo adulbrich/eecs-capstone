@@ -49,7 +49,7 @@ function AdminProjects() {
   return (
     <div className="mx-auto max-w-4xl p-8">
       <h1 className="text-2xl font-semibold">Admin: projects</h1>
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+      <div className="mt-4 flex flex-wrap items-center gap-1 text-sm">
         {STATUSES.map((s) => (
           <Link
             key={s}
@@ -57,8 +57,13 @@ function AdminProjects() {
             search={(prev) => ({ ...prev, status: s })}
             className={
               s === status
-                ? "border-black border-b-2 px-2 py-1"
-                : "px-2 py-1 text-neutral-500 hover:underline"
+                ? "border-b-2 px-2 py-1 font-medium"
+                : "px-2 py-1 text-muted-foreground hover:text-foreground"
+            }
+            style={
+              s === status
+                ? { borderBottomColor: "var(--brand-primary)" }
+                : undefined
             }
           >
             {s.replace(/_/g, " ")}
@@ -70,14 +75,16 @@ function AdminProjects() {
             ...prev,
             includeSoftDeleted: !includeSoftDeleted,
           })}
-          className="ml-4 border px-2 py-1"
+          className="ml-4 rounded-md border border-border px-2 py-1 text-sm hover:bg-secondary"
         >
           {includeSoftDeleted ? "Hide soft-deleted" : "Show soft-deleted"}
         </Link>
       </div>
       <div className="mt-4 space-y-3">
         {rows.length === 0 ? (
-          <p className="text-sm text-neutral-500">No projects in this view.</p>
+          <p className="text-sm text-muted-foreground">
+            No projects in this view.
+          </p>
         ) : (
           rows.map((p) => <ProjectCard key={p.id} project={p} />)
         )}

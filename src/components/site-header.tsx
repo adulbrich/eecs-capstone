@@ -3,6 +3,7 @@ import { authClient } from "#/lib/auth-client";
 import { getPublicUrl } from "#/lib/storage";
 import { InstitutionLogo } from "./institution-logo";
 import { NotificationBell } from "./notification-bell";
+import { Button } from "./ui/button";
 
 export function SiteHeader() {
   const { data: session, isPending } = authClient.useSession();
@@ -33,9 +34,6 @@ export function SiteHeader() {
               <Link to="/my/bookmarks" className="nav-link">
                 Bookmarks
               </Link>
-              <Link to="/projects/new" className="nav-link">
-                New project
-              </Link>
             </>
           )}
           {isStaff && (
@@ -47,7 +45,7 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-3 text-sm">
           {isPending ? (
-            <div className="h-8 w-24 animate-pulse rounded bg-[var(--surface-sunken)]" />
+            <div className="h-8 w-24 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
           ) : signedIn ? (
             <SignedIn
               name={session.user.name}
@@ -69,12 +67,9 @@ function SignedOut() {
       <Link to="/sign-in" className="nav-link text-sm">
         Sign in
       </Link>
-      <Link
-        to="/sign-up"
-        className="bg-brand hover:bg-brand-dark rounded px-3 py-1.5 text-sm font-medium text-white"
-      >
-        Sign up
-      </Link>
+      <Button asChild size="sm">
+        <Link to="/sign-up">Sign up</Link>
+      </Button>
     </>
   );
 }
@@ -97,7 +92,7 @@ function SignedIn({
           <img
             src={resolvedImage}
             alt=""
-            className="h-7 w-7 rounded-full"
+            className="h-7 w-7 rounded-full object-cover"
             referrerPolicy="no-referrer"
           />
         ) : (
@@ -107,16 +102,17 @@ function SignedIn({
         )}
         <span>{name ?? email}</span>
       </Link>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         onClick={async () => {
           await authClient.signOut();
           window.location.href = "/sign-in";
         }}
-        className="rounded border border-[var(--line)] px-3 py-1.5 text-sm hover:bg-[var(--surface-sunken)]"
       >
         Sign out
-      </button>
+      </Button>
     </>
   );
 }

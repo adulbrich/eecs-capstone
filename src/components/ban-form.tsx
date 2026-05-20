@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { banUser, unbanUser } from "#/server/users";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Textarea } from "./ui/textarea";
 
 type Props = {
   userId: string;
@@ -57,25 +60,27 @@ export function BanForm({
       ? new Date(banExpires).toLocaleString()
       : "permanent";
     return (
-      <section className="mt-4 border-2 border-red-300 bg-red-50 p-3 dark:bg-red-950">
+      <section className="mt-4 rounded-md border-2 border-destructive/30 bg-destructive/5 p-3">
         <h2 className="font-medium text-sm">Banned</h2>
         <p className="mt-1 text-sm">
-          <span className="text-neutral-500">Reason: </span>
+          <span className="text-muted-foreground">Reason: </span>
           {banReason ?? "(none)"}
         </p>
         <p className="mt-1 text-sm">
-          <span className="text-neutral-500">Expires: </span>
+          <span className="text-muted-foreground">Expires: </span>
           {expiresDisplay}
         </p>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
+          className="mt-3"
           onClick={() => void onUnban()}
           disabled={busy}
-          className="mt-3 border border-neutral-300 px-3 py-1.5 text-sm hover:bg-white disabled:opacity-50"
         >
           {busy ? "Working..." : "Unban"}
-        </button>
-        {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+        </Button>
+        {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
       </section>
     );
   }
@@ -84,32 +89,32 @@ export function BanForm({
     <section className="mt-4">
       <h2 className="font-medium text-sm">Ban this user</h2>
       <div className="mt-2 space-y-2">
-        <textarea
+        <Textarea
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="Reason (required)"
           required
           rows={3}
-          className="w-full border p-2"
         />
-        <input
+        <Input
           type="datetime-local"
           value={expiresAt}
           onChange={(e) => setExpiresAt(e.target.value)}
-          className="border p-2"
+          className="w-auto"
         />
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-muted-foreground">
           Leave expiry blank for permanent.
         </p>
-        <button
+        <Button
           type="button"
+          variant="destructive"
+          size="sm"
           onClick={() => void onBan()}
           disabled={busy || reason.trim().length === 0}
-          className="border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
         >
           {busy ? "Working..." : "Ban"}
-        </button>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        </Button>
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
     </section>
   );

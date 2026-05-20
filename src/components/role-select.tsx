@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { setUserRole } from "#/server/users";
+import { Button } from "./ui/button";
+import { Label } from "./ui/label";
 
 type Role = "user" | "instructor" | "admin";
 
@@ -31,33 +33,28 @@ export function RoleSelect({ userId, initialRole, onChanged }: Props) {
 
   return (
     <div className="mt-4">
-      <label
-        htmlFor="role-select"
-        className="block text-xs font-medium text-neutral-500"
-      >
-        Role
-      </label>
+      <Label htmlFor="role-select">Role</Label>
       <div className="mt-1 flex items-center gap-2">
         <select
           id="role-select"
           value={role}
           onChange={(e) => setRole(e.target.value as Role)}
-          className="border bg-white p-2 text-sm dark:bg-neutral-900"
+          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
         >
           <option value="user">user</option>
           <option value="instructor">instructor</option>
           <option value="admin">admin</option>
         </select>
-        <button
+        <Button
           type="button"
+          size="sm"
           onClick={() => void onSave()}
           disabled={!dirty || saving}
-          className="bg-brand px-3 py-1.5 text-sm text-white disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save"}
-        </button>
+        </Button>
       </div>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
     </div>
   );
 }

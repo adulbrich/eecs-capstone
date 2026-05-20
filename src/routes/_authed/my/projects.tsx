@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
 import { ProjectCard } from "#/components/project-card";
+import { Button } from "#/components/ui/button";
 import { listMyProjects } from "#/server/projects-queries";
 
 const STATUSES = [
@@ -33,14 +34,11 @@ function MyProjects() {
     <div className="mx-auto max-w-3xl p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">My projects</h1>
-        <Link
-          to="/projects/new"
-          className="bg-brand px-3 py-1.5 text-sm text-white"
-        >
-          New project
-        </Link>
+        <Button asChild size="sm">
+          <Link to="/projects/new">New project</Link>
+        </Button>
       </div>
-      <div className="mt-4 flex flex-wrap gap-2 text-sm">
+      <div className="mt-4 flex flex-wrap gap-1 text-sm">
         {STATUSES.map((s) => (
           <Link
             key={s}
@@ -48,8 +46,13 @@ function MyProjects() {
             search={{ status: s }}
             className={
               s === status
-                ? "border-black border-b-2 px-2 py-1"
-                : "px-2 py-1 text-neutral-500 hover:underline"
+                ? "border-b-2 px-2 py-1 font-medium"
+                : "px-2 py-1 text-muted-foreground hover:text-foreground"
+            }
+            style={
+              s === status
+                ? { borderBottomColor: "var(--brand-primary)" }
+                : undefined
             }
           >
             {s.replace(/_/g, " ")}
@@ -58,7 +61,9 @@ function MyProjects() {
       </div>
       <div className="mt-4 space-y-3">
         {rows.length === 0 ? (
-          <p className="text-sm text-neutral-500">No projects in this view.</p>
+          <p className="text-sm text-muted-foreground">
+            No projects in this view.
+          </p>
         ) : (
           rows.map((p) => <ProjectCard key={p.id} project={p} />)
         )}

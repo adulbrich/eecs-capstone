@@ -6,6 +6,9 @@ import {
 } from "@tanstack/react-router";
 import { useState } from "react";
 import { AdminTable } from "#/components/admin-table";
+import { Button } from "#/components/ui/button";
+import { Input } from "#/components/ui/input";
+import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
 import {
   createCategory,
@@ -55,37 +58,27 @@ function CategoriesAdmin() {
     <div className="mx-auto max-w-4xl p-8">
       <h1 className="text-2xl font-semibold">Admin: categories</h1>
 
-      <form onSubmit={onCreate} className="mt-6 flex flex-wrap items-end gap-2">
+      <form onSubmit={onCreate} className="mt-6 flex flex-wrap items-end gap-3">
         <div>
-          <label
-            htmlFor="cat-name"
-            className="block text-xs font-medium text-neutral-500"
-          >
-            Name
-          </label>
-          <input
+          <Label htmlFor="cat-name">Name</Label>
+          <Input
             id="cat-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="mt-1 border p-2"
+            className="mt-1 w-40"
           />
         </div>
         <div>
-          <label
-            htmlFor="cat-type"
-            className="block text-xs font-medium text-neutral-500"
-          >
-            Type
-          </label>
-          <input
+          <Label htmlFor="cat-type">Type</Label>
+          <Input
             id="cat-type"
             list="cat-type-options"
             value={type}
             onChange={(e) => setType(e.target.value)}
             required
-            className="mt-1 border p-2"
             placeholder="technology, industry, ..."
+            className="mt-1 w-48"
           />
           <datalist id="cat-type-options">
             {types.map((t) => (
@@ -93,26 +86,23 @@ function CategoriesAdmin() {
             ))}
           </datalist>
         </div>
-        <button type="submit" className="bg-brand px-3 py-2 text-sm text-white">
+        <Button type="submit" size="sm">
           Create
-        </button>
+        </Button>
       </form>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
 
       <AdminTable columns={["Name", "Type", ""]}>
         {rows.map((c) => (
           <tr key={c.id}>
-            <td className="border border-neutral-200 p-2 dark:border-neutral-800">
-              {c.name}
-            </td>
-            <td className="border border-neutral-200 p-2 text-neutral-500 dark:border-neutral-800">
+            <td className="border border-border p-2">{c.name}</td>
+            <td className="border border-border p-2 text-muted-foreground">
               {c.type}
             </td>
-            <td className="border border-neutral-200 p-2 dark:border-neutral-800">
+            <td className="border border-border p-2">
               <Link
                 to="/admin/categories/$categoryId"
                 params={{ categoryId: c.id }}
-                className="text-blue-700 hover:underline"
               >
                 Edit
               </Link>

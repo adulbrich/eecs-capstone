@@ -4,6 +4,7 @@ import {
   listEligibleInstructors,
   removeProgramInstructor,
 } from "#/server/programs";
+import { Button } from "./ui/button";
 
 type Instructor = {
   userId: string;
@@ -73,25 +74,29 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
     <section className="mt-6">
       <h2 className="font-medium text-sm">Instructors</h2>
       {instructors.length === 0 ? (
-        <p className="mt-2 text-sm text-neutral-500">None yet.</p>
+        <p className="mt-2 text-sm text-muted-foreground">None yet.</p>
       ) : (
         <ul className="mt-2 space-y-1">
           {instructors.map((i) => (
             <li
               key={i.userId}
-              className="flex items-center justify-between border border-neutral-200 p-2 dark:border-neutral-800"
+              className="flex items-center justify-between rounded-md border border-border p-2"
             >
               <span>
                 {i.name ?? i.email}{" "}
-                <span className="text-xs text-neutral-500">({i.role})</span>
+                <span className="text-xs text-muted-foreground">
+                  ({i.role})
+                </span>
               </span>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="xs"
+                className="text-destructive hover:text-destructive"
                 onClick={() => void remove(i.userId)}
-                className="text-sm text-red-700 hover:underline"
               >
                 Remove
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -100,7 +105,7 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
         <select
           value={picked}
           onChange={(e) => setPicked(e.target.value)}
-          className="border bg-white p-2 dark:bg-neutral-900"
+          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
         >
           <option value="">Add instructor...</option>
           {remaining.map((e) => (
@@ -109,16 +114,16 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
             </option>
           ))}
         </select>
-        <button
+        <Button
           type="button"
+          size="sm"
           onClick={() => void add()}
           disabled={!picked}
-          className="bg-brand px-3 py-1.5 text-sm text-white disabled:opacity-50"
         >
           Add
-        </button>
+        </Button>
       </div>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
     </section>
   );
 }

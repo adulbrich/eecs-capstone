@@ -15,9 +15,9 @@ export function ViewToggle({ current }: Props) {
     });
   }
 
-  const base = "border border-neutral-300 p-1.5 dark:border-neutral-700";
-  const active = "bg-neutral-200 dark:bg-neutral-800";
-  const inactive = "hover:bg-neutral-100 dark:hover:bg-neutral-900";
+  const base = "border border-border p-1.5 transition-colors";
+  const active = "bg-secondary";
+  const inactive = "hover:bg-secondary";
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: aria role=group with label is the right pattern for paired toggle buttons
@@ -27,7 +27,7 @@ export function ViewToggle({ current }: Props) {
         onClick={() => setMode("card")}
         aria-label="Card view"
         aria-pressed={current === "card"}
-        className={`${base} ${current === "card" ? active : inactive}`}
+        className={`${base} rounded-l-md ${current === "card" ? active : inactive}`}
       >
         <LayoutGrid className="h-4 w-4" />
       </button>
@@ -36,7 +36,7 @@ export function ViewToggle({ current }: Props) {
         onClick={() => setMode("row")}
         aria-label="Row view"
         aria-pressed={current === "row"}
-        className={`${base} -ml-px ${current === "row" ? active : inactive}`}
+        className={`${base} -ml-px rounded-r-md ${current === "row" ? active : inactive}`}
       >
         <List className="h-4 w-4" />
       </button>

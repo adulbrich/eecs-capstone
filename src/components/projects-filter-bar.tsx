@@ -2,6 +2,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { listCategories } from "#/server/categories";
 import { listPrograms } from "#/server/programs";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 import { ViewToggle } from "./view-toggle";
 
 type Category = { id: string; name: string; type: string };
@@ -79,31 +81,26 @@ export function ProjectsFilterBar({ q, categories, program, view }: Props) {
   const hasAnyFilter = q || categories.length > 0 || program;
 
   return (
-    <div className="border border-neutral-200 p-4 dark:border-neutral-800">
+    <div className="rounded-lg border border-border p-4">
       <div className="flex items-center gap-3">
-        <input
+        <Input
           type="search"
           value={queryDraft}
           onChange={(e) => setQueryDraft(e.target.value)}
           placeholder='Search projects (try "phrase" or -word to exclude)'
-          className="flex-1 border p-2"
+          className="flex-1"
         />
         <ViewToggle current={view} />
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         <div>
-          <label
-            htmlFor="filter-program"
-            className="block text-xs font-medium text-neutral-500"
-          >
-            Program
-          </label>
+          <Label htmlFor="filter-program">Program</Label>
           <select
             id="filter-program"
             value={program ?? ""}
             onChange={(e) => setProgram(e.target.value)}
-            className="mt-1 w-full border bg-white p-2 dark:bg-neutral-900"
+            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm"
           >
             <option value="">All programs</option>
             {allPrograms.map((p) => (
@@ -117,11 +114,13 @@ export function ProjectsFilterBar({ q, categories, program, view }: Props) {
 
       {grouped.size > 0 && (
         <div className="mt-3">
-          <p className="text-xs font-medium text-neutral-500">Categories</p>
+          <p className="text-xs font-medium text-muted-foreground">
+            Categories
+          </p>
           <div className="mt-1 space-y-2">
             {[...grouped.entries()].map(([type, items]) => (
               <div key={type}>
-                <p className="text-xs text-neutral-400">{type}</p>
+                <p className="text-xs text-muted-foreground">{type}</p>
                 <div className="mt-1 flex flex-wrap gap-2">
                   {items.map((c) => (
                     <label
@@ -147,7 +146,7 @@ export function ProjectsFilterBar({ q, categories, program, view }: Props) {
         <button
           type="button"
           onClick={clearAll}
-          className="mt-3 text-sm text-blue-700 hover:underline"
+          className="mt-3 text-sm text-brand hover:underline"
         >
           Clear all
         </button>

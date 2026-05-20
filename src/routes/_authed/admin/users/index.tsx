@@ -7,6 +7,8 @@ import {
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { AdminTable } from "#/components/admin-table";
+import { Input } from "#/components/ui/input";
+import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
 import { listUsers } from "#/server/users";
 
@@ -68,28 +70,18 @@ function UsersAdmin() {
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <div>
-          <label
-            htmlFor="user-search"
-            className="block text-xs font-medium text-neutral-500"
-          >
-            Search
-          </label>
-          <input
+          <Label htmlFor="user-search">Search</Label>
+          <Input
             id="user-search"
             type="search"
             value={qDraft}
             onChange={(e) => setQDraft(e.target.value)}
             placeholder="Email or name"
-            className="mt-1 border p-2 text-sm"
+            className="mt-1 w-48"
           />
         </div>
         <div>
-          <label
-            htmlFor="user-role"
-            className="block text-xs font-medium text-neutral-500"
-          >
-            Role
-          </label>
+          <Label htmlFor="user-role">Role</Label>
           <select
             id="user-role"
             value={role ?? ""}
@@ -104,7 +96,7 @@ function UsersAdmin() {
                 }),
               })
             }
-            className="mt-1 border bg-white p-2 text-sm dark:bg-neutral-900"
+            className="mt-1 rounded-md border border-border bg-background px-3 py-1.5 text-sm"
           >
             <option value="">All roles</option>
             {ROLES.map((r) => (
@@ -135,24 +127,14 @@ function UsersAdmin() {
       <AdminTable columns={["Email", "Name", "Role", "Banned", ""]}>
         {rows.map((u) => (
           <tr key={u.id}>
-            <td className="border border-neutral-200 p-2 dark:border-neutral-800">
-              {u.email}
-            </td>
-            <td className="border border-neutral-200 p-2 dark:border-neutral-800">
-              {u.name ?? "(none)"}
-            </td>
-            <td className="border border-neutral-200 p-2 dark:border-neutral-800">
-              {u.role}
-            </td>
-            <td className="border border-neutral-200 p-2 dark:border-neutral-800">
+            <td className="border border-border p-2">{u.email}</td>
+            <td className="border border-border p-2">{u.name ?? "(none)"}</td>
+            <td className="border border-border p-2">{u.role}</td>
+            <td className="border border-border p-2">
               {u.banned ? "yes" : ""}
             </td>
-            <td className="border border-neutral-200 p-2 dark:border-neutral-800">
-              <Link
-                to="/admin/users/$userId"
-                params={{ userId: u.id }}
-                className="text-blue-700 hover:underline"
-              >
+            <td className="border border-border p-2">
+              <Link to="/admin/users/$userId" params={{ userId: u.id }}>
                 Manage
               </Link>
             </td>
@@ -164,11 +146,15 @@ function UsersAdmin() {
         <Link
           to="/admin/users"
           search={(prev) => ({ ...prev, page: Math.max(1, page - 1) })}
-          className={page <= 1 ? "text-neutral-300" : "hover:underline"}
+          className={
+            page <= 1
+              ? "pointer-events-none text-muted-foreground/40"
+              : "hover:underline"
+          }
         >
           Previous
         </Link>
-        <span>
+        <span className="text-muted-foreground">
           Page {page} of {totalPages}
         </span>
         <Link
@@ -178,7 +164,9 @@ function UsersAdmin() {
             page: Math.min(totalPages, page + 1),
           })}
           className={
-            page >= totalPages ? "text-neutral-300" : "hover:underline"
+            page >= totalPages
+              ? "pointer-events-none text-muted-foreground/40"
+              : "hover:underline"
           }
         >
           Next

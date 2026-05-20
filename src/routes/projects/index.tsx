@@ -52,7 +52,7 @@ function ProjectsList() {
         }
       >
         {rows.length === 0 ? (
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-muted-foreground">
             No projects matched your search.
           </p>
         ) : (
@@ -65,18 +65,24 @@ function ProjectsList() {
         <Link
           to="/projects"
           search={(prev) => ({ ...prev, page: Math.max(1, page - 1) })}
-          className={page <= 1 ? "text-neutral-300" : "hover:underline"}
+          className={
+            page <= 1
+              ? "pointer-events-none text-muted-foreground/40"
+              : "hover:underline"
+          }
         >
           Previous
         </Link>
-        <span>
+        <span className="text-muted-foreground">
           Page {page} of {totalPages}
         </span>
         <Link
           to="/projects"
           search={(prev) => ({ ...prev, page: Math.min(totalPages, page + 1) })}
           className={
-            page >= totalPages ? "text-neutral-300" : "hover:underline"
+            page >= totalPages
+              ? "pointer-events-none text-muted-foreground/40"
+              : "hover:underline"
           }
         >
           Next

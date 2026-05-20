@@ -6,6 +6,10 @@ import {
 } from "@tanstack/react-router";
 import { useState } from "react";
 import { InstructorManager } from "#/components/instructor-manager";
+import { Button } from "#/components/ui/button";
+import { Input } from "#/components/ui/input";
+import { Label } from "#/components/ui/label";
+import { Textarea } from "#/components/ui/textarea";
 import { getSession } from "#/lib/auth-guards";
 import { deleteProgram, getProgram, updateProgram } from "#/server/programs";
 
@@ -66,72 +70,52 @@ function ProgramEdit() {
   return (
     <div className="mx-auto max-w-2xl p-8">
       <h1 className="text-2xl font-semibold">Edit program</h1>
-      <p className="mt-1 text-sm text-neutral-500">
+      <p className="mt-1 text-sm text-muted-foreground">
         {projectCount} linked project{projectCount === 1 ? "" : "s"}
       </p>
 
       <form onSubmit={onSave} className="mt-6 space-y-3">
-        <div>
-          <label
-            htmlFor="course-id"
-            className="block text-xs font-medium text-neutral-500"
-          >
-            Course ID
-          </label>
-          <input
+        <div className="space-y-1.5">
+          <Label htmlFor="course-id">Course ID</Label>
+          <Input
             id="course-id"
             value={courseId}
             onChange={(e) => setCourseId(e.target.value)}
             required
-            className="mt-1 w-full border p-2"
           />
         </div>
-        <div>
-          <label
-            htmlFor="course-name"
-            className="block text-xs font-medium text-neutral-500"
-          >
-            Course name
-          </label>
-          <input
+        <div className="space-y-1.5">
+          <Label htmlFor="course-name">Course name</Label>
+          <Input
             id="course-name"
             value={courseName}
             onChange={(e) => setCourseName(e.target.value)}
             required
-            className="mt-1 w-full border p-2"
           />
         </div>
-        <div>
-          <label
-            htmlFor="course-desc"
-            className="block text-xs font-medium text-neutral-500"
-          >
-            Description
-          </label>
-          <textarea
+        <div className="space-y-1.5">
+          <Label htmlFor="course-desc">Description</Label>
+          <Textarea
             id="course-desc"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            className="mt-1 w-full border p-2"
           />
         </div>
         <div className="flex gap-2">
-          <button
-            type="submit"
-            className="bg-brand px-3 py-2 text-sm text-white"
-          >
+          <Button type="submit" size="sm">
             Save
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="destructive"
+            size="sm"
             onClick={() => void onDelete()}
-            className="border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50"
           >
             Delete
-          </button>
+          </Button>
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </form>
 
       <InstructorManager

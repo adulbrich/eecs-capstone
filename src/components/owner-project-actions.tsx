@@ -4,6 +4,7 @@ import {
   returnToDraft,
   submitProject,
 } from "#/server/projects";
+import { Button } from "./ui/button";
 
 type Project = {
   id: string;
@@ -53,8 +54,7 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
     id: "submit" | "withdraw" | "delete";
     label: string;
     show: boolean;
-    primary?: boolean;
-    destructive?: boolean;
+    variant?: "default" | "outline" | "destructive";
   }> = [
     {
       id: "submit",
@@ -64,18 +64,19 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
           : "Submit for review",
       show:
         project.status === "draft" || project.status === "changes_requested",
-      primary: true,
+      variant: "default",
     },
     {
       id: "withdraw",
       label: "Withdraw to draft",
       show: project.status === "submitted",
+      variant: "outline",
     },
     {
       id: "delete",
       label: "Delete draft",
       show: project.status === "draft",
-      destructive: true,
+      variant: "destructive",
     },
   ];
 
@@ -83,28 +84,23 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
   if (visible.length === 0 && !error) return null;
 
   return (
-    <section className="mt-6 border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-900">
+    <section className="mt-6 rounded-lg border border-border bg-secondary p-4">
       <h2 className="font-medium text-sm">Your actions</h2>
       <div className="mt-3 flex flex-wrap gap-2">
         {visible.map((b) => (
-          <button
+          <Button
             key={b.id}
             type="button"
+            variant={b.variant ?? "outline"}
+            size="sm"
             disabled={busy}
             onClick={() => void run(b.id)}
-            className={
-              b.primary
-                ? "bg-brand px-3 py-1.5 text-sm text-white disabled:opacity-50"
-                : b.destructive
-                  ? "border border-red-300 px-3 py-1.5 text-red-700 text-sm hover:bg-red-50 disabled:opacity-50"
-                  : "border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 disabled:opacity-50"
-            }
           >
             {b.label}
-          </button>
+          </Button>
         ))}
       </div>
-      {error && <p className="mt-3 text-red-600 text-sm">{error}</p>}
+      {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
     </section>
   );
 }

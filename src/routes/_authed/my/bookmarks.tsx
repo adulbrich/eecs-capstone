@@ -14,12 +14,9 @@ function MyBookmarks() {
       <h1 className="text-2xl font-semibold">My bookmarks</h1>
       <div className="mt-6 space-y-3">
         {rows.length === 0 ? (
-          <p className="text-sm text-neutral-500">
-            No bookmarks yet. Browse{" "}
-            <Link to="/projects" className="text-blue-700 hover:underline">
-              projects
-            </Link>{" "}
-            and click the bookmark icon to save one.
+          <p className="text-sm text-muted-foreground">
+            No bookmarks yet. Browse <Link to="/projects">projects</Link> and
+            click the bookmark icon to save one.
           </p>
         ) : (
           rows.map((p) => <ProjectCard key={p.id} project={p} />)

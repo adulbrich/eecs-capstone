@@ -24,12 +24,12 @@ export function NotificationBell() {
 
   const refresh = useCallback(async () => {
     try {
-      const [{ count }, { rows }] = await Promise.all([
+      const [{ count }, { rows: r }] = await Promise.all([
         unreadCount(),
         listMyNotifications(),
       ]);
       setUnread(count);
-      setRows(rows as Notification[]);
+      setRows(r as Notification[]);
     } catch {
       // ignore (user not authenticated yet)
     }
@@ -72,38 +72,48 @@ export function NotificationBell() {
           void refresh();
         }}
         aria-label="Notifications"
-        className="relative px-2 py-1 hover:bg-neutral-100"
+        className="relative rounded-md px-2 py-1 hover:bg-secondary"
       >
         {unread > 0 ? (
-          <BellRing className="h-5 w-5 text-amber-600" aria-hidden="true" />
+          <BellRing
+            className="h-5 w-5"
+            style={{ color: "var(--status-warning)" }}
+            aria-hidden="true"
+          />
         ) : (
           <Bell className="h-5 w-5" aria-hidden="true" />
         )}
         {unread > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[1.25rem] rounded-full bg-red-600 px-1 text-center text-white text-xs">
+          <span className="absolute -right-1 -top-1 min-w-[1.25rem] rounded-full bg-destructive px-1 text-center text-xs text-white">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
       </button>
       {open && (
-        <div className="absolute right-0 z-50 mt-1 w-80 border bg-white shadow-lg dark:bg-neutral-900">
-          <div className="border-b p-2 font-medium text-sm">Notifications</div>
+        <div className="absolute right-0 z-50 mt-1 w-80 rounded-md border border-border bg-card shadow-lg">
+          <div className="border-b border-border p-2 font-medium text-sm">
+            Notifications
+          </div>
           {rows.length === 0 ? (
-            <p className="p-4 text-neutral-500 text-sm">Nothing yet.</p>
+            <p className="p-4 text-sm text-muted-foreground">Nothing yet.</p>
           ) : (
             <ul>
               {rows.map((n) => (
                 <li
                   key={n.id}
-                  className={n.read ? "border-b" : "border-b bg-blue-50"}
+                  className={
+                    n.read
+                      ? "border-b border-border"
+                      : "border-b border-border bg-[var(--brand-primary-tint)]"
+                  }
                 >
                   <button
                     type="button"
                     onClick={() => void onClickNotification(n)}
-                    className="block w-full p-2 text-left text-sm hover:bg-neutral-50"
+                    className="block w-full p-2 text-left text-sm hover:bg-secondary"
                   >
                     <div className="font-medium">{n.title}</div>
-                    <div className="text-neutral-500 text-xs">
+                    <div className="text-xs text-muted-foreground">
                       {new Date(n.createdAt).toLocaleString()}
                     </div>
                   </button>
@@ -115,7 +125,7 @@ export function NotificationBell() {
             <button
               type="button"
               onClick={() => void onMarkAllRead()}
-              className="block w-full p-2 text-center text-xs hover:bg-neutral-50"
+              className="block w-full p-2 text-center text-xs hover:bg-secondary"
             >
               Mark all read
             </button>

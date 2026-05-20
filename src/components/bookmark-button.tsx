@@ -2,6 +2,7 @@ import { Bookmark } from "lucide-react";
 import { useEffect, useState } from "react";
 import { authClient } from "#/lib/auth-client";
 import { addBookmark, isBookmarked, removeBookmark } from "#/server/bookmarks";
+import { Button } from "./ui/button";
 
 export function BookmarkButton({ projectId }: { projectId: string }) {
   const { data: session } = authClient.useSession();
@@ -12,8 +13,8 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
     if (!session?.user) return;
     void (async () => {
       try {
-        const { bookmarked } = await isBookmarked({ data: { projectId } });
-        setBookmarked(bookmarked);
+        const { bookmarked: b } = await isBookmarked({ data: { projectId } });
+        setBookmarked(b);
       } catch {
         setBookmarked(false);
       }
@@ -38,20 +39,23 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="sm"
       onClick={() => void toggle()}
       disabled={loading}
       aria-label={bookmarked ? "Remove bookmark" : "Bookmark"}
       title={bookmarked ? "Remove bookmark" : "Bookmark"}
-      className="inline-flex items-center gap-1 border border-neutral-300 px-2 py-1 text-sm hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
     >
-      {bookmarked ? (
-        <Bookmark className="h-4 w-4 fill-current text-amber-600" />
-      ) : (
-        <Bookmark className="h-4 w-4" />
-      )}
+      <Bookmark
+        className="h-4 w-4"
+        style={{
+          fill: bookmarked ? "var(--status-warning)" : "none",
+          color: bookmarked ? "var(--status-warning)" : undefined,
+        }}
+      />
       {bookmarked ? "Bookmarked" : "Bookmark"}
-    </button>
+    </Button>
   );
 }

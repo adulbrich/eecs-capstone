@@ -1,4 +1,9 @@
-import { createFileRoute, notFound, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  notFound,
+  useRouter,
+} from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { BookmarkButton } from "#/components/bookmark-button";
 import { CategoryChip } from "#/components/category-chip";
@@ -7,6 +12,7 @@ import { OwnerProjectActions } from "#/components/owner-project-actions";
 import { StaffProjectPanel } from "#/components/staff-project-panel";
 import { StatusBadge } from "#/components/status-badge";
 import { StatusTimeline } from "#/components/status-timeline";
+import { Button } from "#/components/ui/button";
 import { getPublicUrl } from "#/lib/storage";
 import { listProjectCategories } from "#/server/categories";
 import { getProject, listProjectComments } from "#/server/projects-queries";
@@ -62,17 +68,19 @@ function ProjectDetail() {
         <h1 className="text-2xl font-semibold">{project.title as string}</h1>
         <StatusBadge status={project.status as string} />
       </div>
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-3 flex items-center gap-2">
         <BookmarkButton projectId={project.id as string} />
+        {canEdit && (
+          <Button asChild variant="outline" size="sm">
+            <Link
+              to="/projects/$projectId/edit"
+              params={{ projectId: project.id as string }}
+            >
+              Edit
+            </Link>
+          </Button>
+        )}
       </div>
-      {canEdit && (
-        <a
-          href={`/projects/${project.id}/edit`}
-          className="mt-2 inline-block text-blue-700 text-sm hover:underline"
-        >
-          Edit
-        </a>
-      )}
 
       {viewerIsOwner && !viewerIsStaff && (
         <OwnerProjectActions
@@ -98,11 +106,13 @@ function ProjectDetail() {
         const heroUrl = getPublicUrl(project.imageUrl as string | null);
         if (!heroUrl) return null;
         return (
-          <img
-            src={heroUrl}
-            alt=""
-            className="mt-4 aspect-[16/9] w-full object-cover"
-          />
+          <div className="mt-4 overflow-hidden rounded-lg">
+            <img
+              src={heroUrl}
+              alt=""
+              className="aspect-[16/9] w-full object-cover"
+            />
+          </div>
         );
       })()}
 
@@ -180,7 +190,7 @@ function Section({ label, body }: { label: string; body: string | null }) {
   if (!body) return null;
   return (
     <section className="mt-6">
-      <h2 className="font-medium text-neutral-500 text-sm">{label}</h2>
+      <h2 className="font-medium text-sm text-muted-foreground">{label}</h2>
       <p className="mt-1 whitespace-pre-wrap">{body}</p>
     </section>
   );

@@ -38,44 +38,42 @@ function UserDetail() {
   return (
     <div className="mx-auto max-w-2xl p-8">
       <h1 className="text-2xl font-semibold">{user.name ?? user.email}</h1>
-      <p className="mt-1 text-sm text-neutral-500">{user.email}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
       {isSelf && (
-        <p className="mt-1 text-xs text-neutral-500">
+        <p className="mt-1 text-xs text-muted-foreground">
           This is you. Role and ban controls are disabled.
         </p>
       )}
 
       <section className="mt-6 grid grid-cols-3 gap-3 text-sm">
-        <div className="border border-neutral-200 p-3 dark:border-neutral-800">
-          <p className="text-xs text-neutral-500">Role</p>
+        <div className="rounded-md border border-border p-3">
+          <p className="text-xs text-muted-foreground">Role</p>
           <p className="mt-1 font-medium">{user.role}</p>
         </div>
-        <div className="border border-neutral-200 p-3 dark:border-neutral-800">
-          <p className="text-xs text-neutral-500">Projects</p>
+        <div className="rounded-md border border-border p-3">
+          <p className="text-xs text-muted-foreground">Projects</p>
           <p className="mt-1 font-medium">{projectCount}</p>
         </div>
-        <div className="border border-neutral-200 p-3 dark:border-neutral-800">
-          <p className="text-xs text-neutral-500">Bookmarks</p>
+        <div className="rounded-md border border-border p-3">
+          <p className="text-xs text-muted-foreground">Bookmarks</p>
           <p className="mt-1 font-medium">{bookmarkCount}</p>
         </div>
       </section>
 
       {user.affiliation && (
         <p className="mt-4 text-sm">
-          <span className="text-neutral-500">Affiliation: </span>
+          <span className="text-muted-foreground">Affiliation: </span>
           {user.affiliation}
         </p>
       )}
       {user.linkedin && (
         <p className="text-sm">
-          <span className="text-neutral-500">LinkedIn: </span>
-          <a href={user.linkedin} className="text-blue-700 hover:underline">
-            {user.linkedin}
-          </a>
+          <span className="text-muted-foreground">LinkedIn: </span>
+          <a href={user.linkedin}>{user.linkedin}</a>
         </p>
       )}
       <p className="text-sm">
-        <span className="text-neutral-500">Joined: </span>
+        <span className="text-muted-foreground">Joined: </span>
         {new Date(user.createdAt).toLocaleDateString()}
       </p>
 
@@ -100,7 +98,7 @@ function UserDetail() {
       <section className="mt-8">
         <h2 className="font-medium text-sm">Recent projects</h2>
         {recentProjects.length === 0 ? (
-          <p className="mt-2 text-sm text-neutral-500">None.</p>
+          <p className="mt-2 text-sm text-muted-foreground">None.</p>
         ) : (
           <ul className="mt-2 space-y-1">
             {recentProjects.map((p) => (
@@ -108,11 +106,11 @@ function UserDetail() {
                 <Link
                   to="/projects/$projectId"
                   params={{ projectId: p.id }}
-                  className="text-sm text-blue-700 hover:underline"
+                  className="text-sm"
                 >
                   {p.title}
                 </Link>{" "}
-                <span className="text-xs text-neutral-500">
+                <span className="text-xs text-muted-foreground">
                   ({p.status as string})
                 </span>
               </li>

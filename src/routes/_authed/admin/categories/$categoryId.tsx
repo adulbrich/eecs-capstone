@@ -1,5 +1,8 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { Button } from "#/components/ui/button";
+import { Input } from "#/components/ui/input";
+import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
 import {
   deleteCategory,
@@ -64,35 +67,23 @@ function CategoryEdit() {
     <div className="mx-auto max-w-md p-8">
       <h1 className="text-2xl font-semibold">Edit category</h1>
       <form onSubmit={onSave} className="mt-6 space-y-3">
-        <div>
-          <label
-            htmlFor="cat-name"
-            className="block text-xs font-medium text-neutral-500"
-          >
-            Name
-          </label>
-          <input
+        <div className="space-y-1.5">
+          <Label htmlFor="cat-name">Name</Label>
+          <Input
             id="cat-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="mt-1 w-full border p-2"
           />
         </div>
-        <div>
-          <label
-            htmlFor="cat-type"
-            className="block text-xs font-medium text-neutral-500"
-          >
-            Type
-          </label>
-          <input
+        <div className="space-y-1.5">
+          <Label htmlFor="cat-type">Type</Label>
+          <Input
             id="cat-type"
             list="cat-type-options"
             value={type}
             onChange={(e) => setType(e.target.value)}
             required
-            className="mt-1 w-full border p-2"
           />
           <datalist id="cat-type-options">
             {types.map((t) => (
@@ -101,21 +92,19 @@ function CategoryEdit() {
           </datalist>
         </div>
         <div className="flex gap-2">
-          <button
-            type="submit"
-            className="bg-brand px-3 py-2 text-sm text-white"
-          >
+          <Button type="submit" size="sm">
             Save
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="destructive"
+            size="sm"
             onClick={() => void onDelete()}
-            className="border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50"
           >
             Delete
-          </button>
+          </Button>
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </form>
     </div>
   );
