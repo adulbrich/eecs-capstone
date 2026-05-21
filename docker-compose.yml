@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:18
-    container_name: cs-capstone-db
+    container_name: cs-capstone-database
     restart: unless-stopped
     ports:
       - "5432:5432"
@@ -14,7 +14,7 @@ services:
 
   rustfs:
     image: rustfs/rustfs:latest
-    container_name: cs-capstone-s3
+    container_name: cs-capstone-storage
     restart: unless-stopped
     ports:
       - "9000:9000"   # S3 API

@@ -42,11 +42,21 @@
 
 ### Inventory Management
 
-- Users can browse inventory items.
-- Admins can add, edit, and delete inventory items.
-- Users can request inventory items (with a cart functionality).
-- Admins can approve or reject inventory requests.
+- An inventory item can be in the following states (status): available, requested, reserved, checked out, maintenance, retired.
+- Users can browse inventory items (default: available).
+- Users can also see inventory items that are requested, reserved, checked out, and in maintenance, but not retired items.
+- Users cannot see who has requested, reserved, or checked out inventory items.
+- Instructors/admins can add, edit, and delete inventory items.
+- Users can request inventory items (with a cart-like functionality), i.e., users can request several items at once.
+- Instructors/admins can approve or reject inventory requests.
 - Logs should be kept for inventory changes and requests.
+- Instructors/admins can change the status of inventory items and assign them to users when they are checked out.
+- Items are automaticall assigned to the user that requested them when their status is changed to reserved, but instructors/admins can also manually assign items to users when they are checked out.
+- Users cannot change the status of inventory items but for requested. They can only request items that are available.
+- Users can cancel a request for an inventory item if it's still in the requested or reserved status.
+- An inventory item has the following fields: name, description, quantity, location, status, etc.
+- Use the existing notifications system to let users know if the status of a request has changed.
+- If an instructor/admin rejects a request, they have to provide a reason for the rejection, and that reason is visible to the user. The item(s) return to available status.
 
 ### Index Page
 
