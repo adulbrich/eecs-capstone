@@ -1,6 +1,6 @@
 import { and, desc, eq, ilike, ne, or, sql } from "drizzle-orm";
 import { db } from "#/db";
-import { inventoryItems } from "#/db/schema";
+import { inventoryItemEditLog, inventoryItems } from "#/db/schema";
 import { readSession } from "#/lib/_internal/auth-guards";
 
 type Viewer = { id: string; role?: string | null | undefined } | null;
@@ -116,4 +116,127 @@ export async function listInventoryForCurrentUser(data: ListInventoryInput) {
 export async function getInventoryItemForCurrentUser(data: { id: string }) {
   const session = await readSession();
   return getInventoryItemAs(session?.user ?? null, data);
+}
+
+export type CreateInventoryItemInput = {
+  name: string;
+  description: string | null;
+  category: string | null;
+  serial: string | null;
+  location: string | null;
+  notes: string | null;
+  imageUrl: string | null;
+};
+
+function assertStaff(viewer: Viewer) {
+  if (!isStaff(viewer)) throw new Error("Forbidden");
+}
+
+export async function createInventoryItemAs(
+  viewer: Viewer,
+  data: CreateInventoryItemInput,
+) {
+  assertStaff(viewer);
+  const [row] = await db
+    .insert(inventoryItems)
+    .values({
+      name: data.name,
+      description: data.description,
+      category: data.category,
+      serial: data.serial,
+      location: data.location,
+      notes: data.notes,
+      imageUrl: data.imageUrl,
+    })
+    .returning();
+  return fullForStaff(row);
+}
+
+export type UpdateInventoryItemInput = CreateInventoryItemInput & {
+  id: string;
+};
+
+const EDITABLE_FIELDS = [
+  "name",
+  "description",
+  "category",
+  "serial",
+  "location",
+  "notes",
+  "imageUrl",
+] as const;
+
+export async function updateInventoryItemAs(
+  viewer: Viewer,
+  data: UpdateInventoryItemInput,
+) {
+  assertStaff(viewer);
+  return db.transaction(async (tx) => {
+    const [before] = await tx
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, data.id))
+      .for("update");
+    if (!before) throw new Error("Item not found");
+
+    const changed: string[] = [];
+    const oldValues: Record<string, unknown> = {};
+    const newValues: Record<string, unknown> = {};
+    for (const f of EDITABLE_FIELDS) {
+      if ((before as Record<string, unknown>)[f] !== (data as Record<string, unknown>)[f]) {
+        changed.push(f);
+        oldValues[f] = (before as Record<string, unknown>)[f];
+        newValues[f] = (data as Record<string, unknown>)[f];
+      }
+    }
+    if (changed.length === 0) return fullForStaff(before);
+
+    await tx
+      .update(inventoryItems)
+      .set({
+        name: data.name,
+        description: data.description,
+        category: data.category,
+        serial: data.serial,
+        location: data.location,
+        notes: data.notes,
+        imageUrl: data.imageUrl,
+        updatedAt: new Date(),
+      })
+      .where(eq(inventoryItems.id, data.id));
+
+    await tx.insert(inventoryItemEditLog).values({
+      itemId: data.id,
+      editorId: viewer!.id,
+      changedFields: changed,
+      oldValues,
+      newValues,
+    });
+
+    const [after] = await tx
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, data.id));
+    return fullForStaff(after);
+  });
+}
+
+export async function hardDeleteInventoryItemAs(
+  viewer: Viewer,
+  data: { id: string; confirmName: string },
+) {
+  assertStaff(viewer);
+  const [row] = await db
+    .select()
+    .from(inventoryItems)
+    .where(eq(inventoryItems.id, data.id));
+  if (!row) throw new Error("Item not found");
+  if (row.name !== data.confirmName) {
+    throw new Error("Name confirmation does not match");
+  }
+  if (row.status !== "available" && row.status !== "retired") {
+    throw new Error("Hard delete only allowed when status is available or retired");
+  }
+  await db.delete(inventoryItems).where(eq(inventoryItems.id, data.id));
+  return { ok: true as const };
 }
