@@ -350,33 +350,49 @@ export async function submitCartAs(
     const cartRows = await tx
       .select({
         itemId: inventoryCartItems.itemId,
-        status: inventoryItems.status,
-        name: inventoryItems.name,
       })
       .from(inventoryCartItems)
-      .innerJoin(
-        inventoryItems,
-        eq(inventoryCartItems.itemId, inventoryItems.id),
-      )
       .where(eq(inventoryCartItems.userId, viewer.id));
 
     if (cartRows.length === 0) {
       throw new Error("Cart is empty");
     }
 
-    const available = cartRows.filter((r) => r.status === "available");
-    const skipped = cartRows
-      .filter((r) => r.status !== "available")
-      .map((r) => ({ itemId: r.itemId, reason: "no_longer_available" as const }));
+    // Phase 1: lock each cart item row and confirm it is still available.
+    // This closes the TOCTOU window that an unlocked partition select would
+    // leave open: a concurrent transaction could move the item out of
+    // available before we acquire the lock, and the inline transition
+    // below would otherwise silently overwrite that other party's hold.
+    // Mirrors the overwrite guard in transitionItem.
+    const skipped: { itemId: string; reason: "no_longer_available" }[] = [];
+    const survivors: {
+      itemId: string;
+      oldStatus: (typeof inventoryItems.$inferSelect)["status"];
+    }[] = [];
+    for (const row of cartRows) {
+      const [locked] = await tx
+        .select()
+        .from(inventoryItems)
+        .where(eq(inventoryItems.id, row.itemId))
+        .for("update");
+      if (!locked || locked.status !== "available") {
+        skipped.push({ itemId: row.itemId, reason: "no_longer_available" });
+        continue;
+      }
+      survivors.push({ itemId: row.itemId, oldStatus: locked.status });
+    }
 
-    if (available.length === 0) {
-      // Clean up the cart and report all as skipped.
-      await tx
-        .delete(inventoryCartItems)
-        .where(eq(inventoryCartItems.userId, viewer.id));
+    // Cart is always cleared once we have processed it.
+    await tx
+      .delete(inventoryCartItems)
+      .where(eq(inventoryCartItems.userId, viewer.id));
+
+    if (survivors.length === 0) {
       return { requestId: null, submitted: [], skipped };
     }
 
+    // Phase 2: only now insert the request envelope (so we never leave an
+    // orphaned inventoryRequests row when every line races) and the lines.
     const [req] = await tx
       .insert(inventoryRequests)
       .values({ userId: viewer.id, note: data.note })
@@ -385,26 +401,22 @@ export async function submitCartAs(
     const lines = await tx
       .insert(inventoryRequestItems)
       .values(
-        available.map((r) => ({
+        survivors.map((s) => ({
           requestId: req.id,
-          itemId: r.itemId,
+          itemId: s.itemId,
           status: "pending" as const,
         })),
       )
       .returning();
 
-    await tx
-      .delete(inventoryCartItems)
-      .where(eq(inventoryCartItems.userId, viewer.id));
-
     // transitionItem requires staff; do the requested transition inline here
-    // (we are inside the same transaction so atomicity is preserved).
-    for (const line of lines) {
-      const [current] = await tx
-        .select()
-        .from(inventoryItems)
-        .where(eq(inventoryItems.id, line.itemId))
-        .for("update");
+    // (we are inside the same transaction and the survivor rows are already
+    // locked, so atomicity and the overwrite guard hold).
+    // No notification is emitted: self-submit does not need one (matches the
+    // requested-transition arm of transitionItem.maybeNotify).
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const survivor = survivors[i];
       await tx
         .update(inventoryItems)
         .set({
@@ -417,7 +429,7 @@ export async function submitCartAs(
         .where(eq(inventoryItems.id, line.itemId));
       await tx.insert(inventoryItemStatusHistory).values({
         itemId: line.itemId,
-        oldStatus: current.status,
+        oldStatus: survivor.oldStatus,
         newStatus: "requested",
         changedBy: viewer.id,
         requestItemId: line.id,
