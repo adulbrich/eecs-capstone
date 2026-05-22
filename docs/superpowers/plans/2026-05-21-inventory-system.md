@@ -174,9 +174,9 @@ export const inventoryItemStatusHistory = pgTable(
       .notNull(),
     oldStatus: inventoryItemStatusEnum("old_status"),
     newStatus: inventoryItemStatusEnum("new_status").notNull(),
-    changedBy: text("changed_by").references(() => user.id, {
-      onDelete: "set null",
-    }),
+    changedBy: text("changed_by")
+      .references(() => user.id, { onDelete: "restrict" })
+      .notNull(),
     comment: text("comment"),
     requestItemId: uuid("request_item_id").references(
       () => inventoryRequestItems.id,
