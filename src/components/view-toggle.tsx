@@ -1,15 +1,28 @@
 import { useNavigate } from "@tanstack/react-router";
 import { LayoutGrid, List } from "lucide-react";
 
-type Props = {
-  current: "card" | "row";
-};
+type Props =
+  | {
+      current: "card" | "row";
+      value?: undefined;
+      onChange?: undefined;
+    }
+  | {
+      value: "card" | "row";
+      onChange: (view: "card" | "row") => void;
+      current?: undefined;
+    };
 
-export function ViewToggle({ current }: Props) {
+export function ViewToggle(props: Props) {
   const navigate = useNavigate({ from: "/projects/" });
+  const current = props.value ?? props.current!;
 
   function setMode(view: "card" | "row") {
     if (view === current) return;
+    if (props.onChange) {
+      props.onChange(view);
+      return;
+    }
     void navigate({
       search: (prev) => ({ ...prev, view }),
     });
