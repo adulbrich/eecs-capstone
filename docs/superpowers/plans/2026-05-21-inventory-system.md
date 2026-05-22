@@ -1521,15 +1521,25 @@ import { inventoryItemEditLog } from "#/db/schema";
 describe("catalog CRUD", () => {
   it("non-staff cannot create / update / delete", async () => {
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const blank = {
+      name: "X",
+      description: null,
+      category: null,
+      serial: null,
+      location: null,
+      notes: null,
+      imageUrl: null,
+    };
+    await expect(createInventoryItemAs(student, blank)).rejects.toThrow(
+      /Forbidden/,
+    );
     await expect(
-      createInventoryItemAs(student, {
-        name: "X",
-        description: null,
-        category: null,
-        serial: null,
-        location: null,
-        notes: null,
-        imageUrl: null,
+      updateInventoryItemAs(student, { id: "00000000-0000-0000-0000-000000000000", ...blank }),
+    ).rejects.toThrow(/Forbidden/);
+    await expect(
+      hardDeleteInventoryItemAs(student, {
+        id: "00000000-0000-0000-0000-000000000000",
+        confirmName: "X",
       }),
     ).rejects.toThrow(/Forbidden/);
   });
@@ -1586,6 +1596,8 @@ describe("catalog CRUD", () => {
   it("hard-delete refuses when name confirmation does not match", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const item = await makeItem({ name: "Real" });
+    // Retire first so the status gate cannot fire instead and mask a name-gate bug.
+    await transitionItem(admin, { itemId: item.id, nextStatus: "retired" });
     await expect(
       hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Wrong" }),
     ).rejects.toThrow(/confirmation/);
@@ -1614,7 +1626,7 @@ describe("catalog CRUD", () => {
     await transitionItem(admin, { itemId: item.id, nextStatus: "retired" });
     await expect(
       hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Cabled" }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/historical/i);
   });
 });
 ```
