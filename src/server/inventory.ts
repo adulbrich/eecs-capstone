@@ -118,3 +118,45 @@ export const submitCart = createServerFn({ method: "POST" })
     const { submitCartForCurrentUser } = await import("./_internal/inventory");
     return submitCartForCurrentUser(data);
   });
+
+const approveSchema = z.object({
+  requestItemId: z.string().uuid(),
+  pickupBy: z.coerce.date().nullable().default(null),
+});
+
+export const approveRequestItem = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => approveSchema.parse(d))
+  .handler(async ({ data }) => {
+    const { approveRequestItemForCurrentUser } = await import(
+      "./_internal/inventory"
+    );
+    return approveRequestItemForCurrentUser(data);
+  });
+
+const rejectSchema = z.object({
+  requestItemId: z.string().uuid(),
+  reviewComment: z.string().min(1).max(2000),
+});
+
+export const rejectRequestItem = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => rejectSchema.parse(d))
+  .handler(async ({ data }) => {
+    const { rejectRequestItemForCurrentUser } = await import(
+      "./_internal/inventory"
+    );
+    return rejectRequestItemForCurrentUser(data);
+  });
+
+const cancelSchema = z.object({
+  requestItemId: z.string().uuid(),
+  note: z.string().max(2000).nullable().default(null),
+});
+
+export const cancelRequestItem = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => cancelSchema.parse(d))
+  .handler(async ({ data }) => {
+    const { cancelRequestItemForCurrentUser } = await import(
+      "./_internal/inventory"
+    );
+    return cancelRequestItemForCurrentUser(data);
+  });
