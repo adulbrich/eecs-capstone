@@ -1,10 +1,7 @@
 import { and, desc, eq, ilike, ne, or, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { inventoryItems } from "#/db/schema";
-
-// Note: requireUser is dynamic-imported in the *ForCurrentUser helpers added
-// in Phase 3 (when the first writer arrives). Keeping that import lazy avoids
-// a noUnusedLocals lint here in the read-only phase.
+import { readSession } from "#/lib/_internal/auth-guards";
 
 type Viewer = { id: string; role?: string | null | undefined } | null;
 
@@ -112,13 +109,11 @@ export async function getInventoryItemAs(viewer: Viewer, data: { id: string }) {
 }
 
 export async function listInventoryForCurrentUser(data: ListInventoryInput) {
-  const { readSession } = await import("#/lib/_internal/auth-guards");
   const session = await readSession();
   return listInventoryAs(session?.user ?? null, data);
 }
 
 export async function getInventoryItemForCurrentUser(data: { id: string }) {
-  const { readSession } = await import("#/lib/_internal/auth-guards");
   const session = await readSession();
   return getInventoryItemAs(session?.user ?? null, data);
 }
