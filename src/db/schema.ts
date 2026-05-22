@@ -34,11 +34,6 @@ export const projectStatusEnum = pgEnum("project_status", [
   "published",
   "archived",
 ]);
-export const inventoryRequestStatusEnum = pgEnum("inventory_request_status", [
-  "pending",
-  "approved",
-  "rejected",
-]);
 
 export const programs = pgTable("programs", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -253,42 +248,186 @@ export const projectBookmarks = pgTable(
 );
 
 // INVENTORY
-export const inventoryItems = pgTable("inventory_items", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  name: text("name").notNull(),
-  description: text("description"),
-  category: text("category"),
-  quantity: integer("quantity").default(0),
-  reorderThreshold: integer("reorder_threshold").default(10),
-  imageUrl: text("image_url"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const inventoryItemStatusEnum = pgEnum("inventory_item_status", [
+  "available",
+  "requested",
+  "reserved",
+  "checked_out",
+  "maintenance",
+  "retired",
+]);
 
-export const inventoryRequests = pgTable("inventory_requests", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: text("user_id")
-    .references(() => user.id, { onDelete: "restrict" })
-    .notNull(),
-  itemId: uuid("item_id")
-    .references(() => inventoryItems.id)
-    .notNull(),
-  quantity: integer("quantity").notNull().default(1),
-  status: inventoryRequestStatusEnum("status").default("pending"),
-  reason: text("reason"),
-  reviewedBy: text("reviewed_by").references(() => user.id, {
-    onDelete: "set null",
-  }),
-  reviewComment: text("review_comment"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
-});
+export const inventoryRequestItemStatusEnum = pgEnum(
+  "inventory_request_item_status",
+  ["pending", "approved", "rejected", "cancelled", "returned"],
+);
+
+export const inventoryItems = pgTable(
+  "inventory_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    category: text("category"),
+    serial: text("serial"),
+    location: text("location"),
+    notes: text("notes"),
+    imageUrl: text("image_url"),
+
+    status: inventoryItemStatusEnum("status").notNull().default("available"),
+    currentHolderId: text("current_holder_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    currentHolderLabel: text("current_holder_label"),
+    currentRequestItemId: uuid("current_request_item_id"),
+
+    searchVector: tsvector("search_vector")
+      .notNull()
+      .generatedAlwaysAs(
+        sql`setweight(to_tsvector('english', coalesce(name, '')), 'A') || setweight(to_tsvector('english', coalesce(description, '')), 'B') || setweight(to_tsvector('english', coalesce(category, '')), 'C')`,
+      ),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("inventory_items_status_idx").on(t.status),
+    index("inventory_items_category_idx").on(t.category),
+    index("inventory_items_current_holder_idx").on(t.currentHolderId),
+  ],
+);
+
+export const inventoryRequests = pgTable(
+  "inventory_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .references(() => user.id, { onDelete: "restrict" })
+      .notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("inventory_requests_user_created_idx").on(t.userId, t.createdAt),
+  ],
+);
+
+export const inventoryRequestItems = pgTable(
+  "inventory_request_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    requestId: uuid("request_id")
+      .references(() => inventoryRequests.id, { onDelete: "cascade" })
+      .notNull(),
+    itemId: uuid("item_id")
+      .references(() => inventoryItems.id, { onDelete: "restrict" })
+      .notNull(),
+
+    status: inventoryRequestItemStatusEnum("status")
+      .notNull()
+      .default("pending"),
+    reviewedBy: text("reviewed_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewComment: text("review_comment"),
+
+    pickupBy: timestamp("pickup_by", { withTimezone: true }),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    closedBy: text("closed_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    closedReason: text("closed_reason"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("inventory_request_items_request_idx").on(t.requestId),
+    index("inventory_request_items_item_idx").on(t.itemId),
+    index("inventory_request_items_status_idx").on(t.status),
+  ],
+);
+
+export const inventoryCartItems = pgTable(
+  "inventory_cart_items",
+  {
+    userId: text("user_id")
+      .references(() => user.id, { onDelete: "cascade" })
+      .notNull(),
+    itemId: uuid("item_id")
+      .references(() => inventoryItems.id, { onDelete: "cascade" })
+      .notNull(),
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.itemId] })],
+);
+
+export const inventoryItemStatusHistory = pgTable(
+  "inventory_item_status_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    itemId: uuid("item_id")
+      .references(() => inventoryItems.id, { onDelete: "cascade" })
+      .notNull(),
+    oldStatus: inventoryItemStatusEnum("old_status"),
+    newStatus: inventoryItemStatusEnum("new_status").notNull(),
+    changedBy: text("changed_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    comment: text("comment"),
+    requestItemId: uuid("request_item_id").references(
+      () => inventoryRequestItems.id,
+      { onDelete: "set null" },
+    ),
+    holderId: text("holder_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    holderLabel: text("holder_label"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("inventory_item_status_history_item_idx").on(t.itemId, t.createdAt),
+  ],
+);
+
+export const inventoryItemEditLog = pgTable(
+  "inventory_item_edit_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    itemId: uuid("item_id")
+      .references(() => inventoryItems.id, { onDelete: "cascade" })
+      .notNull(),
+    editorId: text("editor_id")
+      .references(() => user.id, { onDelete: "restrict" })
+      .notNull(),
+    changedFields: text("changed_fields").array().notNull(),
+    oldValues: jsonb("old_values").notNull(),
+    newValues: jsonb("new_values").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("inventory_item_edit_log_item_idx").on(t.itemId, t.createdAt),
+  ],
+);
 
 // NOTIFICATIONS
 export const notifications = pgTable(
