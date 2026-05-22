@@ -799,7 +799,7 @@ describe("transitionItem", () => {
     expect(after.currentHolderLabel).toBe("Course demo");
   });
 
-  it("releasing a held item back to available closes the line as returned", async () => {
+  it("releasing a reserved item back to available closes the line as cancelled (released before fulfillment)", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");
     const item = await makeItem();
@@ -816,7 +816,7 @@ describe("transitionItem", () => {
       .select()
       .from(inventoryRequestItems)
       .where(eq(inventoryRequestItems.id, line.id));
-    expect(reqLine.status).toBe("returned");
+    expect(reqLine.status).toBe("cancelled");
     expect(reqLine.closedBy).toBe(admin.id);
     const [after] = await db
       .select()
@@ -824,6 +824,88 @@ describe("transitionItem", () => {
       .where(eq(inventoryItems.id, item.id));
     expect(after.currentHolderId).toBeNull();
     expect(after.currentRequestItemId).toBeNull();
+  });
+
+  it("checked-out item returned to available closes the line as returned (fulfillment completed)", async () => {
+    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    const { line } = await makeRequestLine(student.id, item.id);
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      requestItemId: line.id,
+      holderId: student.id,
+      pickupBy: new Date(Date.now() + 86400000),
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderId: student.id,
+      dueAt: new Date(Date.now() + 7 * 86400000),
+    });
+    await transitionItem(admin, { itemId: item.id, nextStatus: "available" });
+    const [reqLine] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.id, line.id));
+    expect(reqLine.status).toBe("returned");
+    const notifs = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, student.id));
+    expect(
+      notifs.some((n) => n.type === "inventory_item_returned"),
+    ).toBe(true);
+  });
+
+  it("released reserved item to retired notifies requester with inventory_request_closed", async () => {
+    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    const { line } = await makeRequestLine(student.id, item.id);
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      requestItemId: line.id,
+      holderId: student.id,
+      pickupBy: new Date(Date.now() + 86400000),
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "retired",
+      comment: "no longer in service",
+    });
+    const notifs = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, student.id));
+    expect(
+      notifs.some((n) => n.type === "inventory_request_closed"),
+    ).toBe(true);
+  });
+
+  it("rejects requested transition when item is not available (overwrite guard)", async () => {
+    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    const { line: line1 } = await makeRequestLine(student.id, item.id);
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "requested",
+      requestItemId: line1.id,
+      holderId: student.id,
+    });
+    const { line: line2 } = await makeRequestLine(student.id, item.id);
+    await expect(
+      transitionItem(admin, {
+        itemId: item.id,
+        nextStatus: "requested",
+        requestItemId: line2.id,
+        holderId: student.id,
+      }),
+    ).rejects.toThrow(/Cannot move item to requested/);
   });
 });
 ```
