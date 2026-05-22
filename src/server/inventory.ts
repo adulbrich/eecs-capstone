@@ -38,3 +38,49 @@ export const getInventoryItem = createServerFn({ method: "GET" })
     );
     return getInventoryItemForCurrentUser(data);
   });
+
+const itemPayloadSchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(5000).nullable().default(null),
+  category: z.string().max(120).nullable().default(null),
+  serial: z.string().max(120).nullable().default(null),
+  location: z.string().max(200).nullable().default(null),
+  notes: z.string().max(5000).nullable().default(null),
+  imageUrl: z.string().max(500).nullable().default(null),
+});
+
+export const createInventoryItem = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => itemPayloadSchema.parse(d))
+  .handler(async ({ data }) => {
+    const { createInventoryItemForCurrentUser } = await import(
+      "./_internal/inventory"
+    );
+    return createInventoryItemForCurrentUser(data);
+  });
+
+const updatePayloadSchema = itemPayloadSchema.extend({
+  id: z.string().uuid(),
+});
+
+export const updateInventoryItem = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => updatePayloadSchema.parse(d))
+  .handler(async ({ data }) => {
+    const { updateInventoryItemForCurrentUser } = await import(
+      "./_internal/inventory"
+    );
+    return updateInventoryItemForCurrentUser(data);
+  });
+
+const hardDeleteSchema = z.object({
+  id: z.string().uuid(),
+  confirmName: z.string().min(1),
+});
+
+export const hardDeleteInventoryItem = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => hardDeleteSchema.parse(d))
+  .handler(async ({ data }) => {
+    const { hardDeleteInventoryItemForCurrentUser } = await import(
+      "./_internal/inventory"
+    );
+    return hardDeleteInventoryItemForCurrentUser(data);
+  });

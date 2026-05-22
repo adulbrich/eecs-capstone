@@ -1,7 +1,7 @@
 import { and, desc, eq, ilike, ne, or, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { inventoryItemEditLog, inventoryItems, inventoryRequestItems } from "#/db/schema";
-import { readSession } from "#/lib/_internal/auth-guards";
+import { readSession, requireUser } from "#/lib/_internal/auth-guards";
 
 type Viewer = { id: string; role?: string | null | undefined } | null;
 
@@ -256,4 +256,26 @@ export async function hardDeleteInventoryItemAs(
   }
   await db.delete(inventoryItems).where(eq(inventoryItems.id, data.id));
   return { ok: true as const };
+}
+
+export async function createInventoryItemForCurrentUser(
+  data: CreateInventoryItemInput,
+) {
+  const viewer = await requireUser();
+  return createInventoryItemAs(viewer, data);
+}
+
+export async function updateInventoryItemForCurrentUser(
+  data: UpdateInventoryItemInput,
+) {
+  const viewer = await requireUser();
+  return updateInventoryItemAs(viewer, data);
+}
+
+export async function hardDeleteInventoryItemForCurrentUser(data: {
+  id: string;
+  confirmName: string;
+}) {
+  const viewer = await requireUser();
+  return hardDeleteInventoryItemAs(viewer, data);
 }
