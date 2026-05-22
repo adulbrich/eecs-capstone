@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
   inventoryCartItems,
@@ -8,6 +8,7 @@ import {
   inventoryRequestItems,
   inventoryRequests,
   notifications,
+  user,
 } from "#/db/schema";
 import { readSession, requireUser } from "#/lib/_internal/auth-guards";
 
@@ -690,4 +691,136 @@ export async function cancelRequestItemForCurrentUser(data: {
 }) {
   const viewer = await requireUser();
   return cancelRequestItemAs(viewer, data);
+}
+
+export async function listMyItemsAs(viewer: Viewer) {
+  if (!viewer) throw new Error("Sign in required");
+  const [cart, active, history] = await Promise.all([
+    getCartAs(viewer),
+    db
+      .select({
+        line: inventoryRequestItems,
+        item: inventoryItems,
+        request: inventoryRequests,
+      })
+      .from(inventoryRequestItems)
+      .innerJoin(
+        inventoryRequests,
+        eq(inventoryRequestItems.requestId, inventoryRequests.id),
+      )
+      .innerJoin(
+        inventoryItems,
+        eq(inventoryRequestItems.itemId, inventoryItems.id),
+      )
+      .where(
+        and(
+          eq(inventoryRequests.userId, viewer.id),
+          inArray(inventoryRequestItems.status, ["pending", "approved"]),
+        ),
+      )
+      .orderBy(desc(inventoryRequestItems.createdAt)),
+    db
+      .select({
+        line: inventoryRequestItems,
+        item: inventoryItems,
+        request: inventoryRequests,
+      })
+      .from(inventoryRequestItems)
+      .innerJoin(
+        inventoryRequests,
+        eq(inventoryRequestItems.requestId, inventoryRequests.id),
+      )
+      .innerJoin(
+        inventoryItems,
+        eq(inventoryRequestItems.itemId, inventoryItems.id),
+      )
+      .where(
+        and(
+          eq(inventoryRequests.userId, viewer.id),
+          inArray(inventoryRequestItems.status, [
+            "rejected",
+            "cancelled",
+            "returned",
+          ]),
+        ),
+      )
+      .orderBy(desc(inventoryRequestItems.updatedAt))
+      .limit(50),
+  ]);
+  return { cart, active, history };
+}
+
+export async function listInventoryRequestsAs(
+  viewer: Viewer,
+  data: { tab: "pending" | "all" },
+) {
+  assertStaff(viewer);
+  const statusFilter =
+    data.tab === "pending"
+      ? eq(inventoryRequestItems.status, "pending")
+      : undefined;
+  const rows = await db
+    .select({
+      line: inventoryRequestItems,
+      item: inventoryItems,
+      request: inventoryRequests,
+      requesterEmail: user.email,
+      requesterName: user.name,
+    })
+    .from(inventoryRequestItems)
+    .innerJoin(
+      inventoryRequests,
+      eq(inventoryRequestItems.requestId, inventoryRequests.id),
+    )
+    .innerJoin(
+      inventoryItems,
+      eq(inventoryRequestItems.itemId, inventoryItems.id),
+    )
+    .innerJoin(user, eq(inventoryRequests.userId, user.id))
+    .where(statusFilter)
+    .orderBy(desc(inventoryRequests.createdAt));
+
+  // Group by requestId so the admin queue can render one card per batch.
+  const byRequest = new Map<
+    string,
+    {
+      requestId: string;
+      requester: { id: string; email: string; name: string | null };
+      createdAt: Date;
+      note: string | null;
+      lines: typeof rows;
+    }
+  >();
+  for (const r of rows) {
+    const id = r.request.id;
+    const existing = byRequest.get(id);
+    if (existing) {
+      existing.lines.push(r);
+    } else {
+      byRequest.set(id, {
+        requestId: id,
+        requester: {
+          id: r.request.userId,
+          email: r.requesterEmail,
+          name: r.requesterName,
+        },
+        createdAt: r.request.createdAt,
+        note: r.request.note,
+        lines: [r],
+      });
+    }
+  }
+  return Array.from(byRequest.values());
+}
+
+export async function listMyItemsForCurrentUser() {
+  const viewer = await requireUser();
+  return listMyItemsAs(viewer);
+}
+
+export async function listInventoryRequestsForCurrentUser(data: {
+  tab: "pending" | "all";
+}) {
+  const viewer = await requireUser();
+  return listInventoryRequestsAs(viewer, data);
 }
