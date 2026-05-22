@@ -1054,14 +1054,12 @@ export async function getInventoryItemAs(viewer: Viewer, data: { id: string }) {
 }
 
 export async function listInventoryForCurrentUser(data: ListInventoryInput) {
-  // viewer may be null (public listing); read session non-throwing
-  const { readSession } = await import("#/lib/_internal/auth-guards");
+  // viewer may be null (public listing); readSession does not throw.
   const session = await readSession();
   return listInventoryAs(session?.user ?? null, data);
 }
 
 export async function getInventoryItemForCurrentUser(data: { id: string }) {
-  const { readSession } = await import("#/lib/_internal/auth-guards");
   const session = await readSession();
   return getInventoryItemAs(session?.user ?? null, data);
 }
