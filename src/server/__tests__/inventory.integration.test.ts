@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import {
+  inventoryCartItems,
   inventoryItemEditLog,
   inventoryItemStatusHistory,
   inventoryItems,
@@ -12,10 +13,12 @@ import {
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import {
+  addToCartAs,
   createInventoryItemAs,
   getInventoryItemAs,
   hardDeleteInventoryItemAs,
   listInventoryAs,
+  submitCartAs,
   updateInventoryItemAs,
 } from "#/server/_internal/inventory";
 import { transitionItem } from "#/server/_internal/inventory-transitions";
@@ -464,5 +467,63 @@ describe("catalog CRUD", () => {
     await expect(
       hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Cabled" }),
     ).rejects.toThrow(/historical/i);
+  });
+});
+
+describe("cart", () => {
+  it("rejects adding a non-available item", async () => {
+    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "maintenance",
+    });
+    await expect(
+      addToCartAs(student, { itemId: item.id }),
+    ).rejects.toThrow(/available/);
+  });
+
+  it("submit happy path: one request, N lines, items move to requested", async () => {
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const items = await Promise.all([makeItem(), makeItem(), makeItem()]);
+    for (const i of items) await addToCartAs(student, { itemId: i.id });
+    const result = await submitCartAs(student, { note: "for demo" });
+    expect(result.submitted).toHaveLength(3);
+    expect(result.skipped).toHaveLength(0);
+    for (const i of items) {
+      const [row] = await db
+        .select()
+        .from(inventoryItems)
+        .where(eq(inventoryItems.id, i.id));
+      expect(row.status).toBe("requested");
+      expect(row.currentHolderId).toBe(student.id);
+      expect(row.currentRequestItemId).not.toBeNull();
+    }
+    const cartLeft = await db
+      .select()
+      .from(inventoryCartItems)
+      .where(eq(inventoryCartItems.userId, student.id));
+    expect(cartLeft).toHaveLength(0);
+  });
+
+  it("submit partial: skips items that became unavailable between add and submit", async () => {
+    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const [a, b, c] = await Promise.all([makeItem(), makeItem(), makeItem()]);
+    await addToCartAs(student, { itemId: a.id });
+    await addToCartAs(student, { itemId: b.id });
+    await addToCartAs(student, { itemId: c.id });
+    await transitionItem(admin, { itemId: b.id, nextStatus: "maintenance" });
+    const result = await submitCartAs(student, { note: null });
+    expect(result.submitted.sort()).toEqual([a.id, c.id].sort());
+    expect(result.skipped).toEqual([
+      { itemId: b.id, reason: "no_longer_available" },
+    ]);
+    const cartLeft = await db
+      .select()
+      .from(inventoryCartItems)
+      .where(eq(inventoryCartItems.userId, student.id));
+    expect(cartLeft).toHaveLength(0);
   });
 });
