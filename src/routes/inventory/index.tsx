@@ -26,7 +26,7 @@ const searchSchema = z.object({
 });
 
 export const Route = createFileRoute("/inventory/")({
-  validateSearch: (s) => searchSchema.parse(s),
+  validateSearch: searchSchema,
   loaderDeps: ({ search }) => search,
   loader: ({ deps }) =>
     listInventory({

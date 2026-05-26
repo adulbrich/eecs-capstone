@@ -1,5 +1,5 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { BookOpen, FolderKanban, Tag, Users } from "lucide-react";
+import { BookOpen, FolderKanban, Package, Tag, Users } from "lucide-react";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { getAdminStats } from "#/server/admin";
@@ -92,6 +92,12 @@ function AdminHome() {
             icon={BookOpen}
             label="Programs"
             description="Manage course programs and instructors"
+          />
+          <NavCard
+            to="/admin/inventory"
+            icon={Package}
+            label="Inventory"
+            description="Add items, review requests, manage checkouts"
           />
           {isAdmin && (
             <NavCard

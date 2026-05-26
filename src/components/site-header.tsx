@@ -3,9 +3,11 @@ import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { authClient } from "#/lib/auth-client";
 import { getPublicUrl } from "#/lib/storage";
+import { CartButton } from "./cart-button";
 import { InstitutionLogo } from "./institution-logo";
 import { NotificationBell } from "./notification-bell";
 import { Button } from "./ui/button";
+import { UserMenu } from "./user-menu";
 import {
   Sheet,
   SheetClose,
@@ -37,16 +39,9 @@ export function SiteHeader() {
           <Link to="/projects" className="nav-link">
             Projects
           </Link>
-          {signedIn && (
-            <>
-              <Link to="/my/projects" className="nav-link">
-                My Projects
-              </Link>
-              <Link to="/my/bookmarks" className="nav-link">
-                Bookmarks
-              </Link>
-            </>
-          )}
+          <Link to="/inventory" className="nav-link">
+            Inventory
+          </Link>
           {isStaff && (
             <Link to="/admin" className="nav-link">
               Admin
@@ -75,7 +70,12 @@ export function SiteHeader() {
           <InstitutionLogo />
         </Link>
         <div className="flex items-center gap-2">
-          {signedIn && <NotificationBell />}
+          {signedIn && (
+            <>
+              <NotificationBell />
+              <CartButton />
+            </>
+          )}
           <MobileMenu
             signedIn={signedIn}
             isPending={isPending}
@@ -140,16 +140,9 @@ function MobileMenu({
           <NavItem to="/projects" onClick={close}>
             Projects
           </NavItem>
-          {signedIn && (
-            <>
-              <NavItem to="/my/projects" onClick={close}>
-                My Projects
-              </NavItem>
-              <NavItem to="/my/bookmarks" onClick={close}>
-                Bookmarks
-              </NavItem>
-            </>
-          )}
+          <NavItem to="/inventory" onClick={close}>
+            Inventory
+          </NavItem>
           {isStaff && (
             <NavItem to="/admin" onClick={close}>
               Admin
@@ -231,7 +224,7 @@ function SignedInMobile({
             referrerPolicy="no-referrer"
           />
         ) : (
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-sm font-medium">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-(--surface-sunken) text-sm font-medium">
             {(user.name ?? user.email).charAt(0).toUpperCase()}
           </div>
         )}
@@ -242,6 +235,17 @@ function SignedInMobile({
           <p className="truncate text-xs text-muted-foreground">{user.email}</p>
         </div>
       </Link>
+      <div className="-mx-4 flex flex-col gap-0 border-t border-border py-2">
+        <NavItem to="/my/projects" onClick={onClose}>
+          My projects
+        </NavItem>
+        <NavItem to="/my/bookmarks" onClick={onClose}>
+          My bookmarks
+        </NavItem>
+        <NavItem to="/my/items" onClick={onClose}>
+          My items
+        </NavItem>
+      </div>
       <Button
         type="button"
         variant="outline"
@@ -280,36 +284,11 @@ function SignedIn({
   email: string;
   image: string | null | undefined;
 }) {
-  const resolvedImage = getPublicUrl(image);
   return (
     <>
       <NotificationBell />
-      <Link to="/profile" className="flex items-center gap-2 hover:underline">
-        {resolvedImage ? (
-          <img
-            src={resolvedImage}
-            alt=""
-            className="h-7 w-7 rounded-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-xs font-medium">
-            {(name ?? email).charAt(0).toUpperCase()}
-          </div>
-        )}
-        <span>{name ?? email}</span>
-      </Link>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={async () => {
-          await authClient.signOut();
-          window.location.href = "/sign-in";
-        }}
-      >
-        Sign out
-      </Button>
+      <CartButton />
+      <UserMenu user={{ name, email, image }} />
     </>
   );
 }
