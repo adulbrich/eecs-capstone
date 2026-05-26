@@ -68,7 +68,7 @@ Dynamic routes require real database IDs. The global setup inserts the following
 - One published project (owned by `user@example.com`)
 - One inventory item
 - One category
-- One program
+- One program (with `instructor@example.com` assigned as a program instructor)
 
 The resulting IDs are written to `src/test/a11y/.fixtures.json`. Test files read this file to construct URLs for dynamic routes.
 
