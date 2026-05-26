@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import {
@@ -20,6 +20,7 @@ import {
   getInventoryItemAs,
   hardDeleteInventoryItemAs,
   listInventoryAs,
+  recordOverdueNotificationsAs,
   rejectRequestItemAs,
   submitCartAs,
   updateInventoryItemAs,
@@ -644,5 +645,123 @@ describe("request lifecycle", () => {
         note: null,
       }),
     ).rejects.toThrow(/checkout/);
+  });
+});
+
+describe("bulk approve in a batch is atomic", () => {
+  it("a single failing line rolls back the whole batch when run in one tx", async () => {
+    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const [a, b, c] = await Promise.all([makeItem(), makeItem(), makeItem()]);
+    for (const i of [a, b, c]) await addToCartAs(student, { itemId: i.id });
+    await submitCartAs(student, { note: null });
+    const lines = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(inArray(inventoryRequestItems.itemId, [a.id, b.id, c.id]));
+    // Tamper with line B: pre-close it so the approve call fails.
+    await db
+      .update(inventoryRequestItems)
+      .set({ status: "cancelled", closedAt: new Date(), closedBy: student.id })
+      .where(eq(inventoryRequestItems.id, lines[1].id));
+    // Bulk approve all three inside one tx. Middle one will fail; the
+    // first one should also roll back.
+    await expect(
+      db.transaction(async () => {
+        for (const line of lines) {
+          await approveRequestItemAs(admin, {
+            requestItemId: line.id,
+            pickupBy: null,
+          });
+        }
+      }),
+    ).rejects.toThrow();
+    // First item should NOT be reserved.
+    const [aAfter] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, a.id));
+    expect(aAfter.status).toBe("requested");
+  });
+});
+
+describe("past pickup window: lazy detection + idempotent notification", () => {
+  it("writes one notification on first read; does not duplicate on second", async () => {
+    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const item = await makeItem({ name: "Cam" });
+    await addToCartAs(student, { itemId: item.id });
+    await submitCartAs(student, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: new Date(Date.now() - 86400000), // already passed
+    });
+    await recordOverdueNotificationsAs(student, { ownerId: student.id });
+    await recordOverdueNotificationsAs(student, { ownerId: student.id });
+    const notifs = await db
+      .select()
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.userId, student.id),
+          eq(notifications.type, "inventory_pickup_overdue"),
+        ),
+      );
+    expect(notifs).toHaveLength(1);
+    // Status unchanged (no auto-flip).
+    const [after] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(after.status).toBe("reserved");
+  });
+});
+
+describe("defense in depth: impl re-checks role on every staff write", () => {
+  it("createInventoryItemAs throws Forbidden for a non-staff viewer", async () => {
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    await expect(
+      createInventoryItemAs(student, {
+        name: "Sneaky",
+        description: null,
+        category: null,
+        serial: null,
+        location: null,
+        notes: null,
+        imageUrl: null,
+      }),
+    ).rejects.toThrow(/Forbidden/);
+  });
+
+  it("transitionItem throws Forbidden for a non-staff viewer", async () => {
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    await expect(
+      transitionItem(student, { itemId: item.id, nextStatus: "retired" }),
+    ).rejects.toThrow(/Forbidden/);
+  });
+
+  it("approveRequestItemAs and rejectRequestItemAs throw Forbidden for a non-staff viewer", async () => {
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    await addToCartAs(student, { itemId: item.id });
+    await submitCartAs(student, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await expect(
+      approveRequestItemAs(student, { requestItemId: line.id, pickupBy: null }),
+    ).rejects.toThrow(/Forbidden/);
+    await expect(
+      rejectRequestItemAs(student, {
+        requestItemId: line.id,
+        reviewComment: "no",
+      }),
+    ).rejects.toThrow(/Forbidden/);
   });
 });
