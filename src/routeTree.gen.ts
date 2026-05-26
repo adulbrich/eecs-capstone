@@ -12,7 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
+import { Route as InventoryIndexRouteImport } from './routes/inventory/index'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
+import { Route as InventoryItemIdRouteImport } from './routes/inventory/$itemId'
 import { Route as AuthedProfileRouteImport } from './routes/_authed/profile'
 import { Route as AuthedAdminRouteImport } from './routes/_authed/admin'
 import { Route as authVerifyEmailRouteImport } from './routes/(auth)/verify-email'
@@ -48,9 +50,19 @@ const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
   path: '/projects/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InventoryIndexRoute = InventoryIndexRouteImport.update({
+  id: '/inventory/',
+  path: '/inventory/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
   id: '/projects/$projectId',
   path: '/projects/$projectId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InventoryItemIdRoute = InventoryItemIdRouteImport.update({
+  id: '/inventory/$itemId',
+  path: '/inventory/$itemId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedProfileRoute = AuthedProfileRouteImport.update({
@@ -169,7 +181,9 @@ export interface FileRoutesByFullPath {
   '/verify-email': typeof authVerifyEmailRoute
   '/admin': typeof AuthedAdminRouteWithChildren
   '/profile': typeof AuthedProfileRoute
+  '/inventory/$itemId': typeof InventoryItemIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
+  '/inventory/': typeof InventoryIndexRoute
   '/projects/': typeof ProjectsIndexRoute
   '/my/bookmarks': typeof AuthedMyBookmarksRoute
   '/my/projects': typeof AuthedMyProjectsRoute
@@ -193,7 +207,9 @@ export interface FileRoutesByTo {
   '/sign-up': typeof authSignUpRoute
   '/verify-email': typeof authVerifyEmailRoute
   '/profile': typeof AuthedProfileRoute
+  '/inventory/$itemId': typeof InventoryItemIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
+  '/inventory': typeof InventoryIndexRoute
   '/projects': typeof ProjectsIndexRoute
   '/my/bookmarks': typeof AuthedMyBookmarksRoute
   '/my/projects': typeof AuthedMyProjectsRoute
@@ -220,7 +236,9 @@ export interface FileRoutesById {
   '/(auth)/verify-email': typeof authVerifyEmailRoute
   '/_authed/admin': typeof AuthedAdminRouteWithChildren
   '/_authed/profile': typeof AuthedProfileRoute
+  '/inventory/$itemId': typeof InventoryItemIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
+  '/inventory/': typeof InventoryIndexRoute
   '/projects/': typeof ProjectsIndexRoute
   '/_authed/my/bookmarks': typeof AuthedMyBookmarksRoute
   '/_authed/my/projects': typeof AuthedMyProjectsRoute
@@ -247,7 +265,9 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/admin'
     | '/profile'
+    | '/inventory/$itemId'
     | '/projects/$projectId'
+    | '/inventory/'
     | '/projects/'
     | '/my/bookmarks'
     | '/my/projects'
@@ -271,7 +291,9 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/verify-email'
     | '/profile'
+    | '/inventory/$itemId'
     | '/projects/$projectId'
+    | '/inventory'
     | '/projects'
     | '/my/bookmarks'
     | '/my/projects'
@@ -297,7 +319,9 @@ export interface FileRouteTypes {
     | '/(auth)/verify-email'
     | '/_authed/admin'
     | '/_authed/profile'
+    | '/inventory/$itemId'
     | '/projects/$projectId'
+    | '/inventory/'
     | '/projects/'
     | '/_authed/my/bookmarks'
     | '/_authed/my/projects'
@@ -322,7 +346,9 @@ export interface RootRouteChildren {
   authSignInRoute: typeof authSignInRoute
   authSignUpRoute: typeof authSignUpRoute
   authVerifyEmailRoute: typeof authVerifyEmailRoute
+  InventoryItemIdRoute: typeof InventoryItemIdRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
+  InventoryIndexRoute: typeof InventoryIndexRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -350,11 +376,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/inventory/': {
+      id: '/inventory/'
+      path: '/inventory'
+      fullPath: '/inventory/'
+      preLoaderRoute: typeof InventoryIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projects/$projectId': {
       id: '/projects/$projectId'
       path: '/projects/$projectId'
       fullPath: '/projects/$projectId'
       preLoaderRoute: typeof ProjectsProjectIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/$itemId': {
+      id: '/inventory/$itemId'
+      path: '/inventory/$itemId'
+      fullPath: '/inventory/$itemId'
+      preLoaderRoute: typeof InventoryItemIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authed/profile': {
@@ -555,7 +595,9 @@ const rootRouteChildren: RootRouteChildren = {
   authSignInRoute: authSignInRoute,
   authSignUpRoute: authSignUpRoute,
   authVerifyEmailRoute: authVerifyEmailRoute,
+  InventoryItemIdRoute: InventoryItemIdRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,
+  InventoryIndexRoute: InventoryIndexRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
