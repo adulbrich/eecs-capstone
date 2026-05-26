@@ -497,3 +497,25 @@ file. The component renders a button-only state during SSR.
 If you discover a new framework behavior that surprised you, add it here. The rule of thumb: "if it cost more than 30 minutes to figure out, future-us deserves to find it written down."
 
 When updating, keep the structure: short headline, one-paragraph explanation, code example if relevant. The point of this file is grep-friendly recall, not narrative writing.
+
+## Inventory
+
+### Lazy deadlines, no scheduler
+
+`pickup_by` and `due_at` on `inventory_request_items` are informational only. There is no cron. The "past pickup window" / "overdue" badges are computed at query time. Lazy idempotent notifications are inserted on read via `recordOverdueNotificationsAs`, scoped to the viewer's own request lines, using a partial unique index `notifications_overdue_unique_idx` on `(user_id, type, link)` for the two overdue types so re-reads do not duplicate. `onConflictDoNothing` declares the target + where explicitly so future unique indexes on `notifications` cannot silently swallow unrelated conflicts.
+
+### Hard delete is narrow
+
+`inventory_items.id` is referenced by `inventory_request_items` with `ON DELETE RESTRICT`. Hard delete works only when no historical request lines reference the item. `hardDeleteInventoryItemAs` pre-checks this and throws a friendly error instead of letting Postgres surface `23503`. Use retire for anything that has been requested.
+
+### `transitionItem` is the only writer
+
+Every status change to an inventory item must go through `src/server/_internal/inventory-transitions.ts::transitionItem`. It is the only place that writes `inventory_item_status_history` rows and the only place that syncs `current_holder_*` columns with the item status. Approve always delegates to it via `transitionItem(viewer, input, tx)` from inside the approve transaction (the new optional `externalTx` argument). Reject and cancel bypass it intentionally because they emit custom notifications and need different transaction shapes; both are documented in their impls.
+
+### Deferred FK
+
+`inventory_items.current_request_item_id` references `inventory_request_items.id` but the FK is declared in raw SQL inside the migration (not in `schema.ts`) because the two tables reference each other. `ON DELETE SET NULL`.
+
+### submitCart is lock-first
+
+`submitCartAs` locks each cart item with `SELECT FOR UPDATE` and re-checks `status === "available"` before treating it as a survivor. The `inventoryRequests` envelope is inserted only after the lock phase confirms at least one survivor, so an all-race path never leaves an orphaned request row. Items that lost the race are returned in the `skipped` array with reason `"no_longer_available"`.
