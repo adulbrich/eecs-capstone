@@ -1,6 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+function expectFormData(data: unknown): FormData {
+  if (!(data instanceof FormData)) {
+    throw new Error("Expected FormData");
+  }
+  return data;
+}
+
+export const uploadInventoryImage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => expectFormData(data))
+  .handler(async ({ data }) => {
+    const { uploadInventoryImageForCurrentUser } = await import(
+      "./_internal/inventory"
+    );
+    return uploadInventoryImageForCurrentUser(data);
+  });
+
 const itemStatusEnum = z.enum([
   "available",
   "requested",
