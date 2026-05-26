@@ -667,12 +667,13 @@ describe("bulk approve in a batch is atomic", () => {
     // Bulk approve all three inside one tx. Middle one will fail; the
     // first one should also roll back.
     await expect(
-      db.transaction(async () => {
+      db.transaction(async (tx) => {
         for (const line of lines) {
-          await approveRequestItemAs(admin, {
-            requestItemId: line.id,
-            pickupBy: null,
-          });
+          await approveRequestItemAs(
+            admin,
+            { requestItemId: line.id, pickupBy: null },
+            tx,
+          );
         }
       }),
     ).rejects.toThrow();

@@ -13,6 +13,8 @@ import {
 } from "#/db/schema";
 import { readSession, requireUser } from "#/lib/_internal/auth-guards";
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 type Viewer = { id: string; role?: string | null | undefined } | null;
 
 export type ListInventoryInput = {
@@ -499,10 +501,11 @@ function defaultPickupBy(): Date {
 export async function approveRequestItemAs(
   viewer: Viewer,
   data: { requestItemId: string; pickupBy: Date | null },
+  externalTx?: Tx,
 ) {
   assertStaff(viewer);
   const { transitionItem } = await import("./inventory-transitions");
-  return db.transaction(async (tx) => {
+  const run = async (tx: Tx) => {
     // Lock the line before reading and updating it so a concurrent cancel
     // cannot move it out of 'pending' between this read and the transition.
     const [line] = await tx
@@ -546,7 +549,11 @@ export async function approveRequestItemAs(
       tx,
     );
     return { ok: true as const };
-  });
+  };
+  // When the caller already has a transaction (bulk approve flow),
+  // join it so a later failure rolls back earlier approves in the batch.
+  if (externalTx) return run(externalTx);
+  return db.transaction(run);
 }
 
 export async function rejectRequestItemAs(

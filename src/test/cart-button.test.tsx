@@ -13,7 +13,6 @@ vi.mock("@tanstack/react-router", () => ({
     children,
     ...rest
   }: { children: React.ReactNode } & Record<string, unknown>) => (
-    // biome-ignore lint/a11y/useValidAnchor: test stub
     <a {...rest}>{children}</a>
   ),
 }));
