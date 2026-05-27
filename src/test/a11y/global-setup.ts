@@ -54,6 +54,21 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   }
   // instructor is only used as a program_instructors DB fixture — no auth session needed.
 
+  const [adminUser] = await db
+    .select()
+    .from(schema.user)
+    .where(eq(schema.user.email, 'admin@example.com'));
+  if (!adminUser) {
+    throw new Error(
+      'admin@example.com not found in database. Run: npm run db:seed:dev',
+    );
+  }
+  if (adminUser.role !== 'admin') {
+    throw new Error(
+      `admin@example.com has role '${adminUser.role}', expected 'admin'. Run: npm run db:seed:dev`,
+    );
+  }
+
   // Note: select-first is non-atomic. Concurrent global-setup runs could produce
   // duplicate rows since these tables have no UNIQUE constraint on their sentinel
   // values. Acceptable for single-worker CI; revisit if workers > 1.
@@ -141,31 +156,27 @@ async function saveStorageState(email: string, outputPath: string) {
   const context = await browser.newContext();
   const page = await context.newPage();
 
-  await page.goto(`${BASE_URL}/sign-in`, { waitUntil: 'load' });
-  // Wait for React hydration before interacting with the form. Without this,
-  // the browser submits the form natively via GET (before the React onSubmit
-  // handler attaches), causing an infinite redirect loop back to /sign-in.
-  // We detect hydration by checking for a React fiber on the form element,
-  // which React sets during reconciliation after SSR.
-  await page.waitForFunction(
-    () => {
-      const form = document.querySelector('form');
-      if (!form) return false;
-      return Object.keys(form).some(
-        (k) => k.startsWith('__reactFiber') || k.startsWith('__reactProps'),
-      );
-    },
-    { timeout: 15_000 },
-  );
-  await page.fill('input[name="email"]', email);
-  await page.fill('input[name="password"]', PASSWORD);
-
-  // Click submit and wait for navigation away from /sign-in.
-  await page.click('button[type="submit"]');
-  await page.waitForURL((url) => !url.pathname.startsWith('/sign-in'), {
-    timeout: 15_000,
-  });
-
-  await context.storageState({ path: outputPath });
-  await browser.close();
+  try {
+    await page.goto(`${BASE_URL}/sign-in`, { waitUntil: 'load' });
+    // Wait for React hydration before interacting with the form.
+    await page.waitForFunction(
+      () => {
+        const form = document.querySelector('form');
+        if (!form) return false;
+        return Object.keys(form).some(
+          (k) => k.startsWith('__reactFiber') || k.startsWith('__reactProps'),
+        );
+      },
+      { timeout: 15_000 },
+    );
+    await page.fill('input[name="email"]', email);
+    await page.fill('input[name="password"]', PASSWORD);
+    await page.click('button[type="submit"]');
+    await page.waitForURL((url) => !url.pathname.startsWith('/sign-in'), {
+      timeout: 15_000,
+    });
+    await context.storageState({ path: outputPath });
+  } finally {
+    await browser.close();
+  }
 }

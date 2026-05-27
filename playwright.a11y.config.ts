@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './src/test/a11y',
   testMatch: '**/*.a11y.test.ts',
+  retries: 0,
   globalSetup: './src/test/a11y/global-setup.ts',
   reporter: [
     ['list'],
