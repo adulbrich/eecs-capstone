@@ -1,0 +1,62 @@
+import { test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { checkA11y } from './helpers';
+
+const { projectId, itemId } = JSON.parse(
+  readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '.fixtures.json'),
+    'utf-8',
+  ),
+) as { projectId: string; itemId: string };
+
+test('home page', async ({ page }) => {
+  await page.goto('/');
+  await checkA11y(page);
+});
+
+test('sign-in page', async ({ page }) => {
+  await page.goto('/sign-in');
+  await checkA11y(page);
+});
+
+test('sign-up page', async ({ page }) => {
+  await page.goto('/sign-up');
+  await checkA11y(page);
+});
+
+test('verify-email page', async ({ page }) => {
+  await page.goto('/verify-email');
+  await checkA11y(page);
+});
+
+test('forgot-password page', async ({ page }) => {
+  await page.goto('/forgot-password');
+  await checkA11y(page);
+});
+
+test('reset-password page', async ({ page }) => {
+  await page.goto('/reset-password');
+  await checkA11y(page);
+});
+
+test('projects list', async ({ page }) => {
+  await page.goto('/projects');
+  await checkA11y(page);
+});
+
+test('project detail', async ({ page }) => {
+  await page.goto(`/projects/${projectId}`);
+  await checkA11y(page);
+});
+
+test('inventory list', async ({ page }) => {
+  await page.goto('/inventory');
+  await checkA11y(page);
+});
+
+test('inventory item detail', async ({ page }) => {
+  await page.goto(`/inventory/${itemId}`);
+  await checkA11y(page);
+});

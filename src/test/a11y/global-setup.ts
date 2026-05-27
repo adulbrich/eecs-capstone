@@ -141,18 +141,30 @@ async function saveStorageState(email: string, outputPath: string) {
   const context = await browser.newContext();
   const page = await context.newPage();
 
-  await page.goto(`${BASE_URL}/sign-in`);
+  await page.goto(`${BASE_URL}/sign-in`, { waitUntil: 'load' });
+  // Wait for React hydration before interacting with the form. Without this,
+  // the browser submits the form natively via GET (before the React onSubmit
+  // handler attaches), causing an infinite redirect loop back to /sign-in.
+  // We detect hydration by checking for a React fiber on the form element,
+  // which React sets during reconciliation after SSR.
+  await page.waitForFunction(
+    () => {
+      const form = document.querySelector('form');
+      if (!form) return false;
+      return Object.keys(form).some(
+        (k) => k.startsWith('__reactFiber') || k.startsWith('__reactProps'),
+      );
+    },
+    { timeout: 15_000 },
+  );
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', PASSWORD);
 
-  // Retry the click until React hydration completes and the form handler fires.
-  // Filling inputs is safe before hydration; only the submit click needs the handler.
-  await expect(async () => {
-    await page.click('button[type="submit"]');
-    await page.waitForURL((url) => !url.pathname.startsWith('/sign-in'), {
-      timeout: 2_000,
-    });
-  }).toPass({ timeout: 15_000 });
+  // Click submit and wait for navigation away from /sign-in.
+  await page.click('button[type="submit"]');
+  await page.waitForURL((url) => !url.pathname.startsWith('/sign-in'), {
+    timeout: 15_000,
+  });
 
   await context.storageState({ path: outputPath });
   await browser.close();
