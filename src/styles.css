@@ -45,7 +45,7 @@
   /* Status */
   --status-success:       #2E7D32;
   --status-success-bg:    rgba(46, 125, 50, 0.10);
-  --status-warning:       #E65100;
+  --status-warning:       #B84000;
   --status-warning-bg:    rgba(230, 81, 0, 0.10);
   --status-error:         #C62828;
   --status-error-bg:      rgba(198, 40, 40, 0.10);
