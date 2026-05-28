@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { ImageIcon } from "lucide-react";
 import { getPublicUrl } from "#/lib/storage";
-import { cn } from "#/lib/utils.ts";
+import { ImageOrFallback } from "./image-or-fallback";
 import { StatusBadge } from "./status-badge";
 
 type ProjectSummary = {
@@ -12,32 +11,6 @@ type ProjectSummary = {
   publishedAt: Date | string | null;
   imageUrl?: string | null;
 };
-
-function ImageOrFallback({
-  src,
-  className,
-}: {
-  src: string | null;
-  className: string;
-}) {
-  if (src) {
-    return <img src={src} alt="" className={className} loading="lazy" />;
-  }
-  return (
-    <div
-      className={cn(className, "flex items-center justify-center")}
-      style={{
-        background:
-          "linear-gradient(135deg, var(--surface-sunken), var(--surface-base))",
-      }}
-    >
-      <ImageIcon
-        className="size-8 text-[var(--text-secondary)] opacity-30"
-        aria-hidden
-      />
-    </div>
-  );
-}
 
 export function ProjectCard({ project }: { project: ProjectSummary }) {
   const src = getPublicUrl(project.imageUrl);
@@ -86,5 +59,4 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
   );
 }
 
-export { ImageOrFallback };
 export type { ProjectSummary };

@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { getPublicUrl } from "#/lib/storage";
-import { ImageOrFallback, type ProjectSummary } from "./project-card";
+import { ImageOrFallback } from "./image-or-fallback";
+import type { ProjectSummary } from "./project-card";
 import { StatusBadge } from "./status-badge";
 
 export function ProjectRow({ project }: { project: ProjectSummary }) {
@@ -33,7 +34,10 @@ export function ProjectRow({ project }: { project: ProjectSummary }) {
           </p>
         )}
         {project.publishedAt && (
-          <p className="mt-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+          <p
+            className="mt-1 text-xs"
+            style={{ color: "var(--text-secondary)" }}
+          >
             {new Date(project.publishedAt).toLocaleDateString()}
           </p>
         )}
