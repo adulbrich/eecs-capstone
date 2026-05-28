@@ -1,16 +1,16 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
+import { InventoryStatusBadge } from "#/components/inventory-status-badge";
+import { Button } from "#/components/ui/button";
+import { Textarea } from "#/components/ui/textarea";
 import {
   cancelRequestItem,
   listMyItems,
   removeFromCart,
   submitCart,
 } from "#/server/inventory";
-import { Button } from "#/components/ui/button";
-import { Textarea } from "#/components/ui/textarea";
-import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 
 const searchSchema = z.object({
   tab: z.enum(["cart", "active", "history"]).default("active"),
@@ -34,7 +34,7 @@ function MyItems() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
-      <h1 className="text-2xl font-semibold">My items</h1>
+      <h1 className="text-2xl font-semibold">My Items</h1>
       <div className="mt-4 flex gap-4 border-b border-border">
         {(["cart", "active", "history"] as const).map((t) => (
           <button

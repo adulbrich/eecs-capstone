@@ -176,7 +176,7 @@ export function ImageUploader({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100"
+              className="border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700/50"
             >
               {hasContent ? "Replace image" : "Upload image"}
             </button>
@@ -184,7 +184,7 @@ export function ImageUploader({
               <button
                 type="button"
                 onClick={onRemove}
-                className="inline-flex items-center gap-1 border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50"
+                className="inline-flex items-center gap-1 border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
               >
                 <Trash2 className="h-4 w-4" /> Remove
               </button>

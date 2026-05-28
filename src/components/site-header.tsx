@@ -7,7 +7,6 @@ import { CartButton } from "./cart-button";
 import { InstitutionLogo } from "./institution-logo";
 import { NotificationBell } from "./notification-bell";
 import { Button } from "./ui/button";
-import { UserMenu } from "./user-menu";
 import {
   Sheet,
   SheetClose,
@@ -16,6 +15,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "./ui/sheet";
+import { UserMenu } from "./user-menu";
 
 export function SiteHeader() {
   const { data: session, isPending } = authClient.useSession();
@@ -237,13 +237,13 @@ function SignedInMobile({
       </Link>
       <div className="-mx-4 flex flex-col gap-0 border-t border-border py-2">
         <NavItem to="/my/projects" onClick={onClose}>
-          My projects
+          My Projects
         </NavItem>
         <NavItem to="/my/bookmarks" onClick={onClose}>
-          My bookmarks
+          My Bookmarks
         </NavItem>
         <NavItem to="/my/items" onClick={onClose}>
-          My items
+          My Items
         </NavItem>
       </div>
       <Button
