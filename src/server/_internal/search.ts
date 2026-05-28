@@ -1,7 +1,8 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "#/db";
-import { projectCategories, projects } from "#/db/schema";
+import { programs, projectCategories, projects } from "#/db/schema";
 import type { SearchProjectsInput } from "../search";
+import { projectSummarySelect } from "./project-summary";
 
 export async function searchProjectsImpl(data: SearchProjectsInput) {
   const trimmed = data.query.trim();
@@ -33,8 +34,9 @@ export async function searchProjectsImpl(data: SearchProjectsInput) {
 
   const offset = (data.page - 1) * data.pageSize;
   const rows = await db
-    .select()
+    .select(projectSummarySelect)
     .from(projects)
+    .leftJoin(programs, eq(projects.programId, programs.id))
     .where(and(...conditions))
     .orderBy(orderBy)
     .limit(data.pageSize)
