@@ -1,26 +1,35 @@
 // @vitest-environment jsdom
-import { fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { act } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { InventoryFilterBar } from "#/components/inventory-filter-bar";
+
+afterEach(cleanup);
+
+function renderBar(
+  overrides: Partial<Parameters<typeof InventoryFilterBar>[0]> = {},
+) {
+  return render(
+    <InventoryFilterBar
+      q=""
+      status={null}
+      category={null}
+      view="card"
+      categories={[]}
+      onQChange={() => {}}
+      onStatusChange={() => {}}
+      onCategoryChange={() => {}}
+      onViewChange={() => {}}
+      {...overrides}
+    />,
+  );
+}
 
 describe("InventoryFilterBar", () => {
   it("debounces search input", async () => {
     vi.useFakeTimers();
     const onQChange = vi.fn();
-    const { getByPlaceholderText } = render(
-      <InventoryFilterBar
-        q=""
-        status={null}
-        category={null}
-        view="card"
-        categories={[]}
-        onQChange={onQChange}
-        onStatusChange={() => {}}
-        onCategoryChange={() => {}}
-        onViewChange={() => {}}
-      />,
-    );
+    const { getByPlaceholderText } = renderBar({ onQChange });
     fireEvent.change(getByPlaceholderText("Search inventory"), {
       target: { value: "arduino" },
     });
@@ -32,31 +41,12 @@ describe("InventoryFilterBar", () => {
     vi.useRealTimers();
   });
 
-  it("clicking the active status chip clears it", () => {
-    const onStatusChange = vi.fn();
-    const { getAllByText } = render(
-      <InventoryFilterBar
-        q=""
-        status="available"
-        category={null}
-        view="card"
-        categories={[]}
-        onQChange={() => {}}
-        onStatusChange={onStatusChange}
-        onCategoryChange={() => {}}
-        onViewChange={() => {}}
-      />,
-    );
-    // Multiple elements may match "Available" because the shadcn Select
-    // renders a hidden trigger. The chip is the <button> whose inline
-    // borderColor is the brand-primary token (the active-state style).
-    const matches = getAllByText("Available").filter(
-      (el) =>
-        el.tagName === "BUTTON" &&
-        (el as HTMLButtonElement).style.borderColor.includes("brand-primary"),
-    );
-    expect(matches).toHaveLength(1);
-    fireEvent.click(matches[0]);
-    expect(onStatusChange).toHaveBeenCalledWith(null);
+  it("renders category and status dropdowns and the view toggle", () => {
+    const { getByLabelText } = renderBar();
+    // Select triggers are labelled via their associated <Label htmlFor>.
+    expect(getByLabelText("Category")).toBeTruthy();
+    expect(getByLabelText("Status")).toBeTruthy();
+    expect(getByLabelText("Card view")).toBeTruthy();
+    expect(getByLabelText("Row view")).toBeTruthy();
   });
 });

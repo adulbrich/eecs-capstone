@@ -5,6 +5,7 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { useState } from "react";
+import { CategoryTypeCombobox } from "#/components/category-type-combobox";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -112,18 +113,12 @@ function CategoryEdit() {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="cat-type">Type</Label>
-          <Input
+          <CategoryTypeCombobox
             id="cat-type"
-            list="cat-type-options"
             value={type}
-            onChange={(e) => setType(e.target.value)}
-            required
+            onChange={setType}
+            types={types}
           />
-          <datalist id="cat-type-options">
-            {types.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
         </div>
         <div className="flex gap-2">
           <Button type="submit" size="sm">

@@ -44,6 +44,13 @@ export const listInventory = createServerFn({ method: "GET" })
     return listInventoryForCurrentUser(data);
   });
 
+export const listInventoryCategories = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const { listInventoryCategoriesImpl } = await import("./_internal/inventory");
+  return listInventoryCategoriesImpl();
+});
+
 const idOnlySchema = z.object({ id: z.string().uuid() });
 
 export const getInventoryItem = createServerFn({ method: "GET" })
@@ -177,11 +184,12 @@ export const cancelRequestItem = createServerFn({ method: "POST" })
     return cancelRequestItemForCurrentUser(data);
   });
 
-export const listMyItems = createServerFn({ method: "GET" })
-  .handler(async () => {
+export const listMyItems = createServerFn({ method: "GET" }).handler(
+  async () => {
     const { listMyItemsForCurrentUser } = await import("./_internal/inventory");
     return listMyItemsForCurrentUser();
-  });
+  },
+);
 
 const requestQueueSchema = z.object({
   tab: z.enum(["pending", "all"]).default("pending"),
@@ -229,7 +237,9 @@ export const transitionInventoryItem = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => transitionSchema.parse(d))
   .handler(async ({ data }) => {
     const { requireUser } = await import("#/lib/_internal/auth-guards");
-    const { transitionItem } = await import("./_internal/inventory-transitions");
+    const { transitionItem } = await import(
+      "./_internal/inventory-transitions"
+    );
     const viewer = await requireUser();
     await transitionItem(viewer, data);
     return { ok: true as const };

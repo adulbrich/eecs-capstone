@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
+import { ImageIcon } from "lucide-react";
 import { getPublicUrl } from "#/lib/storage";
+import { cn } from "#/lib/utils.ts";
 import { StatusBadge } from "./status-badge";
 
 type ProjectSummary = {
@@ -23,12 +25,17 @@ function ImageOrFallback({
   }
   return (
     <div
-      className={className}
+      className={cn(className, "flex items-center justify-center")}
       style={{
         background:
           "linear-gradient(135deg, var(--surface-sunken), var(--surface-base))",
       }}
-    />
+    >
+      <ImageIcon
+        className="size-8 text-[var(--text-secondary)] opacity-30"
+        aria-hidden
+      />
+    </div>
   );
 }
 
@@ -67,7 +74,10 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
           </p>
         )}
         {project.publishedAt && (
-          <p className="mt-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+          <p
+            className="mt-2 text-xs"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Published {new Date(project.publishedAt).toLocaleDateString()}
           </p>
         )}

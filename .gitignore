@@ -17,3 +17,4 @@ src/test/a11y/.admin-auth.json
 src/test/a11y/.fixtures.json
 playwright-report/
 test-results/
+.playwright-mcp/

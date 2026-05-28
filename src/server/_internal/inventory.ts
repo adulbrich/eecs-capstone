@@ -1,5 +1,15 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 import { db } from "#/db";
 import {
   inventoryCartItems,
@@ -19,7 +29,13 @@ type Viewer = { id: string; role?: string | null | undefined } | null;
 
 export type ListInventoryInput = {
   q: string;
-  status: "available" | "requested" | "reserved" | "checked_out" | "maintenance" | null;
+  status:
+    | "available"
+    | "requested"
+    | "reserved"
+    | "checked_out"
+    | "maintenance"
+    | null;
   category: string | null;
   page: number;
   pageSize: number;
@@ -49,7 +65,9 @@ function isStaff(viewer: Viewer): boolean {
   return viewer?.role === "admin" || viewer?.role === "instructor";
 }
 
-function stripForPublic(row: typeof inventoryItems.$inferSelect): InventoryItemPublic {
+function stripForPublic(
+  row: typeof inventoryItems.$inferSelect,
+): InventoryItemPublic {
   return {
     id: row.id,
     name: row.name,
@@ -63,7 +81,9 @@ function stripForPublic(row: typeof inventoryItems.$inferSelect): InventoryItemP
   };
 }
 
-function fullForStaff(row: typeof inventoryItems.$inferSelect): InventoryItemStaff {
+function fullForStaff(
+  row: typeof inventoryItems.$inferSelect,
+): InventoryItemStaff {
   return {
     ...stripForPublic(row),
     serial: row.serial,
@@ -74,10 +94,14 @@ function fullForStaff(row: typeof inventoryItems.$inferSelect): InventoryItemSta
   };
 }
 
-export async function listInventoryAs(viewer: Viewer, data: ListInventoryInput) {
+export async function listInventoryAs(
+  viewer: Viewer,
+  data: ListInventoryInput,
+) {
   const conditions = [ne(inventoryItems.status, "retired")];
   if (data.status) conditions.push(eq(inventoryItems.status, data.status));
-  if (data.category) conditions.push(eq(inventoryItems.category, data.category));
+  if (data.category)
+    conditions.push(eq(inventoryItems.category, data.category));
   if (data.q) {
     conditions.push(
       or(
@@ -111,7 +135,9 @@ export async function listInventoryAs(viewer: Viewer, data: ListInventoryInput) 
     .where(where);
 
   const mapped = rows.map((r) => {
-    const base = isStaff(viewer) ? fullForStaff(r.item) : stripForPublic(r.item);
+    const base = isStaff(viewer)
+      ? fullForStaff(r.item)
+      : stripForPublic(r.item);
     return { ...base, pickupBy: r.pickupBy, dueAt: r.dueAt };
   });
 
@@ -138,13 +164,31 @@ export async function getInventoryItemAs(viewer: Viewer, data: { id: string }) {
     .where(eq(inventoryItems.id, data.id));
   if (!row) return null;
   if (row.item.status === "retired" && !isStaff(viewer)) return null;
-  const base = isStaff(viewer) ? fullForStaff(row.item) : stripForPublic(row.item);
+  const base = isStaff(viewer)
+    ? fullForStaff(row.item)
+    : stripForPublic(row.item);
   return { ...base, pickupBy: row.pickupBy, dueAt: row.dueAt };
 }
 
 export async function listInventoryForCurrentUser(data: ListInventoryInput) {
   const session = await readSession();
   return listInventoryAs(session?.user ?? null, data);
+}
+
+export async function listInventoryCategoriesImpl() {
+  const rows = await db
+    .selectDistinct({ category: inventoryItems.category })
+    .from(inventoryItems)
+    .where(
+      and(
+        ne(inventoryItems.status, "retired"),
+        isNotNull(inventoryItems.category),
+      ),
+    )
+    .orderBy(inventoryItems.category);
+  return {
+    categories: rows.map((r) => r.category).filter((c): c is string => !!c),
+  };
 }
 
 export async function getInventoryItemForCurrentUser(data: { id: string }) {
@@ -274,7 +318,9 @@ export async function hardDeleteInventoryItemAs(
     throw new Error("Name confirmation does not match");
   }
   if (row.status !== "available" && row.status !== "retired") {
-    throw new Error("Hard delete only allowed when status is available or retired");
+    throw new Error(
+      "Hard delete only allowed when status is available or retired",
+    );
   }
   // Pre-check the RESTRICT FK on inventory_request_items.item_id so the
   // caller gets a friendly error instead of a raw Postgres 23503.
@@ -325,10 +371,7 @@ export async function getCartAs(viewer: Viewer) {
       status: inventoryItems.status,
     })
     .from(inventoryCartItems)
-    .innerJoin(
-      inventoryItems,
-      eq(inventoryCartItems.itemId, inventoryItems.id),
-    )
+    .innerJoin(inventoryItems, eq(inventoryCartItems.itemId, inventoryItems.id))
     .where(eq(inventoryCartItems.userId, viewer.id))
     .orderBy(desc(inventoryCartItems.addedAt));
   return rows;
@@ -914,9 +957,7 @@ export function deriveDeadlineFlags(row: {
       !!row.pickupBy &&
       row.pickupBy.getTime() < now,
     checkoutOverdue:
-      row.status === "checked_out" &&
-      !!row.dueAt &&
-      row.dueAt.getTime() < now,
+      row.status === "checked_out" && !!row.dueAt && row.dueAt.getTime() < now,
   };
 }
 

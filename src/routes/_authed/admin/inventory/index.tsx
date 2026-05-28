@@ -157,7 +157,7 @@ function AdminInventory() {
               })
             }
           >
-            <SelectTrigger id="inv-status" size="sm" className="mt-1 w-40">
+            <SelectTrigger id="inv-status" className="mt-1 w-40">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
@@ -178,8 +178,7 @@ function AdminInventory() {
         {rows.map((r) => {
           const row = r as unknown as StaffRow;
           const img = getPublicUrl(row.imageUrl);
-          const holder =
-            row.currentHolderId ?? row.currentHolderLabel ?? "";
+          const holder = row.currentHolderId ?? row.currentHolderLabel ?? "";
           return (
             <tr key={row.id}>
               <td data-label="Name" className="border border-border p-2">

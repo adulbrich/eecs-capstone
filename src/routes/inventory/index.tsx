@@ -5,7 +5,11 @@ import { InventoryCard } from "#/components/inventory-card";
 import { InventoryFilterBar } from "#/components/inventory-filter-bar";
 import { InventoryRow } from "#/components/inventory-row";
 import { authClient } from "#/lib/auth-client";
-import { addToCart, listInventory } from "#/server/inventory";
+import {
+  addToCart,
+  listInventory,
+  listInventoryCategories,
+} from "#/server/inventory";
 
 type PublicStatus =
   | "available"
@@ -28,16 +32,21 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/inventory/")({
   validateSearch: searchSchema,
   loaderDeps: ({ search }) => search,
-  loader: ({ deps }) =>
-    listInventory({
-      data: {
-        q: deps.q,
-        status: deps.status,
-        category: deps.category,
-        page: deps.page,
-        pageSize: 24,
-      },
-    }),
+  loader: async ({ deps }) => {
+    const [data, { categories }] = await Promise.all([
+      listInventory({
+        data: {
+          q: deps.q,
+          status: deps.status,
+          category: deps.category,
+          page: deps.page,
+          pageSize: 24,
+        },
+      }),
+      listInventoryCategories(),
+    ]);
+    return { ...data, categories };
+  },
   component: InventoryIndex,
 });
 
@@ -57,28 +66,28 @@ function InventoryIndex() {
           status={search.status}
           category={search.category}
           view={search.view}
-          categories={[]}
-          onQChange={(q) =>
-            navigate({ search: (s) => ({ ...s, q, page: 1 }) })
-          }
+          categories={data.categories}
+          onQChange={(q) => navigate({ search: (s) => ({ ...s, q, page: 1 }) })}
           onStatusChange={(status) =>
             navigate({ search: (s) => ({ ...s, status, page: 1 }) })
           }
           onCategoryChange={(category) =>
             navigate({ search: (s) => ({ ...s, category, page: 1 }) })
           }
-          onViewChange={(view) =>
-            navigate({ search: (s) => ({ ...s, view }) })
-          }
+          onViewChange={(view) => navigate({ search: (s) => ({ ...s, view }) })}
         />
       </div>
       {data.rows.length === 0 ? (
-        <p className="mt-8 text-center text-muted-foreground">No items match.</p>
+        <p className="mt-8 text-center text-muted-foreground">
+          No items match.
+        </p>
       ) : search.view === "row" ? (
         <ul className="mt-4 flex flex-col gap-2">
           {data.rows.map((it) => (
             <li key={it.id}>
-              <InventoryRow item={{ ...it, status: it.status as PublicStatus }} />
+              <InventoryRow
+                item={{ ...it, status: it.status as PublicStatus }}
+              />
             </li>
           ))}
         </ul>
