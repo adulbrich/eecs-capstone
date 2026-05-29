@@ -2,8 +2,11 @@ import { eq } from "drizzle-orm";
 import { db } from "#/db";
 import { projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
+import type {
+  ImprovableField,
+  ReviewResult,
+} from "#/lib/project-review-fields";
 import { canEditProject } from "#/lib/project-visibility";
-import type { ImprovableField, ReviewResult } from "#/lib/project-review-fields";
 import { runProjectReview } from "./project-review-core";
 
 export type AuthUser = { id: string; role?: string | null | undefined };

@@ -7,7 +7,9 @@ import { auth } from "#/lib/auth";
 // Mock the core so no real Bedrock call happens; we only test auth gating.
 vi.mock("../_internal/project-review-core", () => ({
   runProjectReview: vi.fn().mockResolvedValue({
-    suggestions: { description: { suggestion: "Better.", rationale: "clearer" } },
+    suggestions: {
+      description: { suggestion: "Better.", rationale: "clearer" },
+    },
     model: "test-model",
     reviewedFields: ["description"],
   }),
@@ -19,7 +21,10 @@ async function makeUser(email: string, role: "user" | "admin") {
   await auth.api.signUpEmail({
     body: { email, password: "Password1!", name: email },
   });
-  await db.update(user).set({ emailVerified: true }).where(eq(user.email, email));
+  await db
+    .update(user)
+    .set({ emailVerified: true })
+    .where(eq(user.email, email));
   if (role !== "user") {
     await db.update(user).set({ role }).where(eq(user.email, email));
   }

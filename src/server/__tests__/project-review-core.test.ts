@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
 import type { ConverseCommandOutput } from "@aws-sdk/client-bedrock-runtime";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildUserMessage,
   parseReviewResponse,
