@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
 import { listPrograms } from "#/server/programs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 type Program = {
   id: string;
@@ -13,6 +20,10 @@ type Props = {
   allowEmpty?: boolean;
   id?: string;
 };
+
+// Radix Select reserves the empty string, so the "(no program)" choice uses
+// a sentinel. The form still stores "" for no program.
+const NONE = "_none_";
 
 export function ProgramSelect({
   value,
@@ -34,18 +45,21 @@ export function ProgramSelect({
   }, []);
 
   return (
-    <select
-      id={id}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="mt-1 w-full border bg-white p-2 dark:bg-neutral-900"
+    <Select
+      value={value === "" ? NONE : value}
+      onValueChange={(v) => onChange(v === NONE ? "" : v)}
     >
-      {allowEmpty && <option value="">(no program)</option>}
-      {programs.map((p) => (
-        <option key={p.id} value={p.id}>
-          {p.courseId} {p.courseName}
-        </option>
-      ))}
-    </select>
+      <SelectTrigger id={id} className="mt-1 w-full" aria-label="Program">
+        <SelectValue placeholder="Select a program" />
+      </SelectTrigger>
+      <SelectContent>
+        {allowEmpty && <SelectItem value={NONE}>(no program)</SelectItem>}
+        {programs.map((p) => (
+          <SelectItem key={p.id} value={p.id}>
+            {p.courseId} {p.courseName}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
