@@ -65,31 +65,37 @@ function InventoryIndex() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 md:p-8">
-      <h1 className="text-2xl font-semibold">Inventory</h1>
-      <div className="mt-4 max-w-4xl">
-        <InventoryFilterBar
-          q={search.q}
-          status={search.status}
-          category={search.category}
-          view={search.view}
-          categories={data.categories}
-          onQChange={(q) => navigate({ search: (s) => ({ ...s, q, page: 1 }) })}
-          onStatusChange={(status) =>
-            navigate({ search: (s) => ({ ...s, status, page: 1 }) })
-          }
-          onCategoryChange={(category) =>
-            navigate({ search: (s) => ({ ...s, category, page: 1 }) })
-          }
-          onViewChange={(view) => navigate({ search: (s) => ({ ...s, view }) })}
-        />
+    <div className="px-4 py-6 md:p-8">
+      <div className="mx-auto max-w-4xl">
+        <h1 className="text-2xl font-semibold">Inventory</h1>
+        <div className="mt-4">
+          <InventoryFilterBar
+            q={search.q}
+            status={search.status}
+            category={search.category}
+            view={search.view}
+            categories={data.categories}
+            onQChange={(q) =>
+              navigate({ search: (s) => ({ ...s, q, page: 1 }) })
+            }
+            onStatusChange={(status) =>
+              navigate({ search: (s) => ({ ...s, status, page: 1 }) })
+            }
+            onCategoryChange={(category) =>
+              navigate({ search: (s) => ({ ...s, category, page: 1 }) })
+            }
+            onViewChange={(view) =>
+              navigate({ search: (s) => ({ ...s, view }) })
+            }
+          />
+        </div>
       </div>
       {data.rows.length === 0 ? (
         <p className="mt-8 text-center text-muted-foreground">
           No items match.
         </p>
       ) : search.view === "row" ? (
-        <div className="mt-6 flex max-w-4xl flex-col gap-3">
+        <div className="mx-auto mt-6 flex max-w-4xl flex-col gap-3">
           {data.rows.map((it) => (
             <InventoryRow
               key={it.id}
@@ -100,7 +106,7 @@ function InventoryIndex() {
           ))}
         </div>
       ) : (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {data.rows.map((it) => (
             <InventoryCard
               key={it.id}
@@ -111,7 +117,7 @@ function InventoryIndex() {
           ))}
         </div>
       )}
-      <div className="mt-6 flex max-w-4xl items-center justify-between text-sm">
+      <div className="mx-auto mt-6 flex max-w-4xl items-center justify-between text-sm">
         <button
           type="button"
           onClick={() =>

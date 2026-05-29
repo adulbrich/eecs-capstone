@@ -38,22 +38,24 @@ function ProjectsList() {
   const search = Route.useSearch();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 md:p-8">
-      <h1 className="text-2xl font-semibold">Projects</h1>
-      <div className="mt-4 max-w-4xl">
-        <ProjectsFilterBar
-          q={search.q}
-          categories={search.categories}
-          program={search.program}
-          archivedOnly={search.archivedOnly}
-          view={search.view}
-        />
+    <div className="px-4 py-6 md:p-8">
+      <div className="mx-auto max-w-4xl">
+        <h1 className="text-2xl font-semibold">Projects</h1>
+        <div className="mt-4">
+          <ProjectsFilterBar
+            q={search.q}
+            categories={search.categories}
+            program={search.program}
+            archivedOnly={search.archivedOnly}
+            view={search.view}
+          />
+        </div>
       </div>
       <div
         className={
           search.view === "card"
-            ? "mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-            : "mt-6 flex max-w-4xl flex-col gap-3"
+            ? "mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+            : "mx-auto mt-6 flex max-w-4xl flex-col gap-3"
         }
       >
         {rows.length === 0 ? (
@@ -66,7 +68,7 @@ function ProjectsList() {
           ))
         )}
       </div>
-      <div className="mt-6 flex max-w-4xl items-center justify-between text-sm">
+      <div className="mx-auto mt-6 flex max-w-4xl items-center justify-between text-sm">
         <Link
           to="/projects"
           search={(prev) => ({ ...prev, page: Math.max(1, page - 1) })}
