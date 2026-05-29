@@ -2,6 +2,11 @@ import { useForm } from "@tanstack/react-form";
 import { useState } from "react";
 import { z } from "zod";
 import { applyServerErrors } from "#/lib/apply-server-errors";
+import type {
+  FieldSuggestion,
+  ImprovableField,
+} from "#/lib/project-review-fields";
+import { reviewProject } from "#/server/project-review";
 import { CategoryMultiSelect } from "./category-multi-select";
 import { ProgramSelect } from "./program-select";
 import { ProjectImageUploader } from "./project-image-uploader";
@@ -51,6 +56,8 @@ type Props = {
     categoryIds: string[],
     pendingImage: File | null,
   ) => Promise<unknown>;
+  enableAiReview?: boolean;
+  projectId?: string;
 };
 
 export function ProjectForm({
@@ -60,6 +67,8 @@ export function ProjectForm({
   showCategories,
   submitLabel,
   onSubmit,
+  enableAiReview,
+  projectId,
 }: Props) {
   const [formError, setFormError] = useState<string | null>(null);
   const [categoryIds, setCategoryIds] = useState<string[]>(
@@ -70,6 +79,13 @@ export function ProjectForm({
   const [pendingImage, setPendingImage] = useState<File | null | undefined>(
     undefined,
   );
+  const [suggestions, setSuggestions] = useState<
+    Partial<Record<ImprovableField, FieldSuggestion>>
+  >({});
+  const [reviewState, setReviewState] = useState<"idle" | "loading" | "empty">(
+    "idle",
+  );
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   const form = useForm({
     defaultValues: {
@@ -115,6 +131,53 @@ export function ProjectForm({
     },
   });
 
+  async function handleReview() {
+    if (!projectId) return;
+    setReviewError(null);
+    setReviewState("loading");
+    try {
+      const v = form.state.values;
+      const result = await reviewProject({
+        data: {
+          projectId,
+          fields: {
+            title: v.title,
+            description: v.description,
+            problemStatement: v.problemStatement,
+            objectives: v.objectives,
+            minQualifications: v.minQualifications,
+            prefQualifications: v.prefQualifications,
+            licenseRestrictions: v.licenseRestrictions,
+          },
+        },
+      });
+      setSuggestions(result.suggestions);
+      setReviewState(result.reviewedFields.length === 0 ? "empty" : "idle");
+    } catch (err) {
+      setReviewError((err as Error)?.message || "AI review failed");
+      setReviewState("idle");
+    }
+  }
+
+  function applyField(field: ImprovableField) {
+    const s = suggestions[field];
+    if (!s) return;
+    form.setFieldValue(field as never, s.suggestion as never);
+    setSuggestions((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function applyAll() {
+    for (const field of Object.keys(suggestions) as ImprovableField[]) {
+      const s = suggestions[field];
+      if (s) form.setFieldValue(field as never, s.suggestion as never);
+    }
+    setSuggestions({});
+  }
+
   return (
     <form
       onSubmit={(e) => {
@@ -124,13 +187,56 @@ export function ProjectForm({
       }}
       className="space-y-4"
     >
-      <Field form={form} name="title" label="Title" />
+      {enableAiReview && (
+        <div className="rounded-md border p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Improve with AI</p>
+              <p className="text-xs text-muted-foreground">
+                Suggests rewrites for the text fields. You review and apply each
+                change.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {Object.keys(suggestions).length > 0 && (
+                <Button type="button" variant="outline" onClick={applyAll}>
+                  Apply all
+                </Button>
+              )}
+              <Button
+                type="button"
+                onClick={handleReview}
+                disabled={reviewState === "loading"}
+              >
+                {reviewState === "loading" ? "Reviewing..." : "Review with AI"}
+              </Button>
+            </div>
+          </div>
+          {reviewError && (
+            <p className="mt-2 text-sm text-destructive">{reviewError}</p>
+          )}
+          {reviewState === "empty" && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              No improvements suggested.
+            </p>
+          )}
+        </div>
+      )}
+      <Field
+        form={form}
+        name="title"
+        label="Title"
+        suggestion={suggestions.title}
+        onApply={() => applyField("title")}
+      />
       <Field
         form={form}
         name="description"
         label="Description"
         textarea
         rows={4}
+        suggestion={suggestions.description}
+        onApply={() => applyField("description")}
       />
       <Field
         form={form}
@@ -138,6 +244,8 @@ export function ProjectForm({
         label="Problem statement"
         textarea
         rows={3}
+        suggestion={suggestions.problemStatement}
+        onApply={() => applyField("problemStatement")}
       />
       <Field
         form={form}
@@ -145,6 +253,8 @@ export function ProjectForm({
         label="Objectives / deliverables"
         textarea
         rows={3}
+        suggestion={suggestions.objectives}
+        onApply={() => applyField("objectives")}
       />
       <Field
         form={form}
@@ -152,6 +262,8 @@ export function ProjectForm({
         label="Minimum qualifications"
         textarea
         rows={2}
+        suggestion={suggestions.minQualifications}
+        onApply={() => applyField("minQualifications")}
       />
       <Field
         form={form}
@@ -159,6 +271,8 @@ export function ProjectForm({
         label="Preferred qualifications"
         textarea
         rows={2}
+        suggestion={suggestions.prefQualifications}
+        onApply={() => applyField("prefQualifications")}
       />
       <Field form={form} name="url" label="URL" placeholder="https://..." />
       <Field form={form} name="contactName" label="Contact name" />
@@ -194,6 +308,8 @@ export function ProjectForm({
         label="License / IP restrictions"
         textarea
         rows={2}
+        suggestion={suggestions.licenseRestrictions}
+        onApply={() => applyField("licenseRestrictions")}
       />
       <form.Field name="programId">
         {(field: AnyForm) => (
@@ -255,9 +371,20 @@ type FieldProps = {
   placeholder?: string;
   textarea?: boolean;
   rows?: number;
+  suggestion?: FieldSuggestion;
+  onApply?: () => void;
 };
 
-function Field({ form, name, label, placeholder, textarea, rows }: FieldProps) {
+function Field({
+  form,
+  name,
+  label,
+  placeholder,
+  textarea,
+  rows,
+  suggestion,
+  onApply,
+}: FieldProps) {
   return (
     <form.Field name={name as never}>
       {(field: AnyForm) => (
@@ -295,6 +422,28 @@ function Field({ form, name, label, placeholder, textarea, rows }: FieldProps) {
                 )
                 .join(", ")}
             </p>
+          )}
+          {suggestion && (
+            <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-2">
+              <p className="text-xs font-medium text-primary">
+                Suggested change
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-sm">
+                {suggestion.suggestion}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {suggestion.rationale}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={onApply}
+              >
+                Apply
+              </Button>
+            </div>
           )}
         </div>
       )}
