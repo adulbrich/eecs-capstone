@@ -1,12 +1,15 @@
 import { Link } from "@tanstack/react-router";
+import { getPublicUrl } from "#/lib/storage";
+import { ImageOrFallback } from "./image-or-fallback";
 import { InventoryStatusBadge } from "./inventory-status-badge";
+import { Button } from "./ui/button";
 
 type Props = {
   item: {
     id: string;
     name: string;
-    category: string | null;
-    location: string | null;
+    description: string | null;
+    imageUrl: string | null;
     status:
       | "available"
       | "requested"
@@ -14,22 +17,47 @@ type Props = {
       | "checked_out"
       | "maintenance";
   };
+  signedIn: boolean;
+  onAddToCart?: (itemId: string) => void;
 };
 
-export function InventoryRow({ item }: Props) {
+export function InventoryRow({ item, signedIn, onAddToCart }: Props) {
+  const src = getPublicUrl(item.imageUrl);
+  const canAdd = signedIn && item.status === "available" && !!onAddToCart;
   return (
-    <Link
-      to="/inventory/$itemId"
-      params={{ itemId: item.id }}
-      className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2 hover:bg-secondary"
-    >
-      <div className="min-w-0">
-        <p className="truncate font-medium">{item.name}</p>
-        <p className="truncate text-xs text-muted-foreground">
-          {item.category} {item.location ? `· ${item.location}` : ""}
-        </p>
-      </div>
-      <InventoryStatusBadge status={item.status} />
-    </Link>
+    <div className="flex items-stretch gap-3 overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary">
+      <Link
+        to="/inventory/$itemId"
+        params={{ itemId: item.id }}
+        className="flex min-w-0 flex-1 items-stretch gap-3"
+      >
+        <ImageOrFallback
+          src={src}
+          className="h-24 w-32 shrink-0 object-cover"
+        />
+        <div className="min-w-0 flex-1 py-3">
+          <h3 className="truncate text-sm font-semibold">{item.name}</h3>
+          {item.description && (
+            <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">
+              {item.description}
+            </p>
+          )}
+          <div className="mt-1">
+            <InventoryStatusBadge status={item.status} />
+          </div>
+        </div>
+      </Link>
+      {canAdd && (
+        <div className="flex shrink-0 items-center pr-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onAddToCart?.(item.id)}
+          >
+            Add to cart
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
