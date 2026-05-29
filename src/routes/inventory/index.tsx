@@ -40,7 +40,7 @@ export const Route = createFileRoute("/inventory/")({
           status: deps.status,
           category: deps.category,
           page: deps.page,
-          pageSize: 24,
+          pageSize: 20,
         },
       }),
       listInventoryCategories(),
@@ -57,10 +57,17 @@ function InventoryIndex() {
   const { data: session } = authClient.useSession();
   const data = Route.useLoaderData();
 
+  const totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
+  const signedIn = !!session?.user;
+  async function addItem(itemId: string) {
+    await addToCart({ data: { itemId } });
+    await qc.invalidateQueries();
+  }
+
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
+    <div className="mx-auto max-w-7xl px-4 py-6 md:p-8">
       <h1 className="text-2xl font-semibold">Inventory</h1>
-      <div className="mt-4">
+      <div className="mt-4 max-w-4xl">
         <InventoryFilterBar
           q={search.q}
           status={search.status}
@@ -82,30 +89,65 @@ function InventoryIndex() {
           No items match.
         </p>
       ) : search.view === "row" ? (
-        <ul className="mt-4 flex flex-col gap-2">
+        <div className="mt-6 flex max-w-4xl flex-col gap-3">
           {data.rows.map((it) => (
-            <li key={it.id}>
-              <InventoryRow
-                item={{ ...it, status: it.status as PublicStatus }}
-              />
-            </li>
+            <InventoryRow
+              key={it.id}
+              item={{ ...it, status: it.status as PublicStatus }}
+              signedIn={signedIn}
+              onAddToCart={addItem}
+            />
           ))}
-        </ul>
+        </div>
       ) : (
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {data.rows.map((it) => (
             <InventoryCard
               key={it.id}
               item={{ ...it, status: it.status as PublicStatus }}
-              signedIn={!!session?.user}
-              onAddToCart={async (itemId) => {
-                await addToCart({ data: { itemId } });
-                await qc.invalidateQueries();
-              }}
+              signedIn={signedIn}
+              onAddToCart={addItem}
             />
           ))}
         </div>
       )}
+      <div className="mt-6 flex max-w-4xl items-center justify-between text-sm">
+        <button
+          type="button"
+          onClick={() =>
+            navigate({
+              search: (s) => ({ ...s, page: Math.max(1, s.page - 1) }),
+            })
+          }
+          disabled={data.page <= 1}
+          className={
+            data.page <= 1
+              ? "pointer-events-none text-muted-foreground/40"
+              : "hover:underline"
+          }
+        >
+          Previous
+        </button>
+        <span className="text-muted-foreground">
+          Page {data.page} of {totalPages}
+        </span>
+        <button
+          type="button"
+          onClick={() =>
+            navigate({
+              search: (s) => ({ ...s, page: Math.min(totalPages, s.page + 1) }),
+            })
+          }
+          disabled={data.page >= totalPages}
+          className={
+            data.page >= totalPages
+              ? "pointer-events-none text-muted-foreground/40"
+              : "hover:underline"
+          }
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 }
