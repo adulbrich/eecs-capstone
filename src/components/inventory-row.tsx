@@ -31,10 +31,12 @@ export function InventoryRow({ item, signedIn, onAddToCart }: Props) {
         params={{ itemId: item.id }}
         className="flex min-w-0 flex-1 items-stretch gap-3"
       >
-        <ImageOrFallback
-          src={src}
-          className="h-24 w-32 shrink-0 object-cover"
-        />
+        <div className="relative w-32 shrink-0 self-stretch">
+          <ImageOrFallback
+            src={src}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        </div>
         <div className="min-w-0 flex-1 py-3">
           <h3 className="truncate text-sm font-semibold">{item.name}</h3>
           {item.description && (

@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "#/db";
 import { projectComments, projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import { canSeeProject, isStaff } from "#/lib/project-visibility";
+import { isStaff } from "#/lib/project-visibility";
 import type { AddCommentInput } from "../comments";
 import { recordCommentNotifications } from "./notify";
 
@@ -18,7 +18,10 @@ export async function addCommentAs(
     .from(projects)
     .where(eq(projects.id, data.projectId));
   if (!project) throw new Error("Project not found");
-  if (!canSeeProject(project, visibility)) {
+  // Comments are a private submitter <-> staff dialogue, so only the project
+  // submitter and staff may participate.
+  const isOwner = project.proposerId === viewer.id;
+  if (!isStaff(visibility) && !isOwner) {
     throw new Error("Forbidden");
   }
   if (data.isInternal && !isStaff(visibility)) {

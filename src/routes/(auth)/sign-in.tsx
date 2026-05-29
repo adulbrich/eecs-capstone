@@ -1,6 +1,7 @@
 import {
   createFileRoute,
   Link,
+  redirect,
   useNavigate,
   useSearch,
 } from "@tanstack/react-router";
@@ -10,14 +11,21 @@ import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
+import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 
 const searchSchema = z.object({ redirect: z.string().optional() });
 
 export const Route = createFileRoute("/(auth)/sign-in")({
   head: () => ({ meta: [{ title: pageTitle("Sign In") }] }),
-  component: SignIn,
   validateSearch: searchSchema,
+  beforeLoad: async () => {
+    const session = await getSession();
+    if (session?.user) {
+      throw redirect({ to: "/profile" });
+    }
+  },
+  component: SignIn,
 });
 
 function SignIn() {

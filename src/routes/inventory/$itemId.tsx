@@ -50,9 +50,6 @@ function ItemDetail() {
               </span>
             )}
           </div>
-          {item.location && (
-            <p className="mt-1 text-sm text-muted-foreground">{item.location}</p>
-          )}
           {item.description && (
             <p className="mt-4 whitespace-pre-wrap">{item.description}</p>
           )}

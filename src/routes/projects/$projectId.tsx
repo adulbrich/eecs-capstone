@@ -160,20 +160,22 @@ function ProjectDetail() {
         </div>
       </section>
 
-      <section className="mt-8">
-        <h2 className="font-semibold text-lg">Comments</h2>
-        <div className="mt-3">
-          <CommentThread
-            projectId={project.id as string}
-            comments={comments}
-            viewerIsStaff={viewerIsStaff}
-            onChanged={() => {
-              void refreshComments();
-              void router.invalidate();
-            }}
-          />
-        </div>
-      </section>
+      {(viewerIsOwner || viewerIsStaff) && (
+        <section className="mt-8">
+          <h2 className="font-semibold text-lg">Comments</h2>
+          <div className="mt-3">
+            <CommentThread
+              projectId={project.id as string}
+              comments={comments}
+              viewerIsStaff={viewerIsStaff}
+              onChanged={() => {
+                void refreshComments();
+                void router.invalidate();
+              }}
+            />
+          </div>
+        </section>
+      )}
 
       {viewerIsStaff && (
         <StaffProjectPanel
@@ -217,10 +219,7 @@ function ContactSection({
         {name && <span>{name}</span>}
         {name && email && <span>: </span>}
         {email && (
-          <a
-            href={`mailto:${email}`}
-            className="text-brand hover:underline"
-          >
+          <a href={`mailto:${email}`} className="text-brand hover:underline">
             {email}
           </a>
         )}

@@ -171,5 +171,5 @@ export async function listProjectCommentsImpl(data: { id: string }) {
     .from(projectComments)
     .where(eq(projectComments.projectId, data.id))
     .orderBy(asc(projectComments.createdAt));
-  return { rows: filterCommentsForViewer(rows, viewer) };
+  return { rows: filterCommentsForViewer(rows, viewer, project) };
 }

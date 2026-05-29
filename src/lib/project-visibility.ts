@@ -59,10 +59,19 @@ export function stripStaffOnlyFields<T extends VisibleProject>(
   return { ...project, notes: null };
 }
 
+/**
+ * Comments are a private dialogue between the project submitter and staff.
+ * Staff see every comment; the submitter sees only non-internal comments;
+ * everyone else (other signed-in users, anonymous viewers) sees none.
+ */
 export function filterCommentsForViewer<T extends VisibleComment>(
   comments: T[],
   viewer: Viewer,
+  project: VisibleProject,
 ): T[] {
   if (isStaff(viewer)) return comments;
-  return comments.filter((c) => !c.isInternal);
+  if (isOwner(project, viewer)) {
+    return comments.filter((c) => !c.isInternal);
+  }
+  return [];
 }

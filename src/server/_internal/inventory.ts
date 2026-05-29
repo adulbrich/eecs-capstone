@@ -46,7 +46,6 @@ export type InventoryItemPublic = {
   name: string;
   description: string | null;
   category: string | null;
-  location: string | null;
   imageUrl: string | null;
   status: string;
   pickupBy: Date | null;
@@ -55,6 +54,7 @@ export type InventoryItemPublic = {
 
 export type InventoryItemStaff = InventoryItemPublic & {
   serial: string | null;
+  location: string | null;
   notes: string | null;
   currentHolderId: string | null;
   currentHolderLabel: string | null;
@@ -73,7 +73,6 @@ function stripForPublic(
     name: row.name,
     description: row.description,
     category: row.category,
-    location: row.location,
     imageUrl: row.imageUrl,
     status: row.status,
     pickupBy: null,
@@ -87,6 +86,7 @@ function fullForStaff(
   return {
     ...stripForPublic(row),
     serial: row.serial,
+    location: row.location,
     notes: row.notes,
     currentHolderId: row.currentHolderId,
     currentHolderLabel: row.currentHolderLabel,

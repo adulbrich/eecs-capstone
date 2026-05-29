@@ -1,13 +1,20 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
+import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 
 export const Route = createFileRoute("/(auth)/sign-up")({
   head: () => ({ meta: [{ title: pageTitle("Sign Up") }] }),
+  beforeLoad: async () => {
+    const session = await getSession();
+    if (session?.user) {
+      throw redirect({ to: "/profile" });
+    }
+  },
   component: SignUp,
 });
 

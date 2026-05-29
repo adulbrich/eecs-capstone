@@ -15,7 +15,12 @@ export function ProjectRow({ project }: { project: ProjectSummary }) {
       params={{ projectId: project.id }}
       className="flex items-stretch gap-3 overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary"
     >
-      <ImageOrFallback src={src} className="h-24 w-32 shrink-0 object-cover" />
+      <div className="relative w-32 shrink-0 self-stretch">
+        <ImageOrFallback
+          src={src}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      </div>
       <div className="min-w-0 flex-1 py-3 pr-3">
         <div className="flex items-start justify-between gap-3">
           <h3 className="truncate text-sm font-semibold">{project.title}</h3>

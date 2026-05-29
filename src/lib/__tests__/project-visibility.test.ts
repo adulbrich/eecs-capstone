@@ -111,19 +111,25 @@ describe("filterCommentsForViewer", () => {
     { id: "c1", isInternal: false, content: "public" },
     { id: "c2", isInternal: true, content: "internal" },
   ];
+  const project = p({ status: "published" });
 
-  it("strips internal for non-staff", () => {
-    const result = filterCommentsForViewer(comments, owner);
+  it("shows the submitter only non-internal comments", () => {
+    const result = filterCommentsForViewer(comments, owner, project);
     expect(result).toEqual([comments[0]]);
   });
 
   it("keeps all for staff", () => {
-    const result = filterCommentsForViewer(comments, admin);
+    const result = filterCommentsForViewer(comments, admin, project);
     expect(result).toEqual(comments);
   });
 
-  it("strips internal for anonymous", () => {
-    const result = filterCommentsForViewer(comments, anon);
-    expect(result).toEqual([comments[0]]);
+  it("hides all comments from non-owner users", () => {
+    const result = filterCommentsForViewer(comments, other, project);
+    expect(result).toEqual([]);
+  });
+
+  it("hides all comments from anonymous viewers", () => {
+    const result = filterCommentsForViewer(comments, anon, project);
+    expect(result).toEqual([]);
   });
 });
