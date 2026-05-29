@@ -56,6 +56,8 @@ function EditProject() {
           showNotes={viewerIsStaff}
           showCategories={viewerIsStaff}
           submitLabel="Save"
+          enableAiReview
+          projectId={projectId}
           onSubmit={async (values, nextCategoryIds, pendingImage) => {
             await updateProject({
               data: {
