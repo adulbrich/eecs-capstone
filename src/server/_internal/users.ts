@@ -4,10 +4,15 @@ import { projectBookmarks, projects, session, user } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { BanUserInput, ListUsersInput, SetUserRoleInput } from "../users";
 
-type AuthUser = { id: string; role?: string | null | undefined };
+interface AuthUser {
+  id: string;
+  role?: string | null | undefined;
+}
 
 function assertAdmin(viewer: AuthUser) {
-  if (viewer.role !== "admin") throw new Error("Forbidden");
+  if (viewer.role !== "admin") {
+    throw new Error("Forbidden");
+  }
 }
 
 function assertNotSelf(viewer: AuthUser, targetId: string, action: string) {
@@ -20,7 +25,7 @@ export async function listUsersImpl(data: ListUsersInput) {
   const conditions = [];
   if (data.q) {
     conditions.push(
-      or(ilike(user.email, `%${data.q}%`), ilike(user.name, `%${data.q}%`)),
+      or(ilike(user.email, `%${data.q}%`), ilike(user.name, `%${data.q}%`))
     );
   }
   if (data.role) {
@@ -64,7 +69,9 @@ export async function listUsersForCurrentUser(data: ListUsersInput) {
 
 export async function getUserImpl(data: { id: string }) {
   const [target] = await db.select().from(user).where(eq(user.id, data.id));
-  if (!target) throw new Error("User not found");
+  if (!target) {
+    throw new Error("User not found");
+  }
 
   const [{ count: projectCount }] = await db
     .select({ count: sql<number>`count(*)::int` })

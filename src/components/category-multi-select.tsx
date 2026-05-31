@@ -3,16 +3,16 @@ import { Checkbox } from "#/components/ui/checkbox";
 import { Label } from "#/components/ui/label";
 import { listCategories } from "#/server/categories";
 
-type Category = {
+interface Category {
   id: string;
   name: string;
   type: string;
-};
+}
 
-type Props = {
-  value: string[];
+interface Props {
   onChange: (next: string[]) => void;
-};
+  value: string[];
+}
 
 export function CategoryMultiSelect({ value, onChange }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -30,7 +30,7 @@ export function CategoryMultiSelect({ value, onChange }: Props) {
 
   function toggle(id: string) {
     onChange(
-      value.includes(id) ? value.filter((v) => v !== id) : [...value, id],
+      value.includes(id) ? value.filter((v) => v !== id) : [...value, id]
     );
   }
 
@@ -43,7 +43,7 @@ export function CategoryMultiSelect({ value, onChange }: Props) {
 
   if (categories.length === 0) {
     return (
-      <p className="text-sm text-neutral-500">
+      <p className="text-neutral-500 text-sm">
         No categories yet. Create some in /admin/categories.
       </p>
     );
@@ -53,15 +53,15 @@ export function CategoryMultiSelect({ value, onChange }: Props) {
     <div className="space-y-3">
       {[...grouped.entries()].map(([type, items]) => (
         <fieldset
-          key={type}
           className="border border-neutral-200 p-2 dark:border-neutral-800"
+          key={type}
         >
-          <legend className="px-1 text-xs font-medium text-neutral-500">
+          <legend className="px-1 font-medium text-neutral-500 text-xs">
             {type}
           </legend>
           <div className="flex flex-wrap gap-2">
             {items.map((c) => (
-              <Label key={c.id} className="font-normal">
+              <Label className="font-normal" key={c.id}>
                 <Checkbox
                   checked={value.includes(c.id)}
                   onCheckedChange={() => toggle(c.id)}

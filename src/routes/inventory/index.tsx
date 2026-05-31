@@ -67,26 +67,26 @@ function InventoryIndex() {
   return (
     <div className="px-4 py-6 md:p-8">
       <div className="mx-auto max-w-4xl">
-        <h1 className="text-2xl font-semibold">Inventory</h1>
+        <h1 className="font-semibold text-2xl">Inventory</h1>
         <div className="mt-4">
           <InventoryFilterBar
-            q={search.q}
-            status={search.status}
-            category={search.category}
-            view={search.view}
             categories={data.categories}
+            category={search.category}
+            onCategoryChange={(category) =>
+              navigate({ search: (s) => ({ ...s, category, page: 1 }) })
+            }
             onQChange={(q) =>
               navigate({ search: (s) => ({ ...s, q, page: 1 }) })
             }
             onStatusChange={(status) =>
               navigate({ search: (s) => ({ ...s, status, page: 1 }) })
             }
-            onCategoryChange={(category) =>
-              navigate({ search: (s) => ({ ...s, category, page: 1 }) })
-            }
             onViewChange={(view) =>
               navigate({ search: (s) => ({ ...s, view }) })
             }
+            q={search.q}
+            status={search.status}
+            view={search.view}
           />
         </div>
       </div>
@@ -98,10 +98,10 @@ function InventoryIndex() {
         <div className="mx-auto mt-6 flex max-w-4xl flex-col gap-3">
           {data.rows.map((it) => (
             <InventoryRow
-              key={it.id}
               item={{ ...it, status: it.status as PublicStatus }}
-              signedIn={signedIn}
+              key={it.id}
               onAddToCart={addItem}
+              signedIn={signedIn}
             />
           ))}
         </div>
@@ -109,28 +109,28 @@ function InventoryIndex() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {data.rows.map((it) => (
             <InventoryCard
-              key={it.id}
               item={{ ...it, status: it.status as PublicStatus }}
-              signedIn={signedIn}
+              key={it.id}
               onAddToCart={addItem}
+              signedIn={signedIn}
             />
           ))}
         </div>
       )}
       <div className="mx-auto mt-6 flex max-w-4xl items-center justify-between text-sm">
         <button
-          type="button"
-          onClick={() =>
-            navigate({
-              search: (s) => ({ ...s, page: Math.max(1, s.page - 1) }),
-            })
-          }
-          disabled={data.page <= 1}
           className={
             data.page <= 1
               ? "pointer-events-none text-muted-foreground/40"
               : "hover:underline"
           }
+          disabled={data.page <= 1}
+          onClick={() =>
+            navigate({
+              search: (s) => ({ ...s, page: Math.max(1, s.page - 1) }),
+            })
+          }
+          type="button"
         >
           Previous
         </button>
@@ -138,18 +138,18 @@ function InventoryIndex() {
           Page {data.page} of {totalPages}
         </span>
         <button
-          type="button"
-          onClick={() =>
-            navigate({
-              search: (s) => ({ ...s, page: Math.min(totalPages, s.page + 1) }),
-            })
-          }
-          disabled={data.page >= totalPages}
           className={
             data.page >= totalPages
               ? "pointer-events-none text-muted-foreground/40"
               : "hover:underline"
           }
+          disabled={data.page >= totalPages}
+          onClick={() =>
+            navigate({
+              search: (s) => ({ ...s, page: Math.min(totalPages, s.page + 1) }),
+            })
+          }
+          type="button"
         >
           Next
         </button>

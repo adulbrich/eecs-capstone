@@ -23,10 +23,13 @@ export const FIELD_LABELS: Record<ImprovableField, string> = {
   licenseRestrictions: "License / IP restrictions",
 };
 
-export type FieldSuggestion = { suggestion: string; rationale: string };
+export interface FieldSuggestion {
+  rationale: string;
+  suggestion: string;
+}
 
-export type ReviewResult = {
-  suggestions: Partial<Record<ImprovableField, FieldSuggestion>>;
+export interface ReviewResult {
   model: string;
   reviewedFields: ImprovableField[];
-};
+  suggestions: Partial<Record<ImprovableField, FieldSuggestion>>;
+}

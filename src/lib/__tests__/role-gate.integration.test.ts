@@ -21,14 +21,14 @@ describe("role gate", () => {
   it("default role for a new user is 'user'", async () => {
     const cookie = await signUpAndVerify(
       `u-${Date.now()}@example.com`,
-      "Password1!",
+      "Password1!"
     );
     const session = await auth.api.getSession({
       headers: new Headers({ cookie }),
     });
     expect(session?.user.role).toBe("user");
     expect(["admin", "instructor"].includes(session?.user.role ?? "")).toBe(
-      false,
+      false
     );
   });
 

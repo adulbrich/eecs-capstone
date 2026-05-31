@@ -13,15 +13,15 @@ export const Route = createFileRoute("/_authed/profile")({
   component: Profile,
 });
 
-type ProfileUser = {
-  id: string;
-  email: string;
-  name: string | null;
-  image?: string | null;
-  role: string | null | undefined;
+interface ProfileUser {
   affiliation?: string | null;
+  email: string;
+  id: string;
+  image?: string | null;
   linkedin?: string | null;
-};
+  name: string | null;
+  role: string | null | undefined;
+}
 
 function Profile() {
   const router = useRouter();
@@ -73,13 +73,13 @@ function Profile() {
 
   return (
     <div className="mx-auto max-w-md px-4 py-6 md:p-8">
-      <h1 className="text-2xl font-semibold">Profile</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
+      <h1 className="font-semibold text-2xl">Profile</h1>
+      <p className="mt-2 text-muted-foreground text-sm">
         {user.email} ({user.role ?? "user"})
       </p>
 
       <div className="mt-6">
-        <h2 className="text-sm font-medium">Avatar</h2>
+        <h2 className="font-medium text-sm">Avatar</h2>
         <div className="mt-2">
           <AvatarUploader
             currentKey={(user.image as string | null) ?? null}
@@ -88,13 +88,13 @@ function Profile() {
         </div>
       </div>
 
-      <form onSubmit={onSaveProfile} className="mt-6 space-y-3">
+      <form className="mt-6 space-y-3" onSubmit={onSaveProfile}>
         <div className="space-y-1.5">
           <Label htmlFor="name">Name</Label>
           <Input
+            defaultValue={user.name ?? ""}
             id="name"
             name="name"
-            defaultValue={user.name ?? ""}
             placeholder="Your name"
             required
           />
@@ -102,53 +102,53 @@ function Profile() {
         <div className="space-y-1.5">
           <Label htmlFor="affiliation">Affiliation</Label>
           <Input
+            defaultValue={user.affiliation ?? ""}
             id="affiliation"
             name="affiliation"
-            defaultValue={user.affiliation ?? ""}
             placeholder="University, company, ..."
           />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="linkedin">LinkedIn URL</Label>
           <Input
+            defaultValue={user.linkedin ?? ""}
             id="linkedin"
             name="linkedin"
-            defaultValue={user.linkedin ?? ""}
             placeholder="https://linkedin.com/in/..."
             type="url"
           />
         </div>
-        <Button type="submit" className="w-full">
+        <Button className="w-full" type="submit">
           Save profile
         </Button>
       </form>
 
-      <h2 className="mt-8 text-lg font-semibold">Change password</h2>
-      <form onSubmit={onChangePassword} className="mt-3 space-y-3">
+      <h2 className="mt-8 font-semibold text-lg">Change password</h2>
+      <form className="mt-3 space-y-3" onSubmit={onChangePassword}>
         <div className="space-y-1.5">
           <Label htmlFor="current">Current password</Label>
           <Input
+            autoComplete="current-password"
             id="current"
             name="current"
-            type="password"
             placeholder="••••••••"
             required
-            autoComplete="current-password"
+            type="password"
           />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="next">New password</Label>
           <Input
+            autoComplete="new-password"
             id="next"
+            minLength={8}
             name="next"
-            type="password"
             placeholder="••••••••"
             required
-            minLength={8}
-            autoComplete="new-password"
+            type="password"
           />
         </div>
-        <Button type="submit" className="w-full">
+        <Button className="w-full" type="submit">
           Change password
         </Button>
       </form>
@@ -158,13 +158,13 @@ function Profile() {
           Saved.
         </p>
       )}
-      {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+      {error && <p className="mt-4 text-destructive text-sm">{error}</p>}
 
       <Button
-        type="button"
-        variant="outline"
         className="mt-8 w-full"
         onClick={onSignOut}
+        type="button"
+        variant="outline"
       >
         Sign out
       </Button>

@@ -35,7 +35,7 @@ const TRANSITIONS: Record<Status, Partial<Record<ActorRole, Status[]>>> = {
 export function canTransition(
   from: Status,
   to: Status,
-  role: ActorRole,
+  role: ActorRole
 ): boolean {
   return (TRANSITIONS[from][role] ?? []).includes(to);
 }
@@ -43,7 +43,7 @@ export function canTransition(
 export function assertTransitionAllowed(
   from: Status,
   to: Status,
-  role: ActorRole,
+  role: ActorRole
 ): void {
   if (!canTransition(from, to, role)) {
     throw new Error(`Transition ${from} -> ${to} not allowed for ${role}`);

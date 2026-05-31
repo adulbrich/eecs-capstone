@@ -39,7 +39,9 @@ export const Route = createFileRoute("/_authed/admin/categories/")({
   head: () => ({ meta: [{ title: pageTitle("Categories") }] }),
   beforeLoad: async () => {
     const session = await getSession();
-    if (!session?.user) throw redirect({ to: "/sign-in" });
+    if (!session?.user) {
+      throw redirect({ to: "/sign-in" });
+    }
     if (!["admin", "instructor"].includes(session.user.role ?? "")) {
       throw redirect({ to: "/" });
     }
@@ -92,8 +94,8 @@ function CategoriesAdmin() {
         </BreadcrumbList>
       </Breadcrumb>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Categories</h1>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <h1 className="font-semibold text-2xl">Categories</h1>
+        <Dialog onOpenChange={setOpen} open={open}>
           <DialogTrigger asChild>
             <Button size="sm">+ New category</Button>
           </DialogTrigger>
@@ -105,28 +107,28 @@ function CategoriesAdmin() {
                 create a new one.
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={onCreate} className="flex flex-col gap-4">
+            <form className="flex flex-col gap-4" onSubmit={onCreate}>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="cat-name">Name</Label>
                 <Input
                   id="cat-name"
-                  value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
+                  value={name}
                 />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="cat-type">Type</Label>
                 <CategoryTypeCombobox
                   id="cat-type"
-                  value={type}
                   onChange={setType}
                   types={types}
+                  value={type}
                 />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && <p className="text-destructive text-sm">{error}</p>}
               <DialogFooter>
-                <Button type="submit" disabled={!(name && type)}>
+                <Button disabled={!(name && type)} type="submit">
                   Create category
                 </Button>
               </DialogFooter>
@@ -138,19 +140,19 @@ function CategoriesAdmin() {
       <AdminTable columns={["Name", "Type", ""]}>
         {rows.map((c) => (
           <tr key={c.id}>
-            <td data-label="Name" className="border border-border p-2">
+            <td className="border border-border p-2" data-label="Name">
               {c.name}
             </td>
             <td
-              data-label="Type"
               className="border border-border p-2 text-muted-foreground"
+              data-label="Type"
             >
               {c.type}
             </td>
             <td className="border border-border p-2">
               <Link
-                to="/admin/categories/$categoryId"
                 params={{ categoryId: c.id }}
+                to="/admin/categories/$categoryId"
               >
                 Edit
               </Link>

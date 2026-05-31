@@ -97,7 +97,7 @@ describe("setUserRoleAs", () => {
   it("refuses self-action", async () => {
     const admin = await makeUser(`a2-${Date.now()}@x.com`, "admin");
     await expect(
-      setUserRoleAs(admin, { userId: admin.id, role: "user" }),
+      setUserRoleAs(admin, { userId: admin.id, role: "user" })
     ).rejects.toThrow(/yourself/);
   });
 
@@ -105,7 +105,7 @@ describe("setUserRoleAs", () => {
     const instructor = await makeUser(`i-${Date.now()}@x.com`, "instructor");
     const target = await makeUser(`u-${Date.now()}@x.com`, "user");
     await expect(
-      setUserRoleAs(instructor, { userId: target.id, role: "admin" }),
+      setUserRoleAs(instructor, { userId: target.id, role: "admin" })
     ).rejects.toThrow();
   });
 });
@@ -151,7 +151,7 @@ describe("banUserAs / unbanUserAs", () => {
         userId: admin.id,
         reason: "x",
         expiresAt: null,
-      }),
+      })
     ).rejects.toThrow(/yourself/);
   });
 

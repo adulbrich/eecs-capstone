@@ -1,20 +1,20 @@
 import sharp from "sharp";
 
-export type ProcessImageOptions = {
-  maxWidth: number;
+export interface ProcessImageOptions {
   maxHeight: number;
-};
+  maxWidth: number;
+}
 
-export type ProcessedImage = {
+export interface ProcessedImage {
   buffer: Buffer;
   contentType: "image/webp";
-  width: number;
   height: number;
-};
+  width: number;
+}
 
 export async function processImage(
   input: Buffer,
-  opts: ProcessImageOptions,
+  opts: ProcessImageOptions
 ): Promise<ProcessedImage> {
   const { data, info } = await sharp(input)
     .rotate()

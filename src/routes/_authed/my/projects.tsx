@@ -30,9 +30,8 @@ export const Route = createFileRoute("/_authed/my/projects")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("My Projects") }] }),
   loaderDeps: ({ search }) => ({ status: search.status }),
-  loader: async ({ deps }) => {
-    return await listMyProjects({ data: { status: deps.status } });
-  },
+  loader: async ({ deps }) =>
+    await listMyProjects({ data: { status: deps.status } }),
   component: MyProjects,
 });
 
@@ -46,7 +45,7 @@ function MyProjects() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">My Projects</h1>
+        <h1 className="font-semibold text-2xl">My Projects</h1>
         <Button asChild size="sm">
           <Link to="/projects/new">New project</Link>
         </Button>
@@ -55,13 +54,13 @@ function MyProjects() {
       {/* Mobile: Select */}
       <div className="mt-4 md:hidden">
         <Select
-          value={status}
           onValueChange={(s) =>
             void navigate({
               to: "/my/projects",
               search: { status: s as (typeof STATUSES)[number] },
             })
           }
+          value={status}
         >
           <SelectTrigger className="w-full">
             <SelectValue />
@@ -77,22 +76,22 @@ function MyProjects() {
       </div>
 
       {/* Desktop: tab strip */}
-      <div className="mt-4 hidden border-b border-border text-sm md:flex">
+      <div className="mt-4 hidden border-border border-b text-sm md:flex">
         {STATUSES.map((s) => (
           <Link
-            key={s}
-            to="/my/projects"
-            search={{ status: s }}
             className={
               s === status
                 ? "-mb-px border-b-2 px-3 py-1.5 font-medium"
                 : "px-3 py-1.5 text-muted-foreground hover:text-foreground"
             }
+            key={s}
+            search={{ status: s }}
             style={
               s === status
                 ? { borderBottomColor: "var(--brand-primary)" }
                 : undefined
             }
+            to="/my/projects"
           >
             {label(s)}
           </Link>
@@ -100,7 +99,7 @@ function MyProjects() {
       </div>
       <div className="mt-6 flex flex-col gap-3">
         {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             No projects in this view.
           </p>
         ) : (

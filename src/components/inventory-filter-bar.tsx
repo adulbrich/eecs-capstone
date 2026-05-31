@@ -18,17 +18,17 @@ type StatusFilter =
   | "maintenance"
   | null;
 
-type Props = {
-  q: string;
-  status: StatusFilter;
-  category: string | null;
-  view: "card" | "row";
+interface Props {
   categories: string[];
+  category: string | null;
+  onCategoryChange: (c: string | null) => void;
   onQChange: (q: string) => void;
   onStatusChange: (s: StatusFilter) => void;
-  onCategoryChange: (c: string | null) => void;
   onViewChange: (v: "card" | "row") => void;
-};
+  q: string;
+  status: StatusFilter;
+  view: "card" | "row";
+}
 
 const STATUS_OPTIONS: { value: NonNullable<StatusFilter>; label: string }[] = [
   { value: "available", label: "Available" },
@@ -42,7 +42,9 @@ export function InventoryFilterBar(props: Props) {
   const [localQ, setLocalQ] = useState(props.q);
   useEffect(() => {
     const t = setTimeout(() => {
-      if (localQ !== props.q) props.onQChange(localQ);
+      if (localQ !== props.q) {
+        props.onQChange(localQ);
+      }
     }, 300);
     return () => clearTimeout(t);
   }, [localQ, props]);
@@ -51,24 +53,24 @@ export function InventoryFilterBar(props: Props) {
     <div className="rounded-lg border border-border p-4">
       <div className="flex items-center gap-3">
         <Input
-          value={localQ}
+          className="flex-1"
           onChange={(e) => setLocalQ(e.target.value)}
           placeholder="Search inventory"
-          className="flex-1"
+          value={localQ}
         />
-        <ViewToggle value={props.view} onChange={props.onViewChange} />
+        <ViewToggle onChange={props.onViewChange} value={props.view} />
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         <div className="flex flex-col gap-1">
           <Label htmlFor="inv-filter-category">Category</Label>
           <Select
-            value={props.category ?? "_all_"}
             onValueChange={(v) =>
               props.onCategoryChange(v === "_all_" ? null : v)
             }
+            value={props.category ?? "_all_"}
           >
-            <SelectTrigger id="inv-filter-category" className="w-full">
+            <SelectTrigger className="w-full" id="inv-filter-category">
               <SelectValue placeholder="All categories" />
             </SelectTrigger>
             <SelectContent>
@@ -85,12 +87,12 @@ export function InventoryFilterBar(props: Props) {
         <div className="flex flex-col gap-1">
           <Label htmlFor="inv-filter-status">Status</Label>
           <Select
-            value={props.status ?? "_all_"}
             onValueChange={(v) =>
               props.onStatusChange(v === "_all_" ? null : (v as StatusFilter))
             }
+            value={props.status ?? "_all_"}
           >
-            <SelectTrigger id="inv-filter-status" className="w-full">
+            <SelectTrigger className="w-full" id="inv-filter-status">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>

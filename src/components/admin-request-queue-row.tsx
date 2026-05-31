@@ -6,17 +6,17 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 
-type Props = {
-  line: {
-    id: string;
-    status: string;
-  };
+interface Props {
   item: {
     id: string;
     name: string;
     status: string;
   };
-};
+  line: {
+    id: string;
+    status: string;
+  };
+}
 
 export function AdminRequestQueueRow({ line, item }: Props) {
   const router = useRouter();
@@ -74,20 +74,20 @@ export function AdminRequestQueueRow({ line, item }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate font-medium">{item.name}</p>
-          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="mt-1 flex items-center gap-2 text-muted-foreground text-xs">
             <InventoryStatusBadge status={item.status as "available"} />
             <span>line: {line.status}</span>
           </div>
         </div>
         {isPending && mode === null && (
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => setMode("approve")}>
+            <Button onClick={() => setMode("approve")} size="sm">
               Approve
             </Button>
             <Button
+              onClick={() => setMode("reject")}
               size="sm"
               variant="outline"
-              onClick={() => setMode("reject")}
             >
               Reject
             </Button>
@@ -99,30 +99,30 @@ export function AdminRequestQueueRow({ line, item }: Props) {
         <div className="mt-3 flex flex-wrap items-end gap-2">
           <div>
             <label
+              className="text-muted-foreground text-xs"
               htmlFor={`pickup-${line.id}`}
-              className="text-xs text-muted-foreground"
             >
               Pickup by (optional)
             </label>
             <Input
+              className="mt-1 w-40"
               id={`pickup-${line.id}`}
+              onChange={(e) => setPickupBy(e.target.value)}
               type="date"
               value={pickupBy}
-              onChange={(e) => setPickupBy(e.target.value)}
-              className="mt-1 w-40"
             />
           </div>
-          <Button size="sm" onClick={() => void onApprove()} disabled={busy}>
+          <Button disabled={busy} onClick={() => void onApprove()} size="sm">
             {busy ? "Saving..." : "Confirm approve"}
           </Button>
           <Button
-            size="sm"
-            variant="outline"
+            disabled={busy}
             onClick={() => {
               setMode(null);
               setError(null);
             }}
-            disabled={busy}
+            size="sm"
+            variant="outline"
           >
             Cancel
           </Button>
@@ -132,28 +132,28 @@ export function AdminRequestQueueRow({ line, item }: Props) {
       {mode === "reject" && (
         <div className="mt-3 space-y-2">
           <Textarea
-            value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Reason (sent to requester)"
             rows={2}
+            value={reason}
           />
           <div className="flex gap-2">
             <Button
+              disabled={busy}
+              onClick={() => void onReject()}
               size="sm"
               variant="destructive"
-              onClick={() => void onReject()}
-              disabled={busy}
             >
               {busy ? "Saving..." : "Confirm reject"}
             </Button>
             <Button
-              size="sm"
-              variant="outline"
+              disabled={busy}
               onClick={() => {
                 setMode(null);
                 setError(null);
               }}
-              disabled={busy}
+              size="sm"
+              variant="outline"
             >
               Cancel
             </Button>
@@ -161,7 +161,7 @@ export function AdminRequestQueueRow({ line, item }: Props) {
         </div>
       )}
 
-      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+      {error && <p className="mt-2 text-destructive text-sm">{error}</p>}
     </div>
   );
 }

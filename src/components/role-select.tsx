@@ -12,11 +12,11 @@ import {
 
 type Role = "user" | "instructor" | "admin";
 
-type Props = {
-  userId: string;
+interface Props {
   initialRole: Role;
   onChanged: () => void;
-};
+  userId: string;
+}
 
 export function RoleSelect({ userId, initialRole, onChanged }: Props) {
   const [role, setRole] = useState<Role>(initialRole);
@@ -42,8 +42,8 @@ export function RoleSelect({ userId, initialRole, onChanged }: Props) {
     <div className="mt-4">
       <Label htmlFor="role-select">Role</Label>
       <div className="mt-1 flex items-center gap-2">
-        <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-          <SelectTrigger id="role-select" size="sm" className="w-36">
+        <Select onValueChange={(v) => setRole(v as Role)} value={role}>
+          <SelectTrigger className="w-36" id="role-select" size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -53,15 +53,15 @@ export function RoleSelect({ userId, initialRole, onChanged }: Props) {
           </SelectContent>
         </Select>
         <Button
-          type="button"
-          size="sm"
-          onClick={() => void onSave()}
           disabled={!dirty || saving}
+          onClick={() => void onSave()}
+          size="sm"
+          type="button"
         >
           {saving ? "Saving..." : "Save"}
         </Button>
       </div>
-      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+      {error && <p className="mt-2 text-destructive text-sm">{error}</p>}
     </div>
   );
 }

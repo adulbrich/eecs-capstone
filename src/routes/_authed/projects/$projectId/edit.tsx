@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_authed/projects/$projectId/edit")({
   head: () => ({ meta: [{ title: pageTitle("Edit Project") }] }),
   loader: async ({ params }) => {
     const data = await getProject({ data: { id: params.projectId } });
-    if (!data.project || !data.canEdit) {
+    if (!(data.project && data.canEdit)) {
       throw redirect({
         to: "/projects/$projectId",
         params: { projectId: params.projectId },
@@ -30,13 +30,16 @@ export const Route = createFileRoute("/_authed/projects/$projectId/edit")({
 function EditProject() {
   const navigate = useNavigate();
   const { project, viewerIsStaff, categoryIds } = Route.useLoaderData();
-  if (!project) return null;
+  if (!project) {
+    return null;
+  }
   const projectId = project.id as string;
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
-      <h1 className="text-2xl font-semibold">Edit project</h1>
+      <h1 className="font-semibold text-2xl">Edit project</h1>
       <div className="mt-6">
         <ProjectForm
+          enableAiReview
           initial={{
             title: project.title as string,
             description: (project.description as string) ?? "",
@@ -53,11 +56,6 @@ function EditProject() {
             notes: (project.notes as string) ?? "",
           }}
           initialCategoryIds={categoryIds}
-          showNotes={viewerIsStaff}
-          showCategories={viewerIsStaff}
-          submitLabel="Save"
-          enableAiReview
-          projectId={projectId}
           onSubmit={async (values, nextCategoryIds, pendingImage) => {
             await updateProject({
               data: {
@@ -83,6 +81,10 @@ function EditProject() {
               params: { projectId },
             });
           }}
+          projectId={projectId}
+          showCategories={viewerIsStaff}
+          showNotes={viewerIsStaff}
+          submitLabel="Save"
         />
       </div>
     </div>

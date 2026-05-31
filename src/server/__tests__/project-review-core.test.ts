@@ -46,7 +46,7 @@ describe("parseReviewResponse", () => {
         description: { suggestion: "Better desc.", rationale: "clearer" },
         objectives: { suggestion: "Better obj.", rationale: "specific" },
       }),
-      "test-model",
+      "test-model"
     );
     expect(result.model).toBe("test-model");
     expect(result.reviewedFields.sort()).toEqual(["description", "objectives"]);
@@ -63,11 +63,11 @@ describe("parseReviewResponse", () => {
         contactEmail: { suggestion: "x@y.com", rationale: "no" },
         description: { suggestion: "ok", rationale: "ok" },
       }),
-      "m",
+      "m"
     );
     expect(result.reviewedFields).toEqual(["description"]);
     expect(
-      (result.suggestions as Record<string, unknown>).contactEmail,
+      (result.suggestions as Record<string, unknown>).contactEmail
     ).toBeUndefined();
   });
 
@@ -83,8 +83,8 @@ describe("parseReviewResponse", () => {
     expect(() =>
       parseReviewResponse(
         toolResponse({ description: { suggestion: "missing rationale" } }),
-        "m",
-      ),
+        "m"
+      )
     ).toThrow();
   });
 });
@@ -94,7 +94,7 @@ describe("runProjectReview", () => {
     const invoke = vi.fn().mockResolvedValue(
       toolResponse({
         title: { suggestion: "Sharper Title", rationale: "punchier" },
-      }),
+      })
     );
     const result = await runProjectReview({ title: "old title" }, invoke);
     expect(invoke).toHaveBeenCalledTimes(1);

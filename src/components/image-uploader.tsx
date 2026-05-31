@@ -11,15 +11,15 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Image processing failed.";
 }
 
-type Props = {
-  currentKey: string | null;
+interface Props {
   aspect?: number;
-  maxWidth: number;
+  currentKey: string | null;
   maxHeight: number;
+  maxWidth: number;
   // Emits the cropped File once the user commits a crop, or null when
   // the user clicks Remove. The parent decides when to actually upload.
   onChange: (file: File | null) => void;
-};
+}
 
 export function ImageUploader({
   currentKey,
@@ -40,21 +40,26 @@ export function ImageUploader({
   // Preview URL for the cropped File. Revoked on cleanup so we don't leak.
   const previewUrl = useMemo(
     () => (pickedFile ? URL.createObjectURL(pickedFile) : null),
-    [pickedFile],
+    [pickedFile]
   );
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
+  useEffect(
+    () => () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    },
+    [previewUrl]
+  );
 
-  const savedUrl = !cleared && !pickedFile ? getPublicUrl(currentKey) : null;
+  const savedUrl = cleared || pickedFile ? null : getPublicUrl(currentKey);
   const displayUrl = previewUrl ?? savedUrl;
   const hasContent = Boolean(pickedFile || (!cleared && currentKey));
 
   function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       setSourceUrl(reader.result as string);
@@ -72,8 +77,8 @@ export function ImageUploader({
         centerCrop(
           makeAspectCrop({ unit: "%", width: 80 }, aspect, width, height),
           width,
-          height,
-        ),
+          height
+        )
       );
     } else {
       setCrop({
@@ -87,7 +92,9 @@ export function ImageUploader({
   }
 
   async function onConfirmCrop() {
-    if (!imgRef.current || !crop) return;
+    if (!(imgRef.current && crop)) {
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -95,7 +102,7 @@ export function ImageUploader({
         imgRef.current,
         crop,
         maxWidth,
-        maxHeight,
+        maxHeight
       );
       const file = new File([blob], "upload.webp", { type: "image/webp" });
       setPickedFile(file);
@@ -128,76 +135,76 @@ export function ImageUploader({
       {sourceUrl ? (
         <div className="space-y-2">
           <ReactCrop
-            crop={crop ?? undefined}
-            onChange={(c) => setCrop(c)}
             aspect={aspect}
+            crop={crop ?? undefined}
             keepSelection
+            onChange={(c) => setCrop(c)}
           >
             <img
+              alt=""
+              onLoad={onImageLoad}
               ref={imgRef}
               src={sourceUrl}
-              onLoad={onImageLoad}
-              alt=""
               style={{ maxHeight: 400 }}
             />
           </ReactCrop>
           <div className="flex gap-2">
             <button
-              type="button"
-              onClick={() => void onConfirmCrop()}
-              disabled={busy || !crop}
               className="bg-brand px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              disabled={busy || !crop}
+              onClick={() => void onConfirmCrop()}
+              type="button"
             >
               {busy ? "Processing..." : "Use image"}
             </button>
             <button
-              type="button"
-              onClick={onCancelCrop}
-              disabled={busy}
               className="border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100"
+              disabled={busy}
+              onClick={onCancelCrop}
+              type="button"
             >
               Cancel
             </button>
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
         </div>
       ) : (
         <div className="space-y-2">
           {displayUrl ? (
             <img
-              src={displayUrl}
               alt="Current"
               className="max-h-48 border border-neutral-200 object-contain dark:border-neutral-800"
+              src={displayUrl}
             />
           ) : (
-            <p className="text-sm text-neutral-500">No image set.</p>
+            <p className="text-neutral-500 text-sm">No image set.</p>
           )}
           <div className="flex gap-2">
             <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
               className="border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700/50"
+              onClick={() => fileInputRef.current?.click()}
+              type="button"
             >
               {hasContent ? "Replace image" : "Upload image"}
             </button>
             {hasContent && (
               <button
-                type="button"
+                className="inline-flex items-center gap-1 border border-red-300 px-3 py-1.5 text-red-700 text-sm hover:bg-red-50 dark:hover:bg-red-950"
                 onClick={onRemove}
-                className="inline-flex items-center gap-1 border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                type="button"
               >
                 <Trash2 className="h-4 w-4" /> Remove
               </button>
             )}
           </div>
           <input
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="hidden"
+            onChange={onPickFile}
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            onChange={onPickFile}
-            className="hidden"
           />
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
         </div>
       )}
     </div>
@@ -208,7 +215,7 @@ async function renderCropToWebpBlob(
   img: HTMLImageElement,
   crop: Crop,
   maxWidth: number,
-  maxHeight: number,
+  maxHeight: number
 ): Promise<Blob> {
   const scaleX = img.naturalWidth / img.width;
   const scaleY = img.naturalHeight / img.height;
@@ -239,7 +246,9 @@ async function renderCropToWebpBlob(
   canvas.width = Math.max(1, Math.floor(targetW));
   canvas.height = Math.max(1, Math.floor(targetH));
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas 2D not supported");
+  if (!ctx) {
+    throw new Error("Canvas 2D not supported");
+  }
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height);
@@ -248,7 +257,7 @@ async function renderCropToWebpBlob(
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
       "image/webp",
-      0.85,
-    ),
+      0.85
+    )
   );
 }

@@ -40,7 +40,7 @@ export const listCategoryTypes = createServerFn({ method: "GET" }).handler(
   async () => {
     const { listCategoryTypesImpl } = await import("./_internal/categories");
     return listCategoryTypesImpl();
-  },
+  }
 );
 
 export const getCategory = createServerFn({ method: "GET" })
@@ -88,7 +88,7 @@ export const setProjectCategories = createServerFn({ method: "POST" })
 
 export const listProjectCategories = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) =>
-    z.object({ projectId: z.string().uuid() }).parse(data),
+    z.object({ projectId: z.string().uuid() }).parse(data)
   )
   .handler(async ({ data }) => {
     const { listProjectCategoriesImpl } = await import(

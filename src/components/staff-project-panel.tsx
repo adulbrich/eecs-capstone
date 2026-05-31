@@ -29,21 +29,21 @@ const STATUS_LABEL: Record<Status, string> = {
   archived: "Archived",
 };
 
-type Project = {
-  id: string;
-  status: string;
+interface Project {
   deletedAt: Date | string | null;
-  notes: string | null;
-};
-
-type EditLogRow = {
   id: string;
-  editorId: string;
+  notes: string | null;
+  status: string;
+}
+
+interface EditLogRow {
   changedFields: string[];
-  oldValues: unknown;
-  newValues: unknown;
   createdAt: Date | string;
-};
+  editorId: string;
+  id: string;
+  newValues: unknown;
+  oldValues: unknown;
+}
 
 export function StaffProjectPanel({
   project,
@@ -100,8 +100,9 @@ export function StaffProjectPanel({
       } else if (action === "restore") {
         await restoreProject({ data: { id: project.id } });
       } else {
-        if (!confirm("Permanently delete this draft? This cannot be undone."))
+        if (!confirm("Permanently delete this draft? This cannot be undone.")) {
           return;
+        }
         await hardDeleteProject({ data: { id: project.id } });
         window.location.href = "/admin/projects";
         return;
@@ -113,12 +114,12 @@ export function StaffProjectPanel({
   }
 
   return (
-    <div className="mt-8 rounded-lg border-2 border-(--brand-primary-tint) bg-card p-4">
+    <div className="mt-8 rounded-lg border-(--brand-primary-tint) border-2 bg-card p-4">
       <p className="island-kicker mb-3">Staff panel</p>
 
       {/* Status stepper — vertical on mobile, horizontal on md+ */}
       <div className="md:overflow-x-auto md:pb-1">
-        <div className="flex flex-col md:flex-row md:min-w-max md:items-center">
+        <div className="flex flex-col md:min-w-max md:flex-row md:items-center">
           {WORKFLOW.map((s, i) => {
             const isCurrent = s === currentStatus;
             const isNormal =
@@ -136,8 +137,8 @@ export function StaffProjectPanel({
             return (
               // flex-col on mobile stacks connector above pill; flex-row on desktop puts them side-by-side
               <div
-                key={s}
                 className="flex flex-col md:flex-row md:items-center"
+                key={s}
               >
                 {i > 0 && (
                   <>
@@ -154,11 +155,14 @@ export function StaffProjectPanel({
                   </>
                 )}
                 <button
-                  type="button"
+                  className={pillClass}
                   disabled={isCurrent}
                   onClick={() => {
-                    if (isNormal) void transition(s);
-                    else setPendingOverride(s);
+                    if (isNormal) {
+                      void transition(s);
+                    } else {
+                      setPendingOverride(s);
+                    }
                   }}
                   title={
                     isCurrent
@@ -167,7 +171,7 @@ export function StaffProjectPanel({
                         ? `Move to ${STATUS_LABEL[s]}`
                         : `Override: force to ${STATUS_LABEL[s]}`
                   }
-                  className={pillClass}
+                  type="button"
                 >
                   {STATUS_LABEL[s]}
                 </button>
@@ -177,7 +181,7 @@ export function StaffProjectPanel({
         </div>
       </div>
 
-      <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+      <div className="mt-2 flex items-center gap-4 text-muted-foreground text-xs">
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-2.5 rounded-full bg-brand" />
           Current
@@ -187,22 +191,22 @@ export function StaffProjectPanel({
           Normal flow
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-2.5 rounded-full border border-dashed border-border" />
+          <span className="inline-block h-2.5 w-2.5 rounded-full border border-border border-dashed" />
           Override
         </span>
       </div>
 
       {/* Comment textarea */}
       <section className="mt-4 space-y-1.5">
-        <label htmlFor="staff-comment" className="block text-sm font-medium">
+        <label className="block font-medium text-sm" htmlFor="staff-comment">
           Comment (added to status history)
         </label>
         <Textarea
           id="staff-comment"
-          value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="Optional — explain the action"
           rows={2}
+          value={comment}
         />
       </section>
 
@@ -216,18 +220,18 @@ export function StaffProjectPanel({
           </p>
           <div className="mt-2 flex gap-2">
             <Button
-              type="button"
-              size="sm"
-              variant="destructive"
               onClick={() => void transition(pendingOverride, true)}
+              size="sm"
+              type="button"
+              variant="destructive"
             >
               Confirm override
             </Button>
             <Button
-              type="button"
-              size="sm"
-              variant="ghost"
               onClick={() => setPendingOverride(null)}
+              size="sm"
+              type="button"
+              variant="ghost"
             >
               Cancel
             </Button>
@@ -235,40 +239,40 @@ export function StaffProjectPanel({
         </div>
       )}
 
-      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+      {error && <p className="mt-2 text-destructive text-sm">{error}</p>}
 
       {/* Danger zone */}
-      <section className="mt-5 border-t border-border pt-4">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <section className="mt-5 border-border border-t pt-4">
+        <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
           Danger zone
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           {!project.deletedAt && project.status !== "draft" && (
             <Button
+              onClick={() => void runDelete("softDelete")}
+              size="sm"
               type="button"
               variant="outline"
-              size="sm"
-              onClick={() => void runDelete("softDelete")}
             >
               Soft delete
             </Button>
           )}
           {project.deletedAt && (
             <Button
+              onClick={() => void runDelete("restore")}
+              size="sm"
               type="button"
               variant="outline"
-              size="sm"
-              onClick={() => void runDelete("restore")}
             >
               Restore
             </Button>
           )}
           {project.status === "draft" && !project.deletedAt && (
             <Button
+              onClick={() => void runDelete("hardDelete")}
+              size="sm"
               type="button"
               variant="destructive"
-              size="sm"
-              onClick={() => void runDelete("hardDelete")}
             >
               Hard delete
             </Button>
@@ -278,22 +282,22 @@ export function StaffProjectPanel({
 
       {/* Internal notes */}
       {project.notes && (
-        <section className="mt-5 border-t border-border pt-4">
-          <h3 className="text-sm font-medium">Internal notes</h3>
+        <section className="mt-5 border-border border-t pt-4">
+          <h3 className="font-medium text-sm">Internal notes</h3>
           <p className="mt-1 whitespace-pre-wrap text-sm">{project.notes}</p>
         </section>
       )}
 
       {/* Edit log */}
-      <section className="mt-5 border-t border-border pt-4">
-        <h3 className="text-sm font-medium">Edit log</h3>
+      <section className="mt-5 border-border border-t pt-4">
+        <h3 className="font-medium text-sm">Edit log</h3>
         {editLog.length === 0 ? (
-          <p className="mt-1 text-sm text-muted-foreground">No edits yet.</p>
+          <p className="mt-1 text-muted-foreground text-sm">No edits yet.</p>
         ) : (
           <ul className="mt-2 space-y-2 text-sm">
             {editLog.map((row) => (
-              <li key={row.id} className="border-l-2 border-border pl-2">
-                <div className="text-xs text-muted-foreground">
+              <li className="border-border border-l-2 pl-2" key={row.id}>
+                <div className="text-muted-foreground text-xs">
                   {row.editorId.slice(0, 8)} at{" "}
                   {new Date(row.createdAt).toLocaleString()}
                 </div>

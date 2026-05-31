@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { db } from "#/db";
 import type { db as Db } from "#/db";
+import { db } from "#/db";
 import {
   inventoryItemStatusHistory,
   inventoryItems,
@@ -18,18 +18,21 @@ export type ItemStatus =
   | "maintenance"
   | "retired";
 
-export type TransitionInput = {
-  itemId: string;
-  nextStatus: ItemStatus;
-  requestItemId?: string | null;
+export interface TransitionInput {
+  comment?: string | null;
+  dueAt?: Date | null;
   holderId?: string | null;
   holderLabel?: string | null;
+  itemId: string;
+  nextStatus: ItemStatus;
   pickupBy?: Date | null;
-  dueAt?: Date | null;
-  comment?: string | null;
-};
+  requestItemId?: string | null;
+}
 
-type Viewer = { id: string; role?: string | null | undefined };
+interface Viewer {
+  id: string;
+  role?: string | null | undefined;
+}
 
 function assertStaff(viewer: Viewer) {
   if (viewer.role !== "admin" && viewer.role !== "instructor") {
@@ -47,19 +50,19 @@ function validateInvariants(input: TransitionInput) {
     case "retired":
       if (holderId || holderLabel || requestItemId) {
         throw new Error(
-          `Cannot set holder or request on transition to ${nextStatus}`,
+          `Cannot set holder or request on transition to ${nextStatus}`
         );
       }
       if (pickupBy || dueAt) {
         throw new Error(
-          `pickupBy / dueAt not allowed on transition to ${nextStatus}`,
+          `pickupBy / dueAt not allowed on transition to ${nextStatus}`
         );
       }
       return;
     case "requested":
-      if (!requestItemId || !holderId || holderLabel) {
+      if (!(requestItemId && holderId) || holderLabel) {
         throw new Error(
-          "requested status requires requestItemId + holderId, no label",
+          "requested status requires requestItemId + holderId, no label"
         );
       }
       return;
@@ -72,7 +75,7 @@ function validateInvariants(input: TransitionInput) {
       const hasLabel = !!holderLabel;
       if (hasUser === hasLabel) {
         throw new Error(
-          `${nextStatus} requires exactly one of holderId or holderLabel`,
+          `${nextStatus} requires exactly one of holderId or holderLabel`
         );
       }
       if (nextStatus === "checked_out" && !dueAt) {
@@ -95,7 +98,7 @@ function validateInvariants(input: TransitionInput) {
 export async function transitionItem(
   viewer: Viewer,
   input: TransitionInput,
-  externalTx?: Tx,
+  externalTx?: Tx
 ) {
   assertStaff(viewer);
   validateInvariants(input);
@@ -113,7 +116,7 @@ export async function transitionItem(
 async function transitionItemInTx(
   tx: Tx,
   viewer: Viewer,
-  input: TransitionInput,
+  input: TransitionInput
 ) {
   const [current] = await tx
     .select()
@@ -121,14 +124,16 @@ async function transitionItemInTx(
     .where(eq(inventoryItems.id, input.itemId))
     .for("update");
 
-  if (!current) throw new Error("Item not found");
+  if (!current) {
+    throw new Error("Item not found");
+  }
 
   // Guard: a fresh request can only attach to an item that is currently
   // free. Without this, callers could orphan an existing pending line by
   // overwriting current_request_item_id silently.
   if (input.nextStatus === "requested" && current.status !== "available") {
     throw new Error(
-      `Cannot move item to requested from ${current.status}; release the existing hold first`,
+      `Cannot move item to requested from ${current.status}; release the existing hold first`
     );
   }
 
@@ -163,7 +168,7 @@ async function transitionItemInTx(
       current.currentRequestItemId,
       viewer.id,
       current.status,
-      input.comment ?? null,
+      input.comment ?? null
     );
   }
 
@@ -202,7 +207,7 @@ async function closeRequestItemOnRelease(
   requestItemId: string,
   actorId: string,
   prevStatus: ItemStatus,
-  comment: string | null,
+  comment: string | null
 ) {
   // Fulfillment ended in the user's hands then came back: returned.
   // Otherwise (reserved abandoned, sent to maintenance/retired before pickup): cancelled.
@@ -221,17 +226,24 @@ async function closeRequestItemOnRelease(
 
 async function maybeNotify(
   tx: Tx,
-  prev: { id: string; name: string; status: ItemStatus; currentHolderId: string | null; currentRequestItemId: string | null },
-  input: TransitionInput,
+  prev: {
+    id: string;
+    name: string;
+    status: ItemStatus;
+    currentHolderId: string | null;
+    currentRequestItemId: string | null;
+  },
+  input: TransitionInput
 ) {
   // Identify a "release-from-hold" path: no new request context provided AND
   // the item was holding one. The original holder is then the recipient.
-  const isReleaseFromHold =
-    !input.requestItemId && !!prev.currentRequestItemId;
+  const isReleaseFromHold = !input.requestItemId && !!prev.currentRequestItemId;
 
   const recipientId =
     input.holderId ?? (isReleaseFromHold ? prev.currentHolderId : null);
-  if (!recipientId) return;
+  if (!recipientId) {
+    return;
+  }
 
   switch (input.nextStatus) {
     case "reserved": {
@@ -243,7 +255,7 @@ async function maybeNotify(
         type: "inventory_request_approved",
         title,
         message: `Your request for ${prev.name} was approved.`,
-        link: `/my/items?tab=active`,
+        link: "/my/items?tab=active",
       });
       return;
     }
@@ -253,14 +265,16 @@ async function maybeNotify(
         type: "inventory_item_checked_out",
         title: `Checked out: ${prev.name}. Due ${formatDate(input.dueAt)}.`,
         message: `${prev.name} is now in your hands.`,
-        link: `/my/items?tab=active`,
+        link: "/my/items?tab=active",
       });
       return;
     }
     case "available":
     case "maintenance":
     case "retired": {
-      if (!isReleaseFromHold) return;
+      if (!isReleaseFromHold) {
+        return;
+      }
       if (prev.status === "checked_out" && input.nextStatus === "available") {
         await tx.insert(notifications).values({
           userId: recipientId,
@@ -275,8 +289,9 @@ async function maybeNotify(
           type: "inventory_request_closed",
           title: `Request closed: ${prev.name}`,
           message:
-            input.comment ?? `Your request for ${prev.name} was closed by staff.`,
-          link: `/my/items?tab=history`,
+            input.comment ??
+            `Your request for ${prev.name} was closed by staff.`,
+          link: "/my/items?tab=history",
         });
       }
       return;
@@ -287,7 +302,9 @@ async function maybeNotify(
 }
 
 function formatDate(d: Date | null | undefined): string {
-  if (!d) return "soon";
+  if (!d) {
+    return "soon";
+  }
   return new Date(d).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",

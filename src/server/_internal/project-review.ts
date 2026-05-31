@@ -9,16 +9,19 @@ import type {
 import { canEditProject } from "#/lib/project-visibility";
 import { runProjectReview } from "./project-review-core";
 
-export type AuthUser = { id: string; role?: string | null | undefined };
+export interface AuthUser {
+  id: string;
+  role?: string | null | undefined;
+}
 
-export type ReviewProjectInput = {
-  projectId: string;
+export interface ReviewProjectInput {
   fields: Partial<Record<ImprovableField, string>>;
-};
+  projectId: string;
+}
 
 export async function reviewProjectAs(
   viewer: AuthUser,
-  input: ReviewProjectInput,
+  input: ReviewProjectInput
 ): Promise<ReviewResult> {
   const [project] = await db
     .select()
@@ -34,7 +37,7 @@ export async function reviewProjectAs(
 }
 
 export async function reviewProjectForCurrentUser(
-  input: ReviewProjectInput,
+  input: ReviewProjectInput
 ): Promise<ReviewResult> {
   const viewer = await requireUser();
   return reviewProjectAs(viewer, input);

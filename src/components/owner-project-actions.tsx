@@ -6,15 +6,15 @@ import {
 } from "#/server/projects";
 import { Button } from "./ui/button";
 
-type Project = {
+interface Project {
   id: string;
   status: string;
-};
+}
 
-type Props = {
-  project: Project;
+interface Props {
   onChanged: () => void;
-};
+  project: Project;
+}
 
 export function OwnerProjectActions({ project, onChanged }: Props) {
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +81,9 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
   ];
 
   const visible = buttons.filter((b) => b.show);
-  if (visible.length === 0 && !error) return null;
+  if (visible.length === 0 && !error) {
+    return null;
+  }
 
   return (
     <section className="mt-6 rounded-lg border border-border bg-secondary p-4">
@@ -89,18 +91,18 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
       <div className="mt-3 flex flex-wrap gap-2">
         {visible.map((b) => (
           <Button
+            disabled={busy}
             key={b.id}
+            onClick={() => void run(b.id)}
+            size="sm"
             type="button"
             variant={b.variant ?? "outline"}
-            size="sm"
-            disabled={busy}
-            onClick={() => void run(b.id)}
           >
             {b.label}
           </Button>
         ))}
       </div>
-      {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+      {error && <p className="mt-3 text-destructive text-sm">{error}</p>}
     </section>
   );
 }

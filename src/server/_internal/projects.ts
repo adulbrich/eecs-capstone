@@ -14,7 +14,10 @@ import {
   recordStatusChangeNotifications,
 } from "./notify";
 
-export type AuthUser = { id: string; role?: string | null | undefined };
+export interface AuthUser {
+  id: string;
+  role?: string | null | undefined;
+}
 
 const PROJECT_EDITABLE_FIELDS = [
   "title",
@@ -38,13 +41,15 @@ function viewerToVisibility(viewer: AuthUser): Viewer {
 
 async function loadProjectOr404(id: string) {
   const [row] = await db.select().from(projects).where(eq(projects.id, id));
-  if (!row) throw new Error("Project not found");
+  if (!row) {
+    throw new Error("Project not found");
+  }
   return row;
 }
 
 export async function createProjectAs(
   viewer: AuthUser,
-  data: ProjectInput,
+  data: ProjectInput
 ): Promise<{ id: string }> {
   const allowedNotes = isStaff(viewerToVisibility(viewer))
     ? (data.notes ?? null)
@@ -75,7 +80,7 @@ export async function createProjectAs(
 
 export async function updateProjectAs(
   viewer: AuthUser,
-  data: UpdateProjectInput,
+  data: UpdateProjectInput
 ): Promise<{ id: string; updated: boolean }> {
   const visibility = viewerToVisibility(viewer);
   const existing = await loadProjectOr404(data.id);
@@ -98,13 +103,17 @@ export async function updateProjectAs(
     licenseRestrictions: data.licenseRestrictions ?? null,
     programId: data.programId ?? null,
   };
-  if (staff) newValues.notes = data.notes ?? null;
+  if (staff) {
+    newValues.notes = data.notes ?? null;
+  }
 
   const oldDiff: Record<string, unknown> = {};
   const newDiff: Record<string, unknown> = {};
   const changedFields: string[] = [];
   for (const field of PROJECT_EDITABLE_FIELDS) {
-    if (!staff && field === "notes") continue;
+    if (!staff && field === "notes") {
+      continue;
+    }
     const oldVal = (existing as Record<string, unknown>)[field] ?? null;
     const newVal = newValues[field] ?? null;
     if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
@@ -139,7 +148,7 @@ export async function performTransitionAs(
   viewer: AuthUser,
   id: string,
   target: Status,
-  comment?: string,
+  comment?: string
 ): Promise<{ id: string; status: Status }> {
   const visibility = viewerToVisibility(viewer);
   const project = await loadProjectOr404(id);
@@ -174,7 +183,7 @@ export async function performTransitionAs(
       tx,
       { id: project.id, title: project.title, proposerId: project.proposerId },
       target,
-      viewer.id,
+      viewer.id
     );
   });
 
@@ -183,15 +192,19 @@ export async function performTransitionAs(
 
 export async function softDeleteProjectAs(
   viewer: AuthUser,
-  id: string,
+  id: string
 ): Promise<{ id: string }> {
   const visibility = viewerToVisibility(viewer);
-  if (!isStaff(visibility)) throw new Error("Forbidden");
+  if (!isStaff(visibility)) {
+    throw new Error("Forbidden");
+  }
   const project = await loadProjectOr404(id);
   if (project.status === "draft") {
     throw new Error("Cannot soft-delete a draft; hard-delete instead.");
   }
-  if (project.deletedAt) throw new Error("Already soft-deleted.");
+  if (project.deletedAt) {
+    throw new Error("Already soft-deleted.");
+  }
   await db.transaction(async (tx) => {
     await tx
       .update(projects)
@@ -201,7 +214,7 @@ export async function softDeleteProjectAs(
       tx,
       { id: project.id, title: project.title, proposerId: project.proposerId },
       "soft-deleted",
-      viewer.id,
+      viewer.id
     );
   });
   return { id };
@@ -209,12 +222,16 @@ export async function softDeleteProjectAs(
 
 export async function restoreProjectAs(
   viewer: AuthUser,
-  id: string,
+  id: string
 ): Promise<{ id: string }> {
   const visibility = viewerToVisibility(viewer);
-  if (!isStaff(visibility)) throw new Error("Forbidden");
+  if (!isStaff(visibility)) {
+    throw new Error("Forbidden");
+  }
   const project = await loadProjectOr404(id);
-  if (!project.deletedAt) throw new Error("Not soft-deleted.");
+  if (!project.deletedAt) {
+    throw new Error("Not soft-deleted.");
+  }
   await db.transaction(async (tx) => {
     await tx
       .update(projects)
@@ -224,7 +241,7 @@ export async function restoreProjectAs(
       tx,
       { id: project.id, title: project.title, proposerId: project.proposerId },
       "restored",
-      viewer.id,
+      viewer.id
     );
   });
   return { id };
@@ -232,7 +249,7 @@ export async function restoreProjectAs(
 
 export async function hardDeleteProjectAs(
   viewer: AuthUser,
-  id: string,
+  id: string
 ): Promise<{ id: string }> {
   const visibility = viewerToVisibility(viewer);
   const project = await loadProjectOr404(id);
@@ -240,7 +257,9 @@ export async function hardDeleteProjectAs(
     throw new Error("Hard delete only allowed on drafts.");
   }
   const isOwner = project.proposerId === viewer.id;
-  if (!isOwner && !isStaff(visibility)) throw new Error("Forbidden");
+  if (!(isOwner || isStaff(visibility))) {
+    throw new Error("Forbidden");
+  }
   await db.delete(projects).where(eq(projects.id, id));
   return { id };
 }
@@ -249,13 +268,16 @@ export async function forceTransitionAs(
   viewer: AuthUser,
   id: string,
   target: Status,
-  comment?: string,
+  comment?: string
 ): Promise<{ id: string; status: Status }> {
   const visibility = viewerToVisibility(viewer);
-  if (!isStaff(visibility)) throw new Error("Forbidden");
+  if (!isStaff(visibility)) {
+    throw new Error("Forbidden");
+  }
   const project = await loadProjectOr404(id);
-  if (project.status === target)
+  if (project.status === target) {
     throw new Error("Project is already in that status.");
+  }
 
   await db.transaction(async (tx) => {
     const updates: Record<string, unknown> = {
@@ -282,7 +304,7 @@ export async function forceTransitionAs(
       tx,
       { id: project.id, title: project.title, proposerId: project.proposerId },
       target,
-      viewer.id,
+      viewer.id
     );
   });
 
@@ -306,7 +328,7 @@ export async function updateProjectForCurrentUser(data: UpdateProjectInput) {
 export async function performTransitionForCurrentUser(
   id: string,
   target: Status,
-  comment?: string,
+  comment?: string
 ) {
   const viewer = await requireUser();
   return performTransitionAs(viewer, id, target, comment);
@@ -315,7 +337,7 @@ export async function performTransitionForCurrentUser(
 export async function forceTransitionForCurrentUser(
   id: string,
   target: Status,
-  comment?: string,
+  comment?: string
 ) {
   const viewer = await requireUser();
   return forceTransitionAs(viewer, id, target, comment);

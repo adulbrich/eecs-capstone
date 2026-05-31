@@ -26,7 +26,7 @@ describe("CartButton", () => {
     const { findByText } = render(
       <QueryClientProvider client={qc}>
         <CartButton />
-      </QueryClientProvider>,
+      </QueryClientProvider>
     );
     expect(await findByText("2")).toBeDefined();
   });
@@ -37,7 +37,7 @@ describe("CartButton", () => {
     const { queryByText } = render(
       <QueryClientProvider client={qc}>
         <CartButton />
-      </QueryClientProvider>,
+      </QueryClientProvider>
     );
     expect(queryByText("0")).toBeNull();
   });

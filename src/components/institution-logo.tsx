@@ -13,24 +13,24 @@ export function InstitutionLogo() {
   return (
     <div className="flex items-center gap-2.5">
       <img
-        src={brand.logoUrl}
         alt={brand.logoAlt}
         className={[
           "h-8 w-auto",
           hasLightVariant ? "dark:hidden" : "dark:brightness-0 dark:invert",
         ].join(" ")}
+        src={brand.logoUrl}
       />
       {hasLightVariant && (
         <img
-          src={brand.logoUrlLight}
           alt={brand.logoAlt}
           className="hidden h-8 w-auto dark:block"
+          src={brand.logoUrlLight}
         />
       )}
       {brand.programName && (
         <>
-          <span className="h-5 w-px bg-[var(--line)]" aria-hidden="true" />
-          <span className="hidden text-xs font-medium text-[var(--text-secondary)] sm:inline">
+          <span aria-hidden="true" className="h-5 w-px bg-[var(--line)]" />
+          <span className="hidden font-medium text-[var(--text-secondary)] text-xs sm:inline">
             {brand.programName}
           </span>
         </>

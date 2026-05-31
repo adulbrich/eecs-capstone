@@ -38,7 +38,7 @@ describe("canSeeProject", () => {
     expect(canSeeProject(p({ status: "published" }), anon)).toBe(true);
     expect(canSeeProject(p({ status: "draft" }), anon)).toBe(false);
     expect(
-      canSeeProject(p({ status: "published", deletedAt: new Date() }), anon),
+      canSeeProject(p({ status: "published", deletedAt: new Date() }), anon)
     ).toBe(false);
   });
 
@@ -46,7 +46,7 @@ describe("canSeeProject", () => {
     expect(canSeeProject(p({ status: "draft" }), owner)).toBe(true);
     expect(canSeeProject(p({ status: "archived" }), owner)).toBe(true);
     expect(
-      canSeeProject(p({ status: "draft", deletedAt: new Date() }), owner),
+      canSeeProject(p({ status: "draft", deletedAt: new Date() }), owner)
     ).toBe(false);
   });
 
@@ -58,7 +58,7 @@ describe("canSeeProject", () => {
   it("staff sees everything including soft-deleted", () => {
     expect(canSeeProject(p({ status: "draft" }), admin)).toBe(true);
     expect(
-      canSeeProject(p({ status: "published", deletedAt: new Date() }), admin),
+      canSeeProject(p({ status: "published", deletedAt: new Date() }), admin)
     ).toBe(true);
     expect(canSeeProject(p({ status: "draft" }), instructor)).toBe(true);
   });
@@ -74,7 +74,7 @@ describe("canEditProject", () => {
     expect(canEditProject(p({ status: "submitted" }), owner)).toBe(true);
     expect(canEditProject(p({ status: "archived" }), owner)).toBe(false);
     expect(
-      canEditProject(p({ status: "draft", deletedAt: new Date() }), owner),
+      canEditProject(p({ status: "draft", deletedAt: new Date() }), owner)
     ).toBe(false);
   });
 
@@ -89,7 +89,7 @@ describe("canEditProject", () => {
 
   it("staff cannot edit a soft-deleted project (must restore first)", () => {
     expect(
-      canEditProject(p({ status: "draft", deletedAt: new Date() }), admin),
+      canEditProject(p({ status: "draft", deletedAt: new Date() }), admin)
     ).toBe(false);
   });
 });

@@ -14,16 +14,24 @@ import {
 } from "./ui/select";
 import { ViewToggle } from "./view-toggle";
 
-type Category = { id: string; name: string; type: string };
-type Program = { id: string; courseId: string; courseName: string };
+interface Category {
+  id: string;
+  name: string;
+  type: string;
+}
+interface Program {
+  courseId: string;
+  courseName: string;
+  id: string;
+}
 
-type Props = {
-  q: string;
+interface Props {
+  archivedOnly: boolean;
   categories: string[];
   program: string | null;
-  archivedOnly: boolean;
+  q: string;
   view: "card" | "row";
-};
+}
 
 export function ProjectsFilterBar({
   q,
@@ -112,11 +120,11 @@ export function ProjectsFilterBar({
     <div className="rounded-lg border border-border p-4">
       <div className="flex items-center gap-3">
         <Input
-          type="search"
-          value={queryDraft}
+          className="flex-1"
           onChange={(e) => setQueryDraft(e.target.value)}
           placeholder='Search projects (try "phrase" or -word to exclude)'
-          className="flex-1"
+          type="search"
+          value={queryDraft}
         />
         <ViewToggle current={view} />
       </div>
@@ -125,10 +133,10 @@ export function ProjectsFilterBar({
         <div>
           <Label htmlFor="filter-program">Program</Label>
           <Select
-            value={program ?? "_all_"}
             onValueChange={(v) => setProgram(v === "_all_" ? "" : v)}
+            value={program ?? "_all_"}
           >
-            <SelectTrigger id="filter-program" className="mt-1 w-full">
+            <SelectTrigger className="mt-1 w-full" id="filter-program">
               <SelectValue placeholder="All programs" />
             </SelectTrigger>
             <SelectContent>
@@ -154,16 +162,16 @@ export function ProjectsFilterBar({
 
       {grouped.size > 0 && (
         <div className="mt-3">
-          <p className="text-xs font-medium text-muted-foreground">
+          <p className="font-medium text-muted-foreground text-xs">
             Categories
           </p>
           <div className="mt-1 space-y-2">
             {[...grouped.entries()].map(([type, items]) => (
               <div key={type}>
-                <p className="text-xs text-muted-foreground">{type}</p>
+                <p className="text-muted-foreground text-xs">{type}</p>
                 <div className="mt-1 flex flex-wrap gap-2">
                   {items.map((c) => (
-                    <Label key={c.id} className="font-normal">
+                    <Label className="font-normal" key={c.id}>
                       <Checkbox
                         checked={categories.includes(c.id)}
                         onCheckedChange={() => toggleCategory(c.id)}
@@ -180,9 +188,9 @@ export function ProjectsFilterBar({
 
       {hasAnyFilter && (
         <button
-          type="button"
+          className="mt-3 text-brand text-sm hover:underline"
           onClick={clearAll}
-          className="mt-3 text-sm text-brand hover:underline"
+          type="button"
         >
           Clear all
         </button>

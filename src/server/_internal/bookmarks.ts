@@ -11,7 +11,9 @@ export async function addBookmarkForCurrentUser(data: { projectId: string }) {
     .select()
     .from(projects)
     .where(eq(projects.id, data.projectId));
-  if (!project) throw new Error("Project not found");
+  if (!project) {
+    throw new Error("Project not found");
+  }
   if (!canSeeProject(project, { id: viewer.id, role: viewer.role ?? null })) {
     throw new Error("Forbidden");
   }
@@ -31,8 +33,8 @@ export async function removeBookmarkForCurrentUser(data: {
     .where(
       and(
         eq(projectBookmarks.userId, viewer.id),
-        eq(projectBookmarks.projectId, data.projectId),
-      ),
+        eq(projectBookmarks.projectId, data.projectId)
+      )
     );
   return { ok: true };
 }
@@ -45,8 +47,8 @@ export async function isBookmarkedForCurrentUser(data: { projectId: string }) {
     .where(
       and(
         eq(projectBookmarks.userId, viewer.id),
-        eq(projectBookmarks.projectId, data.projectId),
-      ),
+        eq(projectBookmarks.projectId, data.projectId)
+      )
     );
   return { bookmarked: !!row };
 }
@@ -62,7 +64,7 @@ export async function listMyBookmarksForCurrentUser() {
     .innerJoin(projects, eq(projectBookmarks.projectId, projects.id))
     .leftJoin(programs, eq(projects.programId, programs.id))
     .where(
-      and(eq(projectBookmarks.userId, viewer.id), isNull(projects.deletedAt)),
+      and(eq(projectBookmarks.userId, viewer.id), isNull(projects.deletedAt))
     )
     .orderBy(desc(projectBookmarks.createdAt));
   return { rows };

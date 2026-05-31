@@ -5,13 +5,13 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
-type Props = {
-  userId: string;
+interface Props {
+  banExpires: Date | string | null;
   banned: boolean;
   banReason: string | null;
-  banExpires: Date | string | null;
   onChanged: () => void;
-};
+  userId: string;
+}
 
 export function BanForm({
   userId,
@@ -72,16 +72,16 @@ export function BanForm({
           {expiresDisplay}
         </p>
         <Button
+          className="mt-3"
+          disabled={busy}
+          onClick={() => void onUnban()}
+          size="sm"
           type="button"
           variant="outline"
-          size="sm"
-          className="mt-3"
-          onClick={() => void onUnban()}
-          disabled={busy}
         >
           {busy ? "Working..." : "Unban"}
         </Button>
-        {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+        {error && <p className="mt-2 text-destructive text-sm">{error}</p>}
       </section>
     );
   }
@@ -93,35 +93,37 @@ export function BanForm({
         <div>
           <Label htmlFor="ban-reason">Reason</Label>
           <Textarea
+            className="mt-1"
             id="ban-reason"
-            value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Reason (required)"
             required
             rows={3}
-            className="mt-1"
+            value={reason}
           />
         </div>
         <div>
-          <Label htmlFor="ban-expires">Expires at (leave blank for permanent)</Label>
+          <Label htmlFor="ban-expires">
+            Expires at (leave blank for permanent)
+          </Label>
           <Input
+            className="mt-1 w-auto"
             id="ban-expires"
+            onChange={(e) => setExpiresAt(e.target.value)}
             type="datetime-local"
             value={expiresAt}
-            onChange={(e) => setExpiresAt(e.target.value)}
-            className="mt-1 w-auto"
           />
         </div>
         <Button
+          disabled={busy || reason.trim().length === 0}
+          onClick={() => void onBan()}
+          size="sm"
           type="button"
           variant="destructive"
-          size="sm"
-          onClick={() => void onBan()}
-          disabled={busy || reason.trim().length === 0}
         >
           {busy ? "Working..." : "Ban"}
         </Button>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-destructive text-sm">{error}</p>}
       </div>
     </section>
   );

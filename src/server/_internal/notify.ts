@@ -4,28 +4,30 @@ import { notifications, projectComments } from "#/db/schema";
 
 type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
 
-type Project = {
+interface Project {
   id: string;
-  title: string;
   proposerId: string;
-};
+  title: string;
+}
 
-type Comment = {
-  id: string;
-  projectId: string;
+interface Comment {
   authorId: string;
-  parentId: string | null;
-  isInternal: boolean | null;
   content: string;
-};
+  id: string;
+  isInternal: boolean | null;
+  parentId: string | null;
+  projectId: string;
+}
 
 export async function recordStatusChangeNotifications(
   tx: Tx,
   project: Project,
   newStatus: string,
-  actorId: string,
+  actorId: string
 ): Promise<void> {
-  if (project.proposerId === actorId) return;
+  if (project.proposerId === actorId) {
+    return;
+  }
   await tx.insert(notifications).values({
     userId: project.proposerId,
     type: "status_change",
@@ -39,9 +41,11 @@ export async function recordSoftDeleteNotification(
   tx: Tx,
   project: Project,
   action: "soft-deleted" | "restored" | "hard-deleted",
-  actorId: string,
+  actorId: string
 ): Promise<void> {
-  if (project.proposerId === actorId) return;
+  if (project.proposerId === actorId) {
+    return;
+  }
   await tx.insert(notifications).values({
     userId: project.proposerId,
     type: "soft_delete",
@@ -54,9 +58,11 @@ export async function recordSoftDeleteNotification(
 export async function recordCommentNotifications(
   tx: Tx,
   project: Project,
-  comment: Comment,
+  comment: Comment
 ): Promise<void> {
-  if (comment.isInternal) return;
+  if (comment.isInternal) {
+    return;
+  }
 
   const recipients = new Set<string>();
   if (comment.authorId !== project.proposerId) {
@@ -70,8 +76,8 @@ export async function recordCommentNotifications(
       .where(
         and(
           eq(projectComments.id, comment.parentId),
-          eq(projectComments.projectId, project.id),
-        ),
+          eq(projectComments.projectId, project.id)
+        )
       );
     if (parent && parent.authorId !== comment.authorId) {
       recipients.add(parent.authorId);

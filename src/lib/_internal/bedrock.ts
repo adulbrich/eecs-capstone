@@ -8,7 +8,9 @@ import {
 let _client: BedrockRuntimeClient | null = null;
 
 export function getBedrockClient(): BedrockRuntimeClient {
-  if (_client) return _client;
+  if (_client) {
+    return _client;
+  }
   _client = new BedrockRuntimeClient({
     region: process.env.BEDROCK_REGION ?? "us-east-1",
     credentials: {
@@ -20,7 +22,7 @@ export function getBedrockClient(): BedrockRuntimeClient {
 }
 
 export type ConverseFn = (
-  input: ConverseCommandInput,
+  input: ConverseCommandInput
 ) => Promise<ConverseCommandOutput>;
 
 export const bedrockConverse: ConverseFn = (input) =>

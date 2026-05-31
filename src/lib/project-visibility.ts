@@ -16,7 +16,9 @@ export type VisibleComment = {
 } & Record<string, unknown>;
 
 export function isStaff(viewer: Viewer): boolean {
-  if (!viewer) return false;
+  if (!viewer) {
+    return false;
+  }
   return viewer.role === "admin" || viewer.role === "instructor";
 }
 
@@ -26,7 +28,7 @@ function isOwner(project: VisibleProject, viewer: Viewer): boolean {
 
 export function canSeeProject(
   project: VisibleProject,
-  viewer: Viewer,
+  viewer: Viewer
 ): boolean {
   if (isStaff(viewer)) {
     return true;
@@ -42,20 +44,30 @@ export function canSeeProject(
 
 export function canEditProject(
   project: VisibleProject,
-  viewer: Viewer,
+  viewer: Viewer
 ): boolean {
-  if (!viewer) return false;
-  if (project.deletedAt) return false;
-  if (isStaff(viewer)) return true;
-  if (!isOwner(project, viewer)) return false;
+  if (!viewer) {
+    return false;
+  }
+  if (project.deletedAt) {
+    return false;
+  }
+  if (isStaff(viewer)) {
+    return true;
+  }
+  if (!isOwner(project, viewer)) {
+    return false;
+  }
   return project.status !== "archived";
 }
 
 export function stripStaffOnlyFields<T extends VisibleProject>(
   project: T,
-  viewer: Viewer,
+  viewer: Viewer
 ): T {
-  if (isStaff(viewer)) return project;
+  if (isStaff(viewer)) {
+    return project;
+  }
   return { ...project, notes: null };
 }
 
@@ -67,9 +79,11 @@ export function stripStaffOnlyFields<T extends VisibleProject>(
 export function filterCommentsForViewer<T extends VisibleComment>(
   comments: T[],
   viewer: Viewer,
-  project: VisibleProject,
+  project: VisibleProject
 ): T[] {
-  if (isStaff(viewer)) return comments;
+  if (isStaff(viewer)) {
+    return comments;
+  }
   if (isOwner(project, viewer)) {
     return comments.filter((c) => !c.isInternal);
   }

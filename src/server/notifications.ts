@@ -9,14 +9,14 @@ export const listMyNotifications = createServerFn({ method: "GET" }).handler(
       "./_internal/notifications"
     );
     return listMyNotificationsImpl();
-  },
+  }
 );
 
 export const unreadCount = createServerFn({ method: "GET" }).handler(
   async () => {
     const { unreadCountImpl } = await import("./_internal/notifications");
     return unreadCountImpl();
-  },
+  }
 );
 
 export const markRead = createServerFn({ method: "POST" })
@@ -30,5 +30,5 @@ export const markAllRead = createServerFn({ method: "POST" }).handler(
   async () => {
     const { markAllReadImpl } = await import("./_internal/notifications");
     return markAllReadImpl();
-  },
+  }
 );

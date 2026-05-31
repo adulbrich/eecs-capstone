@@ -6,7 +6,7 @@ import {
   type Status,
 } from "../project-workflow";
 
-const allowedCases: Array<[Status, Status, ActorRole]> = [
+const allowedCases: [Status, Status, ActorRole][] = [
   ["draft", "submitted", "owner"],
   ["draft", "submitted", "staff"],
   ["draft", "approved", "staff"],
@@ -23,7 +23,7 @@ const allowedCases: Array<[Status, Status, ActorRole]> = [
   ["archived", "published", "staff"],
 ];
 
-const forbiddenCases: Array<[Status, Status, ActorRole]> = [
+const forbiddenCases: [Status, Status, ActorRole][] = [
   ["draft", "approved", "owner"],
   ["draft", "published", "owner"],
   ["draft", "published", "staff"],
@@ -54,13 +54,13 @@ describe("canTransition", () => {
 describe("assertTransitionAllowed", () => {
   it("does not throw on an allowed transition", () => {
     expect(() =>
-      assertTransitionAllowed("draft", "submitted", "owner"),
+      assertTransitionAllowed("draft", "submitted", "owner")
     ).not.toThrow();
   });
 
   it("throws on a forbidden transition with a message naming from, to, role", () => {
     expect(() =>
-      assertTransitionAllowed("draft", "published", "owner"),
+      assertTransitionAllowed("draft", "published", "owner")
     ).toThrow(/draft.*published.*owner/);
   });
 });

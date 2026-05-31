@@ -188,7 +188,7 @@ export const listMyItems = createServerFn({ method: "GET" }).handler(
   async () => {
     const { listMyItemsForCurrentUser } = await import("./_internal/inventory");
     return listMyItemsForCurrentUser();
-  },
+  }
 );
 
 const requestQueueSchema = z.object({

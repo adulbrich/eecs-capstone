@@ -27,10 +27,7 @@ import {
 } from "#/server/_internal/inventory";
 import { transitionItem } from "#/server/_internal/inventory-transitions";
 
-async function makeUser(
-  email: string,
-  role: "user" | "admin" | "instructor",
-) {
+async function makeUser(email: string, role: "user" | "admin" | "instructor") {
   await auth.api.signUpEmail({
     body: { email, password: "Password1!", name: email },
   });
@@ -42,7 +39,9 @@ async function makeUser(
   return { id: u.id, role: u.role };
 }
 
-async function makeItem(overrides: Partial<typeof inventoryItems.$inferInsert> = {}) {
+async function makeItem(
+  overrides: Partial<typeof inventoryItems.$inferInsert> = {}
+) {
   const [item] = await db
     .insert(inventoryItems)
     .values({ name: `Item-${Date.now()}-${Math.random()}`, ...overrides })
@@ -70,7 +69,7 @@ describe("transitionItem", () => {
       transitionItem(student, {
         itemId: item.id,
         nextStatus: "maintenance",
-      }),
+      })
     ).rejects.toThrow(/Forbidden/);
   });
 
@@ -103,7 +102,7 @@ describe("transitionItem", () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const item = await makeItem();
     await expect(
-      transitionItem(admin, { itemId: item.id, nextStatus: "reserved" }),
+      transitionItem(admin, { itemId: item.id, nextStatus: "reserved" })
     ).rejects.toThrow(/requestItemId/);
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");
     const { line } = await makeRequestLine(student.id, item.id);
@@ -114,7 +113,7 @@ describe("transitionItem", () => {
         requestItemId: line.id,
         holderId: student.id,
         holderLabel: "X",
-      }),
+      })
     ).rejects.toThrow(/exactly one of holderId or holderLabel/);
   });
 
@@ -141,9 +140,9 @@ describe("transitionItem", () => {
       .select()
       .from(notifications)
       .where(eq(notifications.userId, student.id));
-    expect(
-      notifs.some((n) => n.type === "inventory_request_approved"),
-    ).toBe(true);
+    expect(notifs.some((n) => n.type === "inventory_request_approved")).toBe(
+      true
+    );
   });
 
   it("checked_out requires dueAt", async () => {
@@ -157,7 +156,7 @@ describe("transitionItem", () => {
         nextStatus: "checked_out",
         requestItemId: line.id,
         holderId: student.id,
-      }),
+      })
     ).rejects.toThrow(/dueAt/);
   });
 
@@ -171,14 +170,14 @@ describe("transitionItem", () => {
       nextStatus: "reserved",
       requestItemId: line.id,
       holderId: student.id,
-      pickupBy: new Date(Date.now() + 86400000),
+      pickupBy: new Date(Date.now() + 86_400_000),
     });
     await transitionItem(admin, {
       itemId: item.id,
       nextStatus: "checked_out",
       requestItemId: line.id,
       holderLabel: "Course demo",
-      dueAt: new Date(Date.now() + 7 * 86400000),
+      dueAt: new Date(Date.now() + 7 * 86_400_000),
     });
     const [after] = await db
       .select()
@@ -198,7 +197,7 @@ describe("transitionItem", () => {
       nextStatus: "reserved",
       requestItemId: line.id,
       holderId: student.id,
-      pickupBy: new Date(Date.now() + 86400000),
+      pickupBy: new Date(Date.now() + 86_400_000),
     });
     await transitionItem(admin, { itemId: item.id, nextStatus: "available" });
     const [reqLine] = await db
@@ -225,14 +224,14 @@ describe("transitionItem", () => {
       nextStatus: "reserved",
       requestItemId: line.id,
       holderId: student.id,
-      pickupBy: new Date(Date.now() + 86400000),
+      pickupBy: new Date(Date.now() + 86_400_000),
     });
     await transitionItem(admin, {
       itemId: item.id,
       nextStatus: "checked_out",
       requestItemId: line.id,
       holderId: student.id,
-      dueAt: new Date(Date.now() + 7 * 86400000),
+      dueAt: new Date(Date.now() + 7 * 86_400_000),
     });
     await transitionItem(admin, { itemId: item.id, nextStatus: "available" });
     const [reqLine] = await db
@@ -244,9 +243,7 @@ describe("transitionItem", () => {
       .select()
       .from(notifications)
       .where(eq(notifications.userId, student.id));
-    expect(
-      notifs.some((n) => n.type === "inventory_item_returned"),
-    ).toBe(true);
+    expect(notifs.some((n) => n.type === "inventory_item_returned")).toBe(true);
   });
 
   it("released reserved item to retired notifies requester with inventory_request_closed", async () => {
@@ -259,7 +256,7 @@ describe("transitionItem", () => {
       nextStatus: "reserved",
       requestItemId: line.id,
       holderId: student.id,
-      pickupBy: new Date(Date.now() + 86400000),
+      pickupBy: new Date(Date.now() + 86_400_000),
     });
     await transitionItem(admin, {
       itemId: item.id,
@@ -270,9 +267,9 @@ describe("transitionItem", () => {
       .select()
       .from(notifications)
       .where(eq(notifications.userId, student.id));
-    expect(
-      notifs.some((n) => n.type === "inventory_request_closed"),
-    ).toBe(true);
+    expect(notifs.some((n) => n.type === "inventory_request_closed")).toBe(
+      true
+    );
   });
 
   it("rejects requested transition when item is not available (overwrite guard)", async () => {
@@ -293,7 +290,7 @@ describe("transitionItem", () => {
         nextStatus: "requested",
         requestItemId: line2.id,
         holderId: student.id,
-      }),
+      })
     ).rejects.toThrow(/Cannot move item to requested/);
   });
 });
@@ -312,7 +309,7 @@ describe("listInventoryAs privacy", () => {
       nextStatus: "reserved",
       requestItemId: line.id,
       holderId: student.id,
-      pickupBy: new Date(Date.now() + 86400000),
+      pickupBy: new Date(Date.now() + 86_400_000),
     });
     const result = await listInventoryAs(null, {
       q: "",
@@ -375,16 +372,19 @@ describe("catalog CRUD", () => {
       imageUrl: null,
     };
     await expect(createInventoryItemAs(student, blank)).rejects.toThrow(
-      /Forbidden/,
+      /Forbidden/
     );
     await expect(
-      updateInventoryItemAs(student, { id: "00000000-0000-0000-0000-000000000000", ...blank }),
+      updateInventoryItemAs(student, {
+        id: "00000000-0000-0000-0000-000000000000",
+        ...blank,
+      })
     ).rejects.toThrow(/Forbidden/);
     await expect(
       hardDeleteInventoryItemAs(student, {
         id: "00000000-0000-0000-0000-000000000000",
         confirmName: "X",
-      }),
+      })
     ).rejects.toThrow(/Forbidden/);
   });
 
@@ -407,10 +407,16 @@ describe("catalog CRUD", () => {
       .where(eq(inventoryItemEditLog.itemId, item.id));
     expect(logs).toHaveLength(1);
     expect(new Set(logs[0].changedFields)).toEqual(
-      new Set(["name", "location"]),
+      new Set(["name", "location"])
     );
-    expect(logs[0].oldValues).toMatchObject({ name: "Old", location: "Shelf A" });
-    expect(logs[0].newValues).toMatchObject({ name: "New", location: "Shelf B" });
+    expect(logs[0].oldValues).toMatchObject({
+      name: "Old",
+      location: "Shelf A",
+    });
+    expect(logs[0].newValues).toMatchObject({
+      name: "New",
+      location: "Shelf B",
+    });
   });
 
   it("hard-delete refuses when status is checked_out", async () => {
@@ -423,17 +429,17 @@ describe("catalog CRUD", () => {
       nextStatus: "reserved",
       requestItemId: line.id,
       holderId: student.id,
-      pickupBy: new Date(Date.now() + 86400000),
+      pickupBy: new Date(Date.now() + 86_400_000),
     });
     await transitionItem(admin, {
       itemId: item.id,
       nextStatus: "checked_out",
       requestItemId: line.id,
       holderId: student.id,
-      dueAt: new Date(Date.now() + 7 * 86400000),
+      dueAt: new Date(Date.now() + 7 * 86_400_000),
     });
     await expect(
-      hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Scope" }),
+      hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Scope" })
     ).rejects.toThrow(/available or retired/);
   });
 
@@ -443,7 +449,7 @@ describe("catalog CRUD", () => {
     // Retire first so the status gate cannot fire instead and mask a name-gate bug.
     await transitionItem(admin, { itemId: item.id, nextStatus: "retired" });
     await expect(
-      hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Wrong" }),
+      hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Wrong" })
     ).rejects.toThrow(/confirmation/);
   });
 
@@ -469,7 +475,7 @@ describe("catalog CRUD", () => {
     await makeRequestLine(student.id, item.id); // pending, never resolved
     await transitionItem(admin, { itemId: item.id, nextStatus: "retired" });
     await expect(
-      hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Cabled" }),
+      hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Cabled" })
     ).rejects.toThrow(/historical/i);
   });
 });
@@ -483,15 +489,17 @@ describe("cart", () => {
       itemId: item.id,
       nextStatus: "maintenance",
     });
-    await expect(
-      addToCartAs(student, { itemId: item.id }),
-    ).rejects.toThrow(/available/);
+    await expect(addToCartAs(student, { itemId: item.id })).rejects.toThrow(
+      /available/
+    );
   });
 
   it("submit happy path: one request, N lines, items move to requested", async () => {
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");
     const items = await Promise.all([makeItem(), makeItem(), makeItem()]);
-    for (const i of items) await addToCartAs(student, { itemId: i.id });
+    for (const i of items) {
+      await addToCartAs(student, { itemId: i.id });
+    }
     const result = await submitCartAs(student, { note: "for demo" });
     expect(result.submitted).toHaveLength(3);
     expect(result.skipped).toHaveLength(0);
@@ -562,9 +570,9 @@ describe("request lifecycle", () => {
       .select()
       .from(notifications)
       .where(eq(notifications.userId, student.id));
-    expect(
-      notifs.some((n) => n.type === "inventory_request_approved"),
-    ).toBe(true);
+    expect(notifs.some((n) => n.type === "inventory_request_approved")).toBe(
+      true
+    );
   });
 
   it("reject requires reason and returns item to available", async () => {
@@ -581,7 +589,7 @@ describe("request lifecycle", () => {
       rejectRequestItemAs(admin, {
         requestItemId: line.id,
         reviewComment: "",
-      }),
+      })
     ).rejects.toThrow(/required/);
     await rejectRequestItemAs(admin, {
       requestItemId: line.id,
@@ -637,13 +645,13 @@ describe("request lifecycle", () => {
       nextStatus: "checked_out",
       requestItemId: lineB.id,
       holderId: student.id,
-      dueAt: new Date(Date.now() + 7 * 86400000),
+      dueAt: new Date(Date.now() + 7 * 86_400_000),
     });
     await expect(
       cancelRequestItemAs(student, {
         requestItemId: lineB.id,
         note: null,
-      }),
+      })
     ).rejects.toThrow(/checkout/);
   });
 });
@@ -653,7 +661,9 @@ describe("bulk approve in a batch is atomic", () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");
     const [a, b, c] = await Promise.all([makeItem(), makeItem(), makeItem()]);
-    for (const i of [a, b, c]) await addToCartAs(student, { itemId: i.id });
+    for (const i of [a, b, c]) {
+      await addToCartAs(student, { itemId: i.id });
+    }
     await submitCartAs(student, { note: null });
     const lines = await db
       .select()
@@ -672,10 +682,10 @@ describe("bulk approve in a batch is atomic", () => {
           await approveRequestItemAs(
             admin,
             { requestItemId: line.id, pickupBy: null },
-            tx,
+            tx
           );
         }
-      }),
+      })
     ).rejects.toThrow();
     // First item should NOT be reserved.
     const [aAfter] = await db
@@ -699,7 +709,7 @@ describe("past pickup window: lazy detection + idempotent notification", () => {
       .where(eq(inventoryRequestItems.itemId, item.id));
     await approveRequestItemAs(admin, {
       requestItemId: line.id,
-      pickupBy: new Date(Date.now() - 86400000), // already passed
+      pickupBy: new Date(Date.now() - 86_400_000), // already passed
     });
     await recordOverdueNotificationsAs(student, { ownerId: student.id });
     await recordOverdueNotificationsAs(student, { ownerId: student.id });
@@ -709,8 +719,8 @@ describe("past pickup window: lazy detection + idempotent notification", () => {
       .where(
         and(
           eq(notifications.userId, student.id),
-          eq(notifications.type, "inventory_pickup_overdue"),
-        ),
+          eq(notifications.type, "inventory_pickup_overdue")
+        )
       );
     expect(notifs).toHaveLength(1);
     // Status unchanged (no auto-flip).
@@ -734,7 +744,7 @@ describe("defense in depth: impl re-checks role on every staff write", () => {
         location: null,
         notes: null,
         imageUrl: null,
-      }),
+      })
     ).rejects.toThrow(/Forbidden/);
   });
 
@@ -742,7 +752,7 @@ describe("defense in depth: impl re-checks role on every staff write", () => {
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");
     const item = await makeItem();
     await expect(
-      transitionItem(student, { itemId: item.id, nextStatus: "retired" }),
+      transitionItem(student, { itemId: item.id, nextStatus: "retired" })
     ).rejects.toThrow(/Forbidden/);
   });
 
@@ -756,13 +766,13 @@ describe("defense in depth: impl re-checks role on every staff write", () => {
       .from(inventoryRequestItems)
       .where(eq(inventoryRequestItems.itemId, item.id));
     await expect(
-      approveRequestItemAs(student, { requestItemId: line.id, pickupBy: null }),
+      approveRequestItemAs(student, { requestItemId: line.id, pickupBy: null })
     ).rejects.toThrow(/Forbidden/);
     await expect(
       rejectRequestItemAs(student, {
         requestItemId: line.id,
         reviewComment: "no",
-      }),
+      })
     ).rejects.toThrow(/Forbidden/);
   });
 });

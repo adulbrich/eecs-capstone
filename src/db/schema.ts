@@ -58,7 +58,7 @@ export const programInstructors = pgTable(
       .references(() => user.id, { onDelete: "cascade" })
       .notNull(),
   },
-  (t) => [primaryKey({ columns: [t.programId, t.userId] })],
+  (t) => [primaryKey({ columns: [t.programId, t.userId] })]
 );
 
 export const categories = pgTable("categories", {
@@ -106,7 +106,7 @@ export const projects = pgTable(
     searchVector: tsvector("search_vector")
       .notNull()
       .generatedAlwaysAs(
-        sql`setweight(to_tsvector('english', coalesce(title, '')), 'A') || setweight(to_tsvector('english', coalesce(description, '')), 'B') || setweight(to_tsvector('english', coalesce(problem_statement, '')), 'B') || setweight(to_tsvector('english', coalesce(objectives, '')), 'C') || setweight(to_tsvector('english', coalesce(min_qualifications, '')), 'C') || setweight(to_tsvector('english', coalesce(pref_qualifications, '')), 'C')`,
+        sql`setweight(to_tsvector('english', coalesce(title, '')), 'A') || setweight(to_tsvector('english', coalesce(description, '')), 'B') || setweight(to_tsvector('english', coalesce(problem_statement, '')), 'B') || setweight(to_tsvector('english', coalesce(objectives, '')), 'C') || setweight(to_tsvector('english', coalesce(min_qualifications, '')), 'C') || setweight(to_tsvector('english', coalesce(pref_qualifications, '')), 'C')`
       ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -121,7 +121,7 @@ export const projects = pgTable(
     index("projects_proposer_id_idx").on(t.proposerId),
     index("projects_program_id_idx").on(t.programId),
     index("projects_published_at_idx").on(t.publishedAt),
-  ],
+  ]
 );
 
 export const projectCategories = pgTable(
@@ -134,7 +134,7 @@ export const projectCategories = pgTable(
       .references(() => categories.id, { onDelete: "cascade" })
       .notNull(),
   },
-  (t) => [primaryKey({ columns: [t.projectId, t.categoryId] })],
+  (t) => [primaryKey({ columns: [t.projectId, t.categoryId] })]
 );
 
 export const projectCollaborators = pgTable(
@@ -148,7 +148,7 @@ export const projectCollaborators = pgTable(
       .notNull(),
     role: text("role").default("collaborator"),
   },
-  (t) => [primaryKey({ columns: [t.projectId, t.userId] })],
+  (t) => [primaryKey({ columns: [t.projectId, t.userId] })]
 );
 
 export const projectComments = pgTable(
@@ -163,7 +163,7 @@ export const projectComments = pgTable(
       .notNull(),
     parentId: uuid("parent_id").references(
       (): import("drizzle-orm/pg-core").AnyPgColumn => projectComments.id,
-      { onDelete: "cascade" },
+      { onDelete: "cascade" }
     ),
     content: text("content").notNull(),
     isInternal: boolean("is_internal").default(false),
@@ -171,7 +171,7 @@ export const projectComments = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("project_comments_project_idx").on(t.projectId, t.createdAt)],
+  (t) => [index("project_comments_project_idx").on(t.projectId, t.createdAt)]
 );
 
 export const projectStatusHistory = pgTable(
@@ -193,7 +193,7 @@ export const projectStatusHistory = pgTable(
   },
   (t) => [
     index("project_status_history_project_idx").on(t.projectId, t.createdAt),
-  ],
+  ]
 );
 
 export const projectBids = pgTable("project_bids", {
@@ -244,7 +244,7 @@ export const projectBookmarks = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.projectId] })],
+  (t) => [primaryKey({ columns: [t.userId, t.projectId] })]
 );
 
 // INVENTORY
@@ -259,7 +259,7 @@ export const inventoryItemStatusEnum = pgEnum("inventory_item_status", [
 
 export const inventoryRequestItemStatusEnum = pgEnum(
   "inventory_request_item_status",
-  ["pending", "approved", "rejected", "cancelled", "returned"],
+  ["pending", "approved", "rejected", "cancelled", "returned"]
 );
 
 export const inventoryItems = pgTable(
@@ -284,7 +284,7 @@ export const inventoryItems = pgTable(
     searchVector: tsvector("search_vector")
       .notNull()
       .generatedAlwaysAs(
-        sql`setweight(to_tsvector('english', coalesce(name, '')), 'A') || setweight(to_tsvector('english', coalesce(description, '')), 'B') || setweight(to_tsvector('english', coalesce(category, '')), 'C')`,
+        sql`setweight(to_tsvector('english', coalesce(name, '')), 'A') || setweight(to_tsvector('english', coalesce(description, '')), 'B') || setweight(to_tsvector('english', coalesce(category, '')), 'C')`
       ),
 
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -298,7 +298,7 @@ export const inventoryItems = pgTable(
     index("inventory_items_status_idx").on(t.status),
     index("inventory_items_category_idx").on(t.category),
     index("inventory_items_current_holder_idx").on(t.currentHolderId),
-  ],
+  ]
 );
 
 export const inventoryRequests = pgTable(
@@ -315,7 +315,7 @@ export const inventoryRequests = pgTable(
   },
   (t) => [
     index("inventory_requests_user_created_idx").on(t.userId, t.createdAt),
-  ],
+  ]
 );
 
 export const inventoryRequestItems = pgTable(
@@ -358,7 +358,7 @@ export const inventoryRequestItems = pgTable(
     index("inventory_request_items_request_idx").on(t.requestId),
     index("inventory_request_items_item_idx").on(t.itemId),
     index("inventory_request_items_status_idx").on(t.status),
-  ],
+  ]
 );
 
 export const inventoryCartItems = pgTable(
@@ -374,7 +374,7 @@ export const inventoryCartItems = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.itemId] })],
+  (t) => [primaryKey({ columns: [t.userId, t.itemId] })]
 );
 
 export const inventoryItemStatusHistory = pgTable(
@@ -392,7 +392,7 @@ export const inventoryItemStatusHistory = pgTable(
     comment: text("comment"),
     requestItemId: uuid("request_item_id").references(
       () => inventoryRequestItems.id,
-      { onDelete: "set null" },
+      { onDelete: "set null" }
     ),
     holderId: text("holder_id").references(() => user.id, {
       onDelete: "set null",
@@ -404,7 +404,7 @@ export const inventoryItemStatusHistory = pgTable(
   },
   (t) => [
     index("inventory_item_status_history_item_idx").on(t.itemId, t.createdAt),
-  ],
+  ]
 );
 
 export const inventoryItemEditLog = pgTable(
@@ -424,9 +424,7 @@ export const inventoryItemEditLog = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [
-    index("inventory_item_edit_log_item_idx").on(t.itemId, t.createdAt),
-  ],
+  (t) => [index("inventory_item_edit_log_item_idx").on(t.itemId, t.createdAt)]
 );
 
 // NOTIFICATIONS
@@ -450,9 +448,9 @@ export const notifications = pgTable(
     index("notifications_user_read_created_idx").on(
       t.userId,
       t.read,
-      t.createdAt,
+      t.createdAt
     ),
-  ],
+  ]
 );
 
 export const projectEditLog = pgTable(
@@ -472,5 +470,5 @@ export const projectEditLog = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("project_edit_log_project_idx").on(t.projectId, t.createdAt)],
+  (t) => [index("project_edit_log_project_idx").on(t.projectId, t.createdAt)]
 );

@@ -27,7 +27,10 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 type Viewer = { id: string; role?: string | null | undefined } | null;
 
-export type ListInventoryInput = {
+export interface ListInventoryInput {
+  category: string | null;
+  page: number;
+  pageSize: number;
   q: string;
   status:
     | "available"
@@ -36,21 +39,18 @@ export type ListInventoryInput = {
     | "checked_out"
     | "maintenance"
     | null;
-  category: string | null;
-  page: number;
-  pageSize: number;
-};
+}
 
-export type InventoryItemPublic = {
-  id: string;
-  name: string;
-  description: string | null;
+export interface InventoryItemPublic {
   category: string | null;
-  imageUrl: string | null;
-  status: string;
-  pickupBy: Date | null;
+  description: string | null;
   dueAt: Date | null;
-};
+  id: string;
+  imageUrl: string | null;
+  name: string;
+  pickupBy: Date | null;
+  status: string;
+}
 
 export type InventoryItemStaff = InventoryItemPublic & {
   serial: string | null;
@@ -66,7 +66,7 @@ function isStaff(viewer: Viewer): boolean {
 }
 
 function stripForPublic(
-  row: typeof inventoryItems.$inferSelect,
+  row: typeof inventoryItems.$inferSelect
 ): InventoryItemPublic {
   return {
     id: row.id,
@@ -81,7 +81,7 @@ function stripForPublic(
 }
 
 function fullForStaff(
-  row: typeof inventoryItems.$inferSelect,
+  row: typeof inventoryItems.$inferSelect
 ): InventoryItemStaff {
   return {
     ...stripForPublic(row),
@@ -96,18 +96,21 @@ function fullForStaff(
 
 export async function listInventoryAs(
   viewer: Viewer,
-  data: ListInventoryInput,
+  data: ListInventoryInput
 ) {
   const conditions = [ne(inventoryItems.status, "retired")];
-  if (data.status) conditions.push(eq(inventoryItems.status, data.status));
-  if (data.category)
+  if (data.status) {
+    conditions.push(eq(inventoryItems.status, data.status));
+  }
+  if (data.category) {
     conditions.push(eq(inventoryItems.category, data.category));
+  }
   if (data.q) {
     conditions.push(
       or(
         sql`${inventoryItems.searchVector} @@ websearch_to_tsquery('english', ${data.q})`,
-        ilike(inventoryItems.name, `%${data.q}%`),
-      )!,
+        ilike(inventoryItems.name, `%${data.q}%`)
+      )!
     );
   }
   const where = and(...conditions);
@@ -122,7 +125,7 @@ export async function listInventoryAs(
     .from(inventoryItems)
     .leftJoin(
       inventoryRequestItems,
-      eq(inventoryItems.currentRequestItemId, inventoryRequestItems.id),
+      eq(inventoryItems.currentRequestItemId, inventoryRequestItems.id)
     )
     .where(where)
     .orderBy(desc(inventoryItems.updatedAt))
@@ -159,11 +162,15 @@ export async function getInventoryItemAs(viewer: Viewer, data: { id: string }) {
     .from(inventoryItems)
     .leftJoin(
       inventoryRequestItems,
-      eq(inventoryItems.currentRequestItemId, inventoryRequestItems.id),
+      eq(inventoryItems.currentRequestItemId, inventoryRequestItems.id)
     )
     .where(eq(inventoryItems.id, data.id));
-  if (!row) return null;
-  if (row.item.status === "retired" && !isStaff(viewer)) return null;
+  if (!row) {
+    return null;
+  }
+  if (row.item.status === "retired" && !isStaff(viewer)) {
+    return null;
+  }
   const base = isStaff(viewer)
     ? fullForStaff(row.item)
     : stripForPublic(row.item);
@@ -182,8 +189,8 @@ export async function listInventoryCategoriesImpl() {
     .where(
       and(
         ne(inventoryItems.status, "retired"),
-        isNotNull(inventoryItems.category),
-      ),
+        isNotNull(inventoryItems.category)
+      )
     )
     .orderBy(inventoryItems.category);
   return {
@@ -196,23 +203,25 @@ export async function getInventoryItemForCurrentUser(data: { id: string }) {
   return getInventoryItemAs(session?.user ?? null, data);
 }
 
-export type CreateInventoryItemInput = {
-  name: string;
-  description: string | null;
+export interface CreateInventoryItemInput {
   category: string | null;
-  serial: string | null;
-  location: string | null;
-  notes: string | null;
+  description: string | null;
   imageUrl: string | null;
-};
+  location: string | null;
+  name: string;
+  notes: string | null;
+  serial: string | null;
+}
 
 function assertStaff(viewer: Viewer) {
-  if (!isStaff(viewer)) throw new Error("Forbidden");
+  if (!isStaff(viewer)) {
+    throw new Error("Forbidden");
+  }
 }
 
 export async function createInventoryItemAs(
   viewer: Viewer,
-  data: CreateInventoryItemInput,
+  data: CreateInventoryItemInput
 ) {
   assertStaff(viewer);
   const [row] = await db
@@ -246,7 +255,7 @@ const EDITABLE_FIELDS = [
 
 export async function updateInventoryItemAs(
   viewer: Viewer,
-  data: UpdateInventoryItemInput,
+  data: UpdateInventoryItemInput
 ) {
   assertStaff(viewer);
   return db.transaction(async (tx) => {
@@ -255,7 +264,9 @@ export async function updateInventoryItemAs(
       .from(inventoryItems)
       .where(eq(inventoryItems.id, data.id))
       .for("update");
-    if (!before) throw new Error("Item not found");
+    if (!before) {
+      throw new Error("Item not found");
+    }
 
     const changed: string[] = [];
     const oldValues: Record<string, unknown> = {};
@@ -272,7 +283,9 @@ export async function updateInventoryItemAs(
         newValues[f] = newVal;
       }
     }
-    if (changed.length === 0) return fullForStaff(before);
+    if (changed.length === 0) {
+      return fullForStaff(before);
+    }
 
     await tx
       .update(inventoryItems)
@@ -290,7 +303,7 @@ export async function updateInventoryItemAs(
 
     await tx.insert(inventoryItemEditLog).values({
       itemId: data.id,
-      editorId: viewer!.id,
+      editorId: viewer?.id,
       changedFields: changed,
       oldValues,
       newValues,
@@ -306,20 +319,22 @@ export async function updateInventoryItemAs(
 
 export async function hardDeleteInventoryItemAs(
   viewer: Viewer,
-  data: { id: string; confirmName: string },
+  data: { id: string; confirmName: string }
 ) {
   assertStaff(viewer);
   const [row] = await db
     .select()
     .from(inventoryItems)
     .where(eq(inventoryItems.id, data.id));
-  if (!row) throw new Error("Item not found");
+  if (!row) {
+    throw new Error("Item not found");
+  }
   if (row.name !== data.confirmName) {
     throw new Error("Name confirmation does not match");
   }
   if (row.status !== "available" && row.status !== "retired") {
     throw new Error(
-      "Hard delete only allowed when status is available or retired",
+      "Hard delete only allowed when status is available or retired"
     );
   }
   // Pre-check the RESTRICT FK on inventory_request_items.item_id so the
@@ -331,7 +346,7 @@ export async function hardDeleteInventoryItemAs(
     .limit(1);
   if (historical) {
     throw new Error(
-      "Cannot hard delete; this item has historical request records. Retire it instead.",
+      "Cannot hard delete; this item has historical request records. Retire it instead."
     );
   }
   await db.delete(inventoryItems).where(eq(inventoryItems.id, data.id));
@@ -339,14 +354,14 @@ export async function hardDeleteInventoryItemAs(
 }
 
 export async function createInventoryItemForCurrentUser(
-  data: CreateInventoryItemInput,
+  data: CreateInventoryItemInput
 ) {
   const viewer = await requireUser();
   return createInventoryItemAs(viewer, data);
 }
 
 export async function updateInventoryItemForCurrentUser(
-  data: UpdateInventoryItemInput,
+  data: UpdateInventoryItemInput
 ) {
   const viewer = await requireUser();
   return updateInventoryItemAs(viewer, data);
@@ -361,7 +376,9 @@ export async function hardDeleteInventoryItemForCurrentUser(data: {
 }
 
 export async function getCartAs(viewer: Viewer) {
-  if (!viewer) throw new Error("Sign in required");
+  if (!viewer) {
+    throw new Error("Sign in required");
+  }
   const rows = await db
     .select({
       itemId: inventoryCartItems.itemId,
@@ -378,12 +395,16 @@ export async function getCartAs(viewer: Viewer) {
 }
 
 export async function addToCartAs(viewer: Viewer, data: { itemId: string }) {
-  if (!viewer) throw new Error("Sign in required");
+  if (!viewer) {
+    throw new Error("Sign in required");
+  }
   const [item] = await db
     .select()
     .from(inventoryItems)
     .where(eq(inventoryItems.id, data.itemId));
-  if (!item) throw new Error("Item not found");
+  if (!item) {
+    throw new Error("Item not found");
+  }
   if (item.status !== "available") {
     throw new Error("Only available items can be added to the cart");
   }
@@ -396,25 +417,29 @@ export async function addToCartAs(viewer: Viewer, data: { itemId: string }) {
 
 export async function removeFromCartAs(
   viewer: Viewer,
-  data: { itemId: string },
+  data: { itemId: string }
 ) {
-  if (!viewer) throw new Error("Sign in required");
+  if (!viewer) {
+    throw new Error("Sign in required");
+  }
   await db
     .delete(inventoryCartItems)
     .where(
       and(
         eq(inventoryCartItems.userId, viewer.id),
-        eq(inventoryCartItems.itemId, data.itemId),
-      ),
+        eq(inventoryCartItems.itemId, data.itemId)
+      )
     );
   return { ok: true as const };
 }
 
 export async function submitCartAs(
   viewer: Viewer,
-  data: { note: string | null },
+  data: { note: string | null }
 ) {
-  if (!viewer) throw new Error("Sign in required");
+  if (!viewer) {
+    throw new Error("Sign in required");
+  }
 
   return db.transaction(async (tx) => {
     const cartRows = await tx
@@ -475,7 +500,7 @@ export async function submitCartAs(
           requestId: req.id,
           itemId: s.itemId,
           status: "pending" as const,
-        })),
+        }))
       )
       .returning();
 
@@ -538,13 +563,13 @@ export async function submitCartForCurrentUser(data: { note: string | null }) {
 const DEFAULT_PICKUP_DAYS = 7;
 
 function defaultPickupBy(): Date {
-  return new Date(Date.now() + DEFAULT_PICKUP_DAYS * 86400000);
+  return new Date(Date.now() + DEFAULT_PICKUP_DAYS * 86_400_000);
 }
 
 export async function approveRequestItemAs(
   viewer: Viewer,
   data: { requestItemId: string; pickupBy: Date | null },
-  externalTx?: Tx,
+  externalTx?: Tx
 ) {
   assertStaff(viewer);
   const { transitionItem } = await import("./inventory-transitions");
@@ -561,18 +586,20 @@ export async function approveRequestItemAs(
       .from(inventoryRequestItems)
       .innerJoin(
         inventoryRequests,
-        eq(inventoryRequestItems.requestId, inventoryRequests.id),
+        eq(inventoryRequestItems.requestId, inventoryRequests.id)
       )
       .where(eq(inventoryRequestItems.id, data.requestItemId))
       .for("update");
-    if (!line) throw new Error("Request line not found");
+    if (!line) {
+      throw new Error("Request line not found");
+    }
     if (line.status !== "pending") {
       throw new Error("Only pending lines can be approved");
     }
     await tx
       .update(inventoryRequestItems)
       .set({
-        reviewedBy: viewer!.id,
+        reviewedBy: viewer?.id,
         reviewedAt: new Date(),
         updatedAt: new Date(),
       })
@@ -589,19 +616,21 @@ export async function approveRequestItemAs(
         holderId: line.requesterId,
         pickupBy: data.pickupBy ?? defaultPickupBy(),
       },
-      tx,
+      tx
     );
     return { ok: true as const };
   };
   // When the caller already has a transaction (bulk approve flow),
   // join it so a later failure rolls back earlier approves in the batch.
-  if (externalTx) return run(externalTx);
+  if (externalTx) {
+    return run(externalTx);
+  }
   return db.transaction(run);
 }
 
 export async function rejectRequestItemAs(
   viewer: Viewer,
-  data: { requestItemId: string; reviewComment: string },
+  data: { requestItemId: string; reviewComment: string }
 ) {
   assertStaff(viewer);
   if (!data.reviewComment.trim()) {
@@ -620,11 +649,13 @@ export async function rejectRequestItemAs(
       .from(inventoryRequestItems)
       .innerJoin(
         inventoryRequests,
-        eq(inventoryRequestItems.requestId, inventoryRequests.id),
+        eq(inventoryRequestItems.requestId, inventoryRequests.id)
       )
       .where(eq(inventoryRequestItems.id, data.requestItemId))
       .for("update");
-    if (!line) throw new Error("Request line not found");
+    if (!line) {
+      throw new Error("Request line not found");
+    }
     if (line.status !== "pending") {
       throw new Error("Only pending lines can be rejected");
     }
@@ -637,11 +668,11 @@ export async function rejectRequestItemAs(
       .update(inventoryRequestItems)
       .set({
         status: "rejected",
-        reviewedBy: viewer!.id,
+        reviewedBy: viewer?.id,
         reviewedAt: new Date(),
         reviewComment: data.reviewComment,
         closedAt: new Date(),
-        closedBy: viewer!.id,
+        closedBy: viewer?.id,
         closedReason: data.reviewComment,
         updatedAt: new Date(),
       })
@@ -660,7 +691,7 @@ export async function rejectRequestItemAs(
       itemId: line.itemId,
       oldStatus: item.status,
       newStatus: "available",
-      changedBy: viewer!.id,
+      changedBy: viewer?.id,
       comment: data.reviewComment,
       requestItemId: line.id,
     });
@@ -669,7 +700,7 @@ export async function rejectRequestItemAs(
       type: "inventory_request_rejected",
       title: `Request denied: ${item.name}`,
       message: data.reviewComment,
-      link: `/my/items?tab=history`,
+      link: "/my/items?tab=history",
     });
     return { ok: true as const };
   });
@@ -677,9 +708,11 @@ export async function rejectRequestItemAs(
 
 export async function cancelRequestItemAs(
   viewer: Viewer,
-  data: { requestItemId: string; note: string | null },
+  data: { requestItemId: string; note: string | null }
 ) {
-  if (!viewer) throw new Error("Sign in required");
+  if (!viewer) {
+    throw new Error("Sign in required");
+  }
   return db.transaction(async (tx) => {
     const [line] = await tx
       .select({
@@ -691,11 +724,13 @@ export async function cancelRequestItemAs(
       .from(inventoryRequestItems)
       .innerJoin(
         inventoryRequests,
-        eq(inventoryRequestItems.requestId, inventoryRequests.id),
+        eq(inventoryRequestItems.requestId, inventoryRequests.id)
       )
       .where(eq(inventoryRequestItems.id, data.requestItemId))
       .for("update");
-    if (!line) throw new Error("Request line not found");
+    if (!line) {
+      throw new Error("Request line not found");
+    }
     if (line.requesterId !== viewer.id) {
       throw new Error("Only the requester can cancel");
     }
@@ -767,7 +802,9 @@ export async function cancelRequestItemForCurrentUser(data: {
 }
 
 export async function listMyItemsAs(viewer: Viewer) {
-  if (!viewer) throw new Error("Sign in required");
+  if (!viewer) {
+    throw new Error("Sign in required");
+  }
   // Notifications are a side-effect; never let them block the read.
   try {
     await recordOverdueNotificationsAs(viewer, { ownerId: viewer.id });
@@ -785,17 +822,17 @@ export async function listMyItemsAs(viewer: Viewer) {
       .from(inventoryRequestItems)
       .innerJoin(
         inventoryRequests,
-        eq(inventoryRequestItems.requestId, inventoryRequests.id),
+        eq(inventoryRequestItems.requestId, inventoryRequests.id)
       )
       .innerJoin(
         inventoryItems,
-        eq(inventoryRequestItems.itemId, inventoryItems.id),
+        eq(inventoryRequestItems.itemId, inventoryItems.id)
       )
       .where(
         and(
           eq(inventoryRequests.userId, viewer.id),
-          inArray(inventoryRequestItems.status, ["pending", "approved"]),
-        ),
+          inArray(inventoryRequestItems.status, ["pending", "approved"])
+        )
       )
       .orderBy(desc(inventoryRequestItems.createdAt)),
     db
@@ -807,11 +844,11 @@ export async function listMyItemsAs(viewer: Viewer) {
       .from(inventoryRequestItems)
       .innerJoin(
         inventoryRequests,
-        eq(inventoryRequestItems.requestId, inventoryRequests.id),
+        eq(inventoryRequestItems.requestId, inventoryRequests.id)
       )
       .innerJoin(
         inventoryItems,
-        eq(inventoryRequestItems.itemId, inventoryItems.id),
+        eq(inventoryRequestItems.itemId, inventoryItems.id)
       )
       .where(
         and(
@@ -820,8 +857,8 @@ export async function listMyItemsAs(viewer: Viewer) {
             "rejected",
             "cancelled",
             "returned",
-          ]),
-        ),
+          ])
+        )
       )
       .orderBy(desc(inventoryRequestItems.updatedAt))
       .limit(50),
@@ -831,7 +868,7 @@ export async function listMyItemsAs(viewer: Viewer) {
 
 export async function listInventoryRequestsAs(
   viewer: Viewer,
-  data: { tab: "pending" | "all" },
+  data: { tab: "pending" | "all" }
 ) {
   assertStaff(viewer);
   // No lazy overdue trigger here: notifications are for the requester, not
@@ -852,11 +889,11 @@ export async function listInventoryRequestsAs(
     .from(inventoryRequestItems)
     .innerJoin(
       inventoryRequests,
-      eq(inventoryRequestItems.requestId, inventoryRequests.id),
+      eq(inventoryRequestItems.requestId, inventoryRequests.id)
     )
     .innerJoin(
       inventoryItems,
-      eq(inventoryRequestItems.itemId, inventoryItems.id),
+      eq(inventoryRequestItems.itemId, inventoryItems.id)
     )
     .innerJoin(user, eq(inventoryRequests.userId, user.id))
     .where(statusFilter)
@@ -909,7 +946,7 @@ export async function listInventoryRequestsForCurrentUser(data: {
 
 export async function getItemHistoryAs(
   viewer: Viewer,
-  data: { itemId: string },
+  data: { itemId: string }
 ) {
   assertStaff(viewer);
   const rows = await db
@@ -994,11 +1031,13 @@ function assertImageFile(file: unknown): asserts file is File {
 
 export async function uploadInventoryImageAs(
   viewer: Viewer,
-  form: FormData,
+  form: FormData
 ): Promise<{ key: string }> {
   assertStaff(viewer);
   const itemId = String(form.get("itemId") ?? "");
-  if (!itemId) throw new Error("Missing itemId");
+  if (!itemId) {
+    throw new Error("Missing itemId");
+  }
   const file = form.get("file");
   assertImageFile(file);
 
@@ -1006,7 +1045,9 @@ export async function uploadInventoryImageAs(
     .select()
     .from(inventoryItems)
     .where(eq(inventoryItems.id, itemId));
-  if (!item) throw new Error("Item not found");
+  if (!item) {
+    throw new Error("Item not found");
+  }
 
   const input = Buffer.from(await file.arrayBuffer());
   const { processImage } = await import("#/lib/_internal/image-processing");
@@ -1047,9 +1088,11 @@ export async function uploadInventoryImageForCurrentUser(form: FormData) {
 
 export async function recordOverdueNotificationsAs(
   viewer: Viewer,
-  opts: { ownerId?: string } = {},
+  opts: { ownerId?: string } = {}
 ) {
-  if (!viewer) return;
+  if (!viewer) {
+    return;
+  }
   const conditions = [eq(inventoryRequestItems.status, "approved")];
   if (opts.ownerId) {
     conditions.push(eq(inventoryRequests.userId, opts.ownerId));
@@ -1066,11 +1109,11 @@ export async function recordOverdueNotificationsAs(
     .from(inventoryRequestItems)
     .innerJoin(
       inventoryRequests,
-      eq(inventoryRequestItems.requestId, inventoryRequests.id),
+      eq(inventoryRequestItems.requestId, inventoryRequests.id)
     )
     .innerJoin(
       inventoryItems,
-      eq(inventoryRequestItems.itemId, inventoryItems.id),
+      eq(inventoryRequestItems.itemId, inventoryItems.id)
     )
     .where(and(...conditions));
 
@@ -1082,7 +1125,7 @@ export async function recordOverdueNotificationsAs(
         userId: r.requesterId,
         type: "inventory_pickup_overdue",
         title: `Pickup window passed: ${r.itemName}`,
-        message: `Your reserved item is past its pickup window.`,
+        message: "Your reserved item is past its pickup window.",
         link: `/inventory/${r.itemId}`,
       });
     }
@@ -1091,12 +1134,14 @@ export async function recordOverdueNotificationsAs(
         userId: r.requesterId,
         type: "inventory_checkout_overdue",
         title: `Overdue: ${r.itemName}`,
-        message: `Your checked-out item is past its due date.`,
+        message: "Your checked-out item is past its due date.",
         link: `/inventory/${r.itemId}`,
       });
     }
   }
-  if (values.length === 0) return;
+  if (values.length === 0) {
+    return;
+  }
   await db
     .insert(notifications)
     .values(values)

@@ -27,5 +27,5 @@ export const clearAvatar = createServerFn({ method: "POST" }).handler(
   async () => {
     const { clearAvatarForCurrentUser } = await import("./_internal/uploads");
     return clearAvatarForCurrentUser();
-  },
+  }
 );

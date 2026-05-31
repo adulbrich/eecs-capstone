@@ -93,7 +93,7 @@ export const requestChanges = createServerFn({ method: "POST" })
     return performTransitionForCurrentUser(
       data.id,
       "changes_requested",
-      data.comment,
+      data.comment
     );
   });
 
@@ -175,7 +175,7 @@ export const performTransition = createServerFn({ method: "POST" })
     return performTransitionForCurrentUser(
       data.id,
       data.status as Status,
-      data.comment,
+      data.comment
     );
   });
 
@@ -188,6 +188,6 @@ export const forceSetProjectStatus = createServerFn({ method: "POST" })
     return forceTransitionForCurrentUser(
       data.id,
       data.status as Status,
-      data.comment,
+      data.comment
     );
   });

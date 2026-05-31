@@ -45,20 +45,20 @@ export const projectFormSchema = z.object({
 
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
 
-type Props = {
+interface Props {
+  enableAiReview?: boolean;
   initial?: Partial<ProjectFormValues>;
   initialCategoryIds?: string[];
-  showNotes: boolean;
-  showCategories: boolean;
-  submitLabel: string;
   onSubmit: (
     values: ProjectFormValues,
     categoryIds: string[],
-    pendingImage: File | null,
+    pendingImage: File | null
   ) => Promise<unknown>;
-  enableAiReview?: boolean;
   projectId?: string;
-};
+  showCategories: boolean;
+  showNotes: boolean;
+  submitLabel: string;
+}
 
 export function ProjectForm({
   initial,
@@ -72,18 +72,18 @@ export function ProjectForm({
 }: Props) {
   const [formError, setFormError] = useState<string | null>(null);
   const [categoryIds, setCategoryIds] = useState<string[]>(
-    initialCategoryIds ?? [],
+    initialCategoryIds ?? []
   );
   // `undefined`: user did not touch the image. `File`: new file to upload on
   // submit. `null`: user clicked Remove, server should clear the image.
   const [pendingImage, setPendingImage] = useState<File | null | undefined>(
-    undefined,
+    undefined
   );
   const [suggestions, setSuggestions] = useState<
     Partial<Record<ImprovableField, FieldSuggestion>>
   >({});
   const [reviewState, setReviewState] = useState<"idle" | "loading" | "empty">(
-    "idle",
+    "idle"
   );
   const [reviewError, setReviewError] = useState<string | null>(null);
 
@@ -106,11 +106,15 @@ export function ProjectForm({
     validators: {
       onSubmit: ({ value }) => {
         const result = projectFormSchema.safeParse(value);
-        if (result.success) return undefined;
+        if (result.success) {
+          return;
+        }
         const fields: Record<string, string> = {};
         for (const issue of result.error.issues) {
           const key = issue.path.join(".");
-          if (key && !fields[key]) fields[key] = issue.message;
+          if (key && !fields[key]) {
+            fields[key] = issue.message;
+          }
         }
         return { fields };
       },
@@ -122,7 +126,7 @@ export function ProjectForm({
       } catch (err) {
         const handled = applyServerErrors(
           form as unknown as Parameters<typeof applyServerErrors>[0],
-          err,
+          err
         );
         if (!handled) {
           setFormError((err as Error)?.message || "Save failed");
@@ -134,7 +138,9 @@ export function ProjectForm({
   async function handleReview() {
     // The edit route always supplies projectId; guard for the future
     // new-project path where the button could appear before a project exists.
-    if (!projectId) return;
+    if (!projectId) {
+      return;
+    }
     setReviewError(null);
     setReviewState("loading");
     // Clear any prior suggestions so a fresh review never shows stale ones.
@@ -159,7 +165,7 @@ export function ProjectForm({
       // Key the empty state off what we will actually render, not the server's
       // reviewedFields list, so the message is correct even if they diverge.
       setReviewState(
-        Object.keys(result.suggestions).length === 0 ? "empty" : "idle",
+        Object.keys(result.suggestions).length === 0 ? "empty" : "idle"
       );
     } catch (err) {
       setReviewError((err as Error)?.message || "AI review failed");
@@ -172,7 +178,9 @@ export function ProjectForm({
   // per-field onChange pipeline here is intentional and harmless.
   function applyField(field: ImprovableField) {
     const s = suggestions[field];
-    if (!s) return;
+    if (!s) {
+      return;
+    }
     form.setFieldValue(field as never, s.suggestion as never);
     setSuggestions((prev) => {
       const next = { ...prev };
@@ -184,40 +192,42 @@ export function ProjectForm({
   function applyAll() {
     for (const field of Object.keys(suggestions) as ImprovableField[]) {
       const s = suggestions[field];
-      if (s) form.setFieldValue(field as never, s.suggestion as never);
+      if (s) {
+        form.setFieldValue(field as never, s.suggestion as never);
+      }
     }
     setSuggestions({});
   }
 
   return (
     <form
+      className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
         setFormError(null);
         void form.handleSubmit();
       }}
-      className="space-y-4"
     >
       {enableAiReview && (
         <div className="rounded-md border p-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-medium">Improve with AI</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="font-medium text-sm">Improve with AI</p>
+              <p className="text-muted-foreground text-xs">
                 Suggests rewrites for the text fields. You review and apply each
                 change.
               </p>
             </div>
             <div className="flex gap-2">
               {Object.keys(suggestions).length > 0 && (
-                <Button type="button" variant="outline" onClick={applyAll}>
+                <Button onClick={applyAll} type="button" variant="outline">
                   Apply all
                 </Button>
               )}
               <Button
-                type="button"
-                onClick={handleReview}
                 disabled={reviewState === "loading"}
+                onClick={handleReview}
+                type="button"
               >
                 {reviewState === "loading" ? "Reviewing..." : "Review with AI"}
               </Button>
@@ -225,10 +235,10 @@ export function ProjectForm({
           </div>
           <output className="block">
             {reviewError && (
-              <p className="mt-2 text-sm text-destructive">{reviewError}</p>
+              <p className="mt-2 text-destructive text-sm">{reviewError}</p>
             )}
             {reviewState === "empty" && (
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-2 text-muted-foreground text-sm">
                 No improvements suggested.
               </p>
             )}
@@ -237,62 +247,62 @@ export function ProjectForm({
       )}
       <Field
         form={form}
-        name="title"
         label="Title"
-        suggestion={suggestions.title}
+        name="title"
         onApply={() => applyField("title")}
+        suggestion={suggestions.title}
       />
       <Field
         form={form}
-        name="description"
         label="Description"
-        textarea
+        name="description"
+        onApply={() => applyField("description")}
         rows={4}
         suggestion={suggestions.description}
-        onApply={() => applyField("description")}
+        textarea
       />
       <Field
         form={form}
-        name="problemStatement"
         label="Problem statement"
-        textarea
+        name="problemStatement"
+        onApply={() => applyField("problemStatement")}
         rows={3}
         suggestion={suggestions.problemStatement}
-        onApply={() => applyField("problemStatement")}
+        textarea
       />
       <Field
         form={form}
-        name="objectives"
         label="Objectives / deliverables"
-        textarea
+        name="objectives"
+        onApply={() => applyField("objectives")}
         rows={3}
         suggestion={suggestions.objectives}
-        onApply={() => applyField("objectives")}
+        textarea
       />
       <Field
         form={form}
-        name="minQualifications"
         label="Minimum qualifications"
-        textarea
+        name="minQualifications"
+        onApply={() => applyField("minQualifications")}
         rows={2}
         suggestion={suggestions.minQualifications}
-        onApply={() => applyField("minQualifications")}
+        textarea
       />
       <Field
         form={form}
-        name="prefQualifications"
         label="Preferred qualifications"
-        textarea
+        name="prefQualifications"
+        onApply={() => applyField("prefQualifications")}
         rows={2}
         suggestion={suggestions.prefQualifications}
-        onApply={() => applyField("prefQualifications")}
+        textarea
       />
-      <Field form={form} name="url" label="URL" placeholder="https://..." />
-      <Field form={form} name="contactName" label="Contact name" />
+      <Field form={form} label="URL" name="url" placeholder="https://..." />
+      <Field form={form} label="Contact name" name="contactName" />
       <Field
         form={form}
-        name="contactEmail"
         label="Contact email"
+        name="contactEmail"
         placeholder="name@example.com"
       />
       <form.Field name="imageUrl">
@@ -304,11 +314,13 @@ export function ProjectForm({
                 currentKey={(field.state.value as string) || null}
                 onChange={(file) => {
                   setPendingImage(file);
-                  if (file === null) field.handleChange("");
+                  if (file === null) {
+                    field.handleChange("");
+                  }
                 }}
               />
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-muted-foreground text-xs">
               Cropped to 16:9 and resized to max 1600x900. Saved when you submit
               the form.
             </p>
@@ -317,12 +329,12 @@ export function ProjectForm({
       </form.Field>
       <Field
         form={form}
-        name="licenseRestrictions"
         label="License / IP restrictions"
-        textarea
+        name="licenseRestrictions"
+        onApply={() => applyField("licenseRestrictions")}
         rows={2}
         suggestion={suggestions.licenseRestrictions}
-        onApply={() => applyField("licenseRestrictions")}
+        textarea
       />
       <form.Field name="programId">
         {(field: AnyForm) => (
@@ -330,8 +342,8 @@ export function ProjectForm({
             <Label htmlFor="programId">Program</Label>
             <ProgramSelect
               id="programId"
-              value={field.state.value as string}
               onChange={(v) => field.handleChange(v)}
+              value={field.state.value as string}
             />
           </div>
         )}
@@ -339,10 +351,10 @@ export function ProjectForm({
       {showNotes && (
         <Field
           form={form}
-          name="notes"
           label="Internal notes (staff only)"
-          textarea
+          name="notes"
           rows={3}
+          textarea
         />
       )}
       {showCategories && (
@@ -350,22 +362,22 @@ export function ProjectForm({
           <Label>Categories</Label>
           <div className="mt-1">
             <CategoryMultiSelect
-              value={categoryIds}
               onChange={setCategoryIds}
+              value={categoryIds}
             />
           </div>
         </div>
       )}
 
       {formError && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-destructive text-sm">
           {formError}
         </div>
       )}
 
       <form.Subscribe selector={(s) => [s.canSubmit, s.isSubmitting] as const}>
         {([canSubmit, isSubmitting]) => (
-          <Button type="submit" disabled={!canSubmit}>
+          <Button disabled={!canSubmit} type="submit">
             {isSubmitting ? "Saving..." : submitLabel}
           </Button>
         )}
@@ -377,16 +389,16 @@ export function ProjectForm({
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Form generics are unstable; field name comes from schema
 type AnyForm = any;
 
-type FieldProps = {
+interface FieldProps {
   form: AnyForm;
-  name: keyof ProjectFormValues;
   label: string;
+  name: keyof ProjectFormValues;
+  onApply?: () => void;
   placeholder?: string;
-  textarea?: boolean;
   rows?: number;
   suggestion?: FieldSuggestion;
-  onApply?: () => void;
-};
+  textarea?: boolean;
+}
 
 function Field({
   form,
@@ -405,55 +417,55 @@ function Field({
           <Label htmlFor={field.name}>{label}</Label>
           {textarea ? (
             <Textarea
+              className="mt-1"
               id={field.name}
               name={field.name}
-              value={field.state.value as string}
-              onChange={(e) => field.handleChange(e.target.value)}
               onBlur={field.handleBlur}
-              rows={rows}
+              onChange={(e) => field.handleChange(e.target.value)}
               placeholder={placeholder}
-              className="mt-1"
+              rows={rows}
+              value={field.state.value as string}
             />
           ) : (
             <Input
+              className="mt-1"
               id={field.name}
               name={field.name}
-              value={field.state.value as string}
-              onChange={(e) => field.handleChange(e.target.value)}
               onBlur={field.handleBlur}
+              onChange={(e) => field.handleChange(e.target.value)}
               placeholder={placeholder}
-              className="mt-1"
+              value={field.state.value as string}
             />
           )}
           {field.state.meta.errors.length > 0 && (
-            <p className="mt-1 text-sm text-destructive">
+            <p className="mt-1 text-destructive text-sm">
               {field.state.meta.errors
                 .map((e: unknown) =>
                   typeof e === "string"
                     ? e
-                    : ((e as { message?: string })?.message ?? String(e)),
+                    : ((e as { message?: string })?.message ?? String(e))
                 )
                 .join(", ")}
             </p>
           )}
           {suggestion && (
             <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-2">
-              <p className="text-xs font-medium text-primary">
+              <p className="font-medium text-primary text-xs">
                 Suggested change
               </p>
               <p className="mt-1 whitespace-pre-wrap text-sm">
                 {suggestion.suggestion}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-muted-foreground text-xs">
                 {suggestion.rationale}
               </p>
               <Button
-                type="button"
-                variant="outline"
-                size="sm"
+                aria-label={`Apply suggestion for ${label}`}
                 className="mt-2"
                 onClick={onApply}
-                aria-label={`Apply suggestion for ${label}`}
+                size="sm"
+                type="button"
+                variant="outline"
               >
                 Apply
               </Button>

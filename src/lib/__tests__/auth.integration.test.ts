@@ -3,7 +3,7 @@ import { auth } from "#/lib/auth";
 
 async function captureConsoleEmail(
   label: string,
-  fn: () => Promise<unknown>,
+  fn: () => Promise<unknown>
 ): Promise<string> {
   let captured = "";
   const orig = process.stderr.write.bind(process.stderr);
@@ -17,11 +17,11 @@ async function captureConsoleEmail(
     process.stderr.write = orig;
   }
   const match = captured.match(
-    new RegExp(`\\[${label}\\][\\s\\S]*?url: (https?://\\S+)`),
+    new RegExp(`\\[${label}\\][\\s\\S]*?url: (https?://\\S+)`)
   );
   if (!match) {
     throw new Error(
-      `No console email captured for ${label}. Got:\n${captured}`,
+      `No console email captured for ${label}. Got:\n${captured}`
     );
   }
   return match[1];

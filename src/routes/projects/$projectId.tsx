@@ -23,14 +23,16 @@ export const Route = createFileRoute("/projects/$projectId")({
     meta: [
       {
         title: pageTitle(
-          (loaderData?.project?.title as string | undefined) ?? "Project",
+          (loaderData?.project?.title as string | undefined) ?? "Project"
         ),
       },
     ],
   }),
   loader: async ({ params }) => {
     const data = await getProject({ data: { id: params.projectId } });
-    if (!data.project) throw notFound();
+    if (!data.project) {
+      throw notFound();
+    }
     const { rows: projectCategories } = await listProjectCategories({
       data: { projectId: params.projectId },
     });
@@ -55,7 +57,9 @@ function ProjectDetail() {
   const projectId = project?.id as string | undefined;
 
   const refreshComments = useCallback(async () => {
-    if (!projectId) return;
+    if (!projectId) {
+      return;
+    }
     try {
       const { rows } = await listProjectComments({
         data: { id: projectId },
@@ -70,21 +74,23 @@ function ProjectDetail() {
     void refreshComments();
   }, [refreshComments]);
 
-  if (!project) return null;
+  if (!project) {
+    return null;
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 md:p-8">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">{project.title as string}</h1>
+        <h1 className="font-semibold text-2xl">{project.title as string}</h1>
         <StatusBadge status={project.status as string} />
       </div>
       <div className="mt-3 flex items-center gap-2">
         <BookmarkButton projectId={project.id as string} />
         {canEdit && (
-          <Button asChild variant="outline" size="sm">
+          <Button asChild size="sm" variant="outline">
             <Link
-              to="/projects/$projectId/edit"
               params={{ projectId: project.id as string }}
+              to="/projects/$projectId/edit"
             >
               Edit
             </Link>
@@ -94,12 +100,12 @@ function ProjectDetail() {
 
       {viewerIsOwner && !viewerIsStaff && (
         <OwnerProjectActions
+          onChanged={() => {
+            void router.invalidate();
+          }}
           project={{
             id: project.id as string,
             status: project.status as string,
-          }}
-          onChanged={() => {
-            void router.invalidate();
           }}
         />
       )}
@@ -107,49 +113,51 @@ function ProjectDetail() {
       {projectCategories.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {projectCategories.map((c) => (
-            <CategoryChip key={c.id} category={c} />
+            <CategoryChip category={c} key={c.id} />
           ))}
         </div>
       )}
 
       {(() => {
         const heroUrl = getPublicUrl(project.imageUrl as string | null);
-        if (!heroUrl) return null;
+        if (!heroUrl) {
+          return null;
+        }
         return (
           <div className="mt-4 overflow-hidden rounded-lg">
             <img
-              src={heroUrl}
               alt=""
               className="aspect-[16/9] w-full object-cover"
+              src={heroUrl}
             />
           </div>
         );
       })()}
 
       <Section
-        label="Description"
         body={project.description as string | null}
+        label="Description"
       />
       <Section
-        label="Problem statement"
         body={project.problemStatement as string | null}
+        label="Problem statement"
       />
-      <Section label="Objectives" body={project.objectives as string | null} />
+      <Section body={project.objectives as string | null} label="Objectives" />
       <Section
-        label="Minimum qualifications"
         body={project.minQualifications as string | null}
+        label="Minimum qualifications"
       />
       <Section
-        label="Preferred qualifications"
         body={project.prefQualifications as string | null}
+        label="Preferred qualifications"
       />
       <ContactSection
-        name={project.contactName as string | null}
         email={project.contactEmail as string | null}
+        name={project.contactName as string | null}
       />
       <Section
-        label="License / IP"
         body={project.licenseRestrictions as string | null}
+        label="License / IP"
       />
       <UrlSection url={project.url as string | null} />
 
@@ -165,13 +173,13 @@ function ProjectDetail() {
           <h2 className="font-semibold text-lg">Comments</h2>
           <div className="mt-3">
             <CommentThread
-              projectId={project.id as string}
               comments={comments}
-              viewerIsStaff={viewerIsStaff}
               onChanged={() => {
                 void refreshComments();
                 void router.invalidate();
               }}
+              projectId={project.id as string}
+              viewerIsStaff={viewerIsStaff}
             />
           </div>
         </section>
@@ -179,14 +187,14 @@ function ProjectDetail() {
 
       {viewerIsStaff && (
         <StaffProjectPanel
+          onChanged={() => {
+            void router.invalidate();
+          }}
           project={{
             id: project.id as string,
             status: project.status as string,
             deletedAt: (project.deletedAt as Date | null) ?? null,
             notes: (project.notes as string | null) ?? null,
-          }}
-          onChanged={() => {
-            void router.invalidate();
           }}
         />
       )}
@@ -195,10 +203,12 @@ function ProjectDetail() {
 }
 
 function Section({ label, body }: { label: string; body: string | null }) {
-  if (!body) return null;
+  if (!body) {
+    return null;
+  }
   return (
     <section className="mt-6">
-      <h2 className="font-medium text-sm text-muted-foreground">{label}</h2>
+      <h2 className="font-medium text-muted-foreground text-sm">{label}</h2>
       <p className="mt-1 whitespace-pre-wrap">{body}</p>
     </section>
   );
@@ -211,15 +221,17 @@ function ContactSection({
   name: string | null;
   email: string | null;
 }) {
-  if (!name && !email) return null;
+  if (!(name || email)) {
+    return null;
+  }
   return (
     <section className="mt-6">
-      <h2 className="font-medium text-sm text-muted-foreground">Contact</h2>
+      <h2 className="font-medium text-muted-foreground text-sm">Contact</h2>
       <p className="mt-1">
         {name && <span>{name}</span>}
         {name && email && <span>: </span>}
         {email && (
-          <a href={`mailto:${email}`} className="text-brand hover:underline">
+          <a className="text-brand hover:underline" href={`mailto:${email}`}>
             {email}
           </a>
         )}
@@ -229,17 +241,19 @@ function ContactSection({
 }
 
 function UrlSection({ url }: { url: string | null }) {
-  if (!url) return null;
+  if (!url) {
+    return null;
+  }
   const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
   return (
     <section className="mt-6">
-      <h2 className="font-medium text-sm text-muted-foreground">URL</h2>
+      <h2 className="font-medium text-muted-foreground text-sm">URL</h2>
       <p className="mt-1">
         <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
           className="break-all text-brand hover:underline"
+          href={href}
+          rel="noopener noreferrer"
+          target="_blank"
         >
           {url}
         </a>

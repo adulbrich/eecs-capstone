@@ -16,7 +16,11 @@ const PUBLIC_BASE =
 export const STORAGE_PUBLIC_BASE = PUBLIC_BASE;
 
 export function getPublicUrl(key: string | null | undefined): string | null {
-  if (!key) return null;
-  if (key.startsWith("http://") || key.startsWith("https://")) return key;
+  if (!key) {
+    return null;
+  }
+  if (key.startsWith("http://") || key.startsWith("https://")) {
+    return key;
+  }
   return `${PUBLIC_BASE}/${key.replace(/^\/+/, "")}`;
 }

@@ -59,7 +59,7 @@ describe("reviewProjectAs", () => {
       reviewProjectAs(stranger, {
         projectId: project.id,
         fields: { description: "old" },
-      }),
+      })
     ).rejects.toThrow("Forbidden");
   });
 
@@ -69,7 +69,7 @@ describe("reviewProjectAs", () => {
       reviewProjectAs(someone, {
         projectId: "00000000-0000-0000-0000-000000000000",
         fields: { description: "old" },
-      }),
+      })
     ).rejects.toThrow("Project not found");
   });
 });

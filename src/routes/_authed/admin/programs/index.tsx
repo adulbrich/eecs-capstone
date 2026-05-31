@@ -34,7 +34,9 @@ export const Route = createFileRoute("/_authed/admin/programs/")({
   head: () => ({ meta: [{ title: pageTitle("Programs") }] }),
   beforeLoad: async () => {
     const session = await getSession();
-    if (!session?.user) throw redirect({ to: "/sign-in" });
+    if (!session?.user) {
+      throw redirect({ to: "/sign-in" });
+    }
     if (!["admin", "instructor"].includes(session.user.role ?? "")) {
       throw redirect({ to: "/" });
     }
@@ -85,8 +87,8 @@ function ProgramsAdmin() {
         </BreadcrumbList>
       </Breadcrumb>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Programs</h1>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <h1 className="font-semibold text-2xl">Programs</h1>
+        <Dialog onOpenChange={setOpen} open={open}>
           <DialogTrigger asChild>
             <Button size="sm">+ New program</Button>
           </DialogTrigger>
@@ -97,38 +99,38 @@ function ProgramsAdmin() {
                 Add a course program that projects can be associated with.
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={onCreate} className="flex flex-col gap-4">
+            <form className="flex flex-col gap-4" onSubmit={onCreate}>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="prog-course-id">Course ID</Label>
                 <Input
                   id="prog-course-id"
-                  value={courseId}
                   onChange={(e) => setCourseId(e.target.value)}
                   placeholder="e.g., CS-462"
                   required
+                  value={courseId}
                 />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="prog-course-name">Course name</Label>
                 <Input
                   id="prog-course-name"
-                  value={courseName}
                   onChange={(e) => setCourseName(e.target.value)}
                   required
+                  value={courseName}
                 />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="prog-description">Description</Label>
                 <Input
                   id="prog-description"
-                  value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Optional"
+                  value={description}
                 />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && <p className="text-destructive text-sm">{error}</p>}
               <DialogFooter>
-                <Button type="submit" disabled={!(courseId && courseName)}>
+                <Button disabled={!(courseId && courseName)} type="submit">
                   Create program
                 </Button>
               </DialogFooter>
@@ -140,16 +142,16 @@ function ProgramsAdmin() {
       <AdminTable columns={["Course ID", "Course name", ""]}>
         {rows.map((p) => (
           <tr key={p.id}>
-            <td data-label="Course ID" className="border border-border p-2">
+            <td className="border border-border p-2" data-label="Course ID">
               {p.courseId}
             </td>
-            <td data-label="Course name" className="border border-border p-2">
+            <td className="border border-border p-2" data-label="Course name">
               {p.courseName}
             </td>
             <td className="border border-border p-2">
               <Link
-                to="/admin/programs/$programId"
                 params={{ programId: p.id }}
+                to="/admin/programs/$programId"
               >
                 Manage
               </Link>

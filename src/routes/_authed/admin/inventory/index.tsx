@@ -52,14 +52,16 @@ export const Route = createFileRoute("/_authed/admin/inventory/")({
   head: () => ({ meta: [{ title: pageTitle("Inventory") }] }),
   beforeLoad: async () => {
     const session = await getSession();
-    if (!session?.user) throw redirect({ to: "/sign-in" });
+    if (!session?.user) {
+      throw redirect({ to: "/sign-in" });
+    }
     if (!["admin", "instructor"].includes(session.user.role ?? "")) {
       throw redirect({ to: "/" });
     }
   },
   loaderDeps: ({ search }) => search,
-  loader: async ({ deps }) => {
-    return await listInventory({
+  loader: async ({ deps }) =>
+    await listInventory({
       data: {
         q: deps.q,
         status: deps.status,
@@ -67,21 +69,20 @@ export const Route = createFileRoute("/_authed/admin/inventory/")({
         page: deps.page,
         pageSize: 20,
       },
-    });
-  },
+    }),
   component: AdminInventory,
 });
 
-type StaffRow = {
-  id: string;
-  name: string;
-  status: string;
+interface StaffRow {
   category: string | null;
-  location: string | null;
-  imageUrl: string | null;
   currentHolderId?: string | null;
   currentHolderLabel?: string | null;
-};
+  id: string;
+  imageUrl: string | null;
+  location: string | null;
+  name: string;
+  status: string;
+}
 
 function AdminInventory() {
   const navigate = useNavigate({ from: "/admin/inventory/" });
@@ -120,9 +121,9 @@ function AdminInventory() {
         </BreadcrumbList>
       </Breadcrumb>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Inventory</h1>
+        <h1 className="font-semibold text-2xl">Inventory</h1>
         <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm">
+          <Button asChild size="sm" variant="outline">
             <Link to="/admin/inventory/requests">Request queue</Link>
           </Button>
           <Button asChild size="sm">
@@ -135,18 +136,17 @@ function AdminInventory() {
         <div>
           <Label htmlFor="inv-search">Search</Label>
           <Input
+            className="mt-1 w-48"
             id="inv-search"
-            type="search"
-            value={qDraft}
             onChange={(e) => setQDraft(e.target.value)}
             placeholder="Name or description"
-            className="mt-1 w-48"
+            type="search"
+            value={qDraft}
           />
         </div>
         <div>
           <Label htmlFor="inv-status">Status</Label>
           <Select
-            value={status ?? "_all_"}
             onValueChange={(v) =>
               void navigate({
                 search: (prev) => ({
@@ -156,8 +156,9 @@ function AdminInventory() {
                 }),
               })
             }
+            value={status ?? "_all_"}
           >
-            <SelectTrigger id="inv-status" className="mt-1 w-40">
+            <SelectTrigger className="mt-1 w-40" id="inv-status">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
@@ -181,46 +182,46 @@ function AdminInventory() {
           const holder = row.currentHolderId ?? row.currentHolderLabel ?? "";
           return (
             <tr key={row.id}>
-              <td data-label="Name" className="border border-border p-2">
+              <td className="border border-border p-2" data-label="Name">
                 <div className="flex items-center gap-2">
                   {img ? (
                     <img
-                      src={img}
                       alt=""
                       className="h-8 w-8 rounded object-cover"
+                      src={img}
                     />
                   ) : (
                     <div className="h-8 w-8 rounded bg-secondary" />
                   )}
                   <Link
-                    to="/admin/inventory/$itemId"
-                    params={{ itemId: row.id }}
                     className="hover:underline"
+                    params={{ itemId: row.id }}
+                    to="/admin/inventory/$itemId"
                   >
                     {row.name}
                   </Link>
                 </div>
               </td>
-              <td data-label="Status" className="border border-border p-2">
+              <td className="border border-border p-2" data-label="Status">
                 <InventoryStatusBadge
-                  status={row.status as Status}
                   showRetired
+                  status={row.status as Status}
                 />
               </td>
-              <td data-label="Holder" className="border border-border p-2">
+              <td className="border border-border p-2" data-label="Holder">
                 {holder || "-"}
               </td>
-              <td data-label="Location" className="border border-border p-2">
+              <td className="border border-border p-2" data-label="Location">
                 {row.location ?? "-"}
               </td>
-              <td data-label="Category" className="border border-border p-2">
+              <td className="border border-border p-2" data-label="Category">
                 {row.category ?? "-"}
               </td>
               <td className="border border-border p-2">
                 <Link
-                  to="/admin/inventory/$itemId/edit"
-                  params={{ itemId: row.id }}
                   className="hover:underline"
+                  params={{ itemId: row.id }}
+                  to="/admin/inventory/$itemId/edit"
                 >
                   Edit
                 </Link>
@@ -232,13 +233,13 @@ function AdminInventory() {
 
       <div className="mt-6 flex items-center justify-between text-sm">
         <Link
-          to="/admin/inventory"
-          search={{ q, status, page: Math.max(1, page - 1) }}
           className={
             page <= 1
               ? "pointer-events-none text-muted-foreground/40"
               : "hover:underline"
           }
+          search={{ q, status, page: Math.max(1, page - 1) }}
+          to="/admin/inventory"
         >
           Previous
         </Link>
@@ -246,13 +247,13 @@ function AdminInventory() {
           Page {page} of {totalPages}
         </span>
         <Link
-          to="/admin/inventory"
-          search={{ q, status, page: Math.min(totalPages, page + 1) }}
           className={
             page >= totalPages
               ? "pointer-events-none text-muted-foreground/40"
               : "hover:underline"
           }
+          search={{ q, status, page: Math.min(totalPages, page + 1) }}
+          to="/admin/inventory"
         >
           Next
         </Link>

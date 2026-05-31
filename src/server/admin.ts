@@ -12,7 +12,9 @@ function count() {
 export const getAdminStats = createServerFn({ method: "GET" }).handler(
   async () => {
     const viewer = await requireUser();
-    if (!isStaff(viewer)) throw new Error("Forbidden");
+    if (!isStaff(viewer)) {
+      throw new Error("Forbidden");
+    }
 
     const [[{ total }], [{ published }], [{ submitted }], [{ userTotal }]] =
       await Promise.all([
@@ -26,8 +28,8 @@ export const getAdminStats = createServerFn({ method: "GET" }).handler(
           .where(
             and(
               sql`${projects.status} = 'published'`,
-              isNull(projects.deletedAt),
-            ),
+              isNull(projects.deletedAt)
+            )
           ),
         db
           .select({ submitted: count() })
@@ -35,12 +37,12 @@ export const getAdminStats = createServerFn({ method: "GET" }).handler(
           .where(
             and(
               sql`${projects.status} = 'submitted'`,
-              isNull(projects.deletedAt),
-            ),
+              isNull(projects.deletedAt)
+            )
           ),
         db.select({ userTotal: count() }).from(user),
       ]);
 
     return { total, published, submitted, userTotal };
-  },
+  }
 );

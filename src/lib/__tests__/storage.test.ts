@@ -14,10 +14,10 @@ describe("getPublicUrl", () => {
 
   it("returns the value unchanged for http/https URLs", () => {
     expect(getPublicUrl("https://example.com/x.png")).toBe(
-      "https://example.com/x.png",
+      "https://example.com/x.png"
     );
     expect(getPublicUrl("http://example.com/x.png")).toBe(
-      "http://example.com/x.png",
+      "http://example.com/x.png"
     );
   });
 

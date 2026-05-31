@@ -1,17 +1,17 @@
 import { ImageUploader } from "./image-uploader";
 
-type Props = {
+interface Props {
   currentKey: string | null;
   onChange: (file: File | null) => void;
-};
+}
 
 export function InventoryImageUploader({ currentKey, onChange }: Props) {
   return (
     <ImageUploader
-      currentKey={currentKey}
       aspect={1}
-      maxWidth={1200}
+      currentKey={currentKey}
       maxHeight={1200}
+      maxWidth={1200}
       onChange={onChange}
     />
   );

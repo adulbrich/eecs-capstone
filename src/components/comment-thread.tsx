@@ -5,22 +5,22 @@ import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
-type Comment = {
-  id: string;
-  projectId: string;
+interface Comment {
   authorId: string;
-  parentId: string | null;
   content: string;
-  isInternal: boolean | null;
   createdAt: Date | string;
-};
-
-type Props = {
+  id: string;
+  isInternal: boolean | null;
+  parentId: string | null;
   projectId: string;
+}
+
+interface Props {
   comments: Comment[];
-  viewerIsStaff: boolean;
   onChanged: () => void;
-};
+  projectId: string;
+  viewerIsStaff: boolean;
+}
 
 export function CommentThread({
   projectId,
@@ -42,18 +42,18 @@ export function CommentThread({
     <div className="space-y-4">
       {topLevel.map((c) => (
         <CommentNode
-          key={c.id}
           comment={c}
-          replies={repliesByParent.get(c.id) ?? []}
-          projectId={projectId}
-          viewerIsStaff={viewerIsStaff}
+          key={c.id}
           onChanged={onChanged}
+          projectId={projectId}
+          replies={repliesByParent.get(c.id) ?? []}
+          viewerIsStaff={viewerIsStaff}
         />
       ))}
       <NewCommentForm
+        onChanged={onChanged}
         projectId={projectId}
         viewerIsStaff={viewerIsStaff}
-        onChanged={onChanged}
       />
     </div>
   );
@@ -75,12 +75,12 @@ function CommentNode({
   const isInternal = comment.isInternal ?? false;
   return (
     <div
-      id={`comment-${comment.id}`}
       className={
         isInternal
           ? "rounded-md border-l-4 p-3"
-          : "border-l-4 border-border p-3"
+          : "border-border border-l-4 p-3"
       }
+      id={`comment-${comment.id}`}
       style={
         isInternal
           ? {
@@ -90,12 +90,12 @@ function CommentNode({
           : undefined
       }
     >
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <div className="flex items-center gap-2 text-muted-foreground text-xs">
         <span>{comment.authorId.slice(0, 8)}</span>
         <span>{new Date(comment.createdAt).toLocaleString()}</span>
         {isInternal && (
           <span
-            className="rounded px-1.5 py-0.5 text-xs font-medium"
+            className="rounded px-1.5 py-0.5 font-medium text-xs"
             style={{
               background: "var(--status-warning-bg)",
               color: "var(--status-warning)",
@@ -106,15 +106,15 @@ function CommentNode({
           </span>
         )}
       </div>
-      <p className="mt-1 text-sm whitespace-pre-wrap">{comment.content}</p>
+      <p className="mt-1 whitespace-pre-wrap text-sm">{comment.content}</p>
 
       {replies.length > 0 && (
         <div className="mt-3 space-y-2 pl-4">
           {replies.map((r) => (
             <div
-              key={r.id}
-              id={`comment-${r.id}`}
               className="border-l-2 p-2"
+              id={`comment-${r.id}`}
+              key={r.id}
               style={
                 r.isInternal
                   ? {
@@ -124,12 +124,12 @@ function CommentNode({
                   : { borderLeftColor: "var(--line)" }
               }
             >
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs">
                 <span>{r.authorId.slice(0, 8)}</span>
                 <span>{new Date(r.createdAt).toLocaleString()}</span>
                 {r.isInternal && (
                   <span
-                    className="rounded px-1.5 py-0.5 text-xs font-medium"
+                    className="rounded px-1.5 py-0.5 font-medium text-xs"
                     style={{
                       color: "var(--status-warning)",
                     }}
@@ -138,17 +138,17 @@ function CommentNode({
                   </span>
                 )}
               </div>
-              <p className="mt-1 text-sm whitespace-pre-wrap">{r.content}</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm">{r.content}</p>
             </div>
           ))}
         </div>
       )}
 
       <ReplyForm
-        projectId={projectId}
-        parentId={comment.id}
-        viewerIsStaff={viewerIsStaff}
         onChanged={onChanged}
+        parentId={comment.id}
+        projectId={projectId}
+        viewerIsStaff={viewerIsStaff}
       />
     </div>
   );
@@ -182,15 +182,15 @@ function NewCommentForm({
 
   return (
     <form
+      className="mt-4 space-y-2 border-border border-t pt-4"
       onSubmit={onSubmit}
-      className="mt-4 space-y-2 border-t border-border pt-4"
     >
       <Textarea
-        value={content}
         onChange={(e) => setContent(e.target.value)}
         placeholder="Add a comment"
         required
         rows={3}
+        value={content}
       />
       {viewerIsStaff && (
         <Label className="font-normal">
@@ -201,10 +201,10 @@ function NewCommentForm({
           Internal (staff only)
         </Label>
       )}
-      <Button type="submit" size="sm">
+      <Button size="sm" type="submit">
         Post comment
       </Button>
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-destructive text-sm">{error}</p>}
     </form>
   );
 }
@@ -228,11 +228,11 @@ function ReplyForm({
   if (!open) {
     return (
       <Button
-        type="button"
-        variant="ghost"
-        size="xs"
         className="mt-2"
         onClick={() => setOpen(true)}
+        size="xs"
+        type="button"
+        variant="ghost"
       >
         Reply
       </Button>
@@ -255,16 +255,16 @@ function ReplyForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-2 space-y-2 pl-4">
+    <form className="mt-2 space-y-2 pl-4" onSubmit={onSubmit}>
       <Textarea
-        value={content}
         onChange={(e) => setContent(e.target.value)}
         placeholder="Reply"
         required
         rows={2}
+        value={content}
       />
       {viewerIsStaff && (
-        <Label className="text-xs font-normal">
+        <Label className="font-normal text-xs">
           <Checkbox
             checked={isInternal}
             onCheckedChange={(checked) => setIsInternal(checked === true)}
@@ -273,19 +273,19 @@ function ReplyForm({
         </Label>
       )}
       <div className="flex gap-2">
-        <Button type="submit" size="xs">
+        <Button size="xs" type="submit">
           Post
         </Button>
         <Button
+          onClick={() => setOpen(false)}
+          size="xs"
           type="button"
           variant="ghost"
-          size="xs"
-          onClick={() => setOpen(false)}
         >
           Cancel
         </Button>
       </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </form>
   );
 }

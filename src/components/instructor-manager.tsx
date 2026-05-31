@@ -13,25 +13,25 @@ import {
   SelectValue,
 } from "./ui/select";
 
-type Instructor = {
-  userId: string;
-  name: string | null;
+interface Instructor {
   email: string;
+  name: string | null;
   role: string | null;
-};
+  userId: string;
+}
 
-type Eligible = {
+interface Eligible {
+  email: string;
   id: string;
   name: string | null;
-  email: string;
   role: string | null;
-};
+}
 
-type Props = {
-  programId: string;
+interface Props {
   initial: Instructor[];
   onChanged: () => void;
-};
+  programId: string;
+}
 
 export function InstructorManager({ programId, initial, onChanged }: Props) {
   const [instructors, setInstructors] = useState(initial);
@@ -54,7 +54,9 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
 
   async function add() {
     setError(null);
-    if (!picked) return;
+    if (!picked) {
+      return;
+    }
     try {
       await addProgramInstructor({ data: { programId, userId: picked } });
       setPicked("");
@@ -81,26 +83,26 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
     <section className="mt-6">
       <h2 className="font-medium text-sm">Instructors</h2>
       {instructors.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">None yet.</p>
+        <p className="mt-2 text-muted-foreground text-sm">None yet.</p>
       ) : (
         <ul className="mt-2 space-y-1">
           {instructors.map((i) => (
             <li
-              key={i.userId}
               className="flex items-center justify-between rounded-md border border-border p-2"
+              key={i.userId}
             >
               <span>
                 {i.name ?? i.email}{" "}
-                <span className="text-xs text-muted-foreground">
+                <span className="text-muted-foreground text-xs">
                   ({i.role})
                 </span>
               </span>
               <Button
-                type="button"
-                variant="ghost"
-                size="xs"
                 className="text-destructive hover:text-destructive"
                 onClick={() => void remove(i.userId)}
+                size="xs"
+                type="button"
+                variant="ghost"
               >
                 Remove
               </Button>
@@ -109,8 +111,8 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
         </ul>
       )}
       <div className="mt-3 flex gap-2">
-        <Select value={picked} onValueChange={setPicked}>
-          <SelectTrigger size="sm" className="w-64" aria-label="Add instructor">
+        <Select onValueChange={setPicked} value={picked}>
+          <SelectTrigger aria-label="Add instructor" className="w-64" size="sm">
             <SelectValue placeholder="Add instructor..." />
           </SelectTrigger>
           <SelectContent>
@@ -122,15 +124,15 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
           </SelectContent>
         </Select>
         <Button
-          type="button"
-          size="sm"
-          onClick={() => void add()}
           disabled={!picked}
+          onClick={() => void add()}
+          size="sm"
+          type="button"
         >
           Add
         </Button>
       </div>
-      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+      {error && <p className="mt-2 text-destructive text-sm">{error}</p>}
     </section>
   );
 }

@@ -5,7 +5,10 @@ import { requireUser } from "#/lib/_internal/auth-guards";
 import { isStaff } from "#/lib/project-visibility";
 import type { ProgramInput, ProgramUpdateInput } from "../programs";
 
-type AuthUser = { id: string; role?: string | null | undefined };
+interface AuthUser {
+  id: string;
+  role?: string | null | undefined;
+}
 
 function assertStaff(viewer: AuthUser) {
   if (!isStaff({ id: viewer.id, role: viewer.role ?? null })) {
@@ -23,7 +26,9 @@ export async function getProgramImpl(data: { id: string }) {
     .select()
     .from(programs)
     .where(eq(programs.id, data.id));
-  if (!program) throw new Error("Program not found");
+  if (!program) {
+    throw new Error("Program not found");
+  }
   const instructors = await db
     .select({
       userId: programInstructors.userId,
@@ -62,7 +67,7 @@ export async function createProgramForCurrentUser(data: ProgramInput) {
 
 export async function updateProgramAs(
   viewer: AuthUser,
-  data: ProgramUpdateInput,
+  data: ProgramUpdateInput
 ) {
   assertStaff(viewer);
   await db
@@ -99,14 +104,16 @@ export async function deleteProgramForCurrentUser(id: string) {
 
 export async function addProgramInstructorAs(
   viewer: AuthUser,
-  data: { programId: string; userId: string },
+  data: { programId: string; userId: string }
 ) {
   assertStaff(viewer);
   const [target] = await db.select().from(user).where(eq(user.id, data.userId));
-  if (!target) throw new Error("User not found");
+  if (!target) {
+    throw new Error("User not found");
+  }
   if (target.role !== "admin" && target.role !== "instructor") {
     throw new Error(
-      "Only users with role admin or instructor can be assigned as program instructors",
+      "Only users with role admin or instructor can be assigned as program instructors"
     );
   }
   await db
@@ -126,7 +133,7 @@ export async function addProgramInstructorForCurrentUser(data: {
 
 export async function removeProgramInstructorAs(
   viewer: AuthUser,
-  data: { programId: string; userId: string },
+  data: { programId: string; userId: string }
 ) {
   assertStaff(viewer);
   await db
@@ -134,8 +141,8 @@ export async function removeProgramInstructorAs(
     .where(
       and(
         eq(programInstructors.programId, data.programId),
-        eq(programInstructors.userId, data.userId),
-      ),
+        eq(programInstructors.userId, data.userId)
+      )
     );
   return { programId: data.programId, userId: data.userId };
 }

@@ -6,7 +6,10 @@ const STATUS_STYLES: Record<string, { fg: string; bg: string }> = {
     fg: "var(--status-warning)",
     bg: "var(--status-warning-bg)",
   },
-  published: { fg: "var(--brand-primary-dark)", bg: "var(--brand-primary-tint)" },
+  published: {
+    fg: "var(--brand-primary-dark)",
+    bg: "var(--brand-primary-tint)",
+  },
   archived: { fg: "var(--status-neutral)", bg: "var(--status-neutral-bg)" },
   deleted: { fg: "var(--status-error)", bg: "var(--status-error-bg)" },
 };
@@ -20,7 +23,7 @@ export function StatusBadge({ status }: { status: string }) {
   const { fg, bg } = STATUS_STYLES[status] ?? FALLBACK;
   return (
     <span
-      className="inline-block rounded px-2 py-0.5 text-xs font-medium"
+      className="inline-block rounded px-2 py-0.5 font-medium text-xs"
       style={{ color: fg, backgroundColor: bg }}
     >
       {status.replace(/_/g, " ")}

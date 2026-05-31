@@ -30,7 +30,9 @@ export const Route = createFileRoute("/_authed/admin/categories/$categoryId")({
   head: () => ({ meta: [{ title: pageTitle("Edit Category") }] }),
   beforeLoad: async () => {
     const session = await getSession();
-    if (!session?.user) throw redirect({ to: "/sign-in" });
+    if (!session?.user) {
+      throw redirect({ to: "/sign-in" });
+    }
     if (!["admin", "instructor"].includes(session.user.role ?? "")) {
       throw redirect({ to: "/" });
     }
@@ -66,10 +68,11 @@ function CategoryEdit() {
   async function onDelete() {
     if (
       !confirm(
-        `Delete category "${category.name}"? Projects tagged with it will lose the tag.`,
+        `Delete category "${category.name}"? Projects tagged with it will lose the tag.`
       )
-    )
+    ) {
       return;
+    }
     setError(null);
     try {
       await deleteCategory({ data: { id: category.id } });
@@ -100,40 +103,40 @@ function CategoryEdit() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 text-2xl font-semibold">Edit category</h1>
-      <form onSubmit={onSave} className="mt-6 space-y-3">
+      <h1 className="mt-2 font-semibold text-2xl">Edit category</h1>
+      <form className="mt-6 space-y-3" onSubmit={onSave}>
         <div className="space-y-1.5">
           <Label htmlFor="cat-name">Name</Label>
           <Input
             id="cat-name"
-            value={name}
             onChange={(e) => setName(e.target.value)}
             required
+            value={name}
           />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="cat-type">Type</Label>
           <CategoryTypeCombobox
             id="cat-type"
-            value={type}
             onChange={setType}
             types={types}
+            value={type}
           />
         </div>
         <div className="flex gap-2">
-          <Button type="submit" size="sm">
+          <Button size="sm" type="submit">
             Save
           </Button>
           <Button
+            onClick={() => void onDelete()}
+            size="sm"
             type="button"
             variant="destructive"
-            size="sm"
-            onClick={() => void onDelete()}
           >
             Delete
           </Button>
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-destructive text-sm">{error}</p>}
       </form>
     </div>
   );

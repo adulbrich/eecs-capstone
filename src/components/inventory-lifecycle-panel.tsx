@@ -42,19 +42,21 @@ const ALL_STATUSES: Status[] = [
   "retired",
 ];
 
-export type HistoryRow = {
-  id: string;
-  oldStatus: string | null;
-  newStatus: string;
+export interface HistoryRow {
+  changedByEmail: string;
+  changedByName: string | null;
   comment: string | null;
+  createdAt: Date | string;
   holderId: string | null;
   holderLabel: string | null;
-  createdAt: Date | string;
-  changedByName: string | null;
-  changedByEmail: string;
-};
+  id: string;
+  newStatus: string;
+  oldStatus: string | null;
+}
 
-type Props = {
+interface Props {
+  history: HistoryRow[];
+  holderName?: string | null;
   item: {
     id: string;
     name: string;
@@ -63,9 +65,7 @@ type Props = {
     currentHolderLabel: string | null;
     currentRequestItemId: string | null;
   };
-  holderName?: string | null;
-  history: HistoryRow[];
-};
+}
 
 function recommendedNext(status: Status): {
   next: Status;
@@ -96,31 +96,31 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
 
   return (
     <section>
-      <h2 className="text-sm font-medium">Status history</h2>
+      <h2 className="font-medium text-sm">Status history</h2>
       {history.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">No history.</p>
+        <p className="mt-2 text-muted-foreground text-sm">No history.</p>
       ) : (
         <>
           <ul className="mt-2 space-y-2">
             {slice.map((h) => (
               <li
-                key={h.id}
                 className="rounded-md border border-border bg-card p-3 text-sm"
+                key={h.id}
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">
                     {h.oldStatus ? `${h.oldStatus} -> ` : ""}
                     {h.newStatus}
                   </span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-muted-foreground text-xs">
                     by {h.changedByName ?? h.changedByEmail}
                   </span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-muted-foreground text-xs">
                     {new Date(h.createdAt).toLocaleString()}
                   </span>
                 </div>
                 {(h.holderId || h.holderLabel) && (
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 text-muted-foreground text-xs">
                     Holder: {h.holderLabel ?? h.holderId}
                   </p>
                 )}
@@ -133,21 +133,21 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
           {totalPages > 1 && (
             <div className="mt-3 flex items-center justify-between text-sm">
               <Button
-                variant="outline"
-                size="sm"
                 disabled={safePage <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
+                size="sm"
+                variant="outline"
               >
                 Previous
               </Button>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-muted-foreground text-xs">
                 Page {safePage} of {totalPages}
               </span>
               <Button
-                variant="outline"
-                size="sm"
                 disabled={safePage >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                size="sm"
+                variant="outline"
               >
                 Next
               </Button>
@@ -233,11 +233,12 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
       dlgTargetStatus === "reserved" || dlgTargetStatus === "checked_out";
     if (needsHolder && !item.currentRequestItemId) {
       setError(
-        "Cannot reserve / check-out from this state; there is no active request line.",
+        "Cannot reserve / check-out from this state; there is no active request line."
       );
       return;
     }
-    const holderId = assignMode === "user" && assignUserId ? assignUserId : null;
+    const holderId =
+      assignMode === "user" && assignUserId ? assignUserId : null;
     const holderLabel =
       assignMode === "label" && assignLabel ? assignLabel : null;
     if (needsHolder && !holderId && !holderLabel) {
@@ -257,7 +258,9 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
   }
 
   async function onRecommendedClick() {
-    if (!rec) return;
+    if (!rec) {
+      return;
+    }
     if (rec.next === "checked_out" || rec.next === "reserved") {
       openDialogFor(rec.next);
       return;
@@ -300,21 +303,23 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
 
   const canHardDelete = status === "available" || status === "retired";
   const holderDisplay =
-    holderName ?? item.currentHolderLabel ?? (item.currentHolderId ? "(user)" : null);
+    holderName ??
+    item.currentHolderLabel ??
+    (item.currentHolderId ? "(user)" : null);
 
   return (
     <div className="space-y-6">
       <section className="rounded-md border border-border bg-card p-4">
-        <p className="text-xs uppercase text-muted-foreground">Status</p>
+        <p className="text-muted-foreground text-xs uppercase">Status</p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
-          <InventoryStatusBadge status={status} showRetired />
-          <span className="text-xs text-muted-foreground">
+          <InventoryStatusBadge showRetired status={status} />
+          <span className="text-muted-foreground text-xs">
             {status.replace(/_/g, " ")}
           </span>
         </div>
         {rec && (
           <div className="mt-3">
-            <Button onClick={onRecommendedClick} disabled={busy} size="sm">
+            <Button disabled={busy} onClick={onRecommendedClick} size="sm">
               {rec.label}
             </Button>
           </div>
@@ -323,13 +328,13 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
           <div>
             <Label htmlFor="override-status">Change status to...</Label>
             <Select
-              value={overrideStatus || undefined}
               onValueChange={(v) => void onOverrideChange(v)}
+              value={overrideStatus || undefined}
             >
               <SelectTrigger
+                className="mt-1 w-48"
                 id="override-status"
                 size="sm"
-                className="mt-1 w-48"
               >
                 <SelectValue placeholder="Pick a status" />
               </SelectTrigger>
@@ -343,13 +348,13 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
             </Select>
           </div>
         </div>
-        {error && (
-          <p className="mt-3 text-sm text-destructive">{error}</p>
-        )}
+        {error && <p className="mt-3 text-destructive text-sm">{error}</p>}
       </section>
 
       <section className="rounded-md border border-border bg-card p-4">
-        <p className="text-xs uppercase text-muted-foreground">Current holder</p>
+        <p className="text-muted-foreground text-xs uppercase">
+          Current holder
+        </p>
         <p className="mt-1 text-sm">
           {holderDisplay ? holderDisplay : "(none)"}
         </p>
@@ -358,28 +363,28 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
       <StatusHistorySection history={history} />
 
       <section className="rounded-md border border-destructive/30 bg-destructive/5 p-4">
-        <h2 className="text-sm font-medium">Danger zone</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <h2 className="font-medium text-sm">Danger zone</h2>
+        <p className="mt-1 text-muted-foreground text-xs">
           Hard delete is allowed only when status is available or retired and
           the item has no historical request lines.
         </p>
         <div className="mt-2">
           <Button
-            variant="destructive"
-            size="sm"
             disabled={!canHardDelete || busy}
             onClick={() => {
               setDelConfirm("");
               setError(null);
               setDelOpen(true);
             }}
+            size="sm"
+            variant="destructive"
           >
             Hard delete item
           </Button>
         </div>
       </section>
 
-      <Dialog open={dlgOpen} onOpenChange={setDlgOpen}>
+      <Dialog onOpenChange={setDlgOpen} open={dlgOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -395,19 +400,19 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
             <div className="flex gap-4 text-sm">
               <label className="flex items-center gap-1">
                 <input
-                  type="radio"
-                  name="assignMode"
                   checked={assignMode === "user"}
+                  name="assignMode"
                   onChange={() => setAssignMode("user")}
+                  type="radio"
                 />
                 Assign to user
               </label>
               <label className="flex items-center gap-1">
                 <input
-                  type="radio"
-                  name="assignMode"
                   checked={assignMode === "label"}
+                  name="assignMode"
                   onChange={() => setAssignMode("label")}
+                  type="radio"
                 />
                 Assign to label
               </label>
@@ -416,22 +421,22 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
               <div>
                 <Label htmlFor="assign-user-id">User id</Label>
                 <Input
+                  className="mt-1"
                   id="assign-user-id"
-                  value={assignUserId}
                   onChange={(e) => setAssignUserId(e.target.value)}
                   placeholder="User id"
-                  className="mt-1"
+                  value={assignUserId}
                 />
               </div>
             ) : (
               <div>
                 <Label htmlFor="assign-label">Label</Label>
                 <Input
+                  className="mt-1"
                   id="assign-label"
-                  value={assignLabel}
                   onChange={(e) => setAssignLabel(e.target.value)}
                   placeholder="e.g. Lab 204"
-                  className="mt-1"
+                  value={assignLabel}
                 />
               </div>
             )}
@@ -439,11 +444,11 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
               <div>
                 <Label htmlFor="due-date">Due date</Label>
                 <Input
+                  className="mt-1"
                   id="due-date"
+                  onChange={(e) => setDueDate(e.target.value)}
                   type="date"
                   value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="mt-1"
                 />
               </div>
             )}
@@ -451,42 +456,42 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
               <div>
                 <Label htmlFor="pickup-date">Pickup by</Label>
                 <Input
+                  className="mt-1"
                   id="pickup-date"
+                  onChange={(e) => setPickupDate(e.target.value)}
                   type="date"
                   value={pickupDate}
-                  onChange={(e) => setPickupDate(e.target.value)}
-                  className="mt-1"
                 />
               </div>
             )}
             <div>
               <Label htmlFor="comment">Comment (optional)</Label>
               <Textarea
+                className="mt-1"
                 id="comment"
-                value={dlgComment}
                 onChange={(e) => setDlgComment(e.target.value)}
                 rows={2}
-                className="mt-1"
+                value={dlgComment}
               />
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-destructive text-sm">{error}</p>}
           </div>
           <DialogFooter>
             <Button
-              variant="outline"
-              onClick={() => setDlgOpen(false)}
               disabled={busy}
+              onClick={() => setDlgOpen(false)}
+              variant="outline"
             >
               Cancel
             </Button>
-            <Button onClick={() => void onConfirmDialog()} disabled={busy}>
+            <Button disabled={busy} onClick={() => void onConfirmDialog()}>
               {busy ? "Saving..." : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={delOpen} onOpenChange={setDelOpen}>
+      <Dialog onOpenChange={setDelOpen} open={delOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Hard delete item</DialogTitle>
@@ -500,24 +505,24 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
               Item name: <span className="font-mono">{item.name}</span>
             </p>
             <Input
-              value={delConfirm}
               onChange={(e) => setDelConfirm(e.target.value)}
               placeholder="Type item name to confirm"
+              value={delConfirm}
             />
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-destructive text-sm">{error}</p>}
           </div>
           <DialogFooter>
             <Button
-              variant="outline"
-              onClick={() => setDelOpen(false)}
               disabled={busy}
+              onClick={() => setDelOpen(false)}
+              variant="outline"
             >
               Cancel
             </Button>
             <Button
-              variant="destructive"
-              onClick={() => void onHardDelete()}
               disabled={busy || delConfirm !== item.name}
+              onClick={() => void onHardDelete()}
+              variant="destructive"
             >
               {busy ? "Deleting..." : "Hard delete"}
             </Button>

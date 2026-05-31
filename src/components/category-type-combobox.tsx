@@ -16,12 +16,12 @@ import {
 } from "#/components/ui/popover";
 import { cn } from "#/lib/utils.ts";
 
-type Props = {
-  value: string;
+interface Props {
+  id?: string;
   onChange: (type: string) => void;
   types: string[];
-  id?: string;
-};
+  value: string;
+}
 
 /**
  * Creatable combobox for category types. Types are derived from existing
@@ -44,15 +44,15 @@ export function CategoryTypeCombobox({ value, onChange, types, id }: Props) {
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger asChild>
         <Button
-          id={id}
-          type="button"
-          variant="outline"
-          role="combobox"
           aria-expanded={open}
           className="w-full justify-between font-normal"
+          id={id}
+          role="combobox"
+          type="button"
+          variant="outline"
         >
           <span className={cn(!value && "text-muted-foreground")}>
             {value || "Select or create a type"}
@@ -63,17 +63,17 @@ export function CategoryTypeCombobox({ value, onChange, types, id }: Props) {
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
         <Command>
           <CommandInput
+            onValueChange={setQuery}
             placeholder="Search or add a type..."
             value={query}
-            onValueChange={setQuery}
           />
           <CommandList>
             <CommandEmpty>No types yet. Type to create one.</CommandEmpty>
             {showCreate && (
               <CommandGroup>
                 <CommandItem
-                  value={`create-${trimmed}`}
                   onSelect={() => select(trimmed)}
+                  value={`create-${trimmed}`}
                 >
                   Create "{trimmed}"
                 </CommandItem>
@@ -81,7 +81,7 @@ export function CategoryTypeCombobox({ value, onChange, types, id }: Props) {
             )}
             <CommandGroup>
               {types.map((t) => (
-                <CommandItem key={t} value={t} onSelect={() => select(t)}>
+                <CommandItem key={t} onSelect={() => select(t)} value={t}>
                   <Check
                     className={cn(value === t ? "opacity-100" : "opacity-0")}
                   />

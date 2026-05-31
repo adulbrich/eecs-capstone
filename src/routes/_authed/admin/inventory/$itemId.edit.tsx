@@ -18,29 +18,33 @@ import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { getInventoryItem } from "#/server/inventory";
 
-type StaffItem = {
-  id: string;
-  name: string;
-  description: string | null;
+interface StaffItem {
   category: string | null;
-  location: string | null;
+  description: string | null;
+  id: string;
   imageUrl: string | null;
-  serial?: string | null;
+  location: string | null;
+  name: string;
   notes?: string | null;
-};
+  serial?: string | null;
+}
 
 export const Route = createFileRoute("/_authed/admin/inventory/$itemId/edit")({
   head: () => ({ meta: [{ title: pageTitle("Edit Inventory Item") }] }),
   beforeLoad: async () => {
     const session = await getSession();
-    if (!session?.user) throw redirect({ to: "/sign-in" });
+    if (!session?.user) {
+      throw redirect({ to: "/sign-in" });
+    }
     if (!["admin", "instructor"].includes(session.user.role ?? "")) {
       throw redirect({ to: "/" });
     }
   },
   loader: async ({ params }) => {
     const item = await getInventoryItem({ data: { id: params.itemId } });
-    if (!item) throw notFound();
+    if (!item) {
+      throw notFound();
+    }
     return item;
   },
   component: EditInventoryItem,
@@ -68,8 +72,8 @@ function EditInventoryItem() {
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
               <Link
-                to="/admin/inventory/$itemId"
                 params={{ itemId: loaded.id }}
+                to="/admin/inventory/$itemId"
               >
                 {loaded.name}
               </Link>
@@ -81,10 +85,9 @@ function EditInventoryItem() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 text-2xl font-semibold">Edit inventory item</h1>
+      <h1 className="mt-2 font-semibold text-2xl">Edit inventory item</h1>
       <div className="mt-6">
         <InventoryForm
-          itemId={loaded.id}
           initial={{
             name: loaded.name,
             description: loaded.description ?? "",
@@ -94,13 +97,14 @@ function EditInventoryItem() {
             notes: loaded.notes ?? "",
             imageUrl: loaded.imageUrl ?? "",
           }}
-          submitLabel="Save"
+          itemId={loaded.id}
           onSaved={(itemId) =>
             navigate({
               to: "/admin/inventory/$itemId",
               params: { itemId },
             })
           }
+          submitLabel="Save"
         />
       </div>
     </div>

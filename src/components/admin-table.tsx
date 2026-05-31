@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
-type Props = {
-  columns: string[];
+interface Props {
   children: ReactNode;
-};
+  columns: string[];
+}
 
 export function AdminTable({ columns, children }: Props) {
   return (
@@ -15,8 +15,8 @@ export function AdminTable({ columns, children }: Props) {
         <tr>
           {columns.map((c) => (
             <th
-              key={c}
               className="border border-border p-2 text-left font-medium"
+              key={c}
             >
               {c}
             </th>

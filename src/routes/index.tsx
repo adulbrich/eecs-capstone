@@ -30,11 +30,11 @@ function Home() {
             <Link to="/projects">Browse Projects</Link>
           </Button>
           {isSignedIn ? (
-            <Button asChild variant="outline" size="lg">
+            <Button asChild size="lg" variant="outline">
               <Link to="/projects/new">Propose a Project</Link>
             </Button>
           ) : (
-            <Button asChild variant="outline" size="lg">
+            <Button asChild size="lg" variant="outline">
               <Link to="/sign-up">Create Account</Link>
             </Button>
           )}
@@ -44,19 +44,19 @@ function Home() {
       <section className="page-wrap pb-24">
         <div className="grid gap-4 sm:grid-cols-3">
           <FeatureCard
+            body="Search and filter capstone proposals by category, technology, and program."
             icon={<BookOpen className="h-5 w-5" />}
             title="Browse Projects"
-            body="Search and filter capstone proposals by category, technology, and program."
           />
           <FeatureCard
+            body="Industry partners and faculty submit proposals for student teams to work on."
             icon={<Users className="h-5 w-5" />}
             title="Propose Ideas"
-            body="Industry partners and faculty submit proposals for student teams to work on."
           />
           <FeatureCard
+            body="Follow your project through the review workflow from draft to published."
             icon={<CheckCircle className="h-5 w-5" />}
             title="Track Progress"
-            body="Follow your project through the review workflow from draft to published."
           />
         </div>
       </section>
@@ -79,7 +79,7 @@ function FeatureCard({
         {icon}
       </div>
       <h3 className="font-semibold">{title}</h3>
-      <p className="mt-2 text-sm text-muted-foreground">{body}</p>
+      <p className="mt-2 text-muted-foreground text-sm">{body}</p>
     </div>
   );
 }

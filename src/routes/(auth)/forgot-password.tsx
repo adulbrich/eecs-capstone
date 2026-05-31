@@ -31,8 +31,8 @@ function ForgotPassword() {
     return (
       <div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">
         <div className="island-shell w-full max-w-sm rounded-xl p-8">
-          <h1 className="text-2xl font-semibold">Check your email</h1>
-          <p className="mt-4 text-sm text-muted-foreground">
+          <h1 className="font-semibold text-2xl">Check your email</h1>
+          <p className="mt-4 text-muted-foreground text-sm">
             If an account exists for that address, we sent a reset link. (In
             dev, check the server console.)
           </p>
@@ -44,20 +44,20 @@ function ForgotPassword() {
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">
       <div className="island-shell w-full max-w-sm rounded-xl p-8">
-        <h1 className="text-2xl font-semibold">Forgot password</h1>
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
+        <h1 className="font-semibold text-2xl">Forgot password</h1>
+        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input
+              autoComplete="email"
               id="email"
               name="email"
-              type="email"
               placeholder="you@example.com"
               required
-              autoComplete="email"
+              type="email"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button className="w-full" disabled={loading} type="submit">
             {loading ? "Sending..." : "Send reset link"}
           </Button>
         </form>

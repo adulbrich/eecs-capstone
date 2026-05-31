@@ -7,15 +7,15 @@ import {
   unreadCount,
 } from "#/server/notifications";
 
-type Notification = {
-  id: string;
-  type: string;
-  title: string;
-  message: string;
-  link: string | null;
-  read: boolean | null;
+interface Notification {
   createdAt: Date | string;
-};
+  id: string;
+  link: string | null;
+  message: string;
+  read: boolean | null;
+  title: string;
+  type: string;
+}
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -66,54 +66,54 @@ export function NotificationBell() {
   return (
     <div className="relative">
       <button
-        type="button"
+        aria-label="Notifications"
+        className="relative rounded-md px-2 py-1 hover:bg-secondary"
         onClick={() => {
           setOpen((v) => !v);
           void refresh();
         }}
-        aria-label="Notifications"
-        className="relative rounded-md px-2 py-1 hover:bg-secondary"
+        type="button"
       >
         {unread > 0 ? (
           <BellRing
+            aria-hidden="true"
             className="h-5 w-5"
             style={{ color: "var(--status-warning)" }}
-            aria-hidden="true"
           />
         ) : (
-          <Bell className="h-5 w-5" aria-hidden="true" />
+          <Bell aria-hidden="true" className="h-5 w-5" />
         )}
         {unread > 0 && (
-          <span className="absolute -right-1 -top-1 min-w-[1.25rem] rounded-full bg-destructive px-1 text-center text-xs text-white">
+          <span className="absolute -top-1 -right-1 min-w-[1.25rem] rounded-full bg-destructive px-1 text-center text-white text-xs">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
       </button>
       {open && (
         <div className="absolute right-0 z-50 mt-1 w-80 rounded-md border border-border bg-card shadow-lg">
-          <div className="border-b border-border p-2 font-medium text-sm">
+          <div className="border-border border-b p-2 font-medium text-sm">
             Notifications
           </div>
           {rows.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">Nothing yet.</p>
+            <p className="p-4 text-muted-foreground text-sm">Nothing yet.</p>
           ) : (
             <ul>
               {rows.map((n) => (
                 <li
-                  key={n.id}
                   className={
                     n.read
-                      ? "border-b border-border"
-                      : "border-b border-border bg-[var(--brand-primary-tint)]"
+                      ? "border-border border-b"
+                      : "border-border border-b bg-[var(--brand-primary-tint)]"
                   }
+                  key={n.id}
                 >
                   <button
-                    type="button"
-                    onClick={() => void onClickNotification(n)}
                     className="block w-full p-2 text-left text-sm hover:bg-secondary"
+                    onClick={() => void onClickNotification(n)}
+                    type="button"
                   >
                     <div className="font-medium">{n.title}</div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-muted-foreground text-xs">
                       {new Date(n.createdAt).toLocaleString()}
                     </div>
                   </button>
@@ -123,9 +123,9 @@ export function NotificationBell() {
           )}
           {rows.length > 0 && (
             <button
-              type="button"
-              onClick={() => void onMarkAllRead()}
               className="block w-full p-2 text-center text-xs hover:bg-secondary"
+              onClick={() => void onMarkAllRead()}
+              type="button"
             >
               Mark all read
             </button>

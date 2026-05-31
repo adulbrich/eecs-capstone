@@ -34,5 +34,5 @@ export const listMyBookmarks = createServerFn({ method: "GET" }).handler(
       "./_internal/bookmarks"
     );
     return listMyBookmarksForCurrentUser();
-  },
+  }
 );

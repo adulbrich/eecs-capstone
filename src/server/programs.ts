@@ -26,7 +26,7 @@ export const listPrograms = createServerFn({ method: "GET" }).handler(
   async () => {
     const { listProgramsImpl } = await import("./_internal/programs");
     return listProgramsImpl();
-  },
+  }
 );
 
 export const getProgram = createServerFn({ method: "GET" })

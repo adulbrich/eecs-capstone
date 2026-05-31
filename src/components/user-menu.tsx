@@ -10,9 +10,9 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-type Props = {
+interface Props {
   user: { name: string | null; email: string; image?: string | null };
-};
+}
 
 export function UserMenu({ user }: Props) {
   const img = getPublicUrl(user.image);
@@ -21,13 +21,13 @@ export function UserMenu({ user }: Props) {
       <DropdownMenuTrigger className="flex items-center gap-2 rounded hover:opacity-80">
         {img ? (
           <img
-            src={img}
             alt=""
             className="h-7 w-7 rounded-full object-cover"
             referrerPolicy="no-referrer"
+            src={img}
           />
         ) : (
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-(--surface-sunken) text-xs font-medium">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-(--surface-sunken) font-medium text-xs">
             {(user.name ?? user.email).charAt(0).toUpperCase()}
           </div>
         )}
@@ -36,7 +36,7 @@ export function UserMenu({ user }: Props) {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="font-normal">
           {user.name && <p className="font-medium">{user.name}</p>}
-          <p className="text-xs text-muted-foreground">{user.email}</p>
+          <p className="text-muted-foreground text-xs">{user.email}</p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
@@ -46,7 +46,7 @@ export function UserMenu({ user }: Props) {
           <Link to="/my/bookmarks">My Bookmarks</Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link to="/my/items" search={{ tab: "active" }}>
+          <Link search={{ tab: "active" }} to="/my/items">
             My Items
           </Link>
         </DropdownMenuItem>

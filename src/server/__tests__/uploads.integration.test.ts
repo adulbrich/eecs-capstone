@@ -11,14 +11,14 @@ import { uploadProjectImageAs } from "#/server/_internal/uploads";
 
 const fixture = readFileSync(
   path.join(
-    __dirname,
+    import.meta.dirname,
     "..",
     "..",
     "lib",
     "__tests__",
     "fixtures",
-    "sample.jpg",
-  ),
+    "sample.jpg"
+  )
 );
 
 function s3Client() {
@@ -85,7 +85,7 @@ describe("uploadProjectImageAs", () => {
       new HeadObjectCommand({
         Bucket: process.env.S3_BUCKET ?? "cs-capstone",
         Key: result.key,
-      }),
+      })
     );
     expect(head.ContentType).toBe("image/webp");
     expect(head.ContentLength).toBeGreaterThan(0);

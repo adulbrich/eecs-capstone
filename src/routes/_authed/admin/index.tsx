@@ -8,7 +8,9 @@ export const Route = createFileRoute("/_authed/admin/")({
   head: () => ({ meta: [{ title: pageTitle("Admin") }] }),
   beforeLoad: async () => {
     const session = await getSession();
-    if (!session?.user) throw redirect({ to: "/sign-in" });
+    if (!session?.user) {
+      throw redirect({ to: "/sign-in" });
+    }
     if (!["admin", "instructor"].includes(session.user.role ?? "")) {
       throw redirect({ to: "/" });
     }
@@ -21,29 +23,29 @@ export const Route = createFileRoute("/_authed/admin/")({
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-lg border border-border bg-card p-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+      <p className="text-muted-foreground text-sm">{label}</p>
+      <p className="mt-1 font-semibold text-2xl tabular-nums">{value}</p>
     </div>
   );
 }
 
-type NavCard = {
-  to: string;
+interface NavCard {
+  description: string;
   icon: React.ElementType;
   label: string;
-  description: string;
-};
+  to: string;
+}
 
 function NavCard({ to, icon: Icon, label, description }: NavCard) {
   return (
     <Link
-      to={to}
       className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-secondary"
+      to={to}
     >
       <Icon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
       <div>
-        <p className="text-sm font-medium">{label}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+        <p className="font-medium text-sm">{label}</p>
+        <p className="mt-0.5 text-muted-foreground text-xs">{description}</p>
       </div>
     </Link>
   );
@@ -56,10 +58,10 @@ function AdminHome() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
-      <h1 className="text-2xl font-semibold">Admin</h1>
+      <h1 className="font-semibold text-2xl">Admin</h1>
 
       <section className="mt-6">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
           Overview
         </h2>
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -71,40 +73,40 @@ function AdminHome() {
       </section>
 
       <section className="mt-8">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
           Manage
         </h2>
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <NavCard
-            to="/admin/projects"
+            description="Review, approve, and manage all projects"
             icon={FolderKanban}
             label="Projects"
-            description="Review, approve, and manage all projects"
+            to="/admin/projects"
           />
           <NavCard
-            to="/admin/categories"
+            description="Add and edit project category tags"
             icon={Tag}
             label="Categories"
-            description="Add and edit project category tags"
+            to="/admin/categories"
           />
           <NavCard
-            to="/admin/programs"
+            description="Manage course programs and instructors"
             icon={BookOpen}
             label="Programs"
-            description="Manage course programs and instructors"
+            to="/admin/programs"
           />
           <NavCard
-            to="/admin/inventory"
+            description="Add items, review requests, manage checkouts"
             icon={Package}
             label="Inventory"
-            description="Add items, review requests, manage checkouts"
+            to="/admin/inventory"
           />
           {isAdmin && (
             <NavCard
-              to="/admin/users"
+              description="Manage roles, bans, and accounts"
               icon={Users}
               label="Users"
-              description="Manage roles, bans, and accounts"
+              to="/admin/users"
             />
           )}
         </div>

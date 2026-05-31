@@ -27,7 +27,7 @@ const item = {
 describe("InventoryCard", () => {
   it("renders name, description, and status", () => {
     const { getByText } = render(
-      <InventoryCard item={item} signedIn={false} />,
+      <InventoryCard item={item} signedIn={false} />
     );
     expect(getByText("Arduino Uno")).toBeTruthy();
     expect(getByText("Microcontroller board for prototyping.")).toBeTruthy();
@@ -37,15 +37,15 @@ describe("InventoryCard", () => {
   it("shows Add to cart only when signed in and available", () => {
     const onAddToCart = vi.fn();
     const { getByText, queryByText, rerender } = render(
-      <InventoryCard item={item} signedIn onAddToCart={onAddToCart} />,
+      <InventoryCard item={item} onAddToCart={onAddToCart} signedIn />
     );
     expect(getByText("Add to cart")).toBeTruthy();
     rerender(
       <InventoryCard
         item={{ ...item, status: "reserved" }}
-        signedIn
         onAddToCart={onAddToCart}
-      />,
+        signedIn
+      />
     );
     expect(queryByText("Add to cart")).toBeNull();
   });

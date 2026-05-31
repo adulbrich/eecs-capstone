@@ -6,8 +6,8 @@ export interface EmailMessage {
 }
 
 export interface EmailSender {
-  sendVerification(msg: EmailMessage): Promise<void>;
   sendPasswordReset(msg: EmailMessage): Promise<void>;
+  sendVerification(msg: EmailMessage): Promise<void>;
 }
 
 export function getEmailSender(): EmailSender {

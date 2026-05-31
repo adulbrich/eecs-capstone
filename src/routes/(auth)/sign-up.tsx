@@ -45,8 +45,8 @@ function SignUp() {
     return (
       <div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">
         <div className="island-shell w-full max-w-sm rounded-xl p-8">
-          <h1 className="text-2xl font-semibold">Check your email</h1>
-          <p className="mt-4 text-sm text-muted-foreground">
+          <h1 className="font-semibold text-2xl">Check your email</h1>
+          <p className="mt-4 text-muted-foreground text-sm">
             We sent a verification link to your address. Open it to finish
             signing up. (In dev, check the server console.)
           </p>
@@ -58,57 +58,57 @@ function SignUp() {
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">
       <div className="island-shell w-full max-w-sm rounded-xl p-8">
-        <h1 className="text-2xl font-semibold">Create an account</h1>
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
+        <h1 className="font-semibold text-2xl">Create an account</h1>
+        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
           <div className="space-y-1.5">
             <Label htmlFor="name">Name</Label>
             <Input
+              autoComplete="name"
               id="name"
               name="name"
               placeholder="Your name"
               required
-              autoComplete="name"
             />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input
+              autoComplete="email"
               id="email"
               name="email"
-              type="email"
               placeholder="you@example.com"
               required
-              autoComplete="email"
+              type="email"
             />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="password">Password</Label>
             <Input
+              autoComplete="new-password"
               id="password"
+              minLength={8}
               name="password"
-              type="password"
               placeholder="••••••••"
               required
-              minLength={8}
-              autoComplete="new-password"
+              type="password"
             />
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={loading}>
+          {error && <p className="text-destructive text-sm">{error}</p>}
+          <Button className="w-full" disabled={loading} type="submit">
             {loading ? "Creating account..." : "Sign up"}
           </Button>
         </form>
         <Button
-          type="button"
-          variant="outline"
           className="mt-3 w-full"
           onClick={() => authClient.signIn.social({ provider: "github" })}
+          type="button"
+          variant="outline"
         >
           Continue with GitHub
         </Button>
-        <p className="mt-6 text-sm text-muted-foreground">
+        <p className="mt-6 text-muted-foreground text-sm">
           Already have an account?{" "}
-          <Link to="/sign-in" className="underline">
+          <Link className="underline" to="/sign-in">
             Sign in
           </Link>
         </p>

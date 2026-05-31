@@ -22,15 +22,16 @@ export const Route = createFileRoute("/_authed/admin/inventory/requests")({
   head: () => ({ meta: [{ title: pageTitle("Inventory Requests") }] }),
   beforeLoad: async () => {
     const session = await getSession();
-    if (!session?.user) throw redirect({ to: "/sign-in" });
+    if (!session?.user) {
+      throw redirect({ to: "/sign-in" });
+    }
     if (!["admin", "instructor"].includes(session.user.role ?? "")) {
       throw redirect({ to: "/" });
     }
   },
   loaderDeps: ({ search }) => ({ tab: search.tab }),
-  loader: async ({ deps }) => {
-    return await listInventoryRequests({ data: { tab: deps.tab } });
-  },
+  loader: async ({ deps }) =>
+    await listInventoryRequests({ data: { tab: deps.tab } }),
   component: AdminRequestQueue,
 });
 
@@ -59,24 +60,24 @@ function AdminRequestQueue() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 text-2xl font-semibold">Inventory requests</h1>
+      <h1 className="mt-2 font-semibold text-2xl">Inventory requests</h1>
 
-      <div className="mt-4 flex gap-4 border-b border-border">
+      <div className="mt-4 flex gap-4 border-border border-b">
         {(["pending", "all"] as const).map((t) => (
           <Link
-            key={t}
-            to="/admin/inventory/requests"
-            search={{ tab: t }}
             className={
               t === tab
                 ? "border-b-2 px-2 py-1 font-medium"
                 : "px-2 py-1 text-muted-foreground hover:text-foreground"
             }
+            key={t}
+            search={{ tab: t }}
             style={
               t === tab
                 ? { borderBottomColor: "var(--brand-primary)" }
                 : undefined
             }
+            to="/admin/inventory/requests"
           >
             {t === "pending" ? "Pending" : "All"}
           </Link>
@@ -85,22 +86,21 @@ function AdminRequestQueue() {
 
       <div className="mt-4 space-y-4">
         {batches.length === 0 && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             No requests in this view.
           </p>
         )}
         {batches.map((batch) => (
           <section
-            key={batch.requestId}
             className="rounded-md border border-border bg-card p-4"
+            key={batch.requestId}
           >
             <header className="mb-3">
               <p className="font-medium">
                 {batch.requester.name ?? batch.requester.email}
               </p>
-              <p className="text-xs text-muted-foreground">
-                {batch.requester.email}{" "}
-                {" · "}
+              <p className="text-muted-foreground text-xs">
+                {batch.requester.email} {" · "}
                 {new Date(batch.createdAt).toLocaleString()}
               </p>
               {batch.note && (
@@ -110,13 +110,13 @@ function AdminRequestQueue() {
             <div className="space-y-2">
               {batch.lines.map((row) => (
                 <AdminRequestQueueRow
-                  key={row.line.id}
-                  line={{ id: row.line.id, status: row.line.status }}
                   item={{
                     id: row.item.id,
                     name: row.item.name,
                     status: row.item.status,
                   }}
+                  key={row.line.id}
+                  line={{ id: row.line.id, status: row.line.status }}
                 />
               ))}
             </div>

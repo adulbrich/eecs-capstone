@@ -12,7 +12,7 @@ export async function searchProjectsImpl(data: SearchProjectsInput) {
   ];
   if (trimmed) {
     conditions.push(
-      sql`${projects.searchVector} @@ websearch_to_tsquery('english', ${trimmed})`,
+      sql`${projects.searchVector} @@ websearch_to_tsquery('english', ${trimmed})`
     );
   }
   if (data.programId) {

@@ -6,22 +6,27 @@ import { isStaff } from "#/lib/project-visibility";
 import type { AddCommentInput } from "../comments";
 import { recordCommentNotifications } from "./notify";
 
-export type AuthUser = { id: string; role?: string | null | undefined };
+export interface AuthUser {
+  id: string;
+  role?: string | null | undefined;
+}
 
 export async function addCommentAs(
   viewer: AuthUser,
-  data: AddCommentInput,
+  data: AddCommentInput
 ): Promise<{ id: string }> {
   const visibility = { id: viewer.id, role: viewer.role ?? null };
   const [project] = await db
     .select()
     .from(projects)
     .where(eq(projects.id, data.projectId));
-  if (!project) throw new Error("Project not found");
+  if (!project) {
+    throw new Error("Project not found");
+  }
   // Comments are a private submitter <-> staff dialogue, so only the project
   // submitter and staff may participate.
   const isOwner = project.proposerId === viewer.id;
-  if (!isStaff(visibility) && !isOwner) {
+  if (!(isStaff(visibility) || isOwner)) {
     throw new Error("Forbidden");
   }
   if (data.isInternal && !isStaff(visibility)) {
@@ -34,11 +39,15 @@ export async function addCommentAs(
       .where(
         and(
           eq(projectComments.id, data.parentId),
-          eq(projectComments.projectId, data.projectId),
-        ),
+          eq(projectComments.projectId, data.projectId)
+        )
       );
-    if (!parent) throw new Error("Parent comment not found on this project");
-    if (parent.parentId) throw new Error("Replies are one level deep");
+    if (!parent) {
+      throw new Error("Parent comment not found on this project");
+    }
+    if (parent.parentId) {
+      throw new Error("Replies are one level deep");
+    }
   }
 
   let createdId = "";
@@ -64,7 +73,7 @@ export async function addCommentAs(
         parentId: row.parentId,
         isInternal: row.isInternal,
         content: row.content,
-      },
+      }
     );
   });
   return { id: createdId };

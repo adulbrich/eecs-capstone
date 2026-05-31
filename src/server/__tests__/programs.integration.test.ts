@@ -75,7 +75,7 @@ describe("programs", () => {
       description: null,
     });
     await expect(
-      addProgramInstructorAs(admin, { programId, userId: plainUser.id }),
+      addProgramInstructorAs(admin, { programId, userId: plainUser.id })
     ).rejects.toThrow();
   });
 

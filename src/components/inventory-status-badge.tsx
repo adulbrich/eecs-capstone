@@ -22,11 +22,13 @@ export function InventoryStatusBadge({
   status: Status;
   showRetired?: boolean;
 }) {
-  if (status === "retired" && !showRetired) return null;
+  if (status === "retired" && !showRetired) {
+    return null;
+  }
   const style = STYLES[status];
   return (
     <span
-      className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium"
+      className="inline-flex items-center rounded px-2 py-0.5 font-medium text-xs"
       style={style}
     >
       {LABEL[status]}

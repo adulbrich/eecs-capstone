@@ -4,7 +4,9 @@ import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { processImage } from "../_internal/image-processing";
 
-const fixture = readFileSync(path.join(__dirname, "fixtures", "sample.jpg"));
+const fixture = readFileSync(
+  path.join(import.meta.dirname, "fixtures", "sample.jpg")
+);
 
 describe("processImage", () => {
   it("returns a webp buffer no larger than the max dimensions", async () => {

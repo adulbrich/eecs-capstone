@@ -46,7 +46,7 @@ export const reviewToolSpec = {
         type: "object",
         additionalProperties: false,
         properties: Object.fromEntries(
-          IMPROVABLE_FIELDS.map((field) => [field, fieldProperty]),
+          IMPROVABLE_FIELDS.map((field) => [field, fieldProperty])
         ),
       },
     },
@@ -67,14 +67,16 @@ Your job: propose clearer, more complete, and more professional versions of the 
 Respond only by calling the ${TOOL_NAME} tool with the improved fields. For each field you include, provide the rewritten "suggestion" and a one-line "rationale" explaining what you improved.`;
 
 export function buildUserMessage(
-  fields: Partial<Record<ImprovableField, string>>,
+  fields: Partial<Record<ImprovableField, string>>
 ): string {
   const parts: string[] = [];
   for (const field of IMPROVABLE_FIELDS) {
     const value = fields[field]?.trim();
-    if (!value) continue;
+    if (!value) {
+      continue;
+    }
     parts.push(
-      `<field name="${field}" label="${FIELD_LABELS[field]}">\n${value}\n</field>`,
+      `<field name="${field}" label="${FIELD_LABELS[field]}">\n${value}\n</field>`
     );
   }
   return parts.join("\n\n");
@@ -82,7 +84,7 @@ export function buildUserMessage(
 
 export function parseReviewResponse(
   response: ConverseCommandOutput,
-  model: string,
+  model: string
 ): ReviewResult {
   const content = response.output?.message?.content ?? [];
   const toolBlock = content.find((block) => block.toolUse?.name === TOOL_NAME);
@@ -110,7 +112,7 @@ export function parseReviewResponse(
 
 export async function runProjectReview(
   fields: Partial<Record<ImprovableField, string>>,
-  invoke: ConverseFn = bedrockConverse,
+  invoke: ConverseFn = bedrockConverse
 ): Promise<ReviewResult> {
   const userMessage = buildUserMessage(fields);
   // Nothing to review: skip the (paid) Bedrock call, which also rejects empty

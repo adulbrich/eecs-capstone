@@ -11,12 +11,12 @@ export function CartButton() {
   });
   const count = data?.length ?? 0;
   return (
-    <Button asChild variant="ghost" size="sm" aria-label="Cart">
-      <Link to="/my/items" search={{ tab: "cart" }}>
+    <Button aria-label="Cart" asChild size="sm" variant="ghost">
+      <Link search={{ tab: "cart" }} to="/my/items">
         <ShoppingCart className="h-5 w-5" />
         {count > 0 && (
           <span
-            className="ml-1 rounded px-1.5 text-xs font-semibold"
+            className="ml-1 rounded px-1.5 font-semibold text-xs"
             style={{
               background: "var(--brand-primary)",
               color: "white",

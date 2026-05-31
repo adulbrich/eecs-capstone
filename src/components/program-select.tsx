@@ -8,18 +8,18 @@ import {
   SelectValue,
 } from "./ui/select";
 
-type Program = {
-  id: string;
+interface Program {
   courseId: string;
   courseName: string;
-};
+  id: string;
+}
 
-type Props = {
-  value: string;
-  onChange: (value: string) => void;
+interface Props {
   allowEmpty?: boolean;
   id?: string;
-};
+  onChange: (value: string) => void;
+  value: string;
+}
 
 // Radix Select reserves the empty string, so the "(no program)" choice uses
 // a sentinel. The form still stores "" for no program.
@@ -46,10 +46,10 @@ export function ProgramSelect({
 
   return (
     <Select
-      value={value === "" ? NONE : value}
       onValueChange={(v) => onChange(v === NONE ? "" : v)}
+      value={value === "" ? NONE : value}
     >
-      <SelectTrigger id={id} className="mt-1 w-full" aria-label="Program">
+      <SelectTrigger aria-label="Program" className="mt-1 w-full" id={id}>
         <SelectValue placeholder="Select a program" />
       </SelectTrigger>
       <SelectContent>

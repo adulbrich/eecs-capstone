@@ -1,5 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
@@ -39,21 +43,23 @@ function MyItems() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
-      <h1 className="text-2xl font-semibold">My Items</h1>
-      <div className="mt-4 flex gap-4 border-b border-border">
+      <h1 className="font-semibold text-2xl">My Items</h1>
+      <div className="mt-4 flex gap-4 border-border border-b">
         {(["cart", "active", "history"] as const).map((t) => (
           <button
-            key={t}
-            type="button"
-            onClick={() => navigate({ search: () => ({ tab: t }) })}
             className={
               t === tab
                 ? "border-b-2 px-2 py-1 font-medium"
                 : "px-2 py-1 text-muted-foreground hover:text-foreground"
             }
+            key={t}
+            onClick={() => navigate({ search: () => ({ tab: t }) })}
             style={
-              t === tab ? { borderBottomColor: "var(--brand-primary)" } : undefined
+              t === tab
+                ? { borderBottomColor: "var(--brand-primary)" }
+                : undefined
             }
+            type="button"
           >
             {t === "cart"
               ? `Cart (${data.cart.length})`
@@ -71,20 +77,20 @@ function MyItems() {
           )}
           {data.cart.map((row) => (
             <div
-              key={row.itemId}
               className="flex items-center justify-between rounded-md border border-border bg-card p-3"
+              key={row.itemId}
             >
               <div>
                 <p className="font-medium">{row.name}</p>
                 <InventoryStatusBadge status={row.status as "available"} />
               </div>
               <Button
-                variant="outline"
-                size="sm"
                 onClick={async () => {
                   await removeFromCart({ data: { itemId: row.itemId } });
                   await refresh();
                 }}
+                size="sm"
+                variant="outline"
               >
                 Remove
               </Button>
@@ -93,9 +99,9 @@ function MyItems() {
           {data.cart.length > 0 && (
             <div className="space-y-2 rounded-md border border-border bg-card p-3">
               <Textarea
-                value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Optional note for staff"
+                value={note}
               />
               <Button
                 onClick={async () => {
@@ -106,7 +112,7 @@ function MyItems() {
                   await refresh();
                   if (result.skipped.length > 0) {
                     alert(
-                      `Submitted ${result.submitted.length}; skipped ${result.skipped.length} (no longer available).`,
+                      `Submitted ${result.submitted.length}; skipped ${result.skipped.length} (no longer available).`
                     );
                   }
                   navigate({ search: () => ({ tab: "active" }) });
@@ -130,33 +136,33 @@ function MyItems() {
               item.status !== "checked_out";
             return (
               <div
-                key={line.id}
                 className="flex items-center justify-between rounded-md border border-border bg-card p-3"
+                key={line.id}
               >
                 <div>
                   <p className="font-medium">{item.name}</p>
                   <InventoryStatusBadge status={item.status as "available"} />
                   {line.pickupBy && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                       Pick up by {line.pickupBy.toLocaleDateString()}
                     </p>
                   )}
                   {line.dueAt && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                       Due {line.dueAt.toLocaleDateString()}
                     </p>
                   )}
                 </div>
                 {canCancel && (
                   <Button
-                    variant="outline"
-                    size="sm"
                     onClick={async () => {
                       await cancelRequestItem({
                         data: { requestItemId: line.id, note: null },
                       });
                       await refresh();
                     }}
+                    size="sm"
+                    variant="outline"
                   >
                     Cancel
                   </Button>
@@ -174,11 +180,13 @@ function MyItems() {
           )}
           {data.history.map(({ line, item }) => (
             <div
-              key={line.id}
               className="rounded-md border border-border bg-card p-3"
+              key={line.id}
             >
               <p className="font-medium">{item.name}</p>
-              <p className="text-xs text-muted-foreground">Status: {line.status}</p>
+              <p className="text-muted-foreground text-xs">
+                Status: {line.status}
+              </p>
               {line.closedReason && (
                 <p className="mt-1 text-sm">{line.closedReason}</p>
               )}

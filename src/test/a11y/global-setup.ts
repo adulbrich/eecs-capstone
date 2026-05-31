@@ -1,21 +1,21 @@
-import { config as loadDotenv } from 'dotenv';
-import { Pool } from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
-import { chromium, expect } from '@playwright/test';
-import { writeFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import * as schema from '../../db/schema';
+import { writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { chromium } from "@playwright/test";
+import { config as loadDotenv } from "dotenv";
+import { eq } from "drizzle-orm";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import * as schema from "../../db/schema";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = "http://localhost:3000";
 // Must match the value set by scripts/seed-dev.ts.
-const PASSWORD = 'password';
+const PASSWORD = "password";
 
 export default async function globalSetup() {
-  loadDotenv({ path: ['.env.local', '.env'] });
+  loadDotenv({ path: [".env.local", ".env"] });
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const db = drizzle(pool, { schema });
@@ -27,8 +27,8 @@ export default async function globalSetup() {
   }
 
   await Promise.all([
-    saveStorageState('user@example.com', join(__dirname, '.user-auth.json')),
-    saveStorageState('admin@example.com', join(__dirname, '.admin-auth.json')),
+    saveStorageState("user@example.com", join(__dirname, ".user-auth.json")),
+    saveStorageState("admin@example.com", join(__dirname, ".admin-auth.json")),
   ]);
 }
 
@@ -36,20 +36,20 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   const [owner] = await db
     .select()
     .from(schema.user)
-    .where(eq(schema.user.email, 'user@example.com'));
+    .where(eq(schema.user.email, "user@example.com"));
   if (!owner) {
     throw new Error(
-      'user@example.com not found in database. Run: npm run db:seed:dev',
+      "user@example.com not found in database. Run: npm run db:seed:dev"
     );
   }
 
   const [instructor] = await db
     .select()
     .from(schema.user)
-    .where(eq(schema.user.email, 'instructor@example.com'));
+    .where(eq(schema.user.email, "instructor@example.com"));
   if (!instructor) {
     throw new Error(
-      'instructor@example.com not found in database. Run: npm run db:seed:dev',
+      "instructor@example.com not found in database. Run: npm run db:seed:dev"
     );
   }
   // instructor is only used as a program_instructors DB fixture — no auth session needed.
@@ -57,15 +57,15 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   const [adminUser] = await db
     .select()
     .from(schema.user)
-    .where(eq(schema.user.email, 'admin@example.com'));
+    .where(eq(schema.user.email, "admin@example.com"));
   if (!adminUser) {
     throw new Error(
-      'admin@example.com not found in database. Run: npm run db:seed:dev',
+      "admin@example.com not found in database. Run: npm run db:seed:dev"
     );
   }
-  if (adminUser.role !== 'admin') {
+  if (adminUser.role !== "admin") {
     throw new Error(
-      `admin@example.com has role '${adminUser.role}', expected 'admin'. Run: npm run db:seed:dev`,
+      `admin@example.com has role '${adminUser.role}', expected 'admin'. Run: npm run db:seed:dev`
     );
   }
 
@@ -77,11 +77,11 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   let [category] = await db
     .select()
     .from(schema.categories)
-    .where(eq(schema.categories.name, 'a11y-test-category'));
+    .where(eq(schema.categories.name, "a11y-test-category"));
   if (!category) {
     [category] = await db
       .insert(schema.categories)
-      .values({ name: 'a11y-test-category', type: 'technology' })
+      .values({ name: "a11y-test-category", type: "technology" })
       .returning();
   }
 
@@ -89,11 +89,14 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   let [program] = await db
     .select()
     .from(schema.programs)
-    .where(eq(schema.programs.courseId, 'A11Y-101'));
+    .where(eq(schema.programs.courseId, "A11Y-101"));
   if (!program) {
     [program] = await db
       .insert(schema.programs)
-      .values({ courseId: 'A11Y-101', courseName: 'Accessibility Test Program' })
+      .values({
+        courseId: "A11Y-101",
+        courseName: "Accessibility Test Program",
+      })
       .returning();
   }
 
@@ -107,14 +110,14 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   let [project] = await db
     .select()
     .from(schema.projects)
-    .where(eq(schema.projects.title, 'A11Y Test Project'));
+    .where(eq(schema.projects.title, "A11Y Test Project"));
   if (!project) {
     [project] = await db
       .insert(schema.projects)
       .values({
-        title: 'A11Y Test Project',
-        description: 'A project created for accessibility testing.',
-        status: 'published',
+        title: "A11Y Test Project",
+        description: "A project created for accessibility testing.",
+        status: "published",
         proposerId: owner.id,
       })
       .returning();
@@ -124,19 +127,19 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   let [item] = await db
     .select()
     .from(schema.inventoryItems)
-    .where(eq(schema.inventoryItems.name, 'A11Y Test Item'));
+    .where(eq(schema.inventoryItems.name, "A11Y Test Item"));
   if (!item) {
     [item] = await db
       .insert(schema.inventoryItems)
       .values({
-        name: 'A11Y Test Item',
-        description: 'An item for accessibility testing.',
+        name: "A11Y Test Item",
+        description: "An item for accessibility testing.",
       })
       .returning();
   }
 
   writeFileSync(
-    join(__dirname, '.fixtures.json'),
+    join(__dirname, ".fixtures.json"),
     JSON.stringify(
       {
         projectId: project.id,
@@ -146,8 +149,8 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
         userId: owner.id,
       },
       null,
-      2,
-    ),
+      2
+    )
   );
 }
 
@@ -157,22 +160,24 @@ async function saveStorageState(email: string, outputPath: string) {
   const page = await context.newPage();
 
   try {
-    await page.goto(`${BASE_URL}/sign-in`, { waitUntil: 'load' });
+    await page.goto(`${BASE_URL}/sign-in`, { waitUntil: "load" });
     // Wait for React hydration before interacting with the form.
     await page.waitForFunction(
       () => {
-        const form = document.querySelector('form');
-        if (!form) return false;
+        const form = document.querySelector("form");
+        if (!form) {
+          return false;
+        }
         return Object.keys(form).some(
-          (k) => k.startsWith('__reactFiber') || k.startsWith('__reactProps'),
+          (k) => k.startsWith("__reactFiber") || k.startsWith("__reactProps")
         );
       },
-      { timeout: 15_000 },
+      { timeout: 15_000 }
     );
     await page.fill('input[name="email"]', email);
     await page.fill('input[name="password"]', PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL((url) => !url.pathname.startsWith('/sign-in'), {
+    await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"), {
       timeout: 15_000,
     });
     await context.storageState({ path: outputPath });

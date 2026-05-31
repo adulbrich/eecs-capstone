@@ -5,7 +5,10 @@ import { projects, user } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { canEditProject } from "#/lib/project-visibility";
 
-type AuthUser = { id: string; role?: string | null | undefined };
+interface AuthUser {
+  id: string;
+  role?: string | null | undefined;
+}
 
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
@@ -30,10 +33,12 @@ function assertImageFile(file: unknown): asserts file is File {
 
 export async function uploadProjectImageAs(
   viewer: AuthUser,
-  form: FormData,
+  form: FormData
 ): Promise<{ key: string }> {
   const projectId = String(form.get("projectId") ?? "");
-  if (!projectId) throw new Error("Missing projectId");
+  if (!projectId) {
+    throw new Error("Missing projectId");
+  }
   const file = form.get("file");
   assertImageFile(file);
 
@@ -41,7 +46,9 @@ export async function uploadProjectImageAs(
     .select()
     .from(projects)
     .where(eq(projects.id, projectId));
-  if (!project) throw new Error("Project not found");
+  if (!project) {
+    throw new Error("Project not found");
+  }
   if (!canEditProject(project, { id: viewer.id, role: viewer.role ?? null })) {
     throw new Error("Forbidden");
   }

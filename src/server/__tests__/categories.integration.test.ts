@@ -71,7 +71,7 @@ describe("categories", () => {
   it("non-staff cannot create", async () => {
     const u = await makeUser(`u-${Date.now()}@x.com`, "user");
     await expect(
-      createCategoryAs(u, { name: "x", type: "technology" }),
+      createCategoryAs(u, { name: "x", type: "technology" })
     ).rejects.toThrow();
   });
 

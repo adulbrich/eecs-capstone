@@ -132,7 +132,7 @@ describe("comments + notifications", () => {
         projectId: pid,
         content: "x",
         isInternal: true,
-      }),
+      })
     ).rejects.toThrow();
   });
 
@@ -158,7 +158,7 @@ describe("comments + notifications", () => {
         content: "c",
         parentId: reply,
         isInternal: false,
-      }),
+      })
     ).rejects.toThrow();
   });
 });

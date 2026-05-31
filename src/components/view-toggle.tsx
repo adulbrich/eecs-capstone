@@ -18,7 +18,9 @@ export function ViewToggle(props: Props) {
   const current = props.value ?? props.current!;
 
   function setMode(view: "card" | "row") {
-    if (view === current) return;
+    if (view === current) {
+      return;
+    }
     if (props.onChange) {
       props.onChange(view);
       return;
@@ -35,22 +37,22 @@ export function ViewToggle(props: Props) {
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: aria role=group with label is the right pattern for paired toggle buttons
-    <div className="flex" role="group" aria-label="View mode">
+    <div aria-label="View mode" className="flex" role="group">
       <button
-        type="button"
-        onClick={() => setMode("card")}
         aria-label="Card view"
         aria-pressed={current === "card"}
         className={`${base} rounded-l-md ${current === "card" ? active : inactive}`}
+        onClick={() => setMode("card")}
+        type="button"
       >
         <LayoutGrid className="h-4 w-4" />
       </button>
       <button
-        type="button"
-        onClick={() => setMode("row")}
         aria-label="Row view"
         aria-pressed={current === "row"}
         className={`${base} -ml-px rounded-r-md ${current === "row" ? active : inactive}`}
+        onClick={() => setMode("row")}
+        type="button"
       >
         <List className="h-4 w-4" />
       </button>

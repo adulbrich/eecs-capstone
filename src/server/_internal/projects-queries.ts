@@ -45,7 +45,9 @@ async function getViewer(): Promise<Viewer> {
 
 export async function listMyProjectsImpl(data: { status: StatusFilter }) {
   const viewer = await getViewer();
-  if (!viewer) return { rows: [] };
+  if (!viewer) {
+    return { rows: [] };
+  }
   const conditions = [
     eq(projects.proposerId, viewer.id),
     isNull(projects.deletedAt),
@@ -67,7 +69,9 @@ export async function listAdminProjectsImpl(data: {
   includeSoftDeleted: boolean;
 }) {
   const viewer = await getViewer();
-  if (!isStaff(viewer)) throw new Error("Forbidden");
+  if (!isStaff(viewer)) {
+    throw new Error("Forbidden");
+  }
   const conditions = [];
   if (data.status !== "all") {
     conditions.push(eq(projects.status, data.status as ProjectStatus));
@@ -142,7 +146,9 @@ export async function getProjectImpl(data: { id: string }) {
 
 export async function listProjectEditLogImpl(data: { id: string }) {
   const viewer = await getViewer();
-  if (!isStaff(viewer)) throw new Error("Forbidden");
+  if (!isStaff(viewer)) {
+    throw new Error("Forbidden");
+  }
   const rows = await db
     .select()
     .from(projectEditLog)
@@ -163,7 +169,7 @@ export async function listProjectCommentsImpl(data: { id: string }) {
     .select()
     .from(projects)
     .where(eq(projects.id, data.id));
-  if (!project || !canSeeProject(project, viewer)) {
+  if (!(project && canSeeProject(project, viewer))) {
     throw new Error("Forbidden");
   }
   const rows = await db

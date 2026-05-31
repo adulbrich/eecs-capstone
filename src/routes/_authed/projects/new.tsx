@@ -19,12 +19,9 @@ function NewProject() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
-      <h1 className="text-2xl font-semibold">New project</h1>
+      <h1 className="font-semibold text-2xl">New project</h1>
       <div className="mt-6">
         <ProjectForm
-          showNotes={isStaff}
-          showCategories={isStaff}
-          submitLabel="Create draft"
           onSubmit={async (values, categoryIds, pendingImage) => {
             const { id } = await createProject({
               data: {
@@ -49,6 +46,9 @@ function NewProject() {
               params: { projectId: id },
             });
           }}
+          showCategories={isStaff}
+          showNotes={isStaff}
+          submitLabel="Create draft"
         />
       </div>
     </div>

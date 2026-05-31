@@ -45,7 +45,9 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
   head: () => ({ meta: [{ title: pageTitle("Projects") }] }),
   beforeLoad: async () => {
     const session = await getSession();
-    if (!session?.user) throw redirect({ to: "/sign-in" });
+    if (!session?.user) {
+      throw redirect({ to: "/sign-in" });
+    }
     if (!["admin", "instructor"].includes(session.user.role ?? "")) {
       throw redirect({ to: "/" });
     }
@@ -54,14 +56,13 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
     status: search.status,
     includeSoftDeleted: search.includeSoftDeleted,
   }),
-  loader: async ({ deps }) => {
-    return await listAdminProjects({
+  loader: async ({ deps }) =>
+    await listAdminProjects({
       data: {
         status: deps.status,
         includeSoftDeleted: deps.includeSoftDeleted,
       },
-    });
-  },
+    }),
   component: AdminProjects,
 });
 
@@ -74,12 +75,12 @@ function AdminProjects() {
 
   const softDeleteToggle = (
     <Link
-      to="/admin/projects"
+      className="text-muted-foreground text-xs hover:text-foreground"
       search={(prev) => ({
         ...prev,
         includeSoftDeleted: !includeSoftDeleted,
       })}
-      className="text-xs text-muted-foreground hover:text-foreground"
+      to="/admin/projects"
     >
       {includeSoftDeleted ? "Hide soft-deleted" : "Show soft-deleted"}
     </Link>
@@ -100,12 +101,11 @@ function AdminProjects() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 text-2xl font-semibold">Projects</h1>
+      <h1 className="mt-2 font-semibold text-2xl">Projects</h1>
 
       {/* Mobile: Select + soft-deleted toggle */}
       <div className="mt-4 space-y-2 md:hidden">
         <Select
-          value={status}
           onValueChange={(s) =>
             void navigate({
               to: "/admin/projects",
@@ -115,6 +115,7 @@ function AdminProjects() {
               }),
             })
           }
+          value={status}
         >
           <SelectTrigger className="w-full">
             <SelectValue />
@@ -132,22 +133,22 @@ function AdminProjects() {
 
       {/* Desktop: tab strip + soft-deleted toggle */}
       <div className="mt-4 hidden items-end justify-between md:flex">
-        <div className="flex border-b border-border text-sm">
+        <div className="flex border-border border-b text-sm">
           {STATUSES.map((s) => (
             <Link
-              key={s}
-              to="/admin/projects"
-              search={(prev) => ({ ...prev, status: s })}
               className={
                 s === status
                   ? "-mb-px border-b-2 px-3 py-1.5 font-medium"
                   : "px-3 py-1.5 text-muted-foreground hover:text-foreground"
               }
+              key={s}
+              search={(prev) => ({ ...prev, status: s })}
               style={
                 s === status
                   ? { borderBottomColor: "var(--brand-primary)" }
                   : undefined
               }
+              to="/admin/projects"
             >
               {label(s)}
             </Link>
@@ -157,7 +158,7 @@ function AdminProjects() {
       </div>
       <div className="mt-6 flex flex-col gap-3">
         {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             No projects in this view.
           </p>
         ) : (

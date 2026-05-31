@@ -42,7 +42,7 @@ function baseProject(title: string, description: string | null = null) {
 async function publish(
   admin: { id: string; role: string | null },
   title: string,
-  body: Partial<ReturnType<typeof baseProject>> = {},
+  body: Partial<ReturnType<typeof baseProject>> = {}
 ) {
   const { id } = await createProjectAs(admin, {
     ...baseProject(title),

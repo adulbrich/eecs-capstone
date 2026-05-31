@@ -22,21 +22,21 @@ export const brand = {
   colorWhite: "#FFFFFF", // Bucktooth White
 } as const satisfies Brand;
 
-export type Brand = {
-  institutionName: string;
-  institutionShort: string;
-  programName: string;
-  logoUrl: string;
-  logoAlt: string;
-  logoUrlLight: string | undefined;
-  faviconUrl: string;
-  supportEmail: string;
-  institutionUrl: string;
+export interface Brand {
+  colorBlack: string;
+  colorOnPrimary: string;
   colorPrimary: string;
   colorPrimaryDark: string;
   colorPrimaryLight: string;
   colorPrimaryTint: string;
-  colorOnPrimary: string;
-  colorBlack: string;
   colorWhite: string;
-};
+  faviconUrl: string;
+  institutionName: string;
+  institutionShort: string;
+  institutionUrl: string;
+  logoAlt: string;
+  logoUrl: string;
+  logoUrlLight: string | undefined;
+  programName: string;
+  supportEmail: string;
+}

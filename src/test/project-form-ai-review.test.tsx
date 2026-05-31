@@ -30,13 +30,13 @@ function renderForm() {
   return render(
     <ProjectForm
       enableAiReview
-      projectId="00000000-0000-0000-0000-000000000001"
       initial={{ title: "Old title", description: "Old description" }}
-      showNotes={false}
-      showCategories={false}
-      submitLabel="Save"
       onSubmit={vi.fn()}
-    />,
+      projectId="00000000-0000-0000-0000-000000000001"
+      showCategories={false}
+      showNotes={false}
+      submitLabel="Save"
+    />
   );
 }
 
@@ -61,7 +61,7 @@ describe("ProjectForm AI review", () => {
 
     await waitFor(() => {
       expect((getByLabelText("Description") as HTMLTextAreaElement).value).toBe(
-        "Improved description.",
+        "Improved description."
       );
     });
   });
@@ -83,10 +83,10 @@ describe("ProjectForm AI review", () => {
 
     await waitFor(() => {
       expect((getByLabelText("Title") as HTMLInputElement).value).toBe(
-        "New Title",
+        "New Title"
       );
       expect((getByLabelText("Description") as HTMLTextAreaElement).value).toBe(
-        "New Description",
+        "New Description"
       );
     });
   });
@@ -111,7 +111,7 @@ describe("ProjectForm AI review", () => {
 
     await findByText("Bedrock unavailable");
     expect((getByText("Review with AI") as HTMLButtonElement).disabled).toBe(
-      false,
+      false
     );
   });
 });

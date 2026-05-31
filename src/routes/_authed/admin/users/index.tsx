@@ -43,12 +43,16 @@ export const Route = createFileRoute("/_authed/admin/users/")({
   head: () => ({ meta: [{ title: pageTitle("Users") }] }),
   beforeLoad: async () => {
     const session = await getSession();
-    if (!session?.user) throw redirect({ to: "/sign-in" });
-    if (session.user.role !== "admin") throw redirect({ to: "/admin" });
+    if (!session?.user) {
+      throw redirect({ to: "/sign-in" });
+    }
+    if (session.user.role !== "admin") {
+      throw redirect({ to: "/admin" });
+    }
   },
   loaderDeps: ({ search }) => search,
-  loader: async ({ deps }) => {
-    return await listUsers({
+  loader: async ({ deps }) =>
+    await listUsers({
       data: {
         q: deps.q,
         role: deps.role,
@@ -56,8 +60,7 @@ export const Route = createFileRoute("/_authed/admin/users/")({
         page: deps.page,
         pageSize: 20,
       },
-    });
-  },
+    }),
   component: UsersAdmin,
 });
 
@@ -97,24 +100,23 @@ function UsersAdmin() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 text-2xl font-semibold">Users</h1>
+      <h1 className="mt-2 font-semibold text-2xl">Users</h1>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <div>
           <Label htmlFor="user-search">Search</Label>
           <Input
+            className="mt-1 w-48"
             id="user-search"
-            type="search"
-            value={qDraft}
             onChange={(e) => setQDraft(e.target.value)}
             placeholder="Email or name"
-            className="mt-1 w-48"
+            type="search"
+            value={qDraft}
           />
         </div>
         <div>
           <Label htmlFor="user-role">Role</Label>
           <Select
-            value={role ?? "_all_"}
             onValueChange={(v) =>
               void navigate({
                 search: (prev) => ({
@@ -126,8 +128,9 @@ function UsersAdmin() {
                 }),
               })
             }
+            value={role ?? "_all_"}
           >
-            <SelectTrigger id="user-role" className="mt-1 w-36">
+            <SelectTrigger className="mt-1 w-36" id="user-role">
               <SelectValue placeholder="All roles" />
             </SelectTrigger>
             <SelectContent>
@@ -160,20 +163,20 @@ function UsersAdmin() {
       <AdminTable columns={["Email", "Name", "Role", "Banned", ""]}>
         {rows.map((u) => (
           <tr key={u.id}>
-            <td data-label="Email" className="border border-border p-2">
+            <td className="border border-border p-2" data-label="Email">
               {u.email}
             </td>
-            <td data-label="Name" className="border border-border p-2">
+            <td className="border border-border p-2" data-label="Name">
               {u.name ?? "(none)"}
             </td>
-            <td data-label="Role" className="border border-border p-2">
+            <td className="border border-border p-2" data-label="Role">
               {u.role}
             </td>
-            <td data-label="Banned" className="border border-border p-2">
+            <td className="border border-border p-2" data-label="Banned">
               {u.banned ? "yes" : ""}
             </td>
             <td className="border border-border p-2">
-              <Link to="/admin/users/$userId" params={{ userId: u.id }}>
+              <Link params={{ userId: u.id }} to="/admin/users/$userId">
                 Manage
               </Link>
             </td>
@@ -183,13 +186,13 @@ function UsersAdmin() {
 
       <div className="mt-6 flex items-center justify-between text-sm">
         <Link
-          to="/admin/users"
-          search={(prev) => ({ ...prev, page: Math.max(1, page - 1) })}
           className={
             page <= 1
               ? "pointer-events-none text-muted-foreground/40"
               : "hover:underline"
           }
+          search={(prev) => ({ ...prev, page: Math.max(1, page - 1) })}
+          to="/admin/users"
         >
           Previous
         </Link>
@@ -197,16 +200,16 @@ function UsersAdmin() {
           Page {page} of {totalPages}
         </span>
         <Link
-          to="/admin/users"
-          search={(prev) => ({
-            ...prev,
-            page: Math.min(totalPages, page + 1),
-          })}
           className={
             page >= totalPages
               ? "pointer-events-none text-muted-foreground/40"
               : "hover:underline"
           }
+          search={(prev) => ({
+            ...prev,
+            page: Math.min(totalPages, page + 1),
+          })}
+          to="/admin/users"
         >
           Next
         </Link>

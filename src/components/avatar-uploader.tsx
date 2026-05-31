@@ -6,10 +6,10 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Save failed. Please try again.";
 }
 
-type Props = {
+interface Props {
   currentKey: string | null;
   onChanged: () => void;
-};
+}
 
 export function AvatarUploader({ currentKey, onChanged }: Props) {
   const [busy, setBusy] = useState(false);
@@ -37,14 +37,14 @@ export function AvatarUploader({ currentKey, onChanged }: Props) {
   return (
     <div className="space-y-2">
       <ImageUploader
-        currentKey={currentKey}
         aspect={1}
-        maxWidth={512}
+        currentKey={currentKey}
         maxHeight={512}
+        maxWidth={512}
         onChange={(f) => void handleChange(f)}
       />
-      {busy && <p className="text-sm text-neutral-500">Saving avatar...</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {busy && <p className="text-neutral-500 text-sm">Saving avatar...</p>}
+      {error && <p className="text-red-600 text-sm">{error}</p>}
     </div>
   );
 }

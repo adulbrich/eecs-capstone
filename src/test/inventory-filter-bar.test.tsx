@@ -7,21 +7,21 @@ import { InventoryFilterBar } from "#/components/inventory-filter-bar";
 afterEach(cleanup);
 
 function renderBar(
-  overrides: Partial<Parameters<typeof InventoryFilterBar>[0]> = {},
+  overrides: Partial<Parameters<typeof InventoryFilterBar>[0]> = {}
 ) {
   return render(
     <InventoryFilterBar
-      q=""
-      status={null}
-      category={null}
-      view="card"
       categories={[]}
+      category={null}
+      onCategoryChange={() => {}}
       onQChange={() => {}}
       onStatusChange={() => {}}
-      onCategoryChange={() => {}}
       onViewChange={() => {}}
+      q=""
+      status={null}
+      view="card"
       {...overrides}
-    />,
+    />
   );
 }
 

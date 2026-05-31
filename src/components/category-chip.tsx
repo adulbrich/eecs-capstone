@@ -1,8 +1,8 @@
-type Category = {
+interface Category {
   id: string;
   name: string;
   type: string;
-};
+}
 
 export function CategoryChip({ category }: { category: Category }) {
   return (

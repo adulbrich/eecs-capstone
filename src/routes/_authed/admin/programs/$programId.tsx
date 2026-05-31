@@ -27,7 +27,9 @@ export const Route = createFileRoute("/_authed/admin/programs/$programId")({
   head: () => ({ meta: [{ title: pageTitle("Edit Program") }] }),
   beforeLoad: async () => {
     const session = await getSession();
-    if (!session?.user) throw redirect({ to: "/sign-in" });
+    if (!session?.user) {
+      throw redirect({ to: "/sign-in" });
+    }
     if (!["admin", "instructor"].includes(session.user.role ?? "")) {
       throw redirect({ to: "/" });
     }
@@ -68,7 +70,9 @@ function ProgramEdit() {
       projectCount > 0
         ? `Delete program "${program.courseName}"? ${projectCount} project(s) will be unlinked but kept.`
         : `Delete program "${program.courseName}"?`;
-    if (!confirm(msg)) return;
+    if (!confirm(msg)) {
+      return;
+    }
     setError(null);
     try {
       await deleteProgram({ data: { id: program.id } });
@@ -99,59 +103,59 @@ function ProgramEdit() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 text-2xl font-semibold">Edit program</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
+      <h1 className="mt-2 font-semibold text-2xl">Edit program</h1>
+      <p className="mt-1 text-muted-foreground text-sm">
         {projectCount} linked project{projectCount === 1 ? "" : "s"}
       </p>
 
-      <form onSubmit={onSave} className="mt-6 space-y-3">
+      <form className="mt-6 space-y-3" onSubmit={onSave}>
         <div className="space-y-1.5">
           <Label htmlFor="course-id">Course ID</Label>
           <Input
             id="course-id"
-            value={courseId}
             onChange={(e) => setCourseId(e.target.value)}
             required
+            value={courseId}
           />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="course-name">Course name</Label>
           <Input
             id="course-name"
-            value={courseName}
             onChange={(e) => setCourseName(e.target.value)}
             required
+            value={courseName}
           />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="course-desc">Description</Label>
           <Textarea
             id="course-desc"
-            value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
+            value={description}
           />
         </div>
         <div className="flex gap-2">
-          <Button type="submit" size="sm">
+          <Button size="sm" type="submit">
             Save
           </Button>
           <Button
+            onClick={() => void onDelete()}
+            size="sm"
             type="button"
             variant="destructive"
-            size="sm"
-            onClick={() => void onDelete()}
           >
             Delete
           </Button>
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-destructive text-sm">{error}</p>}
       </form>
 
       <InstructorManager
-        programId={program.id}
         initial={instructors}
         onChanged={() => router.invalidate()}
+        programId={program.id}
       />
     </div>
   );

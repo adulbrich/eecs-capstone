@@ -45,22 +45,22 @@ function ResetPassword() {
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">
       <div className="island-shell w-full max-w-sm rounded-xl p-8">
-        <h1 className="text-2xl font-semibold">Choose a new password</h1>
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
+        <h1 className="font-semibold text-2xl">Choose a new password</h1>
+        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
           <div className="space-y-1.5">
             <Label htmlFor="password">New password</Label>
             <Input
+              autoComplete="new-password"
               id="password"
+              minLength={8}
               name="password"
-              type="password"
               placeholder="••••••••"
               required
-              minLength={8}
-              autoComplete="new-password"
+              type="password"
             />
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={loading}>
+          {error && <p className="text-destructive text-sm">{error}</p>}
+          <Button className="w-full" disabled={loading} type="submit">
             {loading ? "Resetting..." : "Reset password"}
           </Button>
         </form>

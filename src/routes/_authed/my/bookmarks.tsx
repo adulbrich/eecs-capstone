@@ -14,10 +14,10 @@ function MyBookmarks() {
   return (
     <div className="px-4 py-6 md:p-8">
       <div className="mx-auto max-w-4xl">
-        <h1 className="text-2xl font-semibold">My bookmarks</h1>
+        <h1 className="font-semibold text-2xl">My bookmarks</h1>
       </div>
       {rows.length === 0 ? (
-        <p className="mx-auto mt-6 max-w-4xl text-sm text-muted-foreground">
+        <p className="mx-auto mt-6 max-w-4xl text-muted-foreground text-sm">
           No bookmarks yet. Browse <Link to="/projects">projects</Link> and
           click the bookmark icon to save one.
         </p>

@@ -9,7 +9,7 @@ export function ImageOrFallback({
   className: string;
 }) {
   if (src) {
-    return <img src={src} alt="" className={className} loading="lazy" />;
+    return <img alt="" className={className} loading="lazy" src={src} />;
   }
   return (
     <div
@@ -20,8 +20,8 @@ export function ImageOrFallback({
       }}
     >
       <ImageIcon
-        className="size-8 text-[var(--text-secondary)] opacity-30"
         aria-hidden
+        className="size-8 text-[var(--text-secondary)] opacity-30"
       />
     </div>
   );

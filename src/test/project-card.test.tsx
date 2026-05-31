@@ -36,7 +36,7 @@ describe("ProjectCard", () => {
 
   it("shows the status badge for archived projects", () => {
     const { getByText } = render(
-      <ProjectCard project={{ ...base, status: "archived" }} />,
+      <ProjectCard project={{ ...base, status: "archived" }} />
     );
     expect(getByText("archived")).toBeTruthy();
   });

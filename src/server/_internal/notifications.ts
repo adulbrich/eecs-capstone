@@ -20,7 +20,7 @@ export async function unreadCountImpl() {
     .select({ value: count() })
     .from(notifications)
     .where(
-      and(eq(notifications.userId, viewer.id), eq(notifications.read, false)),
+      and(eq(notifications.userId, viewer.id), eq(notifications.read, false))
     );
   return { count: value };
 }
@@ -31,7 +31,7 @@ export async function markReadImpl(data: { id: string }) {
     .update(notifications)
     .set({ read: true })
     .where(
-      and(eq(notifications.id, data.id), eq(notifications.userId, viewer.id)),
+      and(eq(notifications.id, data.id), eq(notifications.userId, viewer.id))
     );
   return { id: data.id };
 }

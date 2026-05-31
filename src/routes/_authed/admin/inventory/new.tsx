@@ -1,4 +1,9 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  redirect,
+  useNavigate,
+} from "@tanstack/react-router";
 import { InventoryForm } from "#/components/inventory-form";
 import {
   Breadcrumb,
@@ -10,13 +15,14 @@ import {
 } from "#/components/ui/breadcrumb";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
-import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authed/admin/inventory/new")({
   head: () => ({ meta: [{ title: pageTitle("New Inventory Item") }] }),
   beforeLoad: async () => {
     const session = await getSession();
-    if (!session?.user) throw redirect({ to: "/sign-in" });
+    if (!session?.user) {
+      throw redirect({ to: "/sign-in" });
+    }
     if (!["admin", "instructor"].includes(session.user.role ?? "")) {
       throw redirect({ to: "/" });
     }
@@ -47,16 +53,16 @@ function NewInventoryItem() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-2 text-2xl font-semibold">New inventory item</h1>
+      <h1 className="mt-2 font-semibold text-2xl">New inventory item</h1>
       <div className="mt-6">
         <InventoryForm
-          submitLabel="Create item"
           onSaved={(itemId) =>
             navigate({
               to: "/admin/inventory/$itemId",
               params: { itemId },
             })
           }
+          submitLabel="Create item"
         />
       </div>
     </div>

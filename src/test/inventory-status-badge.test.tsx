@@ -10,7 +10,7 @@ describe("InventoryStatusBadge", () => {
   });
   it("shows retired when showRetired is true", () => {
     const { getByText } = render(
-      <InventoryStatusBadge status="retired" showRetired />,
+      <InventoryStatusBadge showRetired status="retired" />
     );
     expect(getByText("Retired")).toBeDefined();
   });

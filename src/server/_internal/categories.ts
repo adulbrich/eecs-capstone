@@ -9,7 +9,10 @@ import type {
   SetProjectCategoriesInput,
 } from "../categories";
 
-type AuthUser = { id: string; role?: string | null | undefined };
+interface AuthUser {
+  id: string;
+  role?: string | null | undefined;
+}
 
 function viewerToVisibility(viewer: AuthUser) {
   return { id: viewer.id, role: viewer.role ?? null };
@@ -49,7 +52,9 @@ export async function getCategoryImpl(data: { id: string }) {
     .select()
     .from(categories)
     .where(eq(categories.id, data.id));
-  if (!row) throw new Error("Category not found");
+  if (!row) {
+    throw new Error("Category not found");
+  }
   return { category: row };
 }
 
@@ -69,7 +74,7 @@ export async function createCategoryForCurrentUser(data: CategoryInput) {
 
 export async function updateCategoryAs(
   viewer: AuthUser,
-  data: CategoryUpdateInput,
+  data: CategoryUpdateInput
 ) {
   assertStaff(viewer);
   await db
@@ -97,14 +102,16 @@ export async function deleteCategoryForCurrentUser(id: string) {
 
 export async function setProjectCategoriesAs(
   viewer: AuthUser,
-  data: SetProjectCategoriesInput,
+  data: SetProjectCategoriesInput
 ) {
   assertStaff(viewer);
   const [project] = await db
     .select()
     .from(projects)
     .where(eq(projects.id, data.projectId));
-  if (!project) throw new Error("Project not found");
+  if (!project) {
+    throw new Error("Project not found");
+  }
   if (!canSeeProject(project, viewerToVisibility(viewer))) {
     throw new Error("Forbidden");
   }
@@ -117,7 +124,7 @@ export async function setProjectCategoriesAs(
         data.categoryIds.map((cid) => ({
           projectId: data.projectId,
           categoryId: cid,
-        })),
+        }))
       );
     }
   });
@@ -125,7 +132,7 @@ export async function setProjectCategoriesAs(
 }
 
 export async function setProjectCategoriesForCurrentUser(
-  data: SetProjectCategoriesInput,
+  data: SetProjectCategoriesInput
 ) {
   const viewer = await requireUser();
   return setProjectCategoriesAs(viewer, data);
