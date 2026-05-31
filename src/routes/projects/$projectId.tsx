@@ -22,9 +22,10 @@ const PROTOCOL_RE = /^https?:\/\//i;
 
 type GetProjectResult = Awaited<ReturnType<typeof getProject>>;
 
-// Explicit loader return type. Without it, `head` consuming `loaderData`
-// in the same route-options object makes TanStack's inference circular and
-// `useLoaderData()` collapses to `never` / `undefined`.
+// Explicit loader return type. On this route `useLoaderData()` / `head`'s
+// loaderData resolve to `never` / `undefined` (an unconfirmed TanStack typing
+// limitation; an explicit Promise<ProjectDetailData> return alone does not fix
+// it, so we also cast at the use sites below). Runtime is unaffected.
 interface ProjectDetailData {
   canEdit: GetProjectResult["canEdit"];
   history: GetProjectResult["history"];
@@ -76,8 +77,8 @@ function ProjectDetail() {
     viewerIsStaff,
     viewerIsOwner,
     projectCategories,
-    // TanStack's loaderData inference collapses on this route (head consumes
-    // loaderData); the loader provably returns ProjectDetailData.
+    // TanStack's loaderData inference collapses to never/undefined on this
+    // route (see ProjectDetailData above); the loader provably returns it.
   } = Route.useLoaderData() as unknown as ProjectDetailData;
   const [comments, setComments] = useState<Comment[]>([]);
   const projectId = project.id;
