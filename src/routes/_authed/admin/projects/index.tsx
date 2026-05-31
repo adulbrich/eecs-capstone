@@ -76,10 +76,10 @@ function AdminProjects() {
   const softDeleteToggle = (
     <Link
       className="text-muted-foreground text-xs hover:text-foreground"
-      search={(prev) => ({
-        ...prev,
+      search={{
+        status,
         includeSoftDeleted: !includeSoftDeleted,
-      })}
+      }}
       to="/admin/projects"
     >
       {includeSoftDeleted ? "Hide soft-deleted" : "Show soft-deleted"}

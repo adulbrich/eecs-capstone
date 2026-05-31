@@ -12,7 +12,7 @@ function count() {
 export const getAdminStats = createServerFn({ method: "GET" }).handler(
   async () => {
     const viewer = await requireUser();
-    if (!isStaff(viewer)) {
+    if (!isStaff({ id: viewer.id, role: viewer.role ?? null })) {
       throw new Error("Forbidden");
     }
 

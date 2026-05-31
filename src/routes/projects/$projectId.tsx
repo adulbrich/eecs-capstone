@@ -20,17 +20,32 @@ import { getProject, listProjectComments } from "#/server/projects-queries";
 
 const PROTOCOL_RE = /^https?:\/\//i;
 
+type GetProjectResult = Awaited<ReturnType<typeof getProject>>;
+
+// Explicit loader return type. Without it, `head` consuming `loaderData`
+// in the same route-options object makes TanStack's inference circular and
+// `useLoaderData()` collapses to `never` / `undefined`.
+interface ProjectDetailData {
+  canEdit: GetProjectResult["canEdit"];
+  history: GetProjectResult["history"];
+  project: NonNullable<GetProjectResult["project"]>;
+  projectCategories: Awaited<ReturnType<typeof listProjectCategories>>["rows"];
+  viewerIsOwner: GetProjectResult["viewerIsOwner"];
+  viewerIsStaff: GetProjectResult["viewerIsStaff"];
+}
+
 export const Route = createFileRoute("/projects/$projectId")({
   head: ({ loaderData }) => ({
     meta: [
       {
         title: pageTitle(
-          (loaderData?.project?.title as string | undefined) ?? "Project"
+          (loaderData as ProjectDetailData | undefined)?.project?.title ??
+            "Project"
         ),
       },
     ],
   }),
-  loader: async ({ params }) => {
+  loader: async ({ params }): Promise<ProjectDetailData> => {
     const data = await getProject({ data: { id: params.projectId } });
     if (!data.project) {
       throw notFound();
@@ -38,7 +53,14 @@ export const Route = createFileRoute("/projects/$projectId")({
     const { rows: projectCategories } = await listProjectCategories({
       data: { projectId: params.projectId },
     });
-    return { ...data, projectCategories };
+    return {
+      project: data.project,
+      history: data.history,
+      canEdit: data.canEdit,
+      viewerIsStaff: data.viewerIsStaff,
+      viewerIsOwner: data.viewerIsOwner,
+      projectCategories,
+    };
   },
   component: ProjectDetail,
 });
@@ -54,9 +76,11 @@ function ProjectDetail() {
     viewerIsStaff,
     viewerIsOwner,
     projectCategories,
-  } = Route.useLoaderData();
+    // TanStack's loaderData inference collapses on this route (head consumes
+    // loaderData); the loader provably returns ProjectDetailData.
+  } = Route.useLoaderData() as unknown as ProjectDetailData;
   const [comments, setComments] = useState<Comment[]>([]);
-  const projectId = project?.id as string | undefined;
+  const projectId = project.id;
 
   const refreshComments = useCallback(async () => {
     if (!projectId) {
