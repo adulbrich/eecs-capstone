@@ -8,17 +8,22 @@
   },
   "files": {
     "includes": [
-      "**",
       "!**/src/routeTree.gen.ts",
       "!**/src/styles.css",
-      "!**/scripts/**",
-      "!**/drizzle/**"
+      "!**/scripts",
+      "!**/drizzle"
     ]
   },
   "linter": {
     "rules": {
       "complexity": {
         "noVoid": "off"
+      },
+      "correctness": {
+        "useImageSize": "off"
+      },
+      "suspicious": {
+        "noAlert": "off"
       }
     }
   },
@@ -29,6 +34,28 @@
         "rules": {
           "style": {
             "useFilenamingConvention": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/__tests__/**",
+        "**/src/test/**"
+      ],
+      "linter": {
+        "rules": {
+          "performance": {
+            "useTopLevelRegex": "off"
+          },
+          "suspicious": {
+            "noEmptyBlockStatements": "off",
+            "useAwait": "off"
+          },
+          "style": {
+            "noNonNullAssertion": "off"
           }
         }
       }
