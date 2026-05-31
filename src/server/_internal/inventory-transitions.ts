@@ -83,6 +83,8 @@ function validateInvariants(input: TransitionInput) {
       }
       return;
     }
+    default:
+      return;
   }
 }
 
@@ -108,9 +110,11 @@ export async function transitionItem(
   // a fresh one. Drizzle's nested db.transaction would otherwise run on a
   // separate connection and break atomicity.
   if (externalTx) {
-    return transitionItemInTx(externalTx, viewer, input);
+    return await transitionItemInTx(externalTx, viewer, input);
   }
-  return db.transaction(async (tx) => transitionItemInTx(tx, viewer, input));
+  return await db.transaction(async (tx) =>
+    transitionItemInTx(tx, viewer, input)
+  );
 }
 
 async function transitionItemInTx(
@@ -176,6 +180,7 @@ async function transitionItemInTx(
 }
 
 async function syncRequestItem(tx: Tx, input: TransitionInput) {
+  // biome-ignore lint/style/noNonNullAssertion: syncRequestItem only runs for request-linked transitions
   const id = input.requestItemId!;
   switch (input.nextStatus) {
     case "reserved":

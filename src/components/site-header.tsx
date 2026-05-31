@@ -50,17 +50,23 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-3 text-sm">
-          {isPending ? (
-            <div className="h-8 w-24 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
-          ) : signedIn ? (
-            <SignedIn
-              email={session.user.email}
-              image={session.user.image}
-              name={session.user.name}
-            />
-          ) : (
-            <SignedOut />
-          )}
+          {(() => {
+            if (isPending) {
+              return (
+                <div className="h-8 w-24 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
+              );
+            }
+            if (signedIn) {
+              return (
+                <SignedIn
+                  email={session.user.email}
+                  image={session.user.image}
+                  name={session.user.name}
+                />
+              );
+            }
+            return <SignedOut />;
+          })()}
         </div>
       </div>
 
@@ -151,13 +157,17 @@ function MobileMenu({
         </div>
 
         <div className="border-border border-t px-4 py-4">
-          {isPending ? (
-            <div className="h-8 w-32 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
-          ) : signedIn && user ? (
-            <SignedInMobile onClose={close} user={user} />
-          ) : (
-            <SignedOutMobile onClose={close} />
-          )}
+          {(() => {
+            if (isPending) {
+              return (
+                <div className="h-8 w-32 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
+              );
+            }
+            if (signedIn && user) {
+              return <SignedInMobile onClose={close} user={user} />;
+            }
+            return <SignedOutMobile onClose={close} />;
+          })()}
         </div>
       </SheetContent>
     </Sheet>

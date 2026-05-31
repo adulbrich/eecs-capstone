@@ -1,6 +1,7 @@
 "use client";
 
 import { Slider as SliderPrimitive } from "radix-ui";
+// biome-ignore lint/performance/noNamespaceImport: shadcn-generated component
 import * as React from "react";
 
 import { cn } from "#/lib/utils.ts";
@@ -13,15 +14,15 @@ function Slider({
   max = 100,
   ...props
 }: React.ComponentProps<typeof SliderPrimitive.Root>) {
-  const _values = React.useMemo(
-    () =>
-      Array.isArray(value)
-        ? value
-        : Array.isArray(defaultValue)
-          ? defaultValue
-          : [min, max],
-    [value, defaultValue, min, max]
-  );
+  const _values = React.useMemo(() => {
+    if (Array.isArray(value)) {
+      return value;
+    }
+    if (Array.isArray(defaultValue)) {
+      return defaultValue;
+    }
+    return [min, max];
+  }, [value, defaultValue, min, max]);
 
   return (
     <SliderPrimitive.Root

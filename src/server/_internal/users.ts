@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, isNull, or, type SQL, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { projectBookmarks, projects, session, user } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
@@ -22,17 +22,24 @@ function assertNotSelf(viewer: AuthUser, targetId: string, action: string) {
 }
 
 export async function listUsersImpl(data: ListUsersInput) {
-  const conditions = [];
+  const conditions: SQL[] = [];
   if (data.q) {
-    conditions.push(
-      or(ilike(user.email, `%${data.q}%`), ilike(user.name, `%${data.q}%`))
+    const q = or(
+      ilike(user.email, `%${data.q}%`),
+      ilike(user.name, `%${data.q}%`)
     );
+    if (q) {
+      conditions.push(q);
+    }
   }
   if (data.role) {
     conditions.push(eq(user.role, data.role));
   }
   if (!data.includeBanned) {
-    conditions.push(or(eq(user.banned, false), isNull(user.banned)));
+    const notBanned = or(eq(user.banned, false), isNull(user.banned));
+    if (notBanned) {
+      conditions.push(notBanned);
+    }
   }
 
   const where = conditions.length ? and(...conditions) : undefined;

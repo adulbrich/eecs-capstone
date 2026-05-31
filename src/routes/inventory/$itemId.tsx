@@ -67,11 +67,15 @@ function ItemDetail() {
               </Button>
             ) : (
               <p className="text-muted-foreground text-sm">
-                {session?.user
-                  ? item.status === "available"
-                    ? null
-                    : "This item is not available right now."
-                  : "Sign in to request items."}
+                {(() => {
+                  if (!session?.user) {
+                    return "Sign in to request items.";
+                  }
+                  if (item.status === "available") {
+                    return null;
+                  }
+                  return "This item is not available right now.";
+                })()}
               </p>
             )}
           </div>

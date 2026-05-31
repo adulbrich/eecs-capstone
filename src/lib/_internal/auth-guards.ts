@@ -2,7 +2,7 @@ import { redirect } from "@tanstack/react-router";
 import { getRequest } from "@tanstack/react-start/server";
 import { auth } from "#/lib/auth";
 
-export async function readSession() {
+export function readSession() {
   const req = getRequest();
   return auth.api.getSession({ headers: req.headers });
 }

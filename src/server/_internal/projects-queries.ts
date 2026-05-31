@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, type SQL } from "drizzle-orm";
 import { db } from "#/db";
 import {
   programs,
@@ -72,7 +72,7 @@ export async function listAdminProjectsImpl(data: {
   if (!isStaff(viewer)) {
     throw new Error("Forbidden");
   }
-  const conditions = [];
+  const conditions: SQL[] = [];
   if (data.status !== "all") {
     conditions.push(eq(projects.status, data.status as ProjectStatus));
   }

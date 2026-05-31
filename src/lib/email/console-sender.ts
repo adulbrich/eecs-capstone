@@ -1,12 +1,14 @@
 import type { EmailMessage, EmailSender } from "./sender";
 
 export class ConsoleEmailSender implements EmailSender {
-  async sendVerification(msg: EmailMessage): Promise<void> {
+  sendVerification(msg: EmailMessage): Promise<void> {
     this.write("VERIFY EMAIL", msg);
+    return Promise.resolve();
   }
 
-  async sendPasswordReset(msg: EmailMessage): Promise<void> {
+  sendPasswordReset(msg: EmailMessage): Promise<void> {
     this.write("RESET PASSWORD", msg);
+    return Promise.resolve();
   }
 
   private write(label: string, msg: EmailMessage) {

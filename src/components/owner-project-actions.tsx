@@ -41,6 +41,8 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
           await hardDeleteProject({ data: { id: project.id } });
           window.location.href = "/my/projects";
           return;
+        default:
+          break;
       }
       onChanged();
     } catch (err) {

@@ -10,10 +10,13 @@ export interface ObjectStorage {
 }
 
 class S3Storage implements ObjectStorage {
-  constructor(
-    private readonly bucket: string,
-    private readonly client: S3Client
-  ) {}
+  private readonly bucket: string;
+  private readonly client: S3Client;
+
+  constructor(bucket: string, client: S3Client) {
+    this.bucket = bucket;
+    this.client = client;
+  }
 
   async put(key: string, body: Buffer, contentType: string): Promise<void> {
     await this.client.send(

@@ -90,33 +90,41 @@ function InventoryIndex() {
           />
         </div>
       </div>
-      {data.rows.length === 0 ? (
-        <p className="mt-8 text-center text-muted-foreground">
-          No items match.
-        </p>
-      ) : search.view === "row" ? (
-        <div className="mx-auto mt-6 flex max-w-4xl flex-col gap-3">
-          {data.rows.map((it) => (
-            <InventoryRow
-              item={{ ...it, status: it.status as PublicStatus }}
-              key={it.id}
-              onAddToCart={addItem}
-              signedIn={signedIn}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-          {data.rows.map((it) => (
-            <InventoryCard
-              item={{ ...it, status: it.status as PublicStatus }}
-              key={it.id}
-              onAddToCart={addItem}
-              signedIn={signedIn}
-            />
-          ))}
-        </div>
-      )}
+      {(() => {
+        if (data.rows.length === 0) {
+          return (
+            <p className="mt-8 text-center text-muted-foreground">
+              No items match.
+            </p>
+          );
+        }
+        if (search.view === "row") {
+          return (
+            <div className="mx-auto mt-6 flex max-w-4xl flex-col gap-3">
+              {data.rows.map((it) => (
+                <InventoryRow
+                  item={{ ...it, status: it.status as PublicStatus }}
+                  key={it.id}
+                  onAddToCart={addItem}
+                  signedIn={signedIn}
+                />
+              ))}
+            </div>
+          );
+        }
+        return (
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            {data.rows.map((it) => (
+              <InventoryCard
+                item={{ ...it, status: it.status as PublicStatus }}
+                key={it.id}
+                onAddToCart={addItem}
+                signedIn={signedIn}
+              />
+            ))}
+          </div>
+        );
+      })()}
       <div className="mx-auto mt-6 flex max-w-4xl items-center justify-between text-sm">
         <button
           className={

@@ -15,7 +15,7 @@ type Props =
 
 export function ViewToggle(props: Props) {
   const navigate = useNavigate({ from: "/projects/" });
-  const current = props.value ?? props.current!;
+  const current = props.value ?? props.current ?? "card";
 
   function setMode(view: "card" | "row") {
     if (view === current) {

@@ -140,6 +140,7 @@ export function ImageUploader({
             keepSelection
             onChange={(c) => setCrop(c)}
           >
+            {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: react-image-crop requires onLoad to measure the image */}
             <img
               alt=""
               onLoad={onImageLoad}

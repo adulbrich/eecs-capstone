@@ -106,12 +106,13 @@ export async function listInventoryAs(
     conditions.push(eq(inventoryItems.category, data.category));
   }
   if (data.q) {
-    conditions.push(
-      or(
-        sql`${inventoryItems.searchVector} @@ websearch_to_tsquery('english', ${data.q})`,
-        ilike(inventoryItems.name, `%${data.q}%`)
-      )!
+    const q = or(
+      sql`${inventoryItems.searchVector} @@ websearch_to_tsquery('english', ${data.q})`,
+      ilike(inventoryItems.name, `%${data.q}%`)
     );
+    if (q) {
+      conditions.push(q);
+    }
   }
   const where = and(...conditions);
   const offset = (data.page - 1) * data.pageSize;
@@ -213,7 +214,7 @@ export interface CreateInventoryItemInput {
   serial: string | null;
 }
 
-function assertStaff(viewer: Viewer) {
+function assertStaff(viewer: Viewer): asserts viewer is NonNullable<Viewer> {
   if (!isStaff(viewer)) {
     throw new Error("Forbidden");
   }
@@ -258,7 +259,7 @@ export async function updateInventoryItemAs(
   data: UpdateInventoryItemInput
 ) {
   assertStaff(viewer);
-  return db.transaction(async (tx) => {
+  return await db.transaction(async (tx) => {
     const [before] = await tx
       .select()
       .from(inventoryItems)
@@ -276,7 +277,7 @@ export async function updateInventoryItemAs(
       // compare with JSON.stringify so a wrapper passing `undefined`
       // for an unset field does not spuriously log a change.
       const oldVal = (before as Record<string, unknown>)[f] ?? null;
-      const newVal = (data as Record<string, unknown>)[f] ?? null;
+      const newVal = (data as unknown as Record<string, unknown>)[f] ?? null;
       if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
         changed.push(f);
         oldValues[f] = oldVal;
@@ -303,7 +304,7 @@ export async function updateInventoryItemAs(
 
     await tx.insert(inventoryItemEditLog).values({
       itemId: data.id,
-      editorId: viewer?.id,
+      editorId: viewer.id,
       changedFields: changed,
       oldValues,
       newValues,
@@ -441,7 +442,7 @@ export async function submitCartAs(
     throw new Error("Sign in required");
   }
 
-  return db.transaction(async (tx) => {
+  return await db.transaction(async (tx) => {
     const cartRows = await tx
       .select({
         itemId: inventoryCartItems.itemId,
@@ -599,7 +600,7 @@ export async function approveRequestItemAs(
     await tx
       .update(inventoryRequestItems)
       .set({
-        reviewedBy: viewer?.id,
+        reviewedBy: viewer.id,
         reviewedAt: new Date(),
         updatedAt: new Date(),
       })
@@ -608,7 +609,7 @@ export async function approveRequestItemAs(
     // unit; syncRequestItem will flip the line to 'approved' under the
     // same lock we already hold.
     await transitionItem(
-      viewer!,
+      viewer,
       {
         itemId: line.itemId,
         nextStatus: "reserved",
@@ -636,7 +637,7 @@ export async function rejectRequestItemAs(
   if (!data.reviewComment.trim()) {
     throw new Error("Reject reason required");
   }
-  return db.transaction(async (tx) => {
+  return await db.transaction(async (tx) => {
     // Join requester id into the initial line read so we do not need a
     // second SELECT just to find the notification recipient.
     const [line] = await tx
@@ -668,11 +669,11 @@ export async function rejectRequestItemAs(
       .update(inventoryRequestItems)
       .set({
         status: "rejected",
-        reviewedBy: viewer?.id,
+        reviewedBy: viewer.id,
         reviewedAt: new Date(),
         reviewComment: data.reviewComment,
         closedAt: new Date(),
-        closedBy: viewer?.id,
+        closedBy: viewer.id,
         closedReason: data.reviewComment,
         updatedAt: new Date(),
       })
@@ -691,7 +692,7 @@ export async function rejectRequestItemAs(
       itemId: line.itemId,
       oldStatus: item.status,
       newStatus: "available",
-      changedBy: viewer?.id,
+      changedBy: viewer.id,
       comment: data.reviewComment,
       requestItemId: line.id,
     });
@@ -713,7 +714,7 @@ export async function cancelRequestItemAs(
   if (!viewer) {
     throw new Error("Sign in required");
   }
-  return db.transaction(async (tx) => {
+  return await db.transaction(async (tx) => {
     const [line] = await tx
       .select({
         id: inventoryRequestItems.id,

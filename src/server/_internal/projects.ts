@@ -78,6 +78,7 @@ export async function createProjectAs(
   return { id: created.id };
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: TODO large update path, decompose field-diffing in a follow-up
 export async function updateProjectAs(
   viewer: AuthUser,
   data: UpdateProjectInput

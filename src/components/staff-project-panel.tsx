@@ -125,13 +125,23 @@ export function StaffProjectPanel({
             const isNormal =
               !isCurrent && canTransition(currentStatus, s, "staff");
 
+            let pillState: string;
+            let pillTitle: string;
+            if (isCurrent) {
+              pillState = "cursor-default bg-[var(--brand-primary)] text-white";
+              pillTitle = "Current status";
+            } else if (isNormal) {
+              pillState =
+                "cursor-pointer border-2 border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-tint)]";
+              pillTitle = `Move to ${STATUS_LABEL[s]}`;
+            } else {
+              pillState =
+                "cursor-pointer border border-dashed border-border text-muted-foreground hover:border-foreground hover:text-foreground";
+              pillTitle = `Override: force to ${STATUS_LABEL[s]}`;
+            }
             const pillClass = [
               "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-              isCurrent
-                ? "cursor-default bg-[var(--brand-primary)] text-white"
-                : isNormal
-                  ? "cursor-pointer border-2 border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-tint)]"
-                  : "cursor-pointer border border-dashed border-border text-muted-foreground hover:border-foreground hover:text-foreground",
+              pillState,
             ].join(" ");
 
             return (
@@ -164,13 +174,7 @@ export function StaffProjectPanel({
                       setPendingOverride(s);
                     }
                   }}
-                  title={
-                    isCurrent
-                      ? "Current status"
-                      : isNormal
-                        ? `Move to ${STATUS_LABEL[s]}`
-                        : `Override: force to ${STATUS_LABEL[s]}`
-                  }
+                  title={pillTitle}
                   type="button"
                 >
                   {STATUS_LABEL[s]}

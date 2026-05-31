@@ -18,6 +18,8 @@ import { getPublicUrl } from "#/lib/storage";
 import { listProjectCategories } from "#/server/categories";
 import { getProject, listProjectComments } from "#/server/projects-queries";
 
+const PROTOCOL_RE = /^https?:\/\//i;
+
 export const Route = createFileRoute("/projects/$projectId")({
   head: ({ loaderData }) => ({
     meta: [
@@ -244,7 +246,7 @@ function UrlSection({ url }: { url: string | null }) {
   if (!url) {
     return null;
   }
-  const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+  const href = PROTOCOL_RE.test(url) ? url : `https://${url}`;
   return (
     <section className="mt-6">
       <h2 className="font-medium text-muted-foreground text-sm">URL</h2>

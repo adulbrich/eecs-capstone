@@ -61,11 +61,15 @@ function MyItems() {
             }
             type="button"
           >
-            {t === "cart"
-              ? `Cart (${data.cart.length})`
-              : t === "active"
-                ? `Active (${data.active.length})`
-                : "History"}
+            {(() => {
+              if (t === "cart") {
+                return `Cart (${data.cart.length})`;
+              }
+              if (t === "active") {
+                return `Active (${data.active.length})`;
+              }
+              return "History";
+            })()}
           </button>
         ))}
       </div>

@@ -60,6 +60,7 @@ interface Props {
   submitLabel: string;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: TODO large form component, split into field groups in a follow-up
 export function ProjectForm({
   initial,
   initialCategoryIds,

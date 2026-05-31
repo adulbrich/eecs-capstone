@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+// biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

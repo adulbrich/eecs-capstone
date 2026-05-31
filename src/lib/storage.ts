@@ -7,6 +7,8 @@
  * (e.g., GitHub OAuth image, DiceBear identicon); those pass through
  * unchanged.
  */
+const LEADING_SLASHES = /^\/+/;
+
 const PUBLIC_BASE =
   (typeof import.meta !== "undefined" &&
     (import.meta as unknown as { env?: Record<string, string> }).env
@@ -22,5 +24,5 @@ export function getPublicUrl(key: string | null | undefined): string | null {
   if (key.startsWith("http://") || key.startsWith("https://")) {
     return key;
   }
-  return `${PUBLIC_BASE}/${key.replace(/^\/+/, "")}`;
+  return `${PUBLIC_BASE}/${key.replace(LEADING_SLASHES, "")}`;
 }
