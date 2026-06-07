@@ -64,8 +64,6 @@
 
 ## Improvements
 
-- Have "summary" cards in the admin (# of users, # of published projects etc.) -  should it be in /admin or on the separate routes (/admin/projects, /admin/users, etc.)?
-  - Figure out what are the most important metrics to show in the summary cards.
 - Have a real "analytics dashboard" with charts and graphs for project trends, user engagement, etc. (stretch goal)
   - Look at how many projects we published per academic year, etc.
   - Look at how many projects were submitted per period, etc.
@@ -73,7 +71,9 @@
 
 ## Current Bugs
 
-- Contract is dark mode is horrendous. Need a design pass. We need an actionable accessibility report to pass to Claude Code.
+- We should be able to link project to a proposer using their unique email address, instead of the user ID. Hopefully, when someone will log with OSU ONID, if there is already an account with that email address, we can link both. This will also make migration from the previous system much easier.
+  - We should be able to search for a user on the project editing form (as staff) to link a proposer to an existing account. If no account exists, we can leave it blank, but still add contact details manually (email, name, etc.).
+  - We should add a note to the contact information field to specify that it will be publicly visible, so if the proposer doesn't want to share their email, they can leave it blank.
 
 ## Getting Started
 
@@ -105,6 +105,11 @@ This project uses [Vitest](https://vitest.dev/) for testing. You can run the tes
 npm run test
 ```
 
+> TODO (future): integration tests currently run against the same database as
+> dev and TRUNCATE every table before each test, which wipes dev data. Point
+> them at a dedicated `cs_capstone_test` database via a separate
+> `TEST_DATABASE_URL`. See the Drizzle section of `docs/QUIRKS.md` for details.
+
 ## Styling
 
 This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
@@ -113,10 +118,9 @@ This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
 
 If you prefer not to use Tailwind CSS:
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Uninstall the packages: `npm install @tailwindcss/vite tailwindcss -D`
+1. Replace the Tailwind import in `src/styles.css` with your own styles
+2. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
+3. Uninstall the packages: `npm uninstall @tailwindcss/vite tailwindcss`
 
 ## Linting & Formatting
 
@@ -140,7 +144,6 @@ This project ships with `nixpacks.toml` so Railway detects the build automatical
 4. Railway runs `vite build` and serves from `dist/client`
 
 Need a database? Click **+ New** in your project to provision Postgres, MySQL, or Redis directly into the same environment — the connection string is auto-injected as `DATABASE_URL`.
-
 
 ## Shadcn
 
@@ -169,13 +172,15 @@ This project uses Better Auth backed by Drizzle + Postgres. Identity lives in th
    npm run dev
    ```
 
-1. Seed an admin user:
+1. Seed your dev database:
 
    ```bash
-   npx tsx scripts/seed-admin.ts
+   npm run db:seed:dev 
    ```
 
-   Reads `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` from `.env.local`. Safe to re-run.
+   Safe to re-run.
+
+   In production, need to seed an admin user (configure in environment variables).
 
 ### Email transport
 

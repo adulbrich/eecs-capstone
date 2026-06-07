@@ -1,5 +1,8 @@
 # Project Domain Implementation Plan
 
+> **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Spec:** `docs/superpowers/specs/2026-05-16-project-domain-design.md`

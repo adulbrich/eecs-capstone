@@ -12,7 +12,7 @@ npm install
 docker compose up -d
 
 # Start development server
-npm dev
+npm run dev
 ```
 
 To stop the database:
@@ -25,15 +25,16 @@ docker compose down
 
 | Command | Description |
 |---------|-------------|
-| `npm dev` | Start dev server on port 3000 |
-| `npm build` | Build for production |
-| `npm db:generate` | Generate Drizzle migrations |
-| `npm db:migrate` | Run Drizzle migrations |
-| `npm db:push` | Push schema to database |
-| `npm db:studio` | Open Drizzle Studio |
-| `npm format` | Format with Biome |
-| `npm lint` | Lint with Biome |
-| `npm check` | Run Biome checks |
+| `npm run dev` | Start dev server on port 3000 |
+| `npm run build` | Build for production |
+| `npm run db:generate` | Generate Drizzle migrations |
+| `npm run db:migrate` | Run Drizzle migrations |
+| `npm run db:push` | Push schema to database |
+| `npm run db:studio` | Open Drizzle Studio |
+| `npm run format` | Format with Ultracite (`ultracite fix`) |
+| `npm run lint` | Lint with Ultracite (`ultracite check`) |
+| `npm run check` | Run Ultracite checks |
+| `npm run typecheck` | Type-check with `tsc --noEmit` |
 | `npm test` | Run Vitest tests |
 
 ## Architecture
@@ -49,13 +50,13 @@ docker compose down
 Database schema is defined in `src/db/schema.ts`. Use Drizzle commands to manage migrations:
 
 ```bash
-npm db:generate
-npm db:migrate
+npm run db:generate
+npm run db:migrate
 ```
 
 ## UI Components
 
-Use shadcn/ui with the `npm dlx shadcn@latest add <component>` command. Existing components are in `src/components/ui/`.
+Use shadcn/ui with the `npx shadcn@latest add <component>` command. Existing components are in `src/components/ui/`.
 
 ## Server functions
 
@@ -67,7 +68,16 @@ import { createServerFn } from "@tanstack/react-start";
 
 ## Code Quality
 
-This project uses Biome for formatting and linting. Always run `npm run check` after finishing work and fix any formatting or linting issues before committing.
+This project uses **Ultracite** (a strict Biome preset) for formatting and linting.
+
+- `npm run check` runs `ultracite check` (read-only); `npm run format` runs `ultracite fix`.
+- `npm run typecheck` runs `tsc --noEmit`. Config lives in `biome.json`, extending `ultracite/biome/core` and `ultracite/biome/react`.
+- Always run `npm run check` and `npm run typecheck` after finishing work, and fix issues before committing. CI (`.github/workflows/ci.yml`) enforces check, typecheck, test, and build.
+- See `docs/QUIRKS.md` for the rules that are deliberately disabled, relaxed in tests, or deferred, and why.
+
+## Library documentation
+
+The stack moves fast (TanStack Start is pre-v1, Better Auth 1.5.x, Drizzle 0.45). Prefer the **context7** MCP server for current, version-accurate docs on these libraries rather than relying on training data. `docs/QUIRKS.md` is the ground truth for this codebase's specific gotchas.
 
 ## Configuration
 

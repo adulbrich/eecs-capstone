@@ -1,5 +1,8 @@
 # Accessibility Fixes Implementation Plan
 
+> **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix all WCAG 2.1 AA violations surfaced by `npm run test:accessibility` so every page passes the axe scan in both light and dark color schemes.

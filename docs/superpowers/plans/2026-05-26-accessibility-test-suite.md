@@ -1,5 +1,8 @@
 # Accessibility Test Suite Implementation Plan
 
+> **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a Playwright + axe-core accessibility test suite that scans every page in both light and dark color schemes against WCAG 2.1 AA rules, with a `test:accessibility` npm script.

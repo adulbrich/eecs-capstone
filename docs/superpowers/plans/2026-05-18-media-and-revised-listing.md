@@ -1,5 +1,8 @@
 # Media + Revised Project Listing Implementation Plan
 
+> **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Read `docs/QUIRKS.md` before starting; it documents every framework gotcha this codebase has hit.
 
 **Spec:** `docs/superpowers/specs/2026-05-18-media-and-revised-listing-design.md`

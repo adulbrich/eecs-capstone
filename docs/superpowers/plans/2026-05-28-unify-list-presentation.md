@@ -1,5 +1,8 @@
 # Unify Projects & Inventory List Presentation Implementation Plan
 
+> **Status (verified 2026-06-07):** ✅ **Implemented and shipped, with one deliberate deviation.** The shared card/row presentation, `image-or-fallback`, `projectSummarySelect` projection, embedded add-to-cart, and inventory pagination are all in place. The plan's outer `max-w-7xl` widening (Tasks 8 & 10) was **not** adopted: the project standardized on `max-w-4xl` page wrappers per `AGENTS.md` (Mobile-First Design → Page wrapper padding). Stale `- [ ]` checkboxes below.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give the Projects and Inventory browse pages (plus the project management views) one cohesive card/row presentation, shared layout/width conventions, an image placeholder for inventory, and Projects-style pagination on Inventory.

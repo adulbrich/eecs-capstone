@@ -1,5 +1,8 @@
 # AI Project Review Implementation Plan
 
+> **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a synchronous "Review with AI" button to the project edit page that asks MiniMax M2.5 on AWS Bedrock to propose per-field rewrites, shown inline beneath each field and applied per field or all at once.

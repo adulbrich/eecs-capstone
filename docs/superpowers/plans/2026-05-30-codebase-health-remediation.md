@@ -1,5 +1,8 @@
 # Codebase Health Remediation Implementation Plan
 
+> **Status (verified 2026-06-07):** ✅ **Implemented and shipped.** Verified against the codebase; all deliverables exist. The `- [ ]` checkboxes below were never ticked during execution; they are stale, not a sign of incomplete work.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close the latent type-safety, linting, CI, and documentation gaps found in the 2026-05-30 codebase review, migrate linting to Ultracite, and adopt Ultracite + context7 in the agent workflow, without changing runtime behavior.
