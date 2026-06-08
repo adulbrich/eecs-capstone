@@ -10,6 +10,7 @@ import { reviewProject } from "#/server/project-review";
 import { CategoryMultiSelect } from "./category-multi-select";
 import { ProgramSelect } from "./program-select";
 import { ProjectImageUploader } from "./project-image-uploader";
+import { ProposerPicker } from "./proposer-picker";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -41,6 +42,7 @@ export const projectFormSchema = z.object({
   licenseRestrictions: z.string().max(1000).default(""),
   programId: optionalUuid,
   notes: z.string().max(5000).default(""),
+  proposerEmail: optionalEmail,
 });
 
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
@@ -57,6 +59,7 @@ interface Props {
   projectId?: string;
   showCategories: boolean;
   showNotes: boolean;
+  showProposer?: boolean;
   submitLabel: string;
 }
 
@@ -70,6 +73,7 @@ export function ProjectForm({
   onSubmit,
   enableAiReview,
   projectId,
+  showProposer,
 }: Props) {
   const [formError, setFormError] = useState<string | null>(null);
   const [categoryIds, setCategoryIds] = useState<string[]>(
@@ -103,6 +107,7 @@ export function ProjectForm({
       licenseRestrictions: initial?.licenseRestrictions ?? "",
       programId: initial?.programId ?? "",
       notes: initial?.notes ?? "",
+      proposerEmail: initial?.proposerEmail ?? "",
     } satisfies ProjectFormValues,
     validators: {
       onSubmit: ({ value }) => {
@@ -299,6 +304,10 @@ export function ProjectForm({
         textarea
       />
       <Field form={form} label="URL" name="url" placeholder="https://..." />
+      <p className="text-muted-foreground text-xs">
+        Contact details below are shown publicly on the project page. Leave them
+        blank to keep them private.
+      </p>
       <Field form={form} label="Contact name" name="contactName" />
       <Field
         form={form}
@@ -349,6 +358,16 @@ export function ProjectForm({
           </div>
         )}
       </form.Field>
+      {showProposer && (
+        <form.Field name="proposerEmail">
+          {(field: AnyForm) => (
+            <ProposerPicker
+              onChange={(email) => field.handleChange(email)}
+              value={field.state.value as string}
+            />
+          )}
+        </form.Field>
+      )}
       {showNotes && (
         <Field
           form={form}
