@@ -45,6 +45,17 @@ export const getProject = createServerFn({ method: "GET" })
     return getProjectImpl(data);
   });
 
+export const getProposerEmailForEdit = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) =>
+    z.object({ projectId: z.string().uuid() }).parse(data)
+  )
+  .handler(async ({ data }) => {
+    const { getProposerEmailForEditImpl } = await import(
+      "./_internal/projects-queries"
+    );
+    return getProposerEmailForEditImpl(data);
+  });
+
 export const listProjectEditLog = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => projectIdSchema.parse(data))
   .handler(async ({ data }) => {

@@ -31,6 +31,13 @@ const projectInputSchema = z.object({
   licenseRestrictions: z.string().max(1000).nullable().optional(),
   programId: z.string().uuid().nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
+  proposerEmail: z
+    .string()
+    .email()
+    .max(200)
+    .nullable()
+    .optional()
+    .or(z.literal("")),
 });
 
 export type ProjectInput = z.infer<typeof projectInputSchema>;

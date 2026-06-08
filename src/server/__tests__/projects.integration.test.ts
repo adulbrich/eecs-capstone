@@ -28,7 +28,7 @@ async function makeUser(email: string, role: "user" | "admin") {
     await db.update(user).set({ role }).where(eq(user.email, email));
   }
   const [u] = await db.select().from(user).where(eq(user.email, email));
-  return { id: u.id, role: u.role };
+  return { id: u.id, role: u.role, email: u.email };
 }
 
 function baseProject() {
@@ -116,6 +116,47 @@ describe("project workflow", () => {
     await softDeleteProjectAs(admin, id);
     const [row] = await db.select().from(projects).where(eq(projects.id, id));
     expect(row.deletedAt).not.toBeNull();
+  });
+});
+
+describe("staff proposer linking by email", () => {
+  it("links proposerId when the email matches an account", async () => {
+    const staff = await makeUser(`staff-${Date.now()}@x.com`, "admin");
+    const target = await makeUser(`target-${Date.now()}@x.com`, "user");
+
+    const { id } = await createProjectAs(staff, {
+      title: "Linked",
+      proposerEmail: target.email,
+    } as never);
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.proposerId).toBe(target.id);
+    expect(row.proposerEmail).toBe(target.email);
+  });
+
+  it("keeps proposerId null when the email matches no account", async () => {
+    const staff = await makeUser(`staff2-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(staff, {
+      title: "Pending",
+      proposerEmail: "noaccount@example.edu",
+    } as never);
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.proposerId).toBeNull();
+    expect(row.proposerEmail).toBe("noaccount@example.edu");
+  });
+
+  it("ignores proposerEmail from a non-staff creator", async () => {
+    const plain = await makeUser(`plain-${Date.now()}@x.com`, "user");
+    const other = await makeUser(`other-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(plain, {
+      title: "Self",
+      proposerEmail: other.email,
+    } as never);
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.proposerId).toBe(plain.id);
+    expect(row.proposerEmail).toBeNull();
   });
 });
 

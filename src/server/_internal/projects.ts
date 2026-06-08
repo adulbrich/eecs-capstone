@@ -1,6 +1,11 @@
 import { eq } from "drizzle-orm";
 import { db } from "#/db";
-import { projectEditLog, projectStatusHistory, projects } from "#/db/schema";
+import {
+  projectEditLog,
+  projectStatusHistory,
+  projects,
+  user,
+} from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { canEditProject, isStaff, type Viewer } from "#/lib/project-visibility";
 import {
@@ -33,7 +38,11 @@ const PROJECT_EDITABLE_FIELDS = [
   "licenseRestrictions",
   "programId",
   "notes",
+  "proposerEmail",
+  "proposerId",
 ] as const;
+
+const STAFF_ONLY_FIELDS = new Set(["notes", "proposerEmail", "proposerId"]);
 
 function viewerToVisibility(viewer: AuthUser): Viewer {
   return { id: viewer.id, role: viewer.role ?? null };
@@ -47,13 +56,29 @@ async function loadProjectOr404(id: string) {
   return row;
 }
 
+async function resolveProposerId(
+  email: string | null | undefined
+): Promise<string | null> {
+  if (!email) {
+    return null;
+  }
+  const [match] = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(eq(user.email, email));
+  return match?.id ?? null;
+}
+
 export async function createProjectAs(
   viewer: AuthUser,
   data: ProjectInput
 ): Promise<{ id: string }> {
-  const allowedNotes = isStaff(viewerToVisibility(viewer))
-    ? (data.notes ?? null)
-    : null;
+  const staff = isStaff(viewerToVisibility(viewer));
+  const allowedNotes = staff ? (data.notes ?? null) : null;
+  const proposerEmail = staff ? data.proposerEmail || null : null;
+  const proposerId = proposerEmail
+    ? await resolveProposerId(proposerEmail)
+    : viewer.id;
 
   const [created] = await db
     .insert(projects)
@@ -71,7 +96,8 @@ export async function createProjectAs(
       licenseRestrictions: data.licenseRestrictions ?? null,
       programId: data.programId ?? null,
       notes: allowedNotes,
-      proposerId: viewer.id,
+      proposerId,
+      proposerEmail,
       status: "draft",
     })
     .returning();
@@ -106,13 +132,18 @@ export async function updateProjectAs(
   };
   if (staff) {
     newValues.notes = data.notes ?? null;
+    const proposerEmail = data.proposerEmail || null;
+    newValues.proposerEmail = proposerEmail;
+    newValues.proposerId = proposerEmail
+      ? await resolveProposerId(proposerEmail)
+      : null;
   }
 
   const oldDiff: Record<string, unknown> = {};
   const newDiff: Record<string, unknown> = {};
   const changedFields: string[] = [];
   for (const field of PROJECT_EDITABLE_FIELDS) {
-    if (!staff && field === "notes") {
+    if (!staff && STAFF_ONLY_FIELDS.has(field)) {
       continue;
     }
     const oldVal = (existing as Record<string, unknown>)[field] ?? null;

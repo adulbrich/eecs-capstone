@@ -6,6 +6,7 @@ import {
   projectEditLog,
   projectStatusHistory,
   projects,
+  user,
 } from "#/db/schema";
 import { readSession } from "#/lib/_internal/auth-guards";
 import {
@@ -142,6 +143,36 @@ export async function getProjectImpl(data: { id: string }) {
     viewerIsStaff,
     viewerIsOwner,
   };
+}
+
+export async function getProposerEmailForEditImpl(data: {
+  projectId: string;
+}): Promise<string> {
+  const viewer = await getViewer();
+  if (!isStaff(viewer)) {
+    throw new Error("Forbidden");
+  }
+  const [project] = await db
+    .select({
+      proposerId: projects.proposerId,
+      proposerEmail: projects.proposerEmail,
+    })
+    .from(projects)
+    .where(eq(projects.id, data.projectId));
+  if (!project) {
+    return "";
+  }
+  if (project.proposerEmail) {
+    return project.proposerEmail;
+  }
+  if (!project.proposerId) {
+    return "";
+  }
+  const [account] = await db
+    .select({ email: user.email })
+    .from(user)
+    .where(eq(user.id, project.proposerId));
+  return account?.email ?? "";
 }
 
 export async function listProjectEditLogImpl(data: { id: string }) {
