@@ -2,7 +2,34 @@ import {
   DeleteObjectCommand,
   PutObjectCommand,
   S3Client,
+  type S3ClientConfig,
 } from "@aws-sdk/client-s3";
+
+const DEFAULT_REGION = "us-east-1";
+
+/**
+ * Builds the S3 client config from the environment.
+ *
+ * Locally we talk to RustFS via a custom `S3_ENDPOINT` with static keys.
+ * In production no `S3_ENDPOINT`/keys are set, so we omit `credentials`
+ * entirely and let the SDK's default chain pick up the ECS **task role**.
+ * Passing empty-string credentials (the previous behavior) would defeat
+ * the task role, so the keys are only included when actually present.
+ */
+export function buildS3Config(
+  env: NodeJS.ProcessEnv = process.env
+): S3ClientConfig {
+  const endpoint = env.S3_ENDPOINT;
+  const accessKeyId = env.S3_ACCESS_KEY;
+  const secretAccessKey = env.S3_SECRET_KEY;
+  return {
+    region: env.S3_REGION ?? DEFAULT_REGION,
+    ...(endpoint ? { endpoint, forcePathStyle: true } : {}),
+    ...(accessKeyId && secretAccessKey
+      ? { credentials: { accessKeyId, secretAccessKey } }
+      : {}),
+  };
+}
 
 export interface ObjectStorage {
   delete(key: string): Promise<void>;
@@ -42,16 +69,7 @@ export function getObjectStorage(): ObjectStorage {
   if (_instance) {
     return _instance;
   }
-  const endpoint = process.env.S3_ENDPOINT;
-  const client = new S3Client({
-    region: process.env.S3_REGION ?? "us-east-1",
-    endpoint,
-    forcePathStyle: !!endpoint,
-    credentials: {
-      accessKeyId: process.env.S3_ACCESS_KEY ?? "",
-      secretAccessKey: process.env.S3_SECRET_KEY ?? "",
-    },
-  });
+  const client = new S3Client(buildS3Config());
   _instance = new S3Storage(process.env.S3_BUCKET ?? "cs-capstone", client);
   return _instance;
 }

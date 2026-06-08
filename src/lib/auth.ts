@@ -7,9 +7,15 @@ import { getEmailSender } from "#/lib/email/sender";
 
 const emailSender = getEmailSender();
 
+const isProduction = process.env.NODE_ENV === "production";
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
   trustHost: process.env.NODE_ENV !== "development",
+  // CloudFront terminates TLS at the edge and forwards to the origin over
+  // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in
+  // production so a misread request protocol can't silently disable them.
+  advanced: { useSecureCookies: isProduction },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,

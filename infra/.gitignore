@@ -1,0 +1,15 @@
+# Terraform provider/plugin cache and working dirs
+.terraform/
+.terraform.tfstate.lock.info
+
+# State files (remote state is used; never commit local state)
+*.tfstate
+*.tfstate.*
+
+# Variable files may contain secrets; only the example is tracked
+terraform.tfvars
+*.auto.tfvars
+
+# Crash logs and plan outputs
+crash.log
+*.tfplan

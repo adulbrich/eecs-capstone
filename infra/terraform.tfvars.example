@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars and fill in. Required values have no defaults.
+
+github_owner = "your-org-or-user"
+github_repo  = "cs-capstone"
+email_from   = "noreply@your-verified-identity.example"
+
+# Optional overrides:
+# region           = "us-west-2"
+# github_client_id = "Iv1.xxxxxxxx"
+# bedrock_region   = "us-east-1"
+# bedrock_model_id = "minimax.minimax-m2.5"

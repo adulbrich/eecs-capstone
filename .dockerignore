@@ -1,0 +1,30 @@
+# Dependencies and build artifacts are produced inside the image
+node_modules
+.output
+.tanstack
+.nitro
+
+# VCS and CI
+.git
+.github
+.gitignore
+
+# Secrets and local env (never bake into an image)
+.env
+.env.*
+!.env.example
+
+# Tests, reports, and editor/tooling state
+test-results
+playwright-report
+.playwright-mcp
+.vscode
+.cta.json
+
+# Docs and infra (not needed by the app build)
+docs
+infra
+*.md
+
+# Local-only compose stack
+docker-compose.yml

@@ -1,0 +1,129 @@
+name: Deploy
+
+# Manual "push of a button" deploy. After merging to main, run this workflow
+# to build + push the image, migrate the database, and roll out to ECS.
+#
+# Run it from the `main` branch: the AWS OIDC role trust is scoped to
+# refs/heads/main, so dispatching from another branch will fail to assume the
+# role. (Change var.deploy_branch in Terraform if you need a different branch.)
+#
+# Requires one GitHub Actions repository variable:
+#   AWS_DEPLOY_ROLE_ARN  - the cs-capstone-github-deploy role ARN (Terraform
+#                          output `github_deploy_role_arn`).
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # assume the AWS role via OIDC
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+  PROJECT: cs-capstone
+
+jobs:
+  deploy:
+    # ubuntu-latest is available on every plan. The linux/arm64 image is built
+    # via QEMU emulation (slower on the first run; the gha cache makes repeats
+    # fast). If your repo HAS arm64 hosted runners, set `runs-on: ubuntu-24.04-arm`
+    # and delete the "Set up QEMU" step for a much faster native build.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Resolve config
+        id: cfg
+        run: |
+          ECR_REPO="${{ steps.ecr.outputs.registry }}/${PROJECT}"
+          ASSETS_BASE=$(aws ssm get-parameter \
+            --name "/${PROJECT}/ASSETS_PUBLIC_BASE" \
+            --query 'Parameter.Value' --output text)
+          {
+            echo "image=${ECR_REPO}:${GITHUB_SHA::12}"
+            echo "assets_base=${ASSETS_BASE}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.cfg.outputs.image }}
+          build-args: |
+            VITE_STORAGE_PUBLIC_BASE=${{ steps.cfg.outputs.assets_base }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Register task definition
+        id: taskdef
+        run: |
+          aws ecs describe-task-definition --task-definition "$PROJECT" \
+            --query 'taskDefinition' --output json > taskdef.json
+          # Swap in the new image and drop the read-only fields that
+          # register-task-definition rejects.
+          jq --arg IMAGE "${{ steps.cfg.outputs.image }}" '
+            .containerDefinitions |= map(if .name == "app" then .image = $IMAGE else . end)
+            | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                  .compatibilities, .registeredAt, .registeredBy)
+          ' taskdef.json > register.json
+          NEW_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://register.json \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "arn=${NEW_ARN}" >> "$GITHUB_OUTPUT"
+
+      - name: Run database migrations
+        run: |
+          # Reuse the service's exact network config (public subnets +
+          # assignPublicIp + app SG) so the one-off task can pull from ECR
+          # over the IGW and reach the private RDS instance.
+          NETCFG=$(aws ecs describe-services \
+            --cluster "$PROJECT" --services "$PROJECT" \
+            --query 'services[0].networkConfiguration' --output json)
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "$PROJECT" \
+            --task-definition "${{ steps.taskdef.outputs.arn }}" \
+            --launch-type FARGATE \
+            --network-configuration "$NETCFG" \
+            --overrides '{"containerOverrides":[{"name":"app","command":["node","scripts/migrate.mjs"]}]}' \
+            --query 'tasks[0].taskArn' --output text)
+          echo "Migration task: $TASK_ARN"
+          aws ecs wait tasks-stopped --cluster "$PROJECT" --tasks "$TASK_ARN"
+          EXIT=$(aws ecs describe-tasks --cluster "$PROJECT" --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[?name==`app`].exitCode | [0]' --output text)
+          echo "Migration exit code: $EXIT"
+          if [ "$EXIT" != "0" ]; then
+            echo "::error::Database migration failed (exit $EXIT)"
+            exit 1
+          fi
+
+      - name: Deploy service
+        run: |
+          aws ecs update-service \
+            --cluster "$PROJECT" --service "$PROJECT" \
+            --task-definition "${{ steps.taskdef.outputs.arn }}" \
+            --desired-count 1 >/dev/null
+          aws ecs wait services-stable --cluster "$PROJECT" --service "$PROJECT"
+          echo "Deployed ${{ steps.cfg.outputs.image }}"

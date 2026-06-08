@@ -1,4 +1,5 @@
 import { ConsoleEmailSender } from "./console-sender";
+import { createSesEmailSender } from "./ses-sender";
 
 export interface EmailMessage {
   to: string;
@@ -15,6 +16,8 @@ export function getEmailSender(): EmailSender {
   switch (transport) {
     case "console":
       return new ConsoleEmailSender();
+    case "ses":
+      return createSesEmailSender();
     default:
       throw new Error(`Unknown EMAIL_TRANSPORT: ${transport}`);
   }

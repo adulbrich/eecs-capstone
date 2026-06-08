@@ -15,6 +15,7 @@ import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
 import { Route as InventoryIndexRouteImport } from './routes/inventory/index'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
 import { Route as InventoryItemIdRouteImport } from './routes/inventory/$itemId'
+import { Route as ApiHealthzRouteImport } from './routes/api/healthz'
 import { Route as AuthedProfileRouteImport } from './routes/_authed/profile'
 import { Route as AuthedAdminRouteImport } from './routes/_authed/admin'
 import { Route as authVerifyEmailRouteImport } from './routes/(auth)/verify-email'
@@ -69,6 +70,11 @@ const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
 const InventoryItemIdRoute = InventoryItemIdRouteImport.update({
   id: '/inventory/$itemId',
   path: '/inventory/$itemId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthzRoute = ApiHealthzRouteImport.update({
+  id: '/api/healthz',
+  path: '/api/healthz',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedProfileRoute = AuthedProfileRouteImport.update({
@@ -221,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/verify-email': typeof authVerifyEmailRoute
   '/admin': typeof AuthedAdminRouteWithChildren
   '/profile': typeof AuthedProfileRoute
+  '/api/healthz': typeof ApiHealthzRoute
   '/inventory/$itemId': typeof InventoryItemIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/inventory/': typeof InventoryIndexRoute
@@ -253,6 +260,7 @@ export interface FileRoutesByTo {
   '/sign-up': typeof authSignUpRoute
   '/verify-email': typeof authVerifyEmailRoute
   '/profile': typeof AuthedProfileRoute
+  '/api/healthz': typeof ApiHealthzRoute
   '/inventory/$itemId': typeof InventoryItemIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/inventory': typeof InventoryIndexRoute
@@ -288,6 +296,7 @@ export interface FileRoutesById {
   '/(auth)/verify-email': typeof authVerifyEmailRoute
   '/_authed/admin': typeof AuthedAdminRouteWithChildren
   '/_authed/profile': typeof AuthedProfileRoute
+  '/api/healthz': typeof ApiHealthzRoute
   '/inventory/$itemId': typeof InventoryItemIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/inventory/': typeof InventoryIndexRoute
@@ -323,6 +332,7 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/admin'
     | '/profile'
+    | '/api/healthz'
     | '/inventory/$itemId'
     | '/projects/$projectId'
     | '/inventory/'
@@ -355,6 +365,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/verify-email'
     | '/profile'
+    | '/api/healthz'
     | '/inventory/$itemId'
     | '/projects/$projectId'
     | '/inventory'
@@ -389,6 +400,7 @@ export interface FileRouteTypes {
     | '/(auth)/verify-email'
     | '/_authed/admin'
     | '/_authed/profile'
+    | '/api/healthz'
     | '/inventory/$itemId'
     | '/projects/$projectId'
     | '/inventory/'
@@ -422,6 +434,7 @@ export interface RootRouteChildren {
   authSignInRoute: typeof authSignInRoute
   authSignUpRoute: typeof authSignUpRoute
   authVerifyEmailRoute: typeof authVerifyEmailRoute
+  ApiHealthzRoute: typeof ApiHealthzRoute
   InventoryItemIdRoute: typeof InventoryItemIdRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
   InventoryIndexRoute: typeof InventoryIndexRoute
@@ -471,6 +484,13 @@ declare module '@tanstack/react-router' {
       path: '/inventory/$itemId'
       fullPath: '/inventory/$itemId'
       preLoaderRoute: typeof InventoryItemIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/healthz': {
+      id: '/api/healthz'
+      path: '/api/healthz'
+      fullPath: '/api/healthz'
+      preLoaderRoute: typeof ApiHealthzRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authed/profile': {
@@ -737,6 +757,7 @@ const rootRouteChildren: RootRouteChildren = {
   authSignInRoute: authSignInRoute,
   authSignUpRoute: authSignUpRoute,
   authVerifyEmailRoute: authVerifyEmailRoute,
+  ApiHealthzRoute: ApiHealthzRoute,
   InventoryItemIdRoute: InventoryItemIdRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,
   InventoryIndexRoute: InventoryIndexRoute,
