@@ -2,6 +2,7 @@ import { and, desc, eq, ilike, isNull, or, type SQL, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { projectBookmarks, projects, session, user } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
+import { isStaff } from "#/lib/project-visibility";
 import type { BanUserInput, ListUsersInput, SetUserRoleInput } from "../users";
 
 interface AuthUser {
@@ -19,6 +20,36 @@ function assertNotSelf(viewer: AuthUser, targetId: string, action: string) {
   if (viewer.id === targetId) {
     throw new Error(`Cannot ${action} yourself`);
   }
+}
+
+function assertStaff(viewer: AuthUser) {
+  if (!isStaff({ id: viewer.id, role: viewer.role ?? null })) {
+    throw new Error("Forbidden");
+  }
+}
+
+const SEARCH_LIMIT = 10;
+
+export async function searchUsersAs(
+  viewer: AuthUser,
+  data: { q: string }
+): Promise<{ id: string; name: string; email: string }[]> {
+  assertStaff(viewer);
+  const q = data.q.trim();
+  if (!q) {
+    return [];
+  }
+  return await db
+    .select({ id: user.id, name: user.name, email: user.email })
+    .from(user)
+    .where(or(ilike(user.email, `%${q}%`), ilike(user.name, `%${q}%`)))
+    .orderBy(user.email)
+    .limit(SEARCH_LIMIT);
+}
+
+export async function searchUsersForCurrentUser(data: { q: string }) {
+  const viewer = await requireUser();
+  return searchUsersAs(viewer, data);
 }
 
 export async function listUsersImpl(data: ListUsersInput) {

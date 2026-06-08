@@ -15,6 +15,17 @@ export type ListUsersInput = z.infer<typeof listUsersSchema>;
 
 const idSchema = z.object({ id: z.string() });
 
+const searchUsersSchema = z.object({
+  q: z.string().trim().max(200).default(""),
+});
+
+export const searchUsers = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => searchUsersSchema.parse(data ?? {}))
+  .handler(async ({ data }) => {
+    const { searchUsersForCurrentUser } = await import("./_internal/users");
+    return searchUsersForCurrentUser(data);
+  });
+
 const setUserRoleSchema = z.object({
   userId: z.string(),
   role: roleEnum,
