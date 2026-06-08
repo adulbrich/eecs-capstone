@@ -76,6 +76,9 @@ export async function createProjectAs(
   const staff = isStaff(viewerToVisibility(viewer));
   const allowedNotes = staff ? (data.notes ?? null) : null;
   const proposerEmail = staff ? data.proposerEmail || null : null;
+  // On create a blank proposer email defaults the proposer to the creator, so a
+  // new project always has an owner. Staff link a different proposer by entering
+  // their email. On edit, clearing the field is instead an explicit unlink.
   const proposerId = proposerEmail
     ? await resolveProposerId(proposerEmail)
     : viewer.id;

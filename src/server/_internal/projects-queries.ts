@@ -162,17 +162,19 @@ export async function getProposerEmailForEditImpl(data: {
   if (!project) {
     return "";
   }
-  if (project.proposerEmail) {
-    return project.proposerEmail;
+  // proposerId is canonical: when the project is linked to an account, prefill
+  // that account's current email so an untouched staff save re-resolves to the
+  // same proposer. Fall back to the stored email only when no account is linked.
+  if (project.proposerId) {
+    const [account] = await db
+      .select({ email: user.email })
+      .from(user)
+      .where(eq(user.id, project.proposerId));
+    if (account?.email) {
+      return account.email;
+    }
   }
-  if (!project.proposerId) {
-    return "";
-  }
-  const [account] = await db
-    .select({ email: user.email })
-    .from(user)
-    .where(eq(user.id, project.proposerId));
-  return account?.email ?? "";
+  return project.proposerEmail ?? "";
 }
 
 export async function listProjectEditLogImpl(data: { id: string }) {
