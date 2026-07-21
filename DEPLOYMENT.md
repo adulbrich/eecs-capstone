@@ -47,8 +47,13 @@ Accounts and access:
 - Admin access to the GitHub repository (to set Actions variables and read
   workflow runs).
 - The ability to create a GitHub OAuth app (org or personal settings).
-- An email address you control to use as the SES sender (for example
-  `noreply@yourdomain.example` or any mailbox you can receive at).
+
+> **Email is deferred.** This deployment does not provision SES (or any other
+> email provider) yet. The app runs with `EMAIL_TRANSPORT=console`, which logs
+> verification/reset links to CloudWatch instead of emailing them. Sign-up
+> still works, but only someone with log access can complete it. See section
+> 4.1 for how to retrieve those links, and section 9 for wiring up real email
+> later.
 
 ---
 
@@ -98,7 +103,6 @@ Edit `terraform.tfvars`:
 ```hcl
 github_owner     = "your-org-or-user"
 github_repo      = "cs-capstone"
-email_from       = "noreply@yourdomain.example"  # SES sender identity
 github_client_id = "Iv1.xxxxxxxx"                # from step 3.1 (not secret)
 ```
 
@@ -139,21 +143,19 @@ terraform output
 
 ## 4. Post-apply configuration
 
-### 4.1 Verify the SES sender identity
+### 4.1 Email verification links (no email provider yet)
 
-Terraform creates the SES identity, and AWS emails a confirmation link to
-`email_from`. Click it. Until then SES will not send from that address.
-
-While SES is in the **sandbox**, you can only send to verified recipients. Verify
-any addresses you will test sign-up with (including your admin emails):
+With no email provider configured, `EMAIL_TRANSPORT=console` writes
+verification and password-reset links to stderr, which CloudWatch captures.
+After someone signs up, pull their link from the logs:
 
 ```bash
-aws sesv2 create-email-identity --email-identity admin1@example.edu --region us-west-2
-aws sesv2 create-email-identity --email-identity admin2@example.edu --region us-west-2
-# each recipient must click the confirmation email
+aws logs tail /ecs/cs-capstone --since 5m --region us-west-2 | grep -A2 "VERIFY EMAIL"
 ```
 
-Moving out of the sandbox (to email arbitrary addresses) is covered in section 9.
+Send or read them the URL out of band. This is fine for bootstrapping admins
+(section 6) and small-scale testing; wiring up real email delivery is covered
+in section 9.
 
 ### 4.2 Set the GitHub OAuth client secret
 
@@ -219,9 +221,9 @@ The app requires email verification and RDS is private, so admins are bootstrapp
 in two steps. Do this for **at least two** people (the app blocks a sole admin
 from demoting or banning themselves).
 
-1. Each future admin signs up through the app UI with email and password. With
-   their address verified in SES (step 4.1), they receive a verification email
-   and click it.
+1. Each future admin signs up through the app UI with email and password.
+   Pull their verification link from CloudWatch (step 4.1) and have them open
+   it.
 2. Promote each to admin by running the bundled one-off task. This reuses the
    exact network configuration of the running service so it can reach the
    private database:
@@ -250,8 +252,8 @@ Repeat with the second admin's email. Check the task's CloudWatch log for
 
 - `curl -I https://<app-dist>.cloudfront.net/api/healthz` returns `200`.
 - Signing in with GitHub completes the OAuth round trip.
-- Email/password sign-up sends a verification email (to a sandbox-verified
-  address) and completes.
+- Email/password sign-up writes a verification link to CloudWatch (step 4.1)
+  and completes once that link is opened.
 - Uploading a project image works and the image loads from
   `https://<assets-dist>.cloudfront.net/...`.
 - Triggering an AI project review succeeds (Bedrock via the task role).
@@ -303,19 +305,25 @@ Migrations run during deploy. To run them out of band, use the same
 
 ---
 
-## 9. SES production access (leaving the sandbox)
+## 9. Adding real email delivery
 
-In the sandbox the app can only email verified recipients, which is fine for
-testing but not for real users. To email anyone:
+Email is deferred until an email provider is set up. The app already supports
+SES as a transport (`src/lib/email/ses-sender.ts`); wiring it up is
+infrastructure, not code:
 
-1. Open a "Request production access" case from the SES console (Account
-   dashboard) in `us-west-2`.
-2. AWS generally wants a verified sending domain and a description of your
-   sending. A domain identity (rather than a single email) is strongly
-   recommended here and ties in with adding a custom domain later.
+1. Add back an `aws_sesv2_email_identity` resource (verified sender, ideally a
+   domain rather than a single address) and an IAM statement granting the ECS
+   task role `ses:SendEmail`.
+2. In `infra/ecs.tf`, set `EMAIL_TRANSPORT=ses`, `EMAIL_FROM=<verified
+   identity>`, and `SES_REGION`.
+3. `terraform apply`, then confirm the identity verification email.
+4. While SES is in the **sandbox**, it can only send to verified recipients —
+   verify any test/admin addresses with
+   `aws sesv2 create-email-identity --email-identity <addr> --region us-west-2`.
+   Request production access from the SES console to email arbitrary users.
 
-Until production access is granted, new users whose addresses are not verified
-in SES cannot complete sign-up.
+Until this is done, sign-up still works, but verification/reset links only
+reach CloudWatch logs (section 4.1), not real inboxes.
 
 ---
 
@@ -328,7 +336,7 @@ Rough monthly cost at capstone scale in us-west-2:
 | Internal ALB | 17 |
 | Fargate (0.25 vCPU / 0.5 GB, 1 task) | 9 |
 | RDS db.t4g.micro + 20 GB | 14 |
-| CloudFront + S3 + SES + ECR + Secrets Manager | 1 to 5 |
+| CloudFront + S3 + ECR + Secrets Manager | 1 to 5 |
 | **Total** | **~40 to 50** |
 
 There is deliberately no NAT Gateway (~$32/mo avoided). The ALB is the largest
@@ -347,9 +355,9 @@ hand, reuse the service's `networkConfiguration` (see section 6).
 URL must be exactly `https://<app-dist>.cloudfront.net/api/auth/callback/github`
 and `BETTER_AUTH_URL` (task-def env) must be the same app host.
 
-**Sign-up errors or no verification email.** In the SES sandbox the recipient
-address must be verified (section 4.1). Confirm the `email_from` identity is
-verified too.
+**Sign-up seems to hang with no verification email.** Expected: no email
+provider is configured yet. Pull the verification link from CloudWatch
+(section 4.1) instead.
 
 **CloudFront returns 502/504.** Usually the task is unhealthy. Check the target
 group health and the task logs. The ALB health check path is `/api/healthz`;
@@ -407,15 +415,16 @@ this config; delete it manually if you are done with the project.
 **Runtime environment (set in the task definition, `infra/ecs.tf`):**
 
 `NODE_ENV`, `PORT`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `S3_BUCKET`,
-`S3_REGION`, `BEDROCK_REGION`, `BEDROCK_MODEL_ID`, `EMAIL_TRANSPORT=ses`,
-`EMAIL_FROM`, `SES_REGION`, plus secrets `DATABASE_URL`, `BETTER_AUTH_SECRET`,
-`GITHUB_CLIENT_SECRET`. In production, S3 and Bedrock use the task role (no
-access keys).
+`S3_REGION`, `BEDROCK_REGION`, `BEDROCK_MODEL_ID`, `EMAIL_TRANSPORT=console`,
+plus secrets `DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`. In
+production, S3 and Bedrock use the task role (no access keys). Email is
+deferred (section 9); switch `EMAIL_TRANSPORT` to `ses` and add `EMAIL_FROM`
+/ `SES_REGION` once it's configured.
 
 **File map:**
 
 - `infra/` Terraform (one file per concern: `vpc`, `security-groups`, `rds`,
-  `s3`, `ecr`, `ecs`, `cloudfront`, `iam`, `ses`, `secrets`, `outputs`).
+  `s3`, `ecr`, `ecs`, `cloudfront`, `iam`, `secrets`, `outputs`).
 - `Dockerfile`, `.dockerignore` multi-stage arm64 image build.
 - `.github/workflows/deploy.yml` manual deploy workflow.
 - `scripts/migrate.mjs` production migration runner.

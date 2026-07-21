@@ -59,12 +59,6 @@ data "aws_iam_policy_document" "task" {
     actions   = ["bedrock:InvokeModel"]
     resources = ["*"]
   }
-
-  statement {
-    sid       = "SES"
-    actions   = ["ses:SendEmail"]
-    resources = ["*"]
-  }
 }
 
 resource "aws_iam_role_policy" "task" {

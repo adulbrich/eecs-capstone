@@ -11,7 +11,7 @@ variable "environment" {
 }
 
 variable "region" {
-  description = "AWS region for the app, RDS, S3, ALB, and SES."
+  description = "AWS region for the app, RDS, S3, and ALB."
   type        = string
   default     = "us-west-2"
 }
@@ -90,11 +90,6 @@ variable "deploy_branch" {
   description = "Branch the Deploy workflow runs from; the OIDC role trust is scoped to this ref."
   type        = string
   default     = "main"
-}
-
-variable "email_from" {
-  description = "Verified SES sender identity used as the email From address."
-  type        = string
 }
 
 variable "bedrock_region" {

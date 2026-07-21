@@ -4,8 +4,12 @@ Provisions the AWS deployment for the CS Capstone app in **us-west-2**:
 a VPC (public app subnets + private ALB/RDS subnets, no NAT Gateway),
 an internal ALB fronted by **CloudFront VPC origins**, an arm64 **Fargate**
 service, **RDS** Postgres, a private **S3** assets bucket served via a second
-CloudFront distribution (OAC), **SES**, ECR, IAM (task/execution roles + a
-GitHub OIDC deploy role), and Secrets Manager / SSM config.
+CloudFront distribution (OAC), ECR, IAM (task/execution roles + a GitHub OIDC
+deploy role), and Secrets Manager / SSM config.
+
+Email is not provisioned yet: the app runs with `EMAIL_TRANSPORT=console`
+(verification/reset links go to CloudWatch logs, not real inboxes). Add SES
+(or another provider) later and flip `EMAIL_TRANSPORT` back in `infra/ecs.tf`.
 
 See the full design in `../.claude/plans/` (the approved deployment plan).
 
@@ -14,8 +18,8 @@ See the full design in `../.claude/plans/` (the approved deployment plan).
 1. **Remote state (once):** create a private, versioned, encrypted S3 bucket
    (e.g. `cs-capstone-tfstate`), then uncomment the `backend "s3"` block in
    `providers.tf`. State holds generated DB/auth secrets, so keep it private.
-2. `cp terraform.tfvars.example terraform.tfvars` and fill in `github_owner`,
-   `github_repo`, and a verified `email_from`.
+2. `cp terraform.tfvars.example terraform.tfvars` and fill in `github_owner`
+   and `github_repo`.
 3. `terraform init`
 4. `terraform apply`
    - The `aws_cloudfront_vpc_origin` resource takes **15-30+ minutes** to
@@ -24,7 +28,6 @@ See the full design in `../.claude/plans/` (the approved deployment plan).
 
 ## After apply
 
-- Confirm the SES identity verification email (sent to `email_from`).
 - Set the real GitHub OAuth client secret:
   `aws secretsmanager put-secret-value --secret-id cs-capstone/github-client-secret --secret-string '<secret>'`
 - Point the GitHub OAuth app callback at the `app_url` output.

@@ -2,7 +2,6 @@
 
 github_owner = "your-org-or-user"
 github_repo  = "cs-capstone"
-email_from   = "noreply@your-verified-identity.example"
 
 # Optional overrides:
 # region           = "us-west-2"
