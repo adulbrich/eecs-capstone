@@ -61,11 +61,15 @@ Accounts and access:
 
 ### 3.1 Create the GitHub OAuth app
 
-1. GitHub → Settings → Developer settings → OAuth Apps → New OAuth App.
+1. GitHub → Settings → Developer settings → **OAuth Apps** (not "GitHub Apps" —
+   easy to mix up, and the wrong one won't work with `better-auth`'s GitHub
+   provider) → New OAuth App.
 2. Homepage URL and callback URL need the app's public URL, which you do not
    have until Terraform runs. Put a placeholder now (for example
    `https://example.com`); you will correct it in step 4.2.
 3. Note the **Client ID** and generate a **Client secret**. Keep both for later.
+   OAuth App client IDs look like `Ov23xxxxxxxxxxxxxxxx`; if it starts with
+   `Iv1.` instead, you created a GitHub App by mistake.
 
 ### 3.2 Create the Terraform remote state bucket
 
@@ -103,7 +107,7 @@ Edit `terraform.tfvars`:
 ```hcl
 github_owner     = "your-org-or-user"
 github_repo      = "eecs-capstone"
-github_client_id = "Iv1.xxxxxxxx"                # from step 3.1 (not secret)
+github_client_id = "Ov23xxxxxxxxxxxxxxxx"        # from step 3.1 (not secret)
 ```
 
 ### 3.4 Confirm Postgres 18 is available
