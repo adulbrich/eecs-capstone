@@ -1,7 +1,7 @@
 export const brand = {
   institutionName: "Oregon State University",
   institutionShort: "OSU",
-  programName: "CS Capstone",
+  programName: "EECS Capstone",
   logoUrl: "/logo-institution.svg",
   logoAlt: "Oregon State University",
   // Optional explicit white/light logo for dark mode.

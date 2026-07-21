@@ -186,7 +186,7 @@ If you change Better Auth plugins or `additionalFields` and re-run `npx @better-
 
 ### `trustHost` is enabled in non-development
 
-`src/lib/auth.ts` sets `trustHost: process.env.NODE_ENV !== "development"`. Required behind proxies (Railway, AWS) so origin detection works. Disabled in dev where `localhost:3000` is direct.
+`src/lib/auth.ts` sets `trustHost: process.env.NODE_ENV !== "development"`. Required behind the CloudFront/ALB proxy chain in production so origin detection works. Disabled in dev where `localhost:3000` is direct.
 
 ### Session role typing
 

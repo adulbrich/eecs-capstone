@@ -1,4 +1,4 @@
-# Deploying CS Capstone to AWS
+# Deploying EECS Capstone to AWS
 
 This is the end-to-end runbook for deploying and operating the app on AWS. It
 is written so that someone who has never seen the project can take it over.

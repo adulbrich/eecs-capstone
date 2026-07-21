@@ -1,7 +1,7 @@
-# CS Capstone App: Product Requirements
+# EECS Capstone App: Product Requirements
 
 This document is the canonical, exhaustive list of product features for the
-Oregon State University CS Capstone application. It captures both what has been
+Oregon State University EECS Capstone application. It captures both what has been
 built and what is still planned. The original feature draft lived in the
 README; it has been expanded here against the actual implementation.
 
@@ -205,7 +205,7 @@ Each project carries:
 
 - ✅ Centralized brand config (institution name, short name, program name,
   logos, favicon, support email, color tokens) applied at runtime via a brand
-  provider. Defaults to Oregon State University / CS Capstone with Beaver
+  provider. Defaults to Oregon State University / EECS Capstone with Beaver
   Orange.
 
 ## 16. Landing Page

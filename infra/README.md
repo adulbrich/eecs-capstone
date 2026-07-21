@@ -1,6 +1,6 @@
 # Infrastructure (Terraform)
 
-Provisions the AWS deployment for the CS Capstone app in **us-west-2**:
+Provisions the AWS deployment for the EECS Capstone app in **us-west-2**:
 a VPC (public app subnets + private ALB/RDS subnets, no NAT Gateway),
 an internal ALB fronted by **CloudFront VPC origins**, an arm64 **Fargate**
 service, **RDS** Postgres, a private **S3** assets bucket served via a second

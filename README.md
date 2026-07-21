@@ -1,6 +1,6 @@
-# CS Capstone App
+# EECS Capstone App
 
-The Oregon State University CS Capstone application: browse and propose capstone
+The Oregon State University EECS Capstone application: browse and propose capstone
 projects, run them through a review workflow, and manage shared inventory.
 
 This README covers how to run and develop the app, plus the roadmap of work that
@@ -213,17 +213,28 @@ Add components using the latest version of [shadcn](https://ui.shadcn.com/):
 npx shadcn@latest add button
 ```
 
-## Deploy to Railway
+## Deploy to AWS
 
-This project ships with `nixpacks.toml` so Railway detects the build
-automatically:
+Production runs on AWS, provisioned with Terraform (`infra/`) and deployed via a
+one-click GitHub Actions workflow (`.github/workflows/deploy.yml`):
 
-1. Push this repo to GitHub.
-2. Visit <https://railway.com/new> and create a project from your repo.
-3. In the **Variables** tab, add the entries from `.env.example` with their
-   production values.
-4. Railway runs `vite build` and serves from `dist/client`.
+- **Compute**: a single arm64 ECS Fargate task running the app's multi-stage
+  Docker image.
+- **Ingress**: CloudFront is the only public entry point, giving a stable
+  HTTPS `*.cloudfront.net` URL with no custom domain required. It reaches an
+  internal Application Load Balancer through a CloudFront VPC origin, so the
+  ALB itself has no public IP.
+- **Data**: a private RDS Postgres instance and a private S3 bucket for
+  uploaded images, the latter served through its own CloudFront distribution
+  via Origin Access Control.
+- **Images/build**: ECR holds built images; the deploy workflow builds
+  natively on an arm64 GitHub-hosted runner (matching the Fargate
+  architecture), pushes to ECR, runs migrations as a one-off ECS task, then
+  rolls the service.
+- **Secrets/config**: app credentials come from the ECS task role (no static
+  AWS keys); secrets live in Secrets Manager, non-secret config in the task
+  definition and SSM.
 
-Need a database? Click **+ New** in your project to provision Postgres directly
-into the same environment; the connection string is auto-injected as
-`DATABASE_URL`.
+See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the full operational runbook
+(first-time setup through teardown) and [`infra/README.md`](./infra/README.md)
+for the Terraform specifics.
