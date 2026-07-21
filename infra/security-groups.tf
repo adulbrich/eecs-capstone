@@ -36,6 +36,27 @@ resource "aws_vpc_security_group_ingress_rule" "alb_http" {
   cidr_ipv4         = var.vpc_cidr
 }
 
+# A VPC-CIDR rule alone isn't enough: AWS's VPC origins docs require the
+# origin's security group to explicitly allow the CloudFront-managed
+# service SG (or the CloudFront managed prefix list). Without this,
+# CloudFront's connection to the ALB times out (504) even though every
+# other client in the VPC can reach it fine.
+data "aws_security_group" "cloudfront_vpc_origins" {
+  name   = "CloudFront-VPCOrigins-Service-SG"
+  vpc_id = aws_vpc.main.id
+
+  depends_on = [aws_cloudfront_vpc_origin.alb]
+}
+
+resource "aws_vpc_security_group_ingress_rule" "alb_from_cloudfront_vpc_origins" {
+  security_group_id            = aws_security_group.alb.id
+  description                  = "HTTP from the CloudFront VPC origins service SG"
+  ip_protocol                  = "tcp"
+  from_port                    = 80
+  to_port                      = 80
+  referenced_security_group_id = data.aws_security_group.cloudfront_vpc_origins.id
+}
+
 resource "aws_vpc_security_group_egress_rule" "alb_to_app" {
   security_group_id            = aws_security_group.alb.id
   description                  = "Forward to app tasks"
