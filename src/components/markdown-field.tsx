@@ -67,9 +67,16 @@ export function MarkdownField({
     onChange(el.value);
   }
 
+  const hintId = `${id}-markdown-hint`;
+
   return (
     <div className="mt-1">
-      <div className="flex flex-wrap items-center gap-1 rounded-t-md border border-input border-b-0 p-1">
+      {/* biome-ignore lint/a11y/useSemanticElements: role=group with label is the right pattern for a toolbar of buttons, not a <fieldset> of form fields */}
+      <div
+        aria-label="Formatting"
+        className="flex flex-wrap items-center gap-1 rounded-t-md border border-input border-b-0 p-1"
+        role="group"
+      >
         {ACTIONS.map(({ action, icon: Icon, label }) => (
           <Button
             aria-label={label}
@@ -85,6 +92,7 @@ export function MarkdownField({
         ))}
         <div className="ml-auto flex gap-1">
           <Button
+            aria-pressed={mode === "edit"}
             onClick={() => setMode("edit")}
             size="sm"
             type="button"
@@ -93,6 +101,7 @@ export function MarkdownField({
             Edit
           </Button>
           <Button
+            aria-pressed={mode === "preview"}
             onClick={() => setMode("preview")}
             size="sm"
             type="button"
@@ -104,6 +113,7 @@ export function MarkdownField({
       </div>
       {mode === "edit" ? (
         <Textarea
+          aria-describedby={hintId}
           className="rounded-t-none"
           id={id}
           name={name}
@@ -119,8 +129,9 @@ export function MarkdownField({
           <Markdown>{value}</Markdown>
         </div>
       )}
-      <p className="mt-1 text-muted-foreground text-xs">
+      <p className="mt-1 text-muted-foreground text-xs" id={hintId}>
         Markdown supported: **bold**, *italic*, - bullet lists, [links](url).
+        Leave a blank line between paragraphs.
       </p>
     </div>
   );

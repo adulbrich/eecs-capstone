@@ -37,11 +37,11 @@ describe("Markdown", () => {
     expect(anchor?.getAttribute("target")).toBe("_blank");
   });
 
-  it("clamps every heading level to h4", () => {
-    const { container } = render(<Markdown>{"# Top\n\n### Third"}</Markdown>);
+  it("clamps every heading level to h3", () => {
+    const { container } = render(<Markdown>{"# Top\n\n#### Fourth"}</Markdown>);
     expect(container.querySelector("h1")).toBeNull();
-    expect(container.querySelector("h3")).toBeNull();
-    expect(container.querySelectorAll("h4").length).toBe(2);
+    expect(container.querySelector("h4")).toBeNull();
+    expect(container.querySelectorAll("h3").length).toBe(2);
   });
 
   it("does not execute or emit raw HTML", () => {

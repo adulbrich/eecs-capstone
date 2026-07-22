@@ -8,13 +8,13 @@
  */
 const CODE_FENCE = /```[\s\S]*?```/g;
 const HORIZONTAL_RULE = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/gm;
-const IMAGE = /!\[([^\]]*)\]\([^)]*\)/g;
+const IMAGE = /!\[[^\]]*\]\([^)]*\)/g;
 const LINK = /\[([^\]]*)\]\([^)]*\)/g;
 const HEADING_MARKER = /^\s{0,3}#{1,6}\s+/gm;
 const BLOCKQUOTE_MARKER = /^\s{0,3}>\s?/gm;
 const LIST_MARKER = /^\s*([*+-]|\d+[.)])\s+/gm;
 const ASTERISK_EMPHASIS = /(\*{1,3}|~~)(?=\S)([\s\S]*?\S)\1/g;
-const UNDERSCORE_EMPHASIS = /(?<!\w)_{1,3}(?=\S)([\s\S]*?\S)_{1,3}(?!\w)/g;
+const UNDERSCORE_EMPHASIS = /(^|[^\w])_{1,3}(?=\S)([\s\S]*?\S)_{1,3}(?!\w)/g;
 const INLINE_CODE = /`([^`]*)`/g;
 const WHITESPACE = /\s+/g;
 
@@ -25,13 +25,13 @@ export function stripMarkdown(input: string | null | undefined): string {
   return input
     .replace(CODE_FENCE, " ")
     .replace(HORIZONTAL_RULE, " ")
-    .replace(IMAGE, "$1")
+    .replace(IMAGE, "")
     .replace(LINK, "$1")
     .replace(HEADING_MARKER, "")
     .replace(BLOCKQUOTE_MARKER, "")
     .replace(LIST_MARKER, "")
     .replace(ASTERISK_EMPHASIS, "$2")
-    .replace(UNDERSCORE_EMPHASIS, "$1")
+    .replace(UNDERSCORE_EMPHASIS, "$1$2")
     .replace(INLINE_CODE, "$1")
     .replace(WHITESPACE, " ")
     .trim();

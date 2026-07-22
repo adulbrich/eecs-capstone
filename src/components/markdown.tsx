@@ -9,9 +9,12 @@ import remarkGfm from "remark-gfm";
  * and no sanitizer are involved. Raw HTML in the source is inert because
  * `rehype-raw` is deliberately not installed.
  *
- * All six heading levels are allowed and then mapped to `h4`: `allowedElements`
+ * All six heading levels are allowed and then mapped to `h3`: `allowedElements`
  * filters by tag name before `components` runs, so a level that is not allowed
- * would be unwrapped rather than remapped.
+ * would be unwrapped rather than remapped. `h3` is used because the routes
+ * that render author markdown already run `h1` (page title) -> `h2` (section
+ * label) -> author heading, and an `h4` there would skip `h3`, which is the
+ * very heading-order violation this clamp exists to prevent.
  */
 const ALLOWED_ELEMENTS = [
   "p",
@@ -42,7 +45,7 @@ const ALLOWED_ELEMENTS = [
 ];
 
 function Heading({ children }: { children?: ReactNode }) {
-  return <h4 className="font-medium text-base">{children}</h4>;
+  return <h3 className="font-semibold text-sm">{children}</h3>;
 }
 
 function Anchor({ href, children }: { children?: ReactNode; href?: string }) {

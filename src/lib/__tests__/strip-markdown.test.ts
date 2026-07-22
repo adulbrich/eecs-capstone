@@ -36,8 +36,8 @@ describe("stripMarkdown", () => {
     );
   });
 
-  it("keeps image alt text and drops the target", () => {
-    expect(stripMarkdown("![a rover](rover.png) here")).toBe("a rover here");
+  it("drops images entirely, alt text included", () => {
+    expect(stripMarkdown("![a rover](rover.png) here")).toBe("here");
   });
 
   it("removes heading markers", () => {
@@ -60,6 +60,10 @@ describe("stripMarkdown", () => {
     expect(stripMarkdown("the snake_case_name field")).toBe(
       "the snake_case_name field"
     );
+  });
+
+  it("removes underscore emphasis markers", () => {
+    expect(stripMarkdown("_italic_")).toBe("italic");
   });
 
   it("collapses whitespace", () => {
