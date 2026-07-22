@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { listCategories } from "#/server/categories";
 import { listPrograms } from "#/server/programs";
+import { FilterSwitch } from "./filter-switch";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -150,13 +151,12 @@ export function ProjectsFilterBar({
           </Select>
         </div>
         <div className="flex items-end">
-          <Label className="font-normal">
-            <Checkbox
-              checked={archivedOnly}
-              onCheckedChange={(checked) => setArchivedOnly(checked === true)}
-            />
-            Show only archived projects
-          </Label>
+          <FilterSwitch
+            checked={archivedOnly}
+            id="filter-archived-only"
+            label="Show only archived projects"
+            onCheckedChange={setArchivedOnly}
+          />
         </div>
       </div>
 

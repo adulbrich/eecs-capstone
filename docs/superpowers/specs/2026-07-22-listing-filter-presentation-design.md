@@ -38,7 +38,8 @@ straightforward port of a filter that already exists on the public listing.
 - Restricting instructors to their own programs. The program filter is a
   convenience, not an authorization boundary. See Decisions.
 - Per-type faceted category filtering, which is its own README roadmap item.
-- Reworking the admin status tab strip.
+- ~~Reworking the admin status tab strip.~~ Superseded during implementation:
+  the tab strip became a dropdown. See Decisions.
 
 ## Decisions
 
@@ -158,6 +159,29 @@ Placement, matching the route's existing responsive split:
 
 - Mobile: the program select stacks under the status select in the existing
   `space-y-2` block, with the soft-delete switch below.
+**Amended during implementation: the status tab strip is now a dropdown.**
+Adding the program select pushed the desktop toolbar past its container. The
+row held a seven-item tab strip plus, newly, a 224px select and the
+soft-delete switch: roughly 960px of content in an 832px `max-w-4xl` column.
+It could not fit at any viewport, and `body { overflow-x: hidden }` meant the
+overflow was silently clipped rather than scrollable.
+
+Converting status to a dropdown fixes the cause rather than the symptom, and
+collapses a structural problem with it. The mobile and desktop blocks had
+been separate because status was a select on one and tabs on the other; both
+were always in the DOM, since `md:hidden` and `hidden md:flex` are visibility
+toggles, not conditional rendering. That forced per-breakpoint id suffixes to
+avoid duplicate ids, after a real duplicate-id defect was found in review.
+With status a dropdown everywhere, the two blocks render identical content
+and collapse into one, so each control has a single instance, the suffix
+machinery is gone, and the program label could become visible like every
+other filter label.
+
+The cost is real and accepted: the available statuses are no longer visible
+at a glance, and switching status is now two clicks rather than one.
+
+The layout below describes the original design and is retained for context.
+
 - Desktop: the status tab strip is unchanged. The program select and the
   soft-delete switch sit together in the right-hand group of the existing
   `flex items-end justify-between` row.

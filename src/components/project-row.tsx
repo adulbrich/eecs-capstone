@@ -11,17 +11,15 @@ export function ProjectRow({ project }: { project: ProjectSummary }) {
   ) as string[];
   return (
     <Link
-      className="flex items-stretch gap-3 overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary"
+      className="flex items-center gap-3 overflow-hidden rounded-lg border border-border bg-card p-3 transition-colors hover:border-primary"
       params={{ projectId: project.id }}
       to="/projects/$projectId"
     >
-      <div className="relative w-32 shrink-0 self-stretch">
-        <ImageOrFallback
-          className="absolute inset-0 h-full w-full object-cover"
-          src={src}
-        />
-      </div>
-      <div className="min-w-0 flex-1 py-3 pr-3">
+      <ImageOrFallback
+        className="aspect-[3/2] w-28 shrink-0 rounded-md object-cover sm:w-40"
+        src={src}
+      />
+      <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
           <h3 className="truncate font-semibold text-sm">{project.title}</h3>
           {project.status !== "published" && (

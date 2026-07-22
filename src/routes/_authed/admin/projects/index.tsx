@@ -4,7 +4,9 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { z } from "zod";
+import { FilterSwitch } from "#/components/filter-switch";
 import { ProjectRow } from "#/components/project-row";
 import {
   Breadcrumb,
@@ -14,6 +16,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
+import { Label } from "#/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -23,6 +26,7 @@ import {
 } from "#/components/ui/select";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { listPrograms } from "#/server/programs";
 import { listAdminProjects } from "#/server/projects-queries";
 
 const STATUSES = [
@@ -36,8 +40,9 @@ const STATUSES = [
 ] as const;
 
 const searchSchema = z.object({
-  status: z.enum(STATUSES).default("all"),
   includeSoftDeleted: z.boolean().default(false),
+  program: z.string().uuid().nullable().default(null),
+  status: z.enum(STATUSES).default("all"),
 });
 
 export const Route = createFileRoute("/_authed/admin/projects/")({
@@ -53,14 +58,16 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
     }
   },
   loaderDeps: ({ search }) => ({
-    status: search.status,
     includeSoftDeleted: search.includeSoftDeleted,
+    program: search.program,
+    status: search.status,
   }),
   loader: async ({ deps }) =>
     await listAdminProjects({
       data: {
-        status: deps.status,
         includeSoftDeleted: deps.includeSoftDeleted,
+        program: deps.program,
+        status: deps.status,
       },
     }),
   component: AdminProjects,
@@ -68,23 +75,24 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
 
 function AdminProjects() {
   const { rows } = Route.useLoaderData();
-  const { status, includeSoftDeleted } = Route.useSearch();
-  const navigate = useNavigate();
+  const { includeSoftDeleted, program, status } = Route.useSearch();
+  const navigate = useNavigate({ from: "/admin/projects/" });
+  const [allPrograms, setAllPrograms] = useState<
+    { courseId: string; courseName: string; id: string }[]
+  >([]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const { rows: progs } = await listPrograms();
+        setAllPrograms(progs);
+      } catch {
+        // Filter degrades to "All programs" if the list cannot be loaded.
+      }
+    })();
+  }, []);
 
   const label = (s: string) => s.replace(/_/g, " ");
-
-  const softDeleteToggle = (
-    <Link
-      className="text-muted-foreground text-xs hover:text-foreground"
-      search={{
-        status,
-        includeSoftDeleted: !includeSoftDeleted,
-      }}
-      to="/admin/projects"
-    >
-      {includeSoftDeleted ? "Hide soft-deleted" : "Show soft-deleted"}
-    </Link>
-  );
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
@@ -103,58 +111,77 @@ function AdminProjects() {
       </Breadcrumb>
       <h1 className="mt-2 font-semibold text-2xl">Projects</h1>
 
-      {/* Mobile: Select + soft-deleted toggle */}
-      <div className="mt-4 space-y-2 md:hidden">
-        <Select
-          onValueChange={(s) =>
+      <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-end">
+        <div>
+          <Label htmlFor="admin-filter-status">Status</Label>
+          <Select
+            onValueChange={(s) =>
+              void navigate({
+                to: "/admin/projects",
+                search: (prev) => ({
+                  ...prev,
+                  status: s as (typeof STATUSES)[number],
+                }),
+              })
+            }
+            value={status}
+          >
+            <SelectTrigger
+              className="mt-1 w-full md:w-48"
+              id="admin-filter-status"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {label(s)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="admin-filter-program">Program</Label>
+          <Select
+            onValueChange={(v) =>
+              void navigate({
+                to: "/admin/projects",
+                search: (prev) => ({
+                  ...prev,
+                  program: v === "_all_" ? null : v,
+                }),
+              })
+            }
+            value={program ?? "_all_"}
+          >
+            <SelectTrigger
+              className="mt-1 w-full md:w-56"
+              id="admin-filter-program"
+            >
+              <SelectValue placeholder="All programs" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all_">All programs</SelectItem>
+              {allPrograms.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.courseId} {p.courseName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <FilterSwitch
+          checked={includeSoftDeleted}
+          id="admin-include-soft-deleted"
+          label="Show soft-deleted"
+          onCheckedChange={(checked) =>
             void navigate({
               to: "/admin/projects",
-              search: (prev) => ({
-                ...prev,
-                status: s as (typeof STATUSES)[number],
-              }),
+              search: (prev) => ({ ...prev, includeSoftDeleted: checked }),
             })
           }
-          value={status}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {label(s)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {softDeleteToggle}
-      </div>
-
-      {/* Desktop: tab strip + soft-deleted toggle */}
-      <div className="mt-4 hidden items-end justify-between md:flex">
-        <div className="flex border-border border-b text-sm">
-          {STATUSES.map((s) => (
-            <Link
-              className={
-                s === status
-                  ? "-mb-px border-b-2 px-3 py-1.5 font-medium"
-                  : "px-3 py-1.5 text-muted-foreground hover:text-foreground"
-              }
-              key={s}
-              search={(prev) => ({ ...prev, status: s })}
-              style={
-                s === status
-                  ? { borderBottomColor: "var(--brand-primary)" }
-                  : undefined
-              }
-              to="/admin/projects"
-            >
-              {label(s)}
-            </Link>
-          ))}
-        </div>
-        <div className="mb-2">{softDeleteToggle}</div>
+        />
       </div>
       <div className="mt-6 flex flex-col gap-3">
         {rows.length === 0 ? (
