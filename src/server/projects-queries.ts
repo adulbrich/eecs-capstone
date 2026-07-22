@@ -18,6 +18,7 @@ const myProjectsSchema = z.object({
 const adminListSchema = z.object({
   status: z.enum(STATUS_FILTER_VALUES).default("all"),
   includeSoftDeleted: z.boolean().default(false),
+  program: z.string().uuid().nullable().default(null),
 });
 
 const projectIdSchema = z.object({ id: z.string().uuid() });

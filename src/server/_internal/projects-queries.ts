@@ -65,11 +65,21 @@ export async function listMyProjectsImpl(data: { status: StatusFilter }) {
   return { rows };
 }
 
-export async function listAdminProjectsImpl(data: {
-  status: StatusFilter;
+interface AdminProjectsFilter {
   includeSoftDeleted: boolean;
-}) {
-  const viewer = await getViewer();
+  program: string | null;
+  status: StatusFilter;
+}
+
+/**
+ * Test seam. Integration tests call this directly with a viewer instead of
+ * going through the request session, matching the `*As(viewer, ...)`
+ * convention used by the mutation helpers.
+ */
+export async function listAdminProjectsAs(
+  viewer: Viewer,
+  data: AdminProjectsFilter
+) {
   if (!isStaff(viewer)) {
     throw new Error("Forbidden");
   }
@@ -80,6 +90,9 @@ export async function listAdminProjectsImpl(data: {
   if (!data.includeSoftDeleted) {
     conditions.push(isNull(projects.deletedAt));
   }
+  if (data.program) {
+    conditions.push(eq(projects.programId, data.program));
+  }
   const rows = await db
     .select(projectSummarySelect)
     .from(projects)
@@ -87,6 +100,10 @@ export async function listAdminProjectsImpl(data: {
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(projects.updatedAt));
   return { rows };
+}
+
+export async function listAdminProjectsImpl(data: AdminProjectsFilter) {
+  return listAdminProjectsAs(await getViewer(), data);
 }
 
 export async function getProjectImpl(data: { id: string }) {
