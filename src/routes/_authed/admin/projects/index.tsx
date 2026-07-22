@@ -5,6 +5,7 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { z } from "zod";
+import { FilterSwitch } from "#/components/filter-switch";
 import { ProjectRow } from "#/components/project-row";
 import {
   Breadcrumb,
@@ -69,21 +70,22 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
 function AdminProjects() {
   const { rows } = Route.useLoaderData();
   const { status, includeSoftDeleted } = Route.useSearch();
-  const navigate = useNavigate();
+  const navigate = useNavigate({ from: "/admin/projects/" });
 
   const label = (s: string) => s.replace(/_/g, " ");
 
   const softDeleteToggle = (
-    <Link
-      className="text-muted-foreground text-xs hover:text-foreground"
-      search={{
-        status,
-        includeSoftDeleted: !includeSoftDeleted,
-      }}
-      to="/admin/projects"
-    >
-      {includeSoftDeleted ? "Hide soft-deleted" : "Show soft-deleted"}
-    </Link>
+    <FilterSwitch
+      checked={includeSoftDeleted}
+      id="admin-include-soft-deleted"
+      label="Show soft-deleted"
+      onCheckedChange={(checked) =>
+        void navigate({
+          to: "/admin/projects",
+          search: (prev) => ({ ...prev, includeSoftDeleted: checked }),
+        })
+      }
+    />
   );
 
   return (
@@ -154,7 +156,7 @@ function AdminProjects() {
             </Link>
           ))}
         </div>
-        <div className="mb-2">{softDeleteToggle}</div>
+        <div>{softDeleteToggle}</div>
       </div>
       <div className="mt-6 flex flex-col gap-3">
         {rows.length === 0 ? (

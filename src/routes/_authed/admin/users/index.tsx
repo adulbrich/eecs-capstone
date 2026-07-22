@@ -7,6 +7,7 @@ import {
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { AdminTable } from "#/components/admin-table";
+import { FilterSwitch } from "#/components/filter-switch";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -15,7 +16,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
-import { Checkbox } from "#/components/ui/checkbox";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import {
@@ -143,21 +143,16 @@ function UsersAdmin() {
             </SelectContent>
           </Select>
         </div>
-        <Label className="font-normal">
-          <Checkbox
-            checked={includeBanned}
-            onCheckedChange={(checked) =>
-              void navigate({
-                search: (prev) => ({
-                  ...prev,
-                  includeBanned: checked === true,
-                  page: 1,
-                }),
-              })
-            }
-          />
-          Include banned
-        </Label>
+        <FilterSwitch
+          checked={includeBanned}
+          id="user-include-banned"
+          label="Include banned"
+          onCheckedChange={(checked) =>
+            void navigate({
+              search: (prev) => ({ ...prev, includeBanned: checked, page: 1 }),
+            })
+          }
+        />
       </div>
 
       <AdminTable columns={["Email", "Name", "Role", "Banned", ""]}>
