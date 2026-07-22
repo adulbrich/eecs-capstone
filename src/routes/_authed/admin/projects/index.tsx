@@ -94,55 +94,6 @@ function AdminProjects() {
 
   const label = (s: string) => s.replace(/_/g, " ");
 
-  const programFilter = (idSuffix: string) => {
-    const triggerId = `admin-filter-program-${idSuffix}`;
-    return (
-      <div>
-        <Label className="sr-only" htmlFor={triggerId}>
-          Program
-        </Label>
-        <Select
-          onValueChange={(v) =>
-            void navigate({
-              to: "/admin/projects",
-              search: (prev) => ({
-                ...prev,
-                program: v === "_all_" ? null : v,
-              }),
-            })
-          }
-          value={program ?? "_all_"}
-        >
-          <SelectTrigger className="w-full md:w-48 lg:w-56" id={triggerId}>
-            <SelectValue placeholder="All programs" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all_">All programs</SelectItem>
-            {allPrograms.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.courseId} {p.courseName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    );
-  };
-
-  const softDeleteToggle = (idSuffix: string) => (
-    <FilterSwitch
-      checked={includeSoftDeleted}
-      id={`admin-include-soft-deleted-${idSuffix}`}
-      label="Show soft-deleted"
-      onCheckedChange={(checked) =>
-        void navigate({
-          to: "/admin/projects",
-          search: (prev) => ({ ...prev, includeSoftDeleted: checked }),
-        })
-      }
-    />
-  );
-
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
       <Breadcrumb>
@@ -160,62 +111,77 @@ function AdminProjects() {
       </Breadcrumb>
       <h1 className="mt-2 font-semibold text-2xl">Projects</h1>
 
-      {/* Mobile: Select + soft-deleted toggle */}
-      <div className="mt-4 space-y-2 md:hidden">
-        <Select
-          onValueChange={(s) =>
+      <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-end">
+        <div>
+          <Label htmlFor="admin-filter-status">Status</Label>
+          <Select
+            onValueChange={(s) =>
+              void navigate({
+                to: "/admin/projects",
+                search: (prev) => ({
+                  ...prev,
+                  status: s as (typeof STATUSES)[number],
+                }),
+              })
+            }
+            value={status}
+          >
+            <SelectTrigger
+              className="mt-1 w-full md:w-48"
+              id="admin-filter-status"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {label(s)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="admin-filter-program">Program</Label>
+          <Select
+            onValueChange={(v) =>
+              void navigate({
+                to: "/admin/projects",
+                search: (prev) => ({
+                  ...prev,
+                  program: v === "_all_" ? null : v,
+                }),
+              })
+            }
+            value={program ?? "_all_"}
+          >
+            <SelectTrigger
+              className="mt-1 w-full md:w-56"
+              id="admin-filter-program"
+            >
+              <SelectValue placeholder="All programs" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all_">All programs</SelectItem>
+              {allPrograms.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.courseId} {p.courseName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <FilterSwitch
+          checked={includeSoftDeleted}
+          id="admin-include-soft-deleted"
+          label="Show soft-deleted"
+          onCheckedChange={(checked) =>
             void navigate({
               to: "/admin/projects",
-              search: (prev) => ({
-                ...prev,
-                status: s as (typeof STATUSES)[number],
-              }),
+              search: (prev) => ({ ...prev, includeSoftDeleted: checked }),
             })
           }
-          value={status}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {label(s)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {programFilter("mobile")}
-        {softDeleteToggle("mobile")}
-      </div>
-
-      {/* Desktop: tab strip + soft-deleted toggle */}
-      <div className="mt-4 hidden flex-wrap items-end justify-between gap-y-2 md:flex">
-        <div className="flex border-border border-b text-sm">
-          {STATUSES.map((s) => (
-            <Link
-              className={
-                s === status
-                  ? "-mb-px whitespace-nowrap border-b-2 px-3 py-1.5 font-medium"
-                  : "whitespace-nowrap px-3 py-1.5 text-muted-foreground hover:text-foreground"
-              }
-              key={s}
-              search={(prev) => ({ ...prev, status: s })}
-              style={
-                s === status
-                  ? { borderBottomColor: "var(--brand-primary)" }
-                  : undefined
-              }
-              to="/admin/projects"
-            >
-              {label(s)}
-            </Link>
-          ))}
-        </div>
-        <div className="flex items-end gap-3">
-          {programFilter("desktop")}
-          {softDeleteToggle("desktop")}
-        </div>
+        />
       </div>
       <div className="mt-6 flex flex-col gap-3">
         {rows.length === 0 ? (
