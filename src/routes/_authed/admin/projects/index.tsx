@@ -4,6 +4,7 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { FilterSwitch } from "#/components/filter-switch";
 import { ProjectRow } from "#/components/project-row";
@@ -15,6 +16,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
+import { Label } from "#/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -24,6 +26,7 @@ import {
 } from "#/components/ui/select";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { listPrograms } from "#/server/programs";
 import { listAdminProjects } from "#/server/projects-queries";
 
 const STATUSES = [
@@ -37,8 +40,9 @@ const STATUSES = [
 ] as const;
 
 const searchSchema = z.object({
-  status: z.enum(STATUSES).default("all"),
   includeSoftDeleted: z.boolean().default(false),
+  program: z.string().uuid().nullable().default(null),
+  status: z.enum(STATUSES).default("all"),
 });
 
 export const Route = createFileRoute("/_authed/admin/projects/")({
@@ -54,14 +58,16 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
     }
   },
   loaderDeps: ({ search }) => ({
-    status: search.status,
     includeSoftDeleted: search.includeSoftDeleted,
+    program: search.program,
+    status: search.status,
   }),
   loader: async ({ deps }) =>
     await listAdminProjects({
       data: {
-        status: deps.status,
         includeSoftDeleted: deps.includeSoftDeleted,
+        program: deps.program,
+        status: deps.status,
       },
     }),
   component: AdminProjects,
@@ -69,10 +75,59 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
 
 function AdminProjects() {
   const { rows } = Route.useLoaderData();
-  const { status, includeSoftDeleted } = Route.useSearch();
+  const { includeSoftDeleted, program, status } = Route.useSearch();
   const navigate = useNavigate({ from: "/admin/projects/" });
+  const [allPrograms, setAllPrograms] = useState<
+    { courseId: string; courseName: string; id: string }[]
+  >([]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const { rows: progs } = await listPrograms();
+        setAllPrograms(progs);
+      } catch {
+        // Filter degrades to "All programs" if the list cannot be loaded.
+      }
+    })();
+  }, []);
 
   const label = (s: string) => s.replace(/_/g, " ");
+
+  const programFilter = (idSuffix: string) => {
+    const triggerId = `admin-filter-program-${idSuffix}`;
+    return (
+      <div>
+        <Label className="sr-only" htmlFor={triggerId}>
+          Program
+        </Label>
+        <Select
+          onValueChange={(v) =>
+            void navigate({
+              to: "/admin/projects",
+              search: (prev) => ({
+                ...prev,
+                program: v === "_all_" ? null : v,
+              }),
+            })
+          }
+          value={program ?? "_all_"}
+        >
+          <SelectTrigger className="w-56" id={triggerId}>
+            <SelectValue placeholder="All programs" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all_">All programs</SelectItem>
+            {allPrograms.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.courseId} {p.courseName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  };
 
   const softDeleteToggle = (idSuffix: string) => (
     <FilterSwitch
@@ -130,6 +185,7 @@ function AdminProjects() {
             ))}
           </SelectContent>
         </Select>
+        {programFilter("mobile")}
         {softDeleteToggle("mobile")}
       </div>
 
@@ -156,7 +212,10 @@ function AdminProjects() {
             </Link>
           ))}
         </div>
-        <div>{softDeleteToggle("desktop")}</div>
+        <div className="flex items-end gap-3">
+          {programFilter("desktop")}
+          {softDeleteToggle("desktop")}
+        </div>
       </div>
       <div className="mt-6 flex flex-col gap-3">
         {rows.length === 0 ? (
