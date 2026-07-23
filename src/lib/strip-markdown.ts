@@ -18,6 +18,7 @@ const LINK = /\[([^\]]*)\]\([^)]*\)/g;
 const HEADING_MARKER = /^\s{0,3}#{1,6}\s+/gm;
 const BLOCKQUOTE_MARKER = /^\s{0,3}>\s?/gm;
 const LIST_MARKER = /^\s*([*+-]|\d+[.)])\s+/gm;
+const TASK_MARKER = /^\[[ xX]\]\s+/gm;
 const ASTERISK_EMPHASIS = /(\*{1,3}|~~)(?=\S)([\s\S]*?\S)\1/g;
 const UNDERSCORE_EMPHASIS = /(^|[^\w])_{1,3}(?=\S)([\s\S]*?\S)_{1,3}(?!\w)/g;
 const INLINE_CODE = /`([^`]*)`/g;
@@ -39,6 +40,7 @@ export function stripMarkdown(input: string | null | undefined): string {
     .replace(HEADING_MARKER, "")
     .replace(BLOCKQUOTE_MARKER, "")
     .replace(LIST_MARKER, "")
+    .replace(TASK_MARKER, "")
     .replace(ASTERISK_EMPHASIS, "$2")
     .replace(UNDERSCORE_EMPHASIS, "$1$2")
     .replace(INLINE_CODE, "$1")

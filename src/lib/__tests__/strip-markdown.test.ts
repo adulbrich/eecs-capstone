@@ -81,4 +81,12 @@ describe("stripMarkdown", () => {
   it("does not strip pipes inside a fenced code block", () => {
     expect(stripMarkdown("```\na | b\n```\nAfter")).toBe("After");
   });
+
+  it("removes GFM task-list checkbox markers", () => {
+    expect(stripMarkdown("- [x] done\n- [ ] todo")).toBe("done todo");
+  });
+
+  it("preserves brackets that are not task markers", () => {
+    expect(stripMarkdown("an array[0] index")).toBe("an array[0] index");
+  });
 });
