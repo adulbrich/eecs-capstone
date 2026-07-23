@@ -1,14 +1,19 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
-import { programs, user } from "#/db/schema";
+import { programs, projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import {
   createProjectAs,
   performTransitionAs,
   softDeleteProjectAs,
 } from "#/server/_internal/projects";
-import { listAdminProjectsAs } from "#/server/_internal/projects-queries";
+import {
+  getProjectAs,
+  listAdminProjectsAs,
+} from "#/server/_internal/projects-queries";
+
+const VECTOR = Array.from({ length: 1024 }, (_, i) => (i === 0 ? 1 : 0));
 
 async function makeAdmin(email: string) {
   await auth.api.signUpEmail({
@@ -156,5 +161,33 @@ describe("admin projects program filter", () => {
         { status: "all", includeSoftDeleted: false, program: null }
       )
     ).rejects.toThrow("Forbidden");
+  });
+});
+
+describe("getProjectAs", () => {
+  it("never returns the embedding vector, even to a staff viewer after the project has been embedded", async () => {
+    const admin = await makeAdmin(`staff-getproject-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(
+      admin,
+      baseProject("Embedded project", null)
+    );
+    await performTransitionAs(admin, id, "submitted");
+    await performTransitionAs(admin, id, "approved");
+    await performTransitionAs(admin, id, "published");
+
+    await db
+      .update(projects)
+      .set({
+        embedding: VECTOR,
+        embeddingSourceHash: "test-hash",
+        embeddingUpdatedAt: new Date(),
+      })
+      .where(eq(projects.id, id));
+
+    const { project } = await getProjectAs(admin, { id });
+    expect(project).not.toBeNull();
+    expect(project?.embedding).toBeFalsy();
+    expect(project?.embeddingSourceHash).toBeFalsy();
+    expect(project?.embeddingUpdatedAt).toBeFalsy();
   });
 });

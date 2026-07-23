@@ -161,15 +161,19 @@ function Profile() {
       <form className="mt-3" onSubmit={onSaveInterests}>
         <Label htmlFor="interests">Interests</Label>
         <Textarea
+          aria-describedby="interests-count"
           className="mt-1"
           id="interests"
           maxLength={2000}
-          onChange={(e) => setInterests(e.target.value)}
+          onChange={(e) => {
+            setInterests(e.target.value);
+            setInterestsStatus("idle");
+          }}
           placeholder="Robotics, embedded systems, and anything involving sensor data. I have taken CS 344 and I am comfortable with C and Python."
           rows={5}
           value={interests}
         />
-        <p className="mt-1 text-muted-foreground text-xs">
+        <p className="mt-1 text-muted-foreground text-xs" id="interests-count">
           {interests.length} / 2000
         </p>
         <Button

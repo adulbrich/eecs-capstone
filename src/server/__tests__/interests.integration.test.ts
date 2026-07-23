@@ -69,6 +69,33 @@ describe("interests", () => {
     expect((await getMyInterestsAs(id)).hasEmbedding).toBe(false);
   });
 
+  it("nulls the stale vector when interests are cleared", async () => {
+    const id = await makeUser(`g-${Date.now()}@x.com`);
+    const embed = vi.fn().mockResolvedValue(VECTOR);
+
+    expect(await saveMyInterestsAs(id, "Robotics", embed)).toEqual({
+      saved: true,
+      embedded: true,
+    });
+    expect((await getMyInterestsAs(id)).hasEmbedding).toBe(true);
+
+    expect(await saveMyInterestsAs(id, "", embed)).toEqual({
+      saved: true,
+      embedded: false,
+    });
+
+    const [row] = await db
+      .select()
+      .from(userInterests)
+      .where(eq(userInterests.userId, id));
+    expect(row.embedding).toBeNull();
+    expect(row.embeddingSourceHash).toBeNull();
+    expect(await getMyInterestsAs(id)).toEqual({
+      interestsText: "",
+      hasEmbedding: false,
+    });
+  });
+
   it("rejects text over the length limit", async () => {
     const id = await makeUser(`e-${Date.now()}@x.com`);
     await expect(saveMyInterestsAs(id, "x".repeat(2001))).rejects.toThrow();

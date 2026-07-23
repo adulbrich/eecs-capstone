@@ -15,7 +15,13 @@ async function main() {
     .from(projects)
     .where(and(eq(projects.status, "published"), isNull(projects.deletedAt)));
 
-  const tally = { updated: 0, unchanged: 0, failed: 0, skipped: 0 };
+  const tally = {
+    cleared: 0,
+    failed: 0,
+    skipped: 0,
+    unchanged: 0,
+    updated: 0,
+  };
 
   for (const row of rows) {
     const outcome = await refreshProjectEmbedding(row.id);

@@ -200,7 +200,7 @@ export function ProjectsFilterBar({
         </div>
       </div>
 
-      {sort === "recommended" && (
+      {sort === "recommended" && canRecommend && (
         <p className="mt-2 text-muted-foreground text-xs">
           Ranked by your interests.{" "}
           <Link className="text-brand hover:underline" to="/profile">

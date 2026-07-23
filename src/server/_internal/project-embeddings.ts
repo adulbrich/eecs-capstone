@@ -19,7 +19,12 @@ import {
   embeddingHash,
 } from "#/lib/embedding-source";
 
-export type RefreshOutcome = "skipped" | "unchanged" | "updated" | "failed";
+export type RefreshOutcome =
+  | "skipped"
+  | "unchanged"
+  | "updated"
+  | "cleared"
+  | "failed";
 
 /** pgvector's text input format, e.g. `[0.1,0.2]`. */
 export function toSqlVector(values: number[]): string {
@@ -123,6 +128,17 @@ export async function refreshInterestsEmbedding(
 
     const source = buildInterestsEmbeddingSource(row.interestsText);
     if (!source) {
+      if (row.embedding || row.embeddingSourceHash) {
+        await db
+          .update(userInterests)
+          .set({
+            embedding: null,
+            embeddingSourceHash: null,
+            embeddingUpdatedAt: new Date(),
+          })
+          .where(eq(userInterests.userId, userId));
+        return "cleared";
+      }
       return "skipped";
     }
     const hash = embeddingHash(

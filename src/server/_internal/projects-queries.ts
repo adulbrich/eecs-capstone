@@ -106,8 +106,12 @@ export async function listAdminProjectsImpl(data: AdminProjectsFilter) {
   return listAdminProjectsAs(await getViewer(), data);
 }
 
-export async function getProjectImpl(data: { id: string }) {
-  const viewer = await getViewer();
+/**
+ * Test seam. Integration tests call this directly with a viewer instead of
+ * going through the request session, matching the `*As(viewer, ...)`
+ * convention used by the mutation helpers.
+ */
+export async function getProjectAs(viewer: Viewer, data: { id: string }) {
   const [project] = await db
     .select()
     .from(projects)
@@ -131,7 +135,15 @@ export async function getProjectImpl(data: { id: string }) {
     };
   }
 
-  const stripped = stripStaffOnlyFields(project, viewer);
+  // The embedding vector is never returned to any client, staff included:
+  // no UI reads it, and shipping ~8KB of floats on every project-detail load
+  // is pure payload bloat.
+  const stripped = {
+    ...stripStaffOnlyFields(project, viewer),
+    embedding: null,
+    embeddingSourceHash: null,
+    embeddingUpdatedAt: null,
+  };
   const history = await db
     .select({
       id: projectStatusHistory.id,
@@ -160,6 +172,10 @@ export async function getProjectImpl(data: { id: string }) {
     viewerIsStaff,
     viewerIsOwner,
   };
+}
+
+export async function getProjectImpl(data: { id: string }) {
+  return getProjectAs(await getViewer(), data);
 }
 
 export async function getProposerEmailForEditImpl(data: {
