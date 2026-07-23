@@ -145,15 +145,15 @@ terraform output
 
 ### 3.6 Embeddings (interest-based recommendations)
 
-Project recommendations need Amazon Titan Text Embeddings V2 in the same region
-as `BEDROCK_REGION`.
+Project recommendations use Amazon Titan Text Embeddings V2
+(`amazon.titan-embed-text-v2:0`) in the same region as `BEDROCK_REGION`.
 
-1. In the Bedrock console for that region, grant model access to
-   `amazon.titan-embed-text-v2:0`. This is an account-level grant and is
-   separate from the IAM `bedrock:InvokeModel` permission the task role already
-   has. Without it every embedding fails silently and the recommended sort
-   falls back to relevance ordering.
-2. The migration creates the `vector` extension. RDS PostgreSQL 18 ships
+Serverless foundation models are now automatically enabled across all AWS
+commercial regions the first time you invoke them in your account, so no manual
+model-access grant is required. The ECS task role already carries the
+`bedrock:InvokeModel` permission it needs.
+
+1. The migration creates the `vector` extension. RDS PostgreSQL 18 ships
    pgvector 0.8.1, and the master user has the privileges to create it.
    Before relying on this, confirm the instance is actually on 18 in your
    region:
@@ -168,7 +168,7 @@ as `BEDROCK_REGION`.
    `infra/rds.tf:19` pins `engine_version = "18"`. If the region does not yet
    offer 18, pgvector is still available on 15, 16, and 17, so the fallback is
    pinning a lower major rather than abandoning the feature.
-3. After the first deploy, backfill vectors for projects published before this
+2. After the first deploy, backfill vectors for projects published before this
    feature existed:
 
    ```bash
@@ -176,8 +176,9 @@ as `BEDROCK_REGION`.
    ```
 
    The script is idempotent and safe to re-run. It exits non-zero if any
-   project failed, which usually means step 1 was missed.
-4. Re-run the backfill after changing `BEDROCK_EMBEDDING_MODEL_ID`. The stored
+   project failed, which points at a Bedrock or database problem worth
+   investigating.
+3. Re-run the backfill after changing `BEDROCK_EMBEDDING_MODEL_ID`. The stored
    hash includes the model id, so every project is treated as stale and
    re-embedded automatically.
 
