@@ -372,6 +372,14 @@ export function ProjectForm({
               id="teamsSupported"
               max={5}
               min={1}
+              onBlur={(e) => {
+                const n = Number(e.target.value);
+                if (!Number.isFinite(n) || n < 1) {
+                  field.handleChange(1);
+                } else if (n > 5) {
+                  field.handleChange(5);
+                }
+              }}
               onChange={(e) => field.handleChange(Number(e.target.value))}
               type="number"
               value={field.state.value as number}

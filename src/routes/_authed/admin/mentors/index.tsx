@@ -49,12 +49,22 @@ function MentorRow({
 }) {
   const router = useRouter();
   const [count, setCount] = useState(mentor.mentorTeamCount);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   async function save(wantsToMentor: boolean) {
-    await setUserMentorStatus({
-      data: { userId: mentor.id, wantsToMentor, mentorTeamCount: count },
-    });
-    router.invalidate();
+    setSaving(true);
+    setError(null);
+    try {
+      await setUserMentorStatus({
+        data: { userId: mentor.id, wantsToMentor, mentorTeamCount: count },
+      });
+      router.invalidate();
+    } catch (err) {
+      setError((err as Error).message || "Could not save.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -74,6 +84,14 @@ function MentorRow({
           className="w-20"
           max={5}
           min={1}
+          onBlur={(e) => {
+            const n = Number(e.target.value);
+            if (!Number.isFinite(n) || n < 1) {
+              setCount(1);
+            } else if (n > 5) {
+              setCount(5);
+            }
+          }}
           onChange={(e) => setCount(Number(e.target.value))}
           type="number"
           value={count}
@@ -81,13 +99,24 @@ function MentorRow({
       </td>
       <td className="border border-border p-2">
         <div className="flex gap-2">
-          <Button onClick={() => save(true)} size="sm" variant="outline">
+          <Button
+            disabled={saving}
+            onClick={() => save(true)}
+            size="sm"
+            variant="outline"
+          >
             Save
           </Button>
-          <Button onClick={() => save(false)} size="sm" variant="outline">
+          <Button
+            disabled={saving}
+            onClick={() => save(false)}
+            size="sm"
+            variant="outline"
+          >
             Remove
           </Button>
         </div>
+        {error && <p className="text-destructive text-xs">{error}</p>}
       </td>
     </tr>
   );

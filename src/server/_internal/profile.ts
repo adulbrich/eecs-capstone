@@ -8,7 +8,7 @@ export async function updateProfileAs(userId: string, data: ProfileInput) {
   await db
     .update(user)
     .set({
-      affiliation: data.affiliation ?? null,
+      affiliation: data.affiliation?.trim() || null,
       linkedin: data.linkedin ?? null,
       mentorTeamCount: data.mentorTeamCount,
       name: data.name,

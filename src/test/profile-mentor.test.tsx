@@ -1,21 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("@tanstack/react-router", () => ({
-  createFileRoute: () => () => ({}),
-  // biome-ignore lint/a11y/useValidAnchor: unused route-mock stub, never rendered by these tests
-  Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
-  useRouter: () => ({ invalidate: () => undefined }),
-}));
-vi.mock("#/server/interests", () => ({
-  getMyInterests: () => Promise.resolve({ interestsText: "" }),
-  saveMyInterests: vi.fn(),
-}));
-vi.mock("#/server/profile", () => ({ updateProfile: vi.fn() }));
-vi.mock("#/lib/auth-client", () => ({ authClient: {} }));
-
-import { MentorFields } from "#/routes/_authed/profile";
+import { afterEach, describe, expect, it } from "vitest";
+import { MentorFields } from "#/components/mentor-fields";
 
 afterEach(cleanup);
 

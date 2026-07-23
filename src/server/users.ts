@@ -91,10 +91,6 @@ const setUserMentorStatusSchema = z.object({
   mentorTeamCount: z.number().int().min(1).max(5),
 });
 
-export type SetUserMentorStatusInput = z.infer<
-  typeof setUserMentorStatusSchema
->;
-
 export const setUserMentorStatus = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => setUserMentorStatusSchema.parse(data))
   .handler(async ({ data }) => {
