@@ -103,3 +103,15 @@ variable "bedrock_model_id" {
   type        = string
   default     = "minimax.minimax-m2.5"
 }
+
+variable "bedrock_embedding_model_id" {
+  description = "Bedrock model id used for project and interest embeddings"
+  type        = string
+  default     = "amazon.titan-embed-text-v2:0"
+}
+
+variable "bedrock_embedding_dimensions" {
+  description = "Embedding vector size; must match the vector(N) column width"
+  type        = string
+  default     = "1024"
+}

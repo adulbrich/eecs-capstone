@@ -143,6 +143,44 @@ terraform output
 # rds_endpoint, github_deploy_role_arn
 ```
 
+### 3.6 Embeddings (interest-based recommendations)
+
+Project recommendations need Amazon Titan Text Embeddings V2 in the same region
+as `BEDROCK_REGION`.
+
+1. In the Bedrock console for that region, grant model access to
+   `amazon.titan-embed-text-v2:0`. This is an account-level grant and is
+   separate from the IAM `bedrock:InvokeModel` permission the task role already
+   has. Without it every embedding fails silently and the recommended sort
+   falls back to relevance ordering.
+2. The migration creates the `vector` extension. RDS PostgreSQL 18 ships
+   pgvector 0.8.1, and the master user has the privileges to create it.
+   Before relying on this, confirm the instance is actually on 18 in your
+   region:
+
+   ```bash
+   aws rds describe-db-engine-versions --engine postgres --engine-version 18 \
+     --query 'DBEngineVersions[0].SupportedFeatureNames' --output text
+   aws rds describe-db-engine-versions --engine postgres --engine-version 18 \
+     --query 'DBEngineVersions[0].ValidUpgradeTarget' --output table
+   ```
+
+   `infra/rds.tf:19` pins `engine_version = "18"`. If the region does not yet
+   offer 18, pgvector is still available on 15, 16, and 17, so the fallback is
+   pinning a lower major rather than abandoning the feature.
+3. After the first deploy, backfill vectors for projects published before this
+   feature existed:
+
+   ```bash
+   npm run embeddings:backfill
+   ```
+
+   The script is idempotent and safe to re-run. It exits non-zero if any
+   project failed, which usually means step 1 was missed.
+4. Re-run the backfill after changing `BEDROCK_EMBEDDING_MODEL_ID`. The stored
+   hash includes the model id, so every project is treated as stale and
+   re-embedded automatically.
+
 ---
 
 ## 4. Post-apply configuration

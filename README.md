@@ -17,7 +17,6 @@ in [`PRD.md`](./PRD.md).
 ### Projects
 
 - Allow rich text formatting (or markdown) in project edit fields (e.g., bullet lists for requirements)
-- Allow users to write their interests etc and be presented with relevant projects (advanced search)
 - When in list view, the aspect ratio of the image does not work. The project image is specifically set to a certain aspect ratio, and it's used in the card view, but then the list view is almost square and might not work for all images. Could we change the aspect ratio of the list view image to render a little better? Not mandatory if no better solution exists.
 - The checkbox to "Show only archived projects" and "include banned" have a weird alignment compared to the other fields next to them (dropdown, inputs, etc.). They are smaller, bottom aligned, and it does not look good. Top of mind I'm thinking of either 1. making the check box taller to match the other fields, or 2. center vertically with the dropdowns/inputs (but not labels), or 3. use a switch instead and vertically align, or 4. you give me a better option that visually works.
 - For show/hide soft-delete in the admin, we could also use a switch to make it clearer. 
@@ -103,6 +102,10 @@ A few conventions worth knowing before you contribute:
 - Full-text search uses a Postgres generated `tsvector` column with a GIN index.
   To change field weights, drop and re-add the column in a new migration (see
   [`docs/QUIRKS.md`](./docs/QUIRKS.md)).
+- Interest-based recommendations use pgvector. Projects are embedded only on
+  publish and re-embedded when a published project's indexed text changes; see
+  `src/server/_internal/project-embeddings.ts`, the single writer of every
+  vector. `npm run embeddings:backfill` is the safety net.
 - All filter/search state lives in URL search params so links are shareable.
 
 ## Authentication setup (Better Auth)

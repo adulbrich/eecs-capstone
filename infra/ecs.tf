@@ -89,6 +89,8 @@ resource "aws_ecs_task_definition" "app" {
         { name = "S3_REGION", value = var.region },
         { name = "BEDROCK_REGION", value = var.bedrock_region },
         { name = "BEDROCK_MODEL_ID", value = var.bedrock_model_id },
+        { name = "BEDROCK_EMBEDDING_MODEL_ID", value = var.bedrock_embedding_model_id },
+        { name = "BEDROCK_EMBEDDING_DIMENSIONS", value = var.bedrock_embedding_dimensions },
         # Logs verification/reset links to CloudWatch instead of sending real
         # email. Switch to "ses" (and set EMAIL_FROM/SES_REGION) once SES is
         # configured.
