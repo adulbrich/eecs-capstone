@@ -34,6 +34,7 @@ interface Project {
   id: string;
   notes: string | null;
   status: string;
+  teamsSupported: number;
 }
 
 interface EditLogRow {
@@ -199,6 +200,14 @@ export function StaffProjectPanel({
           Override
         </span>
       </div>
+
+      {/* Staff-only project details */}
+      <section className="mt-4 border-border border-t pt-4">
+        <p className="text-sm">
+          <span className="text-muted-foreground">Teams supported: </span>
+          {project.teamsSupported ?? 1}
+        </p>
+      </section>
 
       {/* Comment textarea */}
       <section className="mt-4 space-y-1.5">

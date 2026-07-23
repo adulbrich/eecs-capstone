@@ -219,3 +219,47 @@ export async function unbanUserForCurrentUser(data: { userId: string }) {
   const viewer = await requireUser();
   return unbanUserAs(viewer, data);
 }
+
+export async function listMentorsAs(viewer: AuthUser) {
+  assertStaff(viewer);
+  const rows = await db
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      affiliation: user.affiliation,
+      mentorTeamCount: user.mentorTeamCount,
+    })
+    .from(user)
+    .where(eq(user.wantsToMentor, true))
+    .orderBy(user.name);
+  return { rows };
+}
+
+export async function setUserMentorStatusAs(
+  viewer: AuthUser,
+  data: { userId: string; wantsToMentor: boolean; mentorTeamCount: number }
+) {
+  assertStaff(viewer);
+  await db
+    .update(user)
+    .set({
+      wantsToMentor: data.wantsToMentor,
+      mentorTeamCount: data.mentorTeamCount,
+      updatedAt: new Date(),
+    })
+    .where(eq(user.id, data.userId));
+  return { ok: true as const };
+}
+
+export async function listMentorsForCurrentUser() {
+  return listMentorsAs(await requireUser());
+}
+
+export async function setUserMentorStatusForCurrentUser(data: {
+  userId: string;
+  wantsToMentor: boolean;
+  mentorTeamCount: number;
+}) {
+  return setUserMentorStatusAs(await requireUser(), data);
+}

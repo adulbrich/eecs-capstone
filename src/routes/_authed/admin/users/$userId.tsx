@@ -113,6 +113,12 @@ function UserDetail() {
           <a href={user.linkedin}>{user.linkedin}</a>
         </p>
       )}
+      {user.wantsToMentor && (
+        <p className="text-sm">
+          <span className="text-muted-foreground">Mentor: </span>
+          yes ({user.mentorTeamCount ?? 1} teams)
+        </p>
+      )}
       <p className="text-sm">
         <span className="text-muted-foreground">Sign-in: </span>
         {providers.length > 0

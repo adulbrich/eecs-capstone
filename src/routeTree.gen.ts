@@ -32,6 +32,7 @@ import { Route as AuthedMyBookmarksRouteImport } from './routes/_authed/my/bookm
 import { Route as AuthedAdminUsersIndexRouteImport } from './routes/_authed/admin/users/index'
 import { Route as AuthedAdminProjectsIndexRouteImport } from './routes/_authed/admin/projects/index'
 import { Route as AuthedAdminProgramsIndexRouteImport } from './routes/_authed/admin/programs/index'
+import { Route as AuthedAdminMentorsIndexRouteImport } from './routes/_authed/admin/mentors/index'
 import { Route as AuthedAdminInventoryIndexRouteImport } from './routes/_authed/admin/inventory/index'
 import { Route as AuthedAdminCategoriesIndexRouteImport } from './routes/_authed/admin/categories/index'
 import { Route as AuthedProjectsProjectIdEditRouteImport } from './routes/_authed/projects/$projectId/edit'
@@ -159,6 +160,11 @@ const AuthedAdminProgramsIndexRoute =
     path: '/programs/',
     getParentRoute: () => AuthedAdminRoute,
   } as any)
+const AuthedAdminMentorsIndexRoute = AuthedAdminMentorsIndexRouteImport.update({
+  id: '/mentors/',
+  path: '/mentors/',
+  getParentRoute: () => AuthedAdminRoute,
+} as any)
 const AuthedAdminInventoryIndexRoute =
   AuthedAdminInventoryIndexRouteImport.update({
     id: '/inventory/',
@@ -247,6 +253,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
   '/admin/categories/': typeof AuthedAdminCategoriesIndexRoute
   '/admin/inventory/': typeof AuthedAdminInventoryIndexRoute
+  '/admin/mentors/': typeof AuthedAdminMentorsIndexRoute
   '/admin/programs/': typeof AuthedAdminProgramsIndexRoute
   '/admin/projects/': typeof AuthedAdminProjectsIndexRoute
   '/admin/users/': typeof AuthedAdminUsersIndexRoute
@@ -280,6 +287,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
   '/admin/categories': typeof AuthedAdminCategoriesIndexRoute
   '/admin/inventory': typeof AuthedAdminInventoryIndexRoute
+  '/admin/mentors': typeof AuthedAdminMentorsIndexRoute
   '/admin/programs': typeof AuthedAdminProgramsIndexRoute
   '/admin/projects': typeof AuthedAdminProjectsIndexRoute
   '/admin/users': typeof AuthedAdminUsersIndexRoute
@@ -316,6 +324,7 @@ export interface FileRoutesById {
   '/_authed/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
   '/_authed/admin/categories/': typeof AuthedAdminCategoriesIndexRoute
   '/_authed/admin/inventory/': typeof AuthedAdminInventoryIndexRoute
+  '/_authed/admin/mentors/': typeof AuthedAdminMentorsIndexRoute
   '/_authed/admin/programs/': typeof AuthedAdminProgramsIndexRoute
   '/_authed/admin/projects/': typeof AuthedAdminProjectsIndexRoute
   '/_authed/admin/users/': typeof AuthedAdminUsersIndexRoute
@@ -352,6 +361,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/edit'
     | '/admin/categories/'
     | '/admin/inventory/'
+    | '/admin/mentors/'
     | '/admin/programs/'
     | '/admin/projects/'
     | '/admin/users/'
@@ -385,6 +395,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/edit'
     | '/admin/categories'
     | '/admin/inventory'
+    | '/admin/mentors'
     | '/admin/programs'
     | '/admin/projects'
     | '/admin/users'
@@ -420,6 +431,7 @@ export interface FileRouteTypes {
     | '/_authed/projects/$projectId/edit'
     | '/_authed/admin/categories/'
     | '/_authed/admin/inventory/'
+    | '/_authed/admin/mentors/'
     | '/_authed/admin/programs/'
     | '/_authed/admin/projects/'
     | '/_authed/admin/users/'
@@ -605,6 +617,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminProgramsIndexRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
+    '/_authed/admin/mentors/': {
+      id: '/_authed/admin/mentors/'
+      path: '/mentors'
+      fullPath: '/admin/mentors/'
+      preLoaderRoute: typeof AuthedAdminMentorsIndexRouteImport
+      parentRoute: typeof AuthedAdminRoute
+    }
     '/_authed/admin/inventory/': {
       id: '/_authed/admin/inventory/'
       path: '/inventory'
@@ -702,6 +721,7 @@ interface AuthedAdminRouteChildren {
   AuthedAdminUsersUserIdRoute: typeof AuthedAdminUsersUserIdRoute
   AuthedAdminCategoriesIndexRoute: typeof AuthedAdminCategoriesIndexRoute
   AuthedAdminInventoryIndexRoute: typeof AuthedAdminInventoryIndexRoute
+  AuthedAdminMentorsIndexRoute: typeof AuthedAdminMentorsIndexRoute
   AuthedAdminProgramsIndexRoute: typeof AuthedAdminProgramsIndexRoute
   AuthedAdminProjectsIndexRoute: typeof AuthedAdminProjectsIndexRoute
   AuthedAdminUsersIndexRoute: typeof AuthedAdminUsersIndexRoute
@@ -717,6 +737,7 @@ const AuthedAdminRouteChildren: AuthedAdminRouteChildren = {
   AuthedAdminUsersUserIdRoute: AuthedAdminUsersUserIdRoute,
   AuthedAdminCategoriesIndexRoute: AuthedAdminCategoriesIndexRoute,
   AuthedAdminInventoryIndexRoute: AuthedAdminInventoryIndexRoute,
+  AuthedAdminMentorsIndexRoute: AuthedAdminMentorsIndexRoute,
   AuthedAdminProgramsIndexRoute: AuthedAdminProgramsIndexRoute,
   AuthedAdminProjectsIndexRoute: AuthedAdminProjectsIndexRoute,
   AuthedAdminUsersIndexRoute: AuthedAdminUsersIndexRoute,

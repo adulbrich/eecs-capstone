@@ -38,6 +38,7 @@ const projectInputSchema = z.object({
     .nullable()
     .optional()
     .or(z.literal("")),
+  teamsSupported: z.number().int().min(1).max(5).optional(),
 });
 
 export type ProjectInput = z.infer<typeof projectInputSchema>;

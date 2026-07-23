@@ -65,6 +65,7 @@ function EditProject() {
             programId: (project.programId as string) ?? "",
             notes: (project.notes as string) ?? "",
             proposerEmail,
+            teamsSupported: (project.teamsSupported as number) ?? 1,
           }}
           initialCategoryIds={categoryIds}
           onSubmit={async (values, nextCategoryIds, pendingImage) => {

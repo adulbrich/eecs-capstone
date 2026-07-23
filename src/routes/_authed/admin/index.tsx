@@ -3,6 +3,7 @@ import {
   ArrowRight,
   BookOpen,
   FolderKanban,
+  Handshake,
   Package,
   Tag,
   Users,
@@ -169,6 +170,12 @@ function AdminHome() {
             icon={Package}
             label="Inventory"
             to="/admin/inventory"
+          />
+          <NavCard
+            description="See who volunteered to mentor and set capacity"
+            icon={Handshake}
+            label="Mentors"
+            to="/admin/mentors"
           />
           {isAdmin && (
             <NavCard

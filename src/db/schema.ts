@@ -87,6 +87,7 @@ export const projects = pgTable(
     contactName: text("contact_name"),
     imageUrl: text("image_url"),
     licenseRestrictions: text("license_restrictions"),
+    teamsSupported: integer("teams_supported").notNull().default(1),
     /** Staff-visible only; never returned in public queries. */
     notes: text("notes"),
 

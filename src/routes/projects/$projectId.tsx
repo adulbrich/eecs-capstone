@@ -223,6 +223,7 @@ function ProjectDetail() {
             status: project.status as string,
             deletedAt: (project.deletedAt as Date | null) ?? null,
             notes: (project.notes as string | null) ?? null,
+            teamsSupported: (project.teamsSupported as number) ?? 1,
           }}
         />
       )}

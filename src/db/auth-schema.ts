@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import {
   boolean,
   index,
+  integer,
   pgTable,
   text,
   timestamp,
@@ -29,6 +30,8 @@ export const user = pgTable("user", {
   // The CLI re-includes these on regen because they live in the auth config.
   affiliation: text("affiliation"),
   linkedin: text("linkedin"),
+  wantsToMentor: boolean("wants_to_mentor").notNull().default(false),
+  mentorTeamCount: integer("mentor_team_count").notNull().default(1),
 });
 
 export const session = pgTable(

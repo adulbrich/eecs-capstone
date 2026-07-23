@@ -44,6 +44,7 @@ export const projectFormSchema = z.object({
   programId: optionalUuid,
   notes: z.string().max(5000).default(""),
   proposerEmail: optionalEmail,
+  teamsSupported: z.number().int().min(1).max(5).default(1),
 });
 
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
@@ -109,6 +110,7 @@ export function ProjectForm({
       programId: initial?.programId ?? "",
       notes: initial?.notes ?? "",
       proposerEmail: initial?.proposerEmail ?? "",
+      teamsSupported: initial?.teamsSupported ?? 1,
     } satisfies ProjectFormValues,
     validators: {
       onSubmit: ({ value }) => {
@@ -355,6 +357,32 @@ export function ProjectForm({
               id="programId"
               onChange={(v) => field.handleChange(v)}
               value={field.state.value as string}
+            />
+          </div>
+        )}
+      </form.Field>
+      <form.Field name="teamsSupported">
+        {(field: AnyForm) => (
+          <div>
+            <Label htmlFor="teamsSupported">
+              Teams this project can support
+            </Label>
+            <Input
+              className="mt-1 w-24"
+              id="teamsSupported"
+              max={5}
+              min={1}
+              onBlur={(e) => {
+                const n = Number(e.target.value);
+                if (!Number.isFinite(n) || n < 1) {
+                  field.handleChange(1);
+                } else if (n > 5) {
+                  field.handleChange(5);
+                }
+              }}
+              onChange={(e) => field.handleChange(Number(e.target.value))}
+              type="number"
+              value={field.state.value as number}
             />
           </div>
         )}

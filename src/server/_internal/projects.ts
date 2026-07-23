@@ -42,6 +42,7 @@ const PROJECT_EDITABLE_FIELDS = [
   "notes",
   "proposerEmail",
   "proposerId",
+  "teamsSupported",
 ] as const;
 
 const STAFF_ONLY_FIELDS = new Set(["notes", "proposerEmail", "proposerId"]);
@@ -104,6 +105,7 @@ export async function createProjectAs(
       proposerId,
       proposerEmail,
       status: "draft",
+      teamsSupported: data.teamsSupported ?? 1,
     })
     .returning();
   return { id: created.id };
@@ -135,6 +137,7 @@ export async function updateProjectAs(
     imageUrl: data.imageUrl || null,
     licenseRestrictions: data.licenseRestrictions ?? null,
     programId: data.programId ?? null,
+    teamsSupported: data.teamsSupported ?? 1,
   };
   if (staff) {
     newValues.notes = data.notes ?? null;

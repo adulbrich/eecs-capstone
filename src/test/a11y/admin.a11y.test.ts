@@ -82,3 +82,8 @@ test("admin program detail", async ({ page }) => {
   await page.goto(`/admin/programs/${programId}`);
   await checkA11y(page);
 });
+
+test("admin mentors list", async ({ page }) => {
+  await page.goto("/admin/mentors");
+  await checkA11y(page);
+});

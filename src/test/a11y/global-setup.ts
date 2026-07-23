@@ -70,6 +70,13 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
     );
   }
 
+  // Opt the owner user into mentoring so /admin/mentors renders a populated
+  // row (Input + Save/Remove buttons) for axe to scan, not just the empty state.
+  await db
+    .update(schema.user)
+    .set({ wantsToMentor: true, mentorTeamCount: 2 })
+    .where(eq(schema.user.id, owner.id));
+
   // Note: select-first is non-atomic. Concurrent global-setup runs could produce
   // duplicate rows since these tables have no UNIQUE constraint on their sentinel
   // values. Acceptable for single-worker CI; revisit if workers > 1.

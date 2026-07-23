@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AvatarUploader } from "#/components/avatar-uploader";
+import { MentorFields } from "#/components/mentor-fields";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
@@ -21,8 +22,10 @@ interface ProfileUser {
   id: string;
   image?: string | null;
   linkedin?: string | null;
+  mentorTeamCount?: number | null;
   name: string | null;
   role: string | null | undefined;
+  wantsToMentor?: boolean | null;
 }
 
 function Profile() {
@@ -35,6 +38,12 @@ function Profile() {
   const [interestsStatus, setInterestsStatus] = useState<
     "idle" | "saving" | "saved" | "degraded" | "error"
   >("idle");
+  const [wantsToMentor, setWantsToMentor] = useState(
+    Boolean(user.wantsToMentor)
+  );
+  const [mentorTeamCount, setMentorTeamCount] = useState(
+    user.mentorTeamCount ?? 1
+  );
 
   useEffect(() => {
     void (async () => {
@@ -58,6 +67,8 @@ function Profile() {
           name: String(form.get("name") ?? ""),
           affiliation: String(form.get("affiliation") ?? "") || null,
           linkedin: String(form.get("linkedin") ?? "") || null,
+          wantsToMentor,
+          mentorTeamCount,
         },
       });
       setSaved(true);
@@ -148,6 +159,12 @@ function Profile() {
             type="url"
           />
         </div>
+        <MentorFields
+          count={mentorTeamCount}
+          onCountChange={setMentorTeamCount}
+          onToggle={setWantsToMentor}
+          wants={wantsToMentor}
+        />
         <Button className="w-full" type="submit">
           Save profile
         </Button>

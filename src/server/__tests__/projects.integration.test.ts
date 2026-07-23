@@ -46,6 +46,7 @@ function baseProject() {
     licenseRestrictions: null,
     programId: null,
     notes: null,
+    teamsSupported: 1,
   };
 }
 
@@ -103,6 +104,23 @@ describe("project workflow", () => {
       .where(eq(projectEditLog.projectId, id));
     expect(rows).toHaveLength(1);
     expect(rows[0].changedFields).toEqual(["description"]);
+  });
+
+  it("persists and defaults teamsSupported", async () => {
+    const admin = await makeUser(`t-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(admin, baseProject());
+    const [created] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, id));
+    expect(created.teamsSupported).toBe(1);
+
+    await updateProjectAs(admin, { ...baseProject(), id, teamsSupported: 3 });
+    const [updated] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, id));
+    expect(updated.teamsSupported).toBe(3);
   });
 
   it("soft delete sets deletedAt; restore clears it", async () => {

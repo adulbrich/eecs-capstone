@@ -41,6 +41,8 @@ export const auth = betterAuth({
     additionalFields: {
       affiliation: { type: "string", required: false },
       linkedin: { type: "string", required: false },
+      wantsToMentor: { type: "boolean", required: false, defaultValue: false },
+      mentorTeamCount: { type: "number", required: false, defaultValue: 1 },
     },
   },
   plugins: [
