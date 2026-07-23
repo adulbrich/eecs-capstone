@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
+import { EmptyState } from "#/components/empty-state";
 import { FilterSwitch } from "#/components/filter-switch";
 import { ProjectRow } from "#/components/project-row";
 import {
@@ -135,7 +136,7 @@ function AdminProjects() {
             <SelectContent>
               {STATUSES.map((s) => (
                 <SelectItem key={s} value={s}>
-                  {label(s)}
+                  {s === "all" ? "All statuses" : label(s)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -183,15 +184,15 @@ function AdminProjects() {
           }
         />
       </div>
-      <div className="mt-6 flex flex-col gap-3">
-        {rows.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No projects in this view.
-          </p>
-        ) : (
-          rows.map((p) => <ProjectRow key={p.id} project={p} />)
-        )}
-      </div>
+      {rows.length === 0 ? (
+        <EmptyState>No projects in this view.</EmptyState>
+      ) : (
+        <div className="mt-6 flex flex-col gap-3">
+          {rows.map((p) => (
+            <ProjectRow key={p.id} project={p} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

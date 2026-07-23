@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
+import { EmptyState } from "#/components/empty-state";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { Button } from "#/components/ui/button";
 import { Textarea } from "#/components/ui/textarea";
@@ -77,7 +78,7 @@ function MyItems() {
       {tab === "cart" && (
         <div className="mt-4 space-y-2">
           {data.cart.length === 0 && (
-            <p className="text-muted-foreground">Your cart is empty.</p>
+            <EmptyState>Your cart is empty.</EmptyState>
           )}
           {data.cart.map((row) => (
             <div
@@ -180,7 +181,7 @@ function MyItems() {
       {tab === "history" && (
         <div className="mt-4 space-y-2">
           {data.history.length === 0 && (
-            <p className="text-muted-foreground">No history yet.</p>
+            <EmptyState>No history yet.</EmptyState>
           )}
           {data.history.map(({ line, item }) => (
             <div

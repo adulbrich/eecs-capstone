@@ -1,6 +1,7 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { z } from "zod";
 import { AdminRequestQueueRow } from "#/components/admin-request-queue-row";
+import { EmptyState } from "#/components/empty-state";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -86,9 +87,7 @@ function AdminRequestQueue() {
 
       <div className="mt-4 space-y-4">
         {batches.length === 0 && (
-          <p className="text-muted-foreground text-sm">
-            No requests in this view.
-          </p>
+          <EmptyState>No requests in this view.</EmptyState>
         )}
         {batches.map((batch) => (
           <section

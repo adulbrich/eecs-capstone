@@ -1,7 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
+import { EmptyState } from "#/components/empty-state";
 import { ProjectRow } from "#/components/project-row";
 import { Button } from "#/components/ui/button";
+import { Label } from "#/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -51,8 +53,8 @@ function MyProjects() {
         </Button>
       </div>
 
-      {/* Mobile: Select */}
-      <div className="mt-4 md:hidden">
+      <div className="mt-4">
+        <Label htmlFor="my-filter-status">Status</Label>
         <Select
           onValueChange={(s) =>
             void navigate({
@@ -62,50 +64,27 @@ function MyProjects() {
           }
           value={status}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="mt-1 w-full md:w-48" id="my-filter-status">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {STATUSES.map((s) => (
               <SelectItem key={s} value={s}>
-                {label(s)}
+                {s === "all" ? "All statuses" : label(s)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
-
-      {/* Desktop: tab strip */}
-      <div className="mt-4 hidden border-border border-b text-sm md:flex">
-        {STATUSES.map((s) => (
-          <Link
-            className={
-              s === status
-                ? "-mb-px border-b-2 px-3 py-1.5 font-medium"
-                : "px-3 py-1.5 text-muted-foreground hover:text-foreground"
-            }
-            key={s}
-            search={{ status: s }}
-            style={
-              s === status
-                ? { borderBottomColor: "var(--brand-primary)" }
-                : undefined
-            }
-            to="/my/projects"
-          >
-            {label(s)}
-          </Link>
-        ))}
-      </div>
-      <div className="mt-6 flex flex-col gap-3">
-        {rows.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No projects in this view.
-          </p>
-        ) : (
-          rows.map((p) => <ProjectRow key={p.id} project={p} />)
-        )}
-      </div>
+      {rows.length === 0 ? (
+        <EmptyState>No projects in this view.</EmptyState>
+      ) : (
+        <div className="mt-6 flex flex-col gap-3">
+          {rows.map((p) => (
+            <ProjectRow key={p.id} project={p} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

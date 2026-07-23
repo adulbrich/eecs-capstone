@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
+import { EmptyState } from "#/components/empty-state";
 import { InventoryCard } from "#/components/inventory-card";
 import { InventoryFilterBar } from "#/components/inventory-filter-bar";
 import { InventoryRow } from "#/components/inventory-row";
@@ -92,11 +93,7 @@ function InventoryIndex() {
       </div>
       {(() => {
         if (data.rows.length === 0) {
-          return (
-            <p className="mt-8 text-center text-muted-foreground">
-              No items match.
-            </p>
-          );
+          return <EmptyState>No items match.</EmptyState>;
         }
         if (search.view === "row") {
           return (

@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
+import { EmptyState } from "#/components/empty-state";
 import { ProjectListItem } from "#/components/project-list-item";
 import { ProjectsFilterBar } from "#/components/projects-filter-bar";
 import { pageTitle } from "#/lib/page-title";
@@ -53,23 +54,21 @@ function ProjectsList() {
           />
         </div>
       </div>
-      <div
-        className={
-          search.view === "card"
-            ? "mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
-            : "mx-auto mt-6 flex max-w-4xl flex-col gap-3"
-        }
-      >
-        {rows.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No projects matched your search.
-          </p>
-        ) : (
-          rows.map((p) => (
+      {rows.length === 0 ? (
+        <EmptyState>No projects matched your search.</EmptyState>
+      ) : (
+        <div
+          className={
+            search.view === "card"
+              ? "mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+              : "mx-auto mt-6 flex max-w-4xl flex-col gap-3"
+          }
+        >
+          {rows.map((p) => (
             <ProjectListItem key={p.id} mode={search.view} project={p} />
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
       <div className="mx-auto mt-6 flex max-w-4xl items-center justify-between text-sm">
         <Link
           className={
