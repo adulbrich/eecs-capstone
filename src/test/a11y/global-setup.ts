@@ -117,7 +117,42 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
       .insert(schema.projects)
       .values({
         title: "A11Y Test Project",
-        description: "A project created for accessibility testing.",
+        description:
+          "## Overview\n\nThis project was **created** for *accessibility testing* " +
+          "of the markdown-authoring feature. See the [project charter]" +
+          "(https://example.com/charter) for background.\n\n" +
+          "Key aspects:\n\n" +
+          "- Renders headings, lists, and links\n" +
+          "- Exercises bold and italic emphasis\n" +
+          "- Includes a fenced code block\n\n" +
+          '```js\nconst status = "published";\n```',
+        problemStatement:
+          "# Problem Statement\n\n" +
+          "Capstone teams currently **lack** a way to author *rich* project " +
+          "descriptions. Without markdown support, students cannot:\n\n" +
+          "1. Link to external references\n" +
+          "2. Format code snippets\n" +
+          "3. Structure long text with headings\n\n" +
+          "See the [accessibility guidelines](https://example.com/a11y) for " +
+          "more detail.\n\n```bash\nnpm run test:accessibility\n```",
+        objectives:
+          "## Objectives\n\n" +
+          "The team will pursue the following *primary* and **secondary** goals:\n\n" +
+          "1. Ship a markdown renderer that is accessible by default\n" +
+          "2. Clamp author headings so page structure stays valid\n" +
+          "3. Keep links [safe](https://example.com/safety) with proper `rel` attributes\n\n" +
+          "- No raw HTML execution\n" +
+          "- No layout regressions\n\n```ts\nexport const done = true;\n```",
+        minQualifications:
+          "## Minimum Qualifications\n\n" +
+          "Applicants should be comfortable with **TypeScript** and *React*, " +
+          "and have reviewed the [contribution guide]" +
+          "(https://example.com/contributing).\n\n" +
+          "Required skills:\n\n" +
+          "- Familiarity with accessible markup\n" +
+          "- Experience writing automated tests\n\n" +
+          "1. Complete the onboarding checklist\n" +
+          "2. Set up the local dev environment\n\n```sh\nnpm install\n```",
         status: "published",
         proposerId: owner.id,
       })

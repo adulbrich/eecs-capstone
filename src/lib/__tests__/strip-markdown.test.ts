@@ -69,4 +69,16 @@ describe("stripMarkdown", () => {
   it("collapses whitespace", () => {
     expect(stripMarkdown("a\n\n\nb   c")).toBe("a b c");
   });
+
+  it("reduces a GFM table to its cell text", () => {
+    expect(stripMarkdown("| a | b |\n| - | - |\n| 1 | 2 |")).toBe("a b 1 2");
+  });
+
+  it("does not confuse a table separator row with a horizontal rule", () => {
+    expect(stripMarkdown("- - -")).toBe("");
+  });
+
+  it("does not strip pipes inside a fenced code block", () => {
+    expect(stripMarkdown("```\na | b\n```\nAfter")).toBe("After");
+  });
 });

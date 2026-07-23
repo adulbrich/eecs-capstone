@@ -30,6 +30,7 @@ const ALLOWED_ELEMENTS = [
   "pre",
   "blockquote",
   "hr",
+  "input",
   "h1",
   "h2",
   "h3",

@@ -66,4 +66,14 @@ describe("Markdown", () => {
     );
     expect(container.querySelector("table")).toBeTruthy();
   });
+
+  it("renders checked and unchecked GFM task list items differently", () => {
+    const { container } = render(
+      <Markdown>{"- [x] done\n- [ ] todo"}</Markdown>
+    );
+    const boxes = container.querySelectorAll("input[type=checkbox]");
+    expect(boxes.length).toBe(2);
+    expect((boxes[0] as HTMLInputElement).checked).toBe(true);
+    expect((boxes[1] as HTMLInputElement).checked).toBe(false);
+  });
 });
