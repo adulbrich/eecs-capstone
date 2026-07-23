@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { BookmarkButton } from "#/components/bookmark-button";
 import { CategoryChip } from "#/components/category-chip";
 import { CommentThread } from "#/components/comment-thread";
+import { Markdown } from "#/components/markdown";
 import { OwnerProjectActions } from "#/components/owner-project-actions";
 import { StaffProjectPanel } from "#/components/staff-project-panel";
 import { StatusBadge } from "#/components/status-badge";
@@ -236,7 +237,9 @@ function Section({ label, body }: { label: string; body: string | null }) {
   return (
     <section className="mt-6">
       <h2 className="font-medium text-muted-foreground text-sm">{label}</h2>
-      <p className="mt-1 whitespace-pre-wrap">{body}</p>
+      <div className="mt-1">
+        <Markdown>{body}</Markdown>
+      </div>
     </section>
   );
 }

@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { getPublicUrl } from "#/lib/storage";
+import { stripMarkdown } from "#/lib/strip-markdown";
 import { ImageOrFallback } from "./image-or-fallback";
 import { type ProjectSummary, programLabel } from "./project-card";
 import { StatusBadge } from "./status-badge";
@@ -28,7 +29,7 @@ export function ProjectRow({ project }: { project: ProjectSummary }) {
         </div>
         {project.description && (
           <p className="mt-1 line-clamp-3 text-muted-foreground text-sm">
-            {project.description}
+            {stripMarkdown(project.description)}
           </p>
         )}
         {meta.length > 0 && (

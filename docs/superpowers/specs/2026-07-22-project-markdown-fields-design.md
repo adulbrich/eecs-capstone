@@ -70,10 +70,21 @@ hand the AI reviewer markup instead of prose.
   break, will reflow into single paragraphs on first render. The Preview tab
   makes this visible to authors, and any owner or staff member can fix a
   project by adding blank lines. See Risk callouts.
-- **Headings are clamped to `h4`.** The detail page already establishes an
-  `h1`/`h2` hierarchy. Allowing author-controlled `h1` would break heading
-  order, which the accessibility test suite checks. `#` through `######` all
-  render as `h4`.
+- **Headings are clamped to `h3`.** The detail page already establishes an
+  `h1` (project title) / `h2` (section label) hierarchy, so an author heading
+  belongs at `h3`. `#` through `######` all render as `h3`.
+
+  Corrected during implementation. This originally said `h4`, justified as
+  protecting heading order. That was wrong twice over. An `h4` directly under
+  an `h2` skips `h3` and is itself the violation it claimed to prevent, and
+  `staff-project-panel.tsx` already uses `h3` under those same `h2`s. The
+  supporting claim was also false: `src/test/a11y/helpers.ts:12` filters axe to
+  `wcag2a`, `wcag2aa`, `wcag21a` and `wcag21aa`, and axe classifies
+  `heading-order` as `best-practice`, so that suite never checked heading order
+  and could not have caught either the original error or an author-controlled
+  `h1`. All six levels stay in `allowedElements` so they can be remapped;
+  removing them would make `unwrapDisallowed` flatten `# Foo` into a bare
+  paragraph instead.
 - **Links get `rel="noopener noreferrer"` and `target="_blank"`** via a custom
   `a` renderer, per the project's security standards.
 - **`search_vector` is left alone.** `to_tsvector` treats `*`, `-`, `#`, and
@@ -133,9 +144,9 @@ The single render path, used by both the detail page and the Preview tab.
 
 - `react-markdown` with `remark-gfm`.
 - `allowedElements`: `p`, `strong`, `em`, `del`, `ul`, `ol`, `li`, `a`, `code`,
-  `pre`, `blockquote`, `hr`, `h4`, `table`, `thead`, `tbody`, `tr`, `th`, `td`.
+  `pre`, `blockquote`, `hr`, `h1`-`h6`, `table`, `thead`, `tbody`, `tr`, `th`, `td`.
   `unwrapDisallowed` is set so disallowed nodes keep their text content.
-- `components`: `a` adds `rel`/`target`; `h1`-`h6` all map to `h4`.
+- `components`: `a` adds `rel`/`target`; `h1`-`h6` all map to `h3`.
 - Rendered inside `prose prose-sm max-w-none dark:prose-invert` from
   `@tailwindcss/typography`, which is already installed and enabled in
   `src/styles.css:2`.
@@ -180,7 +191,7 @@ enabled.
 - Unit: the `Markdown` component renders a list, bold text, and a link with
   `rel="noopener noreferrer"`; and does not render a `<script>` or an `<img>`
   present in the source.
-- Unit: `#`-prefixed lines render as `h4`, not `h1`.
+- Unit: `#`-prefixed lines render as `h3`, not `h1`.
 - Accessibility (Playwright): the project detail page and the project form keep
   a clean axe run, with heading order preserved on a project whose fields
   contain markdown headings.

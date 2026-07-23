@@ -4,6 +4,7 @@ import {
   buildUserMessage,
   parseReviewResponse,
   runProjectReview,
+  SYSTEM_PROMPT,
   TOOL_NAME,
 } from "../_internal/project-review-core";
 
@@ -110,5 +111,15 @@ describe("runProjectReview", () => {
     expect(invoke).not.toHaveBeenCalled();
     expect(result.reviewedFields).toEqual([]);
     expect(result.suggestions).toEqual({});
+  });
+});
+
+describe("SYSTEM_PROMPT", () => {
+  it("tells the model that field content is markdown", () => {
+    expect(SYSTEM_PROMPT).toContain("Markdown");
+  });
+
+  it("tells the model to return markdown and preserve structure", () => {
+    expect(SYSTEM_PROMPT).toContain("Return each suggestion as Markdown");
   });
 });

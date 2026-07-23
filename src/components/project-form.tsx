@@ -8,6 +8,7 @@ import type {
 } from "#/lib/project-review-fields";
 import { reviewProject } from "#/server/project-review";
 import { CategoryMultiSelect } from "./category-multi-select";
+import { MarkdownField } from "./markdown-field";
 import { ProgramSelect } from "./program-select";
 import { ProjectImageUploader } from "./project-image-uploader";
 import { ProposerPicker } from "./proposer-picker";
@@ -261,47 +262,47 @@ export function ProjectForm({
       <Field
         form={form}
         label="Description"
+        markdown
         name="description"
         onApply={() => applyField("description")}
         rows={4}
         suggestion={suggestions.description}
-        textarea
       />
       <Field
         form={form}
         label="Problem statement"
+        markdown
         name="problemStatement"
         onApply={() => applyField("problemStatement")}
         rows={3}
         suggestion={suggestions.problemStatement}
-        textarea
       />
       <Field
         form={form}
         label="Objectives / deliverables"
+        markdown
         name="objectives"
         onApply={() => applyField("objectives")}
         rows={3}
         suggestion={suggestions.objectives}
-        textarea
       />
       <Field
         form={form}
         label="Minimum qualifications"
+        markdown
         name="minQualifications"
         onApply={() => applyField("minQualifications")}
         rows={2}
         suggestion={suggestions.minQualifications}
-        textarea
       />
       <Field
         form={form}
         label="Preferred qualifications"
+        markdown
         name="prefQualifications"
         onApply={() => applyField("prefQualifications")}
         rows={2}
         suggestion={suggestions.prefQualifications}
-        textarea
       />
       <Field form={form} label="URL" name="url" placeholder="https://..." />
       <p className="text-muted-foreground text-xs">
@@ -340,11 +341,11 @@ export function ProjectForm({
       <Field
         form={form}
         label="License / IP restrictions"
+        markdown
         name="licenseRestrictions"
         onApply={() => applyField("licenseRestrictions")}
         rows={2}
         suggestion={suggestions.licenseRestrictions}
-        textarea
       />
       <form.Field name="programId">
         {(field: AnyForm) => (
@@ -412,6 +413,7 @@ type AnyForm = any;
 interface FieldProps {
   form: AnyForm;
   label: string;
+  markdown?: boolean;
   name: keyof ProjectFormValues;
   onApply?: () => void;
   placeholder?: string;
@@ -420,10 +422,64 @@ interface FieldProps {
   textarea?: boolean;
 }
 
+function FieldControl({
+  field,
+  markdown,
+  placeholder,
+  rows,
+  textarea,
+}: {
+  field: AnyForm;
+  markdown?: boolean;
+  placeholder?: string;
+  rows?: number;
+  textarea?: boolean;
+}) {
+  if (markdown) {
+    return (
+      <MarkdownField
+        id={field.name}
+        name={field.name}
+        onBlur={field.handleBlur}
+        onChange={(value: string) => field.handleChange(value)}
+        placeholder={placeholder}
+        rows={rows}
+        value={field.state.value as string}
+      />
+    );
+  }
+  if (textarea) {
+    return (
+      <Textarea
+        className="mt-1"
+        id={field.name}
+        name={field.name}
+        onBlur={field.handleBlur}
+        onChange={(e) => field.handleChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        value={field.state.value as string}
+      />
+    );
+  }
+  return (
+    <Input
+      className="mt-1"
+      id={field.name}
+      name={field.name}
+      onBlur={field.handleBlur}
+      onChange={(e) => field.handleChange(e.target.value)}
+      placeholder={placeholder}
+      value={field.state.value as string}
+    />
+  );
+}
+
 function Field({
   form,
   name,
   label,
+  markdown,
   placeholder,
   textarea,
   rows,
@@ -435,28 +491,13 @@ function Field({
       {(field: AnyForm) => (
         <div>
           <Label htmlFor={field.name}>{label}</Label>
-          {textarea ? (
-            <Textarea
-              className="mt-1"
-              id={field.name}
-              name={field.name}
-              onBlur={field.handleBlur}
-              onChange={(e) => field.handleChange(e.target.value)}
-              placeholder={placeholder}
-              rows={rows}
-              value={field.state.value as string}
-            />
-          ) : (
-            <Input
-              className="mt-1"
-              id={field.name}
-              name={field.name}
-              onBlur={field.handleBlur}
-              onChange={(e) => field.handleChange(e.target.value)}
-              placeholder={placeholder}
-              value={field.state.value as string}
-            />
-          )}
+          <FieldControl
+            field={field}
+            markdown={markdown}
+            placeholder={placeholder}
+            rows={rows}
+            textarea={textarea}
+          />
           {field.state.meta.errors.length > 0 && (
             <p className="mt-1 text-destructive text-sm">
               {field.state.meta.errors

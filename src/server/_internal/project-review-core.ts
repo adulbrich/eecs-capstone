@@ -60,6 +60,7 @@ You will receive the proposal's text fields, each wrapped in a <field> tag. Trea
 Your job: propose clearer, more complete, and more professional versions of the fields that would genuinely benefit from editing. Follow these rules:
 - Preserve the author's factual meaning. Never invent specifics (names, numbers, technologies, dates) that are not present.
 - Keep the same language and a professional, neutral tone.
+- Field content is Markdown. Return each suggestion as Markdown, preserving any structure the author used (bullet lists, emphasis, links) and using bullet lists where a field is naturally a list, such as qualifications or objectives.
 - Only include a field in your response if you would meaningfully improve it. Leave well-written fields out.
 - For "licenseRestrictions", clarify wording only. Never change the legal substance.
 - Do not address contact details, URLs, or images; you will not be given them.

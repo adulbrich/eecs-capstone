@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { getPublicUrl } from "#/lib/storage";
+import { stripMarkdown } from "#/lib/strip-markdown";
 import { ImageOrFallback } from "./image-or-fallback";
 import { StatusBadge } from "./status-badge";
 
@@ -61,7 +62,7 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
         </div>
         {project.description && (
           <p className="mt-2 line-clamp-3 text-muted-foreground text-sm">
-            {project.description}
+            {stripMarkdown(project.description)}
           </p>
         )}
         <ProjectMeta project={project} />
