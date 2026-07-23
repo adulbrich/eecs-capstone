@@ -38,40 +38,49 @@ export async function refreshProjectEmbedding(
   projectId: string,
   embed: EmbedFn = bedrockEmbed
 ): Promise<RefreshOutcome> {
-  const [project] = await db
-    .select()
-    .from(projects)
-    .where(eq(projects.id, projectId));
-  if (!project || project.status !== "published" || project.deletedAt) {
-    return "skipped";
-  }
-
-  const categoryRows = await db
-    .select({ name: categories.name })
-    .from(projectCategories)
-    .innerJoin(categories, eq(projectCategories.categoryId, categories.id))
-    .where(eq(projectCategories.projectId, projectId));
-
-  let programLabel: string | null = null;
-  if (project.programId) {
-    const [program] = await db
-      .select({ courseId: programs.courseId, courseName: programs.courseName })
-      .from(programs)
-      .where(eq(programs.id, project.programId));
-    programLabel = program ? `${program.courseId} ${program.courseName}` : null;
-  }
-
-  const source = buildProjectEmbeddingSource(
-    project,
-    categoryRows.map((row) => row.name),
-    programLabel
-  );
-  const hash = embeddingHash(source, EMBEDDING_MODEL_ID, EMBEDDING_DIMENSIONS);
-  if (project.embeddingSourceHash === hash) {
-    return "unchanged";
-  }
-
   try {
+    const [project] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, projectId));
+    if (!project || project.status !== "published" || project.deletedAt) {
+      return "skipped";
+    }
+
+    const categoryRows = await db
+      .select({ name: categories.name })
+      .from(projectCategories)
+      .innerJoin(categories, eq(projectCategories.categoryId, categories.id))
+      .where(eq(projectCategories.projectId, projectId));
+
+    let programLabel: string | null = null;
+    if (project.programId) {
+      const [program] = await db
+        .select({
+          courseId: programs.courseId,
+          courseName: programs.courseName,
+        })
+        .from(programs)
+        .where(eq(programs.id, project.programId));
+      programLabel = program
+        ? `${program.courseId} ${program.courseName}`
+        : null;
+    }
+
+    const source = buildProjectEmbeddingSource(
+      project,
+      categoryRows.map((row) => row.name),
+      programLabel
+    );
+    const hash = embeddingHash(
+      source,
+      EMBEDDING_MODEL_ID,
+      EMBEDDING_DIMENSIONS
+    );
+    if (project.embeddingSourceHash === hash) {
+      return "unchanged";
+    }
+
     const vector = await embed(source);
     await db
       .update(projects)
@@ -93,29 +102,38 @@ export async function refreshProjectEmbedding(
  * The single writer of a user's interest embedding. Unlike the project path,
  * the outcome is returned to the UI, because the user explicitly asked for
  * their recommendations to be prepared.
+ *
+ * Never throws. Callers run it after their transaction has committed, so a
+ * Bedrock outage leaves the vector null or stale and the user's action still
+ * succeeds. `scripts/backfill-embeddings.ts` sweeps up whatever this leaves
+ * behind.
  */
 export async function refreshInterestsEmbedding(
   userId: string,
   embed: EmbedFn = bedrockEmbed
 ): Promise<RefreshOutcome> {
-  const [row] = await db
-    .select()
-    .from(userInterests)
-    .where(eq(userInterests.userId, userId));
-  if (!row) {
-    return "skipped";
-  }
-
-  const source = buildInterestsEmbeddingSource(row.interestsText);
-  if (!source) {
-    return "skipped";
-  }
-  const hash = embeddingHash(source, EMBEDDING_MODEL_ID, EMBEDDING_DIMENSIONS);
-  if (row.embeddingSourceHash === hash && row.embedding) {
-    return "unchanged";
-  }
-
   try {
+    const [row] = await db
+      .select()
+      .from(userInterests)
+      .where(eq(userInterests.userId, userId));
+    if (!row) {
+      return "skipped";
+    }
+
+    const source = buildInterestsEmbeddingSource(row.interestsText);
+    if (!source) {
+      return "skipped";
+    }
+    const hash = embeddingHash(
+      source,
+      EMBEDDING_MODEL_ID,
+      EMBEDDING_DIMENSIONS
+    );
+    if (row.embeddingSourceHash === hash && row.embedding) {
+      return "unchanged";
+    }
+
     const vector = await embed(source);
     await db
       .update(userInterests)
