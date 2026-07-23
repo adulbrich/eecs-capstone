@@ -7,6 +7,7 @@ import { refreshProjectEmbedding } from "#/server/_internal/project-embeddings";
 import {
   createProjectAs,
   performTransitionAs,
+  updateProjectAs,
 } from "#/server/_internal/projects";
 
 const VECTOR = Array.from({ length: 1024 }, (_, i) => (i === 0 ? 1 : 0));
@@ -127,6 +128,87 @@ describe("refreshProjectEmbedding", () => {
     const embed = vi.fn();
 
     expect(await refreshProjectEmbedding(id, embed)).toBe("skipped");
+    expect(embed).not.toHaveBeenCalled();
+  });
+});
+
+describe("embedding triggers", () => {
+  it("embeds when a project is published", async () => {
+    const admin = await makeAdmin(`g-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Live"));
+    const embed = vi.fn().mockResolvedValue(VECTOR);
+
+    await performTransitionAs(admin, id, "submitted", undefined, embed);
+    expect(embed).not.toHaveBeenCalled();
+
+    await performTransitionAs(admin, id, "approved", undefined, embed);
+    await performTransitionAs(admin, id, "published", undefined, embed);
+
+    expect(embed).toHaveBeenCalledTimes(1);
+    expect((await readRow(id)).embedding?.length).toBe(1024);
+  });
+
+  it("still publishes when embedding fails", async () => {
+    const admin = await makeAdmin(`h-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Live"));
+    const embed = vi.fn().mockRejectedValue(new Error("bedrock down"));
+
+    await performTransitionAs(admin, id, "submitted", undefined, embed);
+    await performTransitionAs(admin, id, "approved", undefined, embed);
+    await expect(
+      performTransitionAs(admin, id, "published", undefined, embed)
+    ).resolves.toMatchObject({ status: "published" });
+
+    const row = await readRow(id);
+    expect(row.status).toBe("published");
+    expect(row.embedding).toBeNull();
+  });
+
+  it("re-embeds when a published project's indexed text is edited", async () => {
+    const admin = await makeAdmin(`i-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Live"));
+    const embed = vi.fn().mockResolvedValue(VECTOR);
+    await publish(admin, id);
+    await refreshProjectEmbedding(id, embed);
+    embed.mockClear();
+
+    await updateProjectAs(
+      admin,
+      { ...baseProject("Live"), id, description: "Greenhouses now." },
+      embed
+    );
+
+    expect(embed).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not embed when a draft is edited", async () => {
+    const admin = await makeAdmin(`j-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Draft"));
+    const embed = vi.fn().mockResolvedValue(VECTOR);
+
+    await updateProjectAs(
+      admin,
+      { ...baseProject("Draft"), id, description: "Changed." },
+      embed
+    );
+
+    expect(embed).not.toHaveBeenCalled();
+  });
+
+  it("does not embed when only untracked fields change", async () => {
+    const admin = await makeAdmin(`k-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Live"));
+    const embed = vi.fn().mockResolvedValue(VECTOR);
+    await publish(admin, id);
+    await refreshProjectEmbedding(id, embed);
+    embed.mockClear();
+
+    await updateProjectAs(
+      admin,
+      { ...baseProject("Live"), id, notes: "internal only" },
+      embed
+    );
+
     expect(embed).not.toHaveBeenCalled();
   });
 });

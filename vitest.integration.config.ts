@@ -15,5 +15,8 @@ export default defineConfig({
     setupFiles: ["src/test/setup.integration.ts"],
     pool: "forks",
     fileParallelism: false,
+    // Embeddings must never reach AWS from a test. Tests that need a vector
+    // inject their own EmbedFn; everything else fails fast and locally.
+    env: { BEDROCK_EMBEDDINGS_ENABLED: "false" },
   },
 });

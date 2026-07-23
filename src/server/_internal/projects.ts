@@ -7,6 +7,7 @@ import {
   user,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
+import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
 import { canEditProject, isStaff, type Viewer } from "#/lib/project-visibility";
 import {
   type ActorRole,
@@ -18,6 +19,7 @@ import {
   recordSoftDeleteNotification,
   recordStatusChangeNotifications,
 } from "./notify";
+import { refreshProjectEmbedding } from "./project-embeddings";
 
 export interface AuthUser {
   id: string;
@@ -110,7 +112,8 @@ export async function createProjectAs(
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: TODO large update path, decompose field-diffing in a follow-up
 export async function updateProjectAs(
   viewer: AuthUser,
-  data: UpdateProjectInput
+  data: UpdateProjectInput,
+  embed?: EmbedFn
 ): Promise<{ id: string; updated: boolean }> {
   const visibility = viewerToVisibility(viewer);
   const existing = await loadProjectOr404(data.id);
@@ -176,6 +179,10 @@ export async function updateProjectAs(
     });
   });
 
+  if (existing.status === "published") {
+    await refreshProjectEmbedding(existing.id, embed);
+  }
+
   return { id: existing.id, updated: true };
 }
 
@@ -183,7 +190,8 @@ export async function performTransitionAs(
   viewer: AuthUser,
   id: string,
   target: Status,
-  comment?: string
+  comment?: string,
+  embed?: EmbedFn
 ): Promise<{ id: string; status: Status }> {
   const visibility = viewerToVisibility(viewer);
   const project = await loadProjectOr404(id);
@@ -221,6 +229,12 @@ export async function performTransitionAs(
       viewer.id
     );
   });
+
+  // After the transaction, never inside it: a Bedrock call must not hold a
+  // database transaction open, and its failure must not roll back the publish.
+  if (target === "published") {
+    await refreshProjectEmbedding(id, embed);
+  }
 
   return { id, status: target };
 }
@@ -303,7 +317,8 @@ export async function forceTransitionAs(
   viewer: AuthUser,
   id: string,
   target: Status,
-  comment?: string
+  comment?: string,
+  embed?: EmbedFn
 ): Promise<{ id: string; status: Status }> {
   const visibility = viewerToVisibility(viewer);
   if (!isStaff(visibility)) {
@@ -342,6 +357,12 @@ export async function forceTransitionAs(
       viewer.id
     );
   });
+
+  // After the transaction, never inside it: a Bedrock call must not hold a
+  // database transaction open, and its failure must not roll back the publish.
+  if (target === "published") {
+    await refreshProjectEmbedding(id, embed);
+  }
 
   return { id, status: target };
 }
