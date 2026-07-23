@@ -72,8 +72,8 @@ const SEARCH_DEFAULTS = {
 describe("sort=recommended", () => {
   it("orders by cosine distance from the viewer's interest vector", async () => {
     const admin = await makeAdmin(`a-${Date.now()}@x.com`);
-    await publishWithVector(admin, "Far", unitVector(1));
     await publishWithVector(admin, "Near", unitVector(0));
+    await publishWithVector(admin, "Far", unitVector(1));
     await db.insert(userInterests).values({
       userId: admin.id,
       interestsText: "robotics",
@@ -90,8 +90,8 @@ describe("sort=recommended", () => {
 
   it("places projects with no embedding last, without dropping them", async () => {
     const admin = await makeAdmin(`b-${Date.now()}@x.com`);
-    await publishWithVector(admin, "Unembedded", null);
     await publishWithVector(admin, "Embedded", unitVector(0));
+    await publishWithVector(admin, "Unembedded", null);
     await db.insert(userInterests).values({
       userId: admin.id,
       interestsText: "robotics",
