@@ -46,6 +46,10 @@ For developer setup, architecture notes, and the active roadmap, see
 - ✅ Profile management: name, email, affiliation, LinkedIn, avatar, and a
   private free-text interests statement that drives personalized project
   recommendations (see §8).
+- ✅ Mentorship opt-in: a profile toggle ("I want to mentor a team", labelled
+  "For professionals and faculty, not students") and a teams-to-mentor count
+  (1-5, default 1). Opting in requires an affiliation. Staff act on these via
+  the mentors admin surface (see §14).
 - ✅ Change password from the profile page.
 - ✅ Avatar upload with the shared crop + resize image pipeline.
 - ✅ Account detail view (shows the user's role).
@@ -69,6 +73,8 @@ Each project carries:
   a `proposerEmail` link key for proposers without an account yet.
 - ✅ Program association.
 - ✅ Program manager (main instructor).
+- ✅ Teams supported: how many student teams the project can take on (1-5,
+  default 1), set and edited by staff on the project form.
 - ✅ Collaborators table (schema present for multi-user project membership).
 - ✅ Full-text search vector (Postgres generated `tsvector`, weighted across
   title, description, problem statement, objectives, and qualifications).
@@ -221,8 +227,13 @@ Each project carries:
   `/admin`).
 - ✅ Text search (email + name), role filter, include-banned toggle.
 - ✅ User detail at `/admin/users/$id`: profile block, sign-in source (account
-  providers such as GitHub or email/password), project + bookmark counts, five
-  most recent projects, role select, ban form.
+  providers such as GitHub or email/password), a mentor indicator (opt-in state
+  and team count), project + bookmark counts, five most recent projects, role
+  select, ban form.
+- ✅ Mentors page at `/admin/mentors`, open to all staff (admins and
+  instructors, unlike the admin-only user list): lists users who opted in to
+  mentoring with their affiliation, and lets staff adjust each mentor's opt-in
+  state and team capacity. Surfaced from the admin overview.
 - ✅ Self-action guards: admins cannot change their own role or ban themselves;
   the server refuses self-actions.
 - ✅ Ban atomically updates the user row and revokes that user's sessions in
