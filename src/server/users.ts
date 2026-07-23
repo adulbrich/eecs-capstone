@@ -77,3 +77,29 @@ export const unbanUser = createServerFn({ method: "POST" })
     const { unbanUserForCurrentUser } = await import("./_internal/users");
     return unbanUserForCurrentUser(data);
   });
+
+export const listMentors = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const { listMentorsForCurrentUser } = await import("./_internal/users");
+    return listMentorsForCurrentUser();
+  }
+);
+
+const setUserMentorStatusSchema = z.object({
+  userId: z.string(),
+  wantsToMentor: z.boolean(),
+  mentorTeamCount: z.number().int().min(1).max(5),
+});
+
+export type SetUserMentorStatusInput = z.infer<
+  typeof setUserMentorStatusSchema
+>;
+
+export const setUserMentorStatus = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => setUserMentorStatusSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { setUserMentorStatusForCurrentUser } = await import(
+      "./_internal/users"
+    );
+    return setUserMentorStatusForCurrentUser(data);
+  });
