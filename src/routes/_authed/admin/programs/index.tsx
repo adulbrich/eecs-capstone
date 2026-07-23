@@ -105,7 +105,7 @@ function ProgramsAdmin() {
                 <Input
                   id="prog-course-id"
                   onChange={(e) => setCourseId(e.target.value)}
-                  placeholder="e.g., CS-462"
+                  placeholder="e.g., CS 461"
                   required
                   value={courseId}
                 />
