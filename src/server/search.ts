@@ -8,6 +8,7 @@ const searchInputSchema = z.object({
   archivedOnly: z.boolean().default(false),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(50).default(20),
+  sort: z.enum(["relevance", "newest", "recommended"]).default("relevance"),
 });
 
 export type SearchProjectsInput = z.infer<typeof searchInputSchema>;
@@ -15,6 +16,6 @@ export type SearchProjectsInput = z.infer<typeof searchInputSchema>;
 export const searchProjects = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => searchInputSchema.parse(data ?? {}))
   .handler(async ({ data }) => {
-    const { searchProjectsImpl } = await import("./_internal/search");
-    return searchProjectsImpl(data);
+    const { searchProjectsForRequest } = await import("./_internal/search");
+    return searchProjectsForRequest(data);
   });

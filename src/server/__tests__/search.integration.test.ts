@@ -69,6 +69,7 @@ describe("searchProjects", () => {
       archivedOnly: false,
       page: 1,
       pageSize: 20,
+      sort: "relevance",
     });
     expect(rows[0].id).toBe(titleId);
     const order = rows.map((r) => r.id);
@@ -85,6 +86,7 @@ describe("searchProjects", () => {
       archivedOnly: false,
       page: 1,
       pageSize: 20,
+      sort: "relevance",
     });
     expect(rows.find((r) => r.id === id)).toBeUndefined();
   });
@@ -100,6 +102,7 @@ describe("searchProjects", () => {
       archivedOnly: false,
       page: 1,
       pageSize: 20,
+      sort: "relevance",
     });
     const order = rows.map((r) => r.id);
     expect(order.indexOf(second)).toBeLessThan(order.indexOf(first));
@@ -115,6 +118,7 @@ describe("searchProjects", () => {
       archivedOnly: false,
       page: 1,
       pageSize: 20,
+      sort: "relevance",
     });
     expect(rows.length).toBeGreaterThan(0);
   });
