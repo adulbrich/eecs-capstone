@@ -14,14 +14,6 @@ is not built yet. For the full, exhaustive feature list (built and planned), see
 These are the features still on the table. Everything already built is documented
 in [`PRD.md`](./PRD.md).
 
-### Projects
-
-- Allow rich text formatting (or markdown) in project edit fields (e.g., bullet lists for requirements)
-- When in list view, the aspect ratio of the image does not work. The project image is specifically set to a certain aspect ratio, and it's used in the card view, but then the list view is almost square and might not work for all images. Could we change the aspect ratio of the list view image to render a little better? Not mandatory if no better solution exists.
-- The checkbox to "Show only archived projects" and "include banned" have a weird alignment compared to the other fields next to them (dropdown, inputs, etc.). They are smaller, bottom aligned, and it does not look good. Top of mind I'm thinking of either 1. making the check box taller to match the other fields, or 2. center vertically with the dropdowns/inputs (but not labels), or 3. use a switch instead and vertically align, or 4. you give me a better option that visually works.
-- For show/hide soft-delete in the admin, we could also use a switch to make it clearer. 
-- Could we filter admin projects by programs as well? We will have different instructors in charge of different programs. The program filter should also be a query param. This would be in addition to the status and soft delete flags.
-
 ### Authentication
 
 - Additional SSO providers beyond GitHub: Google, LinkedIn, Discord, and Oregon

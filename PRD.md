@@ -43,7 +43,9 @@ For developer setup, architecture notes, and the active roadmap, see
 - ⬜ LinkedIn SSO.
 - ⬜ Discord SSO.
 - ⬜ Oregon State University ONID SSO.
-- ✅ Profile management: name, email, affiliation, LinkedIn, avatar.
+- ✅ Profile management: name, email, affiliation, LinkedIn, avatar, and a
+  private free-text interests statement that drives personalized project
+  recommendations (see §8).
 - ✅ Change password from the profile page.
 - ✅ Avatar upload with the shared crop + resize image pipeline.
 - ✅ Account detail view (shows the user's role).
@@ -55,6 +57,13 @@ Each project carries:
 - ✅ Random UUID, title, description, problem statement,
   objectives/deliverables, minimum qualifications, preferred qualifications,
   URL, contact name, contact email, image, license/IP restrictions.
+- ✅ The long text fields (description, problem statement, objectives, both
+  qualification fields, license/IP restrictions) accept Markdown, authored with
+  a formatting toolbar and Edit/Preview tabs and rendered safely as React
+  elements (no raw HTML, no `dangerouslySetInnerHTML`). Card and row summaries
+  strip the markup back to plain text.
+- ✅ Semantic embedding vector (pgvector), written when a project is published
+  and refreshed when its indexed text changes, powering recommendations (§8).
 - ✅ Staff-only `notes` field (never returned by public queries).
 - ✅ Project proposer (linked user account, resolved from email; nullable) and
   a `proposerEmail` link key for proposers without an account yet.
@@ -106,8 +115,12 @@ Each project carries:
   user's own created/proposed/submitted projects.
 - ✅ Authenticated project create (`/projects/new`) and edit
   (`/projects/$id/edit`).
-- ✅ Staff project list (`/admin/projects`) with filters and an
-  include-soft-deleted toggle.
+- ✅ Staff project list (`/admin/projects`) with status and program filters and
+  a show-soft-deleted switch, all held in URL search params.
+- ✅ Consistent list presentation: fixed-ratio row thumbnails, boolean filters
+  rendered as switches aligned with the adjacent inputs, status dropdowns
+  (including an "All statuses" option), and a shared centered empty state across
+  the list pages.
 
 ## 8. Discovery & Taxonomy
 
@@ -118,6 +131,14 @@ Each project carries:
 - ✅ All filter/search state lives in URL search params (shareable links).
 - ✅ Card / row listing toggle (`?view=card|row`); filters and search apply
   identically in both modes.
+- ✅ Sort control on the public listing: most relevant (default), newest, and
+  "recommended for you".
+- ✅ Personalized recommendations: signed-in users write an interests statement
+  on their profile; it and every published project are embedded with Amazon
+  Titan Text Embeddings V2 (pgvector), and the recommended sort ranks projects
+  by cosine similarity to the interests vector. Falls back to relevance ordering
+  when a viewer has no interest vector yet; interest vectors never leave the
+  server, and projects are embedded only on publish.
 - ✅ Bookmarks: bookmark button on project detail (authed) and a
   `/my/bookmarks` view.
 
@@ -143,7 +164,7 @@ Each project carries:
   objectives, qualifications, license restrictions) surfaced from the project
   form.
 - ✅ Backed by AWS Bedrock (`BEDROCK_MODEL_ID`, configurable); returns
-  per-field improvement suggestions.
+  per-field improvement suggestions as Markdown, matching the fields' format.
 
 ## 11. Media & Images
 
@@ -191,11 +212,17 @@ Each project carries:
 
 ## 14. User Administration
 
+- ✅ Admin overview (`/admin`): project, published, awaiting-review, inventory
+  request, and user counts. The "Awaiting review" and "Inventory requests"
+  tiles turn into colored, clickable alerts that deep-link to the filtered work
+  queues (`/admin/projects?status=submitted`,
+  `/admin/inventory/requests?tab=pending`) when items are pending.
 - ✅ Admin-only user list at `/admin/users` (instructors are redirected to
   `/admin`).
 - ✅ Text search (email + name), role filter, include-banned toggle.
-- ✅ User detail at `/admin/users/$id`: profile block, project + bookmark
-  counts, five most recent projects, role select, ban form.
+- ✅ User detail at `/admin/users/$id`: profile block, sign-in source (account
+  providers such as GitHub or email/password), project + bookmark counts, five
+  most recent projects, role select, ban form.
 - ✅ Self-action guards: admins cannot change their own role or ban themselves;
   the server refuses self-actions.
 - ✅ Ban atomically updates the user row and revokes that user's sessions in
