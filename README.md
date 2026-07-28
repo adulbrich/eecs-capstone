@@ -14,6 +14,13 @@ is not built yet. For the full, exhaustive feature list (built and planned), see
 These are the features still on the table. Everything already built is documented
 in [`PRD.md`](./PRD.md).
 
+- In project Comments, instead of the id, it should show the name of the user who posted the comment or reply.
+- In project Comments, a reply to an internal comment should always be internal as well (and cannot be unchecked). But someone can leave an internal reply to a non-internal comment.
+- In the individual project page, h2 headings should look more like h2 headings (bigger). Otherwise, e.g., bold text in the fields will stand out more than the h2 headers and confuse the user in terms of page semantics.
+- Are internal notes (that are added by the proposer) visible to the proposer after submission? If yes, we should change that heading to "private notes" and indicate that this is a section with details only visible to staff and proposer, not public. It should be reflected in /projects/new as well.
+- The subtitle on the index page "Browse student capstone proposals, submit your own idea, and follow projects through the review workflow." is incorrect. Projects can be from anyone. The headline should be the unique value prop for this site, project submission, project management, browsing, inventory, ...
+- For the inventory, we must also have a field only visible to staff with information such as code for the locker, etc. Use same wording as decided from above private memo discussion for projects.
+
 ### Authentication
 
 - Additional SSO providers beyond GitHub: Google, LinkedIn, Discord, and Oregon
