@@ -120,13 +120,24 @@ Fate of the two server fns this replaces, verified by grep rather than assumed:
 `src/routes/_authed/admin/inventory/index.tsx`
 - Row link target becomes `/inventory/$itemId`.
 - Edit link target becomes `/inventory/$itemId/edit`.
+- "+ New item" link target becomes `/inventory/new`.
 
-`src/routes/_authed/admin/inventory/new.tsx`
+`src/routes/_authed/inventory/new.tsx` (**moved** from
+`src/routes/_authed/admin/inventory/new.tsx`)
+- URL becomes `/inventory/new`, mirroring `/projects/new`
+  (`routes/_authed/projects/new.tsx`).
 - Post-create navigation target becomes `/inventory/$itemId`.
-- The route itself stays at `/admin/inventory/new`: creating an item is not
-  item-scoped, has no id to hang a public URL on, and is a staff management
-  action alongside the table and the request queue. Only item-scoped surfaces
-  move to `/inventory`.
+- Keeps its own `beforeLoad` staff check, for the same reason as the edit
+  route: `_authed` guarantees only a signed-in user. `createInventoryItemAs`
+  independently calls `assertStaff`.
+- Breadcrumb (`Admin > Inventory > New item`) is dropped, as on the detail
+  page: it described a path this route no longer sits under.
+
+After these moves, every surface scoped to an inventory item lives under
+`/inventory`, and `/admin/inventory` holds only the cross-item management
+views. That is the same split projects already have: `/projects/new`,
+`/projects/$projectId`, `/projects/$projectId/edit` in user space, with
+`/admin/projects` as the management table.
 
 ### New component (`src/components/staff-inventory-panel.tsx`)
 
@@ -244,6 +255,9 @@ Extending the privacy block added earlier:
 - `admin inventory item edit` is repointed from `/admin/inventory/${itemId}/edit`
   to `/inventory/${itemId}/edit` and renamed `inventory item edit (staff)`. Its
   route moved, so leaving it would scan a path that no longer resolves.
+- `admin inventory new` is repointed from `/admin/inventory/new` to
+  `/inventory/new` and renamed `inventory new (staff)`, for the same reason.
+- `admin inventory list` and `admin inventory requests` are unchanged.
 
 ### Existing tests expected to stay green
 
@@ -261,10 +275,10 @@ being changed.
   exist to prove it.
 - `InventoryLifecyclePanel` is relocated, not refactored. Its size and its
   `text-sm` `h2`s are a known follow-up, deliberately not bundled here.
-- `/admin/inventory` (the management table) stays. Only the item *detail* page
-  merges; a bulk management table is a different surface from a detail view.
 - The `/admin/inventory` table and `/admin/inventory/requests` queue stay where
-  they are. They are management surfaces spanning many items, not views of one.
+  they are. They are management surfaces spanning many items, not views of one,
+  which is the line this spec draws: item-scoped surfaces live under
+  `/inventory`, cross-item ones under `/admin`.
 - No default placeholder image for inventory items. Projects got a branded 16:9
   placeholder; inventory items are square and unbranded, and would need their
   own asset.
@@ -279,6 +293,14 @@ being changed.
   failure mode, and `npm run typecheck` is what catches it. Known call sites to
   update, found by grep: the admin table's row link and its edit link, the
   edit page's breadcrumb, and `new.tsx`'s post-create navigation.
+- **`/inventory/new` vs `/inventory/$itemId`.** A static segment now shares a
+  level with a dynamic one, so `new` must not be parsed as an item id: doing so
+  would send a staff member to a not-found page instead of the create form.
+  TanStack Router ranks static segments above dynamic ones, and projects
+  already rely on exactly this (`/projects/new` beside `/projects/$projectId`),
+  so the arrangement is proven in this codebase rather than assumed. The a11y
+  `inventory new (staff)` test is what would catch a regression, since it
+  asserts against the rendered create form.
 - **Non-staff reaching `/inventory/$itemId/edit` directly.** The route is no
   longer behind an `/admin` prefix, so the URL is guessable from the detail
   page. The `beforeLoad` staff check is what holds; the a11y suite exercises it
