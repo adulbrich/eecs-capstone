@@ -41,7 +41,6 @@ const STATUS_LABEL: Record<Status, string> = {
 interface Project {
   deletedAt: Date | string | null;
   id: string;
-  notes: string | null;
   status: string;
   teamsSupported: number;
 }
@@ -344,13 +343,9 @@ export function StaffProjectPanel({
         </div>
       </section>
 
-      {/* Internal notes */}
-      {project.notes && (
-        <section className="mt-5 border-border border-t pt-4">
-          <h3 className="font-medium text-sm">Internal notes</h3>
-          <p className="mt-1 whitespace-pre-wrap text-sm">{project.notes}</p>
-        </section>
-      )}
+      {/* Private notes render on the shared project page, above this panel:
+          they are visible to the proposer as well, so they are not staff-only
+          content and would be duplicated here. */}
 
       {/* Edit log */}
       <section className="mt-5 border-border border-t pt-4">

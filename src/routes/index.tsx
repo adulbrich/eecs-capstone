@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BookOpen, CheckCircle, Users } from "lucide-react";
+import { BookOpen, CheckCircle, Package, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "#/components/ui/button";
 import { authClient } from "#/lib/auth-client";
@@ -21,9 +21,10 @@ function Home() {
       <section className="page-wrap py-20 text-center">
         <p className="island-kicker">{brand.institutionName}</p>
         <h1 className="display-title mt-4">{brand.programName}</h1>
-        <p className="mx-auto mt-5 max-w-xl text-lg text-muted-foreground">
-          Browse student capstone proposals, submit your own idea, and follow
-          projects through the review workflow.
+        <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
+          One home for capstone projects: propose one from anywhere, manage it
+          through review to publication, browse the catalog, and borrow the
+          equipment your team needs.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Button asChild size="lg">
@@ -42,21 +43,26 @@ function Home() {
       </section>
 
       <section className="page-wrap pb-24">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <FeatureCard
-            body="Search and filter capstone proposals by category, technology, and program."
+            body="Search and filter the published catalog by category, technology, and program."
             icon={<BookOpen className="h-5 w-5" />}
             title="Browse Projects"
           />
           <FeatureCard
-            body="Industry partners and faculty submit proposals for student teams to work on."
+            body="Anyone can propose a project: industry partners, faculty, staff, and students alike."
             icon={<Users className="h-5 w-5" />}
-            title="Propose Ideas"
+            title="Propose a Project"
           />
           <FeatureCard
-            body="Follow your project through the review workflow from draft to published."
+            body="Manage your proposal from draft through review to publication, with feedback in one thread."
             icon={<CheckCircle className="h-5 w-5" />}
-            title="Track Progress"
+            title="Manage Review"
+          />
+          <FeatureCard
+            body="Reserve and check out hardware from the shared equipment inventory."
+            icon={<Package className="h-5 w-5" />}
+            title="Borrow Equipment"
           />
         </div>
       </section>

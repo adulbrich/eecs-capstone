@@ -7,6 +7,7 @@ import { Textarea } from "./ui/textarea";
 
 interface Comment {
   authorId: string;
+  authorName: string | null;
   content: string;
   createdAt: Date | string;
   id: string;
@@ -21,6 +22,14 @@ interface Props {
   projectId: string;
   viewerIsStaff: boolean;
 }
+
+/** Accounts are never hard-deleted, so this is a defensive fallback only. */
+const UNKNOWN_AUTHOR = "Unknown user";
+
+const INTERNAL_SURFACE = {
+  borderLeftColor: "var(--status-warning)",
+  background: "var(--status-warning-bg)",
+};
 
 export function CommentThread({
   projectId,
@@ -59,6 +68,29 @@ export function CommentThread({
   );
 }
 
+function CommentHeader({ comment }: { comment: Comment }) {
+  return (
+    <div className="flex items-center gap-2 text-muted-foreground text-xs">
+      <span className="font-medium text-foreground">
+        {comment.authorName ?? UNKNOWN_AUTHOR}
+      </span>
+      <span>{new Date(comment.createdAt).toLocaleString()}</span>
+      {comment.isInternal && (
+        <span
+          className="rounded px-1.5 py-0.5 font-medium text-xs"
+          style={{
+            background: "var(--status-warning-bg)",
+            color: "var(--status-warning)",
+            border: "1px solid var(--status-warning)",
+          }}
+        >
+          internal
+        </span>
+      )}
+    </div>
+  );
+}
+
 function CommentNode({
   comment,
   replies,
@@ -81,31 +113,9 @@ function CommentNode({
           : "border-border border-l-4 p-3"
       }
       id={`comment-${comment.id}`}
-      style={
-        isInternal
-          ? {
-              borderLeftColor: "var(--status-warning)",
-              background: "var(--status-warning-bg)",
-            }
-          : undefined
-      }
+      style={isInternal ? INTERNAL_SURFACE : undefined}
     >
-      <div className="flex items-center gap-2 text-muted-foreground text-xs">
-        <span>{comment.authorId.slice(0, 8)}</span>
-        <span>{new Date(comment.createdAt).toLocaleString()}</span>
-        {isInternal && (
-          <span
-            className="rounded px-1.5 py-0.5 font-medium text-xs"
-            style={{
-              background: "var(--status-warning-bg)",
-              color: "var(--status-warning)",
-              border: "1px solid var(--status-warning)",
-            }}
-          >
-            internal
-          </span>
-        )}
-      </div>
+      <CommentHeader comment={comment} />
       <p className="mt-1 whitespace-pre-wrap text-sm">{comment.content}</p>
 
       {replies.length > 0 && (
@@ -117,27 +127,11 @@ function CommentNode({
               key={r.id}
               style={
                 r.isInternal
-                  ? {
-                      borderLeftColor: "var(--status-warning)",
-                      background: "var(--status-warning-bg)",
-                    }
+                  ? INTERNAL_SURFACE
                   : { borderLeftColor: "var(--line)" }
               }
             >
-              <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                <span>{r.authorId.slice(0, 8)}</span>
-                <span>{new Date(r.createdAt).toLocaleString()}</span>
-                {r.isInternal && (
-                  <span
-                    className="rounded px-1.5 py-0.5 font-medium text-xs"
-                    style={{
-                      color: "var(--status-warning)",
-                    }}
-                  >
-                    internal
-                  </span>
-                )}
-              </div>
+              <CommentHeader comment={r} />
               <p className="mt-1 whitespace-pre-wrap text-sm">{r.content}</p>
             </div>
           ))}
@@ -147,6 +141,7 @@ function CommentNode({
       <ReplyForm
         onChanged={onChanged}
         parentId={comment.id}
+        parentIsInternal={isInternal}
         projectId={projectId}
         viewerIsStaff={viewerIsStaff}
       />
@@ -212,18 +207,25 @@ function NewCommentForm({
 function ReplyForm({
   projectId,
   parentId,
+  parentIsInternal,
   viewerIsStaff,
   onChanged,
 }: {
   projectId: string;
   parentId: string;
+  parentIsInternal: boolean;
   viewerIsStaff: boolean;
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
-  const [isInternal, setIsInternal] = useState(false);
+  const [isInternalChoice, setIsInternalChoice] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // A reply inherits its parent's internal flag. The server enforces this too;
+  // here it keeps the checkbox from promising something the server will
+  // override. Replies to a public comment stay a free staff choice.
+  const isInternal = parentIsInternal || isInternalChoice;
 
   if (!open) {
     return (
@@ -247,6 +249,7 @@ function ReplyForm({
         data: { projectId, parentId, content, isInternal },
       });
       setContent("");
+      setIsInternalChoice(false);
       setOpen(false);
       onChanged();
     } catch (err) {
@@ -264,13 +267,23 @@ function ReplyForm({
         value={content}
       />
       {viewerIsStaff && (
-        <Label className="font-normal text-xs">
-          <Checkbox
-            checked={isInternal}
-            onCheckedChange={(checked) => setIsInternal(checked === true)}
-          />
-          Internal (staff only)
-        </Label>
+        <div>
+          <Label className="font-normal text-xs">
+            <Checkbox
+              checked={isInternal}
+              disabled={parentIsInternal}
+              onCheckedChange={(checked) =>
+                setIsInternalChoice(checked === true)
+              }
+            />
+            Internal (staff only)
+          </Label>
+          {parentIsInternal && (
+            <p className="mt-1 text-muted-foreground text-xs">
+              Replies to an internal comment are always internal.
+            </p>
+          )}
+        </div>
       )}
       <div className="flex gap-2">
         <Button size="xs" type="submit">

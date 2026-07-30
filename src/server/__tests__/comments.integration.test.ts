@@ -1,13 +1,14 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
-import { notifications, user } from "#/db/schema";
+import { notifications, projectComments, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { addCommentAs } from "#/server/_internal/comments";
 import {
   createProjectAs,
   performTransitionAs,
 } from "#/server/_internal/projects";
+import { listProjectCommentsAs } from "#/server/_internal/projects-queries";
 
 async function makeUser(email: string, role: "user" | "admin") {
   await auth.api.signUpEmail({
@@ -139,6 +140,122 @@ describe("comments + notifications", () => {
         isInternal: true,
       })
     ).rejects.toThrow();
+  });
+
+  it("forces a reply to an internal comment to be internal", async () => {
+    const owner = await makeUser(`o7-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`a7-${Date.now()}@x.com`, "admin");
+    const { id: pid } = await createProjectAs(owner, baseProject());
+    await performTransitionAs(owner, pid, "submitted");
+
+    const { id: parentId } = await addCommentAs(admin, {
+      projectId: pid,
+      content: "internal parent",
+      isInternal: true,
+    });
+    const { id: replyId } = await addCommentAs(admin, {
+      projectId: pid,
+      content: "reply that asked to be public",
+      parentId,
+      isInternal: false,
+    });
+
+    const [reply] = await db
+      .select()
+      .from(projectComments)
+      .where(eq(projectComments.id, replyId));
+    expect(reply.isInternal).toBe(true);
+  });
+
+  it("does not notify the proposer about an inherited-internal reply", async () => {
+    const owner = await makeUser(`o8-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`a8-${Date.now()}@x.com`, "admin");
+    const { id: pid } = await createProjectAs(owner, baseProject());
+    await performTransitionAs(owner, pid, "submitted");
+
+    const { id: parentId } = await addCommentAs(admin, {
+      projectId: pid,
+      content: "internal parent",
+      isInternal: true,
+    });
+    await addCommentAs(admin, {
+      projectId: pid,
+      content: "internal reply",
+      parentId,
+      isInternal: false,
+    });
+
+    const ownerNotifs = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, owner.id));
+    expect(ownerNotifs.filter((n) => n.type === "comment")).toHaveLength(0);
+  });
+
+  it("keeps an internal reply to a public comment out of the proposer's view", async () => {
+    const owner = await makeUser(`o9-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`a9-${Date.now()}@x.com`, "admin");
+    const { id: pid } = await createProjectAs(owner, baseProject());
+    await performTransitionAs(owner, pid, "submitted");
+
+    const { id: parentId } = await addCommentAs(admin, {
+      projectId: pid,
+      content: "public parent",
+      isInternal: false,
+    });
+    await addCommentAs(admin, {
+      projectId: pid,
+      content: "staff aside",
+      parentId,
+      isInternal: true,
+    });
+
+    const { rows: ownerRows } = await listProjectCommentsAs(owner, { id: pid });
+    expect(ownerRows.map((r) => r.content)).toEqual(["public parent"]);
+
+    const { rows: staffRows } = await listProjectCommentsAs(admin, { id: pid });
+    expect(staffRows).toHaveLength(2);
+  });
+
+  it("still refuses an internal comment from a non-staff replier", async () => {
+    const owner = await makeUser(`o10-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`a10-${Date.now()}@x.com`, "admin");
+    const { id: pid } = await createProjectAs(owner, baseProject());
+    await performTransitionAs(owner, pid, "submitted");
+    const { id: parentId } = await addCommentAs(admin, {
+      projectId: pid,
+      content: "public parent",
+      isInternal: false,
+    });
+
+    await expect(
+      addCommentAs(owner, {
+        projectId: pid,
+        content: "sneaky",
+        parentId,
+        isInternal: true,
+      })
+    ).rejects.toThrow();
+  });
+
+  it("returns the author's name so the thread need not show ids", async () => {
+    const owner = await makeUser(`o11-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`a11-${Date.now()}@x.com`, "admin");
+    const { id: pid } = await createProjectAs(owner, baseProject());
+    await performTransitionAs(owner, pid, "submitted");
+    await addCommentAs(admin, {
+      projectId: pid,
+      content: "named",
+      isInternal: false,
+    });
+
+    const { rows } = await listProjectCommentsAs(admin, { id: pid });
+    const [adminRow] = await db
+      .select()
+      .from(user)
+      .where(eq(user.id, admin.id));
+    expect(rows[0].authorName).toBe(adminRow.name);
+    expect(rows[0].authorName).toBeTruthy();
   });
 
   it("rejects reply to a reply", async () => {

@@ -28,7 +28,9 @@ For developer setup, architecture notes, and the active roadmap, see
   - `admin`: full access, including user administration and category
     management.
 - ✅ "Staff" is the union of `instructor` and `admin`; staff-only UI and data
-  (notes, internal comments, edit logs, transition actions) are gated on it.
+  (internal comments, edit logs, transition actions, proposer email, inventory
+  private notes) are gated on it. Project private notes are the one shared
+  surface: staff and the project's proposer both see and edit them (§3).
 - ✅ Role assignment is performed by admins from the user admin surface.
 
 ## 2. Authentication & Accounts
@@ -68,7 +70,10 @@ Each project carries:
   strip the markup back to plain text.
 - ✅ Semantic embedding vector (pgvector), written when a project is published
   and refreshed when its indexed text changes, powering recommendations (§8).
-- ✅ Staff-only `notes` field (never returned by public queries).
+- ✅ Private notes (`notes`) field, labelled "Private notes" wherever it
+  appears. Visible and editable to staff and to the project's proposer, who
+  authors it on `/projects/new`; stripped from the payload for every other
+  viewer, signed in or not, on published projects included.
 - ✅ Project proposer (linked user account, resolved from email; nullable) and
   a `proposerEmail` link key for proposers without an account yet.
 - ✅ Program association.
@@ -103,6 +108,11 @@ Each project carries:
 - ✅ Users reply to review comments when a project is in `changes_requested`.
 - ✅ Internal staff-only comments (invisible to users).
 - ✅ Threaded comments (parent/child).
+- ✅ Comments show the author's display name, not their user id.
+- ✅ A reply to an internal comment is always internal: the checkbox is forced
+  on and disabled in the UI, and the server coerces the flag regardless of what
+  the client sends. The converse is deliberately allowed, so staff can leave an
+  internal reply under a comment the proposer can see.
 
 ## 6. Logging & Audit
 
@@ -183,13 +193,21 @@ Each project carries:
 - ✅ Storage rows hold keys, not URLs; `getPublicUrl(key)` builds rendered URLs
   with a pass-through for legacy `http(s)://` values (DiceBear identicons, OAuth
   images).
+- ✅ Projects without an image of their own render a branded default
+  (`public/project-placeholder.webp`, 960x540 WebP) on cards, rows, and the
+  detail hero. It is presentation only and is never written to
+  `projects.image_url`, so "no image" stays recoverable.
 
 ## 12. Inventory Management
 
 - ✅ Item statuses: `available`, `requested`, `reserved`, `checked_out`,
   `maintenance`, `retired`.
-- ✅ Item fields: name, description, category, serial, location, notes, image,
+- ✅ Item fields: name, description, category, serial, label, location, image,
   current holder.
+- ✅ Private notes: a staff-only free-text field for details like locker codes
+  and storage quirks, using the same "Private notes" wording as projects (§3).
+  Stripped from every non-staff list row and detail payload; the audience line
+  differs from the project one because an item has no proposer.
 - ✅ Users browse inventory (default: available) and can also see requested,
   reserved, checked out, and in-maintenance items, but not retired items.
 - ✅ Users cannot see who has requested/reserved/checked out an item.
@@ -248,7 +266,10 @@ Each project carries:
 
 ## 16. Landing Page
 
-- ✅ Index page introduces the program and links to Projects.
+- ✅ Index page leads with the whole value proposition (propose, manage through
+  review, browse, borrow equipment) rather than framing proposals as
+  student-only, and links to Projects.
+- ✅ Four feature cards: browse, propose, manage review, borrow equipment.
 - ✅ Inventory linked from the site header.
 - 🟡 Handbook is currently a separate Astro site; not yet linked or integrated.
 

@@ -10,6 +10,8 @@ import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
 interface Props {
+  /** Extra element id to announce alongside the built-in markdown hint. */
+  describedBy?: string;
   id: string;
   name: string;
   onBlur: () => void;
@@ -28,6 +30,7 @@ const ACTIONS: { action: ToolbarAction; icon: typeof Bold; label: string }[] = [
 ];
 
 export function MarkdownField({
+  describedBy,
   id,
   name,
   onBlur,
@@ -113,7 +116,7 @@ export function MarkdownField({
       </div>
       {mode === "edit" ? (
         <Textarea
-          aria-describedby={hintId}
+          aria-describedby={describedBy ? `${describedBy} ${hintId}` : hintId}
           className="rounded-t-none"
           id={id}
           name={name}

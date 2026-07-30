@@ -359,6 +359,45 @@ describe("listInventoryAs privacy", () => {
     ).toBe(holderEmail);
   });
 
+  it("keeps private notes off the detail page for a signed-in non-staff user", async () => {
+    const admin = await makeUser(`pnd-a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`pnd-s-${Date.now()}@x.com`, "user");
+    const item = await makeItem({
+      notes: "Locker B4, code 1180.",
+      serial: "SN-777",
+      location: "Kelley 2063",
+    });
+
+    const studentView = await getInventoryItemAs(student, { id: item.id });
+    expect(studentView).not.toBeNull();
+    expect("notes" in (studentView as object)).toBe(false);
+    expect("serial" in (studentView as object)).toBe(false);
+    expect("location" in (studentView as object)).toBe(false);
+    expect(JSON.stringify(studentView)).not.toContain("1180");
+
+    const staffView = await getInventoryItemAs(admin, { id: item.id });
+    expect((staffView as unknown as { notes: string }).notes).toBe(
+      "Locker B4, code 1180."
+    );
+  });
+
+  it("keeps private notes out of a non-staff list row", async () => {
+    const student = await makeUser(`pnl-s-${Date.now()}@x.com`, "user");
+    const item = await makeItem({ notes: "Locker B4, code 1180." });
+
+    const result = await listInventoryAs(student, {
+      q: "",
+      status: null,
+      category: null,
+      page: 1,
+      pageSize: 50,
+    });
+    const found = result.rows.find((r) => r.id === item.id);
+    expect(found).toBeDefined();
+    expect("notes" in (found as object)).toBe(false);
+    expect(JSON.stringify(found)).not.toContain("1180");
+  });
+
   it("hides retired items from non-staff list and detail", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const item = await makeItem();

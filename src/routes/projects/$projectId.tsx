@@ -15,7 +15,11 @@ import { StatusBadge } from "#/components/status-badge";
 import { StatusTimeline } from "#/components/status-timeline";
 import { Button } from "#/components/ui/button";
 import { pageTitle } from "#/lib/page-title";
-import { getPublicUrl } from "#/lib/storage";
+import {
+  PRIVATE_NOTES_LABEL,
+  PRIVATE_NOTES_PROJECT_HINT,
+} from "#/lib/private-notes";
+import { projectImageSrc } from "#/lib/project-image";
 import { listProjectCategories } from "#/server/categories";
 import { getProject, listProjectComments } from "#/server/projects-queries";
 
@@ -146,21 +150,13 @@ function ProjectDetail() {
         </div>
       )}
 
-      {(() => {
-        const heroUrl = getPublicUrl(project.imageUrl as string | null);
-        if (!heroUrl) {
-          return null;
-        }
-        return (
-          <div className="mt-4 overflow-hidden rounded-lg">
-            <img
-              alt=""
-              className="aspect-[16/9] w-full object-cover"
-              src={heroUrl}
-            />
-          </div>
-        );
-      })()}
+      <div className="mt-4 overflow-hidden rounded-lg">
+        <img
+          alt=""
+          className="aspect-[16/9] w-full object-cover"
+          src={projectImageSrc(project.imageUrl as string | null)}
+        />
+      </div>
 
       <Section
         body={project.description as string | null}
@@ -189,9 +185,14 @@ function ProjectDetail() {
       />
       <UrlSection url={project.url as string | null} />
 
+      <PrivateNotesSection
+        notes={(project.notes as string | null) ?? null}
+        visible={viewerIsStaff || viewerIsOwner}
+      />
+
       {(viewerIsStaff || viewerIsOwner) && (
         <section className="mt-8">
-          <h2 className="font-semibold text-lg">Status history</h2>
+          <SectionHeading>Status history</SectionHeading>
           <div className="mt-3">
             <StatusTimeline rows={history} />
           </div>
@@ -200,7 +201,7 @@ function ProjectDetail() {
 
       {(viewerIsOwner || viewerIsStaff) && (
         <section className="mt-8">
-          <h2 className="font-semibold text-lg">Comments</h2>
+          <SectionHeading>Comments</SectionHeading>
           <div className="mt-3">
             <CommentThread
               comments={comments}
@@ -224,7 +225,6 @@ function ProjectDetail() {
             id: project.id as string,
             status: project.status as string,
             deletedAt: (project.deletedAt as Date | null) ?? null,
-            notes: (project.notes as string | null) ?? null,
             teamsSupported: (project.teamsSupported as number) ?? 1,
           }}
         />
@@ -233,16 +233,54 @@ function ProjectDetail() {
   );
 }
 
+/**
+ * Every h2 on this page renders through here. The fields themselves are
+ * markdown and can contain bold runs at body size, so a section heading has to
+ * outrank them visually or the page reads as if the bold text were the
+ * structure. Sits one step below the h1 (`text-2xl`) and above the staff
+ * panel's h3s (`text-sm`).
+ */
+function SectionHeading({ children }: { children: string }) {
+  return <h2 className="font-semibold text-xl tracking-tight">{children}</h2>;
+}
+
 function Section({ label, body }: { label: string; body: string | null }) {
   if (!body) {
     return null;
   }
   return (
-    <section className="mt-6">
-      <h2 className="font-medium text-muted-foreground text-sm">{label}</h2>
-      <div className="mt-1">
+    <section className="mt-8">
+      <SectionHeading>{label}</SectionHeading>
+      <div className="mt-2">
         <Markdown>{body}</Markdown>
       </div>
+    </section>
+  );
+}
+
+/**
+ * Private notes belong to the proposer and staff jointly, so they render on the
+ * shared page rather than inside the staff-only panel. The server has already
+ * nulled `notes` for everyone else; `visible` only keeps the empty section from
+ * rendering for a viewer who could never have content here.
+ */
+function PrivateNotesSection({
+  notes,
+  visible,
+}: {
+  notes: string | null;
+  visible: boolean;
+}) {
+  if (!(visible && notes)) {
+    return null;
+  }
+  return (
+    <section className="mt-8">
+      <SectionHeading>{PRIVATE_NOTES_LABEL}</SectionHeading>
+      <p className="mt-1 text-muted-foreground text-sm">
+        {PRIVATE_NOTES_PROJECT_HINT}
+      </p>
+      <p className="mt-2 whitespace-pre-wrap">{notes}</p>
     </section>
   );
 }
@@ -258,9 +296,9 @@ function ContactSection({
     return null;
   }
   return (
-    <section className="mt-6">
-      <h2 className="font-medium text-muted-foreground text-sm">Contact</h2>
-      <p className="mt-1">
+    <section className="mt-8">
+      <SectionHeading>Contact</SectionHeading>
+      <p className="mt-2">
         {name && <span>{name}</span>}
         {name && email && <span>: </span>}
         {email && (
@@ -279,9 +317,9 @@ function UrlSection({ url }: { url: string | null }) {
   }
   const href = PROTOCOL_RE.test(url) ? url : `https://${url}`;
   return (
-    <section className="mt-6">
-      <h2 className="font-medium text-muted-foreground text-sm">URL</h2>
-      <p className="mt-1">
+    <section className="mt-8">
+      <SectionHeading>URL</SectionHeading>
+      <p className="mt-2">
         <a
           className="break-all text-brand hover:underline"
           href={href}

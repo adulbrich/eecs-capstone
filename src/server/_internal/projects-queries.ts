@@ -14,7 +14,7 @@ import {
   canSeeStatusHistory,
   filterCommentsForViewer,
   isStaff,
-  stripStaffOnlyFields,
+  stripPrivateFields,
   type Viewer,
 } from "#/lib/project-visibility";
 import { projectSummarySelect } from "./project-summary";
@@ -140,7 +140,7 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
   // no UI reads it, and shipping ~8KB of floats on every project-detail load
   // is pure payload bloat.
   const stripped = {
-    ...stripStaffOnlyFields(project, viewer),
+    ...stripPrivateFields(project, viewer),
     embedding: null,
     embeddingSourceHash: null,
     embeddingUpdatedAt: null,
@@ -235,8 +235,10 @@ export async function listProjectEditLogImpl(data: { id: string }) {
   };
 }
 
-export async function listProjectCommentsImpl(data: { id: string }) {
-  const viewer = await getViewer();
+export async function listProjectCommentsAs(
+  viewer: Viewer,
+  data: { id: string }
+) {
   const [project] = await db
     .select()
     .from(projects)
@@ -244,10 +246,27 @@ export async function listProjectCommentsImpl(data: { id: string }) {
   if (!(project && canSeeProject(project, viewer))) {
     throw new Error("Forbidden");
   }
+  // Join the author so the thread can render a name instead of a raw id. The
+  // FK is `onDelete: restrict`, so the row is always there; the left join and
+  // the fallback below only guard against a future relaxation of that rule.
   const rows = await db
-    .select()
+    .select({
+      id: projectComments.id,
+      projectId: projectComments.projectId,
+      authorId: projectComments.authorId,
+      authorName: user.name,
+      parentId: projectComments.parentId,
+      content: projectComments.content,
+      isInternal: projectComments.isInternal,
+      createdAt: projectComments.createdAt,
+    })
     .from(projectComments)
+    .leftJoin(user, eq(user.id, projectComments.authorId))
     .where(eq(projectComments.projectId, data.id))
     .orderBy(asc(projectComments.createdAt));
   return { rows: filterCommentsForViewer(rows, viewer, project) };
+}
+
+export async function listProjectCommentsImpl(data: { id: string }) {
+  return listProjectCommentsAs(await getViewer(), data);
 }

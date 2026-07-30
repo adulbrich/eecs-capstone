@@ -14,6 +14,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 import type { ProjectSummary } from "#/components/project-card";
 import { ProjectRow } from "#/components/project-row";
+import { PROJECT_PLACEHOLDER_IMAGE } from "#/lib/project-image";
 
 afterEach(cleanup);
 
@@ -40,11 +41,11 @@ describe("ProjectRow thumbnail", () => {
     expect(img?.className).not.toContain("absolute");
   });
 
-  it("renders the fallback at the same fixed ratio", () => {
+  it("renders the default placeholder at the same fixed ratio", () => {
     const { container } = render(<ProjectRow project={base} />);
-    expect(container.querySelector("img")).toBeNull();
-    const fallback = container.querySelector('[class*="aspect-"]');
-    expect(fallback?.className).toContain("aspect-[3/2]");
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("src")).toBe(PROJECT_PLACEHOLDER_IMAGE);
+    expect(img?.className).toContain("aspect-[3/2]");
   });
 
   it("does not stretch the thumbnail to the row height", () => {

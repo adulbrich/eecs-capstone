@@ -76,14 +76,48 @@ export function canEditProject(
   return project.status !== "archived";
 }
 
-export function stripStaffOnlyFields<T extends VisibleProject>(
+/**
+ * Private notes are the proposer's and staff's shared scratchpad: submission
+ * context that should never reach the public catalog, but that the proposer who
+ * wrote it must still be able to read and revise. Anyone else, signed in or
+ * not, never sees it.
+ */
+export function canSeePrivateNotes(
+  project: VisibleProject,
+  viewer: Viewer
+): boolean {
+  return isStaff(viewer) || isOwner(project, viewer);
+}
+
+/**
+ * Writing private notes follows the same rule as reading them. Callers must
+ * still check {@link canEditProject} first: this only answers "may this viewer
+ * touch the notes field", not "may this viewer edit the project at all".
+ */
+export function canWritePrivateNotes(
+  project: VisibleProject,
+  viewer: Viewer
+): boolean {
+  return canSeePrivateNotes(project, viewer);
+}
+
+/**
+ * Removes fields the viewer may not read. `notes` is private to staff and the
+ * proposer; `proposerEmail` stays staff-only, because it identifies a third
+ * party rather than describing the project.
+ */
+export function stripPrivateFields<T extends VisibleProject>(
   project: T,
   viewer: Viewer
 ): T {
-  if (isStaff(viewer)) {
-    return project;
+  const next = { ...project };
+  if (!canSeePrivateNotes(project, viewer)) {
+    next.notes = null;
   }
-  return { ...project, notes: null, proposerEmail: null };
+  if (!isStaff(viewer)) {
+    (next as VisibleProject).proposerEmail = null;
+  }
+  return next;
 }
 
 /**

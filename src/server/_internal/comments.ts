@@ -29,9 +29,12 @@ export async function addCommentAs(
   if (!(isStaff(visibility) || isOwner)) {
     throw new Error("Forbidden");
   }
+  // Checked against the caller's own flag, before any inheritance below, so a
+  // non-staff caller cannot smuggle an internal comment in via a parentId.
   if (data.isInternal && !isStaff(visibility)) {
     throw new Error("Only staff may post internal comments");
   }
+  let isInternal = data.isInternal;
   if (data.parentId) {
     const [parent] = await db
       .select()
@@ -48,6 +51,13 @@ export async function addCommentAs(
     if (parent.parentId) {
       throw new Error("Replies are one level deep");
     }
+    // An internal thread stays internal all the way down: a reply that quoted
+    // its internal parent would otherwise expose that parent's substance to
+    // the proposer. The converse is deliberately not true, so staff can still
+    // start an internal side-thread under a comment the proposer can see.
+    if (parent.isInternal) {
+      isInternal = true;
+    }
   }
 
   let createdId = "";
@@ -59,7 +69,7 @@ export async function addCommentAs(
         authorId: viewer.id,
         parentId: data.parentId ?? null,
         content: data.content,
-        isInternal: data.isInternal,
+        isInternal,
       })
       .returning();
     createdId = row.id;

@@ -1,12 +1,12 @@
 import { Link } from "@tanstack/react-router";
-import { getPublicUrl } from "#/lib/storage";
+import { projectImageSrc } from "#/lib/project-image";
 import { stripMarkdown } from "#/lib/strip-markdown";
 import { ImageOrFallback } from "./image-or-fallback";
 import { type ProjectSummary, programLabel } from "./project-card";
 import { StatusBadge } from "./status-badge";
 
 export function ProjectRow({ project }: { project: ProjectSummary }) {
-  const src = getPublicUrl(project.imageUrl);
+  const src = projectImageSrc(project.imageUrl);
   const meta = [programLabel(project), project.contactName].filter(
     Boolean
   ) as string[];

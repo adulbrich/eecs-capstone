@@ -27,7 +27,7 @@ function NewProject() {
               data: {
                 ...values,
                 programId: values.programId || null,
-                notes: isStaff ? values.notes || null : null,
+                notes: values.notes || null,
                 proposerEmail: isStaff
                   ? values.proposerEmail || null
                   : undefined,
@@ -50,7 +50,7 @@ function NewProject() {
             });
           }}
           showCategories={isStaff}
-          showNotes={isStaff}
+          showNotes
           showProposer={isStaff}
           submitLabel="Create draft"
         />

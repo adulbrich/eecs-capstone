@@ -3,6 +3,10 @@ import { useState } from "react";
 import { z } from "zod";
 import { applyServerErrors } from "#/lib/apply-server-errors";
 import {
+  PRIVATE_NOTES_INVENTORY_HINT,
+  PRIVATE_NOTES_LABEL,
+} from "#/lib/private-notes";
+import {
   createInventoryItem,
   updateInventoryItem,
   uploadInventoryImage,
@@ -164,8 +168,9 @@ export function InventoryForm({
         )}
       </form.Field>
       <Field
+        description={PRIVATE_NOTES_INVENTORY_HINT}
         form={form}
-        label="Internal notes (staff only)"
+        label={PRIVATE_NOTES_LABEL}
         name="notes"
         rows={3}
         textarea
@@ -192,6 +197,8 @@ export function InventoryForm({
 type AnyForm = any;
 
 interface FieldProps {
+  /** Helper text rendered under the label and wired up via aria-describedby. */
+  description?: string;
   form: AnyForm;
   label: string;
   name: keyof InventoryFormValues;
@@ -200,14 +207,32 @@ interface FieldProps {
   textarea?: boolean;
 }
 
-function Field({ form, name, label, placeholder, textarea, rows }: FieldProps) {
+function Field({
+  description,
+  form,
+  name,
+  label,
+  placeholder,
+  textarea,
+  rows,
+}: FieldProps) {
+  const descriptionId = description ? `${name}-description` : undefined;
   return (
     <form.Field name={name as never}>
       {(field: AnyForm) => (
         <div>
           <Label htmlFor={field.name}>{label}</Label>
+          {description && (
+            <p
+              className="mt-0.5 text-muted-foreground text-xs"
+              id={descriptionId}
+            >
+              {description}
+            </p>
+          )}
           {textarea ? (
             <Textarea
+              aria-describedby={descriptionId}
               className="mt-1"
               id={field.name}
               name={field.name}
@@ -219,6 +244,7 @@ function Field({ form, name, label, placeholder, textarea, rows }: FieldProps) {
             />
           ) : (
             <Input
+              aria-describedby={descriptionId}
               className="mt-1"
               id={field.name}
               name={field.name}

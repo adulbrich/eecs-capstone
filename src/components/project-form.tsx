@@ -2,6 +2,10 @@ import { useForm } from "@tanstack/react-form";
 import { useState } from "react";
 import { z } from "zod";
 import { applyServerErrors } from "#/lib/apply-server-errors";
+import {
+  PRIVATE_NOTES_LABEL,
+  PRIVATE_NOTES_PROJECT_HINT,
+} from "#/lib/private-notes";
 import type {
   FieldSuggestion,
   ImprovableField,
@@ -399,8 +403,9 @@ export function ProjectForm({
       )}
       {showNotes && (
         <Field
+          description={PRIVATE_NOTES_PROJECT_HINT}
           form={form}
-          label="Internal notes (staff only)"
+          label={PRIVATE_NOTES_LABEL}
           name="notes"
           rows={3}
           textarea
@@ -439,6 +444,8 @@ export function ProjectForm({
 type AnyForm = any;
 
 interface FieldProps {
+  /** Helper text rendered under the label and wired up via aria-describedby. */
+  description?: string;
   form: AnyForm;
   label: string;
   markdown?: boolean;
@@ -451,12 +458,14 @@ interface FieldProps {
 }
 
 function FieldControl({
+  describedBy,
   field,
   markdown,
   placeholder,
   rows,
   textarea,
 }: {
+  describedBy?: string;
   field: AnyForm;
   markdown?: boolean;
   placeholder?: string;
@@ -466,6 +475,7 @@ function FieldControl({
   if (markdown) {
     return (
       <MarkdownField
+        describedBy={describedBy}
         id={field.name}
         name={field.name}
         onBlur={field.handleBlur}
@@ -479,6 +489,7 @@ function FieldControl({
   if (textarea) {
     return (
       <Textarea
+        aria-describedby={describedBy}
         className="mt-1"
         id={field.name}
         name={field.name}
@@ -492,6 +503,7 @@ function FieldControl({
   }
   return (
     <Input
+      aria-describedby={describedBy}
       className="mt-1"
       id={field.name}
       name={field.name}
@@ -504,6 +516,7 @@ function FieldControl({
 }
 
 function Field({
+  description,
   form,
   name,
   label,
@@ -514,12 +527,22 @@ function Field({
   suggestion,
   onApply,
 }: FieldProps) {
+  const descriptionId = description ? `${name}-description` : undefined;
   return (
     <form.Field name={name as never}>
       {(field: AnyForm) => (
         <div>
           <Label htmlFor={field.name}>{label}</Label>
+          {description && (
+            <p
+              className="mt-0.5 text-muted-foreground text-xs"
+              id={descriptionId}
+            >
+              {description}
+            </p>
+          )}
           <FieldControl
+            describedBy={descriptionId}
             field={field}
             markdown={markdown}
             placeholder={placeholder}

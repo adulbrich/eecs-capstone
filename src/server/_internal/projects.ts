@@ -8,7 +8,12 @@ import {
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
-import { canEditProject, isStaff, type Viewer } from "#/lib/project-visibility";
+import {
+  canEditProject,
+  canWritePrivateNotes,
+  isStaff,
+  type Viewer,
+} from "#/lib/project-visibility";
 import {
   type ActorRole,
   assertTransitionAllowed,
@@ -45,8 +50,6 @@ const PROJECT_EDITABLE_FIELDS = [
   "teamsSupported",
 ] as const;
 
-const STAFF_ONLY_FIELDS = new Set(["notes", "proposerEmail", "proposerId"]);
-
 function viewerToVisibility(viewer: AuthUser): Viewer {
   return { id: viewer.id, role: viewer.role ?? null };
 }
@@ -77,7 +80,6 @@ export async function createProjectAs(
   data: ProjectInput
 ): Promise<{ id: string }> {
   const staff = isStaff(viewerToVisibility(viewer));
-  const allowedNotes = staff ? (data.notes ?? null) : null;
   const proposerEmail = staff ? data.proposerEmail || null : null;
   // On create a blank proposer email defaults the proposer to the creator, so a
   // new project always has an owner. Staff link a different proposer by entering
@@ -85,6 +87,11 @@ export async function createProjectAs(
   const proposerId = proposerEmail
     ? await resolveProposerId(proposerEmail)
     : viewer.id;
+  // Private notes belong to staff and the proposer jointly. On create the
+  // writer is always one of the two by construction (only staff may name a
+  // different proposer; everyone else becomes the proposer), so there is
+  // nothing to gate here. The update path re-checks per project.
+  const allowedNotes = data.notes ?? null;
 
   const [created] = await db
     .insert(projects)
@@ -139,8 +146,10 @@ export async function updateProjectAs(
     programId: data.programId ?? null,
     teamsSupported: data.teamsSupported ?? 1,
   };
-  if (staff) {
+  if (canWritePrivateNotes(existing, visibility)) {
     newValues.notes = data.notes ?? null;
+  }
+  if (staff) {
     const proposerEmail = data.proposerEmail || null;
     newValues.proposerEmail = proposerEmail;
     newValues.proposerId = proposerEmail
@@ -152,7 +161,10 @@ export async function updateProjectAs(
   const newDiff: Record<string, unknown> = {};
   const changedFields: string[] = [];
   for (const field of PROJECT_EDITABLE_FIELDS) {
-    if (!staff && STAFF_ONLY_FIELDS.has(field)) {
+    // A field the viewer was not allowed to write never made it into
+    // `newValues`, and `.set()` leaves it alone. Diffing it anyway would log a
+    // phantom "changed to null" edit for a value that is still in the row.
+    if (!(field in newValues)) {
       continue;
     }
     const oldVal = (existing as Record<string, unknown>)[field] ?? null;

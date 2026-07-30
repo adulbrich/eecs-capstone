@@ -320,3 +320,111 @@ describe("status timeline visibility and changes-requested feedback", () => {
     expect(changeNotif?.message).toContain("Please tighten the scope.");
   });
 });
+
+describe("private notes", () => {
+  it("lets a proposer write private notes at creation and read them back", async () => {
+    const owner = await makeUser(`pn-o-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      notes: "Budget comes from the robotics grant.",
+    });
+
+    const view = await getProjectAs(owner, { id });
+    expect(view.project?.notes).toBe("Budget comes from the robotics grant.");
+  });
+
+  it("hides private notes from other signed-in users and anonymous viewers", async () => {
+    const owner = await makeUser(`pn-o2-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`pn-a2-${Date.now()}@x.com`, "admin");
+    const nosy = await makeUser(`pn-n2-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      notes: "Locker 12, code 4471.",
+    });
+    await performTransitionAs(owner, id, "submitted");
+    await performTransitionAs(admin, id, "approved");
+    await performTransitionAs(admin, id, "published");
+
+    expect((await getProjectAs(nosy, { id })).project?.notes).toBeNull();
+    expect((await getProjectAs(null, { id })).project?.notes).toBeNull();
+    expect((await getProjectAs(owner, { id })).project?.notes).toBe(
+      "Locker 12, code 4471."
+    );
+    expect((await getProjectAs(admin, { id })).project?.notes).toBe(
+      "Locker 12, code 4471."
+    );
+  });
+
+  it("lets the proposer edit their own private notes", async () => {
+    const owner = await makeUser(`pn-o3-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      notes: "first draft",
+    });
+
+    await updateProjectAs(owner, {
+      id,
+      ...baseProject(),
+      notes: "revised by the proposer",
+    });
+
+    expect((await getProjectAs(owner, { id })).project?.notes).toBe(
+      "revised by the proposer"
+    );
+  });
+
+  it("does not let a proposer's save wipe notes staff added", async () => {
+    const owner = await makeUser(`pn-o4-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`pn-a4-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+    await updateProjectAs(admin, {
+      id,
+      ...baseProject(),
+      notes: "staff context",
+    });
+
+    // The proposer sees the notes now, so an untouched save round-trips them.
+    const seen = (await getProjectAs(owner, { id })).project?.notes;
+    expect(seen).toBe("staff context");
+    await updateProjectAs(owner, { id, ...baseProject(), notes: seen ?? null });
+
+    expect((await getProjectAs(admin, { id })).project?.notes).toBe(
+      "staff context"
+    );
+  });
+
+  it("logs a notes edit under the proposer who made it", async () => {
+    const owner = await makeUser(`pn-o5-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, baseProject());
+    await updateProjectAs(owner, {
+      id,
+      ...baseProject(),
+      notes: "added later",
+    });
+
+    const log = await db
+      .select()
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
+    expect(log).toHaveLength(1);
+    expect(log[0].changedFields).toContain("notes");
+    expect(log[0].editorId).toBe(owner.id);
+  });
+
+  it("keeps proposerEmail staff-only even though notes are not", async () => {
+    const owner = await makeUser(`pn-o6-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`pn-a6-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(admin, {
+      ...baseProject(),
+      notes: "n",
+      proposerEmail: owner.email,
+    });
+
+    const ownerView = await getProjectAs(owner, { id });
+    expect(ownerView.project?.notes).toBe("n");
+    expect(ownerView.project?.proposerEmail).toBeNull();
+    expect((await getProjectAs(admin, { id })).project?.proposerEmail).toBe(
+      owner.email
+    );
+  });
+});

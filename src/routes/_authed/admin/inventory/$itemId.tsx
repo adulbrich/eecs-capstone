@@ -20,6 +20,10 @@ import {
 import { Button } from "#/components/ui/button";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import {
+  PRIVATE_NOTES_INVENTORY_HINT,
+  PRIVATE_NOTES_LABEL,
+} from "#/lib/private-notes";
 import { getPublicUrl } from "#/lib/storage";
 import { getInventoryItem, getItemHistory } from "#/server/inventory";
 
@@ -143,9 +147,12 @@ function AdminItemDetail() {
           {item.notes && (
             <div>
               <p className="text-muted-foreground text-xs uppercase">
-                Internal notes
+                {PRIVATE_NOTES_LABEL}
               </p>
               <p className="mt-1 whitespace-pre-wrap text-sm">{item.notes}</p>
+              <p className="mt-1 text-muted-foreground text-xs">
+                {PRIVATE_NOTES_INVENTORY_HINT}
+              </p>
             </div>
           )}
         </div>

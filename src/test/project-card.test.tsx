@@ -13,6 +13,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 import { ProjectCard, type ProjectSummary } from "#/components/project-card";
+import { PROJECT_PLACEHOLDER_IMAGE } from "#/lib/project-image";
 
 afterEach(cleanup);
 
@@ -39,6 +40,22 @@ describe("ProjectCard", () => {
       <ProjectCard project={{ ...base, status: "archived" }} />
     );
     expect(getByText("archived")).toBeTruthy();
+  });
+
+  it("falls back to the default image when the project has none", () => {
+    const { container } = render(<ProjectCard project={base} />);
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(
+      PROJECT_PLACEHOLDER_IMAGE
+    );
+  });
+
+  it("prefers the project's own image when it has one", () => {
+    const { container } = render(
+      <ProjectCard project={{ ...base, imageUrl: "projects/a/b.webp" }} />
+    );
+    const src = container.querySelector("img")?.getAttribute("src");
+    expect(src).not.toBe(PROJECT_PLACEHOLDER_IMAGE);
+    expect(src).toContain("projects/a/b.webp");
   });
 
   it("renders program, contact, and updated meta", () => {

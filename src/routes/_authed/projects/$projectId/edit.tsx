@@ -74,7 +74,7 @@ function EditProject() {
                 id: projectId,
                 ...values,
                 programId: values.programId || null,
-                notes: viewerIsStaff ? values.notes || null : null,
+                notes: values.notes || null,
                 proposerEmail: viewerIsStaff
                   ? values.proposerEmail || null
                   : undefined,
@@ -98,7 +98,7 @@ function EditProject() {
           }}
           projectId={projectId}
           showCategories={viewerIsStaff}
-          showNotes={viewerIsStaff}
+          showNotes
           showProposer={viewerIsStaff}
           submitLabel="Save"
         />

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   canEditProject,
+  canSeePrivateNotes,
   canSeeProject,
   canSeeStatusHistory,
+  canWritePrivateNotes,
   filterCommentsForViewer,
   isStaff,
-  stripStaffOnlyFields,
+  stripPrivateFields,
   type Viewer,
   type VisibleProject,
 } from "../project-visibility";
@@ -114,15 +116,69 @@ describe("canEditProject", () => {
   });
 });
 
-describe("stripStaffOnlyFields", () => {
-  it("removes notes for non-staff", () => {
-    const result = stripStaffOnlyFields(p({ notes: "secret" }), owner);
+describe("canSeePrivateNotes", () => {
+  it("is true for staff", () => {
+    expect(canSeePrivateNotes(p({}), admin)).toBe(true);
+    expect(canSeePrivateNotes(p({}), instructor)).toBe(true);
+  });
+
+  it("is true for the proposer, who wrote them", () => {
+    expect(canSeePrivateNotes(p({}), owner)).toBe(true);
+  });
+
+  it("is false for other signed-in users and anonymous viewers", () => {
+    expect(canSeePrivateNotes(p({}), other)).toBe(false);
+    expect(canSeePrivateNotes(p({}), anon)).toBe(false);
+  });
+
+  it("stays private on a published project", () => {
+    expect(canSeePrivateNotes(p({ status: "published" }), other)).toBe(false);
+    expect(canSeePrivateNotes(p({ status: "published" }), anon)).toBe(false);
+  });
+});
+
+describe("canWritePrivateNotes", () => {
+  it("matches read access: staff and the proposer", () => {
+    expect(canWritePrivateNotes(p({}), admin)).toBe(true);
+    expect(canWritePrivateNotes(p({}), owner)).toBe(true);
+    expect(canWritePrivateNotes(p({}), other)).toBe(false);
+    expect(canWritePrivateNotes(p({}), anon)).toBe(false);
+  });
+});
+
+describe("stripPrivateFields", () => {
+  it("removes notes for an unrelated user", () => {
+    const result = stripPrivateFields(p({ notes: "secret" }), other);
+    expect(result.notes).toBeNull();
+  });
+
+  it("removes notes for anonymous viewers", () => {
+    const result = stripPrivateFields(p({ notes: "secret" }), anon);
     expect(result.notes).toBeNull();
   });
 
   it("keeps notes for staff", () => {
-    const result = stripStaffOnlyFields(p({ notes: "secret" }), admin);
+    const result = stripPrivateFields(p({ notes: "secret" }), admin);
     expect(result.notes).toBe("secret");
+  });
+
+  it("keeps notes for the proposer", () => {
+    const result = stripPrivateFields(p({ notes: "secret" }), owner);
+    expect(result.notes).toBe("secret");
+  });
+
+  it("keeps proposerEmail staff-only, even from the proposer", () => {
+    const withEmail = p({ notes: "secret", proposerEmail: "who@x.com" });
+    expect(stripPrivateFields(withEmail, owner).proposerEmail).toBeNull();
+    expect(stripPrivateFields(withEmail, admin).proposerEmail).toBe(
+      "who@x.com"
+    );
+  });
+
+  it("does not mutate the row it was handed", () => {
+    const original = p({ notes: "secret" });
+    stripPrivateFields(original, other);
+    expect(original.notes).toBe("secret");
   });
 });
 

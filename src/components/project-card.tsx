@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { getPublicUrl } from "#/lib/storage";
+import { projectImageSrc } from "#/lib/project-image";
 import { stripMarkdown } from "#/lib/strip-markdown";
 import { ImageOrFallback } from "./image-or-fallback";
 import { StatusBadge } from "./status-badge";
@@ -42,7 +42,7 @@ function ProjectMeta({ project }: { project: ProjectSummary }) {
 }
 
 export function ProjectCard({ project }: { project: ProjectSummary }) {
-  const src = getPublicUrl(project.imageUrl);
+  const src = projectImageSrc(project.imageUrl);
   return (
     <Link
       className="flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary"
