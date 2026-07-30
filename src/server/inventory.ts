@@ -62,6 +62,15 @@ export const getInventoryItem = createServerFn({ method: "GET" })
     return getInventoryItemForCurrentUser(data);
   });
 
+export const getInventoryItemDetail = createServerFn({ method: "GET" })
+  .inputValidator((d: unknown) => idOnlySchema.parse(d))
+  .handler(async ({ data }) => {
+    const { getInventoryItemDetailForCurrentUser } = await import(
+      "./_internal/inventory"
+    );
+    return getInventoryItemDetailForCurrentUser(data);
+  });
+
 const itemPayloadSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(5000).nullable().default(null),

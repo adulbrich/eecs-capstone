@@ -18,6 +18,7 @@ import {
   cancelRequestItemAs,
   createInventoryItemAs,
   getInventoryItemAs,
+  getInventoryItemDetailAs,
   hardDeleteInventoryItemAs,
   listInventoryAs,
   recordOverdueNotificationsAs,
@@ -414,6 +415,73 @@ describe("listInventoryAs privacy", () => {
     expect(anonDetail).toBeNull();
     const staffDetail = await getInventoryItemAs(admin, { id: item.id });
     expect(staffDetail?.status).toBe("retired");
+  });
+
+  it("gives an anonymous viewer no history and no staff fields", async () => {
+    const admin = await makeUser(`dtl-a-${Date.now()}@x.com`, "admin");
+    const item = await makeItem({ notes: "Locker B4, code 1180." });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "maintenance",
+    });
+
+    const view = await getInventoryItemDetailAs(null, { id: item.id });
+    expect(view).not.toBeNull();
+    expect(view?.viewerIsStaff).toBe(false);
+    expect(view?.history).toEqual([]);
+    expect("notes" in (view?.item as object)).toBe(false);
+    expect(JSON.stringify(view)).not.toContain("1180");
+  });
+
+  it("gives a signed-in non-staff user no history and no staff fields", async () => {
+    const admin = await makeUser(`dtl-a2-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`dtl-s2-${Date.now()}@x.com`, "user");
+    const item = await makeItem({ notes: "Locker B4, code 1180." });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "maintenance",
+    });
+
+    const view = await getInventoryItemDetailAs(student, { id: item.id });
+    expect(view?.viewerIsStaff).toBe(false);
+    expect(view?.history).toEqual([]);
+    expect("serial" in (view?.item as object)).toBe(false);
+    expect("location" in (view?.item as object)).toBe(false);
+  });
+
+  it("gives staff the history and the staff fields", async () => {
+    const admin = await makeUser(`dtl-a3-${Date.now()}@x.com`, "admin");
+    const item = await makeItem({ notes: "Locker B4, code 1180." });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "maintenance",
+    });
+
+    const view = await getInventoryItemDetailAs(admin, { id: item.id });
+    expect(view?.viewerIsStaff).toBe(true);
+    expect(view?.history.length).toBeGreaterThan(0);
+    expect((view?.item as unknown as { notes: string }).notes).toBe(
+      "Locker B4, code 1180."
+    );
+  });
+
+  it("returns null for a retired item viewed by a non-staff user", async () => {
+    const admin = await makeUser(`dtl-a4-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`dtl-s4-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    await transitionItem(admin, { itemId: item.id, nextStatus: "retired" });
+
+    expect(await getInventoryItemDetailAs(student, { id: item.id })).toBeNull();
+    expect(await getInventoryItemDetailAs(null, { id: item.id })).toBeNull();
+    expect(
+      (await getInventoryItemDetailAs(admin, { id: item.id }))?.item.status
+    ).toBe("retired");
+  });
+
+  it("returns null for an item that does not exist", async () => {
+    const admin = await makeUser(`dtl-a5-${Date.now()}@x.com`, "admin");
+    const missing = "00000000-0000-0000-0000-0000000000ff";
+    expect(await getInventoryItemDetailAs(admin, { id: missing })).toBeNull();
   });
 });
 

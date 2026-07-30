@@ -1006,6 +1006,38 @@ export async function getItemHistoryForCurrentUser(data: { itemId: string }) {
 }
 
 /**
+ * One call for the item detail page, so a public loader can render a staff
+ * branch without touching `getItemHistoryAs`, which opens with `assertStaff`
+ * and would throw for an anonymous viewer rather than degrade.
+ *
+ * `viewerIsStaff` is returned explicitly rather than inferred by the caller
+ * from the presence of `notes` / `serial`: sniffing the payload shape would
+ * silently invert the gate the day a field is added to the public shape.
+ */
+export async function getInventoryItemDetailAs(
+  viewer: Viewer,
+  data: { id: string }
+) {
+  const item = await getInventoryItemAs(viewer, data);
+  if (!item) {
+    return null;
+  }
+  const staff = isStaff(viewer);
+  return {
+    item,
+    history: staff ? await getItemHistoryAs(viewer, { itemId: data.id }) : [],
+    viewerIsStaff: staff,
+  };
+}
+
+export async function getInventoryItemDetailForCurrentUser(data: {
+  id: string;
+}) {
+  const session = await readSession();
+  return getInventoryItemDetailAs(session?.user ?? null, data);
+}
+
+/**
  * Derive the two deadline flags for a row. `status` is the item-level
  * status, not the request line's: when a line is `approved` the item is
  * either `reserved` (pre-pickup) or `checked_out` (post-pickup), and we
