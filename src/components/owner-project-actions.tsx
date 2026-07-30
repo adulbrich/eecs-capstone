@@ -4,6 +4,7 @@ import {
   returnToDraft,
   submitProject,
 } from "#/server/projects";
+import { SectionHeading } from "./section-heading";
 import { Button } from "./ui/button";
 
 interface Project {
@@ -89,7 +90,7 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
 
   return (
     <section className="mt-6 rounded-lg border border-border bg-secondary p-4">
-      <h2 className="font-medium text-sm">Your actions</h2>
+      <SectionHeading>Your actions</SectionHeading>
       <div className="mt-3 flex flex-wrap gap-2">
         {visible.map((b) => (
           <Button

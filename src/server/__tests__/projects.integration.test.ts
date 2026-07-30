@@ -377,10 +377,15 @@ describe("private notes", () => {
     const owner = await makeUser(`pn-o4-${Date.now()}@x.com`, "user");
     const admin = await makeUser(`pn-a4-${Date.now()}@x.com`, "admin");
     const { id } = await createProjectAs(owner, baseProject());
+    // The staff edit form prefills proposerEmail from getProposerEmailForEdit,
+    // so a staff save always sends it back. Omitting it here would be an
+    // explicit unlink, which would drop the owner and make this test pass for
+    // the wrong reason.
     await updateProjectAs(admin, {
       id,
       ...baseProject(),
       notes: "staff context",
+      proposerEmail: owner.email,
     });
 
     // The proposer sees the notes now, so an untouched save round-trips them.

@@ -10,6 +10,7 @@ import { CategoryChip } from "#/components/category-chip";
 import { CommentThread } from "#/components/comment-thread";
 import { Markdown } from "#/components/markdown";
 import { OwnerProjectActions } from "#/components/owner-project-actions";
+import { SectionHeading } from "#/components/section-heading";
 import { StaffProjectPanel } from "#/components/staff-project-panel";
 import { StatusBadge } from "#/components/status-badge";
 import { StatusTimeline } from "#/components/status-timeline";
@@ -231,17 +232,6 @@ function ProjectDetail() {
       )}
     </div>
   );
-}
-
-/**
- * Every h2 on this page renders through here. The fields themselves are
- * markdown and can contain bold runs at body size, so a section heading has to
- * outrank them visually or the page reads as if the bold text were the
- * structure. Sits one step below the h1 (`text-2xl`) and above the staff
- * panel's h3s (`text-sm`).
- */
-function SectionHeading({ children }: { children: string }) {
-  return <h2 className="font-semibold text-xl tracking-tight">{children}</h2>;
 }
 
 function Section({ label, body }: { label: string; body: string | null }) {
