@@ -99,13 +99,34 @@ Fate of the two server fns this replaces, verified by grep rather than assumed:
 - Its `StaffItem` interface, `<dl>` and notes block move into the new panel; the
   breadcrumb is dropped (see below).
 
+`src/routes/_authed/inventory/$itemId/edit.tsx` (**moved** from
+`src/routes/_authed/admin/inventory/$itemId_.edit.tsx`)
+- URL becomes `/inventory/$itemId/edit`, mirroring
+  `/projects/$projectId/edit`.
+- **No trailing-underscore de-nesting needed**, unlike its current filename.
+  That underscore exists because the old edit file sat beside
+  `admin/inventory/$itemId.tsx`, which TanStack treated as its parent layout;
+  since that route has no `<Outlet />`, the form silently never rendered (the
+  bug recorded in the 2026-07-23 spec addendum). In the new location the detail
+  route lives in the public tree and the edit route in the pathless `_authed`
+  tree, so there is no parent to nest under. This is exactly the arrangement
+  projects already use (`routes/projects/$projectId.tsx` +
+  `routes/_authed/projects/$projectId/edit.tsx`), which is proven to work.
+- Keeps its own `beforeLoad` staff check: `_authed` only guarantees a signed-in
+  user, not a staff one. Non-staff are redirected to `/inventory/$itemId`
+  rather than `/`, which is where they were trying to go.
+- Breadcrumb's item link becomes `/inventory/$itemId`.
+
 `src/routes/_authed/admin/inventory/index.tsx`
 - Row link target becomes `/inventory/$itemId`.
+- Edit link target becomes `/inventory/$itemId/edit`.
 
-`src/routes/_authed/admin/inventory/$itemId_.edit.tsx`
-- Back-link target becomes `/inventory/$itemId`. The edit route itself is
-  unchanged and stays under `/admin`, since it is a staff-only form rather than
-  a view.
+`src/routes/_authed/admin/inventory/new.tsx`
+- Post-create navigation target becomes `/inventory/$itemId`.
+- The route itself stays at `/admin/inventory/new`: creating an item is not
+  item-scoped, has no id to hang a public URL on, and is a staff management
+  action alongside the table and the request queue. Only item-scoped surfaces
+  move to `/inventory`.
 
 ### New component (`src/components/staff-inventory-panel.tsx`)
 
@@ -115,7 +136,11 @@ is `mt-8 rounded-lg border-(--brand-primary-tint) border-2 bg-card p-4` with an
 
 - Staff fields `<dl>`: location, serial, label.
 - Private notes, using `PRIVATE_NOTES_LABEL` / `PRIVATE_NOTES_INVENTORY_HINT`.
-- Edit link to `/admin/inventory/$itemId/edit`.
+- Edit link to `/inventory/$itemId/edit`. Living inside this panel makes the
+  button staff-only by construction, with no separate visibility check to keep
+  in sync. This is the one place inventory deliberately differs from projects:
+  a project shows Edit to its owner as well, an item has no owner, so staff are
+  the only audience.
 - `<InventoryLifecyclePanel>` relocated **unchanged**. It is 558 lines with its
   own status-transition dialogs and danger zone; moving it as-is keeps this
   change reviewable, and its behavior is already covered by existing tests.
@@ -216,6 +241,9 @@ Extending the privacy block added earlier:
   now covers.
 - The public `inventory item detail` test is unchanged and now also asserts
   that the anonymous render has no staff panel.
+- `admin inventory item edit` is repointed from `/admin/inventory/${itemId}/edit`
+  to `/inventory/${itemId}/edit` and renamed `inventory item edit (staff)`. Its
+  route moved, so leaving it would scan a path that no longer resolves.
 
 ### Existing tests expected to stay green
 
@@ -235,15 +263,8 @@ being changed.
   `text-sm` `h2`s are a known follow-up, deliberately not bundled here.
 - `/admin/inventory` (the management table) stays. Only the item *detail* page
   merges; a bulk management table is a different surface from a detail view.
-- **The inventory edit form stays at `/admin/inventory/$itemId/edit`**, even
-  though the project edit form lives at `/projects/$projectId/edit`. This is a
-  real difference in audience, not a leftover inconsistency: a project has an
-  owner, so any signed-in user may reach its edit form for their own project,
-  and the route belongs in user space. An inventory item has no owner and only
-  staff may ever edit one, so its form belongs with the rest of the staff
-  management surface (`/admin/inventory`, `/admin/inventory/new`,
-  `/admin/inventory/requests`). What gets unified here is the *view*, which has
-  a mixed audience; the form does not.
+- The `/admin/inventory` table and `/admin/inventory/requests` queue stay where
+  they are. They are management surfaces spanning many items, not views of one.
 - No default placeholder image for inventory items. Projects got a branded 16:9
   placeholder; inventory items are square and unbranded, and would need their
   own asset.
@@ -256,7 +277,14 @@ being changed.
   surviving `to="/admin/inventory/$itemId"` is a build error rather than a
   runtime 404, since TanStack Router types route paths. That is the desired
   failure mode, and `npm run typecheck` is what catches it. Known call sites to
-  update: the admin table row and the edit page's back-link.
+  update, found by grep: the admin table's row link and its edit link, the
+  edit page's breadcrumb, and `new.tsx`'s post-create navigation.
+- **Non-staff reaching `/inventory/$itemId/edit` directly.** The route is no
+  longer behind an `/admin` prefix, so the URL is guessable from the detail
+  page. The `beforeLoad` staff check is what holds; the a11y suite exercises it
+  as staff, and the server functions behind the form (`updateInventoryItemAs`)
+  already `assertStaff` independently, so the guard is defence in depth rather
+  than the only gate.
 - **SSR shape.** The merged route is server-rendered for anonymous viewers with
   a staff-only branch in the tree. The branch is driven by the server-computed
   `viewerIsStaff` and the payload is already stripped server-side, so an
