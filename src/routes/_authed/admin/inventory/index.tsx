@@ -200,7 +200,7 @@ function AdminInventory() {
                   <Link
                     className="hover:underline"
                     params={{ itemId: row.id }}
-                    to="/admin/inventory/$itemId"
+                    to="/inventory/$itemId"
                   >
                     {row.name}
                   </Link>
@@ -225,7 +225,7 @@ function AdminInventory() {
                 <Link
                   className="hover:underline"
                   params={{ itemId: row.id }}
-                  to="/admin/inventory/$itemId/edit"
+                  to="/inventory/$itemId/edit"
                 >
                   Edit
                 </Link>

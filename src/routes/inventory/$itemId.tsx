@@ -1,24 +1,33 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
+import type { HistoryRow } from "#/components/inventory-lifecycle-panel";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
+import {
+  StaffInventoryPanel,
+  type StaffPanelItem,
+} from "#/components/staff-inventory-panel";
 import { Button } from "#/components/ui/button";
 import { authClient } from "#/lib/auth-client";
+import { pageTitle } from "#/lib/page-title";
 import { getPublicUrl } from "#/lib/storage";
-import { addToCart, getInventoryItem } from "#/server/inventory";
+import { addToCart, getInventoryItemDetail } from "#/server/inventory";
 
 export const Route = createFileRoute("/inventory/$itemId")({
+  head: () => ({ meta: [{ title: pageTitle("Inventory Item") }] }),
   loader: async ({ params }) => {
-    const item = await getInventoryItem({ data: { id: params.itemId } });
-    if (!item) {
+    const detail = await getInventoryItemDetail({
+      data: { id: params.itemId },
+    });
+    if (!detail) {
       throw notFound();
     }
-    return item;
+    return detail;
   },
   component: ItemDetail,
 });
 
 function ItemDetail() {
-  const item = Route.useLoaderData();
+  const { item, history, viewerIsStaff } = Route.useLoaderData();
   const qc = useQueryClient();
   const { data: session } = authClient.useSession();
   const img = getPublicUrl(item.imageUrl);
@@ -30,12 +39,15 @@ function ItemDetail() {
         <div className="overflow-hidden rounded-lg bg-(--surface-sunken)">
           {img ? (
             <img alt="" className="h-full w-full object-cover" src={img} />
-          ) : null}
+          ) : (
+            <div className="aspect-square" />
+          )}
         </div>
         <div>
           <h1 className="font-semibold text-2xl">{item.name}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <InventoryStatusBadge
+              showRetired={viewerIsStaff}
               status={
                 item.status as
                   | "available"
@@ -81,6 +93,13 @@ function ItemDetail() {
           </div>
         </div>
       </div>
+
+      {viewerIsStaff && (
+        <StaffInventoryPanel
+          history={history as unknown as HistoryRow[]}
+          item={item as unknown as StaffPanelItem}
+        />
+      )}
     </div>
   );
 }

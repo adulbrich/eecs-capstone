@@ -36,13 +36,12 @@ import { Route as AuthedAdminMentorsIndexRouteImport } from './routes/_authed/ad
 import { Route as AuthedAdminInventoryIndexRouteImport } from './routes/_authed/admin/inventory/index'
 import { Route as AuthedAdminCategoriesIndexRouteImport } from './routes/_authed/admin/categories/index'
 import { Route as AuthedProjectsProjectIdEditRouteImport } from './routes/_authed/projects/$projectId/edit'
+import { Route as AuthedInventoryItemIdEditRouteImport } from './routes/_authed/inventory/$itemId/edit'
 import { Route as AuthedAdminUsersUserIdRouteImport } from './routes/_authed/admin/users/$userId'
 import { Route as AuthedAdminProgramsProgramIdRouteImport } from './routes/_authed/admin/programs/$programId'
 import { Route as AuthedAdminInventoryRequestsRouteImport } from './routes/_authed/admin/inventory/requests'
 import { Route as AuthedAdminInventoryNewRouteImport } from './routes/_authed/admin/inventory/new'
-import { Route as AuthedAdminInventoryItemIdRouteImport } from './routes/_authed/admin/inventory/$itemId'
 import { Route as AuthedAdminCategoriesCategoryIdRouteImport } from './routes/_authed/admin/categories/$categoryId'
-import { Route as AuthedAdminInventoryItemIdEditRouteImport } from './routes/_authed/admin/inventory/$itemId_.edit'
 
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
@@ -183,6 +182,12 @@ const AuthedProjectsProjectIdEditRoute =
     path: '/projects/$projectId/edit',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedInventoryItemIdEditRoute =
+  AuthedInventoryItemIdEditRouteImport.update({
+    id: '/inventory/$itemId/edit',
+    path: '/inventory/$itemId/edit',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAdminUsersUserIdRoute = AuthedAdminUsersUserIdRouteImport.update({
   id: '/users/$userId',
   path: '/users/$userId',
@@ -205,22 +210,10 @@ const AuthedAdminInventoryNewRoute = AuthedAdminInventoryNewRouteImport.update({
   path: '/inventory/new',
   getParentRoute: () => AuthedAdminRoute,
 } as any)
-const AuthedAdminInventoryItemIdRoute =
-  AuthedAdminInventoryItemIdRouteImport.update({
-    id: '/inventory/$itemId',
-    path: '/inventory/$itemId',
-    getParentRoute: () => AuthedAdminRoute,
-  } as any)
 const AuthedAdminCategoriesCategoryIdRoute =
   AuthedAdminCategoriesCategoryIdRouteImport.update({
     id: '/categories/$categoryId',
     path: '/categories/$categoryId',
-    getParentRoute: () => AuthedAdminRoute,
-  } as any)
-const AuthedAdminInventoryItemIdEditRoute =
-  AuthedAdminInventoryItemIdEditRouteImport.update({
-    id: '/inventory/$itemId_/edit',
-    path: '/inventory/$itemId/edit',
     getParentRoute: () => AuthedAdminRoute,
   } as any)
 
@@ -245,11 +238,11 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin/': typeof AuthedAdminIndexRoute
   '/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
-  '/admin/inventory/$itemId': typeof AuthedAdminInventoryItemIdRoute
   '/admin/inventory/new': typeof AuthedAdminInventoryNewRoute
   '/admin/inventory/requests': typeof AuthedAdminInventoryRequestsRoute
   '/admin/programs/$programId': typeof AuthedAdminProgramsProgramIdRoute
   '/admin/users/$userId': typeof AuthedAdminUsersUserIdRoute
+  '/inventory/$itemId/edit': typeof AuthedInventoryItemIdEditRoute
   '/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
   '/admin/categories/': typeof AuthedAdminCategoriesIndexRoute
   '/admin/inventory/': typeof AuthedAdminInventoryIndexRoute
@@ -257,7 +250,6 @@ export interface FileRoutesByFullPath {
   '/admin/programs/': typeof AuthedAdminProgramsIndexRoute
   '/admin/projects/': typeof AuthedAdminProjectsIndexRoute
   '/admin/users/': typeof AuthedAdminUsersIndexRoute
-  '/admin/inventory/$itemId/edit': typeof AuthedAdminInventoryItemIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -279,11 +271,11 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin': typeof AuthedAdminIndexRoute
   '/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
-  '/admin/inventory/$itemId': typeof AuthedAdminInventoryItemIdRoute
   '/admin/inventory/new': typeof AuthedAdminInventoryNewRoute
   '/admin/inventory/requests': typeof AuthedAdminInventoryRequestsRoute
   '/admin/programs/$programId': typeof AuthedAdminProgramsProgramIdRoute
   '/admin/users/$userId': typeof AuthedAdminUsersUserIdRoute
+  '/inventory/$itemId/edit': typeof AuthedInventoryItemIdEditRoute
   '/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
   '/admin/categories': typeof AuthedAdminCategoriesIndexRoute
   '/admin/inventory': typeof AuthedAdminInventoryIndexRoute
@@ -291,7 +283,6 @@ export interface FileRoutesByTo {
   '/admin/programs': typeof AuthedAdminProgramsIndexRoute
   '/admin/projects': typeof AuthedAdminProjectsIndexRoute
   '/admin/users': typeof AuthedAdminUsersIndexRoute
-  '/admin/inventory/$itemId/edit': typeof AuthedAdminInventoryItemIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -316,11 +307,11 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_authed/admin/': typeof AuthedAdminIndexRoute
   '/_authed/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
-  '/_authed/admin/inventory/$itemId': typeof AuthedAdminInventoryItemIdRoute
   '/_authed/admin/inventory/new': typeof AuthedAdminInventoryNewRoute
   '/_authed/admin/inventory/requests': typeof AuthedAdminInventoryRequestsRoute
   '/_authed/admin/programs/$programId': typeof AuthedAdminProgramsProgramIdRoute
   '/_authed/admin/users/$userId': typeof AuthedAdminUsersUserIdRoute
+  '/_authed/inventory/$itemId/edit': typeof AuthedInventoryItemIdEditRoute
   '/_authed/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
   '/_authed/admin/categories/': typeof AuthedAdminCategoriesIndexRoute
   '/_authed/admin/inventory/': typeof AuthedAdminInventoryIndexRoute
@@ -328,7 +319,6 @@ export interface FileRoutesById {
   '/_authed/admin/programs/': typeof AuthedAdminProgramsIndexRoute
   '/_authed/admin/projects/': typeof AuthedAdminProjectsIndexRoute
   '/_authed/admin/users/': typeof AuthedAdminUsersIndexRoute
-  '/_authed/admin/inventory/$itemId_/edit': typeof AuthedAdminInventoryItemIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -353,11 +343,11 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/admin/'
     | '/admin/categories/$categoryId'
-    | '/admin/inventory/$itemId'
     | '/admin/inventory/new'
     | '/admin/inventory/requests'
     | '/admin/programs/$programId'
     | '/admin/users/$userId'
+    | '/inventory/$itemId/edit'
     | '/projects/$projectId/edit'
     | '/admin/categories/'
     | '/admin/inventory/'
@@ -365,7 +355,6 @@ export interface FileRouteTypes {
     | '/admin/programs/'
     | '/admin/projects/'
     | '/admin/users/'
-    | '/admin/inventory/$itemId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -387,11 +376,11 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/admin'
     | '/admin/categories/$categoryId'
-    | '/admin/inventory/$itemId'
     | '/admin/inventory/new'
     | '/admin/inventory/requests'
     | '/admin/programs/$programId'
     | '/admin/users/$userId'
+    | '/inventory/$itemId/edit'
     | '/projects/$projectId/edit'
     | '/admin/categories'
     | '/admin/inventory'
@@ -399,7 +388,6 @@ export interface FileRouteTypes {
     | '/admin/programs'
     | '/admin/projects'
     | '/admin/users'
-    | '/admin/inventory/$itemId/edit'
   id:
     | '__root__'
     | '/'
@@ -423,11 +411,11 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/_authed/admin/'
     | '/_authed/admin/categories/$categoryId'
-    | '/_authed/admin/inventory/$itemId'
     | '/_authed/admin/inventory/new'
     | '/_authed/admin/inventory/requests'
     | '/_authed/admin/programs/$programId'
     | '/_authed/admin/users/$userId'
+    | '/_authed/inventory/$itemId/edit'
     | '/_authed/projects/$projectId/edit'
     | '/_authed/admin/categories/'
     | '/_authed/admin/inventory/'
@@ -435,7 +423,6 @@ export interface FileRouteTypes {
     | '/_authed/admin/programs/'
     | '/_authed/admin/projects/'
     | '/_authed/admin/users/'
-    | '/_authed/admin/inventory/$itemId_/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -645,6 +632,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProjectsProjectIdEditRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/inventory/$itemId/edit': {
+      id: '/_authed/inventory/$itemId/edit'
+      path: '/inventory/$itemId/edit'
+      fullPath: '/inventory/$itemId/edit'
+      preLoaderRoute: typeof AuthedInventoryItemIdEditRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/admin/users/$userId': {
       id: '/_authed/admin/users/$userId'
       path: '/users/$userId'
@@ -673,25 +667,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminInventoryNewRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
-    '/_authed/admin/inventory/$itemId': {
-      id: '/_authed/admin/inventory/$itemId'
-      path: '/inventory/$itemId'
-      fullPath: '/admin/inventory/$itemId'
-      preLoaderRoute: typeof AuthedAdminInventoryItemIdRouteImport
-      parentRoute: typeof AuthedAdminRoute
-    }
     '/_authed/admin/categories/$categoryId': {
       id: '/_authed/admin/categories/$categoryId'
       path: '/categories/$categoryId'
       fullPath: '/admin/categories/$categoryId'
       preLoaderRoute: typeof AuthedAdminCategoriesCategoryIdRouteImport
-      parentRoute: typeof AuthedAdminRoute
-    }
-    '/_authed/admin/inventory/$itemId_/edit': {
-      id: '/_authed/admin/inventory/$itemId_/edit'
-      path: '/inventory/$itemId/edit'
-      fullPath: '/admin/inventory/$itemId/edit'
-      preLoaderRoute: typeof AuthedAdminInventoryItemIdEditRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
   }
@@ -700,7 +680,6 @@ declare module '@tanstack/react-router' {
 interface AuthedAdminRouteChildren {
   AuthedAdminIndexRoute: typeof AuthedAdminIndexRoute
   AuthedAdminCategoriesCategoryIdRoute: typeof AuthedAdminCategoriesCategoryIdRoute
-  AuthedAdminInventoryItemIdRoute: typeof AuthedAdminInventoryItemIdRoute
   AuthedAdminInventoryNewRoute: typeof AuthedAdminInventoryNewRoute
   AuthedAdminInventoryRequestsRoute: typeof AuthedAdminInventoryRequestsRoute
   AuthedAdminProgramsProgramIdRoute: typeof AuthedAdminProgramsProgramIdRoute
@@ -711,13 +690,11 @@ interface AuthedAdminRouteChildren {
   AuthedAdminProgramsIndexRoute: typeof AuthedAdminProgramsIndexRoute
   AuthedAdminProjectsIndexRoute: typeof AuthedAdminProjectsIndexRoute
   AuthedAdminUsersIndexRoute: typeof AuthedAdminUsersIndexRoute
-  AuthedAdminInventoryItemIdEditRoute: typeof AuthedAdminInventoryItemIdEditRoute
 }
 
 const AuthedAdminRouteChildren: AuthedAdminRouteChildren = {
   AuthedAdminIndexRoute: AuthedAdminIndexRoute,
   AuthedAdminCategoriesCategoryIdRoute: AuthedAdminCategoriesCategoryIdRoute,
-  AuthedAdminInventoryItemIdRoute: AuthedAdminInventoryItemIdRoute,
   AuthedAdminInventoryNewRoute: AuthedAdminInventoryNewRoute,
   AuthedAdminInventoryRequestsRoute: AuthedAdminInventoryRequestsRoute,
   AuthedAdminProgramsProgramIdRoute: AuthedAdminProgramsProgramIdRoute,
@@ -728,7 +705,6 @@ const AuthedAdminRouteChildren: AuthedAdminRouteChildren = {
   AuthedAdminProgramsIndexRoute: AuthedAdminProgramsIndexRoute,
   AuthedAdminProjectsIndexRoute: AuthedAdminProjectsIndexRoute,
   AuthedAdminUsersIndexRoute: AuthedAdminUsersIndexRoute,
-  AuthedAdminInventoryItemIdEditRoute: AuthedAdminInventoryItemIdEditRoute,
 }
 
 const AuthedAdminRouteWithChildren = AuthedAdminRoute._addFileChildren(
@@ -742,6 +718,7 @@ interface AuthedRouteChildren {
   AuthedMyItemsRoute: typeof AuthedMyItemsRoute
   AuthedMyProjectsRoute: typeof AuthedMyProjectsRoute
   AuthedProjectsNewRoute: typeof AuthedProjectsNewRoute
+  AuthedInventoryItemIdEditRoute: typeof AuthedInventoryItemIdEditRoute
   AuthedProjectsProjectIdEditRoute: typeof AuthedProjectsProjectIdEditRoute
 }
 
@@ -752,6 +729,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedMyItemsRoute: AuthedMyItemsRoute,
   AuthedMyProjectsRoute: AuthedMyProjectsRoute,
   AuthedProjectsNewRoute: AuthedProjectsNewRoute,
+  AuthedInventoryItemIdEditRoute: AuthedInventoryItemIdEditRoute,
   AuthedProjectsProjectIdEditRoute: AuthedProjectsProjectIdEditRoute,
 }
 

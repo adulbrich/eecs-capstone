@@ -58,7 +58,7 @@ function NewInventoryItem() {
         <InventoryForm
           onSaved={(itemId) =>
             navigate({
-              to: "/admin/inventory/$itemId",
+              to: "/inventory/$itemId",
               params: { itemId },
             })
           }

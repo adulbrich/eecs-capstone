@@ -1000,11 +1000,6 @@ export async function getItemHistoryAs(
   return rows;
 }
 
-export async function getItemHistoryForCurrentUser(data: { itemId: string }) {
-  const viewer = await requireUser();
-  return getItemHistoryAs(viewer, data);
-}
-
 /**
  * One call for the item detail page, so a public loader can render a staff
  * branch without touching `getItemHistoryAs`, which opens with `assertStaff`

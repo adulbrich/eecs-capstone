@@ -33,13 +33,13 @@ test("admin inventory new", async ({ page }) => {
   await checkA11y(page);
 });
 
-test("admin inventory item detail", async ({ page }) => {
-  await page.goto(`/admin/inventory/${itemId}`);
+test("inventory item detail (staff)", async ({ page }) => {
+  await page.goto(`/inventory/${itemId}`);
   await checkA11y(page);
 });
 
-test("admin inventory item edit", async ({ page }) => {
-  await page.goto(`/admin/inventory/${itemId}/edit`);
+test("inventory item edit (staff)", async ({ page }) => {
+  await page.goto(`/inventory/${itemId}/edit`);
   await checkA11y(page);
 });
 

@@ -214,17 +214,6 @@ export const listInventoryRequests = createServerFn({ method: "GET" })
     return listInventoryRequestsForCurrentUser(data);
   });
 
-const itemHistorySchema = z.object({ itemId: z.string().uuid() });
-
-export const getItemHistory = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) => itemHistorySchema.parse(d))
-  .handler(async ({ data }) => {
-    const { getItemHistoryForCurrentUser } = await import(
-      "./_internal/inventory"
-    );
-    return getItemHistoryForCurrentUser(data);
-  });
-
 const transitionSchema = z.object({
   itemId: z.string().uuid(),
   nextStatus: z.enum([

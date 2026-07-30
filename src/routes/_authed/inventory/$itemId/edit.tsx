@@ -1,19 +1,10 @@
 import {
   createFileRoute,
-  Link,
   notFound,
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
 import { InventoryForm } from "#/components/inventory-form";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "#/components/ui/breadcrumb";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { getInventoryItem } from "#/server/inventory";
@@ -30,8 +21,11 @@ interface StaffItem {
   serial?: string | null;
 }
 
-export const Route = createFileRoute("/_authed/admin/inventory/$itemId_/edit")({
+export const Route = createFileRoute("/_authed/inventory/$itemId/edit")({
   head: () => ({ meta: [{ title: pageTitle("Edit Inventory Item") }] }),
+  // `_authed` guarantees a signed-in user, not a staff one, and this URL is
+  // now guessable from the public detail page. Defence in depth over
+  // `updateInventoryItemAs`, which asserts staff on its own.
   beforeLoad: async () => {
     const session = await getSession();
     if (!session?.user) {
@@ -56,37 +50,7 @@ function EditInventoryItem() {
   const loaded = Route.useLoaderData() as unknown as StaffItem;
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/admin">Admin</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/admin/inventory">Inventory</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link
-                params={{ itemId: loaded.id }}
-                to="/admin/inventory/$itemId"
-              >
-                {loaded.name}
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Edit</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <h1 className="mt-2 font-semibold text-2xl">Edit inventory item</h1>
+      <h1 className="font-semibold text-2xl">Edit inventory item</h1>
       <div className="mt-6">
         <InventoryForm
           initial={{
@@ -101,10 +65,7 @@ function EditInventoryItem() {
           }}
           itemId={loaded.id}
           onSaved={(itemId) =>
-            navigate({
-              to: "/admin/inventory/$itemId",
-              params: { itemId },
-            })
+            navigate({ to: "/inventory/$itemId", params: { itemId } })
           }
           submitLabel="Save"
         />
