@@ -66,6 +66,34 @@ To stop the database and storage:
 docker compose down
 ```
 
+### Port conflicts
+
+The stack publishes Postgres on 5432 and RustFS on 9000/9001. If another
+project already holds those host ports, the containers still start but silently
+publish nothing, and the app talks to the *other* project's services instead:
+Postgres fails with `password authentication failed`, while S3 may quietly
+accept writes, because the default `rustfsadmin` credentials are the same.
+
+Give this stack its own host ports in `.env` (docker compose reads `.env`, and
+**not** `.env.local`), then mirror them in `.env.local`:
+
+```bash
+# .env — read by docker compose
+POSTGRES_PORT=5433
+STORAGE_PORT=9100
+STORAGE_CONSOLE_PORT=9101
+```
+
+```bash
+# .env.local — read by the app and the scripts
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/eecs_capstone"
+S3_ENDPOINT=http://localhost:9100
+VITE_STORAGE_PUBLIC_BASE=http://localhost:9100/cs-capstone
+```
+
+Then `docker compose up -d --force-recreate`. Confirm the ports actually bound
+with `docker compose ps` and check the publishers column is not empty.
+
 To build for production:
 
 ```bash

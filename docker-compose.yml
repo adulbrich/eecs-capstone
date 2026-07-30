@@ -4,7 +4,10 @@ services:
     container_name: cs-capstone-database
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      # Host port is overridable so this can coexist with another project's
+      # Postgres on 5432. Set POSTGRES_PORT in `.env` (Compose reads `.env`,
+      # NOT `.env.local`) and match it in DATABASE_URL in `.env.local`.
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -17,8 +20,12 @@ services:
     container_name: cs-capstone-storage
     restart: unless-stopped
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Console/UI (if available)
+      # Overridable for the same reason as POSTGRES_PORT above. Keep
+      # S3_ENDPOINT and VITE_STORAGE_PUBLIC_BASE in `.env.local` in sync:
+      # another project's S3 on 9000 accepts the same default credentials, so a
+      # mismatch uploads into the wrong bucket instead of failing.
+      - "${STORAGE_PORT:-9000}:9000"           # S3 API
+      - "${STORAGE_CONSOLE_PORT:-9001}:9001"   # Console/UI (if available)
     environment:
       - RUSTFS_ACCESS_KEY=rustfsadmin
       - RUSTFS_SECRET_KEY=rustfsadmin
