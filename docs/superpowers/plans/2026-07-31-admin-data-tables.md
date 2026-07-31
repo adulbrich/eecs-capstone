@@ -74,7 +74,9 @@
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `interface SortState { desc: boolean; id: string }`; `parseSort(sort, dir, sortableIds, fallback): SortState`; `serializeSort(state, fallback): { dir?: "asc" | "desc"; sort?: string }`; `parseHidden(cols, hideableIds, fallback): string[]`; `serializeHidden(hidden, fallback): string | undefined`; `readStoredHidden(storageKey): string[] | null`; `writeStoredHidden(storageKey, hidden): void`; `useSeedColumnsFromStorage(storageKey, current, seed): void`.
+- Produces: `interface SortState { desc: boolean; id: string }`; `parseSort(sort, dir, sortableIds, fallback): SortState`; `serializeSort(state, fallback): { dir?: "asc" | "desc"; sort?: string }`; `parseHidden(cols, hideableIds, fallback): string[]`; `serializeHidden(hidden, fallback): string | undefined`; `readStoredHidden(storageKey): string[] | null`; `writeStoredHidden(storageKey, hidden): void`; `useSeedColumnsFromStorage(storageKey, current, seed): void`; and the hook all three routes use, `useAdminTableState({ columns, defaultSort, replaceSearch, search, setSearch, storageKey }): { hidden, onHiddenChange, onSortChange, sort }`.
+
+The hook exists so the three routes do not each repeat the same wiring. It is deliberately router-agnostic: it takes a plain `search` object and two callbacks rather than importing `useNavigate`, which is what makes it unit-testable here and keeps each route down to a few lines.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -219,7 +221,81 @@ describe("useSeedColumnsFromStorage", () => {
     expect(seed).not.toHaveBeenCalled();
   });
 });
+
+describe("useAdminTableState", () => {
+  const COLUMNS = [
+    { enableHiding: false, id: "name" },
+    { id: "status" },
+    { defaultHidden: true, id: "serial" },
+    { enableSorting: false, id: "actions" },
+  ];
+
+  function setup(search: Record<string, string | undefined> = {}) {
+    const replaceSearch = vi.fn();
+    const setSearch = vi.fn();
+    const { result } = renderHook(() =>
+      useAdminTableState({
+        columns: COLUMNS,
+        defaultSort: FALLBACK,
+        replaceSearch,
+        search,
+        setSearch,
+        storageKey: "inventory",
+      })
+    );
+    return { replaceSearch, result, setSearch };
+  }
+
+  it("derives the default sort and hidden set from the columns", () => {
+    const { result } = setup();
+    expect(result.current.sort).toEqual(FALLBACK);
+    expect(result.current.hidden).toEqual(["serial"]);
+  });
+
+  it("reads sort and visibility out of the search object", () => {
+    const { result } = setup({ cols: "status", dir: "asc", sort: "status" });
+    expect(result.current.sort).toEqual({ desc: false, id: "status" });
+    expect(result.current.hidden).toEqual(["status"]);
+  });
+
+  it("ignores a sort on a column that cannot be sorted", () => {
+    const { result } = setup({ dir: "asc", sort: "actions" });
+    expect(result.current.sort).toEqual(FALLBACK);
+  });
+
+  it("pushes a sort change back through setSearch", () => {
+    const { result, setSearch } = setup();
+    result.current.onSortChange({ desc: false, id: "name" });
+    expect(setSearch).toHaveBeenCalledWith({ dir: "asc", sort: "name" });
+  });
+
+  it("clears both params when the sort returns to the default", () => {
+    const { result, setSearch } = setup({ dir: "asc", sort: "name" });
+    result.current.onSortChange(FALLBACK);
+    expect(setSearch).toHaveBeenCalledWith({ dir: undefined, sort: undefined });
+  });
+
+  it("pushes a visibility change back through setSearch", () => {
+    const { result, setSearch } = setup();
+    result.current.onHiddenChange("status");
+    expect(setSearch).toHaveBeenCalledWith({ cols: "status" });
+  });
+
+  it("seeds the cols param from storage through replaceSearch", () => {
+    writeStoredHidden("inventory", ["status"]);
+    const { replaceSearch } = setup();
+    expect(replaceSearch).toHaveBeenCalledWith({ cols: "status" });
+  });
+
+  it("does not seed when the cols param is already set", () => {
+    writeStoredHidden("inventory", ["status"]);
+    const { replaceSearch } = setup({ cols: "serial" });
+    expect(replaceSearch).not.toHaveBeenCalled();
+  });
+});
 ```
+
+Add `useAdminTableState` to the import list at the top of the file.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -391,12 +467,100 @@ export function useSeedColumnsFromStorage(
     seed(stored.join(","));
   }, [storageKey, current, seed]);
 }
+
+/** The three URL params this hook owns. Routes carry others alongside them. */
+export interface AdminTableSearch {
+  cols?: string;
+  dir?: "asc" | "desc";
+  sort?: string;
+}
+
+/**
+ * The subset of a column definition this hook needs. `AdminColumn` from
+ * `admin-data-table.tsx` satisfies it structurally, so routes pass their
+ * column list straight through.
+ */
+export interface AdminTableStateColumn {
+  defaultHidden?: boolean;
+  enableHiding?: boolean;
+  enableSorting?: boolean;
+  id: string;
+}
+
+interface UseAdminTableStateOptions {
+  columns: readonly AdminTableStateColumn[];
+  defaultSort: SortState;
+  /** Applies a param patch with history replacement, for the storage seed. */
+  replaceSearch: (patch: AdminTableSearch) => void;
+  search: AdminTableSearch;
+  /** Applies a param patch as a normal navigation. */
+  setSearch: (patch: AdminTableSearch) => void;
+  storageKey: string;
+}
+
+/**
+ * Everything a route needs to drive `AdminDataTable`, derived from its column
+ * list and its URL params.
+ *
+ * Router-agnostic on purpose: it takes a plain `search` object and two
+ * callbacks instead of reaching for `useNavigate`. That keeps it unit-testable
+ * and keeps all three admin routes down to a handful of lines each.
+ *
+ * `columns`, `defaultSort`, `setSearch` and `replaceSearch` must be
+ * referentially stable. Define the first two as module constants and wrap the
+ * callbacks in `useCallback`, or the seeding effect re-runs every render.
+ */
+export function useAdminTableState({
+  columns,
+  defaultSort,
+  replaceSearch,
+  search,
+  setSearch,
+  storageKey,
+}: UseAdminTableStateOptions) {
+  const sortableIds = useMemo(
+    () => columns.filter((c) => c.enableSorting !== false).map((c) => c.id),
+    [columns]
+  );
+  const hideableIds = useMemo(
+    () => columns.filter((c) => c.enableHiding !== false).map((c) => c.id),
+    [columns]
+  );
+  const defaultHidden = useMemo(
+    () => columns.filter((c) => c.defaultHidden).map((c) => c.id),
+    [columns]
+  );
+
+  const seed = useCallback(
+    (cols: string) => replaceSearch({ cols }),
+    [replaceSearch]
+  );
+  useSeedColumnsFromStorage(storageKey, search.cols, seed);
+
+  const onSortChange = useCallback(
+    (next: SortState) => setSearch(serializeSort(next, defaultSort)),
+    [defaultSort, setSearch]
+  );
+  const onHiddenChange = useCallback(
+    (cols: string | undefined) => setSearch({ cols }),
+    [setSearch]
+  );
+
+  return {
+    hidden: parseHidden(search.cols, hideableIds, defaultHidden),
+    onHiddenChange,
+    onSortChange,
+    sort: parseSort(search.sort, search.dir, sortableIds, defaultSort),
+  };
+}
 ```
+
+Change the React import on line 1 to `import { useCallback, useEffect, useMemo } from "react";`.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `ulimit -n 8192; CI=true npx vitest run src/lib/__tests__/table-state.test.ts`
-Expected: PASS, 17 tests.
+Expected: PASS, 25 tests.
 
 - [ ] **Step 5: Lint, typecheck, commit**
 
@@ -1476,15 +1640,12 @@ const COLUMNS: AdminColumn<Row>[] = [
     id: "actions",
   },
 ];
-
-const SORTABLE_IDS = COLUMNS.filter((c) => c.enableSorting !== false).map(
-  (c) => c.id
-);
-const HIDEABLE_IDS = COLUMNS.filter((c) => c.enableHiding !== false).map(
-  (c) => c.id
-);
-const DEFAULT_HIDDEN = COLUMNS.filter((c) => c.defaultHidden).map((c) => c.id);
 ```
+
+`COLUMNS` and `DEFAULT_SORT` must be module-level constants, not values built
+inside the component. `useAdminTableState` derives its sortable, hideable, and
+default-hidden id lists from `COLUMNS` and memoizes on its identity, so a fresh
+array every render would defeat the memoization and re-run the seeding effect.
 
 - [ ] **Step 3: Wire the component**
 
@@ -1492,7 +1653,9 @@ const DEFAULT_HIDDEN = COLUMNS.filter((c) => c.defaultHidden).map((c) => c.id);
 function AdminInventory() {
   const navigate = useNavigate({ from: "/admin/inventory/" });
   const { categories, rows } = Route.useLoaderData();
-  const { category, cols, dir, q, sort, status } = Route.useSearch();
+  // The whole search object goes to the hook, which reads cols/dir/sort.
+  const search = Route.useSearch();
+  const { category, q, status } = search;
   const [qDraft, setQDraft] = useState(q);
 
   useEffect(() => setQDraft(q), [q]);
@@ -1506,26 +1669,25 @@ function AdminInventory() {
     return () => clearTimeout(t);
   }, [qDraft, q, navigate]);
 
-  const seedCols = useCallback(
-    (next: string) =>
-      void navigate({
-        replace: true,
-        search: (prev) => ({ ...prev, cols: next }),
-      }),
+  const setSearch = useCallback(
+    (patch: AdminTableSearch) =>
+      void navigate({ search: (prev) => ({ ...prev, ...patch }) }),
     [navigate]
   );
-  useSeedColumnsFromStorage("inventory", cols, seedCols);
+  const replaceSearch = useCallback(
+    (patch: AdminTableSearch) =>
+      void navigate({ replace: true, search: (prev) => ({ ...prev, ...patch }) }),
+    [navigate]
+  );
 
-  const sortState = parseSort(sort, dir, SORTABLE_IDS, DEFAULT_SORT);
-  const hidden = parseHidden(cols, HIDEABLE_IDS, DEFAULT_HIDDEN);
-
-  const onSortChange = (next: SortState) =>
-    void navigate({
-      search: (prev) => ({ ...prev, ...serializeSort(next, DEFAULT_SORT) }),
-    });
-
-  const onHiddenChange = (next: string | undefined) =>
-    void navigate({ search: (prev) => ({ ...prev, cols: next }) });
+  const { hidden, onHiddenChange, onSortChange, sort } = useAdminTableState({
+    columns: COLUMNS,
+    defaultSort: DEFAULT_SORT,
+    replaceSearch,
+    search,
+    setSearch,
+    storageKey: "inventory",
+  });
 
   return (
     <div className="px-4 py-6 md:px-8">
@@ -1540,7 +1702,7 @@ function AdminInventory() {
         hidden={hidden}
         onHiddenChange={onHiddenChange}
         onSortChange={onSortChange}
-        sort={sortState}
+        sort={sort}
         storageKey="inventory"
         toolbar={
           <>
@@ -1920,7 +2082,7 @@ const COLUMNS: AdminColumn<Row>[] = [
 
 - [ ] **Step 3: Wire the component**
 
-Open `src/routes/_authed/admin/inventory/index.tsx` as Task 4 committed it and copy its state wiring block (the `seedCols` callback, the `useSeedColumnsFromStorage` call, `sortState`, `hidden`, `onSortChange`, `onHiddenChange`, and the `SORTABLE_IDS` / `HIDEABLE_IDS` / `DEFAULT_HIDDEN` derivations). It is working code in the repo, so prefer it over the abridged version shown in Task 4's step 3. Change `"inventory"` to `"projects"` in both `useSeedColumnsFromStorage` and `storageKey`, and derive the three id lists from this file's own `COLUMNS`.
+Open `src/routes/_authed/admin/inventory/index.tsx` as Task 4 committed it and follow its shape: the two `useCallback` wrappers (`setSearch`, `replaceSearch`) around `navigate`, then one `useAdminTableState` call. That is four short blocks, not a copied wiring section, because the hook from Task 1 holds the logic. Pass `storageKey: "projects"` and this file's own module-level `COLUMNS` and `DEFAULT_SORT`.
 
 Move the five existing filter controls (search input, status select, program select, proposer select, soft-deleted switch) into the `toolbar` prop unchanged. Delete the `ProjectRow` import, the `EmptyState` import and its conditional (the shared table renders the empty state now), and change the container from `mx-auto max-w-4xl px-4 py-6 md:p-8` to `px-4 py-6 md:px-8`.
 
@@ -2130,7 +2292,7 @@ const COLUMNS: AdminColumn<Row>[] = [
 ];
 ```
 
-Container becomes `px-4 py-6 md:px-8`. Add a search input to the toolbar with the same 300ms debounce used in Task 4. `caption` is `"Mentors"`, `emptyMessage` is `"No mentors yet."`, `storageKey` is `"mentors"`, `DEFAULT_SORT` is `{ desc: false, id: "name" }`.
+Container becomes `px-4 py-6 md:px-8`. Add a search input to the toolbar with the same 300ms debounce used in Task 4. Wire the state with `useAdminTableState` exactly as the other two routes do. `caption` is `"Mentors"`, `emptyMessage` is `"No mentors yet."`, `storageKey` is `"mentors"`, `DEFAULT_SORT` is `{ desc: false, id: "name" }`.
 
 - [ ] **Step 5: Delete the old table component**
 
