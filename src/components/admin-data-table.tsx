@@ -183,7 +183,20 @@ export function AdminDataTable<T>({
     <div className="mt-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-3">{toolbar}</div>
-        <DropdownMenu>
+        {/*
+          modal={false}: Radix's default modal DropdownMenu hides the rest of
+          the page from assistive tech via `aria-hidden` (not `inert`) while
+          it's open: @radix-ui/react-menu calls `hideOthers` from the
+          `aria-hidden` package directly rather than its `inert`-aware
+          `suppressOthers`. That leaves every focusable element outside the
+          menu (nav links, the search box, sort buttons) inside an
+          aria-hidden subtree, which axe correctly flags as
+          aria-hidden-focus. This menu is a lightweight column toggle, not a
+          workflow that needs a hard focus trap, so opting out of modal
+          behavior is the right fix here rather than living with the
+          violation or fighting Radix's internals.
+        */}
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="outline">
               <Columns3 aria-hidden className="size-4" />

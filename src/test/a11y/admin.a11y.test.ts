@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { checkA11y } from "./helpers";
+import { checkA11y, closeMenu, waitForHydration } from "./helpers";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -25,6 +26,19 @@ test("admin dashboard", async ({ page }) => {
 
 test("admin inventory list", async ({ page }) => {
   await page.goto("/admin/inventory");
+  await checkA11y(page);
+});
+
+test("admin inventory table interactions", async ({ page }) => {
+  await page.goto("/admin/inventory");
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Columns" }).click();
+  await checkA11y(page);
+  await closeMenu(page);
+  await page.getByRole("button", { name: /Name/ }).click();
+  await expect(
+    page.getByRole("columnheader", { name: /Name/ })
+  ).toHaveAttribute("aria-sort", /ascending|descending/);
   await checkA11y(page);
 });
 
@@ -91,4 +105,316 @@ test("admin program detail", async ({ page }) => {
 test("admin mentors list", async ({ page }) => {
   await page.goto("/admin/mentors");
   await checkA11y(page);
+});
+
+// The rest of this file exercises behavior that only a browser can prove:
+// static SSR checks confirm markup is present or absent, but never actually
+// click a sort header, toggle a column, resize the viewport, or scroll.
+
+/**
+ * Toggles a column's checkbox and waits for its columnheader to actually
+ * appear before moving on. `onColumnVisibilityChange` derives its next state
+ * from the current `hidden` prop, which only updates after the URL
+ * round-trip commits, so firing the clicks back-to-back with nothing awaited
+ * between them drops all but the last one. Confirming each toggle lands is
+ * what a real user waiting to see the column would also, incidentally, do.
+ */
+async function toggleColumnOn(page: Page, label: string): Promise<void> {
+  await page.getByRole("menuitemcheckbox", { name: label }).click();
+  await expect(
+    page.getByRole("columnheader", { name: label, exact: true })
+  ).toBeVisible();
+}
+
+test("admin inventory table shows its default-hidden columns when toggled on", async ({
+  page,
+}) => {
+  await page.goto("/admin/inventory");
+  await waitForHydration(page);
+  const hiddenColumns = ["Label", "Serial", "Due", "Updated", "Created"];
+
+  await page.getByRole("button", { name: "Columns" }).click();
+  for (const label of hiddenColumns) {
+    await toggleColumnOn(page, label);
+  }
+  await closeMenu(page);
+
+  for (const label of hiddenColumns) {
+    await expect(
+      page.getByRole("columnheader", { name: label, exact: true })
+    ).toBeVisible();
+    const cell = page.locator(`td[data-label="${label}"]`).first();
+    await expect(cell).toBeVisible();
+    const text = (await cell.textContent())?.trim() ?? "";
+    // Every one of these columns' cell/accessorFn functions has never run in
+    // any prior check (the SSR checks only ever saw the default column set).
+    // A non-empty string proves the cell rendered rather than throwing.
+    expect(text.length).toBeGreaterThan(0);
+  }
+
+  await checkA11y(page);
+});
+
+test("admin projects table shows its default-hidden columns when toggled on", async ({
+  page,
+}) => {
+  await page.goto("/admin/projects");
+  await waitForHydration(page);
+  const hiddenColumns = ["Contact", "Teams", "Created", "Published"];
+
+  await page.getByRole("button", { name: "Columns" }).click();
+  for (const label of hiddenColumns) {
+    await toggleColumnOn(page, label);
+  }
+  await closeMenu(page);
+
+  for (const label of hiddenColumns) {
+    await expect(
+      page.getByRole("columnheader", { name: label, exact: true })
+    ).toBeVisible();
+    const cell = page.locator(`td[data-label="${label}"]`).first();
+    await expect(cell).toBeVisible();
+    const text = (await cell.textContent())?.trim() ?? "";
+    expect(text.length).toBeGreaterThan(0);
+  }
+
+  await checkA11y(page);
+});
+
+test("sorting a column writes sort and dir into the URL", async ({ page }) => {
+  await page.goto("/admin/inventory");
+  await waitForHydration(page);
+  const beforeRows = await page
+    .locator(".admin-table tbody tr")
+    .allTextContents();
+
+  await page.getByRole("button", { name: "Category", exact: true }).click();
+
+  // The URL and the rendered aria-sort must change together: this is the
+  // same click producing both effects, not a URL update that happens to
+  // coincide with a state change elsewhere. Which direction a fresh column
+  // starts in is TanStack's call (it varies by column), so accept either:
+  // the assertion is that a real toggle happened, not which one won.
+  await expect(
+    page.getByRole("columnheader", { name: "Category", exact: true })
+  ).toHaveAttribute("aria-sort", /ascending|descending/);
+  await expect(page).toHaveURL(/[?&]sort=category(&|$)/);
+  await expect(page).toHaveURL(/[?&]dir=(asc|desc)(&|$)/);
+
+  const afterRows = await page
+    .locator(".admin-table tbody tr")
+    .allTextContents();
+  expect(afterRows).not.toEqual(beforeRows);
+});
+
+test("toggling a column writes cols into the URL, absent by default", async ({
+  page,
+}) => {
+  await page.goto("/admin/inventory");
+  await waitForHydration(page);
+  // A fresh session with no stored preference: the param is genuinely absent,
+  // not just not-yet-checked.
+  await expect(page).not.toHaveURL(/[?&]cols=/);
+
+  await page.getByRole("button", { name: "Columns" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Location" }).click();
+  await closeMenu(page);
+  // The default-hidden columns (label, serial, dueAt, updatedAt, createdAt)
+  // stay hidden too, so `cols` carries the whole hidden set, not a bare diff:
+  // assert membership rather than an exact string. `toHaveURL` polls, which
+  // matters here, since the URL update lands after an async navigation.
+  // (Commas are URL-encoded as %2C, so a `\b` word-boundary check would break
+  // on the trailing "C"; a plain substring match is what actually holds.)
+  await expect(page).toHaveURL(/[?&]cols=[^&]*location/);
+  await expect(
+    page.getByRole("columnheader", { name: "Location", exact: true })
+  ).toHaveCount(0);
+});
+
+test("toggling back to the default column set omits the cols param", async ({
+  page,
+}) => {
+  // Known defect (see task-8-report.md "Reset columns / cols param" finding):
+  // serializeHidden correctly computes `undefined` for a hidden set that
+  // matches the page default, but `useSeedColumnsFromStorage`'s effect fires
+  // on that same `cols` transition to undefined and re-seeds the URL from the
+  // storage line the very same toggle just wrote, landing back on an
+  // explicit (if literally-default) `cols` param instead of a clean URL.
+  // test.fail() keeps this assertion running rather than deleting it: it
+  // will flip to a failure, and needs inverting, the moment someone fixes
+  // the underlying effect.
+  test.fail();
+
+  await page.goto("/admin/inventory");
+  await waitForHydration(page);
+
+  await page.getByRole("button", { name: "Columns" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Location" }).click();
+  await closeMenu(page);
+  await expect(page).toHaveURL(/[?&]cols=[^&]*location/);
+
+  // Toggling it back on returns the visible set to the page default. The
+  // param should disappear rather than being written back with the literal
+  // default list.
+  await page.getByRole("button", { name: "Columns" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Location" }).click();
+  await closeMenu(page);
+  await expect(page).not.toHaveURL(/[?&]cols=/);
+});
+
+test("column layout persists across a reload via the localStorage seed", async ({
+  page,
+}) => {
+  await page.goto("/admin/inventory");
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Columns" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Location" }).click();
+  await closeMenu(page);
+  await expect(
+    page.getByRole("columnheader", { name: "Location", exact: true })
+  ).toHaveCount(0);
+
+  // A bare navigation (no cols param) is the actual test of the storage seed
+  // path: page.reload() would keep the existing ?cols= in the URL and prove
+  // nothing about localStorage. This simulates a fresh visit: a bookmark, a
+  // new tab, or a browser restart, the kind only localStorage can inform.
+  await page.goto("/admin/inventory");
+  // Polls: the seed effect that reads localStorage and writes `cols` back
+  // into the URL runs after hydration, not before this navigation resolves.
+  await expect(page).toHaveURL(/[?&]cols=[^&]*location/);
+  await expect(
+    page.getByRole("columnheader", { name: "Location", exact: true })
+  ).toHaveCount(0);
+});
+
+test("Reset columns restores the default column set", async ({ page }) => {
+  await page.goto("/admin/inventory");
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Columns" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Location" }).click();
+  await closeMenu(page);
+  await expect(
+    page.getByRole("columnheader", { name: "Location", exact: true })
+  ).toHaveCount(0);
+  await expect(page).toHaveURL(/[?&]cols=[^&]*location/);
+
+  await page.getByRole("button", { name: "Columns" }).click();
+  await page.getByRole("menuitem", { name: "Reset columns" }).click();
+
+  await expect(
+    page.getByRole("columnheader", { name: "Location", exact: true })
+  ).toBeVisible();
+
+  // The rendered set is what "restores the defaults" means; the URL after a
+  // reset is a separate question this suite does not assert on (see the
+  // task report for what was observed there). What must hold is durability:
+  // a Reset has to survive a bare re-visit rather than being silently undone
+  // by the stale preference it was supposed to replace.
+  await page.goto("/admin/inventory");
+  await expect(
+    page.getByRole("columnheader", { name: "Location", exact: true })
+  ).toBeVisible();
+});
+
+test("admin table restacks into cards below 768px", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.goto("/admin/inventory");
+  await waitForHydration(page);
+
+  await expect(page.locator(".admin-table thead")).toBeHidden();
+
+  const cells = page.locator(".admin-table tbody tr").first().locator("td");
+  const firstCell = cells.first();
+  const secondCell = cells.nth(1);
+  await expect(firstCell).toBeVisible();
+
+  const dataLabel = await firstCell.getAttribute("data-label");
+  expect(dataLabel).toBeTruthy();
+
+  // The field name on a mobile card comes entirely from a CSS
+  // `content: attr(data-label)` pseudo-element, which is invisible to
+  // getByText. Read the resolved pseudo-element content directly, which
+  // fails if the attribute is missing, empty, or the CSS selector stops
+  // matching.
+  const beforeContent = await firstCell.evaluate(
+    (el) => window.getComputedStyle(el, "::before").content
+  );
+  expect(beforeContent).toBe(`"${dataLabel}"`);
+
+  // The label check alone would still pass if the row stayed in table layout
+  // (cells side by side) rather than actually restacking into a card. Two
+  // cells of the same row sitting side by side share a y; stacked, the
+  // second sits below the first.
+  const firstBox = await firstCell.boundingBox();
+  const secondBox = await secondCell.boundingBox();
+  if (!(firstBox && secondBox)) {
+    throw new Error("Row cells not found for the stacking check.");
+  }
+  expect(secondBox.y).toBeGreaterThan(firstBox.y);
+});
+
+test("admin table header stays pinned while the body scrolls at md and up", async ({
+  page,
+}) => {
+  // Short enough that calc(100vh - 14rem) forces the wrapper to scroll even
+  // with the handful of rows the dev seed provides, and wide enough (>=768px)
+  // to stay off the mobile-card layout.
+  await page.setViewportSize({ width: 1024, height: 420 });
+  await page.goto("/admin/inventory");
+  await waitForHydration(page);
+
+  const container = page.locator('[data-slot="table-container"]');
+  const header = page.getByRole("columnheader", { name: "Name", exact: true });
+  const firstRowCell = page
+    .locator(".admin-table tbody tr")
+    .first()
+    .locator("td")
+    .first();
+
+  const scrollHeight = await container.evaluate((el) => el.scrollHeight);
+  const clientHeight = await container.evaluate((el) => el.clientHeight);
+  // Positive control: the container must actually overflow, or scrolling it
+  // below would be a no-op and every assertion after this would be vacuous.
+  expect(scrollHeight).toBeGreaterThan(clientHeight);
+
+  const containerBox = await container.boundingBox();
+  if (!containerBox) {
+    throw new Error("Table container not found.");
+  }
+  const rowBoxBefore = await firstRowCell.boundingBox();
+  if (!rowBoxBefore) {
+    throw new Error("First row not found before scrolling.");
+  }
+  // Second positive control: before scrolling, the first data row renders
+  // below the header, not already hidden behind it.
+  expect(rowBoxBefore.y).toBeGreaterThan(containerBox.y);
+
+  await container.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+
+  const scrollTop = await container.evaluate((el) => el.scrollTop);
+  expect(scrollTop).toBeGreaterThan(0);
+
+  // `position: sticky` only pins once the element would otherwise scroll
+  // past its container's edge, so a bare "same position as before scrolling"
+  // check is wrong here, since the header's natural (unstuck) position and
+  // its pinned position aren't the same point. The real test is that once
+  // scrolled, it holds flush with the scroll container's own top edge, the
+  // definition of "pinned," rather than being carried off with the content.
+  await expect(header).toBeVisible();
+  const headerBoxAfter = await header.boundingBox();
+  if (!headerBoxAfter) {
+    throw new Error("Header column not found after scrolling.");
+  }
+  expect(Math.round(headerBoxAfter.y)).toBe(Math.round(containerBox.y));
+
+  // The row that was below the header has now scrolled up behind it,
+  // confirming body content actually moved underneath a header that held its
+  // position, rather than both having simply stayed still.
+  const rowBoxAfter = await firstRowCell.boundingBox();
+  if (!rowBoxAfter) {
+    throw new Error("First row not found after scrolling.");
+  }
+  expect(rowBoxAfter.y).toBeLessThan(headerBoxAfter.y);
 });

@@ -88,7 +88,7 @@ function MentorControls({ mentor }: { mentor: Row }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Input
-        aria-label={`Teams for ${mentor.name ?? mentor.email}`}
+        aria-label={`Capacity for ${mentor.name ?? mentor.email}`}
         className="w-20"
         max={MAX_TEAMS}
         min={MIN_TEAMS}
