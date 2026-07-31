@@ -3,7 +3,7 @@ import {
   PRIVATE_PANEL_AUDIENCE_HINT,
 } from "#/lib/private-notes";
 import { CommentThread } from "./comment-thread";
-import { SectionHeading } from "./section-heading";
+import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { StatusTimeline } from "./status-timeline";
 
 type Comment = Parameters<typeof CommentThread>[0]["comments"][number];
@@ -15,9 +15,8 @@ type HistoryRow = Parameters<typeof StatusTimeline>[0]["rows"][number];
  * so the boundary is structural rather than something each section has to
  * re-explain.
  *
- * Deliberately NOT brand-tinted like the staff panel: a staff viewer renders
- * both, stacked, and identical borders would read as one region and defeat the
- * separation. Neutral border here, brand tint reserved for staff-only.
+ * Neutral tone, not the staff panel's brand tint: a staff viewer renders both,
+ * stacked, and identical borders would read as one region.
  */
 export function ProjectPrivatePanel({
   comments,
@@ -35,37 +34,28 @@ export function ProjectPrivatePanel({
   viewerIsStaff: boolean;
 }) {
   return (
-    <div className="mt-8 rounded-lg border border-border bg-(--surface-sunken) p-4">
-      <SectionHeading>Private</SectionHeading>
-      <p className="mt-1 text-muted-foreground text-sm">
-        {PRIVATE_PANEL_AUDIENCE_HINT}
-      </p>
+    <Panel tone="private">
+      <PanelHeader title="Private" />
+      <PanelNote>{PRIVATE_PANEL_AUDIENCE_HINT}</PanelNote>
 
       {notes && (
-        <section className="mt-5 border-border border-t pt-4">
-          <h3 className="font-medium text-sm">{PRIVATE_NOTES_LABEL}</h3>
-          <p className="mt-1 whitespace-pre-wrap text-sm">{notes}</p>
-        </section>
+        <PanelSection title={PRIVATE_NOTES_LABEL}>
+          <p className="whitespace-pre-wrap text-sm">{notes}</p>
+        </PanelSection>
       )}
 
-      <section className="mt-5 border-border border-t pt-4">
-        <h3 className="font-medium text-sm">Status history</h3>
-        <div className="mt-2">
-          <StatusTimeline rows={history} />
-        </div>
-      </section>
+      <PanelSection title="Status history">
+        <StatusTimeline rows={history} />
+      </PanelSection>
 
-      <section className="mt-5 border-border border-t pt-4">
-        <h3 className="font-medium text-sm">Comments</h3>
-        <div className="mt-2">
-          <CommentThread
-            comments={comments}
-            onChanged={onCommentsChanged}
-            projectId={projectId}
-            viewerIsStaff={viewerIsStaff}
-          />
-        </div>
-      </section>
-    </div>
+      <PanelSection title="Comments">
+        <CommentThread
+          comments={comments}
+          onChanged={onCommentsChanged}
+          projectId={projectId}
+          viewerIsStaff={viewerIsStaff}
+        />
+      </PanelSection>
+    </Panel>
   );
 }

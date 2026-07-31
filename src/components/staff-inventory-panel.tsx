@@ -2,11 +2,13 @@ import { Link } from "@tanstack/react-router";
 import {
   PRIVATE_NOTES_INVENTORY_HINT,
   PRIVATE_NOTES_LABEL,
+  STAFF_PANEL_AUDIENCE_HINT,
 } from "#/lib/private-notes";
 import {
   type HistoryRow,
   InventoryLifecyclePanel,
 } from "./inventory-lifecycle-panel";
+import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { Button } from "./ui/button";
 
 export interface StaffPanelItem {
@@ -38,57 +40,60 @@ export function StaffInventoryPanel({
   item: StaffPanelItem;
 }) {
   return (
-    <div className="mt-8 rounded-lg border-(--brand-primary-tint) border-2 bg-card p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="island-kicker">Staff panel</p>
-        <div className="flex items-center gap-2">
-          {/* This page is public now, so a staff member who arrived from the
-              management table has no other way back to it. */}
-          <Button asChild size="sm" variant="ghost">
-            <Link to="/admin/inventory">Manage inventory</Link>
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link params={{ itemId: item.id }} to="/inventory/$itemId/edit">
-              Edit
-            </Link>
-          </Button>
-        </div>
-      </div>
+    <Panel tone="staff">
+      <PanelHeader
+        actions={
+          <>
+            {/* This page is public now, so a staff member who arrived from the
+                management table has no other way back to it. */}
+            <Button asChild size="sm" variant="ghost">
+              <Link to="/admin/inventory">Manage inventory</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link params={{ itemId: item.id }} to="/inventory/$itemId/edit">
+                Edit
+              </Link>
+            </Button>
+          </>
+        }
+        title="Staff panel"
+      />
+      <PanelNote>{STAFF_PANEL_AUDIENCE_HINT}</PanelNote>
 
-      <dl className="grid grid-cols-3 gap-2 text-sm">
-        <dt className="text-muted-foreground">Location</dt>
-        <dd className="col-span-2">{item.location ?? "-"}</dd>
-        <dt className="text-muted-foreground">Serial</dt>
-        <dd className="col-span-2">{item.serial ?? "-"}</dd>
-        <dt className="text-muted-foreground">Label</dt>
-        <dd className="col-span-2">{item.label ?? "-"}</dd>
-      </dl>
+      <PanelSection title="Details">
+        <dl className="grid grid-cols-3 gap-2 text-sm">
+          <dt className="text-muted-foreground">Location</dt>
+          <dd className="col-span-2">{item.location ?? "-"}</dd>
+          <dt className="text-muted-foreground">Serial</dt>
+          <dd className="col-span-2">{item.serial ?? "-"}</dd>
+          <dt className="text-muted-foreground">Label</dt>
+          <dd className="col-span-2">{item.label ?? "-"}</dd>
+        </dl>
+      </PanelSection>
 
       {item.notes && (
-        <section className="mt-4 border-border border-t pt-4">
-          <h3 className="font-medium text-sm">{PRIVATE_NOTES_LABEL}</h3>
-          <p className="mt-1 whitespace-pre-wrap text-sm">{item.notes}</p>
+        <PanelSection title={PRIVATE_NOTES_LABEL}>
+          <p className="whitespace-pre-wrap text-sm">{item.notes}</p>
           <p className="mt-1 text-muted-foreground text-xs">
             {PRIVATE_NOTES_INVENTORY_HINT}
           </p>
-        </section>
+        </PanelSection>
       )}
 
-      <div className="mt-4 border-border border-t pt-4">
-        <InventoryLifecyclePanel
-          history={history}
-          item={{
-            id: item.id,
-            name: item.name,
-            status: item.status,
-            currentHolderId: item.currentHolderId ?? null,
-            currentHolderName: item.currentHolderName ?? null,
-            currentHolderEmail: item.currentHolderEmail ?? null,
-            currentHolderLabel: item.currentHolderLabel ?? null,
-            currentRequestItemId: item.currentRequestItemId ?? null,
-          }}
-        />
-      </div>
-    </div>
+      {/* Renders its own PanelSections, so it slots into the same rhythm. */}
+      <InventoryLifecyclePanel
+        history={history}
+        item={{
+          id: item.id,
+          name: item.name,
+          status: item.status,
+          currentHolderId: item.currentHolderId ?? null,
+          currentHolderName: item.currentHolderName ?? null,
+          currentHolderEmail: item.currentHolderEmail ?? null,
+          currentHolderLabel: item.currentHolderLabel ?? null,
+          currentRequestItemId: item.currentRequestItemId ?? null,
+        }}
+      />
+    </Panel>
   );
 }

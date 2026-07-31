@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { STAFF_PANEL_AUDIENCE_HINT } from "#/lib/private-notes";
 import { canTransition, type Status } from "#/lib/project-workflow";
 import {
   forceSetProjectStatus,
@@ -9,6 +10,7 @@ import {
 } from "#/server/projects";
 import { listProjectEditLog } from "#/server/projects-queries";
 import { LocalTime } from "./local-time";
+import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -143,93 +145,99 @@ export function StaffProjectPanel({
   const isChangesRequested = pending?.target === "changes_requested";
 
   return (
-    <div className="mt-8 rounded-lg border-(--brand-primary-tint) border-2 bg-card p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="island-kicker">Staff panel</p>
-        <span className="text-muted-foreground text-xs">
-          Teams supported:{" "}
-          <span className="font-medium text-foreground">
-            {project.teamsSupported ?? 1}
+    <Panel tone="staff">
+      <PanelHeader
+        actions={
+          <span className="text-muted-foreground text-xs">
+            Teams supported:{" "}
+            <span className="font-medium text-foreground">
+              {project.teamsSupported ?? 1}
+            </span>
           </span>
-        </span>
-      </div>
+        }
+        title="Staff panel"
+      />
+      <PanelNote>{STAFF_PANEL_AUDIENCE_HINT}</PanelNote>
 
-      {/* Status stepper — vertical on mobile, horizontal on md+ */}
-      <div className="md:overflow-x-auto md:pb-1">
-        <div className="flex flex-col md:min-w-max md:flex-row md:items-center">
-          {WORKFLOW.map((s, i) => {
-            const isCurrent = s === currentStatus;
-            const isNormal =
-              !isCurrent && canTransition(currentStatus, s, "staff");
+      <PanelSection title="Status">
+        {/* Status stepper — vertical on mobile, horizontal on md+ */}
+        <div className="md:overflow-x-auto md:pb-1">
+          <div className="flex flex-col md:min-w-max md:flex-row md:items-center">
+            {WORKFLOW.map((s, i) => {
+              const isCurrent = s === currentStatus;
+              const isNormal =
+                !isCurrent && canTransition(currentStatus, s, "staff");
 
-            let pillState: string;
-            let pillTitle: string;
-            if (isCurrent) {
-              pillState = "cursor-default bg-[var(--brand-primary)] text-white";
-              pillTitle = "Current status";
-            } else if (isNormal) {
-              pillState =
-                "cursor-pointer border-2 border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-tint)]";
-              pillTitle = `Move to ${STATUS_LABEL[s]}`;
-            } else {
-              pillState =
-                "cursor-pointer border border-dashed border-border text-muted-foreground hover:border-foreground hover:text-foreground";
-              pillTitle = `Override: force to ${STATUS_LABEL[s]}`;
-            }
-            const pillClass = [
-              "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-              pillState,
-            ].join(" ");
+              let pillState: string;
+              let pillTitle: string;
+              if (isCurrent) {
+                pillState =
+                  "cursor-default bg-[var(--brand-primary)] text-white";
+                pillTitle = "Current status";
+              } else if (isNormal) {
+                pillState =
+                  "cursor-pointer border-2 border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-tint)]";
+                pillTitle = `Move to ${STATUS_LABEL[s]}`;
+              } else {
+                pillState =
+                  "cursor-pointer border border-dashed border-border text-muted-foreground hover:border-foreground hover:text-foreground";
+                pillTitle = `Override: force to ${STATUS_LABEL[s]}`;
+              }
+              const pillClass = [
+                "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                pillState,
+              ].join(" ");
 
-            return (
-              // flex-col on mobile stacks connector above pill; flex-row on desktop puts them side-by-side
-              <div
-                className="flex flex-col md:flex-row md:items-center"
-                key={s}
-              >
-                {i > 0 && (
-                  <>
-                    {/* vertical track line (mobile) */}
-                    <div
-                      aria-hidden
-                      className="ml-3.5 h-4 w-px shrink-0 bg-border md:hidden"
-                    />
-                    {/* horizontal track line (desktop) */}
-                    <div
-                      aria-hidden
-                      className="hidden h-px w-5 shrink-0 bg-border md:block"
-                    />
-                  </>
-                )}
-                <button
-                  className={pillClass}
-                  disabled={isCurrent}
-                  onClick={() => openTransition(s, !isNormal)}
-                  title={pillTitle}
-                  type="button"
+              return (
+                // flex-col on mobile stacks connector above pill; flex-row on desktop puts them side-by-side
+                <div
+                  className="flex flex-col md:flex-row md:items-center"
+                  key={s}
                 >
-                  {STATUS_LABEL[s]}
-                </button>
-              </div>
-            );
-          })}
+                  {i > 0 && (
+                    <>
+                      {/* vertical track line (mobile) */}
+                      <div
+                        aria-hidden
+                        className="ml-3.5 h-4 w-px shrink-0 bg-border md:hidden"
+                      />
+                      {/* horizontal track line (desktop) */}
+                      <div
+                        aria-hidden
+                        className="hidden h-px w-5 shrink-0 bg-border md:block"
+                      />
+                    </>
+                  )}
+                  <button
+                    className={pillClass}
+                    disabled={isCurrent}
+                    onClick={() => openTransition(s, !isNormal)}
+                    title={pillTitle}
+                    type="button"
+                  >
+                    {STATUS_LABEL[s]}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      <div className="mt-2 flex items-center gap-4 text-muted-foreground text-xs">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-brand" />
-          Current
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-brand" />
-          Normal flow
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-2.5 rounded-full border border-border border-dashed" />
-          Override
-        </span>
-      </div>
+        <div className="mt-2 flex flex-wrap items-center gap-4 text-muted-foreground text-xs">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-brand" />
+            Current
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-brand" />
+            Normal flow
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-2.5 w-2.5 rounded-full border border-border border-dashed" />
+            Override
+          </span>
+        </div>
+      </PanelSection>
 
       {/* Status-change confirmation modal (normal + override) */}
       <Dialog
@@ -305,12 +313,8 @@ export function StaffProjectPanel({
         <p className="mt-2 text-destructive text-sm">{error}</p>
       )}
 
-      {/* Danger zone */}
-      <section className="mt-5 border-border border-t pt-4">
-        <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-          Danger zone
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
+      <PanelSection title="Danger zone" tone="danger">
+        <div className="flex flex-wrap gap-2">
           {!project.deletedAt && project.status !== "draft" && (
             <Button
               onClick={() => void runDelete("softDelete")}
@@ -342,21 +346,19 @@ export function StaffProjectPanel({
             </Button>
           )}
         </div>
-      </section>
+      </PanelSection>
 
       {/* Private notes render on the shared project page, above this panel:
           they are visible to the proposer as well, so they are not staff-only
           content and would be duplicated here. */}
 
-      {/* Edit log */}
-      <section className="mt-5 border-border border-t pt-4">
-        <h3 className="font-medium text-sm">Edit log</h3>
+      <PanelSection title="Edit log">
         {editLog.length === 0 ? (
-          <p className="mt-1 text-muted-foreground text-sm">No edits yet.</p>
+          <p className="text-muted-foreground text-sm">No edits yet.</p>
         ) : (
-          <ul className="mt-2 space-y-2 text-sm">
+          <ul className="space-y-2 text-sm">
             {editLog.map((row) => (
-              <li className="border-border border-l-2 pl-2" key={row.id}>
+              <li className="border-border border-l-2 pl-3" key={row.id}>
                 <div className="text-muted-foreground text-xs">
                   {row.editorId.slice(0, 8)} at{" "}
                   <LocalTime value={row.createdAt} />
@@ -368,7 +370,7 @@ export function StaffProjectPanel({
             ))}
           </ul>
         )}
-      </section>
-    </div>
+      </PanelSection>
+    </Panel>
   );
 }

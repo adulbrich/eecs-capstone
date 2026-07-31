@@ -377,7 +377,11 @@ a {
   text-transform: uppercase;
   font-weight: 700;
   font-size: 0.69rem;
-  color: var(--brand-primary);
+  /* brand-primary-dark, not brand-primary: this is small bold text, so it needs
+     4.5:1. The vivid orange scores 3.91 on --surface-sunken (the private panel)
+     and only 4.56 on white, passing by a hair. The dark/light-inverted shade
+     scores 5.14 and 6.76 on those same surfaces. */
+  color: var(--brand-primary-dark);
 }
 
 .nav-link {

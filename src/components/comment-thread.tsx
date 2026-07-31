@@ -178,11 +178,10 @@ function NewCommentForm({
     }
   }
 
+  // No top rule here: inside the private panel the section already draws one,
+  // and a second made the composer look like a separate section.
   return (
-    <form
-      className="mt-4 space-y-2 border-border border-t pt-4"
-      onSubmit={onSubmit}
-    >
+    <form className="mt-4 space-y-2" onSubmit={onSubmit}>
       <Textarea
         onChange={(e) => setContent(e.target.value)}
         placeholder="Add a comment"

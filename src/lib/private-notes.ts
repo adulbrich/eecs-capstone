@@ -28,3 +28,13 @@ export const PRIVATE_NOTES_INVENTORY_HINT =
  */
 export const PRIVATE_PANEL_AUDIENCE_HINT =
   "Only visible to the proposer and program staff. Never shown publicly.";
+
+/**
+ * Audience line for the staff-only panels on both the project and the
+ * inventory item page. Lives here with the other audience strings so all of
+ * them stay in one place and keep the same voice; it names the two roles
+ * explicitly because "staff" is this app's own shorthand, not a term a
+ * proposer or student would necessarily map to instructors and admins.
+ */
+export const STAFF_PANEL_AUDIENCE_HINT =
+  "Only visible to staff (instructors and admins). Never shown publicly.";

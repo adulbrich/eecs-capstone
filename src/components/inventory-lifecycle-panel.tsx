@@ -6,6 +6,7 @@ import {
 } from "#/server/inventory";
 import { InventoryStatusBadge } from "./inventory-status-badge";
 import { LocalTime } from "./local-time";
+import { PanelSection } from "./panel";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -120,18 +121,17 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
   const slice = history.slice(start, start + HISTORY_PAGE_SIZE);
 
   return (
-    <section>
-      <h2 className="font-medium text-sm">Status history</h2>
+    <PanelSection title="Status history">
       {history.length === 0 ? (
-        <p className="mt-2 text-muted-foreground text-sm">No history.</p>
+        <p className="text-muted-foreground text-sm">No history.</p>
       ) : (
         <>
-          <ul className="mt-2 space-y-2">
+          {/* Left-rule rows, matching StatusTimeline and the project edit log.
+              These used to be bordered cards, which read as many small panels
+              inside a panel. */}
+          <ul className="space-y-3">
             {slice.map((h) => (
-              <li
-                className="rounded-md border border-border bg-card p-3 text-sm"
-                key={h.id}
-              >
+              <li className="border-border border-l-2 pl-3 text-sm" key={h.id}>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">
                     {h.oldStatus ? `${h.oldStatus} -> ` : ""}
@@ -180,7 +180,7 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
           )}
         </>
       )}
-    </section>
+    </PanelSection>
   );
 }
 
@@ -341,23 +341,26 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
   const holderDisplay = formatHolderDisplay(item, holderName);
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-md border border-border bg-card p-4">
-        <p className="text-muted-foreground text-xs uppercase">Status</p>
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <InventoryStatusBadge showRetired status={status} />
-          <span className="text-muted-foreground text-xs">
-            {status.replace(/_/g, " ")}
-          </span>
-        </div>
-        {rec && (
-          <div className="mt-3">
+    <>
+      {/* Status and holder were two separate bordered cards. The holder is an
+          attribute of the current status, not a peer of it, so they read as one
+          section with a shared separator like the project panel's. */}
+      <PanelSection title="Status">
+        <dl className="grid grid-cols-3 items-center gap-2 text-sm">
+          <dt className="text-muted-foreground">Current</dt>
+          <dd className="col-span-2 flex flex-wrap items-center gap-2">
+            <InventoryStatusBadge showRetired status={status} />
+          </dd>
+          <dt className="text-muted-foreground">Holder</dt>
+          <dd className="col-span-2">{holderDisplay ?? "-"}</dd>
+        </dl>
+
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          {rec && (
             <Button disabled={busy} onClick={onRecommendedClick} size="sm">
               {rec.label}
             </Button>
-          </div>
-        )}
-        <div className="mt-4 flex flex-wrap items-end gap-2">
+          )}
           <div>
             <Label htmlFor="override-status">Change status to...</Label>
             <Select
@@ -382,22 +385,12 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
           </div>
         </div>
         {error && <p className="mt-3 text-destructive text-sm">{error}</p>}
-      </section>
-
-      <section className="rounded-md border border-border bg-card p-4">
-        <p className="text-muted-foreground text-xs uppercase">
-          Current holder
-        </p>
-        <p className="mt-1 text-sm">
-          {holderDisplay ? holderDisplay : "(none)"}
-        </p>
-      </section>
+      </PanelSection>
 
       <StatusHistorySection history={history} />
 
-      <section className="rounded-md border border-destructive/30 bg-destructive/5 p-4">
-        <h2 className="font-medium text-sm">Danger zone</h2>
-        <p className="mt-1 text-muted-foreground text-xs">
+      <PanelSection title="Danger zone" tone="danger">
+        <p className="text-muted-foreground text-xs">
           Hard delete is allowed only when status is available or retired and
           the item has no historical request lines.
         </p>
@@ -415,7 +408,7 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
             Hard delete item
           </Button>
         </div>
-      </section>
+      </PanelSection>
 
       <Dialog onOpenChange={setDlgOpen} open={dlgOpen}>
         <DialogContent>
@@ -558,6 +551,6 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
