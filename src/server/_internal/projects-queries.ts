@@ -28,7 +28,10 @@ import {
   stripPrivateFields,
   type Viewer,
 } from "#/lib/project-visibility";
-import { projectSummarySelect } from "./project-summary";
+import {
+  adminProjectSummarySelect,
+  projectSummarySelect,
+} from "./project-summary";
 
 type JsonValue =
   | string
@@ -136,12 +139,18 @@ export async function listAdminProjectsAs(
   }
   const trimmed = data.q.trim();
   if (trimmed) {
-    // Same shape as the public listing: the generated tsvector for whole-word
-    // relevance, plus a title ILIKE so a partial word still matches, which is
-    // what staff hunting for a half-remembered title actually type.
+    // Same tsvector-plus-title-ILIKE shape as the public listing, so a
+    // partial word still matches what staff hunting for a half-remembered
+    // title actually type, extended with contact and proposer fields since
+    // staff also search by who is involved, not just the text.
+    const like = `%${trimmed}%`;
     const match = or(
       sql`${projects.searchVector} @@ websearch_to_tsquery('english', ${trimmed})`,
-      ilike(projects.title, `%${trimmed}%`)
+      ilike(projects.title, like),
+      ilike(projects.contactName, like),
+      ilike(projects.contactEmail, like),
+      ilike(user.name, like),
+      ilike(user.email, like)
     );
     if (match) {
       listConditions.push(match);
@@ -150,9 +159,12 @@ export async function listAdminProjectsAs(
 
   const [rows, proposers] = await Promise.all([
     db
-      .select(projectSummarySelect)
+      .select(adminProjectSummarySelect)
       .from(projects)
       .leftJoin(programs, eq(projects.programId, programs.id))
+      // Left, not inner: `proposerId` is `onDelete: "set null"`, so an inner join
+      // would silently drop projects whose proposer account was removed.
+      .leftJoin(user, eq(projects.proposerId, user.id))
       .where(listConditions.length ? and(...listConditions) : undefined)
       .orderBy(desc(projects.updatedAt)),
     db

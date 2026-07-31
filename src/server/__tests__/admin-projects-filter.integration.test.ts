@@ -322,3 +322,68 @@ describe("admin projects proposer filter", () => {
     );
   });
 });
+
+describe("admin project search reaches people, not just text", () => {
+  it("finds a project by its proposer's email", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    const proposer = await makeAdmin("rivera@example.edu");
+    await createProjectAs(proposer, baseProject("Trail Mapper", null));
+    const { rows } = await listAdminProjectsAs(admin, {
+      includeSoftDeleted: false,
+      program: null,
+      proposer: null,
+      q: "rivera@example.edu",
+      status: "all",
+    });
+    expect(rows.map((r) => r.title)).toEqual(["Trail Mapper"]);
+  });
+
+  it("finds a project by its contact name", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    await createProjectAs(admin, {
+      ...baseProject("Weather Station", null),
+      contactName: "Priya Raman",
+    });
+    const { rows } = await listAdminProjectsAs(admin, {
+      includeSoftDeleted: false,
+      program: null,
+      proposer: null,
+      q: "Priya",
+      status: "all",
+    });
+    expect(rows.map((r) => r.title)).toEqual(["Weather Station"]);
+  });
+
+  it("still lists a project whose proposer account was deleted", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    const proposer = await makeAdmin("leaving@example.edu");
+    await createProjectAs(proposer, baseProject("Orphan Project", null));
+    await db.delete(user).where(eq(user.id, proposer.id));
+    const { rows } = await listAdminProjectsAs(admin, {
+      includeSoftDeleted: false,
+      program: null,
+      proposer: null,
+      q: "",
+      status: "all",
+    });
+    expect(rows.map((r) => r.title)).toContain("Orphan Project");
+  });
+
+  it("carries the proposer and contact fields the table shows", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    await createProjectAs(admin, {
+      ...baseProject("Rich Row", null),
+      contactEmail: "contact@example.edu",
+    });
+    const { rows } = await listAdminProjectsAs(admin, {
+      includeSoftDeleted: false,
+      program: null,
+      proposer: null,
+      q: "",
+      status: "all",
+    });
+    expect(rows[0].proposerEmail).toBe("staff@example.edu");
+    expect(rows[0].contactEmail).toBe("contact@example.edu");
+    expect(rows[0].teamsSupported).toBe(1);
+  });
+});
