@@ -229,37 +229,25 @@ test("toggling a column writes cols into the URL, absent by default", async ({
   await expect(
     page.getByRole("columnheader", { name: "Location", exact: true })
   ).toHaveCount(0);
-});
 
-test("toggling back to the default column set omits the cols param", async ({
-  page,
-}) => {
-  // Known defect (see task-8-report.md "Reset columns / cols param" finding):
-  // serializeHidden correctly computes `undefined` for a hidden set that
-  // matches the page default, but `useSeedColumnsFromStorage`'s effect fires
-  // on that same `cols` transition to undefined and re-seeds the URL from the
-  // storage line the very same toggle just wrote, landing back on an
-  // explicit (if literally-default) `cols` param instead of a clean URL.
-  // test.fail() keeps this assertion running rather than deleting it: it
-  // will flip to a failure, and needs inverting, the moment someone fixes
-  // the underlying effect.
-  test.fail();
-
-  await page.goto("/admin/inventory");
-  await waitForHydration(page);
-
-  await page.getByRole("button", { name: "Columns" }).click();
-  await page.getByRole("menuitemcheckbox", { name: "Location" }).click();
-  await closeMenu(page);
-  await expect(page).toHaveURL(/[?&]cols=[^&]*location/);
-
-  // Toggling it back on returns the visible set to the page default. The
-  // param should disappear rather than being written back with the literal
-  // default list.
+  // Toggling it back on returns the visible set to the page default: the
+  // param must disappear again, not be written back with the literal default
+  // list. This used to fail: resetColumns's sibling code path,
+  // onColumnVisibilityChange, wrote the literal default set into storage
+  // whenever a toggle happened to land back on the default, and
+  // useSeedColumnsFromStorage would re-seed `cols` from that stored value on
+  // the very next render, undoing the clean URL serializeHidden had just
+  // produced. Fixed by clearing the stored preference instead of writing the
+  // default into it (src/components/admin-data-table.tsx,
+  // onColumnVisibilityChange and resetColumns both route through
+  // clearStoredHidden now).
   await page.getByRole("button", { name: "Columns" }).click();
   await page.getByRole("menuitemcheckbox", { name: "Location" }).click();
   await closeMenu(page);
   await expect(page).not.toHaveURL(/[?&]cols=/);
+  await expect(
+    page.getByRole("columnheader", { name: "Location", exact: true })
+  ).toBeVisible();
 });
 
 test("column layout persists across a reload via the localStorage seed", async ({
@@ -304,16 +292,18 @@ test("Reset columns restores the default column set", async ({ page }) => {
   await expect(
     page.getByRole("columnheader", { name: "Location", exact: true })
   ).toBeVisible();
+  // The URL comes back clean too: resetColumns clears the stored preference
+  // rather than writing the default set into it, so there is nothing left
+  // for useSeedColumnsFromStorage to re-seed from on this same render.
+  await expect(page).not.toHaveURL(/[?&]cols=/);
 
-  // The rendered set is what "restores the defaults" means; the URL after a
-  // reset is a separate question this suite does not assert on (see the
-  // task report for what was observed there). What must hold is durability:
-  // a Reset has to survive a bare re-visit rather than being silently undone
-  // by the stale preference it was supposed to replace.
+  // Durability: a Reset has to survive a bare re-visit rather than being
+  // silently undone by the stale preference it was supposed to replace.
   await page.goto("/admin/inventory");
   await expect(
     page.getByRole("columnheader", { name: "Location", exact: true })
   ).toBeVisible();
+  await expect(page).not.toHaveURL(/[?&]cols=/);
 });
 
 test("admin table restacks into cards below 768px", async ({ page }) => {

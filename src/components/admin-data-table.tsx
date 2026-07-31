@@ -31,6 +31,7 @@ import {
   TableRow,
 } from "#/components/ui/table";
 import {
+  clearStoredHidden,
   type SortState,
   serializeHidden,
   writeStoredHidden,
@@ -157,8 +158,18 @@ export function AdminDataTable<T>({
       const nextHidden = Object.entries(next)
         .filter(([, visible]) => !visible)
         .map(([id]) => id);
-      writeStoredHidden(storageKey, nextHidden);
-      onHiddenChange(serializeHidden(nextHidden, defaultHidden));
+      const serialized = serializeHidden(nextHidden, defaultHidden);
+      // A toggle that lands back on the page default hits the same trap as
+      // an explicit reset: writing the literal default set into storage
+      // would leave a "preference" on record, and the seed effect would
+      // write it straight back into the URL the next time cols is
+      // undefined, undoing the clean URL serializeHidden just produced.
+      if (serialized === undefined) {
+        clearStoredHidden(storageKey);
+      } else {
+        writeStoredHidden(storageKey, nextHidden);
+      }
+      onHiddenChange(serialized);
     },
     onSortingChange: (updater) => {
       const next = typeof updater === "function" ? updater(sorting) : updater;
@@ -175,7 +186,13 @@ export function AdminDataTable<T>({
   const hideable = table.getAllLeafColumns().filter((c) => c.getCanHide());
 
   const resetColumns = () => {
-    writeStoredHidden(storageKey, defaultHidden);
+    // Clear the stored preference rather than writing the default set into
+    // it. "Reset" means "I no longer have a preference," not "my preference
+    // happens to equal the default." Writing the latter would leave a
+    // preference on record, and useSeedColumnsFromStorage would dutifully
+    // seed it straight back into the URL the next time cols is undefined,
+    // undoing the clean URL that onHiddenChange(undefined) just produced.
+    clearStoredHidden(storageKey);
     onHiddenChange(undefined);
   };
 

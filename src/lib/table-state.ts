@@ -132,6 +132,27 @@ export function writeStoredHidden(
 }
 
 /**
+ * Removes a page's stored column layout entirely, so a later
+ * `readStoredHidden` sees `null` ("no preference, use the page default")
+ * rather than `[]` ("deliberately show everything") or a literal copy of the
+ * default set. That distinction is what `useSeedColumnsFromStorage` branches
+ * on: writing the default set instead of clearing it would leave a
+ * preference on record, and the seed effect would dutifully write it back
+ * into the URL the next time `cols` becomes undefined. A no-op (never
+ * throws) when storage is unavailable.
+ */
+export function clearStoredHidden(storageKey: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.removeItem(STORAGE_PREFIX + storageKey);
+  } catch {
+    // Ignore: storage may be disabled (private mode).
+  }
+}
+
+/**
  * Seeds `?cols=` from the persisted layout on first render.
  *
  * The URL stays the source of truth: when the param is present this is a

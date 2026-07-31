@@ -160,19 +160,34 @@ describe("AdminDataTable", () => {
     );
   });
 
-  it("omits the param when a toggle lands back on the page default", () => {
+  it("omits the param and clears storage when a toggle lands back on the page default", () => {
     const onHiddenChange = vi.fn();
+    localStorage.setItem("cs-capstone:admin-cols:test", "somethingElse");
     renderTable({ hidden: [], onHiddenChange });
     openColumnsMenu();
     screen.getByRole("menuitemcheckbox", { name: "Location" }).click();
     // Location is default-hidden, so hiding it returns the table to the page
-    // default: the URL param is omitted even though storage still records
-    // the raw set. Storage carries the literal set; the URL carries only the
-    // divergence from default.
+    // default: the URL param is omitted. Storage must be cleared, not
+    // written with the literal default set. A stored copy of the default is
+    // indistinguishable from "the user has a preference that happens to
+    // match the default," and the seed effect that reads storage on the next
+    // param-less render would write it straight back into the URL, undoing
+    // the clean URL this same toggle just produced.
     expect(onHiddenChange).toHaveBeenCalledWith(undefined);
-    expect(localStorage.getItem("cs-capstone:admin-cols:test")).toBe(
-      "location"
-    );
+    expect(localStorage.getItem("cs-capstone:admin-cols:test")).toBeNull();
+  });
+
+  it("clears the stored preference and reports undefined when Reset columns is activated", () => {
+    const onHiddenChange = vi.fn();
+    // A real, non-default stored preference, so a fix that regresses to
+    // writing the literal default set back (instead of clearing the key)
+    // still leaves a truthy value here and this test catches it.
+    localStorage.setItem("cs-capstone:admin-cols:test", "location");
+    renderTable({ hidden: ["location"], onHiddenChange });
+    openColumnsMenu();
+    screen.getByRole("menuitem", { name: "Reset columns" }).click();
+    expect(onHiddenChange).toHaveBeenCalledWith(undefined);
+    expect(localStorage.getItem("cs-capstone:admin-cols:test")).toBeNull();
   });
 
   it("offers no checkbox for a column that cannot be hidden", () => {

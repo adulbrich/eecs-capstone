@@ -2,6 +2,7 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  clearStoredHidden,
   parseHidden,
   parseSort,
   readStoredHidden,
@@ -114,6 +115,28 @@ describe("stored columns", () => {
     writeStoredHidden("inventory", []);
     expect(readStoredHidden("inventory")).toEqual([]);
   });
+
+  it("removes a stored preference entirely, distinct from an empty set", () => {
+    writeStoredHidden("inventory", ["serial", "label"]);
+    clearStoredHidden("inventory");
+    // null ("no preference, use the page default") is not the same answer as
+    // [] ("deliberately show everything"): useSeedColumnsFromStorage branches
+    // on exactly this distinction, so a clear must produce null, not [].
+    expect(readStoredHidden("inventory")).toBeNull();
+  });
+
+  it("leaves other pages' stored preferences alone", () => {
+    writeStoredHidden("inventory", ["serial"]);
+    writeStoredHidden("projects", ["contact"]);
+    clearStoredHidden("inventory");
+    expect(readStoredHidden("inventory")).toBeNull();
+    expect(readStoredHidden("projects")).toEqual(["contact"]);
+  });
+
+  it("is a no-op when nothing was stored", () => {
+    expect(() => clearStoredHidden("inventory")).not.toThrow();
+    expect(readStoredHidden("inventory")).toBeNull();
+  });
 });
 
 describe("useSeedColumnsFromStorage", () => {
@@ -132,6 +155,19 @@ describe("useSeedColumnsFromStorage", () => {
   });
 
   it("does not seed when nothing is stored", () => {
+    const seed = vi.fn();
+    renderHook(() => useSeedColumnsFromStorage("inventory", undefined, seed));
+    expect(seed).not.toHaveBeenCalled();
+  });
+
+  it("does not seed after a stored preference has been cleared", () => {
+    // Regression coverage for the resetColumns bug: writing the default set
+    // to storage instead of clearing it leaves a "preference" on record, and
+    // this effect dutifully seeds it back the next time cols is undefined.
+    // Clearing storage (rather than writing the default set into it) is what
+    // keeps a reset table's URL clean on the very next render.
+    writeStoredHidden("inventory", ["serial"]);
+    clearStoredHidden("inventory");
     const seed = vi.fn();
     renderHook(() => useSeedColumnsFromStorage("inventory", undefined, seed));
     expect(seed).not.toHaveBeenCalled();
