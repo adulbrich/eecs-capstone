@@ -415,7 +415,13 @@ and sortable headers plus a column menu are both new interactive surfaces.
 2. **Projects.** `adminProjectSummarySelect`, the widened search, the route.
    The richest of the three.
 3. **Mentors.** The `q` parameter, the route, the inline-edit test. Then delete
-   `src/components/admin-table.tsx`, which has no remaining consumers.
+   `src/components/admin-table.tsx`.
+
+**Correction, made during implementation.** That last step was wrong and was
+not carried out. `AdminTable` still has three consumers after mentors:
+`/admin/programs`, `/admin/users`, and `/admin/categories`. Deleting it would
+break the build. It stays until those three pages migrate, which the project
+backlog already records as separate future work.
 
 The old component is deleted outright rather than kept as a wrapper: the app is
 pre-production and carries no back-compatibility shims.

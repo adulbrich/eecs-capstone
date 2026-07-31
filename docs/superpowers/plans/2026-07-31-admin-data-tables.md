@@ -60,7 +60,7 @@
 
 | File | Reason |
 | --- | --- |
-| `src/components/admin-table.tsx` | No consumers after Task 7. Its `data-columns` attribute was already dead. |
+| ~~`src/components/admin-table.tsx`~~ | **Not deleted.** This row was wrong. `AdminTable` still has three consumers after Task 7: `/admin/programs`, `/admin/users`, and `/admin/categories`. It stays until those pages migrate, which the project backlog records as separate future work. |
 
 **Untouched on purpose:** `src/styles.css` (the `.admin-table` mobile card rules keep working as-is), `src/components/project-row.tsx` (still used by the public listing through `project-list-item.tsx`), `src/lib/view-preference.ts`.
 
@@ -2114,7 +2114,7 @@ git commit -m "feat(admin): rebuild the projects list as a sortable data table"
 - Modify: `src/server/users.ts`
 - Modify: `src/routes/_authed/admin/mentors/index.tsx`
 - Modify: `src/test/admin-data-table.test.tsx` (one added test)
-- Delete: `src/components/admin-table.tsx`
+- ~~Delete: `src/components/admin-table.tsx`~~ (see the correction in File Structure: it still has three consumers and stays)
 
 **Interfaces:**
 - Consumes: Tasks 1 and 2, and the route shape from Task 4.
@@ -2303,7 +2303,7 @@ grep -rn "admin-table\|AdminTable" src/ --include="*.tsx" --include="*.ts"
 Only `src/styles.css` (the class, which stays) should remain. Then:
 
 ```bash
-rm src/components/admin-table.tsx
+# Do NOT run this. AdminTable still has three consumers. See the File Structure correction.
 ```
 
 - [ ] **Step 6: Run everything**
