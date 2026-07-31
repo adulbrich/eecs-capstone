@@ -143,9 +143,11 @@ rediscovered per page:
 
 - **Nulls sort last in both directions.** Most columns here are nullable, and a
   staff member sorting by Location wants locations, not forty blank rows first.
-  TanStack's `sortUndefined` option only recognizes `undefined`, while Drizzle
-  returns SQL nulls, so the shared comparators must test for both explicitly
-  rather than relying on that option.
+  TanStack's `sortUndefined: "last"` does this, and is applied before the
+  direction is negated, so it holds ascending and descending alike. It only
+  recognizes `undefined` though, while Drizzle returns SQL nulls, so each
+  nullable column's `accessorFn` maps `null` to `undefined` before the option
+  can take effect.
 - **Text sorts case-insensitively**, via `localeCompare` with
   `sensitivity: "base"`, so `arduino` and `Arduino` interleave.
 - **Status sorts by workflow order, not alphabetically.** Inventory sorts
