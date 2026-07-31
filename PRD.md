@@ -113,6 +113,9 @@ Each project carries:
   on and disabled in the UI, and the server coerces the flag regardless of what
   the client sends. The converse is deliberately allowed, so staff can leave an
   internal reply under a comment the proposer can see.
+- ✅ Private notes, status history, and comments render inside one bordered
+  "Private" panel on the project page, visible to the proposer and staff, with
+  a single audience statement instead of per-section explanations.
 
 ## 6. Logging & Audit
 
@@ -211,7 +214,15 @@ Each project carries:
 - ✅ Users browse inventory (default: available) and can also see requested,
   reserved, checked out, and in-maintenance items, but not retired items.
 - ✅ Users cannot see who has requested/reserved/checked out an item.
-- ✅ Staff add, edit, and delete inventory items.
+- ✅ Staff add, edit, and delete inventory items. Every item-scoped surface
+  lives under `/inventory` (`/inventory/new`, `/inventory/$itemId`,
+  `/inventory/$itemId/edit`), with staff-only routes guarded individually;
+  `/admin/inventory` keeps only the cross-item management table and the
+  request queue. This mirrors how projects are laid out.
+- ✅ One item detail page for everyone: public viewers see image, name,
+  status, category, description and Add to cart; staff additionally render a
+  staff panel with serial, label, location, private notes, the Edit link and
+  the lifecycle controls.
 - ✅ Cart-style requests: users request several items at once (`/my/items`
   cart, request items table).
 - ✅ Staff approve or reject inventory requests (`/admin/inventory/requests`).
