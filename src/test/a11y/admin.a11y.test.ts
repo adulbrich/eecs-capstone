@@ -28,8 +28,8 @@ test("admin inventory list", async ({ page }) => {
   await checkA11y(page);
 });
 
-test("admin inventory new", async ({ page }) => {
-  await page.goto("/admin/inventory/new");
+test("inventory new (staff)", async ({ page }) => {
+  await page.goto("/inventory/new");
   await checkA11y(page);
 });
 

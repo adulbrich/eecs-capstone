@@ -128,7 +128,7 @@ function AdminInventory() {
             <Link to="/admin/inventory/requests">Request queue</Link>
           </Button>
           <Button asChild size="sm">
-            <Link to="/admin/inventory/new">+ New item</Link>
+            <Link to="/inventory/new">+ New item</Link>
           </Button>
         </div>
       </div>

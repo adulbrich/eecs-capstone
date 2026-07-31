@@ -29,6 +29,7 @@ import { Route as AuthedProjectsNewRouteImport } from './routes/_authed/projects
 import { Route as AuthedMyProjectsRouteImport } from './routes/_authed/my/projects'
 import { Route as AuthedMyItemsRouteImport } from './routes/_authed/my/items'
 import { Route as AuthedMyBookmarksRouteImport } from './routes/_authed/my/bookmarks'
+import { Route as AuthedInventoryNewRouteImport } from './routes/_authed/inventory/new'
 import { Route as AuthedAdminUsersIndexRouteImport } from './routes/_authed/admin/users/index'
 import { Route as AuthedAdminProjectsIndexRouteImport } from './routes/_authed/admin/projects/index'
 import { Route as AuthedAdminProgramsIndexRouteImport } from './routes/_authed/admin/programs/index'
@@ -40,7 +41,6 @@ import { Route as AuthedInventoryItemIdEditRouteImport } from './routes/_authed/
 import { Route as AuthedAdminUsersUserIdRouteImport } from './routes/_authed/admin/users/$userId'
 import { Route as AuthedAdminProgramsProgramIdRouteImport } from './routes/_authed/admin/programs/$programId'
 import { Route as AuthedAdminInventoryRequestsRouteImport } from './routes/_authed/admin/inventory/requests'
-import { Route as AuthedAdminInventoryNewRouteImport } from './routes/_authed/admin/inventory/new'
 import { Route as AuthedAdminCategoriesCategoryIdRouteImport } from './routes/_authed/admin/categories/$categoryId'
 
 const AuthedRoute = AuthedRouteImport.update({
@@ -142,6 +142,11 @@ const AuthedMyBookmarksRoute = AuthedMyBookmarksRouteImport.update({
   path: '/my/bookmarks',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedInventoryNewRoute = AuthedInventoryNewRouteImport.update({
+  id: '/inventory/new',
+  path: '/inventory/new',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedAdminUsersIndexRoute = AuthedAdminUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
@@ -205,11 +210,6 @@ const AuthedAdminInventoryRequestsRoute =
     path: '/inventory/requests',
     getParentRoute: () => AuthedAdminRoute,
   } as any)
-const AuthedAdminInventoryNewRoute = AuthedAdminInventoryNewRouteImport.update({
-  id: '/inventory/new',
-  path: '/inventory/new',
-  getParentRoute: () => AuthedAdminRoute,
-} as any)
 const AuthedAdminCategoriesCategoryIdRoute =
   AuthedAdminCategoriesCategoryIdRouteImport.update({
     id: '/categories/$categoryId',
@@ -231,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/inventory/': typeof InventoryIndexRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/inventory/new': typeof AuthedInventoryNewRoute
   '/my/bookmarks': typeof AuthedMyBookmarksRoute
   '/my/items': typeof AuthedMyItemsRoute
   '/my/projects': typeof AuthedMyProjectsRoute
@@ -238,7 +239,6 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin/': typeof AuthedAdminIndexRoute
   '/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
-  '/admin/inventory/new': typeof AuthedAdminInventoryNewRoute
   '/admin/inventory/requests': typeof AuthedAdminInventoryRequestsRoute
   '/admin/programs/$programId': typeof AuthedAdminProgramsProgramIdRoute
   '/admin/users/$userId': typeof AuthedAdminUsersUserIdRoute
@@ -264,6 +264,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/inventory': typeof InventoryIndexRoute
   '/projects': typeof ProjectsIndexRoute
+  '/inventory/new': typeof AuthedInventoryNewRoute
   '/my/bookmarks': typeof AuthedMyBookmarksRoute
   '/my/items': typeof AuthedMyItemsRoute
   '/my/projects': typeof AuthedMyProjectsRoute
@@ -271,7 +272,6 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin': typeof AuthedAdminIndexRoute
   '/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
-  '/admin/inventory/new': typeof AuthedAdminInventoryNewRoute
   '/admin/inventory/requests': typeof AuthedAdminInventoryRequestsRoute
   '/admin/programs/$programId': typeof AuthedAdminProgramsProgramIdRoute
   '/admin/users/$userId': typeof AuthedAdminUsersUserIdRoute
@@ -300,6 +300,7 @@ export interface FileRoutesById {
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/inventory/': typeof InventoryIndexRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/_authed/inventory/new': typeof AuthedInventoryNewRoute
   '/_authed/my/bookmarks': typeof AuthedMyBookmarksRoute
   '/_authed/my/items': typeof AuthedMyItemsRoute
   '/_authed/my/projects': typeof AuthedMyProjectsRoute
@@ -307,7 +308,6 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_authed/admin/': typeof AuthedAdminIndexRoute
   '/_authed/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
-  '/_authed/admin/inventory/new': typeof AuthedAdminInventoryNewRoute
   '/_authed/admin/inventory/requests': typeof AuthedAdminInventoryRequestsRoute
   '/_authed/admin/programs/$programId': typeof AuthedAdminProgramsProgramIdRoute
   '/_authed/admin/users/$userId': typeof AuthedAdminUsersUserIdRoute
@@ -336,6 +336,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/inventory/'
     | '/projects/'
+    | '/inventory/new'
     | '/my/bookmarks'
     | '/my/items'
     | '/my/projects'
@@ -343,7 +344,6 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/admin/'
     | '/admin/categories/$categoryId'
-    | '/admin/inventory/new'
     | '/admin/inventory/requests'
     | '/admin/programs/$programId'
     | '/admin/users/$userId'
@@ -369,6 +369,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/inventory'
     | '/projects'
+    | '/inventory/new'
     | '/my/bookmarks'
     | '/my/items'
     | '/my/projects'
@@ -376,7 +377,6 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/admin'
     | '/admin/categories/$categoryId'
-    | '/admin/inventory/new'
     | '/admin/inventory/requests'
     | '/admin/programs/$programId'
     | '/admin/users/$userId'
@@ -404,6 +404,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/inventory/'
     | '/projects/'
+    | '/_authed/inventory/new'
     | '/_authed/my/bookmarks'
     | '/_authed/my/items'
     | '/_authed/my/projects'
@@ -411,7 +412,6 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/_authed/admin/'
     | '/_authed/admin/categories/$categoryId'
-    | '/_authed/admin/inventory/new'
     | '/_authed/admin/inventory/requests'
     | '/_authed/admin/programs/$programId'
     | '/_authed/admin/users/$userId'
@@ -583,6 +583,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedMyBookmarksRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/inventory/new': {
+      id: '/_authed/inventory/new'
+      path: '/inventory/new'
+      fullPath: '/inventory/new'
+      preLoaderRoute: typeof AuthedInventoryNewRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/admin/users/': {
       id: '/_authed/admin/users/'
       path: '/users'
@@ -660,13 +667,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminInventoryRequestsRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
-    '/_authed/admin/inventory/new': {
-      id: '/_authed/admin/inventory/new'
-      path: '/inventory/new'
-      fullPath: '/admin/inventory/new'
-      preLoaderRoute: typeof AuthedAdminInventoryNewRouteImport
-      parentRoute: typeof AuthedAdminRoute
-    }
     '/_authed/admin/categories/$categoryId': {
       id: '/_authed/admin/categories/$categoryId'
       path: '/categories/$categoryId'
@@ -680,7 +680,6 @@ declare module '@tanstack/react-router' {
 interface AuthedAdminRouteChildren {
   AuthedAdminIndexRoute: typeof AuthedAdminIndexRoute
   AuthedAdminCategoriesCategoryIdRoute: typeof AuthedAdminCategoriesCategoryIdRoute
-  AuthedAdminInventoryNewRoute: typeof AuthedAdminInventoryNewRoute
   AuthedAdminInventoryRequestsRoute: typeof AuthedAdminInventoryRequestsRoute
   AuthedAdminProgramsProgramIdRoute: typeof AuthedAdminProgramsProgramIdRoute
   AuthedAdminUsersUserIdRoute: typeof AuthedAdminUsersUserIdRoute
@@ -695,7 +694,6 @@ interface AuthedAdminRouteChildren {
 const AuthedAdminRouteChildren: AuthedAdminRouteChildren = {
   AuthedAdminIndexRoute: AuthedAdminIndexRoute,
   AuthedAdminCategoriesCategoryIdRoute: AuthedAdminCategoriesCategoryIdRoute,
-  AuthedAdminInventoryNewRoute: AuthedAdminInventoryNewRoute,
   AuthedAdminInventoryRequestsRoute: AuthedAdminInventoryRequestsRoute,
   AuthedAdminProgramsProgramIdRoute: AuthedAdminProgramsProgramIdRoute,
   AuthedAdminUsersUserIdRoute: AuthedAdminUsersUserIdRoute,
@@ -714,6 +712,7 @@ const AuthedAdminRouteWithChildren = AuthedAdminRoute._addFileChildren(
 interface AuthedRouteChildren {
   AuthedAdminRoute: typeof AuthedAdminRouteWithChildren
   AuthedProfileRoute: typeof AuthedProfileRoute
+  AuthedInventoryNewRoute: typeof AuthedInventoryNewRoute
   AuthedMyBookmarksRoute: typeof AuthedMyBookmarksRoute
   AuthedMyItemsRoute: typeof AuthedMyItemsRoute
   AuthedMyProjectsRoute: typeof AuthedMyProjectsRoute
@@ -725,6 +724,7 @@ interface AuthedRouteChildren {
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminRoute: AuthedAdminRouteWithChildren,
   AuthedProfileRoute: AuthedProfileRoute,
+  AuthedInventoryNewRoute: AuthedInventoryNewRoute,
   AuthedMyBookmarksRoute: AuthedMyBookmarksRoute,
   AuthedMyItemsRoute: AuthedMyItemsRoute,
   AuthedMyProjectsRoute: AuthedMyProjectsRoute,
