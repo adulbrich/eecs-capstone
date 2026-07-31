@@ -36,6 +36,41 @@ function assertStaff(viewer: AuthUser) {
 
 const SEARCH_LIMIT = 10;
 
+// A whitelist, not a lookup by string: a sort key arrives from the URL as an
+// arbitrary string, and an unvalidated column name reaching ORDER BY is an
+// injection surface.
+const USER_SORT_COLUMNS = {
+  banned: user.banned,
+  createdAt: user.createdAt,
+  email: user.email,
+  name: user.name,
+  role: user.role,
+} as const;
+
+function isUserSortColumn(key: string): key is keyof typeof USER_SORT_COLUMNS {
+  return key in USER_SORT_COLUMNS;
+}
+
+/**
+ * Builds the ORDER BY clause for the users listing. Nulls sort last in both
+ * directions, matching every client-sorted table on this branch. Postgres
+ * defaults to NULLS LAST for ASC but NULLS FIRST for DESC, so the DESC case
+ * needs it stated explicitly. `asc()`/`desc()` cannot express that, so the
+ * clause is built with `sql` instead.
+ *
+ * An unknown or absent sort key, or a sort without a valid direction, falls
+ * back to createdAt descending, which is the pre-sorting behavior.
+ */
+function userOrderBy(sort: string | undefined, dir: string | undefined) {
+  if (sort && isUserSortColumn(sort) && (dir === "asc" || dir === "desc")) {
+    const column = USER_SORT_COLUMNS[sort];
+    return dir === "desc"
+      ? sql`${column} DESC NULLS LAST`
+      : sql`${column} ASC NULLS LAST`;
+  }
+  return sql`${user.createdAt} DESC NULLS LAST`;
+}
+
 export async function searchUsersAs(
   viewer: AuthUser,
   data: { q: string }
@@ -93,7 +128,7 @@ export async function listUsersImpl(data: ListUsersInput) {
     })
     .from(user)
     .where(where)
-    .orderBy(desc(user.createdAt))
+    .orderBy(userOrderBy(data.sort, data.dir))
     .limit(data.pageSize)
     .offset(offset);
 

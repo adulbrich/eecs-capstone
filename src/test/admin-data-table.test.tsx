@@ -269,6 +269,35 @@ describe("AdminDataTable", () => {
     expect(descending).toEqual(["Lab 2", "Lab 1", "-"]);
   });
 
+  it("leaves row order to the caller when serverSorted is set", () => {
+    const { container } = renderTable({
+      hidden: [],
+      serverSorted: true,
+      sort: { desc: false, id: "name" },
+    });
+    const names = [...container.querySelectorAll("tbody tr")].map(
+      (tr) => tr.querySelector("td")?.textContent
+    );
+    // DATA order, not sorted order: the server already ordered these rows.
+    expect(names).toEqual(["beta", "Alpha", "gamma"]);
+  });
+
+  it("still reports sort changes when serverSorted is set", () => {
+    const onSortChange = vi.fn();
+    renderTable({ onSortChange, serverSorted: true });
+    screen.getByRole("button", { name: /Name/ }).click();
+    expect(onSortChange).toHaveBeenCalledWith({ desc: true, id: "name" });
+  });
+
+  it("still marks the sorted column with aria-sort when serverSorted is set", () => {
+    renderTable({ serverSorted: true, sort: { desc: true, id: "name" } });
+    expect(
+      screen
+        .getByRole("columnheader", { name: /Name/ })
+        .getAttribute("aria-sort")
+    ).toBe("descending");
+  });
+
   it("keeps a cell's unsaved input value across a re-sort", () => {
     function EditableCell() {
       const [value, setValue] = useState("");

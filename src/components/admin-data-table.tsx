@@ -65,6 +65,15 @@ export interface AdminDataTableProps<T> {
   hidden: string[];
   onHiddenChange: (cols: string | undefined) => void;
   onSortChange: (sort: SortState) => void;
+  /**
+   * Set when the server already ordered the rows and will reorder them on the
+   * next request, which is the case for any paginated listing. Header clicks
+   * still report through onSortChange and aria-sort still reflects the current
+   * column; only the local reordering is skipped, because sorting one page of
+   * rows in the browser would sort a slice while appearing to sort the whole
+   * table.
+   */
+  serverSorted?: boolean;
   sort: SortState;
   storageKey: string;
   toolbar?: ReactNode;
@@ -107,6 +116,7 @@ export function AdminDataTable<T>({
   hidden,
   onHiddenChange,
   onSortChange,
+  serverSorted,
   sort,
   storageKey,
   toolbar,
@@ -152,6 +162,7 @@ export function AdminDataTable<T>({
     getCoreRowModel: getCoreRowModel(),
     getRowId,
     getSortedRowModel: getSortedRowModel(),
+    manualSorting: serverSorted ?? false,
     onColumnVisibilityChange: (updater) => {
       const next =
         typeof updater === "function" ? updater(columnVisibility) : updater;
