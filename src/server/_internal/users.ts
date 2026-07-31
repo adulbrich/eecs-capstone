@@ -48,7 +48,11 @@ const USER_SORT_COLUMNS = {
 } as const;
 
 function isUserSortColumn(key: string): key is keyof typeof USER_SORT_COLUMNS {
-  return key in USER_SORT_COLUMNS;
+  // `key in USER_SORT_COLUMNS` walks the prototype chain, so "constructor",
+  // "toString", "hasOwnProperty", "valueOf", and "__proto__" would all pass
+  // the guard and resolve to an Object.prototype value instead of a
+  // PgColumn. Object.hasOwn checks only the object's own properties.
+  return Object.hasOwn(USER_SORT_COLUMNS, key);
 }
 
 /**
@@ -59,7 +63,11 @@ function isUserSortColumn(key: string): key is keyof typeof USER_SORT_COLUMNS {
  * clause is built with `sql` instead.
  *
  * An unknown or absent sort key, or a sort without a valid direction, falls
- * back to createdAt descending, which is the pre-sorting behavior.
+ * back to createdAt descending, which is the pre-sorting behavior. This
+ * includes the case where the column is valid but `dir` is missing or
+ * invalid: a caller cannot get a whitelisted column sorted without also
+ * supplying a valid direction, the whole request falls back together rather
+ * than defaulting the direction silently.
  */
 function userOrderBy(sort: string | undefined, dir: string | undefined) {
   if (sort && isUserSortColumn(sort) && (dir === "asc" || dir === "desc")) {

@@ -163,6 +163,41 @@ describe("listUsersImpl sorting", () => {
     ]);
   });
 
+  it("falls back to createdAt desc for a prototype-chain sort key instead of throwing", async () => {
+    // "constructor" and "__proto__" are not own properties of the whitelist,
+    // but a naive `key in USER_SORT_COLUMNS` guard walks the prototype chain
+    // and passes them anyway, resolving to an Object.prototype value instead
+    // of a PgColumn. This must be rejected the same way an unknown column
+    // name is, not merely avoid throwing.
+    const base = Date.now();
+    const older = await makeUser("proto-older@example.edu", "user");
+    const newer = await makeUser("proto-newer@example.edu", "user");
+    await db
+      .update(user)
+      .set({ createdAt: new Date(base) })
+      .where(eq(user.id, older.id));
+    await db
+      .update(user)
+      .set({ createdAt: new Date(base + 1000) })
+      .where(eq(user.id, newer.id));
+
+    for (const sort of ["constructor", "__proto__"]) {
+      const { rows } = await listUsersImpl({
+        q: "",
+        role: null,
+        includeBanned: true,
+        page: 1,
+        pageSize: 50,
+        sort,
+        dir: "asc",
+      });
+      expect(rows.map((r) => r.email)).toEqual([
+        "proto-newer@example.edu",
+        "proto-older@example.edu",
+      ]);
+    }
+  });
+
   it("composes sorting with the existing role filter", async () => {
     // Inserted in email-ascending order, so createdAt-desc (the unsorted
     // fallback) would yield admin-b, admin-a: the opposite of what this test

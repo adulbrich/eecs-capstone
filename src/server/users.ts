@@ -9,7 +9,7 @@ const listUsersSchema = z.object({
   includeBanned: z.boolean().default(true),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(100).default(20),
-  sort: z.string().optional(),
+  sort: z.string().max(40).optional(),
   dir: z.enum(["asc", "desc"]).optional(),
 });
 
