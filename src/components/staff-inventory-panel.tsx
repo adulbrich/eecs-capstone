@@ -1,9 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import {
-  PRIVATE_NOTES_INVENTORY_HINT,
-  PRIVATE_NOTES_LABEL,
-  STAFF_PANEL_AUDIENCE_HINT,
-} from "#/lib/private-notes";
+import { STAFF_PANEL_AUDIENCE_HINT } from "#/lib/private-notes";
 import {
   type HistoryRow,
   InventoryLifecyclePanel,
@@ -71,12 +67,11 @@ export function StaffInventoryPanel({
         </dl>
       </PanelSection>
 
+      {/* Just "Notes": the panel's own audience note already says these are
+          staff-only, so repeating it per section was redundant. */}
       {item.notes && (
-        <PanelSection title={PRIVATE_NOTES_LABEL}>
+        <PanelSection title="Notes">
           <p className="whitespace-pre-wrap text-sm">{item.notes}</p>
-          <p className="mt-1 text-muted-foreground text-xs">
-            {PRIVATE_NOTES_INVENTORY_HINT}
-          </p>
         </PanelSection>
       )}
 

@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import {
   PRIVATE_NOTES_LABEL,
   PRIVATE_PANEL_AUDIENCE_HINT,
@@ -5,6 +6,7 @@ import {
 import { CommentThread } from "./comment-thread";
 import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { StatusTimeline } from "./status-timeline";
+import { Button } from "./ui/button";
 
 type Comment = Parameters<typeof CommentThread>[0]["comments"][number];
 type HistoryRow = Parameters<typeof StatusTimeline>[0]["rows"][number];
@@ -19,23 +21,48 @@ type HistoryRow = Parameters<typeof StatusTimeline>[0]["rows"][number];
  * stacked, and identical borders would read as one region.
  */
 export function ProjectPrivatePanel({
+  canEdit,
   comments,
   history,
   notes,
   onCommentsChanged,
   projectId,
+  teamsSupported,
   viewerIsStaff,
 }: {
+  canEdit: boolean;
   comments: Comment[];
   history: HistoryRow[];
   notes: string | null;
   onCommentsChanged: () => void;
   projectId: string;
+  teamsSupported: number;
   viewerIsStaff: boolean;
 }) {
   return (
     <Panel tone="private">
-      <PanelHeader title="Private" />
+      <PanelHeader
+        actions={
+          <>
+            {/* Team capacity is proposer-and-staff information, not staff-only,
+                so it belongs here rather than in the staff panel. */}
+            <span className="text-muted-foreground text-xs">
+              Teams supported:{" "}
+              <span className="font-medium text-foreground">
+                {teamsSupported}
+              </span>
+            </span>
+            {canEdit && (
+              <Button asChild size="sm" variant="outline">
+                <Link params={{ projectId }} to="/projects/$projectId/edit">
+                  Edit
+                </Link>
+              </Button>
+            )}
+          </>
+        }
+        title="Private"
+      />
       <PanelNote>{PRIVATE_PANEL_AUDIENCE_HINT}</PanelNote>
 
       {notes && (

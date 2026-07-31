@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { STAFF_PANEL_AUDIENCE_HINT } from "#/lib/private-notes";
 import { canTransition, type Status } from "#/lib/project-workflow";
@@ -45,7 +46,6 @@ interface Project {
   deletedAt: Date | string | null;
   id: string;
   status: string;
-  teamsSupported: number;
 }
 
 interface EditLogRow {
@@ -148,12 +148,12 @@ export function StaffProjectPanel({
     <Panel tone="staff">
       <PanelHeader
         actions={
-          <span className="text-muted-foreground text-xs">
-            Teams supported:{" "}
-            <span className="font-medium text-foreground">
-              {project.teamsSupported ?? 1}
-            </span>
-          </span>
+          // Mirrors "Manage inventory" on the item page: this page is reachable
+          // publicly, so staff who came from the management table need a way
+          // back to it.
+          <Button asChild size="sm" variant="ghost">
+            <Link to="/admin/projects">Manage projects</Link>
+          </Button>
         }
         title="Staff panel"
       />

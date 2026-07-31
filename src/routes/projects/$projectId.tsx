@@ -189,6 +189,7 @@ function ProjectDetail() {
 
       {(viewerIsStaff || viewerIsOwner) && (
         <ProjectPrivatePanel
+          canEdit={canEdit}
           comments={comments}
           history={history}
           notes={(project.notes as string | null) ?? null}
@@ -197,6 +198,7 @@ function ProjectDetail() {
             void router.invalidate();
           }}
           projectId={project.id as string}
+          teamsSupported={(project.teamsSupported as number) ?? 1}
           viewerIsStaff={viewerIsStaff}
         />
       )}
@@ -210,7 +212,6 @@ function ProjectDetail() {
             id: project.id as string,
             status: project.status as string,
             deletedAt: (project.deletedAt as Date | null) ?? null,
-            teamsSupported: (project.teamsSupported as number) ?? 1,
           }}
         />
       )}
