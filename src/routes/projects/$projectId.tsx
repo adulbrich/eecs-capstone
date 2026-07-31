@@ -7,19 +7,14 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { BookmarkButton } from "#/components/bookmark-button";
 import { CategoryChip } from "#/components/category-chip";
-import { CommentThread } from "#/components/comment-thread";
 import { Markdown } from "#/components/markdown";
 import { OwnerProjectActions } from "#/components/owner-project-actions";
+import { ProjectPrivatePanel } from "#/components/project-private-panel";
 import { SectionHeading } from "#/components/section-heading";
 import { StaffProjectPanel } from "#/components/staff-project-panel";
 import { StatusBadge } from "#/components/status-badge";
-import { StatusTimeline } from "#/components/status-timeline";
 import { Button } from "#/components/ui/button";
 import { pageTitle } from "#/lib/page-title";
-import {
-  PRIVATE_NOTES_LABEL,
-  PRIVATE_NOTES_PROJECT_HINT,
-} from "#/lib/private-notes";
 import { projectImageSrc } from "#/lib/project-image";
 import { listProjectCategories } from "#/server/categories";
 import { getProject, listProjectComments } from "#/server/projects-queries";
@@ -72,7 +67,7 @@ export const Route = createFileRoute("/projects/$projectId")({
   component: ProjectDetail,
 });
 
-type Comment = Parameters<typeof CommentThread>[0]["comments"][number];
+type Comment = Parameters<typeof ProjectPrivatePanel>[0]["comments"][number];
 
 function ProjectDetail() {
   const router = useRouter();
@@ -186,35 +181,18 @@ function ProjectDetail() {
       />
       <UrlSection url={project.url as string | null} />
 
-      <PrivateNotesSection
-        notes={(project.notes as string | null) ?? null}
-        visible={viewerIsStaff || viewerIsOwner}
-      />
-
       {(viewerIsStaff || viewerIsOwner) && (
-        <section className="mt-8">
-          <SectionHeading>Status history</SectionHeading>
-          <div className="mt-3">
-            <StatusTimeline rows={history} />
-          </div>
-        </section>
-      )}
-
-      {(viewerIsOwner || viewerIsStaff) && (
-        <section className="mt-8">
-          <SectionHeading>Comments</SectionHeading>
-          <div className="mt-3">
-            <CommentThread
-              comments={comments}
-              onChanged={() => {
-                void refreshComments();
-                void router.invalidate();
-              }}
-              projectId={project.id as string}
-              viewerIsStaff={viewerIsStaff}
-            />
-          </div>
-        </section>
+        <ProjectPrivatePanel
+          comments={comments}
+          history={history}
+          notes={(project.notes as string | null) ?? null}
+          onCommentsChanged={() => {
+            void refreshComments();
+            void router.invalidate();
+          }}
+          projectId={project.id as string}
+          viewerIsStaff={viewerIsStaff}
+        />
       )}
 
       {viewerIsStaff && (
@@ -244,33 +222,6 @@ function Section({ label, body }: { label: string; body: string | null }) {
       <div className="mt-2">
         <Markdown>{body}</Markdown>
       </div>
-    </section>
-  );
-}
-
-/**
- * Private notes belong to the proposer and staff jointly, so they render on the
- * shared page rather than inside the staff-only panel. The server has already
- * nulled `notes` for everyone else; `visible` only keeps the empty section from
- * rendering for a viewer who could never have content here.
- */
-function PrivateNotesSection({
-  notes,
-  visible,
-}: {
-  notes: string | null;
-  visible: boolean;
-}) {
-  if (!(visible && notes)) {
-    return null;
-  }
-  return (
-    <section className="mt-8">
-      <SectionHeading>{PRIVATE_NOTES_LABEL}</SectionHeading>
-      <p className="mt-1 text-muted-foreground text-sm">
-        {PRIVATE_NOTES_PROJECT_HINT}
-      </p>
-      <p className="mt-2 whitespace-pre-wrap">{notes}</p>
     </section>
   );
 }
