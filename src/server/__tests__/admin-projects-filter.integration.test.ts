@@ -386,4 +386,42 @@ describe("admin project search reaches people, not just text", () => {
     expect(rows[0].contactEmail).toBe("contact@example.edu");
     expect(rows[0].teamsSupported).toBe(1);
   });
+
+  it("falls back to the stored proposerEmail when the proposer account is deleted", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    const proposer = await makeAdmin("leaving2@example.edu");
+    await createProjectAs(admin, {
+      ...baseProject("Deleted Account Proposer", null),
+      proposerEmail: "leaving2@example.edu",
+    });
+    await db.delete(user).where(eq(user.id, proposer.id));
+    const { rows } = await listAdminProjectsAs(admin, {
+      includeSoftDeleted: false,
+      program: null,
+      proposer: null,
+      q: "",
+      status: "all",
+    });
+    const row = rows.find((r) => r.title === "Deleted Account Proposer");
+    expect(row?.proposerId).toBeNull();
+    expect(row?.proposerEmail).toBe("leaving2@example.edu");
+  });
+
+  it("reports the stored proposerEmail for a proposal that matches no account yet", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    await createProjectAs(admin, {
+      ...baseProject("Unlinked Proposal", null),
+      proposerEmail: "unregistered@example.edu",
+    });
+    const { rows } = await listAdminProjectsAs(admin, {
+      includeSoftDeleted: false,
+      program: null,
+      proposer: null,
+      q: "",
+      status: "all",
+    });
+    const row = rows.find((r) => r.title === "Unlinked Proposal");
+    expect(row?.proposerId).toBeNull();
+    expect(row?.proposerEmail).toBe("unregistered@example.edu");
+  });
 });

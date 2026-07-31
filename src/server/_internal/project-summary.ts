@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { programs, projects, user } from "#/db/schema";
 
 /**
@@ -30,7 +31,15 @@ export const adminProjectSummarySelect = {
   createdAt: projects.createdAt,
   deletedAt: projects.deletedAt,
   programId: projects.programId,
-  proposerEmail: user.email,
+  // `proposerId IS NULL AND proposerEmail IS NOT NULL` is a normal steady
+  // state, not just a deleted-account edge case: staff can name a proposer by
+  // email who has no account yet, and the project links up automatically the
+  // first time that person signs in. Until then, `user.email` from the join
+  // resolves to null, so fall back to the stored snapshot column, same as
+  // `getProposerEmailForEditImpl` does. Do not simplify this to `user.email`.
+  proposerEmail: sql<
+    string | null
+  >`coalesce(${user.email}, ${projects.proposerEmail})`,
   proposerId: projects.proposerId,
   proposerName: user.name,
   publishedAt: projects.publishedAt,

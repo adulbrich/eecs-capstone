@@ -141,7 +141,7 @@ export async function listAdminProjectsAs(
   if (trimmed) {
     // Same tsvector-plus-title-ILIKE shape as the public listing, so a
     // partial word still matches what staff hunting for a half-remembered
-    // title actually type, extended with contact and proposer fields since
+    // title actually type. Extended with contact and proposer fields, since
     // staff also search by who is involved, not just the text.
     const like = `%${trimmed}%`;
     const match = or(
