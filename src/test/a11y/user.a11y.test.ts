@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { checkA11y } from "./helpers";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -40,6 +40,12 @@ test("new project form", async ({ page }) => {
 
 test("project detail (proposer, private panel)", async ({ page }) => {
   await page.goto(`/projects/${projectId}`);
+  // Prove the panel actually rendered rather than trusting the conditional:
+  // this heading only exists inside ProjectPrivatePanel, which requires
+  // viewerIsOwner (or viewerIsStaff) to be true.
+  await expect(
+    page.getByRole("heading", { name: "Private", exact: true })
+  ).toBeVisible();
   await checkA11y(page);
 });
 

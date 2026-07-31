@@ -219,8 +219,9 @@ Each project carries:
   `/inventory/$itemId/edit`), with staff-only routes guarded individually;
   `/admin/inventory` keeps only the cross-item management table and the
   request queue. This mirrors how projects are laid out.
-- ✅ One item detail page for everyone: public viewers see image, name,
-  status, category, description and Add to cart; staff additionally render a
+- ✅ One item detail page for everyone: every viewer sees image, name,
+  status, category, and description; signed-in users additionally see
+  Add to cart when the item is available; staff additionally render a
   staff panel with serial, label, location, private notes, the Edit link and
   the lifecycle controls.
 - ✅ Cart-style requests: users request several items at once (`/my/items`
