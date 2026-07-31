@@ -220,18 +220,36 @@ export async function unbanUserForCurrentUser(data: { userId: string }) {
   return unbanUserAs(viewer, data);
 }
 
-export async function listMentorsAs(viewer: AuthUser) {
+export async function listMentorsAs(
+  viewer: AuthUser,
+  data: { q: string } = { q: "" }
+) {
   assertStaff(viewer);
+  const conditions = [eq(user.wantsToMentor, true)];
+  const trimmed = data.q.trim();
+  if (trimmed) {
+    // The `user` table carries no tsvector, so this is substring matching.
+    // Adequate for a list of a few dozen people.
+    const like = `%${trimmed}%`;
+    const match = or(
+      ilike(user.name, like),
+      ilike(user.email, like),
+      ilike(user.affiliation, like)
+    );
+    if (match) {
+      conditions.push(match);
+    }
+  }
   const rows = await db
     .select({
-      id: user.id,
-      name: user.name,
-      email: user.email,
       affiliation: user.affiliation,
+      email: user.email,
+      id: user.id,
       mentorTeamCount: user.mentorTeamCount,
+      name: user.name,
     })
     .from(user)
-    .where(eq(user.wantsToMentor, true))
+    .where(and(...conditions))
     .orderBy(user.name);
   return { rows };
 }
@@ -252,8 +270,8 @@ export async function setUserMentorStatusAs(
   return { ok: true as const };
 }
 
-export async function listMentorsForCurrentUser() {
-  return listMentorsAs(await requireUser());
+export async function listMentorsForCurrentUser(data: { q: string }) {
+  return listMentorsAs(await requireUser(), data);
 }
 
 export async function setUserMentorStatusForCurrentUser(data: {

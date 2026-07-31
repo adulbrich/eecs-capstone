@@ -38,6 +38,28 @@ describe("mentor server functions", () => {
     await expect(listMentorsAs(plain)).rejects.toThrow("Forbidden");
   });
 
+  it("filters mentors by a search term across name, email, and affiliation", async () => {
+    const staff = await makeUser(`s3-${Date.now()}@x.com`, "instructor");
+    const stamp = Date.now();
+    const match = await makeUser(`findme-${stamp}@x.com`, "user");
+    const other = await makeUser(`other-${stamp}@x.com`, "user");
+    await db
+      .update(user)
+      .set({
+        wantsToMentor: true,
+        mentorTeamCount: 1,
+        affiliation: "Rare Affiliation Co",
+      })
+      .where(eq(user.id, match.id));
+    await db
+      .update(user)
+      .set({ wantsToMentor: true, mentorTeamCount: 1 })
+      .where(eq(user.id, other.id));
+
+    const { rows } = await listMentorsAs(staff, { q: "Rare Affiliation" });
+    expect(rows.map((r) => r.id)).toEqual([match.id]);
+  });
+
   it("staff can edit a user's mentor status", async () => {
     const staff = await makeUser(`s2-${Date.now()}@x.com`, "admin");
     const target = await makeUser(`u-${Date.now()}@x.com`, "user");

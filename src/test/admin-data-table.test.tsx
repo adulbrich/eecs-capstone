@@ -6,6 +6,7 @@ import {
   screen,
   within,
 } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type AdminColumn,
@@ -251,5 +252,55 @@ describe("AdminDataTable", () => {
       (tr) => within(tr as HTMLElement).getAllByRole("cell")[1].textContent
     );
     expect(descending).toEqual(["Lab 2", "Lab 1", "-"]);
+  });
+
+  it("keeps a cell's unsaved input value across a re-sort", () => {
+    function EditableCell() {
+      const [value, setValue] = useState("");
+      return (
+        <input
+          aria-label="Teams"
+          onChange={(e) => setValue(e.target.value)}
+          value={value}
+        />
+      );
+    }
+
+    const columns: AdminColumn<Row>[] = [
+      ...COLUMNS,
+      {
+        cell: () => <EditableCell />,
+        enableHiding: false,
+        enableSorting: false,
+        header: "Teams",
+        id: "teams",
+      },
+    ];
+
+    const props = {
+      caption: "Test items",
+      columns,
+      data: DATA,
+      defaultSort: DEFAULT_SORT,
+      emptyMessage: "Nothing here.",
+      getRowId: (row: Row) => row.id,
+      hidden: [],
+      onHiddenChange: vi.fn(),
+      onSortChange: vi.fn(),
+      storageKey: "test",
+    };
+
+    const { rerender } = render(
+      <AdminDataTable {...props} sort={{ desc: false, id: "name" }} />
+    );
+    const input = screen.getAllByLabelText("Teams")[0] as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "4" } });
+
+    rerender(<AdminDataTable {...props} sort={{ desc: true, id: "name" }} />);
+
+    // "Alpha" sorted first ascending and last descending. Its input must have
+    // moved with it rather than being remounted at position 0.
+    const inputs = screen.getAllByLabelText("Teams") as HTMLInputElement[];
+    expect(inputs.at(-1)?.value).toBe("4");
   });
 });

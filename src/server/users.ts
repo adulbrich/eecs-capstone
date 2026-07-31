@@ -78,12 +78,14 @@ export const unbanUser = createServerFn({ method: "POST" })
     return unbanUserForCurrentUser(data);
   });
 
-export const listMentors = createServerFn({ method: "GET" }).handler(
-  async () => {
+const listMentorsSchema = z.object({ q: z.string().default("") });
+
+export const listMentors = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => listMentorsSchema.parse(data))
+  .handler(async ({ data }) => {
     const { listMentorsForCurrentUser } = await import("./_internal/users");
-    return listMentorsForCurrentUser();
-  }
-);
+    return listMentorsForCurrentUser(data);
+  });
 
 const setUserMentorStatusSchema = z.object({
   userId: z.string(),
