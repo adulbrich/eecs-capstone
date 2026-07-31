@@ -38,6 +38,11 @@ test("new project form", async ({ page }) => {
   await checkA11y(page);
 });
 
+test("project detail (proposer, private panel)", async ({ page }) => {
+  await page.goto(`/projects/${projectId}`);
+  await checkA11y(page);
+});
+
 test("edit project form", async ({ page }) => {
   await page.goto(`/projects/${projectId}/edit`);
   await checkA11y(page);
