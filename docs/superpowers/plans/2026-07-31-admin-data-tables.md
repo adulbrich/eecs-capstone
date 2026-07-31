@@ -2388,3 +2388,362 @@ The README backlog already records these; they are not part of this plan.
 - Row selection and bulk actions, and CSV export of the current selection. The column definitions leave room for a leading selection column, but nothing here builds one.
 - Migrating `/admin/users`, `/admin/categories`, and `/admin/programs`. They keep `max-w-4xl` and their current markup.
 - Row virtualization. Revisit only if a table passes a few thousand rows, which would also mean moving sorting into `ORDER BY`.
+
+---
+
+# Amendment: the remaining three admin pages
+
+Added after Task 8, at the user's request: `/admin/users`, `/admin/categories`,
+and `/admin/programs` move onto the shared table too. This retires the
+"Migrate other admin pages to tanstack/table as well" backlog item and finally
+makes `src/components/admin-table.tsx` deletable, which the original plan
+wrongly assumed Task 7 would achieve.
+
+Two user decisions shape this amendment:
+
+1. **`/admin/users` keeps its server pagination and sorts on the server.** It
+   is the one table that can plausibly outgrow a few hundred rows, so it does
+   not follow the load-everything approach the other five use.
+2. **`/admin/categories` and `/admin/programs` get sorting and column
+   visibility only.** No search box, no new filters, no server changes.
+
+### The governing rule, restated
+
+The original rule was "the server decides which rows exist, the client decides
+their order and which columns show." Decision 1 refines it:
+
+> **The server decides which rows exist. Where the server paginates, it also
+> decides their order.** Column visibility is always client state.
+
+That gives exactly one exception, `/admin/users`, and it is an exception with a
+reason rather than an inconsistency: sorting a single page of 20 rows in the
+browser would sort 20 of N rows while appearing to sort all of them.
+
+The mechanical consequence is that `sort` and `dir` join `loaderDeps` on that
+one route, which is the opposite of what Tasks 4, 6, and 7 required. `cols`
+still must not, because column visibility never involves the server.
+
+---
+
+## Task 9: Server-sorted mode
+
+**Files:**
+- Modify: `src/components/admin-data-table.tsx`
+- Modify: `src/server/_internal/users.ts`
+- Modify: `src/server/users.ts`
+- Test: `src/test/admin-data-table.test.tsx`
+- Test: `src/server/__tests__/admin-users-sort.integration.test.ts` (create)
+
+**Interfaces:**
+- Consumes: `AdminDataTableProps` (Task 2), `listUsersImpl` as it stands.
+- Produces: an optional `serverSorted?: boolean` prop on `AdminDataTable`, and
+  `listUsersImpl` accepting `sort` and `dir`.
+
+- [ ] **Step 1: Write the failing component test**
+
+Add to `src/test/admin-data-table.test.tsx`. Use plain DOM assertions; this
+repo has no jest-dom.
+
+```tsx
+it("leaves row order to the caller when serverSorted is set", () => {
+  const { container } = renderTable({
+    hidden: [],
+    serverSorted: true,
+    sort: { desc: false, id: "name" },
+  });
+  const names = [...container.querySelectorAll("tbody tr")].map(
+    (tr) => tr.querySelector("td")?.textContent
+  );
+  // DATA order, not sorted order: the server already ordered these rows.
+  expect(names).toEqual(["beta", "Alpha", "gamma"]);
+});
+
+it("still reports sort changes when serverSorted is set", () => {
+  const onSortChange = vi.fn();
+  renderTable({ onSortChange, serverSorted: true });
+  screen.getByRole("button", { name: /Name/ }).click();
+  expect(onSortChange).toHaveBeenCalledWith({ desc: true, id: "name" });
+});
+
+it("still marks the sorted column with aria-sort when serverSorted is set", () => {
+  renderTable({ serverSorted: true, sort: { desc: true, id: "name" } });
+  expect(
+    screen.getByRole("columnheader", { name: /Name/ }).getAttribute("aria-sort")
+  ).toBe("descending");
+});
+```
+
+- [ ] **Step 2: Run to verify failure**
+
+`ulimit -n 8192; CI=true npx vitest run src/test/admin-data-table.test.tsx`
+Expected: the first test FAILS because rows come back sorted.
+
+- [ ] **Step 3: Implement the prop**
+
+In `AdminDataTableProps`, add `serverSorted?: boolean`. Document it:
+
+```ts
+  /**
+   * Set when the server already ordered the rows and will reorder them on the
+   * next request, which is the case for any paginated listing. Header clicks
+   * still report through onSortChange and aria-sort still reflects the current
+   * column; only the local reordering is skipped, because sorting one page of
+   * rows in the browser would sort a slice while appearing to sort the whole
+   * table.
+   */
+  serverSorted?: boolean;
+```
+
+Pass `manualSorting: serverSorted ?? false` to `useReactTable`. Leave
+`getSortedRowModel` in place: TanStack ignores it under `manualSorting`.
+
+- [ ] **Step 4: Write the failing server tests**
+
+Create `src/server/__tests__/admin-users-sort.integration.test.ts`. Copy the
+`makeAdmin` fixture idiom from the sibling integration tests.
+
+Cover: sorting ascending and descending by `email`; sorting by `name` with a
+null name landing **last in both directions**; an unknown `sort` value falling
+back to the default `createdAt desc`; and sorting composing with the existing
+`role` filter and pagination rather than replacing them.
+
+- [ ] **Step 5: Implement server sorting**
+
+In `src/server/_internal/users.ts`, add `sort` and `dir` to `ListUsersInput`
+and build the `ORDER BY` from a whitelist. A whitelist, not a lookup by string,
+because an unvalidated column name reaching `ORDER BY` is an injection surface:
+
+```ts
+const USER_SORT_COLUMNS = {
+  banned: user.banned,
+  createdAt: user.createdAt,
+  email: user.email,
+  name: user.name,
+  role: user.role,
+} as const;
+```
+
+Nulls must sort last in **both** directions, matching what the client-side
+tables do. Postgres defaults to `NULLS LAST` for ascending and `NULLS FIRST`
+for descending, so descending needs it stated explicitly. Build the clause with
+`sql` rather than `asc()`/`desc()` so the null handling is expressible.
+
+Unknown or absent `sort` falls back to `createdAt` descending, which is the
+current behavior.
+
+In `src/server/users.ts`, extend `listUsersSchema` with
+`sort: z.string().optional()` and `dir: z.enum(["asc", "desc"]).optional()`.
+
+- [ ] **Step 6: Verify**
+
+```
+ulimit -n 8192; CI=true npx vitest run src/test/admin-data-table.test.tsx
+ulimit -n 8192; CI=true npm run test:integration
+npm run check && npm run typecheck
+```
+
+- [ ] **Step 7: Commit**
+
+```bash
+git commit -m "feat(admin): add server-sorted mode for paginated tables"
+```
+
+---
+
+## Task 10: The users route
+
+**Files:**
+- Modify: `src/routes/_authed/admin/users/index.tsx`
+
+**Interfaces:** consumes Task 9's `serverSorted` prop and the widened
+`listUsers`, plus `useAdminTableState` and `AdminDataTable`.
+
+- [ ] **Step 1: Extend the search schema**
+
+Add `cols`, `dir`, and `sort` as optional fields beside the existing `q`,
+`role`, `includeBanned`, and `page`.
+
+- [ ] **Step 2: Fix loaderDeps, with the exception**
+
+This route currently has `loaderDeps: ({ search }) => search`, which Tasks 4
+and 6 had to narrow. Here it becomes explicit but **includes** `sort` and
+`dir`, because the server does the ordering:
+
+```ts
+loaderDeps: ({ search }) => ({
+  dir: search.dir,
+  includeBanned: search.includeBanned,
+  page: search.page,
+  q: search.q,
+  role: search.role,
+  sort: search.sort,
+}),
+```
+
+`cols` is deliberately absent: column visibility never involves the server.
+Write that reason as a comment; it is the single most confusing line in this
+file for anyone who read the other four routes first.
+
+- [ ] **Step 3: Columns**
+
+Module-level `COLUMNS` and `DEFAULT_SORT = { desc: true, id: "createdAt" }`.
+
+| Column | id | Default | Notes |
+| --- | --- | --- | --- |
+| Email | `email` | visible, `enableHiding: false` | |
+| Name | `name` | visible | `?? "(none)"` |
+| Role | `role` | visible | |
+| Banned | `banned` | visible | render "yes" or "" as today |
+| Created | `createdAt` | hidden | `LocalTime dateOnly`, `sortingFn: "datetime"` |
+| Actions | `actions` | visible, `enableHiding: false`, `enableSorting: false` | the existing Manage link |
+
+Sorting is server-side, so `sortingFn` and `accessorFn` null-mapping are inert
+for ordering here. Keep the accessors anyway so the column ids stay meaningful
+and the file reads like its four siblings.
+
+- [ ] **Step 4: Wire it**
+
+Follow the shape in `src/routes/_authed/admin/inventory/index.tsx`, with two
+differences:
+
+- Pass `serverSorted` to `AdminDataTable`.
+- `setSearch` must reset `page` to 1 whenever it changes `sort` or `dir`.
+  Changing the sort while on page 5 would otherwise show an arbitrary slice of
+  a newly ordered list. The existing filter handlers already reset `page`, so
+  follow that precedent.
+
+Keep the Previous/Next block and `totalPages`. Change the container to
+`px-4 py-6 md:px-8`.
+
+- [ ] **Step 5: Verify and commit**
+
+Full unit suite, `npm run check`, `npm run typecheck`. Confirm in a browser
+that clicking a header re-queries and reorders **across pages**, not just
+within the visible 20, and that it returns to page 1.
+
+```bash
+git commit -m "feat(admin): rebuild the users list on the shared table"
+```
+
+---
+
+## Task 11: The categories and programs routes
+
+**Files:**
+- Modify: `src/routes/_authed/admin/categories/index.tsx`
+- Modify: `src/routes/_authed/admin/programs/index.tsx`
+
+These two are the simplest of the six: no filters, no pagination, no server
+changes, and both already load every row. Each keeps its existing create
+dialog in the page header, untouched.
+
+- [ ] **Step 1: Categories**
+
+Add a `validateSearch` schema with just `cols`, `dir`, and `sort`. The route
+has none today. No `loaderDeps` change is needed because the loader takes no
+filters; leave the loader as it is.
+
+`DEFAULT_SORT = { desc: false, id: "type" }`, matching today's
+`orderBy(categories.type, categories.name)` as closely as a single sort key
+can.
+
+| Column | id | Default | Notes |
+| --- | --- | --- | --- |
+| Name | `name` | visible, `enableHiding: false` | |
+| Type | `type` | visible | keep the `text-muted-foreground` styling on the cell |
+| Created | `createdAt` | hidden | `LocalTime dateOnly`, `sortingFn: "datetime"` |
+| Actions | `actions` | visible, `enableHiding: false`, `enableSorting: false` | the existing Edit link |
+
+`caption` is "Categories", `emptyMessage` is "No categories yet.",
+`storageKey` is `"categories"`.
+
+- [ ] **Step 2: Programs**
+
+Same treatment. `DEFAULT_SORT = { desc: false, id: "courseId" }`, matching
+today's `orderBy(programs.courseId)`.
+
+| Column | id | Default | Notes |
+| --- | --- | --- | --- |
+| Course ID | `courseId` | visible, `enableHiding: false` | |
+| Course name | `courseName` | visible | |
+| Description | `description` | hidden | `?? "-"`, nulls last |
+| Created | `createdAt` | hidden | `LocalTime dateOnly`, `sortingFn: "datetime"` |
+| Updated | `updatedAt` | hidden | `LocalTime dateOnly`, `sortingFn: "datetime"` |
+| Actions | `actions` | visible, `enableHiding: false`, `enableSorting: false` | the existing Manage link |
+
+`listProgramsImpl` already does a bare `select()`, so `description`,
+`createdAt`, and `updatedAt` are on the rows already. No server change.
+
+`caption` is "Programs", `emptyMessage` is "No programs yet.", `storageKey` is
+`"programs"`.
+
+- [ ] **Step 3: Both**
+
+Container becomes `px-4 py-6 md:px-8`. Module-level `COLUMNS` and
+`DEFAULT_SORT`. `getRowId={(row) => row.id}`. No `toolbar` prop: neither page
+has filters, so the Columns button sits alone, which the shared component
+already handles.
+
+- [ ] **Step 4: Verify and commit**
+
+Full unit suite, `npm run check`, `npm run typecheck`, and a browser check that
+both create dialogs still work.
+
+```bash
+git commit -m "feat(admin): rebuild the categories and programs lists on the shared table"
+```
+
+---
+
+## Task 12: Delete AdminTable and extend the accessibility pass
+
+**Files:**
+- Delete: `src/components/admin-table.tsx`
+- Modify: `src/test/a11y/admin.a11y.test.ts`
+
+- [ ] **Step 1: Confirm there are no consumers**
+
+```bash
+grep -rn "AdminTable\b" src/ | grep -v "AdminTableSearch"
+```
+
+The only expected hit is the component's own definition. If any route still
+imports it, stop and report: a page was missed.
+
+- [ ] **Step 2: Delete it**
+
+```bash
+rm src/components/admin-table.tsx
+```
+
+Keep the `.admin-table` rules in `src/styles.css`. The shared table still uses
+that class name, and those rules are what produce the mobile cards.
+
+- [ ] **Step 3: Extend the accessibility coverage**
+
+Task 8 added an interaction pass for `/admin/inventory`. Extend the same
+treatment to the three newly migrated pages: open the Columns menu, run
+`checkA11y`, activate a sort header, assert `aria-sort`, run `checkA11y` again.
+
+For `/admin/users` specifically, also assert that activating a sort header
+changes the **rows**, not just the URL, since that page round-trips to the
+server to reorder. That is the one behavior in this amendment no unit test can
+reach.
+
+- [ ] **Step 4: Full verification**
+
+```
+ulimit -n 8192; CI=true npm test
+ulimit -n 8192; CI=true npm run test:integration
+npm run test:accessibility
+npm run check
+npm run typecheck
+```
+
+All five must pass.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git commit -m "refactor(admin): delete the superseded AdminTable component"
+```
