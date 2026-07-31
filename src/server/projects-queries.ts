@@ -19,6 +19,9 @@ const adminListSchema = z.object({
   status: z.enum(STATUS_FILTER_VALUES).default("all"),
   includeSoftDeleted: z.boolean().default(false),
   program: z.string().uuid().nullable().default(null),
+  // Better Auth user ids are text, not UUIDs, so this cannot be `.uuid()`.
+  proposer: z.string().max(255).nullable().default(null),
+  q: z.string().max(200).default(""),
 });
 
 const projectIdSchema = z.object({ id: z.string().uuid() });

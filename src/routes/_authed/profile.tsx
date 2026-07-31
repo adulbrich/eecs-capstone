@@ -28,12 +28,44 @@ interface ProfileUser {
   wantsToMentor?: boolean | null;
 }
 
+type Feedback = { kind: "error" | "saved"; message: string } | null;
+
+/**
+ * Result of a single form, rendered directly beneath that form's own submit
+ * button. `output` rather than `p` so assistive tech announces the result when
+ * it appears, matching the interests section.
+ */
+function FormFeedback({ feedback }: { feedback: Feedback }) {
+  if (!feedback) {
+    return null;
+  }
+  return (
+    <output
+      className={
+        feedback.kind === "error"
+          ? "mt-2 block text-destructive text-sm"
+          : "mt-2 block text-sm"
+      }
+      style={
+        feedback.kind === "saved"
+          ? { color: "var(--status-success)" }
+          : undefined
+      }
+    >
+      {feedback.message}
+    </output>
+  );
+}
+
 function Profile() {
   const router = useRouter();
   const ctx = Route.useRouteContext() as { user: ProfileUser };
   const user = ctx.user;
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  // One feedback slot per form. These used to be a single shared pair, which
+  // is why saving the profile printed "Saved." underneath the change-password
+  // form at the very bottom of the page.
+  const [profileFeedback, setProfileFeedback] = useState<Feedback>(null);
+  const [passwordFeedback, setPasswordFeedback] = useState<Feedback>(null);
   const [interests, setInterests] = useState("");
   const [interestsStatus, setInterestsStatus] = useState<
     "idle" | "saving" | "saved" | "degraded" | "error"
@@ -58,8 +90,7 @@ function Profile() {
 
   async function onSaveProfile(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError(null);
-    setSaved(false);
+    setProfileFeedback(null);
     const form = new FormData(e.currentTarget);
     try {
       await updateProfile({
@@ -71,16 +102,16 @@ function Profile() {
           mentorTeamCount,
         },
       });
-      setSaved(true);
+      setProfileFeedback({ kind: "saved", message: "Saved." });
       router.invalidate();
     } catch (err) {
-      setError((err as Error).message);
+      setProfileFeedback({ kind: "error", message: (err as Error).message });
     }
   }
 
   async function onChangePassword(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError(null);
+    setPasswordFeedback(null);
     const form = new FormData(e.currentTarget);
     const { error: cpError } = await authClient.changePassword({
       currentPassword: String(form.get("current") ?? ""),
@@ -88,9 +119,12 @@ function Profile() {
       revokeOtherSessions: true,
     });
     if (cpError) {
-      setError(cpError.message ?? "Password change failed");
+      setPasswordFeedback({
+        kind: "error",
+        message: cpError.message ?? "Password change failed",
+      });
     } else {
-      setSaved(true);
+      setPasswordFeedback({ kind: "saved", message: "Password changed." });
     }
   }
 
@@ -168,9 +202,12 @@ function Profile() {
         <Button className="w-full" type="submit">
           Save profile
         </Button>
+        <FormFeedback feedback={profileFeedback} />
       </form>
 
-      <h2 className="mt-8 font-semibold text-lg">Your interests</h2>
+      <h2 className="mt-8 border-border border-t pt-8 font-semibold text-lg">
+        Your interests
+      </h2>
       <p className="mt-1 text-muted-foreground text-sm">
         Describe what you would like to work on, in your own words. Only you can
         see this. It is used to sort projects by how well they match you.
@@ -223,7 +260,9 @@ function Profile() {
         </output>
       </form>
 
-      <h2 className="mt-8 font-semibold text-lg">Change password</h2>
+      <h2 className="mt-8 border-border border-t pt-8 font-semibold text-lg">
+        Change password
+      </h2>
       <form className="mt-3 space-y-3" onSubmit={onChangePassword}>
         <div className="space-y-1.5">
           <Label htmlFor="current">Current password</Label>
@@ -251,23 +290,19 @@ function Profile() {
         <Button className="w-full" type="submit">
           Change password
         </Button>
+        <FormFeedback feedback={passwordFeedback} />
       </form>
 
-      {saved && (
-        <p className="mt-4 text-sm" style={{ color: "var(--status-success)" }}>
-          Saved.
-        </p>
-      )}
-      {error && <p className="mt-4 text-destructive text-sm">{error}</p>}
-
-      <Button
-        className="mt-8 w-full"
-        onClick={onSignOut}
-        type="button"
-        variant="outline"
-      >
-        Sign out
-      </Button>
+      <div className="mt-8 border-border border-t pt-8">
+        <Button
+          className="w-full"
+          onClick={onSignOut}
+          type="button"
+          variant="outline"
+        >
+          Sign out
+        </Button>
+      </div>
     </div>
   );
 }

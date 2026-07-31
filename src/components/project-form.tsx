@@ -5,6 +5,7 @@ import { applyServerErrors } from "#/lib/apply-server-errors";
 import {
   PRIVATE_NOTES_LABEL,
   PRIVATE_NOTES_PROJECT_HINT,
+  STAFF_PANEL_AUDIENCE_HINT,
 } from "#/lib/private-notes";
 import type {
   FieldSuggestion,
@@ -13,6 +14,7 @@ import type {
 import { reviewProject } from "#/server/project-review";
 import { CategoryMultiSelect } from "./category-multi-select";
 import { MarkdownField } from "./markdown-field";
+import { Panel, PanelHeader, PanelNote } from "./panel";
 import { ProgramSelect } from "./program-select";
 import { ProjectImageUploader } from "./project-image-uploader";
 import { ProposerPicker } from "./proposer-picker";
@@ -391,16 +393,8 @@ export function ProjectForm({
           </div>
         )}
       </form.Field>
-      {showProposer && (
-        <form.Field name="proposerEmail">
-          {(field: AnyForm) => (
-            <ProposerPicker
-              onChange={(email) => field.handleChange(email)}
-              value={field.state.value as string}
-            />
-          )}
-        </form.Field>
-      )}
+      {/* Private notes stay outside the staff panel: the proposer writes and
+          reads them too, so they are not staff-only content. */}
       {showNotes && (
         <Field
           description={PRIVATE_NOTES_PROJECT_HINT}
@@ -411,16 +405,40 @@ export function ProjectForm({
           textarea
         />
       )}
-      {showCategories && (
-        <div>
-          <Label>Categories</Label>
-          <div className="mt-1">
-            <CategoryMultiSelect
-              onChange={setCategoryIds}
-              value={categoryIds}
-            />
+
+      {/* The staff-only inputs, grouped and labelled the same way the project
+          page's staff panel is, so it is obvious while filling the form which
+          fields a proposer would never see. No PanelSection titles here: each
+          control already has its own label, and a section heading above a
+          field label would just say the same word twice. */}
+      {(showProposer || showCategories) && (
+        <Panel tone="staff">
+          <PanelHeader title="Staff panel" />
+          <PanelNote>{STAFF_PANEL_AUDIENCE_HINT}</PanelNote>
+          <div className="mt-4 space-y-4">
+            {showProposer && (
+              <form.Field name="proposerEmail">
+                {(field: AnyForm) => (
+                  <ProposerPicker
+                    onChange={(email) => field.handleChange(email)}
+                    value={field.state.value as string}
+                  />
+                )}
+              </form.Field>
+            )}
+            {showCategories && (
+              <div>
+                <Label>Categories</Label>
+                <div className="mt-1">
+                  <CategoryMultiSelect
+                    onChange={setCategoryIds}
+                    value={categoryIds}
+                  />
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        </Panel>
       )}
 
       {formError && (

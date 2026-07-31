@@ -53,6 +53,23 @@ function baseProject(title: string, programId: string | null) {
   };
 }
 
+/**
+ * The admin filter shape, with the fields each test does not care about
+ * defaulted. Keeps adding a filter from rewriting every call site.
+ */
+function filter(
+  overrides: Partial<Parameters<typeof listAdminProjectsAs>[1]> = {}
+): Parameters<typeof listAdminProjectsAs>[1] {
+  return {
+    status: "all",
+    includeSoftDeleted: false,
+    program: null,
+    proposer: null,
+    q: "",
+    ...overrides,
+  };
+}
+
 describe("admin projects program filter", () => {
   it("returns only projects in the selected program", async () => {
     const admin = await makeAdmin(`a-${Date.now()}@x.com`);
@@ -62,11 +79,10 @@ describe("admin projects program filter", () => {
     await createProjectAs(admin, baseProject("In CS 461", cs461));
     await createProjectAs(admin, baseProject("In ECE 441", ece441));
 
-    const { rows } = await listAdminProjectsAs(admin, {
-      status: "all",
-      includeSoftDeleted: false,
-      program: cs461,
-    });
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ program: cs461 })
+    );
 
     expect(rows.map((r) => r.title)).toEqual(["In CS 461"]);
   });
@@ -78,11 +94,7 @@ describe("admin projects program filter", () => {
     await createProjectAs(admin, baseProject("In CS 461", cs461));
     await createProjectAs(admin, baseProject("No program", null));
 
-    const { rows } = await listAdminProjectsAs(admin, {
-      status: "all",
-      includeSoftDeleted: false,
-      program: null,
-    });
+    const { rows } = await listAdminProjectsAs(admin, filter());
 
     expect(rows.map((r) => r.title).sort()).toEqual([
       "In CS 461",
@@ -109,11 +121,10 @@ describe("admin projects program filter", () => {
     await performTransitionAs(admin, otherProgram.id, "approved");
     await performTransitionAs(admin, otherProgram.id, "published");
 
-    const { rows } = await listAdminProjectsAs(admin, {
-      status: "published",
-      includeSoftDeleted: false,
-      program: cs461,
-    });
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ status: "published", program: cs461 })
+    );
 
     expect(rows.map((r) => r.title)).toEqual(["Live"]);
     expect(rows.map((r) => r.id)).not.toContain(draft.id);
@@ -131,18 +142,16 @@ describe("admin projects program filter", () => {
     await performTransitionAs(admin, deleted.id, "submitted");
     await softDeleteProjectAs(admin, deleted.id);
 
-    const withoutDeleted = await listAdminProjectsAs(admin, {
-      status: "all",
-      includeSoftDeleted: false,
-      program: cs461,
-    });
+    const withoutDeleted = await listAdminProjectsAs(
+      admin,
+      filter({ program: cs461 })
+    );
     expect(withoutDeleted.rows.map((r) => r.id)).not.toContain(deleted.id);
 
-    const withDeleted = await listAdminProjectsAs(admin, {
-      status: "all",
-      includeSoftDeleted: true,
-      program: cs461,
-    });
+    const withDeleted = await listAdminProjectsAs(
+      admin,
+      filter({ includeSoftDeleted: true, program: cs461 })
+    );
     expect(withDeleted.rows.map((r) => r.id)).toContain(deleted.id);
   });
 
@@ -156,10 +165,7 @@ describe("admin projects program filter", () => {
       .where(eq(user.email, "plain@x.com"));
 
     await expect(
-      listAdminProjectsAs(
-        { id: u.id, role: u.role },
-        { status: "all", includeSoftDeleted: false, program: null }
-      )
+      listAdminProjectsAs({ id: u.id, role: u.role }, filter())
     ).rejects.toThrow("Forbidden");
   });
 });
@@ -189,5 +195,130 @@ describe("getProjectAs", () => {
     expect(project?.embedding).toBeFalsy();
     expect(project?.embeddingSourceHash).toBeFalsy();
     expect(project?.embeddingUpdatedAt).toBeFalsy();
+  });
+});
+
+async function makeProposer(email: string) {
+  await auth.api.signUpEmail({
+    body: { email, password: "Password1!", name: email },
+  });
+  await db
+    .update(user)
+    .set({ emailVerified: true })
+    .where(eq(user.email, email));
+  const [u] = await db.select().from(user).where(eq(user.email, email));
+  return { id: u.id, role: u.role };
+}
+
+describe("admin projects search", () => {
+  it("matches on title and on body text", async () => {
+    const admin = await makeAdmin(`s-${Date.now()}@x.com`);
+    await createProjectAs(admin, {
+      ...baseProject("Warehouse Robot Fleet", null),
+      description: "Coordinates autonomous forklifts in a distribution centre.",
+    });
+    await createProjectAs(admin, baseProject("Wildlife Camera Trap", null));
+
+    const byTitle = await listAdminProjectsAs(
+      admin,
+      filter({ q: "warehouse" })
+    );
+    expect(byTitle.rows.map((r) => r.title)).toEqual(["Warehouse Robot Fleet"]);
+
+    const byBody = await listAdminProjectsAs(admin, filter({ q: "forklifts" }));
+    expect(byBody.rows.map((r) => r.title)).toEqual(["Warehouse Robot Fleet"]);
+  });
+
+  it("matches a partial word, which the tsvector alone would not", async () => {
+    const admin = await makeAdmin(`s2-${Date.now()}@x.com`);
+    await createProjectAs(admin, baseProject("Telemetry Platform", null));
+
+    const { rows } = await listAdminProjectsAs(admin, filter({ q: "eleme" }));
+    expect(rows.map((r) => r.title)).toEqual(["Telemetry Platform"]);
+  });
+
+  it("composes search with the status filter", async () => {
+    const admin = await makeAdmin(`s3-${Date.now()}@x.com`);
+    const live = await createProjectAs(
+      admin,
+      baseProject("Sensor Draft", null)
+    );
+    await createProjectAs(admin, baseProject("Sensor Other", null));
+    await performTransitionAs(admin, live.id, "submitted");
+
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ q: "sensor", status: "submitted" })
+    );
+    expect(rows.map((r) => r.title)).toEqual(["Sensor Draft"]);
+  });
+});
+
+describe("admin projects proposer filter", () => {
+  it("returns only the selected proposer's projects", async () => {
+    const admin = await makeAdmin(`p-a-${Date.now()}@x.com`);
+    const alice = await makeProposer(`p-alice-${Date.now()}@x.com`);
+    const bob = await makeProposer(`p-bob-${Date.now()}@x.com`);
+    await createProjectAs(alice, baseProject("Alice project", null));
+    await createProjectAs(bob, baseProject("Bob project", null));
+
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ proposer: alice.id })
+    );
+    expect(rows.map((r) => r.title)).toEqual(["Alice project"]);
+  });
+
+  it("offers every proposer in the current status/program/deleted scope", async () => {
+    const admin = await makeAdmin(`p2-a-${Date.now()}@x.com`);
+    const alice = await makeProposer(`p2-alice-${Date.now()}@x.com`);
+    const bob = await makeProposer(`p2-bob-${Date.now()}@x.com`);
+    const alicePublished = await createProjectAs(
+      alice,
+      baseProject("Alice published", null)
+    );
+    await performTransitionAs(alice, alicePublished.id, "submitted");
+    await performTransitionAs(admin, alicePublished.id, "approved");
+    await performTransitionAs(admin, alicePublished.id, "published");
+    await createProjectAs(bob, baseProject("Bob draft", null));
+
+    const all = await listAdminProjectsAs(admin, filter());
+    expect(all.proposers.map((p) => p.id).sort()).toEqual(
+      [alice.id, bob.id].sort()
+    );
+
+    // Bob has nothing published, so he drops out of the options when the
+    // status filter narrows. This is the behaviour the dropdown depends on.
+    const published = await listAdminProjectsAs(
+      admin,
+      filter({ status: "published" })
+    );
+    expect(published.proposers.map((p) => p.id)).toEqual([alice.id]);
+  });
+
+  it("does not narrow the proposer options by the search text or by the chosen proposer", async () => {
+    const admin = await makeAdmin(`p3-a-${Date.now()}@x.com`);
+    const alice = await makeProposer(`p3-alice-${Date.now()}@x.com`);
+    const bob = await makeProposer(`p3-bob-${Date.now()}@x.com`);
+    await createProjectAs(alice, baseProject("Quantum compiler", null));
+    await createProjectAs(bob, baseProject("Garden sensors", null));
+
+    // Searching for one project must not empty the dropdown of the other's
+    // proposer, or picking from it becomes impossible.
+    const searched = await listAdminProjectsAs(admin, filter({ q: "quantum" }));
+    expect(searched.rows).toHaveLength(1);
+    expect(searched.proposers.map((p) => p.id).sort()).toEqual(
+      [alice.id, bob.id].sort()
+    );
+
+    // Likewise, selecting a proposer must not reduce the options to just them.
+    const selected = await listAdminProjectsAs(
+      admin,
+      filter({ proposer: alice.id })
+    );
+    expect(selected.rows).toHaveLength(1);
+    expect(selected.proposers.map((p) => p.id).sort()).toEqual(
+      [alice.id, bob.id].sort()
+    );
   });
 });

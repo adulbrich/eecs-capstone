@@ -38,7 +38,7 @@ export const Route = createFileRoute("/_authed/my/projects")({
 });
 
 function MyProjects() {
-  const { rows } = Route.useLoaderData();
+  const { rows, teamCapacity } = Route.useLoaderData();
   const { status } = Route.useSearch();
   const navigate = useNavigate();
 
@@ -52,6 +52,14 @@ function MyProjects() {
           <Link to="/projects/new">New project</Link>
         </Button>
       </div>
+      {/* Spans every non-archived project, so it does not move with the status
+          filter below. */}
+      <p className="mt-1 text-muted-foreground text-sm">
+        Total team capacity across your active projects:{" "}
+        <span className="font-medium text-foreground tabular-nums">
+          {teamCapacity}
+        </span>
+      </p>
 
       <div className="mt-4">
         <Label htmlFor="my-filter-status">Status</Label>

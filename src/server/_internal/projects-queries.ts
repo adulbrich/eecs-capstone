@@ -1,4 +1,15 @@
-import { and, asc, desc, eq, isNull, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  isNull,
+  ne,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { db } from "#/db";
 import {
   programs,
@@ -48,7 +59,7 @@ async function getViewer(): Promise<Viewer> {
 export async function listMyProjectsImpl(data: { status: StatusFilter }) {
   const viewer = await getViewer();
   if (!viewer) {
-    return { rows: [] };
+    return { rows: [], teamCapacity: 0 };
   }
   const conditions = [
     eq(projects.proposerId, viewer.id),
@@ -57,18 +68,37 @@ export async function listMyProjectsImpl(data: { status: StatusFilter }) {
   if (data.status !== "all") {
     conditions.push(eq(projects.status, data.status as ProjectStatus));
   }
-  const rows = await db
-    .select(projectSummarySelect)
-    .from(projects)
-    .leftJoin(programs, eq(projects.programId, programs.id))
-    .where(and(...conditions))
-    .orderBy(desc(projects.updatedAt));
-  return { rows };
+  const [rows, [capacity]] = await Promise.all([
+    db
+      .select(projectSummarySelect)
+      .from(projects)
+      .leftJoin(programs, eq(projects.programId, programs.id))
+      .where(and(...conditions))
+      .orderBy(desc(projects.updatedAt)),
+    // Deliberately NOT filtered by `data.status`: this is the owner's standing
+    // commitment across everything still live, so it must not move when they
+    // change the status filter. Archived projects no longer take teams.
+    db
+      .select({
+        teamCapacity: sql<number>`coalesce(sum(${projects.teamsSupported}), 0)::int`,
+      })
+      .from(projects)
+      .where(
+        and(
+          eq(projects.proposerId, viewer.id),
+          isNull(projects.deletedAt),
+          ne(projects.status, "archived")
+        )
+      ),
+  ]);
+  return { rows, teamCapacity: capacity?.teamCapacity ?? 0 };
 }
 
 interface AdminProjectsFilter {
   includeSoftDeleted: boolean;
   program: string | null;
+  proposer: string | null;
+  q: string;
   status: StatusFilter;
 }
 
@@ -84,23 +114,59 @@ export async function listAdminProjectsAs(
   if (!isStaff(viewer)) {
     throw new Error("Forbidden");
   }
-  const conditions: SQL[] = [];
+  // The scope the proposer dropdown is built from: status, program and the
+  // soft-delete switch, but NOT the search text or the proposer choice itself.
+  // Excluding the proposer keeps the option you picked from being the only one
+  // left; excluding `q` keeps typing in the search box from emptying the
+  // dropdown underneath you.
+  const scope: SQL[] = [];
   if (data.status !== "all") {
-    conditions.push(eq(projects.status, data.status as ProjectStatus));
+    scope.push(eq(projects.status, data.status as ProjectStatus));
   }
   if (!data.includeSoftDeleted) {
-    conditions.push(isNull(projects.deletedAt));
+    scope.push(isNull(projects.deletedAt));
   }
   if (data.program) {
-    conditions.push(eq(projects.programId, data.program));
+    scope.push(eq(projects.programId, data.program));
   }
-  const rows = await db
-    .select(projectSummarySelect)
-    .from(projects)
-    .leftJoin(programs, eq(projects.programId, programs.id))
-    .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(desc(projects.updatedAt));
-  return { rows };
+
+  const listConditions: SQL[] = [...scope];
+  if (data.proposer) {
+    listConditions.push(eq(projects.proposerId, data.proposer));
+  }
+  const trimmed = data.q.trim();
+  if (trimmed) {
+    // Same shape as the public listing: the generated tsvector for whole-word
+    // relevance, plus a title ILIKE so a partial word still matches, which is
+    // what staff hunting for a half-remembered title actually type.
+    const match = or(
+      sql`${projects.searchVector} @@ websearch_to_tsquery('english', ${trimmed})`,
+      ilike(projects.title, `%${trimmed}%`)
+    );
+    if (match) {
+      listConditions.push(match);
+    }
+  }
+
+  const [rows, proposers] = await Promise.all([
+    db
+      .select(projectSummarySelect)
+      .from(projects)
+      .leftJoin(programs, eq(projects.programId, programs.id))
+      .where(listConditions.length ? and(...listConditions) : undefined)
+      .orderBy(desc(projects.updatedAt)),
+    db
+      .selectDistinct({
+        email: user.email,
+        id: user.id,
+        name: user.name,
+      })
+      .from(projects)
+      .innerJoin(user, eq(projects.proposerId, user.id))
+      .where(scope.length ? and(...scope) : undefined)
+      .orderBy(asc(user.name)),
+  ]);
+  return { proposers, rows };
 }
 
 export async function listAdminProjectsImpl(data: AdminProjectsFilter) {
