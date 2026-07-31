@@ -225,7 +225,7 @@ function MentorsAdmin() {
         columns={COLUMNS}
         data={rows}
         defaultSort={DEFAULT_SORT}
-        emptyMessage="No mentors yet."
+        emptyMessage="No mentors in this view."
         getRowId={(row) => row.id}
         hidden={hidden}
         onHiddenChange={onHiddenChange}
