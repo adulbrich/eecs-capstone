@@ -5,7 +5,7 @@ import { applyServerErrors } from "#/lib/apply-server-errors";
 import {
   PRIVATE_NOTES_LABEL,
   PRIVATE_NOTES_PROJECT_HINT,
-  STAFF_PANEL_AUDIENCE_HINT,
+  STAFF_FIELDS_AUDIENCE_HINT,
 } from "#/lib/private-notes";
 import type {
   FieldSuggestion,
@@ -414,7 +414,7 @@ export function ProjectForm({
       {(showProposer || showCategories) && (
         <Panel tone="staff">
           <PanelHeader title="Staff panel" />
-          <PanelNote>{STAFF_PANEL_AUDIENCE_HINT}</PanelNote>
+          <PanelNote>{STAFF_FIELDS_AUDIENCE_HINT}</PanelNote>
           <div className="mt-4 space-y-4">
             {showProposer && (
               <form.Field name="proposerEmail">

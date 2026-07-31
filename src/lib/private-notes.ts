@@ -38,3 +38,12 @@ export const PRIVATE_PANEL_AUDIENCE_HINT =
  */
 export const STAFF_PANEL_AUDIENCE_HINT =
   "Only visible to staff (instructors and admins). Never shown publicly.";
+
+/**
+ * The same idea on a *form* rather than a detail page. The panel line above
+ * describes content a reader can see; on the project form these are controls
+ * the proposer cannot use at all, and "never shown publicly" would be the
+ * wrong claim for a field like Categories, which is public once set.
+ */
+export const STAFF_FIELDS_AUDIENCE_HINT =
+  "These settings are only available to staff (instructors and admins). Not to the project proposer.";

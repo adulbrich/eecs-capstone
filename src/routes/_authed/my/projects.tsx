@@ -55,7 +55,7 @@ function MyProjects() {
       {/* Spans every non-archived project, so it does not move with the status
           filter below. */}
       <p className="mt-1 text-muted-foreground text-sm">
-        Total team capacity across your active projects:{" "}
+        Expected number of teams (active projects, excluding archived):{" "}
         <span className="font-medium text-foreground tabular-nums">
           {teamCapacity}
         </span>
