@@ -2,10 +2,16 @@ import {
   createFileRoute,
   Link,
   redirect,
+  useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { useState } from "react";
-import { AdminTable } from "#/components/admin-table";
+import { useCallback, useState } from "react";
+import { z } from "zod";
+import {
+  type AdminColumn,
+  AdminDataTable,
+} from "#/components/admin-data-table";
+import { LocalTime } from "#/components/local-time";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -28,9 +34,21 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import {
+  type AdminTableSearch,
+  type SortState,
+  useAdminTableState,
+} from "#/lib/table-state";
 import { createProgram, listPrograms } from "#/server/programs";
 
+const searchSchema = z.object({
+  cols: z.string().optional(),
+  dir: z.enum(["asc", "desc"]).optional(),
+  sort: z.string().optional(),
+});
+
 export const Route = createFileRoute("/_authed/admin/programs/")({
+  validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Programs") }] }),
   beforeLoad: async () => {
     const session = await getSession();
@@ -45,9 +63,70 @@ export const Route = createFileRoute("/_authed/admin/programs/")({
   component: ProgramsAdmin,
 });
 
+type Row = Awaited<ReturnType<typeof listPrograms>>["rows"][number];
+
+const DEFAULT_SORT: SortState = { desc: false, id: "courseId" };
+
+const COLUMNS: AdminColumn<Row>[] = [
+  {
+    accessorFn: (row) => row.courseId,
+    cell: ({ row }) => row.original.courseId,
+    enableHiding: false,
+    header: "Course ID",
+    id: "courseId",
+  },
+  {
+    accessorFn: (row) => row.courseName,
+    cell: ({ row }) => row.original.courseName,
+    header: "Course name",
+    id: "courseName",
+  },
+  {
+    accessorFn: (row) => row.description ?? undefined,
+    cell: ({ row }) => row.original.description ?? "-",
+    defaultHidden: true,
+    header: "Description",
+    id: "description",
+    sortUndefined: "last",
+  },
+  {
+    accessorFn: (row) => row.createdAt,
+    cell: ({ row }) => <LocalTime dateOnly value={row.original.createdAt} />,
+    defaultHidden: true,
+    header: "Created",
+    id: "createdAt",
+    sortingFn: "datetime",
+  },
+  {
+    accessorFn: (row) => row.updatedAt,
+    cell: ({ row }) => <LocalTime dateOnly value={row.original.updatedAt} />,
+    defaultHidden: true,
+    header: "Updated",
+    id: "updatedAt",
+    sortingFn: "datetime",
+  },
+  {
+    cell: ({ row }) => (
+      <Link
+        className="hover:underline"
+        params={{ programId: row.original.id }}
+        to="/admin/programs/$programId"
+      >
+        Manage
+      </Link>
+    ),
+    enableHiding: false,
+    enableSorting: false,
+    header: "Actions",
+    id: "actions",
+  },
+];
+
 function ProgramsAdmin() {
   const router = useRouter();
   const { rows } = Route.useLoaderData();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/admin/programs/" });
   const [open, setOpen] = useState(false);
   const [courseId, setCourseId] = useState("");
   const [courseName, setCourseName] = useState("");
@@ -71,8 +150,31 @@ function ProgramsAdmin() {
     }
   }
 
+  const setSearch = useCallback(
+    (patch: AdminTableSearch) =>
+      void navigate({ search: (prev) => ({ ...prev, ...patch }) }),
+    [navigate]
+  );
+  const replaceSearch = useCallback(
+    (patch: AdminTableSearch) =>
+      void navigate({
+        replace: true,
+        search: (prev) => ({ ...prev, ...patch }),
+      }),
+    [navigate]
+  );
+
+  const { hidden, onHiddenChange, onSortChange, sort } = useAdminTableState({
+    columns: COLUMNS,
+    defaultSort: DEFAULT_SORT,
+    replaceSearch,
+    search,
+    setSearch,
+    storageKey: "programs",
+  });
+
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
+    <div className="px-4 py-6 md:px-8">
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -139,26 +241,19 @@ function ProgramsAdmin() {
         </Dialog>
       </div>
 
-      <AdminTable columns={["Course ID", "Course name", ""]}>
-        {rows.map((p) => (
-          <tr key={p.id}>
-            <td className="border border-border p-2" data-label="Course ID">
-              {p.courseId}
-            </td>
-            <td className="border border-border p-2" data-label="Course name">
-              {p.courseName}
-            </td>
-            <td className="border border-border p-2">
-              <Link
-                params={{ programId: p.id }}
-                to="/admin/programs/$programId"
-              >
-                Manage
-              </Link>
-            </td>
-          </tr>
-        ))}
-      </AdminTable>
+      <AdminDataTable
+        caption="Programs"
+        columns={COLUMNS}
+        data={rows}
+        defaultSort={DEFAULT_SORT}
+        emptyMessage="No programs yet."
+        getRowId={(row) => row.id}
+        hidden={hidden}
+        onHiddenChange={onHiddenChange}
+        onSortChange={onSortChange}
+        sort={sort}
+        storageKey="programs"
+      />
     </div>
   );
 }

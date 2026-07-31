@@ -2,11 +2,17 @@ import {
   createFileRoute,
   Link,
   redirect,
+  useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { useState } from "react";
-import { AdminTable } from "#/components/admin-table";
+import { useCallback, useState } from "react";
+import { z } from "zod";
+import {
+  type AdminColumn,
+  AdminDataTable,
+} from "#/components/admin-data-table";
 import { CategoryTypeCombobox } from "#/components/category-type-combobox";
+import { LocalTime } from "#/components/local-time";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -30,12 +36,24 @@ import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import {
+  type AdminTableSearch,
+  type SortState,
+  useAdminTableState,
+} from "#/lib/table-state";
+import {
   createCategory,
   listCategories,
   listCategoryTypes,
 } from "#/server/categories";
 
+const searchSchema = z.object({
+  cols: z.string().optional(),
+  dir: z.enum(["asc", "desc"]).optional(),
+  sort: z.string().optional(),
+});
+
 export const Route = createFileRoute("/_authed/admin/categories/")({
+  validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Categories") }] }),
   beforeLoad: async () => {
     const session = await getSession();
@@ -56,9 +74,56 @@ export const Route = createFileRoute("/_authed/admin/categories/")({
   component: CategoriesAdmin,
 });
 
+type Row = Awaited<ReturnType<typeof listCategories>>["rows"][number];
+
+const DEFAULT_SORT: SortState = { desc: false, id: "type" };
+
+const COLUMNS: AdminColumn<Row>[] = [
+  {
+    accessorFn: (row) => row.name,
+    cell: ({ row }) => row.original.name,
+    enableHiding: false,
+    header: "Name",
+    id: "name",
+  },
+  {
+    accessorFn: (row) => row.type,
+    cell: ({ row }) => (
+      <span className="text-muted-foreground">{row.original.type}</span>
+    ),
+    header: "Type",
+    id: "type",
+  },
+  {
+    accessorFn: (row) => row.createdAt,
+    cell: ({ row }) => <LocalTime dateOnly value={row.original.createdAt} />,
+    defaultHidden: true,
+    header: "Created",
+    id: "createdAt",
+    sortingFn: "datetime",
+  },
+  {
+    cell: ({ row }) => (
+      <Link
+        className="hover:underline"
+        params={{ categoryId: row.original.id }}
+        to="/admin/categories/$categoryId"
+      >
+        Edit
+      </Link>
+    ),
+    enableHiding: false,
+    enableSorting: false,
+    header: "Actions",
+    id: "actions",
+  },
+];
+
 function CategoriesAdmin() {
   const router = useRouter();
   const { rows, types } = Route.useLoaderData();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/admin/categories/" });
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState("");
@@ -78,8 +143,31 @@ function CategoriesAdmin() {
     }
   }
 
+  const setSearch = useCallback(
+    (patch: AdminTableSearch) =>
+      void navigate({ search: (prev) => ({ ...prev, ...patch }) }),
+    [navigate]
+  );
+  const replaceSearch = useCallback(
+    (patch: AdminTableSearch) =>
+      void navigate({
+        replace: true,
+        search: (prev) => ({ ...prev, ...patch }),
+      }),
+    [navigate]
+  );
+
+  const { hidden, onHiddenChange, onSortChange, sort } = useAdminTableState({
+    columns: COLUMNS,
+    defaultSort: DEFAULT_SORT,
+    replaceSearch,
+    search,
+    setSearch,
+    storageKey: "categories",
+  });
+
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
+    <div className="px-4 py-6 md:px-8">
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -137,29 +225,19 @@ function CategoriesAdmin() {
         </Dialog>
       </div>
 
-      <AdminTable columns={["Name", "Type", ""]}>
-        {rows.map((c) => (
-          <tr key={c.id}>
-            <td className="border border-border p-2" data-label="Name">
-              {c.name}
-            </td>
-            <td
-              className="border border-border p-2 text-muted-foreground"
-              data-label="Type"
-            >
-              {c.type}
-            </td>
-            <td className="border border-border p-2">
-              <Link
-                params={{ categoryId: c.id }}
-                to="/admin/categories/$categoryId"
-              >
-                Edit
-              </Link>
-            </td>
-          </tr>
-        ))}
-      </AdminTable>
+      <AdminDataTable
+        caption="Categories"
+        columns={COLUMNS}
+        data={rows}
+        defaultSort={DEFAULT_SORT}
+        emptyMessage="No categories yet."
+        getRowId={(row) => row.id}
+        hidden={hidden}
+        onHiddenChange={onHiddenChange}
+        onSortChange={onSortChange}
+        sort={sort}
+        storageKey="categories"
+      />
     </div>
   );
 }
