@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { InventoryForm } from "#/components/inventory-form";
 import { getSession } from "#/lib/auth-guards";
+import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
 import { getInventoryItem } from "#/server/inventory";
 
@@ -36,6 +37,11 @@ export const Route = createFileRoute("/_authed/inventory/$itemId/edit")({
     }
   },
   loader: async ({ params }) => {
+    // A param that cannot name an item is a 404, not a 500 from the server
+    // function's Zod `.uuid()` validator.
+    if (!isUuid(params.itemId)) {
+      throw notFound();
+    }
     const item = await getInventoryItem({ data: { id: params.itemId } });
     if (!item) {
       throw notFound();

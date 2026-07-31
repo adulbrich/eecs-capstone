@@ -399,6 +399,55 @@ describe("listInventoryAs privacy", () => {
     expect(JSON.stringify(found)).not.toContain("1180");
   });
 
+  it("carries the joined holder identity through the staff detail payload", async () => {
+    // Guards the mapping that turns the joined row into the staff shape: the
+    // holder name and email come from a LEFT JOIN, not from the item row, so
+    // a refactor that rebuilt the payload could silently drop them while every
+    // item-column assertion kept passing.
+    const admin = await makeUser(`hj-a-${Date.now()}@x.com`, "admin");
+    const holderEmail = `hj-h-${Date.now()}@x.com`;
+    const holder = await makeUser(holderEmail, "user");
+    const item = await makeItem();
+    const { line } = await makeRequestLine(holder.id, item.id);
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      requestItemId: line.id,
+      holderId: holder.id,
+      pickupBy: new Date(Date.now() + 86_400_000),
+    });
+
+    const view = await getInventoryItemDetailAs(admin, { id: item.id });
+    expect(view?.viewerIsStaff).toBe(true);
+    if (!view?.viewerIsStaff) {
+      throw new Error("expected the staff branch");
+    }
+    expect(view.item.currentHolderId).toBe(holder.id);
+    expect(view.item.currentHolderName).toBe(holderEmail);
+    expect(view.item.currentHolderEmail).toBe(holderEmail);
+    expect(view.item.pickupBy).toBeInstanceOf(Date);
+  });
+
+  it("does not leak the holder identity to a non-staff viewer", async () => {
+    const admin = await makeUser(`hj-a2-${Date.now()}@x.com`, "admin");
+    const holderEmail = `hj-h2-${Date.now()}@x.com`;
+    const holder = await makeUser(holderEmail, "user");
+    const nosy = await makeUser(`hj-n2-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    const { line } = await makeRequestLine(holder.id, item.id);
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      requestItemId: line.id,
+      holderId: holder.id,
+      pickupBy: new Date(Date.now() + 86_400_000),
+    });
+
+    const view = await getInventoryItemDetailAs(nosy, { id: item.id });
+    expect(view?.viewerIsStaff).toBe(false);
+    expect(JSON.stringify(view)).not.toContain(holderEmail);
+  });
+
   it("hides retired items from non-staff list and detail", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const item = await makeItem();

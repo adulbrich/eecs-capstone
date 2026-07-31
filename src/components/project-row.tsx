@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { projectImageSrc } from "#/lib/project-image";
 import { stripMarkdown } from "#/lib/strip-markdown";
 import { ImageOrFallback } from "./image-or-fallback";
+import { LocalTime } from "./local-time";
 import { type ProjectSummary, programLabel } from "./project-card";
 import { StatusBadge } from "./status-badge";
 
@@ -39,7 +40,7 @@ export function ProjectRow({ project }: { project: ProjectSummary }) {
         )}
         {project.updatedAt && (
           <p className="mt-0.5 text-muted-foreground text-xs">
-            Updated {new Date(project.updatedAt).toLocaleDateString()}
+            Updated <LocalTime dateOnly value={project.updatedAt} />
           </p>
         )}
       </div>

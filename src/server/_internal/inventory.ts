@@ -164,7 +164,30 @@ export async function listInventoryAs(
   };
 }
 
-export async function getInventoryItemAs(viewer: Viewer, data: { id: string }) {
+/** A staff item plus the joined holder identity. */
+export type InventoryItemStaffDetail = InventoryItemStaff & {
+  currentHolderEmail: string | null;
+  currentHolderName: string | null;
+};
+
+interface InventoryItemJoinedRow {
+  dueAt: Date | null;
+  holderEmail: string | null;
+  holderName: string | null;
+  item: typeof inventoryItems.$inferSelect;
+  pickupBy: Date | null;
+}
+
+/**
+ * The one query behind both the item detail reads, including the rule that a
+ * retired item does not exist for anyone but staff. Extracted so the two
+ * callers below map the same row through the same two gates instead of each
+ * re-deriving the branch.
+ */
+async function loadInventoryItemRowFor(
+  viewer: Viewer,
+  id: string
+): Promise<InventoryItemJoinedRow | null> {
   const [row] = await db
     .select({
       item: inventoryItems,
@@ -179,27 +202,40 @@ export async function getInventoryItemAs(viewer: Viewer, data: { id: string }) {
       eq(inventoryItems.currentRequestItemId, inventoryRequestItems.id)
     )
     .leftJoin(user, eq(inventoryItems.currentHolderId, user.id))
-    .where(eq(inventoryItems.id, data.id));
+    .where(eq(inventoryItems.id, id));
   if (!row) {
     return null;
   }
   if (row.item.status === "retired" && !isStaff(viewer)) {
     return null;
   }
-  if (isStaff(viewer)) {
-    return {
-      ...fullForStaff(row.item),
-      currentHolderName: row.holderName,
-      currentHolderEmail: row.holderEmail,
-      pickupBy: row.pickupBy,
-      dueAt: row.dueAt,
-    };
-  }
+  return row;
+}
+
+function toStaffDetail(row: InventoryItemJoinedRow): InventoryItemStaffDetail {
+  return {
+    ...fullForStaff(row.item),
+    currentHolderName: row.holderName,
+    currentHolderEmail: row.holderEmail,
+    pickupBy: row.pickupBy,
+    dueAt: row.dueAt,
+  };
+}
+
+function toPublicDetail(row: InventoryItemJoinedRow): InventoryItemPublic {
   return {
     ...stripForPublic(row.item),
     pickupBy: row.pickupBy,
     dueAt: row.dueAt,
   };
+}
+
+export async function getInventoryItemAs(viewer: Viewer, data: { id: string }) {
+  const row = await loadInventoryItemRowFor(viewer, data.id);
+  if (!row) {
+    return null;
+  }
+  return isStaff(viewer) ? toStaffDetail(row) : toPublicDetail(row);
 }
 
 export async function listInventoryForCurrentUser(data: ListInventoryInput) {
@@ -1009,20 +1045,34 @@ export async function getItemHistoryAs(
  * from the presence of `notes` / `serial`: sniffing the payload shape would
  * silently invert the gate the day a field is added to the public shape.
  */
+export type InventoryItemDetail =
+  | {
+      history: Awaited<ReturnType<typeof getItemHistoryAs>>;
+      item: InventoryItemStaffDetail;
+      viewerIsStaff: true;
+    }
+  | { history: never[]; item: InventoryItemPublic; viewerIsStaff: false };
+
 export async function getInventoryItemDetailAs(
   viewer: Viewer,
   data: { id: string }
-) {
-  const item = await getInventoryItemAs(viewer, data);
-  if (!item) {
+): Promise<InventoryItemDetail | null> {
+  const row = await loadInventoryItemRowFor(viewer, data.id);
+  if (!row) {
     return null;
   }
-  const staff = isStaff(viewer);
-  return {
-    item,
-    history: staff ? await getItemHistoryAs(viewer, { itemId: data.id }) : [],
-    viewerIsStaff: staff,
-  };
+  // Discriminated on `viewerIsStaff`, so a consumer that narrows on it gets
+  // the staff fields and the history without a cast. Building each branch from
+  // the row directly is what makes that sound: there is no wider value being
+  // asserted down to a narrower type.
+  if (isStaff(viewer)) {
+    return {
+      item: toStaffDetail(row),
+      history: await getItemHistoryAs(viewer, { itemId: data.id }),
+      viewerIsStaff: true,
+    };
+  }
+  return { item: toPublicDetail(row), history: [], viewerIsStaff: false };
 }
 
 export async function getInventoryItemDetailForCurrentUser(data: {

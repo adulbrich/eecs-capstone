@@ -1,3 +1,4 @@
+import { LocalTime } from "./local-time";
 import { StatusBadge } from "./status-badge";
 
 interface HistoryRow {
@@ -28,7 +29,7 @@ export function StatusTimeline({ rows }: { rows: HistoryRow[] }) {
             <span className="text-muted-foreground">→</span>
             <StatusBadge status={r.newStatus} />
             <span className="text-muted-foreground text-xs">
-              {new Date(r.createdAt).toLocaleString()}
+              <LocalTime value={r.createdAt} />
             </span>
           </div>
           {r.comment && (

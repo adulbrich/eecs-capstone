@@ -1,5 +1,11 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  notFound,
+  redirect,
+  useNavigate,
+} from "@tanstack/react-router";
 import { ProjectForm } from "#/components/project-form";
+import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
 import {
   listProjectCategories,
@@ -12,6 +18,12 @@ import { uploadProjectImage } from "#/server/uploads";
 export const Route = createFileRoute("/_authed/projects/$projectId/edit")({
   head: () => ({ meta: [{ title: pageTitle("Edit Project") }] }),
   loader: async ({ params }) => {
+    // 404 rather than the redirect below: a malformed id has no project detail
+    // page to send the user to, so redirecting would just bounce them into the
+    // same 500 one route over.
+    if (!isUuid(params.projectId)) {
+      throw notFound();
+    }
     const data = await getProject({ data: { id: params.projectId } });
     if (!(data.project && data.canEdit)) {
       throw redirect({

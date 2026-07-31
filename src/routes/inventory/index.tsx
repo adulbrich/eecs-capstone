@@ -7,6 +7,7 @@ import { InventoryCard } from "#/components/inventory-card";
 import { InventoryFilterBar } from "#/components/inventory-filter-bar";
 import { InventoryRow } from "#/components/inventory-row";
 import { authClient } from "#/lib/auth-client";
+import { useHasMounted } from "#/lib/use-has-mounted";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
 import type { ViewMode } from "#/lib/view-preference";
 import {
@@ -68,10 +69,13 @@ function InventoryIndex() {
   useSeedViewFromStorage(search.view, seedView);
   const qc = useQueryClient();
   const { data: session } = authClient.useSession();
+  const hasMounted = useHasMounted();
   const data = Route.useLoaderData();
 
   const totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
-  const signedIn = !!session?.user;
+  // Gated on mount so the server's signed-out render and the client's first
+  // render agree; see useHasMounted.
+  const signedIn = hasMounted && !!session?.user;
   async function addItem(itemId: string) {
     await addToCart({ data: { itemId } });
     await qc.invalidateQueries();

@@ -59,8 +59,12 @@ describe("ProjectCard", () => {
   });
 
   it("renders program, contact, and updated meta", () => {
-    const { getByText } = render(<ProjectCard project={base} />);
+    const { container, getByText } = render(<ProjectCard project={base} />);
     expect(getByText("CS-462 Capstone · Jane Doe")).toBeTruthy();
-    expect(getByText(/^Updated /)).toBeTruthy();
+    // The timestamp renders inside a nested <time> (see LocalTime), so the
+    // paragraph's text spans elements and a whole-string matcher would miss it.
+    const updated = container.querySelector("time");
+    expect(updated?.getAttribute("dateTime")).toBe(base.updatedAt);
+    expect(updated?.closest("p")?.textContent).toMatch(/^Updated /);
   });
 });

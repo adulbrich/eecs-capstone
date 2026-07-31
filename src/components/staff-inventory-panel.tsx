@@ -39,13 +39,20 @@ export function StaffInventoryPanel({
 }) {
   return (
     <div className="mt-8 rounded-lg border-(--brand-primary-tint) border-2 bg-card p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="island-kicker">Staff panel</p>
-        <Button asChild size="sm" variant="outline">
-          <Link params={{ itemId: item.id }} to="/inventory/$itemId/edit">
-            Edit
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* This page is public now, so a staff member who arrived from the
+              management table has no other way back to it. */}
+          <Button asChild size="sm" variant="ghost">
+            <Link to="/admin/inventory">Manage inventory</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link params={{ itemId: item.id }} to="/inventory/$itemId/edit">
+              Edit
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <dl className="grid grid-cols-3 gap-2 text-sm">

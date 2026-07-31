@@ -5,6 +5,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { BanForm } from "#/components/ban-form";
+import { LocalTime } from "#/components/local-time";
 import { RoleSelect } from "#/components/role-select";
 import {
   Breadcrumb,
@@ -127,7 +128,7 @@ function UserDetail() {
       </p>
       <p className="text-sm">
         <span className="text-muted-foreground">Joined: </span>
-        {new Date(user.createdAt).toLocaleDateString()}
+        <LocalTime dateOnly value={user.createdAt} />
       </p>
 
       {!isSelf && (

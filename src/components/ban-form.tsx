@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { banUser, unbanUser } from "#/server/users";
+import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -57,9 +58,11 @@ export function BanForm({
   }
 
   if (banned) {
-    const expiresDisplay = banExpires
-      ? new Date(banExpires).toLocaleString()
-      : "permanent";
+    const expiresDisplay = banExpires ? (
+      <LocalTime value={banExpires} />
+    ) : (
+      "permanent"
+    );
     return (
       <section className="mt-4 rounded-md border-2 border-destructive/30 bg-destructive/5 p-3">
         <h2 className="font-medium text-sm">Banned</h2>

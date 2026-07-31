@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { addComment } from "#/server/comments";
+import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
@@ -74,7 +75,9 @@ function CommentHeader({ comment }: { comment: Comment }) {
       <span className="font-medium text-foreground">
         {comment.authorName ?? UNKNOWN_AUTHOR}
       </span>
-      <span>{new Date(comment.createdAt).toLocaleString()}</span>
+      <span>
+        <LocalTime value={comment.createdAt} />
+      </span>
       {comment.isInternal && (
         <span
           className="rounded px-1.5 py-0.5 font-medium text-xs"

@@ -1,11 +1,13 @@
 import { Bookmark } from "lucide-react";
 import { useEffect, useState } from "react";
 import { authClient } from "#/lib/auth-client";
+import { useHasMounted } from "#/lib/use-has-mounted";
 import { addBookmark, isBookmarked, removeBookmark } from "#/server/bookmarks";
 import { Button } from "./ui/button";
 
 export function BookmarkButton({ projectId }: { projectId: string }) {
   const { data: session } = authClient.useSession();
+  const hasMounted = useHasMounted();
   const [bookmarked, setBookmarked] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -23,7 +25,10 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
     })();
   }, [session?.user, projectId]);
 
-  if (!session?.user) {
+  // The server always renders nothing here (it has no session), so the first
+  // client render must too, or this button appears where the server put the
+  // next sibling and React discards the tree as a hydration mismatch.
+  if (!(hasMounted && session?.user)) {
     return null;
   }
 

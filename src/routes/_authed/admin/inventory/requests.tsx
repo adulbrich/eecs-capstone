@@ -2,6 +2,7 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { z } from "zod";
 import { AdminRequestQueueRow } from "#/components/admin-request-queue-row";
 import { EmptyState } from "#/components/empty-state";
+import { LocalTime } from "#/components/local-time";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -100,7 +101,7 @@ function AdminRequestQueue() {
               </p>
               <p className="text-muted-foreground text-xs">
                 {batch.requester.email} {" · "}
-                {new Date(batch.createdAt).toLocaleString()}
+                <LocalTime value={batch.createdAt} />
               </p>
               {batch.note && (
                 <p className="mt-2 whitespace-pre-wrap text-sm">{batch.note}</p>

@@ -8,6 +8,7 @@ import {
   softDeleteProject,
 } from "#/server/projects";
 import { listProjectEditLog } from "#/server/projects-queries";
+import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -358,7 +359,7 @@ export function StaffProjectPanel({
               <li className="border-border border-l-2 pl-2" key={row.id}>
                 <div className="text-muted-foreground text-xs">
                   {row.editorId.slice(0, 8)} at{" "}
-                  {new Date(row.createdAt).toLocaleString()}
+                  <LocalTime value={row.createdAt} />
                 </div>
                 <div className="text-xs">
                   Changed: {row.changedFields.join(", ")}

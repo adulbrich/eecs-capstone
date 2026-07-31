@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Button } from "#/components/ui/button";
 import { authClient } from "#/lib/auth-client";
 import { brand } from "#/lib/brand";
+import { useHasMounted } from "#/lib/use-has-mounted";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -14,7 +15,9 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const { data: session } = authClient.useSession();
-  const isSignedIn = !!session?.user;
+  // Server-rendered signed-out, so the first client render must agree; the
+  // signed-in CTA swaps in after mount. See useHasMounted.
+  const isSignedIn = useHasMounted() && !!session?.user;
 
   return (
     <main>

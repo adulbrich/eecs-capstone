@@ -5,6 +5,7 @@ import {
   transitionInventoryItem,
 } from "#/server/inventory";
 import { InventoryStatusBadge } from "./inventory-status-badge";
+import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -140,7 +141,7 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
                     by {h.changedByName ?? h.changedByEmail}
                   </span>
                   <span className="text-muted-foreground text-xs">
-                    {new Date(h.createdAt).toLocaleString()}
+                    <LocalTime value={h.createdAt} />
                   </span>
                 </div>
                 {(h.holderId || h.holderLabel) && (
@@ -323,8 +324,12 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
         data: { id: item.id, confirmName: delConfirm },
       });
       setDelOpen(false);
-      // Navigate back to the list.
-      window.location.href = "/admin/inventory";
+      // Client-side navigation, not `window.location.href`: this panel now
+      // renders on the public item page, so a hard redirect would tear down
+      // the whole SPA to leave a route the router can reach directly. The item
+      // no longer exists, so the management table is the only sensible
+      // destination, and only staff can reach this button.
+      await router.navigate({ to: "/admin/inventory" });
     } catch (e) {
       setError((e as Error)?.message || "Delete failed");
     } finally {

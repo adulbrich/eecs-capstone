@@ -6,6 +6,7 @@ import {
   markRead,
   unreadCount,
 } from "#/server/notifications";
+import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
@@ -122,7 +123,7 @@ export function NotificationBell() {
                 >
                   <div className="font-medium">{n.title}</div>
                   <div className="text-muted-foreground text-xs">
-                    {new Date(n.createdAt).toLocaleString()}
+                    <LocalTime value={n.createdAt} />
                   </div>
                 </button>
               </li>

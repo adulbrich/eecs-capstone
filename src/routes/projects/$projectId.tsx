@@ -14,6 +14,7 @@ import { SectionHeading } from "#/components/section-heading";
 import { StaffProjectPanel } from "#/components/staff-project-panel";
 import { StatusBadge } from "#/components/status-badge";
 import { Button } from "#/components/ui/button";
+import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
 import { projectImageSrc } from "#/lib/project-image";
 import { listProjectCategories } from "#/server/categories";
@@ -48,6 +49,11 @@ export const Route = createFileRoute("/projects/$projectId")({
     ],
   }),
   loader: async ({ params }): Promise<ProjectDetailData> => {
+    // A param that cannot name a project is a 404. Without this the server
+    // function's Zod `.uuid()` throws and the page 500s instead.
+    if (!isUuid(params.projectId)) {
+      throw notFound();
+    }
     const data = await getProject({ data: { id: params.projectId } });
     if (!data.project) {
       throw notFound();

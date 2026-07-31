@@ -8,6 +8,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { EmptyState } from "#/components/empty-state";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
+import { LocalTime } from "#/components/local-time";
 import { Button } from "#/components/ui/button";
 import { Textarea } from "#/components/ui/textarea";
 import {
@@ -149,12 +150,12 @@ function MyItems() {
                   <InventoryStatusBadge status={item.status as "available"} />
                   {line.pickupBy && (
                     <p className="text-muted-foreground text-xs">
-                      Pick up by {line.pickupBy.toLocaleDateString()}
+                      Pick up by <LocalTime dateOnly value={line.pickupBy} />
                     </p>
                   )}
                   {line.dueAt && (
                     <p className="text-muted-foreground text-xs">
-                      Due {line.dueAt.toLocaleDateString()}
+                      Due <LocalTime dateOnly value={line.dueAt} />
                     </p>
                   )}
                 </div>
