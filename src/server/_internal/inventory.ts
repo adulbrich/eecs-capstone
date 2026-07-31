@@ -8,6 +8,7 @@ import {
   isNotNull,
   ne,
   or,
+  type SQL,
   sql,
 } from "drizzle-orm";
 import { db } from "#/db";
@@ -53,13 +54,15 @@ export interface InventoryItemPublic {
 }
 
 export type InventoryItemStaff = InventoryItemPublic & {
-  serial: string | null;
-  label: string | null;
-  location: string | null;
-  notes: string | null;
+  createdAt: Date;
   currentHolderId: string | null;
   currentHolderLabel: string | null;
   currentRequestItemId: string | null;
+  label: string | null;
+  location: string | null;
+  notes: string | null;
+  serial: string | null;
+  updatedAt: Date;
 };
 
 function isStaff(viewer: Viewer): boolean {
@@ -86,6 +89,7 @@ function fullForStaff(
 ): InventoryItemStaff {
   return {
     ...stripForPublic(row),
+    createdAt: row.createdAt,
     serial: row.serial,
     label: row.label,
     location: row.location,
@@ -93,20 +97,35 @@ function fullForStaff(
     currentHolderId: row.currentHolderId,
     currentHolderLabel: row.currentHolderLabel,
     currentRequestItemId: row.currentRequestItemId,
+    updatedAt: row.updatedAt,
   };
 }
 
-export async function listInventoryAs(
-  viewer: Viewer,
-  data: ListInventoryInput
-) {
-  const conditions = [ne(inventoryItems.status, "retired")];
+/**
+ * The conditions every inventory listing shares. Search is deliberately not
+ * included: the public predicate matches name and the tsvector only, while
+ * the staff predicate also reaches serial, label, location and holder, and
+ * those must never become publicly searchable.
+ */
+function buildInventoryScope(data: {
+  category: string | null;
+  status: ListInventoryInput["status"];
+}): SQL[] {
+  const conditions: SQL[] = [ne(inventoryItems.status, "retired")];
   if (data.status) {
     conditions.push(eq(inventoryItems.status, data.status));
   }
   if (data.category) {
     conditions.push(eq(inventoryItems.category, data.category));
   }
+  return conditions;
+}
+
+export async function listInventoryAs(
+  viewer: Viewer,
+  data: ListInventoryInput
+) {
+  const conditions = buildInventoryScope(data);
   if (data.q) {
     const q = or(
       sql`${inventoryItems.searchVector} @@ websearch_to_tsquery('english', ${data.q})`,
@@ -241,6 +260,78 @@ export async function getInventoryItemAs(viewer: Viewer, data: { id: string }) {
 export async function listInventoryForCurrentUser(data: ListInventoryInput) {
   const session = await readSession();
   return listInventoryAs(session?.user ?? null, data);
+}
+
+export interface ListAdminInventoryInput {
+  category: string | null;
+  q: string;
+  status: ListInventoryInput["status"];
+}
+
+/**
+ * The staff inventory listing: every matching row, unpaginated, because the
+ * table sorts client-side and a page of 20 would make "sort by name" a lie.
+ *
+ * The search predicate is wider than the public one on purpose, reaching the
+ * fields staff actually hunt by. It stays in this function rather than in the
+ * shared scope so those staff-only fields cannot leak into public search.
+ */
+export async function listAdminInventoryAs(
+  viewer: Viewer,
+  data: ListAdminInventoryInput
+) {
+  assertStaff(viewer);
+  const conditions = buildInventoryScope(data);
+  const trimmed = data.q.trim();
+  if (trimmed) {
+    const like = `%${trimmed}%`;
+    const match = or(
+      sql`${inventoryItems.searchVector} @@ websearch_to_tsquery('english', ${trimmed})`,
+      ilike(inventoryItems.name, like),
+      ilike(inventoryItems.serial, like),
+      ilike(inventoryItems.label, like),
+      ilike(inventoryItems.location, like),
+      ilike(user.name, like),
+      ilike(user.email, like)
+    );
+    if (match) {
+      conditions.push(match);
+    }
+  }
+
+  const rows = await db
+    .select({
+      dueAt: inventoryRequestItems.dueAt,
+      holderEmail: user.email,
+      holderName: user.name,
+      item: inventoryItems,
+      pickupBy: inventoryRequestItems.pickupBy,
+    })
+    .from(inventoryItems)
+    .leftJoin(
+      inventoryRequestItems,
+      eq(inventoryItems.currentRequestItemId, inventoryRequestItems.id)
+    )
+    .leftJoin(user, eq(inventoryItems.currentHolderId, user.id))
+    .where(and(...conditions))
+    .orderBy(desc(inventoryItems.updatedAt));
+
+  return {
+    rows: rows.map((r) => ({
+      ...fullForStaff(r.item),
+      currentHolderEmail: r.holderEmail,
+      currentHolderName: r.holderName,
+      dueAt: r.dueAt,
+      pickupBy: r.pickupBy,
+    })),
+  };
+}
+
+export async function listAdminInventoryForCurrentUser(
+  data: ListAdminInventoryInput
+) {
+  const session = await readSession();
+  return listAdminInventoryAs(session?.user ?? null, data);
 }
 
 export async function listInventoryCategoriesImpl() {

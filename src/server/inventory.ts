@@ -44,6 +44,21 @@ export const listInventory = createServerFn({ method: "GET" })
     return listInventoryForCurrentUser(data);
   });
 
+const listAdminInventorySchema = z.object({
+  category: z.string().nullable().default(null),
+  q: z.string().default(""),
+  status: itemStatusEnum.nullable().default(null),
+});
+
+export const listAdminInventory = createServerFn({ method: "GET" })
+  .inputValidator((d: unknown) => listAdminInventorySchema.parse(d))
+  .handler(async ({ data }) => {
+    const { listAdminInventoryForCurrentUser } = await import(
+      "./_internal/inventory"
+    );
+    return listAdminInventoryForCurrentUser(data);
+  });
+
 export const listInventoryCategories = createServerFn({
   method: "GET",
 }).handler(async () => {
