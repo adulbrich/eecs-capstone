@@ -16,6 +16,18 @@ variable "region" {
   default     = "us-west-2"
 }
 
+variable "domain_name" {
+  description = "Custom hostname served by the app CloudFront distribution."
+  type        = string
+  default     = "capstone.eecs.oregonstate.edu"
+}
+
+variable "certificate_domain" {
+  description = "DomainName of the ACM certificate covering var.domain_name. The certificate is created and DNS-validated out of band because the eecs.oregonstate.edu zone is managed by OSU, not by this configuration."
+  type        = string
+  default     = "*.eecs.oregonstate.edu"
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for the VPC."
   type        = string

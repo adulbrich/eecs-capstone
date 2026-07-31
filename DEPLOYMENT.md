@@ -182,6 +182,38 @@ model-access grant is required. The ECS task role already carries the
    hash includes the model id, so every project is treated as stale and
    re-embedded automatically.
 
+### 3.7 Custom domain and TLS certificate
+
+The app is served at `capstone.eecs.oregonstate.edu`. Terraform does **not**
+create the certificate, because the `eecs.oregonstate.edu` zone is managed by
+OSU rather than by this account. `infra/cloudfront.tf` reads the existing
+certificate through `data "aws_acm_certificate"`, which can never destroy it;
+re-issuing one costs a support ticket with multi-day turnaround.
+
+What exists today, created by hand:
+
+| Item | Value |
+| --- | --- |
+| Certificate | `*.eecs.oregonstate.edu`, ARN ending `f6cecdcc` |
+| Region | **us-east-1** (CloudFront only accepts viewer certs from us-east-1, regardless of `var.region`) |
+| Validation | DNS, `_7b5da3599a6223875e6bf5dee1000c5a.eecs.oregonstate.edu` |
+| Expires | 2027-02-13 |
+
+Two DNS records live in OSU's zone and must both stay in place:
+
+1. `capstone.eecs.oregonstate.edu` CNAME → the app distribution's
+   `*.cloudfront.net` domain (`terraform output app_url`). Without the matching
+   `aliases` entry on the distribution, CloudFront answers `403` for this host.
+2. `_7b5da3599a6223875e6bf5dee1000c5a.eecs.oregonstate.edu` CNAME →
+   `_eaf2da48d6e94e7e570d398eedce87f0.jkddzztszm.acm-validations.aws`. **This is
+   permanent.** ACM re-validates against it to auto-renew around December 2026.
+   Deleting it after issuance breaks the site a year later with no other warning.
+
+To stand this up from scratch: request a DNS-validated certificate in us-east-1,
+send both records to EECS IT in one ticket, and note in the ticket that record 1
+returns `403` until `terraform apply` attaches the alias, so an early test
+failure is expected rather than a bad request.
+
 ---
 
 ## 4. Post-apply configuration

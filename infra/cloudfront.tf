@@ -24,6 +24,19 @@ resource "aws_cloudfront_origin_access_control" "assets" {
   signing_protocol                  = "sigv4"
 }
 
+# Read-only on purpose. The certificate is DNS-validated against a record in
+# the OSU-managed eecs.oregonstate.edu zone, so re-issuing it costs a support
+# ticket. A data source can never destroy it; an imported resource could.
+# See DEPLOYMENT.md section 3.7 for the records OSU holds. `most_recent` picks
+# silently if this shared account ever holds two certs for the same domain;
+# that is tolerable here because any such cert covers the same hostname.
+data "aws_acm_certificate" "app" {
+  provider    = aws.us_east_1
+  domain      = var.certificate_domain
+  statuses    = ["ISSUED"]
+  most_recent = true
+}
+
 data "aws_cloudfront_cache_policy" "caching_disabled" {
   name = "Managed-CachingDisabled"
 }
@@ -42,6 +55,7 @@ resource "aws_cloudfront_distribution" "app" {
   enabled         = true
   comment         = "${var.project} app"
   is_ipv6_enabled = true
+  aliases         = [var.domain_name]
 
   origin {
     domain_name = aws_lb.app.dns_name
@@ -68,7 +82,9 @@ resource "aws_cloudfront_distribution" "app" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    acm_certificate_arn      = data.aws_acm_certificate.app.arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
   }
 
   tags = { Name = "${var.project}-app" }
