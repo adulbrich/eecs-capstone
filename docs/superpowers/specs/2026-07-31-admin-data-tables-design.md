@@ -54,6 +54,10 @@ the assumption the whole design rests on. If any table later approaches
 thousands of rows, sorting has to move into `ORDER BY` with a column whitelist,
 and this document's core rule is what would have to change.
 
+The exposure is narrower than it looks: `/admin/projects` and `/admin/mentors`
+already load every matching row today. Only inventory changes behavior here,
+from 20 rows per request to the whole filtered set.
+
 ---
 
 ## Feature A: the shared table component
@@ -64,24 +68,35 @@ shadcn ships no data-table component; its Data Table page is a guide to
 composing `<Table />` with TanStack yourself, which is what this design does.
 The only installable piece is `table.tsx`, eight thin wrappers over plain HTML
 table elements. It is adopted for consistency with the other components in
-`src/components/ui/`, and it needs three edits on arrival:
+`src/components/ui/`, and it needs four edits on arrival:
 
 1. `Table` hardcodes a wrapper `<div className="relative w-full
    overflow-x-auto">`, and the `className` prop lands on the inner `<table>`,
-   not the div. The wrapper becomes `md:overflow-x-auto` so horizontal
-   scrolling never applies at the card breakpoint.
+   not the div. The wrapper becomes `md:max-h-[calc(100vh-14rem)]
+   md:overflow-auto`, so it is a genuine scroll container above the card
+   breakpoint and no container at all below it. The height constraint is what
+   makes the sticky header work; see below.
 2. `TableCell` and `TableHead` carry `whitespace-nowrap`, which is right for a
    table row and wrong for a stacked card. Both become `whitespace-normal
    md:whitespace-nowrap`.
-3. shadcn rules rows with a single `border-b` on `TableRow` and puts no border
-   on cells. The mobile CSS uses each cell's `border-bottom` as the card's
-   internal divider, so `.admin-table tbody td` keeps its own bottom border
-   under 768px. Above that breakpoint the admin tables lose today's full grid
-   lines and become row-ruled. This is an intended visual change.
+3. The `<table>` gets `border-separate border-spacing-0`. A sticky header
+   requires this: `position: sticky` on a `th` does not hold under
+   `border-collapse: collapse` in most engines, which is what both the browser
+   default and the current `admin-table.tsx:11` markup use.
+4. The row rule moves off `TableRow` and onto the cells. In the separated
+   border model a `<tr>` cannot paint a border at all, so shadcn's
+   `TableRow` `border-b` would silently render nothing once edit 3 lands.
+   `TableHead` and `TableCell` each take the `border-b` instead. This also
+   preserves what the mobile CSS depends on, since it uses each cell's
+   `border-bottom` as the card's internal divider.
+
+Above the card breakpoint the admin tables therefore lose today's full grid
+lines and become row-ruled. That is an intended visual change.
 
 Recording these edits matters because the component is copy-owned: there is no
 upstream to sync with, and a future reader needs to know which divergences are
-deliberate.
+deliberate, particularly edits 3 and 4, which look like arbitrary style churn
+until you know the sticky header is what forced them.
 
 ### `src/components/admin-data-table.tsx` (new)
 
@@ -93,7 +108,6 @@ interface AdminDataTableProps<T> {
   caption: string;          // rendered in <TableCaption>, for screen readers
   columns: ColumnDef<T>[];
   data: T[];
-  defaultHidden: string[];  // column ids hidden until the user says otherwise
   defaultSort: { id: string; desc: boolean };
   emptyMessage: string;
   getRowId: (row: T) => string;
@@ -105,6 +119,14 @@ interface AdminDataTableProps<T> {
 Pages supply column definitions and their filter controls; everything else is
 shared. `getRowId` is required rather than optional, for the reason given under
 Feature D.
+
+There is deliberately no `defaultHidden` prop. Whether a column starts hidden
+lives on the column definition itself, as `meta: { defaultHidden: true }`, and
+`AdminDataTable` derives the initial visibility state by reading it. One source
+of truth means the per-page column tables below map one to one onto code, and
+it removes the possibility of a column being listed as hidden by default while
+also setting `enableHiding: false`, a combination that would be unreachable
+from the UI.
 
 The rendered table keeps `className="admin-table"` so the existing mobile CSS
 applies unchanged, and every body cell emits `data-label` derived from its
@@ -240,8 +262,18 @@ container at `md` and up; the mobile card view is unaffected. The other admin
 list pages (`users`, `categories`, `programs`) keep their current narrow layout
 and are out of scope.
 
-`thead th` gets `position: sticky; top: 0` at `md` and up only, since `thead` is
-`display: none` below that breakpoint.
+The header pins at `md` and up only, since `thead` is `display: none` below that
+breakpoint. Three things have to hold together for it to actually stick, and
+all three are already accounted for in the `table.tsx` edits:
+
+- the wrapper is a height-constrained scroll container, so `top: 0` has
+  something to stick against rather than being pinned to the top of a table
+  that scrolls away with the page;
+- the table is `border-separate` with zero spacing, since sticky positioning on
+  a `th` does not hold under `border-collapse: collapse`;
+- each `th` carries an opaque background (`bg-secondary`, matching today's
+  header) and a `z-index`, or the body rows show through as they scroll under
+  it.
 
 ### `/admin/inventory`
 
@@ -326,7 +358,10 @@ and sortable headers plus a column menu are both new interactive surfaces.
 - `<th scope="col">` with a real `<button>` inside, and `aria-sort` on the `th`.
 - The column menu is Radix `DropdownMenu`, so keyboard operation, focus
   trapping, and `aria-checked` come from the primitive.
-- `<TableCaption>` names each table.
+- `<TableCaption>` names each table, rendered as the **first** child of
+  `<Table>`, before `<TableHeader>`. shadcn styles it `caption-bottom` so it
+  appears below visually, but the HTML spec requires `<caption>` to be the
+  table's first child and axe flags it otherwise.
 - A visually hidden `aria-live="polite"` region announces the row count after
   filtering ("24 items"), since the table can change size with no visible
   focus change.
@@ -360,8 +395,12 @@ and sortable headers plus a column menu are both new interactive surfaces.
 **Accessibility (`playwright`):**
 
 - `admin.a11y.test.ts` gains an interaction pass on `/admin/inventory`: open
-  the column menu, activate a sort header, then `checkA11y`. The existing
-  static route checks for all three pages stay.
+  the column menu, activate a sort header, then `checkA11y`.
+- The existing static route checks for all three pages stay, but they are not
+  assumed to keep passing. Each page is now a new markup surface for axe
+  (`scope`, `aria-sort` values, caption position, the dropdown trigger's
+  accessible name), so the suite runs at the end of every phase and any new
+  violation blocks that phase rather than being carried forward.
 
 ---
 
