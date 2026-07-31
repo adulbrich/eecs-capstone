@@ -89,6 +89,7 @@ function ProjectsList() {
               ? "pointer-events-none text-muted-foreground/40"
               : "hover:underline"
           }
+          from="/projects/"
           search={(prev) => ({ ...prev, page: Math.max(1, page - 1) })}
           to="/projects"
         >
@@ -103,6 +104,7 @@ function ProjectsList() {
               ? "pointer-events-none text-muted-foreground/40"
               : "hover:underline"
           }
+          from="/projects/"
           search={(prev) => ({ ...prev, page: Math.min(totalPages, page + 1) })}
           to="/projects"
         >

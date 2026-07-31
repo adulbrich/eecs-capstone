@@ -4,10 +4,14 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
-import { AdminTable } from "#/components/admin-table";
+import {
+  type AdminColumn,
+  AdminDataTable,
+} from "#/components/admin-data-table";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
+import { LocalTime } from "#/components/local-time";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -29,7 +33,15 @@ import {
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { getPublicUrl } from "#/lib/storage";
-import { listInventory } from "#/server/inventory";
+import {
+  type AdminTableSearch,
+  type SortState,
+  useAdminTableState,
+} from "#/lib/table-state";
+import {
+  listAdminInventory,
+  listInventoryCategories,
+} from "#/server/inventory";
 
 const STATUSES = [
   "available",
@@ -42,9 +54,12 @@ const STATUSES = [
 type Status = (typeof STATUSES)[number];
 
 const searchSchema = z.object({
+  category: z.string().nullable().default(null),
+  cols: z.string().optional(),
+  dir: z.enum(["asc", "desc"]).optional(),
   q: z.string().default(""),
+  sort: z.string().optional(),
   status: z.enum(STATUSES).nullable().default(null),
-  page: z.number().int().min(1).default(1),
 });
 
 export const Route = createFileRoute("/_authed/admin/inventory/")({
@@ -59,36 +74,171 @@ export const Route = createFileRoute("/_authed/admin/inventory/")({
       throw redirect({ to: "/" });
     }
   },
-  loaderDeps: ({ search }) => search,
-  loader: async ({ deps }) =>
-    await listInventory({
-      data: {
-        q: deps.q,
-        status: deps.status,
-        category: null,
-        page: deps.page,
-        pageSize: 20,
-      },
-    }),
+  // Only the filter fields: sort and column visibility are client state and
+  // must not re-run the loader.
+  loaderDeps: ({ search }) => ({
+    category: search.category,
+    q: search.q,
+    status: search.status,
+  }),
+  loader: async ({ deps }) => {
+    const [items, categories] = await Promise.all([
+      listAdminInventory({ data: deps }),
+      listInventoryCategories(),
+    ]);
+    return { categories: categories.categories, rows: items.rows };
+  },
   component: AdminInventory,
 });
 
-interface StaffRow {
-  category: string | null;
-  currentHolderId?: string | null;
-  currentHolderLabel?: string | null;
-  currentHolderName?: string | null;
-  id: string;
-  imageUrl: string | null;
-  location: string | null;
-  name: string;
-  status: string;
-}
+type Row = Awaited<ReturnType<typeof listAdminInventory>>["rows"][number];
+
+const STATUS_ORDER: Record<string, number> = {
+  available: 0,
+  requested: 1,
+  reserved: 2,
+  checked_out: 3,
+  maintenance: 4,
+};
+
+const DEFAULT_SORT: SortState = { desc: true, id: "updatedAt" };
+
+const COLUMNS: AdminColumn<Row>[] = [
+  {
+    accessorFn: (row) => row.name,
+    cell: ({ row }) => {
+      const img = getPublicUrl(row.original.imageUrl);
+      return (
+        <div className="flex items-center gap-2">
+          {img ? (
+            <img alt="" className="h-8 w-8 rounded object-cover" src={img} />
+          ) : (
+            <div className="h-8 w-8 rounded bg-secondary" />
+          )}
+          <Link
+            className="hover:underline"
+            params={{ itemId: row.original.id }}
+            to="/inventory/$itemId"
+          >
+            {row.original.name}
+          </Link>
+        </div>
+      );
+    },
+    enableHiding: false,
+    header: "Name",
+    id: "name",
+  },
+  {
+    // Alphabetical status order means nothing to a reader; this is the order
+    // an item actually moves through.
+    accessorFn: (row) => STATUS_ORDER[row.status] ?? 99,
+    cell: ({ row }) => (
+      <InventoryStatusBadge
+        showRetired
+        status={row.original.status as Status}
+      />
+    ),
+    header: "Status",
+    id: "status",
+  },
+  {
+    accessorFn: (row) =>
+      row.currentHolderName ?? row.currentHolderLabel ?? undefined,
+    cell: ({ row }) =>
+      row.original.currentHolderName ??
+      row.original.currentHolderLabel ??
+      (row.original.currentHolderId ? "(user)" : "-"),
+    header: "Holder",
+    id: "holder",
+    sortUndefined: "last",
+  },
+  {
+    accessorFn: (row) => row.location ?? undefined,
+    cell: ({ row }) => row.original.location ?? "-",
+    header: "Location",
+    id: "location",
+    sortUndefined: "last",
+  },
+  {
+    accessorFn: (row) => row.category ?? undefined,
+    cell: ({ row }) => row.original.category ?? "-",
+    header: "Category",
+    id: "category",
+    sortUndefined: "last",
+  },
+  {
+    accessorFn: (row) => row.label ?? undefined,
+    cell: ({ row }) => row.original.label ?? "-",
+    defaultHidden: true,
+    header: "Label",
+    id: "label",
+    sortUndefined: "last",
+  },
+  {
+    accessorFn: (row) => row.serial ?? undefined,
+    cell: ({ row }) => row.original.serial ?? "-",
+    defaultHidden: true,
+    header: "Serial",
+    id: "serial",
+    sortUndefined: "last",
+  },
+  {
+    accessorFn: (row) => row.dueAt ?? undefined,
+    cell: ({ row }) =>
+      row.original.dueAt ? (
+        <LocalTime dateOnly value={row.original.dueAt} />
+      ) : (
+        "-"
+      ),
+    defaultHidden: true,
+    header: "Due",
+    id: "dueAt",
+    // Values arrive as Date instances (or ISO strings); the default "text"
+    // sortingFn would compare their String() forms, which starts with the
+    // weekday name and sorts nothing chronologically.
+    sortingFn: "datetime",
+    sortUndefined: "last",
+  },
+  {
+    accessorFn: (row) => row.updatedAt,
+    cell: ({ row }) => <LocalTime dateOnly value={row.original.updatedAt} />,
+    defaultHidden: true,
+    header: "Updated",
+    id: "updatedAt",
+    sortingFn: "datetime",
+  },
+  {
+    accessorFn: (row) => row.createdAt,
+    cell: ({ row }) => <LocalTime dateOnly value={row.original.createdAt} />,
+    defaultHidden: true,
+    header: "Created",
+    id: "createdAt",
+    sortingFn: "datetime",
+  },
+  {
+    cell: ({ row }) => (
+      <Link
+        className="hover:underline"
+        params={{ itemId: row.original.id }}
+        to="/inventory/$itemId/edit"
+      >
+        Edit
+      </Link>
+    ),
+    enableHiding: false,
+    enableSorting: false,
+    header: "Actions",
+    id: "actions",
+  },
+];
 
 function AdminInventory() {
   const navigate = useNavigate({ from: "/admin/inventory/" });
-  const { rows, total, page, pageSize } = Route.useLoaderData();
-  const { q, status } = Route.useSearch();
+  const { categories, rows } = Route.useLoaderData();
+  // The whole search object goes to the hook, which reads cols/dir/sort.
+  const search = Route.useSearch();
+  const { category, q, status } = search;
   const [qDraft, setQDraft] = useState(q);
 
   useEffect(() => setQDraft(q), [q]);
@@ -96,18 +246,37 @@ function AdminInventory() {
   useEffect(() => {
     const t = setTimeout(() => {
       if (qDraft !== q) {
-        void navigate({
-          search: (prev) => ({ ...prev, q: qDraft, page: 1 }),
-        });
+        void navigate({ search: (prev) => ({ ...prev, q: qDraft }) });
       }
     }, 300);
     return () => clearTimeout(t);
   }, [qDraft, q, navigate]);
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const setSearch = useCallback(
+    (patch: AdminTableSearch) =>
+      void navigate({ search: (prev) => ({ ...prev, ...patch }) }),
+    [navigate]
+  );
+  const replaceSearch = useCallback(
+    (patch: AdminTableSearch) =>
+      void navigate({
+        replace: true,
+        search: (prev) => ({ ...prev, ...patch }),
+      }),
+    [navigate]
+  );
+
+  const { hidden, onHiddenChange, onSortChange, sort } = useAdminTableState({
+    columns: COLUMNS,
+    defaultSort: DEFAULT_SORT,
+    replaceSearch,
+    search,
+    setSearch,
+    storageKey: "inventory",
+  });
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
+    <div className="px-4 py-6 md:px-8">
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -133,135 +302,86 @@ function AdminInventory() {
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-end gap-3">
-        <div>
-          <Label htmlFor="inv-search">Search</Label>
-          <Input
-            className="mt-1 w-48"
-            id="inv-search"
-            onChange={(e) => setQDraft(e.target.value)}
-            placeholder="Name or description"
-            type="search"
-            value={qDraft}
-          />
-        </div>
-        <div>
-          <Label htmlFor="inv-status">Status</Label>
-          <Select
-            onValueChange={(v) =>
-              void navigate({
-                search: (prev) => ({
-                  ...prev,
-                  status: (v === "_all_" ? null : v) as Status | null,
-                  page: 1,
-                }),
-              })
-            }
-            value={status ?? "_all_"}
-          >
-            <SelectTrigger className="mt-1 w-40" id="inv-status">
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="_all_">All statuses</SelectItem>
-              {STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s.replace(/_/g, " ")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <AdminTable
-        columns={["Name", "Status", "Holder", "Location", "Category", ""]}
-      >
-        {rows.map((r) => {
-          const row = r as unknown as StaffRow;
-          const img = getPublicUrl(row.imageUrl);
-          const holder =
-            row.currentHolderName ??
-            row.currentHolderLabel ??
-            (row.currentHolderId ? "(user)" : "");
-          return (
-            <tr key={row.id}>
-              <td className="border border-border p-2" data-label="Name">
-                <div className="flex items-center gap-2">
-                  {img ? (
-                    <img
-                      alt=""
-                      className="h-8 w-8 rounded object-cover"
-                      src={img}
-                    />
-                  ) : (
-                    <div className="h-8 w-8 rounded bg-secondary" />
-                  )}
-                  <Link
-                    className="hover:underline"
-                    params={{ itemId: row.id }}
-                    to="/inventory/$itemId"
-                  >
-                    {row.name}
-                  </Link>
-                </div>
-              </td>
-              <td className="border border-border p-2" data-label="Status">
-                <InventoryStatusBadge
-                  showRetired
-                  status={row.status as Status}
-                />
-              </td>
-              <td className="border border-border p-2" data-label="Holder">
-                {holder || "-"}
-              </td>
-              <td className="border border-border p-2" data-label="Location">
-                {row.location ?? "-"}
-              </td>
-              <td className="border border-border p-2" data-label="Category">
-                {row.category ?? "-"}
-              </td>
-              <td className="border border-border p-2">
-                <Link
-                  className="hover:underline"
-                  params={{ itemId: row.id }}
-                  to="/inventory/$itemId/edit"
-                >
-                  Edit
-                </Link>
-              </td>
-            </tr>
-          );
-        })}
-      </AdminTable>
-
-      <div className="mt-6 flex items-center justify-between text-sm">
-        <Link
-          className={
-            page <= 1
-              ? "pointer-events-none text-muted-foreground/40"
-              : "hover:underline"
-          }
-          search={{ q, status, page: Math.max(1, page - 1) }}
-          to="/admin/inventory"
-        >
-          Previous
-        </Link>
-        <span className="text-muted-foreground">
-          Page {page} of {totalPages}
-        </span>
-        <Link
-          className={
-            page >= totalPages
-              ? "pointer-events-none text-muted-foreground/40"
-              : "hover:underline"
-          }
-          search={{ q, status, page: Math.min(totalPages, page + 1) }}
-          to="/admin/inventory"
-        >
-          Next
-        </Link>
-      </div>
+      <AdminDataTable
+        caption="Inventory items"
+        columns={COLUMNS}
+        data={rows}
+        defaultSort={DEFAULT_SORT}
+        emptyMessage="No items in this view."
+        getRowId={(row) => row.id}
+        hidden={hidden}
+        onHiddenChange={onHiddenChange}
+        onSortChange={onSortChange}
+        sort={sort}
+        storageKey="inventory"
+        toolbar={
+          <>
+            <div>
+              <Label htmlFor="inv-search">Search</Label>
+              <Input
+                className="mt-1 w-48"
+                id="inv-search"
+                onChange={(e) => setQDraft(e.target.value)}
+                placeholder="Name or description"
+                type="search"
+                value={qDraft}
+              />
+            </div>
+            <div>
+              <Label htmlFor="inv-status">Status</Label>
+              <Select
+                onValueChange={(v) =>
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      status: (v === "_all_" ? null : v) as Status | null,
+                    }),
+                  })
+                }
+                value={status ?? "_all_"}
+              >
+                <SelectTrigger className="mt-1 w-40" id="inv-status">
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all_">All statuses</SelectItem>
+                  {STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="inv-category">Category</Label>
+              <Select
+                onValueChange={(v) =>
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      category: v === "_all_" ? null : v,
+                    }),
+                  })
+                }
+                value={category ?? "_all_"}
+              >
+                <SelectTrigger className="mt-1 w-40" id="inv-category">
+                  <SelectValue placeholder="All categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all_">All categories</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        }
+      />
     </div>
   );
 }
