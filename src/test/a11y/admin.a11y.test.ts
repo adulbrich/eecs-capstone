@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { checkA11y } from "./helpers";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -35,6 +35,11 @@ test("inventory new (staff)", async ({ page }) => {
 
 test("inventory item detail (staff)", async ({ page }) => {
   await page.goto(`/inventory/${itemId}`);
+  // Counterpart to the public suite's absence assertion: prove the staff
+  // panel actually renders for a staff viewer rather than trusting the
+  // conditional (a regression pinning viewerIsStaff to false would
+  // otherwise still pass every a11y check).
+  await expect(page.getByText("Staff panel")).not.toHaveCount(0);
   await checkA11y(page);
 });
 

@@ -16,3 +16,15 @@ export const PRIVATE_NOTES_PROJECT_HINT =
 
 export const PRIVATE_NOTES_INVENTORY_HINT =
   "Only visible to staff, e.g. locker codes or storage location details. Never shown publicly.";
+
+/**
+ * Audience line for the project page's private panel, which bundles private
+ * notes together with status history and comments. PRIVATE_NOTES_PROJECT_HINT
+ * above describes the notes field alone, on the form where a proposer writes
+ * them; this constant describes the whole read-back region, which both the
+ * proposer and staff can view. It intentionally names both audiences instead
+ * of using "you", since a staff viewer reading someone else's project is not
+ * the owner the word "you" would imply.
+ */
+export const PRIVATE_PANEL_AUDIENCE_HINT =
+  "Only visible to the proposer and program staff. Never shown publicly.";

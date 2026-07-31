@@ -1,4 +1,7 @@
-import { PRIVATE_NOTES_LABEL } from "#/lib/private-notes";
+import {
+  PRIVATE_NOTES_LABEL,
+  PRIVATE_PANEL_AUDIENCE_HINT,
+} from "#/lib/private-notes";
 import { CommentThread } from "./comment-thread";
 import { SectionHeading } from "./section-heading";
 import { StatusTimeline } from "./status-timeline";
@@ -35,7 +38,7 @@ export function ProjectPrivatePanel({
     <div className="mt-8 rounded-lg border border-border bg-(--surface-sunken) p-4">
       <SectionHeading>Private</SectionHeading>
       <p className="mt-1 text-muted-foreground text-sm">
-        Only visible to you and program staff. Never shown publicly.
+        {PRIVATE_PANEL_AUDIENCE_HINT}
       </p>
 
       {notes && (
