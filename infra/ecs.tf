@@ -92,9 +92,18 @@ resource "aws_ecs_task_definition" "app" {
         { name = "BEDROCK_EMBEDDING_MODEL_ID", value = var.bedrock_embedding_model_id },
         { name = "BEDROCK_EMBEDDING_DIMENSIONS", value = var.bedrock_embedding_dimensions },
         # Logs verification/reset links to CloudWatch instead of sending real
-        # email. Switch to "ses" (and set EMAIL_FROM/SES_REGION) once SES is
-        # configured.
+        # email. Flip to "ses" only after the DKIM CNAMEs resolve and the
+        # identity reads SUCCESS; sending from an unverified domain fails
+        # outright, which would break sign-up rather than degrade it.
         { name = "EMAIL_TRANSPORT", value = "console" },
+        # Inert while EMAIL_TRANSPORT=console. Set now so the cutover is a
+        # one-line change. The From domain must match the verified identity or
+        # DKIM alignment fails, so both derive from var.domain_name.
+        { name = "EMAIL_FROM", value = "noreply@${var.domain_name}" },
+        # src/lib/email/ses-sender.ts falls back to us-east-1. The identity
+        # lives in var.region, and the mismatch surfaces only as an opaque
+        # "email address not verified" error, so pin it explicitly.
+        { name = "SES_REGION", value = var.region },
       ]
 
       secrets = [

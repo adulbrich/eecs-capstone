@@ -214,6 +214,13 @@ send both records to EECS IT in one ticket, and note in the ticket that record 1
 returns `403` until `terraform apply` attaches the alias, so an early test
 failure is expected rather than a bad request.
 
+Once the site CNAME resolves, point `BETTER_AUTH_URL` (`infra/ecs.tf`) and the
+`app_url` output at `var.domain_name`, and swap the GitHub OAuth callback URL
+in the same window (GitHub allows one per app, so it is a hard cutover).
+Applying alone does not move `BETTER_AUTH_URL`: the service carries
+`ignore_changes = [task_definition]`, so the value reaches the container only
+on the next deploy. See section 9.5 for the same mechanism in more detail.
+
 ---
 
 ## 4. Post-apply configuration
@@ -376,23 +383,124 @@ Migrations run during deploy. To run them out of band, use the same
 
 ## 9. Adding real email delivery
 
-Email is deferred until an email provider is set up. The app already supports
-SES as a transport (`src/lib/email/ses-sender.ts`); wiring it up is
-infrastructure, not code:
+The app sends from `noreply@capstone.eecs.oregonstate.edu` via SES
+(`src/lib/email/ses-sender.ts`). The code is done; what remains is a domain
+identity, DNS records OSU has to publish, and production access.
 
-1. Add back an `aws_sesv2_email_identity` resource (verified sender, ideally a
-   domain rather than a single address) and an IAM statement granting the ECS
-   task role `ses:SendEmail`.
-2. In `infra/ecs.tf`, set `EMAIL_TRANSPORT=ses`, `EMAIL_FROM=<verified
-   identity>`, and `SES_REGION`.
-3. `terraform apply`, then confirm the identity verification email.
-4. While SES is in the **sandbox**, it can only send to verified recipients —
-   verify any test/admin addresses with
-   `aws --profile aws-capstone1 sesv2 create-email-identity --email-identity <addr> --region us-west-2`.
-   Request production access from the SES console to email arbitrary users.
+`infra/ses.tf` and the `SendEmail` statement in `infra/iam.tf` are already in
+place. `EMAIL_FROM` and `SES_REGION` are already set in `infra/ecs.tf` and are
+inert while `EMAIL_TRANSPORT=console`, so the cutover is a one-line change.
 
-Until this is done, sign-up still works, but verification/reset links only
-reach CloudWatch logs (section 6), not real inboxes.
+**A domain identity, not an address identity.** SES verifies an address
+identity by emailing it a confirmation link that a human must click, and
+`noreply@` has no mailbox. Domain identity is the only workable option here.
+
+### 9.1 Why DKIM is mandatory
+
+`oregonstate.edu` publishes `v=DMARC1; p=reject` with no `sp=` override. Under
+RFC 7489 policy discovery a receiver looks up `_dmarc.<the exact domain>`,
+finds nothing, and then jumps straight to the organizational domain
+`_dmarc.oregonstate.edu`, skipping intermediate labels. The `p=none` on
+`eecs.oregonstate.edu` therefore does **not** apply to
+`capstone.eecs.oregonstate.edu`. (Newer tree-walk discovery would find it, so
+behavior varies by receiver; assume the strict reading.)
+
+Unaligned mail is rejected outright, not spam-foldered. DKIM alignment is the
+whole game, which is why `EMAIL_FROM` derives from `var.domain_name`: the
+`From:` domain must match the DKIM `d=` domain.
+
+SPF alignment is not required. DMARC passes on either SPF *or* DKIM, and
+without a custom MAIL FROM domain SES uses an `amazonses.com` envelope sender,
+which never aligns. A custom MAIL FROM domain adds robustness through
+forwarding but needs `MX` and `TXT` records, so treat it as a later
+improvement rather than part of this setup.
+
+### 9.2 Get the DKIM records
+
+```bash
+cd infra
+terraform apply          # creates the identity; generates the DKIM tokens
+terraform output ses_dkim_records
+```
+
+This yields three CNAMEs of the form
+`<token>._domainkey.capstone.eecs.oregonstate.edu` →
+`<token>.dkim.amazonses.com`.
+
+### 9.3 The OSU ticket
+
+Send EECS IT all three records. Two things to state explicitly:
+
+- **They are permanent.** SES re-checks them and will mark the domain
+  unverified if they disappear, silently killing sign-up.
+- **They sit below a name that is itself a CNAME** to CloudFront. A CNAME may
+  not share its own label with other records, but records at *descendant*
+  names are a grey area that some DNS implementations refuse. Ask whether
+  their tooling accepts it.
+
+If it does not, verify a sibling name instead, for example
+`mail.eecs.oregonstate.edu`, and send from `noreply@mail.eecs.oregonstate.edu`.
+No CNAME sits at that label, so DKIM records land cleanly. Set `var.domain_name`
+aside and give `infra/ses.tf` its own variable in that case, since the sending
+domain and the site domain would no longer be the same string.
+
+Check progress without waiting on a ticket reply:
+
+```bash
+aws --profile aws-capstone1 sesv2 get-email-identity \
+  --email-identity capstone.eecs.oregonstate.edu --region us-west-2 \
+  --query '{Verified:VerifiedForSendingStatus,Dkim:DkimAttributes.Status}'
+```
+
+### 9.4 Leave the sandbox
+
+A new account is capped at 200 messages/day, 1/second, **and can only send to
+verified addresses**. Check with:
+
+```bash
+aws --profile aws-capstone1 sesv2 get-account --region us-west-2 \
+  --query 'ProductionAccessEnabled'
+```
+
+`false` means sandbox. Request production access from the SES console (Account
+dashboard → Request production access). It goes to AWS Support with roughly a
+day's turnaround and is independent of the DNS work, so file it early. Expect
+to describe the sending use case, volume, and how bounces are handled.
+
+To test before it clears, verify individual recipients:
+
+```bash
+aws --profile aws-capstone1 sesv2 create-email-identity \
+  --email-identity you@example.com --region us-west-2
+```
+
+### 9.5 Cut over
+
+Only once `VerifiedForSendingStatus` is `true` **and** production access is
+granted, flip `EMAIL_TRANSPORT` to `"ses"` in `infra/ecs.tf` and apply.
+Sending from an unverified domain fails outright, so flipping early breaks
+sign-up rather than degrading it.
+
+**Applying is not enough.** `aws_ecs_service.app` carries
+`ignore_changes = [task_definition, desired_count]`, so `terraform apply`
+registers a new task definition revision and deliberately leaves the service
+on the old one. Environment variables reach the running container only when
+the deploy workflow next runs: it reads the latest ACTIVE revision, swaps in
+the freshly built image, and updates the service. So the cutover is apply
+**then** deploy. This is why `terraform apply` reporting success is not
+evidence that email is on; confirm with a real sign-up instead.
+
+Until then sign-up still works, but verification and reset links reach only
+CloudWatch logs (section 6), not real inboxes.
+
+### 9.6 SES console wizard
+
+The console's getting-started wizard maps onto the above loosely. Step 1 asks
+for an email address, which is a **sandbox test recipient**, not your sender.
+Step 2 is the domain identity that actually matters. Step 3's pricing plan is
+Virtual Deliverability Manager, which is paid and unnecessary at this scale.
+Steps 4 through 6 (deliverability enhancements, dedicated IP pools, tenant
+management) are for high-volume senders and should be skipped.
 
 ---
 
