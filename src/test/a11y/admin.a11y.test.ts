@@ -458,10 +458,18 @@ test("admin categories table interactions", async ({ page }) => {
   await page.getByRole("button", { name: "Columns" }).click();
   await checkA11y(page);
   await closeMenu(page);
-  await page.getByRole("button", { name: "Type", exact: true }).click();
-  await expect(
-    page.getByRole("columnheader", { name: "Type", exact: true })
-  ).toHaveAttribute("aria-sort", /ascending|descending/);
+  // Not "Type": that's this page's default sort column (see DEFAULT_SORT in
+  // the route), so its header already carries aria-sort="ascending" before
+  // any click, which would make the assertion below pass even if the click
+  // silently no-oped. "Name" starts unsorted, so a passing assertion here
+  // can only mean the click actually did something. Capturing the before
+  // state and asserting a change closes the same hole permanently, in case
+  // a future default-sort change ever put a table back in this position.
+  const header = page.getByRole("columnheader", { name: "Name", exact: true });
+  const before = await header.getAttribute("aria-sort");
+  await page.getByRole("button", { name: "Name", exact: true }).click();
+  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/);
+  expect(await header.getAttribute("aria-sort")).not.toBe(before);
   await checkA11y(page);
 });
 
@@ -471,10 +479,14 @@ test("admin programs table interactions", async ({ page }) => {
   await page.getByRole("button", { name: "Columns" }).click();
   await checkA11y(page);
   await closeMenu(page);
+  const header = page.getByRole("columnheader", {
+    exact: true,
+    name: "Course name",
+  });
+  const before = await header.getAttribute("aria-sort");
   await page.getByRole("button", { name: "Course name", exact: true }).click();
-  await expect(
-    page.getByRole("columnheader", { name: "Course name", exact: true })
-  ).toHaveAttribute("aria-sort", /ascending|descending/);
+  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/);
+  expect(await header.getAttribute("aria-sort")).not.toBe(before);
   await checkA11y(page);
 });
 
@@ -484,10 +496,11 @@ test("admin users table interactions", async ({ page }) => {
   await page.getByRole("button", { name: "Columns" }).click();
   await checkA11y(page);
   await closeMenu(page);
+  const header = page.getByRole("columnheader", { exact: true, name: "Email" });
+  const before = await header.getAttribute("aria-sort");
   await page.getByRole("button", { name: "Email", exact: true }).click();
-  await expect(
-    page.getByRole("columnheader", { name: "Email", exact: true })
-  ).toHaveAttribute("aria-sort", /ascending|descending/);
+  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/);
+  expect(await header.getAttribute("aria-sort")).not.toBe(before);
   await checkA11y(page);
 });
 
@@ -501,13 +514,20 @@ test("admin users table sort header activates via keyboard", async ({
 }) => {
   await page.goto("/admin/users");
   await waitForHydration(page);
+  const columnHeader = page.getByRole("columnheader", {
+    exact: true,
+    name: "Name",
+  });
+  const before = await columnHeader.getAttribute("aria-sort");
   const header = page.getByRole("button", { name: "Name", exact: true });
   await header.focus();
   await expect(header).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(
-    page.getByRole("columnheader", { name: "Name", exact: true })
-  ).toHaveAttribute("aria-sort", /ascending|descending/);
+  await expect(columnHeader).toHaveAttribute(
+    "aria-sort",
+    /ascending|descending/
+  );
+  expect(await columnHeader.getAttribute("aria-sort")).not.toBe(before);
 });
 
 test("admin users list: sorting a column reorders the rendered rows, not just the URL", async ({
@@ -515,6 +535,11 @@ test("admin users list: sorting a column reorders the rendered rows, not just th
 }) => {
   await page.goto("/admin/users");
   await waitForHydration(page);
+  const header = page.getByRole("columnheader", {
+    exact: true,
+    name: "Email",
+  });
+  const beforeSort = await header.getAttribute("aria-sort");
   const beforeRows = await page
     .locator(".admin-table tbody tr")
     .allTextContents();
@@ -523,16 +548,18 @@ test("admin users list: sorting a column reorders the rendered rows, not just th
   expect(beforeRows.length).toBeGreaterThan(0);
 
   await page.getByRole("button", { name: "Email", exact: true }).click();
-  await expect(
-    page.getByRole("columnheader", { name: "Email", exact: true })
-  ).toHaveAttribute("aria-sort", /ascending|descending/);
+  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/);
+  expect(await header.getAttribute("aria-sort")).not.toBe(beforeSort);
   await expect(page).toHaveURL(/[?&]sort=email(&|$)/);
   await expect(page).toHaveURL(/[?&]dir=(asc|desc)(&|$)/);
 
-  // AdminDataTable is given serverSorted on this route, which turns off its
-  // own client-side reordering entirely. There is nothing left in the
-  // browser that could have changed this row order except the new request
-  // that clicking the header sent to the server.
+  // sort/dir are in this route's loaderDeps, so the header click above sent
+  // a new request and the loader returned a (possibly) different page,
+  // which is what the row comparison below actually tests. That is not the
+  // same claim as "serverSorted/manualSorting is wired correctly": resorting
+  // an already server-ordered set of unique rows client-side is a no-op, so
+  // this test would still pass even if that prop were broken. serverSorted
+  // itself is covered by the admin-data-table unit tests, not here.
   const afterRows = await page
     .locator(".admin-table tbody tr")
     .allTextContents();
@@ -548,8 +575,10 @@ test("admin users list: sorting from page 2 returns to page 1", async ({
   // fixtures global-setup.ts creates, or the sort header below would not be
   // in the DOM (AdminDataTable renders its empty state instead of a table
   // once rows.length is 0) and the click after this would throw rather than
-  // prove anything about the page reset.
-  await expect(page.getByText(/^Page 2 of \d+$/)).toBeVisible();
+  // prove anything about the page reset. Requiring totalPages >= 2 (not just
+  // \d+) matters here: "Page 2 of 1" would satisfy a bare \d+ pattern too,
+  // which is exactly the broken-fixture case this control exists to catch.
+  await expect(page.getByText(/^Page 2 of [2-9]\d*$/)).toBeVisible();
 
   await page.getByRole("button", { name: "Email", exact: true }).click();
 
