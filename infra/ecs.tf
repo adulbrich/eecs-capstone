@@ -83,7 +83,11 @@ resource "aws_ecs_task_definition" "app" {
       environment = [
         { name = "NODE_ENV", value = "production" },
         { name = "PORT", value = tostring(var.app_port) },
-        { name = "BETTER_AUTH_URL", value = "https://${aws_cloudfront_distribution.app.domain_name}" },
+        # better-auth derives trustedOrigins from this value and reads it
+        # before it will consider x-forwarded-host, so trustHost does not
+        # cover a hostname that disagrees with it: requests from any other
+        # origin fail the origin check with INVALID_ORIGIN.
+        { name = "BETTER_AUTH_URL", value = "https://${var.domain_name}" },
         { name = "GITHUB_CLIENT_ID", value = var.github_client_id },
         { name = "S3_BUCKET", value = aws_s3_bucket.assets.bucket },
         { name = "S3_REGION", value = var.region },

@@ -20,9 +20,11 @@ Internet ──► CloudFront "app"  ──(VPC origin)──► internal ALB �
 
 - **Compute**: ECS Fargate, single arm64 task, in public subnets (public IP is
   used only for outbound; inbound is locked to the ALB).
-- **Ingress**: CloudFront is the only public entry point. It gives a stable
-  HTTPS `*.cloudfront.net` URL with no custom domain. The ALB is internal (no
-  public IP) and is reached through a CloudFront VPC origin.
+- **Ingress**: CloudFront is the only public entry point, served at
+  `capstone.eecs.oregonstate.edu` (section 3.7). The ALB is internal (no public
+  IP) and is reached through a CloudFront VPC origin. Uploaded assets stay on
+  the second distribution's `*.cloudfront.net` name; only the app has a custom
+  domain.
 - **Data**: RDS Postgres (not publicly accessible) and a private S3 bucket
   served through a second CloudFront distribution via Origin Access Control.
 - **Secrets/identity**: app credentials come from the ECS task role (no static
@@ -202,8 +204,10 @@ What exists today, created by hand:
 Two DNS records live in OSU's zone and must both stay in place:
 
 1. `capstone.eecs.oregonstate.edu` CNAME → the app distribution's
-   `*.cloudfront.net` domain (`terraform output app_url`). Without the matching
-   `aliases` entry on the distribution, CloudFront answers `403` for this host.
+   `*.cloudfront.net` domain (`terraform output app_distribution_domain`;
+   `app_url` returns the custom domain and so cannot give you the target).
+   Without the matching `aliases` entry on the distribution, CloudFront answers
+   `403` for this host.
 2. `_7b5da3599a6223875e6bf5dee1000c5a.eecs.oregonstate.edu` CNAME →
    `_eaf2da48d6e94e7e570d398eedce87f0.jkddzztszm.acm-validations.aws`. **This is
    permanent.** ACM re-validates against it to auto-renew around December 2026.
@@ -214,12 +218,20 @@ send both records to EECS IT in one ticket, and note in the ticket that record 1
 returns `403` until `terraform apply` attaches the alias, so an early test
 failure is expected rather than a bad request.
 
-Once the site CNAME resolves, point `BETTER_AUTH_URL` (`infra/ecs.tf`) and the
-`app_url` output at `var.domain_name`, and swap the GitHub OAuth callback URL
-in the same window (GitHub allows one per app, so it is a hard cutover).
-Applying alone does not move `BETTER_AUTH_URL`: the service carries
-`ignore_changes = [task_definition]`, so the value reaches the container only
-on the next deploy. See section 9.5 for the same mechanism in more detail.
+The cutover to this hostname is done: `BETTER_AUTH_URL`, the `app_url` output,
+and the GitHub OAuth callback all point at it, and the old
+`*.cloudfront.net` URL no longer accepts logins. That last part is deliberate,
+not a regression. `better-auth` derives its trusted origins from
+`BETTER_AUTH_URL` and reads that env var *before* it will consider
+`x-forwarded-host`, so `trustHost` does not extend trust to a second hostname:
+requests from any other origin fail with `INVALID_ORIGIN`. Serving two
+hostnames would mean listing both in `trustedOrigins`, which this project has
+no reason to do.
+
+If you ever move the hostname again, remember that applying is only half of
+it. The service carries `ignore_changes = [task_definition]`, so a changed
+`BETTER_AUTH_URL` reaches the container only on the next deploy. Section 9.5
+covers the same mechanism in more detail.
 
 ---
 
@@ -240,11 +252,13 @@ aws --profile aws-capstone1 secretsmanager put-secret-value \
 
 Using the `app_url` output, set the OAuth app's:
 
-- Homepage URL: `https://<app-dist>.cloudfront.net`
+- Homepage URL: `https://capstone.eecs.oregonstate.edu`
 - Authorization callback URL:
-  `https://<app-dist>.cloudfront.net/api/auth/callback/github`
+  `https://capstone.eecs.oregonstate.edu/api/auth/callback/github`
 
-The callback path must be exact.
+The callback path must be exact, and it must match `BETTER_AUTH_URL`. GitHub
+allows one callback URL per OAuth app, so changing the app's hostname is a hard
+cutover rather than a gradual one.
 
 ### 4.3 Give GitHub Actions the deploy role
 
@@ -325,8 +339,17 @@ Repeat with the second admin's email. Check the task's CloudWatch log for
 
 ## 7. Verification checklist
 
-- `curl -I https://<app-dist>.cloudfront.net/api/healthz` returns `200`.
+- `curl -I https://capstone.eecs.oregonstate.edu/api/healthz` returns `200`.
 - Signing in with GitHub completes the OAuth round trip.
+- The origin check accepts the public hostname. This POST should return
+  `INVALID_EMAIL_OR_PASSWORD`, not `INVALID_ORIGIN`:
+
+  ```bash
+  curl -s -X POST https://capstone.eecs.oregonstate.edu/api/auth/sign-in/email \
+    -H 'Content-Type: application/json' \
+    -H 'Origin: https://capstone.eecs.oregonstate.edu' \
+    -d '{"email":"probe@example.invalid","password":"x"}'
+  ```
 - Email/password sign-up writes a verification link to CloudWatch (section 6)
   and completes once that link is opened.
 - Uploading a project image works and the image loads from
@@ -529,8 +552,25 @@ workflow copies this from the live service automatically; if you run a task by
 hand, reuse the service's `networkConfiguration` (see section 6).
 
 **Login redirect mismatch / "redirect_uri" error.** The GitHub OAuth callback
-URL must be exactly `https://<app-dist>.cloudfront.net/api/auth/callback/github`
-and `BETTER_AUTH_URL` (task-def env) must be the same app host.
+URL must be exactly
+`https://capstone.eecs.oregonstate.edu/api/auth/callback/github` and
+`BETTER_AUTH_URL` (task-def env) must be the same app host.
+
+**Login fails with `INVALID_ORIGIN`.** `BETTER_AUTH_URL` on the *running* task
+definition disagrees with the hostname in the browser. Editing `infra/ecs.tf`
+and applying is not enough; the service ignores task-definition changes, so
+check what is actually deployed:
+
+```bash
+TD=$(aws --profile aws-capstone1 ecs describe-services --cluster eecs-capstone \
+  --services eecs-capstone --region us-west-2 \
+  --query 'services[0].taskDefinition' --output text)
+aws --profile aws-capstone1 ecs describe-task-definition --task-definition "$TD" \
+  --region us-west-2 \
+  --query 'taskDefinition.containerDefinitions[0].environment[?name==`BETTER_AUTH_URL`]'
+```
+
+If it shows the old host, run the deploy workflow.
 
 **Sign-up seems to hang with no verification email.** Expected: no email
 provider is configured yet. Pull the verification link from CloudWatch
