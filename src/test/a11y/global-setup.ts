@@ -1,14 +1,28 @@
+import { randomUUID } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import { config as loadDotenv } from "dotenv";
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
+
+// Prefixes used by the create-dialog-plus-dropdown coverage in
+// admin.a11y.test.ts. Those rows are deleted by the test itself on success,
+// but a failed assertion partway through would otherwise leave one behind
+// forever. Sweeping by prefix here makes a failed run self-heal on the next
+// one, the same role the rest of this file's select-first fixtures play.
+const DIALOG_CATEGORY_NAME_PREFIX = "A11y Dialog Category ";
+const DIALOG_PROGRAM_COURSE_ID_PREFIX = "A11Y-DLG-";
+// Extra users so /admin/users has more than one page of real rows (pageSize
+// is 20). The dev seed alone never clears that bar, and the pagination-reset
+// assertion in admin.a11y.test.ts needs an actual second page to sort from,
+// not just a page=2 URL with nothing behind it.
+const PAGINATION_USER_COUNT = 15;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BASE_URL = "http://localhost:3000";
@@ -76,6 +90,40 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
     .update(schema.user)
     .set({ wantsToMentor: true, mentorTeamCount: 2 })
     .where(eq(schema.user.id, owner.id));
+
+  // Self-heal any row left behind by a create-dialog test that failed after
+  // creating but before its own cleanup ran.
+  await db
+    .delete(schema.categories)
+    .where(like(schema.categories.name, `${DIALOG_CATEGORY_NAME_PREFIX}%`));
+  await db
+    .delete(schema.programs)
+    .where(
+      like(schema.programs.courseId, `${DIALOG_PROGRAM_COURSE_ID_PREFIX}%`)
+    );
+
+  // Idempotent, select-first, same pattern as the rest of this function.
+  // Explicit, spread-out createdAt values matter here: userOrderBy's
+  // `createdAt DESC` has no tiebreaker, and rows sharing the same
+  // defaultNow() timestamp would make LIMIT/OFFSET pagination unstable
+  // across the two pages the sort-reset test depends on.
+  for (let i = 0; i < PAGINATION_USER_COUNT; i++) {
+    const email = `a11y-pagination-user-${i}@example.com`;
+    const [existingPaginationUser] = await db
+      .select()
+      .from(schema.user)
+      .where(eq(schema.user.email, email));
+    if (!existingPaginationUser) {
+      await db.insert(schema.user).values({
+        id: randomUUID(),
+        name: `A11y Pagination User ${i}`,
+        email,
+        emailVerified: true,
+        role: "user",
+        createdAt: new Date(Date.now() - (i + 1) * 60_000),
+      });
+    }
+  }
 
   // Note: select-first is non-atomic. Concurrent global-setup runs could produce
   // duplicate rows since these tables have no UNIQUE constraint on their sentinel

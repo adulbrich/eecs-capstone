@@ -3,6 +3,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
+import { config as loadDotenv } from "dotenv";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+// biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
+import * as schema from "../../db/schema";
 import { checkA11y, closeMenu, waitForHydration } from "./helpers";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -18,6 +24,39 @@ const { itemId, categoryId, programId, userId } = JSON.parse(
 };
 
 test.use({ storageState: join(__dirname, ".admin-auth.json") });
+
+// DB access for the create-dialog coverage further down: those tests write a
+// row through the UI and need to remove it afterward, which is not something
+// a page.goto() can do. Loaded lazily (not at module scope) because this
+// file's worker process is not the same process that runs global-setup.ts,
+// so DATABASE_URL is not guaranteed to already be in the environment.
+let pool: Pool | undefined;
+function getDb() {
+  if (!pool) {
+    loadDotenv({ path: [".env.local", ".env"] });
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL is not set; cannot clean up test rows.");
+    }
+    pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  }
+  return drizzle(pool, { schema });
+}
+
+async function deleteCategoryByName(name: string): Promise<void> {
+  await getDb()
+    .delete(schema.categories)
+    .where(eq(schema.categories.name, name));
+}
+
+async function deleteProgramByCourseId(courseId: string): Promise<void> {
+  await getDb()
+    .delete(schema.programs)
+    .where(eq(schema.programs.courseId, courseId));
+}
+
+test.afterAll(async () => {
+  await pool?.end();
+});
 
 test("admin dashboard", async ({ page }) => {
   await page.goto("/admin");
@@ -407,4 +446,205 @@ test("admin table header stays pinned while the body scrolls at md and up", asyn
     throw new Error("First row not found after scrolling.");
   }
   expect(rowBoxAfter.y).toBeLessThan(headerBoxAfter.y);
+});
+
+// The three tables migrated in tasks 9-11 get the same interaction pass
+// task 8 gave inventory: open the Columns menu, scan, activate a sort
+// header, confirm aria-sort actually changed, scan again.
+
+test("admin categories table interactions", async ({ page }) => {
+  await page.goto("/admin/categories");
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Columns" }).click();
+  await checkA11y(page);
+  await closeMenu(page);
+  await page.getByRole("button", { name: "Type", exact: true }).click();
+  await expect(
+    page.getByRole("columnheader", { name: "Type", exact: true })
+  ).toHaveAttribute("aria-sort", /ascending|descending/);
+  await checkA11y(page);
+});
+
+test("admin programs table interactions", async ({ page }) => {
+  await page.goto("/admin/programs");
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Columns" }).click();
+  await checkA11y(page);
+  await closeMenu(page);
+  await page.getByRole("button", { name: "Course name", exact: true }).click();
+  await expect(
+    page.getByRole("columnheader", { name: "Course name", exact: true })
+  ).toHaveAttribute("aria-sort", /ascending|descending/);
+  await checkA11y(page);
+});
+
+test("admin users table interactions", async ({ page }) => {
+  await page.goto("/admin/users");
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Columns" }).click();
+  await checkA11y(page);
+  await closeMenu(page);
+  await page.getByRole("button", { name: "Email", exact: true }).click();
+  await expect(
+    page.getByRole("columnheader", { name: "Email", exact: true })
+  ).toHaveAttribute("aria-sort", /ascending|descending/);
+  await checkA11y(page);
+});
+
+// /admin/users is the only table that paginates and orders on the server
+// (serverSorted), so a header click there means something none of the
+// client-sorted tables can prove: that the rows themselves came back from a
+// new request, not a browser-side re-sort of what was already on screen.
+
+test("admin users table sort header activates via keyboard", async ({
+  page,
+}) => {
+  await page.goto("/admin/users");
+  await waitForHydration(page);
+  const header = page.getByRole("button", { name: "Name", exact: true });
+  await header.focus();
+  await expect(header).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("columnheader", { name: "Name", exact: true })
+  ).toHaveAttribute("aria-sort", /ascending|descending/);
+});
+
+test("admin users list: sorting a column reorders the rendered rows, not just the URL", async ({
+  page,
+}) => {
+  await page.goto("/admin/users");
+  await waitForHydration(page);
+  const beforeRows = await page
+    .locator(".admin-table tbody tr")
+    .allTextContents();
+  // Positive control: an empty "before" snapshot would make the inequality
+  // below pass for the wrong reason.
+  expect(beforeRows.length).toBeGreaterThan(0);
+
+  await page.getByRole("button", { name: "Email", exact: true }).click();
+  await expect(
+    page.getByRole("columnheader", { name: "Email", exact: true })
+  ).toHaveAttribute("aria-sort", /ascending|descending/);
+  await expect(page).toHaveURL(/[?&]sort=email(&|$)/);
+  await expect(page).toHaveURL(/[?&]dir=(asc|desc)(&|$)/);
+
+  // AdminDataTable is given serverSorted on this route, which turns off its
+  // own client-side reordering entirely. There is nothing left in the
+  // browser that could have changed this row order except the new request
+  // that clicking the header sent to the server.
+  const afterRows = await page
+    .locator(".admin-table tbody tr")
+    .allTextContents();
+  expect(afterRows).not.toEqual(beforeRows);
+});
+
+test("admin users list: sorting from page 2 returns to page 1", async ({
+  page,
+}) => {
+  await page.goto("/admin/users?page=2");
+  await waitForHydration(page);
+  // Positive control: page 2 has to hold real rows, from the pagination
+  // fixtures global-setup.ts creates, or the sort header below would not be
+  // in the DOM (AdminDataTable renders its empty state instead of a table
+  // once rows.length is 0) and the click after this would throw rather than
+  // prove anything about the page reset.
+  await expect(page.getByText(/^Page 2 of \d+$/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Email", exact: true }).click();
+
+  await expect(page.getByText(/^Page 1 of \d+$/)).toBeVisible();
+  await expect(page).not.toHaveURL(/[?&]page=2(&|$)/);
+});
+
+// /admin/categories and /admin/programs are the first routes on this branch
+// to put a Radix Dialog (the create form) and AdminDataTable's Radix
+// DropdownMenu (Columns) on the same page. AdminDataTable sets modal={false}
+// on its dropdown specifically to avoid leaving the rest of the page under
+// aria-hidden while it's open; nothing before this had a second overlay on
+// the same page to prove that choice still holds up. Both assertions below
+// exist because of that: the dialog closing has to actually clear whatever
+// it hid, and the dropdown has to still work afterward.
+
+test("admin programs: create dialog and Columns dropdown coexist", async ({
+  page,
+}) => {
+  await page.goto("/admin/programs");
+  await waitForHydration(page);
+
+  const unique = Date.now();
+  const courseId = `A11Y-DLG-${unique}`;
+  const courseName = `A11y Dialog Program ${unique}`;
+
+  try {
+    await page.getByRole("button", { name: "+ New program" }).click();
+    const dialog = page.getByRole("dialog", { name: "New program" });
+    await dialog.getByLabel("Course ID").fill(courseId);
+    await dialog.getByLabel("Course name").fill(courseName);
+    await dialog.getByRole("button", { name: "Create program" }).click();
+
+    // Radix keeps DialogContent mounted through its animate-out transition,
+    // and the aria-hidden it puts on the rest of the page while open comes
+    // off at unmount, not at the moment `open` flips to false. Wait for it
+    // to actually leave the DOM before scanning, the same reason closeMenu
+    // waits out the dropdown's own animate-out rather than trusting Escape
+    // alone.
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    // onCreate calls router.invalidate() on success: the new row appearing
+    // is proof the create round-tripped and the loader re-ran, not just that
+    // the dialog closed.
+    await expect(
+      page.getByRole("cell", { name: courseId, exact: true })
+    ).toBeVisible();
+
+    await checkA11y(page);
+
+    // With the dialog fully closed, the Columns dropdown still opens and
+    // toggles a column: not blocked or left inert by whatever the dialog's
+    // own teardown did to the rest of the page.
+    await page.getByRole("button", { name: "Columns" }).click();
+    await toggleColumnOn(page, "Description");
+    await closeMenu(page);
+    await checkA11y(page);
+  } finally {
+    await deleteProgramByCourseId(courseId);
+  }
+});
+
+test("admin categories: create dialog and Columns dropdown coexist", async ({
+  page,
+}) => {
+  await page.goto("/admin/categories");
+  await waitForHydration(page);
+
+  const uniqueName = `A11y Dialog Category ${Date.now()}`;
+
+  try {
+    await page.getByRole("button", { name: "+ New category" }).click();
+    const dialog = page.getByRole("dialog", { name: "New category" });
+    await dialog.getByLabel("Name").fill(uniqueName);
+    // The Type field's accessible name is ambiguous between its <label> text
+    // ("Type") and its own visible content ("Select or create a type"), so
+    // it is targeted by id rather than by role name here.
+    await dialog.locator("#cat-type").click();
+    // "technology" is guaranteed to exist as a type: global-setup.ts's
+    // a11y-test-category fixture uses it, and listCategoryTypes reads types
+    // from existing categories, so it's always in this popover's list.
+    await page.getByRole("option", { name: "technology", exact: true }).click();
+    await dialog.getByRole("button", { name: "Create category" }).click();
+
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(
+      page.getByRole("cell", { name: uniqueName, exact: true })
+    ).toBeVisible();
+
+    await checkA11y(page);
+
+    await page.getByRole("button", { name: "Columns" }).click();
+    await toggleColumnOn(page, "Created");
+    await closeMenu(page);
+    await checkA11y(page);
+  } finally {
+    await deleteCategoryByName(uniqueName);
+  }
 });
