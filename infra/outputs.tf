@@ -1,6 +1,11 @@
 output "app_url" {
   description = "Public HTTPS URL of the app (set as the GitHub OAuth callback host)."
-  value       = "https://${aws_cloudfront_distribution.app.domain_name}"
+  value       = "https://${var.domain_name}"
+}
+
+output "app_distribution_domain" {
+  description = "The app distribution's own *.cloudfront.net name. This is the CNAME target OSU points var.domain_name at; app_url no longer surfaces it."
+  value       = aws_cloudfront_distribution.app.domain_name
 }
 
 output "assets_url" {

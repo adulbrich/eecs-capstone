@@ -20,9 +20,11 @@ Internet ──► CloudFront "app"  ──(VPC origin)──► internal ALB �
 
 - **Compute**: ECS Fargate, single arm64 task, in public subnets (public IP is
   used only for outbound; inbound is locked to the ALB).
-- **Ingress**: CloudFront is the only public entry point. It gives a stable
-  HTTPS `*.cloudfront.net` URL with no custom domain. The ALB is internal (no
-  public IP) and is reached through a CloudFront VPC origin.
+- **Ingress**: CloudFront is the only public entry point, served at
+  `capstone.eecs.oregonstate.edu` (section 3.7). The ALB is internal (no public
+  IP) and is reached through a CloudFront VPC origin. Uploaded assets stay on
+  the second distribution's `*.cloudfront.net` name; only the app has a custom
+  domain.
 - **Data**: RDS Postgres (not publicly accessible) and a private S3 bucket
   served through a second CloudFront distribution via Origin Access Control.
 - **Secrets/identity**: app credentials come from the ECS task role (no static
@@ -182,6 +184,55 @@ model-access grant is required. The ECS task role already carries the
    hash includes the model id, so every project is treated as stale and
    re-embedded automatically.
 
+### 3.7 Custom domain and TLS certificate
+
+The app is served at `capstone.eecs.oregonstate.edu`. Terraform does **not**
+create the certificate, because the `eecs.oregonstate.edu` zone is managed by
+OSU rather than by this account. `infra/cloudfront.tf` reads the existing
+certificate through `data "aws_acm_certificate"`, which can never destroy it;
+re-issuing one costs a support ticket with multi-day turnaround.
+
+What exists today, created by hand:
+
+| Item | Value |
+| --- | --- |
+| Certificate | `*.eecs.oregonstate.edu`, ARN ending `f6cecdcc` |
+| Region | **us-east-1** (CloudFront only accepts viewer certs from us-east-1, regardless of `var.region`) |
+| Validation | DNS, `_7b5da3599a6223875e6bf5dee1000c5a.eecs.oregonstate.edu` |
+| Expires | 2027-02-13 |
+
+Two DNS records live in OSU's zone and must both stay in place:
+
+1. `capstone.eecs.oregonstate.edu` CNAME → the app distribution's
+   `*.cloudfront.net` domain (`terraform output app_distribution_domain`;
+   `app_url` returns the custom domain and so cannot give you the target).
+   Without the matching `aliases` entry on the distribution, CloudFront answers
+   `403` for this host.
+2. `_7b5da3599a6223875e6bf5dee1000c5a.eecs.oregonstate.edu` CNAME →
+   `_eaf2da48d6e94e7e570d398eedce87f0.jkddzztszm.acm-validations.aws`. **This is
+   permanent.** ACM re-validates against it to auto-renew around December 2026.
+   Deleting it after issuance breaks the site a year later with no other warning.
+
+To stand this up from scratch: request a DNS-validated certificate in us-east-1,
+send both records to EECS IT in one ticket, and note in the ticket that record 1
+returns `403` until `terraform apply` attaches the alias, so an early test
+failure is expected rather than a bad request.
+
+The cutover to this hostname is done: `BETTER_AUTH_URL`, the `app_url` output,
+and the GitHub OAuth callback all point at it, and the old
+`*.cloudfront.net` URL no longer accepts logins. That last part is deliberate,
+not a regression. `better-auth` derives its trusted origins from
+`BETTER_AUTH_URL` and reads that env var *before* it will consider
+`x-forwarded-host`, so `trustHost` does not extend trust to a second hostname:
+requests from any other origin fail with `INVALID_ORIGIN`. Serving two
+hostnames would mean listing both in `trustedOrigins`, which this project has
+no reason to do.
+
+If you ever move the hostname again, remember that applying is only half of
+it. The service carries `ignore_changes = [task_definition]`, so a changed
+`BETTER_AUTH_URL` reaches the container only on the next deploy. Section 9.5
+covers the same mechanism in more detail.
+
 ---
 
 ## 4. Post-apply configuration
@@ -201,11 +252,13 @@ aws --profile aws-capstone1 secretsmanager put-secret-value \
 
 Using the `app_url` output, set the OAuth app's:
 
-- Homepage URL: `https://<app-dist>.cloudfront.net`
+- Homepage URL: `https://capstone.eecs.oregonstate.edu`
 - Authorization callback URL:
-  `https://<app-dist>.cloudfront.net/api/auth/callback/github`
+  `https://capstone.eecs.oregonstate.edu/api/auth/callback/github`
 
-The callback path must be exact.
+The callback path must be exact, and it must match `BETTER_AUTH_URL`. GitHub
+allows one callback URL per OAuth app, so changing the app's hostname is a hard
+cutover rather than a gradual one.
 
 ### 4.3 Give GitHub Actions the deploy role
 
@@ -286,8 +339,17 @@ Repeat with the second admin's email. Check the task's CloudWatch log for
 
 ## 7. Verification checklist
 
-- `curl -I https://<app-dist>.cloudfront.net/api/healthz` returns `200`.
+- `curl -I https://capstone.eecs.oregonstate.edu/api/healthz` returns `200`.
 - Signing in with GitHub completes the OAuth round trip.
+- The origin check accepts the public hostname. This POST should return
+  `INVALID_EMAIL_OR_PASSWORD`, not `INVALID_ORIGIN`:
+
+  ```bash
+  curl -s -X POST https://capstone.eecs.oregonstate.edu/api/auth/sign-in/email \
+    -H 'Content-Type: application/json' \
+    -H 'Origin: https://capstone.eecs.oregonstate.edu' \
+    -d '{"email":"probe@example.invalid","password":"x"}'
+  ```
 - Email/password sign-up writes a verification link to CloudWatch (section 6)
   and completes once that link is opened.
 - Uploading a project image works and the image loads from
@@ -344,23 +406,124 @@ Migrations run during deploy. To run them out of band, use the same
 
 ## 9. Adding real email delivery
 
-Email is deferred until an email provider is set up. The app already supports
-SES as a transport (`src/lib/email/ses-sender.ts`); wiring it up is
-infrastructure, not code:
+The app sends from `noreply@capstone.eecs.oregonstate.edu` via SES
+(`src/lib/email/ses-sender.ts`). The code is done; what remains is a domain
+identity, DNS records OSU has to publish, and production access.
 
-1. Add back an `aws_sesv2_email_identity` resource (verified sender, ideally a
-   domain rather than a single address) and an IAM statement granting the ECS
-   task role `ses:SendEmail`.
-2. In `infra/ecs.tf`, set `EMAIL_TRANSPORT=ses`, `EMAIL_FROM=<verified
-   identity>`, and `SES_REGION`.
-3. `terraform apply`, then confirm the identity verification email.
-4. While SES is in the **sandbox**, it can only send to verified recipients —
-   verify any test/admin addresses with
-   `aws --profile aws-capstone1 sesv2 create-email-identity --email-identity <addr> --region us-west-2`.
-   Request production access from the SES console to email arbitrary users.
+`infra/ses.tf` and the `SendEmail` statement in `infra/iam.tf` are already in
+place. `EMAIL_FROM` and `SES_REGION` are already set in `infra/ecs.tf` and are
+inert while `EMAIL_TRANSPORT=console`, so the cutover is a one-line change.
 
-Until this is done, sign-up still works, but verification/reset links only
-reach CloudWatch logs (section 6), not real inboxes.
+**A domain identity, not an address identity.** SES verifies an address
+identity by emailing it a confirmation link that a human must click, and
+`noreply@` has no mailbox. Domain identity is the only workable option here.
+
+### 9.1 Why DKIM is mandatory
+
+`oregonstate.edu` publishes `v=DMARC1; p=reject` with no `sp=` override. Under
+RFC 7489 policy discovery a receiver looks up `_dmarc.<the exact domain>`,
+finds nothing, and then jumps straight to the organizational domain
+`_dmarc.oregonstate.edu`, skipping intermediate labels. The `p=none` on
+`eecs.oregonstate.edu` therefore does **not** apply to
+`capstone.eecs.oregonstate.edu`. (Newer tree-walk discovery would find it, so
+behavior varies by receiver; assume the strict reading.)
+
+Unaligned mail is rejected outright, not spam-foldered. DKIM alignment is the
+whole game, which is why `EMAIL_FROM` derives from `var.domain_name`: the
+`From:` domain must match the DKIM `d=` domain.
+
+SPF alignment is not required. DMARC passes on either SPF *or* DKIM, and
+without a custom MAIL FROM domain SES uses an `amazonses.com` envelope sender,
+which never aligns. A custom MAIL FROM domain adds robustness through
+forwarding but needs `MX` and `TXT` records, so treat it as a later
+improvement rather than part of this setup.
+
+### 9.2 Get the DKIM records
+
+```bash
+cd infra
+terraform apply          # creates the identity; generates the DKIM tokens
+terraform output ses_dkim_records
+```
+
+This yields three CNAMEs of the form
+`<token>._domainkey.capstone.eecs.oregonstate.edu` →
+`<token>.dkim.amazonses.com`.
+
+### 9.3 The OSU ticket
+
+Send EECS IT all three records. Two things to state explicitly:
+
+- **They are permanent.** SES re-checks them and will mark the domain
+  unverified if they disappear, silently killing sign-up.
+- **They sit below a name that is itself a CNAME** to CloudFront. A CNAME may
+  not share its own label with other records, but records at *descendant*
+  names are a grey area that some DNS implementations refuse. Ask whether
+  their tooling accepts it.
+
+If it does not, verify a sibling name instead, for example
+`mail.eecs.oregonstate.edu`, and send from `noreply@mail.eecs.oregonstate.edu`.
+No CNAME sits at that label, so DKIM records land cleanly. Set `var.domain_name`
+aside and give `infra/ses.tf` its own variable in that case, since the sending
+domain and the site domain would no longer be the same string.
+
+Check progress without waiting on a ticket reply:
+
+```bash
+aws --profile aws-capstone1 sesv2 get-email-identity \
+  --email-identity capstone.eecs.oregonstate.edu --region us-west-2 \
+  --query '{Verified:VerifiedForSendingStatus,Dkim:DkimAttributes.Status}'
+```
+
+### 9.4 Leave the sandbox
+
+A new account is capped at 200 messages/day, 1/second, **and can only send to
+verified addresses**. Check with:
+
+```bash
+aws --profile aws-capstone1 sesv2 get-account --region us-west-2 \
+  --query 'ProductionAccessEnabled'
+```
+
+`false` means sandbox. Request production access from the SES console (Account
+dashboard → Request production access). It goes to AWS Support with roughly a
+day's turnaround and is independent of the DNS work, so file it early. Expect
+to describe the sending use case, volume, and how bounces are handled.
+
+To test before it clears, verify individual recipients:
+
+```bash
+aws --profile aws-capstone1 sesv2 create-email-identity \
+  --email-identity you@example.com --region us-west-2
+```
+
+### 9.5 Cut over
+
+Only once `VerifiedForSendingStatus` is `true` **and** production access is
+granted, flip `EMAIL_TRANSPORT` to `"ses"` in `infra/ecs.tf` and apply.
+Sending from an unverified domain fails outright, so flipping early breaks
+sign-up rather than degrading it.
+
+**Applying is not enough.** `aws_ecs_service.app` carries
+`ignore_changes = [task_definition, desired_count]`, so `terraform apply`
+registers a new task definition revision and deliberately leaves the service
+on the old one. Environment variables reach the running container only when
+the deploy workflow next runs: it reads the latest ACTIVE revision, swaps in
+the freshly built image, and updates the service. So the cutover is apply
+**then** deploy. This is why `terraform apply` reporting success is not
+evidence that email is on; confirm with a real sign-up instead.
+
+Until then sign-up still works, but verification and reset links reach only
+CloudWatch logs (section 6), not real inboxes.
+
+### 9.6 SES console wizard
+
+The console's getting-started wizard maps onto the above loosely. Step 1 asks
+for an email address, which is a **sandbox test recipient**, not your sender.
+Step 2 is the domain identity that actually matters. Step 3's pricing plan is
+Virtual Deliverability Manager, which is paid and unnecessary at this scale.
+Steps 4 through 6 (deliverability enhancements, dedicated IP pools, tenant
+management) are for high-volume senders and should be skipped.
 
 ---
 
@@ -389,8 +552,25 @@ workflow copies this from the live service automatically; if you run a task by
 hand, reuse the service's `networkConfiguration` (see section 6).
 
 **Login redirect mismatch / "redirect_uri" error.** The GitHub OAuth callback
-URL must be exactly `https://<app-dist>.cloudfront.net/api/auth/callback/github`
-and `BETTER_AUTH_URL` (task-def env) must be the same app host.
+URL must be exactly
+`https://capstone.eecs.oregonstate.edu/api/auth/callback/github` and
+`BETTER_AUTH_URL` (task-def env) must be the same app host.
+
+**Login fails with `INVALID_ORIGIN`.** `BETTER_AUTH_URL` on the *running* task
+definition disagrees with the hostname in the browser. Editing `infra/ecs.tf`
+and applying is not enough; the service ignores task-definition changes, so
+check what is actually deployed:
+
+```bash
+TD=$(aws --profile aws-capstone1 ecs describe-services --cluster eecs-capstone \
+  --services eecs-capstone --region us-west-2 \
+  --query 'services[0].taskDefinition' --output text)
+aws --profile aws-capstone1 ecs describe-task-definition --task-definition "$TD" \
+  --region us-west-2 \
+  --query 'taskDefinition.containerDefinitions[0].environment[?name==`BETTER_AUTH_URL`]'
+```
+
+If it shows the old host, run the deploy workflow.
 
 **Sign-up seems to hang with no verification email.** Expected: no email
 provider is configured yet. Pull the verification link from CloudWatch

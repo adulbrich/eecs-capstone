@@ -83,7 +83,11 @@ resource "aws_ecs_task_definition" "app" {
       environment = [
         { name = "NODE_ENV", value = "production" },
         { name = "PORT", value = tostring(var.app_port) },
-        { name = "BETTER_AUTH_URL", value = "https://${aws_cloudfront_distribution.app.domain_name}" },
+        # better-auth derives trustedOrigins from this value and reads it
+        # before it will consider x-forwarded-host, so trustHost does not
+        # cover a hostname that disagrees with it: requests from any other
+        # origin fail the origin check with INVALID_ORIGIN.
+        { name = "BETTER_AUTH_URL", value = "https://${var.domain_name}" },
         { name = "GITHUB_CLIENT_ID", value = var.github_client_id },
         { name = "S3_BUCKET", value = aws_s3_bucket.assets.bucket },
         { name = "S3_REGION", value = var.region },
@@ -92,9 +96,18 @@ resource "aws_ecs_task_definition" "app" {
         { name = "BEDROCK_EMBEDDING_MODEL_ID", value = var.bedrock_embedding_model_id },
         { name = "BEDROCK_EMBEDDING_DIMENSIONS", value = var.bedrock_embedding_dimensions },
         # Logs verification/reset links to CloudWatch instead of sending real
-        # email. Switch to "ses" (and set EMAIL_FROM/SES_REGION) once SES is
-        # configured.
+        # email. Flip to "ses" only after the DKIM CNAMEs resolve and the
+        # identity reads SUCCESS; sending from an unverified domain fails
+        # outright, which would break sign-up rather than degrade it.
         { name = "EMAIL_TRANSPORT", value = "console" },
+        # Inert while EMAIL_TRANSPORT=console. Set now so the cutover is a
+        # one-line change. The From domain must match the verified identity or
+        # DKIM alignment fails, so both derive from var.domain_name.
+        { name = "EMAIL_FROM", value = "noreply@${var.domain_name}" },
+        # src/lib/email/ses-sender.ts falls back to us-east-1. The identity
+        # lives in var.region, and the mismatch surfaces only as an opaque
+        # "email address not verified" error, so pin it explicitly.
+        { name = "SES_REGION", value = var.region },
       ]
 
       secrets = [

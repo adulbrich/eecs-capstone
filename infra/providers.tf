@@ -42,4 +42,13 @@ provider "aws" {
   }
 }
 
+# CloudFront only accepts viewer certificates from us-east-1, regardless of
+# where the rest of the stack lives. Used for a data lookup only, so no
+# default_tags block is needed: this provider creates nothing.
+provider "aws" {
+  alias   = "us_east_1"
+  region  = "us-east-1"
+  profile = "aws-capstone1"
+}
+
 data "aws_caller_identity" "current" {}

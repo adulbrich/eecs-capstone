@@ -59,6 +59,15 @@ data "aws_iam_policy_document" "task" {
     actions   = ["bedrock:InvokeModel"]
     resources = ["*"]
   }
+
+  # SESv2's SendEmailCommand maps to the ses:SendEmail action. Scoped to this
+  # identity so the task cannot send as any other verified domain in the
+  # shared account.
+  statement {
+    sid       = "SendEmail"
+    actions   = ["ses:SendEmail"]
+    resources = [aws_sesv2_email_identity.app.arn]
+  }
 }
 
 resource "aws_iam_role_policy" "task" {
