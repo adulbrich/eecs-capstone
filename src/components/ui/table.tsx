@@ -34,31 +34,18 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
 
 function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
-    <thead
-      className={cn("[&_tr]:border-b", className)}
-      data-slot="table-header"
-      {...props}
-    />
+    <thead className={cn(className)} data-slot="table-header" {...props} />
   );
 }
 
 function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
-  return (
-    <tbody
-      className={cn("[&_tr:last-child]:border-0", className)}
-      data-slot="table-body"
-      {...props}
-    />
-  );
+  return <tbody className={cn(className)} data-slot="table-body" {...props} />;
 }
 
 function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   return (
     <tfoot
-      className={cn(
-        "border-t bg-muted/50 font-medium [&>tr]:last:border-b-0",
-        className
-      )}
+      className={cn("border-t bg-muted/50 font-medium", className)}
       data-slot="table-footer"
       {...props}
     />

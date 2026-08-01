@@ -141,6 +141,10 @@ const COLUMNS: AdminColumn<Row>[] = [
     ),
     header: "Status",
     id: "status",
+    // Numeric, not text: the locale-compare default would compare String(n),
+    // where "10" sorts before "2". Only single-digit ordinals plus a 99
+    // sentinel exist today, so this is latent until a tenth status arrives.
+    sortingFn: "basic",
   },
   {
     accessorFn: (row) =>
@@ -194,16 +198,18 @@ const COLUMNS: AdminColumn<Row>[] = [
     defaultHidden: true,
     header: "Due",
     id: "dueAt",
-    // Values arrive as Date instances (or ISO strings); the default "text"
-    // sortingFn would compare their String() forms, which starts with the
-    // weekday name and sorts nothing chronologically.
+    // Values arrive as Date instances (or ISO strings); the locale-compare
+    // default sortingFn would compare their String() forms, which starts
+    // with the weekday name and sorts nothing chronologically.
     sortingFn: "datetime",
     sortUndefined: "last",
   },
   {
     accessorFn: (row) => row.updatedAt,
     cell: ({ row }) => <LocalTime dateOnly value={row.original.updatedAt} />,
-    defaultHidden: true,
+    // Visible by default: this is the page's default sort column, and a
+    // staff table sorted by a date should show that date rather than hide
+    // the one column that explains the order rows are in.
     header: "Updated",
     id: "updatedAt",
     sortingFn: "datetime",
@@ -319,10 +325,10 @@ function AdminInventory() {
             <div>
               <Label htmlFor="inv-search">Search</Label>
               <Input
-                className="mt-1 w-48"
+                className="mt-1 w-64"
                 id="inv-search"
                 onChange={(e) => setQDraft(e.target.value)}
-                placeholder="Name or description"
+                placeholder="Name, description, serial, label, location, or holder"
                 type="search"
                 value={qDraft}
               />

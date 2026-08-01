@@ -144,6 +144,10 @@ const COLUMNS: AdminColumn<Row>[] = [
     cell: ({ row }) => <StatusBadge status={row.original.status} />,
     header: "Status",
     id: "status",
+    // Numeric, not text: same reasoning as the Teams column below, and as
+    // inventory's Status column. The "10" sorts before "2" trap is latent
+    // until a tenth status exists.
+    sortingFn: "basic",
   },
   {
     // Sorts on the name alone (not a name-or-email fallback), so an unlinked
@@ -201,8 +205,8 @@ const COLUMNS: AdminColumn<Row>[] = [
     defaultHidden: true,
     header: "Teams",
     id: "teams",
-    // Numeric, not text: the "text" default would compare String(n), where
-    // "10" sorts before "2".
+    // Numeric, not text: the locale-compare default would compare String(n),
+    // where "10" sorts before "2".
     sortingFn: "basic",
   },
   {
@@ -347,7 +351,7 @@ function AdminProjects() {
                 className="mt-1 w-64"
                 id="admin-search"
                 onChange={(e) => setQueryDraft(e.target.value)}
-                placeholder="Search titles and descriptions"
+                placeholder="Title, description, contact, or proposer"
                 type="search"
                 value={queryDraft}
               />

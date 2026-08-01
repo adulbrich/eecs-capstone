@@ -60,7 +60,7 @@
 
 | File | Reason |
 | --- | --- |
-| ~~`src/components/admin-table.tsx`~~ | **Not deleted.** This row was wrong. `AdminTable` still has three consumers after Task 7: `/admin/programs`, `/admin/users`, and `/admin/categories`. It stays until those pages migrate, which the project backlog records as separate future work. |
+| `src/components/admin-table.tsx` | Superseded by `AdminDataTable`. This row originally said "not deleted" because `AdminTable` still had three consumers after Task 7 (`/admin/programs`, `/admin/users`, `/admin/categories`); that correction is itself stale now that those three migrated in Tasks 10 and 11. Deleted in Task 12. |
 
 **Untouched on purpose:** `src/styles.css` (the `.admin-table` mobile card rules keep working as-is), `src/components/project-row.tsx` (still used by the public listing through `project-list-item.tsx`), `src/lib/view-preference.ts`.
 

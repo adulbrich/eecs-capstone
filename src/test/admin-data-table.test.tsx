@@ -118,6 +118,28 @@ describe("AdminDataTable", () => {
     ).toBe("ascending");
   });
 
+  it("omits aria-sort entirely on a header that cannot be sorted", () => {
+    const columns: AdminColumn<Row>[] = [
+      ...COLUMNS,
+      {
+        cell: () => "Edit",
+        enableHiding: false,
+        enableSorting: false,
+        header: "Actions",
+        id: "actions",
+      },
+    ];
+    renderTable({ columns, hidden: [] });
+    // Not "none": that value tells assistive tech this header participates
+    // in sorting and simply isn't the active one, which is false for a
+    // column that can never be sorted.
+    expect(
+      screen
+        .getByRole("columnheader", { name: "Actions" })
+        .getAttribute("aria-sort")
+    ).toBeNull();
+  });
+
   it("reports a sort change when a header button is activated", () => {
     const onSortChange = vi.fn();
     renderTable({ onSortChange });
@@ -212,9 +234,23 @@ describe("AdminDataTable", () => {
     expect(screen.getByText("Filters go here")).not.toBeNull();
   });
 
-  it("announces the row count in a live region", () => {
+  it("announces the row count and the current sort order in a live region", () => {
     renderTable();
-    expect(screen.getByText("3 rows")).not.toBeNull();
+    expect(
+      screen.getByText("3 rows, sorted by Name, ascending")
+    ).not.toBeNull();
+  });
+
+  it("announces the sort order even when the sorted column is hidden", () => {
+    // Location is hidden by `renderTable`'s default `hidden` prop, so its
+    // header (and the aria-sort it would carry) never reaches the DOM. The
+    // live region is the only surface left that can say the table is
+    // ordered by it at all.
+    renderTable({ sort: { desc: true, id: "location" } });
+    expect(
+      screen.getByText("3 rows, sorted by Location, descending")
+    ).not.toBeNull();
+    expect(screen.queryByRole("columnheader", { name: /Location/ })).toBeNull();
   });
 
   it("sorts text case-insensitively", () => {
@@ -225,6 +261,25 @@ describe("AdminDataTable", () => {
     // Capitalized "Alpha" must interleave with the lowercase names rather
     // than sorting ahead of all of them on its byte value.
     expect(names).toEqual(["Alpha", "beta", "gamma"]);
+  });
+
+  it("sorts an accented name among its unaccented peers, not after 'z'", () => {
+    // Differential: under TanStack's built-in "text" sortingFn
+    // (compareBasic on lowercased strings), this would come out
+    // ["Adam", "Zoe", "Émile"], because "é" (U+00E9) compares greater than
+    // "z" (U+007A) by code point. Under localeCompare/Intl.Collator with
+    // `sensitivity: "base"`, accented letters sort among their unaccented
+    // peers instead, which is what a reader actually expects.
+    const accentedRows: Row[] = [
+      { id: "1", location: null, name: "Zoe" },
+      { id: "2", location: null, name: "Émile" },
+      { id: "3", location: null, name: "Adam" },
+    ];
+    const { container } = renderTable({ data: accentedRows, hidden: [] });
+    const names = [...container.querySelectorAll("tbody tr")].map(
+      (tr) => tr.querySelector("td")?.textContent
+    );
+    expect(names).toEqual(["Adam", "Émile", "Zoe"]);
   });
 
   it("sorts nulls last regardless of direction", () => {

@@ -35,6 +35,13 @@ export function parseSort(
 /**
  * The inverse of `parseSort`. Both params are omitted when the state matches
  * the page default, so an untouched table has a clean URL.
+ *
+ * The return type spells out `dir`/`sort` as always-present keys holding
+ * `undefined`, rather than making them optional. That is load-bearing, not
+ * incidental: `/admin/users`'s `setSearch` resets `page` to 1 by checking
+ * `"sort" in patch`, and an optional key that is simply absent when unset
+ * would make that check false for a real (default-restoring) sort change,
+ * silently breaking the page reset.
  */
 export function serializeSort(
   state: SortState,

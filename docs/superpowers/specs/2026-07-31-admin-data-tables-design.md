@@ -439,3 +439,104 @@ pre-production and carries no back-compatibility shims.
 - `/admin/users`, `/admin/categories`, `/admin/programs`.
 - The public `/inventory` and `/projects` listings, including their pagination,
   their view toggle, and `ProjectRow`.
+
+---
+
+## Amendment: what actually shipped
+
+Added after Task 12, during the whole-branch review that preceded merge. The
+document above describes the design as it stood after Task 8 and was never
+updated for Tasks 9 through 12, which is the plan's job (see its own
+amendment), not this spec's. Rather than rewrite the sections above and lose
+the reasoning they record, this section says where the shipped code now
+diverges from them.
+
+**Scope.** Every "the three pages" above should be read as history, not as
+the current state. All six admin list pages
+(`/admin/inventory`, `/admin/projects`, `/admin/mentors`, `/admin/users`,
+`/admin/categories`, `/admin/programs`) ship on `AdminDataTable`. The "Out of
+scope" list's `/admin/users`, `/admin/categories`, `/admin/programs` entry and
+Feature C's claim that those three "keep their current narrow layout" are both
+stale: all six use `px-4 py-6 md:px-8`, not `max-w-4xl`.
+
+**The governing rule, amended again.** The rule at the top of this document
+("the server decides which rows exist, the client decides their order and
+which columns show") holds for five of the six pages. `/admin/users` is the
+one exception: it paginates on the server, so the server also has to decide
+the order, or a sort click would reorder only the 20 rows already on screen
+while presenting that as sorting the whole table. The rule that actually
+governs the shipped code is:
+
+> **The server decides which rows exist. Where the server paginates, it also
+> decides their order. Column visibility is always client state.**
+
+This is `AdminDataTableProps.serverSorted` (`admin-data-table.tsx`): when set,
+TanStack's `manualSorting` is turned on, so the component stops reordering
+rows locally, while header clicks, `aria-sort`, and the live-region
+announcement all keep working exactly as they do on the other five pages.
+`/admin/users` is the only route that passes it, and its `sort`/`dir` (not
+`cols`) join that route's `loaderDeps` for the same reason.
+
+**The component contract is not what this document describes.** The `Props`
+sketch above is for an *uncontrolled* `AdminDataTable` that owns its own URL
+and localStorage sync internally. What shipped is fully *controlled*: `hidden`
+/ `onHiddenChange` and `sort` / `onSortChange` are props, and the caller is
+responsible for the URL round-trip. The sync logic itself lives in
+`useAdminTableState`, a router-agnostic hook in `src/lib/table-state.ts` that
+this document never mentions, built on the lower-level `parseSort` /
+`serializeSort` / `parseHidden` / `serializeHidden` /
+`useSeedColumnsFromStorage` primitives it does describe. Every route calls
+`useAdminTableState` once and passes its four return values straight through
+to `AdminDataTable`. This is the largest divergence between this document and
+the code, because it changes where the state actually lives, not just a
+naming detail.
+
+**`defaultHidden` is a top-level `AdminColumn` field, not `meta`.** This
+document says a column's initial visibility lives at
+`meta: { defaultHidden: true }`. It shipped as `defaultHidden?: boolean`
+directly on `AdminColumn<T>` (`ColumnDef<T, unknown> & { defaultHidden?:
+boolean; header: string; id: string }`) instead, alongside the already-narrowed
+`header` and required `id`. The code is right to do this: `defaultHidden`,
+`header`, and `id` are all read the same way, by `AdminDataTable` reaching
+into the page's own column list rather than TanStack's widened `columnDef`,
+so keeping all three in one place is simpler than carving one of them out into
+`meta`.
+
+**Storage key.** The `localStorage` prefix is `cs-capstone:admin-cols:`, not
+`admin-table-cols:` as sketched above.
+
+**The live region.** It announces `"N rows"` (or `"1 row"`), not `"24
+items"`. Fixed separately in the same review that produced this amendment:
+it now also announces the current sort, e.g. `"42 rows, sorted by Updated,
+descending"`, using the same header-label map the column text and each cell's
+`data-label` already read from. That addition exists because the row count
+alone goes silent on the table's order whenever the sorted column happens to
+be hidden, which `defaultHidden` and the column picker both make reachable.
+
+**Mentors shipped four columns, not five.** The per-page table above lists
+Name, Affiliation, Email, Teams, and Actions as five separate columns, with
+Teams holding "the existing number input, live state." What shipped
+consolidates Teams and Actions into one `Capacity` column that renders the
+number input and its Save/Remove buttons together. That is the right call: the
+input and the two buttons that act on it are one control, not two, and
+splitting them across columns would only make a reader hunt across the row for
+pieces of the same interaction.
+
+**Text sorting.** The `localeCompare` with `sensitivity: "base"` claim in
+Feature A's sorting rules was, for most of this branch's life, not what
+shipped: the default fallback was TanStack's built-in `"text"` sorting
+function instead, which lowercases and compares by code point. The two agree
+on case-insensitivity but disagree on accented characters: under `"text"`,
+"Émile" sorts after "z" (U+00E9 > U+007A); under `localeCompare`/`Intl.Collator`
+with base sensitivity, it sorts among the E's, as a reader would expect. This
+was corrected in the same review as this amendment, so `AdminDataTable` now
+does implement what this document originally claimed. The gap mattered in
+practice: `/admin/mentors` and `/admin/users` list real people's names.
+
+**The Sequencing "Correction" is itself now stale.** It says `AdminTable`
+"stays until those three pages migrate, which the project backlog already
+records as separate future work." Those three pages (`/admin/users`,
+`/admin/categories`, `/admin/programs`) did migrate, in Tasks 10 and 11, and
+`src/components/admin-table.tsx` was deleted in Task 12
+(`refactor(admin): delete the superseded AdminTable component`). Nothing
+depends on it any longer.

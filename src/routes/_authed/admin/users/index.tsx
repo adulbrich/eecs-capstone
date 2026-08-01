@@ -123,7 +123,9 @@ const COLUMNS: AdminColumn<Row>[] = [
   {
     accessorFn: (row) => row.createdAt,
     cell: ({ row }) => <LocalTime dateOnly value={row.original.createdAt} />,
-    defaultHidden: true,
+    // Visible by default: this is the page's default sort column, and a
+    // staff table sorted by a date should show that date rather than hide
+    // the one column that explains the order rows are in.
     header: "Created",
     id: "createdAt",
     sortingFn: "datetime",

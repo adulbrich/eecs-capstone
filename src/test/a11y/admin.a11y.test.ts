@@ -170,7 +170,9 @@ test("admin inventory table shows its default-hidden columns when toggled on", a
 }) => {
   await page.goto("/admin/inventory");
   await waitForHydration(page);
-  const hiddenColumns = ["Label", "Serial", "Due", "Updated", "Created"];
+  // Updated is not in this list: it is the page's default sort column and is
+  // visible by default now, so toggling it here would hide it instead.
+  const hiddenColumns = ["Label", "Serial", "Due", "Created"];
 
   await page.getByRole("button", { name: "Columns" }).click();
   for (const label of hiddenColumns) {
@@ -258,8 +260,8 @@ test("toggling a column writes cols into the URL, absent by default", async ({
   await page.getByRole("button", { name: "Columns" }).click();
   await page.getByRole("menuitemcheckbox", { name: "Location" }).click();
   await closeMenu(page);
-  // The default-hidden columns (label, serial, dueAt, updatedAt, createdAt)
-  // stay hidden too, so `cols` carries the whole hidden set, not a bare diff:
+  // The default-hidden columns (label, serial, dueAt, createdAt) stay hidden
+  // too, so `cols` carries the whole hidden set, not a bare diff:
   // assert membership rather than an exact string. `toHaveURL` polls, which
   // matters here, since the URL update lands after an async navigation.
   // (Commas are URL-encoded as %2C, so a `\b` word-boundary check would break

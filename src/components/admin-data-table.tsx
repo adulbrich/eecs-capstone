@@ -4,6 +4,7 @@ import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
+  type SortingFn,
   type SortingState,
   useReactTable,
   type VisibilityState,
@@ -36,6 +37,27 @@ import {
   serializeHidden,
   writeStoredHidden,
 } from "#/lib/table-state";
+
+// Hoisted once rather than constructed per comparison, the same reasoning
+// that keeps regex literals out of loops: a Collator is comparatively
+// expensive to build and this one is reused for every text comparison in
+// every table.
+const collator = new Intl.Collator(undefined, { sensitivity: "base" });
+
+/**
+ * The default sort for any column that does not set its own `sortingFn`.
+ * `localeCompare`-equivalent (via `Intl.Collator`) rather than TanStack's
+ * built-in `"text"`, which lowercases and compares by code point: under that
+ * scheme an accented name like "Émile" sorts after "z" because U+00E9 is
+ * greater than U+007A. `sensitivity: "base"` keeps the case-insensitivity
+ * `"text"` had, while ordering accented letters among their unaccented peers
+ * the way a reader expects.
+ */
+const localeCompareSortingFn: SortingFn<unknown> = (rowA, rowB, columnId) =>
+  collator.compare(
+    String(rowA.getValue(columnId)),
+    String(rowB.getValue(columnId))
+  );
 
 /**
  * A column definition for an admin table.
@@ -138,11 +160,20 @@ export function AdminDataTable<T>({
 
   // TanStack auto-detects `alphanumeric` sorting for columns whose sample
   // values look numeric-ish; default every column without its own
-  // `sortingFn` to `text`, which is what case-insensitive comparison needs.
+  // `sortingFn` to the locale-aware comparator above instead.
   const columnsWithSorting = useMemo(
     () =>
-      columns.map((column) =>
-        column.sortingFn ? column : { ...column, sortingFn: "text" as const }
+      columns.map(
+        (column): AdminColumn<T> =>
+          column.sortingFn
+            ? column
+            : {
+                ...column,
+                // localeCompareSortingFn only reads its rows through
+                // `getValue`, so it works identically for every T; the cast
+                // just tells TanStack's contravariant SortingFn<T> that.
+                sortingFn: localeCompareSortingFn as SortingFn<T>,
+              }
       ),
     [columns]
   );
@@ -195,6 +226,17 @@ export function AdminDataTable<T>({
 
   const rows = table.getRowModel().rows;
   const hideable = table.getAllLeafColumns().filter((c) => c.getCanHide());
+
+  // The row count alone leaves the table's order silently unannounced: when
+  // the sorted column is hidden (its header, and the aria-sort it carries,
+  // are not in the DOM at all), nothing else tells a screen reader user which
+  // way the rows are ordered. Naming it here, from the same `labels` map the
+  // header text and each cell's `data-label` already use, keeps the announced
+  // column name in sync with what a sighted user would see if that column
+  // were visible.
+  const rowCountText = rows.length === 1 ? "1 row" : `${rows.length} rows`;
+  const sortedLabel = labels.get(sort.id) ?? sort.id;
+  const orderText = `sorted by ${sortedLabel}, ${sort.desc ? "descending" : "ascending"}`;
 
   const resetColumns = () => {
     // Clear the stored preference rather than writing the default set into
@@ -253,7 +295,7 @@ export function AdminDataTable<T>({
       </div>
 
       <p aria-live="polite" className="sr-only">
-        {rows.length === 1 ? "1 row" : `${rows.length} rows`}
+        {`${rowCountText}, ${orderText}`}
       </p>
 
       {rows.length === 0 ? (
@@ -267,14 +309,15 @@ export function AdminDataTable<T>({
                 {group.headers.map((header) => {
                   const direction = header.column.getIsSorted();
                   const label = labels.get(header.column.id) ?? "";
+                  const canSort = header.column.getCanSort();
                   return (
                     <TableHead
-                      aria-sort={ariaSort(direction)}
+                      aria-sort={canSort ? ariaSort(direction) : undefined}
                       className="bg-secondary md:sticky md:top-0 md:z-10"
                       key={header.id}
                       scope="col"
                     >
-                      {header.column.getCanSort() ? (
+                      {canSort ? (
                         <button
                           className="inline-flex items-center gap-1 hover:underline"
                           onClick={header.column.getToggleSortingHandler()}
