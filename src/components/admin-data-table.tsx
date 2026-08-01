@@ -41,8 +41,9 @@ import {
 // Hoisted once rather than constructed per comparison, the same reasoning
 // that keeps regex literals out of loops: a Collator is comparatively
 // expensive to build and this one is reused for every text comparison in
-// every table.
-const collator = new Intl.Collator(undefined, { sensitivity: "base" });
+// every table. Locale is pinned to "en" (not undefined) to ensure
+// deterministic sort order across server-side rendering and client hydration.
+const collator = new Intl.Collator("en", { sensitivity: "base" });
 
 /**
  * The default sort for any column that does not set its own `sortingFn`.
