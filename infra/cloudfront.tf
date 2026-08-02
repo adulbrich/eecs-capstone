@@ -49,8 +49,12 @@ data "aws_cloudfront_origin_request_policy" "all_viewer" {
   name = "Managed-AllViewer"
 }
 
-# App distribution: dynamic SSR origin (the ALB via VPC origin). Caching is
-# disabled and all viewer headers/cookies/query are forwarded.
+# App distribution: dynamic SSR origin (the ALB via VPC origin). On the
+# default behavior, caching is disabled and all viewer headers/cookies/query
+# are forwarded. A separate ordered_cache_behavior below caches /assets/* on
+# Managed-CachingOptimized; never widen that path_pattern beyond hashed build
+# output, since CachingOptimized's one-second minimum TTL caches even when
+# the origin sends no-cache.
 resource "aws_cloudfront_distribution" "app" {
   enabled         = true
   comment         = "${var.project} app"

@@ -5,7 +5,7 @@
  * major-version jump has already silently broken this file once:
  *
  *   npx --yes svgo@4.0.2 --config svgo.config.mjs \
- *     -i public/logo-institution.svg -o public/logo-institution.min.svg
+ *     -i src/assets/logo-institution.svg -o src/assets/logo-institution.min.svg
  *
  * Kept in the repo rather than run as a one-off so a future brand swap can
  * re-minify identically.

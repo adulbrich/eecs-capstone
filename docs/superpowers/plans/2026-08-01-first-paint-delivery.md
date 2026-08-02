@@ -403,7 +403,7 @@ remain unsized and are a separate follow-up."
 
 **Interfaces:**
 - Consumes: Task 2's test, which must still pass afterwards.
-- Produces: the same mark at roughly 3 KB to 5 KB with its `viewBox` intact. Task 4 moves the resulting file.
+- Produces: the same mark at 29,320 bytes (down from 35,440, a 17 percent reduction) with its `viewBox` intact. That is well short of the roughly 3 KB to 5 KB originally expected: about 78 percent of the file is genuine path geometry from Inkscape rather than metadata, so there was much less to strip than assumed. Task 4 moves the resulting file.
 
 - [ ] **Step 1: Record the baseline**
 

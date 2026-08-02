@@ -13,12 +13,14 @@ The governing principle, which every decision below follows from:
 > **Nothing render-blocking crosses the origin boundary uncompressed. Nothing
 > that occupies layout space arrives without declaring its size.**
 
-The first clause governs Feature A. The second governs Features B and C, and it
-is what connects two problems that look unrelated: the oversized logo and the
-header's post-hydration reflow are the same defect, which is that the browser
-cannot reserve correct space before the payload lands. Feature D sits outside the
-principle on purpose; it was never a cause, only an aggravator, which is why it
-is gated on measurement rather than scheduled.
+The first clause governs Feature A. The second governs Feature B outright: the
+oversized logo lays out at its full intrinsic size before its dimensions are
+declared, which is exactly the defect the principle names. Feature C was
+originally grouped with B on the theory that the header's session skeleton has
+the same defect. Reading the actual flex layout does not support that theory,
+which is why Feature C now carries the same PENDING MEASUREMENT status as
+Feature D, for a different reason: Feature D was never a cause, only an
+aggravator, while Feature C's cause itself is unverified.
 
 ---
 
@@ -201,10 +203,15 @@ The `h-8 w-auto` classes still win once CSS applies, which is correct.
 
 ### B2: minify
 
-SVGO over `public/logo-institution.svg`, expecting 3 KB to 5 KB from 35,440.
-Two preservation constraints: `viewBox` must survive, because B1's derivation
-depends on it, and path structure must not change in a way that breaks the
-`dark:brightness-0 dark:invert` filter at `institution-logo.tsx:18`.
+SVGO over `public/logo-institution.svg`. The original estimate expected 3 KB to
+5 KB from 35,440. The actual result is 29,320 bytes, a 17 percent reduction, far
+short of that estimate: roughly 78 percent of the file is genuine path geometry
+from Inkscape rather than the metadata cruft the estimate assumed there would be
+more of, so there was much less to strip. Compression does the heavy lifting
+instead, not minification: the 29,320-byte raw file becomes 9,252 bytes over
+brotli. Two preservation constraints: `viewBox` must survive, because B1's
+derivation depends on it, and path structure must not change in a way that
+breaks the `dark:brightness-0 dark:invert` filter at `institution-logo.tsx:18`.
 
 ### B3: move into the hashed pipeline
 
@@ -227,7 +234,7 @@ instead of the filter hack, but it hardcodes the OSU mark and makes
 
 ---
 
-## Feature C: header session state
+## Feature C: header session state (PENDING MEASUREMENT)
 
 `src/components/site-header.tsx:21` calls `authClient.useSession()`, which is
 `isPending` during SSR. The server therefore ships
@@ -236,11 +243,49 @@ instead of the filter hack, but it hardcodes the OSU mark and makes
 <div class="h-8 w-24 animate-pulse rounded-md bg-[var(--surface-sunken)]"></div>
 ```
 
-at `site-header.tsx:56` (desktop) and `:163` (mobile), which the client replaces
-with wider content after hydration. Confirmed present in the served HTML. This is
-independent of Features A and B and will still be there once the CSS is fast.
+at `site-header.tsx:56`, on the desktop branch. Confirmed present in the served
+HTML. A second, differently sized instance exists at `:163`, but it is not part
+of the mobile bar; see the correction below.
 
-**The fix reserves space; it does not remove the skeleton.**
+**Correction to this feature's own earlier claims.** This design previously
+said flatly that the pending placeholder "causes a reflow" and that "both the
+desktop branch (`:56`) and the mobile branch (`:163`)" needed a fix, with the
+`:163` instance also "confirmed present in the served HTML." Reading the actual
+layout does not support either claim:
+
+- Desktop (`site-header.tsx:33`) is `[logo] [nav flex-1] [session]`. The nav at
+  `:38` carries `flex flex-1` and absorbs any width change in the session slot;
+  its own links stay left-aligned regardless. The session slot itself sits at
+  `:52` (this design earlier misstated it as `:50`; corrected here rather than
+  repeating the error) and is the last flex item in the row, so its right edge
+  is already pinned by the flex container. Nothing outside the slot moves when
+  the slot's own content resizes.
+- Mobile (`:74`) is `justify-between` with exactly two children, `[logo]` and
+  `[actions]`. The actions block is right-anchored by `justify-between` itself,
+  so the hamburger trigger stays rightmost no matter what the actions block
+  contains.
+- The `:163` skeleton is not in the mobile bar at all. It lives inside
+  `MobileMenu`'s `SheetContent`, which carries no `forceMount`. It does not
+  mount until the user opens the drawer, is therefore never present in the SSR
+  HTML, and cannot affect first paint or CLS. This feature's claimed scope was
+  overstated by roughly half: the entire mobile side does not apply.
+
+Nothing in the desktop flex layout requires the reflow this feature originally
+assumed. The one claim left unverified is narrow: whether the desktop
+skeleton's specific width (`h-8 w-24`) differs enough from the resolved
+signed-in or signed-out width to visibly resize the session slot itself, even
+though that resize, if it exists, does not propagate to the nav or anything
+else on the page.
+
+**No change ships from this section unless a measurement demonstrates real
+movement.** Profile the desktop session slot in DevTools across the pending,
+signed-out, and signed-in states. If the slot's own width changes by an amount
+that reads as a visible jump, the fix described below applies. If it does not,
+close this item and leave the design alone, the same disposition Feature D
+uses for its own gate.
+
+**If measurement demands the fix, it reserves space rather than removing the
+skeleton, as follows.**
 
 Server-rendering the signed-out state, mirroring the `useHasMounted` pattern in
 `src/routes/index.tsx`, was considered and rejected. That pattern is right on the
@@ -250,17 +295,18 @@ signed-out means every returning signed-in user is shown "Sign in / Sign up"
 before it corrects. That trades a neutral wrong state (the pulse, which honestly
 reports "not yet known") for a confidently wrong one.
 
-The actual goal is no reflow, not no skeleton. The session slot gets a
-`min-width` sized to the wider of the two resolved states (signed-out, which is
-a "Sign in" link plus a "Sign up" button; and signed-in, which is the
-notification bell, cart button, and user menu). The pending skeleton is sized to
-that same width, so all three states occupy identical space, nothing around them
-moves, and the pulse keeps telling the truth. Both the desktop branch (`:56`) and
-the mobile branch (`:163`) receive it.
+The goal, if this proceeds, is no reflow in the desktop slot specifically, not
+no skeleton. The slot would get a `min-width` sized to the wider of the two
+resolved states (signed-out, which is a "Sign in" link plus a "Sign up" button;
+and signed-in, which is the notification bell, cart button, and user menu),
+with the pending skeleton sized to match, so all three states occupy identical
+space and the pulse keeps telling the truth. The `:163` skeleton needs no such
+treatment: since it is never present before the drawer opens, it has no
+first-paint or CLS consequence to reserve space against.
 
-The two resolved widths are measured in a browser during implementation rather
-than guessed; this design deliberately does not assert pixel values it did not
-measure.
+The two resolved widths, if this proceeds, are to be measured in a browser
+during implementation rather than guessed; this design deliberately does not
+assert pixel values it did not measure.
 
 ---
 
@@ -323,7 +369,7 @@ scheduled for change.
 | What | Where | Guards |
 | --- | --- | --- |
 | Logo `<img>` carries `width`/`height` matching the SVG viewBox ratio | `src/test/institution-logo.test.tsx` (new) | B1 being dropped in a later refactor |
-| Header session slot reserves the same width in pending, signed-out, and signed-in states | `src/test/site-header.test.tsx` (new) | C regressing |
+| Header session slot reserves the same width in pending, signed-out, and signed-in states, **conditional on Feature C's measurement showing real movement** | `src/test/site-header.test.tsx` (new; not created if nothing moves) | C regressing, if the fix is built at all |
 | Build emits `.br` variants for `/assets/*` | `scripts/` check, run after build in CI | **A1 regressing on a dependency bump** |
 
 The third row carries the most weight. A1 is a build-configuration flag with no
@@ -333,9 +379,12 @@ quietly returns to shipping 98 KB of raw CSS. An assertion on the build output i
 the only thing that catches it, and it is the difference between fixing this once
 and fixing it again in six months.
 
-Both new component tests follow the existing convention in `src/test/`:
-`// @vitest-environment jsdom` on line 1, Testing Library, assertions inside
-`it()`. There are no existing logo or header tests to extend.
+The institution-logo test in row one is created unconditionally. The
+site-header test in row two is created only if Feature C's measurement shows
+real movement; if it is created, it follows the same convention as the
+institution-logo test: `// @vitest-environment jsdom` on line 1, Testing
+Library, assertions inside `it()`. There are no existing logo or header tests
+to extend.
 
 The Playwright axe suite needs no new cases; `alt` text and heading structure are
 unchanged by this work.
@@ -375,3 +424,15 @@ filter that can expose fill-rule changes the light path hides.
 **B3 breaks SSR.** `brand.ts` is imported by `__root.tsx`, which runs on both
 server and client. A `?url` import resolves in both environments under Vite, but
 this is worth confirming in a production build rather than only in dev.
+
+**A future institution mark under 4 KB would silently void B3.**
+`vite.config.ts` sets no `assetsInlineLimit`, so Vite's 4096-byte default
+applies to the `?url` import. The current mark is safe at 29,320 bytes, well
+above that threshold. If a future brand swap dropped in a mark under 4 KB,
+Vite would inline it as a base64 data URI directly in the HTML instead of
+emitting it as a hashed file in `/assets/`, which would silently void B3's
+entire premise of inheriting A2's CloudFront cache behavior: there would be no
+`/assets/*` request left to cache. A future swap should check the minified
+mark's size against that threshold, or force the file path with Vite's
+documented `?no-inline` query modifier; either avoids the regression without
+changing `vite.config.ts` now.
