@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",
+    "check:compression": "node scripts/check-compression.mjs",
     "preview": "vite preview",
     "test": "vitest run --exclude '**/*.integration.test.ts' --exclude '**/*.a11y.test.ts'",
     "test:accessibility": "playwright test --config playwright.a11y.config.ts",

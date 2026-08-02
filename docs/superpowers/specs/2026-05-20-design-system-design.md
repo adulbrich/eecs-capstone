@@ -60,7 +60,7 @@ export const brand = {
 export type Brand = typeof brand;
 ```
 
-**To adopt this for another institution:** fork the repo, update every field above (and the matching `:root` defaults in `styles.css`), replace `/public/logo-institution.svg`. Nothing else requires changes.
+**To adopt this for another institution:** fork the repo, update every field above (and the matching `:root` defaults in `styles.css`), and replace `src/assets/logo-institution.svg`. `src/lib/brand.ts` imports the mark from `#/assets/logo-institution.svg?url`, which is what resolves that path into the built bundle; a file dropped at the old `/public/logo-institution.svg` location is silently ignored and the previous mark keeps rendering. Nothing else requires changes.
 
 ---
 
@@ -278,9 +278,9 @@ Applies brand CSS custom properties to `:root` via `element.style.setProperty()`
 
 Header logo lockup. Renders `<img src={brand.logoUrl} alt={brand.logoAlt}>` at `32px` height, a `1px` vertical divider, and `brand.programName` in caption weight. Falls back to `brand.institutionShort` in bold if `brand.logoUrl` is falsy or empty.
 
-### `/public/logo-institution.svg`
+### `src/assets/logo-institution.svg`
 
-OSU logo asset. Must be supplied by the developer. The repo ships a text placeholder SVG (`INSTITUTION`) so the app renders on a fresh clone without the real logo file.
+OSU logo asset. Must be supplied by the developer. `src/lib/brand.ts` imports it via `#/assets/logo-institution.svg?url`, which is what resolves the file into the built, hashed bundle. The repo ships a text placeholder SVG (`INSTITUTION`) so the app renders on a fresh clone without the real logo file.
 
 ---
 
