@@ -475,12 +475,26 @@ a {
   /* The column marked `cardHeader` titles the record, so it becomes the
      card's header strip: full width, no field name in front of it. Without
      this it renders as just another labelled field, and the 5.5rem label
-     column squeezes a title and its thumbnail into whatever is left. */
+     column squeezes a title and its thumbnail into whatever is left.
+
+     Deliberately no background of its own: the card is already `--card`, and
+     tinting the header `--secondary` put the orange title links on a lighter
+     gray that reads washed out in dark mode. Weight and the row rule below it
+     are enough to make it read as a header. */
   .admin-table tbody td[data-card-header] {
     display: block;
     padding: 0.75rem;
-    background: var(--secondary);
     font-weight: 500;
+  }
+}
+
+/* The table proper, at md and up. The container supplies the surface, the
+   border and the radius (see `admin-data-table.tsx`); the last row drops its
+   rule so the body meets that rounded edge cleanly instead of drawing a line
+   across it. */
+@media (min-width: 768px) {
+  .admin-table tbody tr:last-child td {
+    border-bottom: none;
   }
 }
 

@@ -3,7 +3,7 @@ import type * as React from "react";
 import { cn } from "#/lib/utils";
 
 /**
- * shadcn's table, with four local edits. The component is copy-owned, so
+ * shadcn's table, with five local edits. The component is copy-owned, so
  * these divergences are permanent and deliberate:
  *
  * 1. The wrapper scrolls (and caps its height) only at `md` and up, because
@@ -13,11 +13,24 @@ import { cn } from "#/lib/utils";
  * 3. The table is `border-separate`, which sticky headers require.
  * 4. The row rule lives on the cells, not on `TableRow`, because a `tr`
  *    cannot paint a border once the table is `border-separate`.
+ * 5. The wrapper takes its own `containerClassName`. Upstream hardcodes the
+ *    wrapper's classes and routes `className` to the inner `table`, which
+ *    leaves callers unable to give the container a surface or a border. That
+ *    is exactly what an admin table needs: without a background of its own it
+ *    sits directly on the page gradient, which is lightest and orange-tinted
+ *    near the top of the page, and orange links on it lose contrast.
  */
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+function Table({
+  className,
+  containerClassName,
+  ...props
+}: React.ComponentProps<"table"> & { containerClassName?: string }) {
   return (
     <div
-      className="relative w-full md:max-h-[calc(100vh-14rem)] md:overflow-auto"
+      className={cn(
+        "relative w-full md:max-h-[calc(100vh-14rem)] md:overflow-auto",
+        containerClassName
+      )}
       data-slot="table-container"
     >
       <table

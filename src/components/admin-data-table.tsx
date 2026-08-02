@@ -319,10 +319,21 @@ export function AdminDataTable<T>({
         {`${rowCountText}, ${orderText}`}
       </p>
 
+      {/*
+        The container carries the surface, not the table: at md and up the
+        admin table reads as one card, matching the rest of the app's
+        bordered, rounded surfaces. Without a background of its own it sits on
+        the page gradient, which is lightest and orange-tinted near the top of
+        the page, so orange title links lose contrast there. Below md this is
+        skipped, because `src/styles.css` already gives each row its own card.
+      */}
       {rows.length === 0 ? (
         <EmptyState>{emptyMessage}</EmptyState>
       ) : (
-        <Table className="admin-table mt-4">
+        <Table
+          className="admin-table"
+          containerClassName="mt-4 md:rounded-lg md:border md:border-border md:bg-card"
+        >
           <TableCaption className="sr-only">{caption}</TableCaption>
           <TableHeader>
             {table.getHeaderGroups().map((group) => (

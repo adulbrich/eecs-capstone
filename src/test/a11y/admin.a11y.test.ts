@@ -456,7 +456,16 @@ test("admin table header stays pinned while the body scrolls at md and up", asyn
   if (!headerBoxAfter) {
     throw new Error("Header column not found after scrolling.");
   }
-  expect(Math.round(headerBoxAfter.y)).toBe(Math.round(containerBox.y));
+  // `top: 0` pins to the scroll container's padding box, while boundingBox
+  // reports its border box, so the container's own top border sits between
+  // them. Add it rather than loosening this to a tolerance: the point of the
+  // assertion is that the header is exactly flush, not approximately.
+  const containerBorderTop = await container.evaluate(
+    (el) => Number.parseFloat(window.getComputedStyle(el).borderTopWidth) || 0
+  );
+  expect(Math.round(headerBoxAfter.y)).toBe(
+    Math.round(containerBox.y + containerBorderTop)
+  );
 
   // The row that was below the header has now scrolled up behind it,
   // confirming body content actually moved underneath a header that held its
