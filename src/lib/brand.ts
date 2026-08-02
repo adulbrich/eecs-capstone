@@ -1,8 +1,13 @@
+import logoInstitution from "#/assets/logo-institution.svg?url";
+
 export const brand = {
   institutionName: "Oregon State University",
   institutionShort: "OSU",
   programName: "EECS Capstone",
-  logoUrl: "/logo-institution.svg",
+  // Imported rather than referenced by path so Vite hashes it into /assets/,
+  // where the CloudFront behavior added in infra/cloudfront.tf caches it.
+  // Files left in public/ are copied verbatim and ship with no cache-control.
+  logoUrl: logoInstitution,
   logoAlt: "Oregon State University",
   // Optional explicit white/light logo for dark mode.
   // When undefined, InstitutionLogo uses CSS filter inversion instead.
