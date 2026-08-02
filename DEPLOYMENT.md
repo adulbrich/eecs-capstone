@@ -50,12 +50,13 @@ Accounts and access:
   workflow runs).
 - The ability to create a GitHub OAuth app (org or personal settings).
 
-> **Email is deferred.** This deployment does not provision SES (or any other
-> email provider) yet. The app runs with `EMAIL_TRANSPORT=console`, which logs
-> verification/reset links to CloudWatch instead of emailing them. Sign-up
-> still works, but only someone with log access can complete it. See section
-> 6 for how to retrieve those links (once the app is actually deployed), and
-> section 9 for wiring up real email later.
+> **Email is not switched on yet.** SES *is* provisioned (`infra/ses.tf`) and
+> the domain identity verifies, but the app still runs with
+> `EMAIL_TRANSPORT=console`, which logs verification/reset links to CloudWatch
+> instead of emailing them. Sign-up still works, but only someone with log
+> access can complete it. See section 6 for how to retrieve those links (once
+> the app is actually deployed), and section 9 for what is left before the
+> cutover.
 
 ---
 
@@ -407,12 +408,18 @@ Migrations run during deploy. To run them out of band, use the same
 ## 9. Adding real email delivery
 
 The app sends from `noreply@capstone.eecs.oregonstate.edu` via SES
-(`src/lib/email/ses-sender.ts`). The code is done; what remains is a domain
-identity, DNS records OSU has to publish, and production access.
+(`src/lib/email/ses-sender.ts`). The code is done, and so is the identity: the
+three DKIM records below are published and the domain verifies. What remains is
+production access (9.4) and the cutover itself (9.5).
 
 `infra/ses.tf` and the `SendEmail` statement in `infra/iam.tf` are already in
-place. `EMAIL_FROM` and `SES_REGION` are already set in `infra/ecs.tf` and are
-inert while `EMAIL_TRANSPORT=console`, so the cutover is a one-line change.
+place. `EMAIL_FROM`, `EMAIL_REPLY_TO` and `SES_REGION` are already set in
+`infra/ecs.tf` and are inert while `EMAIL_TRANSPORT=console`, so the cutover is
+a one-line change.
+
+Sections 9.1 through 9.3 record how the identity was set up; they are kept
+because the records are permanent and someone will eventually have to explain
+or re-create them.
 
 **A domain identity, not an address identity.** SES verifies an address
 identity by emailing it a confirmation link that a human must click, and
@@ -502,7 +509,8 @@ aws --profile aws-capstone1 sesv2 create-email-identity \
 Only once `VerifiedForSendingStatus` is `true` **and** production access is
 granted, flip `EMAIL_TRANSPORT` to `"ses"` in `infra/ecs.tf` and apply.
 Sending from an unverified domain fails outright, so flipping early breaks
-sign-up rather than degrading it.
+sign-up rather than degrading it. Set `email_reply_to` in the same apply if an
+address has been agreed (9.6); it is optional and does not gate the cutover.
 
 **Applying is not enough.** `aws_ecs_service.app` carries
 `ignore_changes = [task_definition, desired_count]`, so `terraform apply`
@@ -516,7 +524,37 @@ evidence that email is on; confirm with a real sign-up instead.
 Until then sign-up still works, but verification and reset links reach only
 CloudWatch logs (section 6), not real inboxes.
 
-### 9.6 SES console wizard
+### 9.6 Reply-To (optional)
+
+`noreply@capstone.eecs.oregonstate.edu` has no mailbox, so a reply to a
+verification or reset email disappears. `EMAIL_REPLY_TO` names an address that
+does receive mail, and the app puts it in `ReplyToAddresses` on every message
+it sends.
+
+It is genuinely optional at every layer: `var.email_reply_to` defaults to `""`,
+the task definition always passes the variable, and
+`createSesEmailSender` treats blank as unset and omits the header. Only
+`EMAIL_FROM` is required under `EMAIL_TRANSPORT=ses`, so email works with no
+Reply-To at all, which is how it ships today.
+
+To set one:
+
+```bash
+cd infra
+terraform apply -var 'email_reply_to=capstone@oregonstate.edu'
+```
+
+Or add `email_reply_to` to `terraform.tfvars` alongside the other variables
+(3.3). Then run the deploy workflow: as in 9.5, `terraform apply` alone
+registers a new task definition revision without moving the service onto it.
+
+Unlike `EMAIL_FROM`, this address plays no part in DMARC: alignment is checked
+against the `From:` domain and the DKIM `d=` domain, and `Reply-To` is not an
+authenticated header. So it needs no SES verification and need not live on
+`capstone.eecs.oregonstate.edu` at all. An ordinary OSU mailbox or a shared
+alias is fine, and is the point: replies should reach a person.
+
+### 9.7 SES console wizard
 
 The console's getting-started wizard maps onto the above loosely. Step 1 asks
 for an email address, which is a **sandbox test recipient**, not your sender.
@@ -633,10 +671,10 @@ this config; delete it manually if you are done with the project.
 
 `NODE_ENV`, `PORT`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `S3_BUCKET`,
 `S3_REGION`, `BEDROCK_REGION`, `BEDROCK_MODEL_ID`, `EMAIL_TRANSPORT=console`,
-plus secrets `DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`. In
-production, S3 and Bedrock use the task role (no access keys). Email is
-deferred (section 9); switch `EMAIL_TRANSPORT` to `ses` and add `EMAIL_FROM`
-/ `SES_REGION` once it's configured.
+`EMAIL_FROM`, `EMAIL_REPLY_TO` (blank), `SES_REGION`, plus secrets
+`DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`. In production, S3
+and Bedrock use the task role (no access keys). The three email variables are
+inert until `EMAIL_TRANSPORT` flips to `ses` (section 9.5).
 
 **File map:**
 

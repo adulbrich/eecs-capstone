@@ -92,6 +92,12 @@ variable "github_repo" {
   type        = string
 }
 
+variable "email_reply_to" {
+  description = "Optional Reply-To address for outbound mail. Empty means replies land on EMAIL_FROM. It is not part of DKIM alignment, so it need not be a verified identity or even sit on the sending domain."
+  type        = string
+  default     = ""
+}
+
 variable "github_client_id" {
   description = "GitHub OAuth app client ID (not secret). The client secret lives in Secrets Manager."
   type        = string

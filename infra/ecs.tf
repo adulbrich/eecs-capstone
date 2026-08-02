@@ -104,6 +104,10 @@ resource "aws_ecs_task_definition" "app" {
         # one-line change. The From domain must match the verified identity or
         # DKIM alignment fails, so both derive from var.domain_name.
         { name = "EMAIL_FROM", value = "noreply@${var.domain_name}" },
+        # Optional, and empty until a Reply-To address is decided. The app
+        # treats "" as unset and omits the header, so this can ship blank; it
+        # plays no part in DKIM alignment, unlike EMAIL_FROM above.
+        { name = "EMAIL_REPLY_TO", value = var.email_reply_to },
         # src/lib/email/ses-sender.ts falls back to us-east-1. The identity
         # lives in var.region, and the mismatch surfaces only as an opaque
         # "email address not verified" error, so pin it explicitly.

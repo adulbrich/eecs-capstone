@@ -13,12 +13,12 @@ is not built yet. For the full, exhaustive feature list (built and planned), see
 
 - SES Setup. The domain identity is done: the three DKIM records are published
   in the OSU-managed zone and verify. Sending From
-  `noreply@capstone.eecs.oregonstate.edu` could be switched on by flipping
+  `noreply@capstone.eecs.oregonstate.edu` is a one-line cutover, flipping
   `EMAIL_TRANSPORT` to `ses` in `infra/ecs.tf`, which currently pins `console`.
-  What is left is the Reply-To address, and it needs code as well as a
-  decision: `SesEmailSender.dispatch` sets only `FromEmailAddress`, so
-  supporting one means adding `ReplyToAddresses` to the `SendEmailCommand`
-  input plus an `EMAIL_REPLY_TO` variable alongside `EMAIL_FROM`.
+  Still to decide: the Reply-To address. `EMAIL_REPLY_TO` (Terraform
+  `email_reply_to`) is wired end to end but optional and currently blank, so it
+  does not block the cutover; unset just means replies land on the unattended
+  `noreply@` mailbox. See [`DEPLOYMENT.md`](./DEPLOYMENT.md) §9.6.
 
 ## Roadmap (not yet implemented)
 
@@ -219,6 +219,8 @@ version, this file could return to CLI generation; until then, edit it directly.
   verification and password-reset URLs are written to the server's stderr.
 - `ses`: real outbound mail through AWS SES v2 (`src/lib/email/ses-sender.ts`),
   which additionally requires `EMAIL_FROM` to be a verified sender identity.
+  `EMAIL_REPLY_TO` is optional: set it and every message carries that
+  `Reply-To`, leave it blank and the header is omitted.
 
 The SES path is implemented and its domain identity verifies, but production
 still runs the console transport pending a Reply-To address (see

@@ -37,11 +37,18 @@ const PASSWORD_RESET: EmailContent = {
 
 export class SesEmailSender implements EmailSender {
   private readonly from: string;
+  private readonly replyTo: string | null;
   private readonly send: SesSendFn;
 
-  constructor(from: string, send: SesSendFn) {
+  /**
+   * `replyTo` is optional because `from` is the address DMARC aligns against;
+   * a reply-to only decides where a human's reply lands, so mail sends
+   * correctly without one.
+   */
+  constructor(from: string, send: SesSendFn, replyTo: string | null = null) {
     this.from = from;
     this.send = send;
+    this.replyTo = replyTo;
   }
 
   sendVerification(msg: EmailMessage): Promise<void> {
@@ -58,6 +65,9 @@ export class SesEmailSender implements EmailSender {
   ): Promise<void> {
     await this.send({
       FromEmailAddress: this.from,
+      // `undefined` is dropped by the SDK serializer, so an unconfigured
+      // reply-to leaves the header off rather than sending an empty list.
+      ReplyToAddresses: this.replyTo ? [this.replyTo] : undefined,
       Destination: { ToAddresses: [msg.to] },
       Content: {
         Simple: {
@@ -92,7 +102,13 @@ export function createSesEmailSender(): SesEmailSender {
   if (!from) {
     throw new Error("EMAIL_FROM must be set when EMAIL_TRANSPORT=ses");
   }
-  return new SesEmailSender(from, (input) =>
-    getSesClient().send(new SendEmailCommand(input))
+  // Deliberately not required: the ECS task definition always passes
+  // EMAIL_REPLY_TO, as an empty string until an address is decided, and email
+  // must not stop working for want of one.
+  const replyTo = process.env.EMAIL_REPLY_TO?.trim() || null;
+  return new SesEmailSender(
+    from,
+    (input) => getSesClient().send(new SendEmailCommand(input)),
+    replyTo
   );
 }
