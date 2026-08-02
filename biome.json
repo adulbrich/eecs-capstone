@@ -59,6 +59,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["**/src/components/institution-logo.tsx"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "useImageSize": "on"
+          }
+        }
+      }
     }
   ]
 }
