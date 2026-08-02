@@ -231,6 +231,17 @@ Each project carries:
   items go back to `available`.
 - ✅ Staff change item status and assign holders; items auto-assign to the
   requesting user on reserve, with manual override on checkout.
+- ✅ Staff-assigned holds need no request line: an item that was never carted
+  can be reserved or checked out directly, assigned to an account, to an email
+  address, or to an ad-hoc label. An address that matches an account links to
+  it (and so notifies the holder) the same way a project's proposer email
+  resolves to a proposer; an address with no account is still recorded.
+  The hold's pickup-by and due-at live on the item, so they survive whether or
+  not a request line exists.
+- ✅ The item form groups every non-public field (serial, label, location,
+  private notes) into a staff panel, matching the project form's staff panel,
+  so the split between public and internal values is visible while filling it
+  in. It matches the server's public/staff split exactly.
 - ✅ Users cannot change item status except to request available items.
 - ✅ Users cancel a request while it is still `requested` or `reserved`.
 - ✅ Request-item lifecycle: `pending`, `approved`, `rejected`, `cancelled`,

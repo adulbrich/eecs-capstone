@@ -64,6 +64,13 @@
       "when": 1784843673871,
       "tag": "0008_add_inventory_label",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785642316169,
+      "tag": "0009_warm_cammi",
+      "breakpoints": true
     }
   ]
 }

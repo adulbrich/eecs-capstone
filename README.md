@@ -9,15 +9,31 @@ is not built yet. For the full, exhaustive feature list (built and planned), see
 [`docs/QUIRKS.md`](./docs/QUIRKS.md). For agent/contributor conventions, see
 [`AGENTS.md`](./AGENTS.md).
 
+## Pending
+
+- SES Setup. DKIM keys are generated for capstone.eecs.oregonstate.edu; the
+  records still need to be published in the OSU-managed zone before the
+  identity verifies. The From address aims to be
+  noreply@capstone.eecs.oregonstate.edu and the Reply-To address still needs to
+  be defined. Until then the ECS task definition pins `EMAIL_TRANSPORT=console`.
+
 ## Roadmap (not yet implemented)
 
 These are the features still on the table. Everything already built is documented
 in [`PRD.md`](./PRD.md).
 
+- Have a preview deployment on AWS that uses a very small DB, but otherwise the same stack as the rest. This means having another "Deploy (Preview)" GitHub Actions workflow that, in addition to the jobs/steps in the normal Deploy: resets the preview DB with the dev seeds and data, deploys on another container/url, and shows a big "PREVIEW DEPLOYMENT" banner at the top all pages. Spec this. This should work for specific branches if possible (e.g., someone opens a PR, and we manually deploy a preview with that branch).
+- Check all the nice shadcn/ui components and see if we use them everywhere we can. Audit where we could update the app accordingly. The most important things are that the UI is consistent across the app + accessibility.
+- Ability to export admin tables to CSV (current selection)
+- categories for inventory items should be managed in /admin/categories as well, and be pulled from that store in the inventory/new and /edit routes
+- Show staff-assigned holds in the holder's `/my/items`. An item checked out to
+  an email address that matches an account notifies that account, but the
+  "My items" tabs still read from request lines only, so a walk-in hold does
+  not appear there.
+
 ### Authentication
 
-- Additional SSO providers beyond GitHub: Google, LinkedIn, Discord, and Oregon
-  State University ONID.
+- Additional SSO providers beyond GitHub: Oregon State University ONID.
 
 ### Discovery & taxonomy
 
@@ -57,6 +73,7 @@ We might need to scrap that because different sections handle project assignment
 ```bash
 npm install
 docker compose up -d
+npm run db:migrate    # nothing applies migrations on boot
 npm run dev
 ```
 
@@ -192,9 +209,17 @@ version, this file could return to CLI generation; until then, edit it directly.
 
 ### Email transport
 
-Email verification and password-reset URLs are written to the server's stderr via
-a console transport (`EMAIL_TRANSPORT=console`). Real outbound email (Resend, SES)
-is a future swap behind the `EmailSender` interface in `src/lib/email/sender.ts`.
+`EMAIL_TRANSPORT` selects the sender behind the `EmailSender` interface in
+`src/lib/email/sender.ts`:
+
+- `console` (default, and what the ECS task definition currently pins): email
+  verification and password-reset URLs are written to the server's stderr.
+- `ses`: real outbound mail through AWS SES v2 (`src/lib/email/ses-sender.ts`),
+  which additionally requires `EMAIL_FROM` to be a verified sender identity.
+
+The SES path is implemented but not switched on in production yet: the sender
+identity is still pending (see [Pending](#pending) above), and the From address
+must align with the verified identity or DKIM fails.
 
 ## Object storage
 
@@ -231,7 +256,16 @@ npm run test:integration
 ```
 
 Each test starts from a TRUNCATEd database, so they share a single fork and run
-serially.
+serially. They read the schema as it exists, so run `npm run db:migrate` after
+pulling a migration or every one of them fails on the missing column.
+
+Accessibility is checked separately, with Playwright and axe against the running
+app (the config starts `npm run dev` itself, or reuses one already listening on
+port 3000):
+
+```bash
+npm run test:accessibility
+```
 
 > TODO (future): integration tests currently run against the same database as
 > dev and TRUNCATE every table before each test, which wipes dev data. Point them
@@ -266,10 +300,14 @@ one-click GitHub Actions workflow (`.github/workflows/deploy.yml`):
 
 - **Compute**: a single arm64 ECS Fargate task running the app's multi-stage
   Docker image.
-- **Ingress**: CloudFront is the only public entry point, giving a stable
-  HTTPS `*.cloudfront.net` URL with no custom domain required. It reaches an
-  internal Application Load Balancer through a CloudFront VPC origin, so the
-  ALB itself has no public IP.
+- **Ingress**: CloudFront is the only public entry point, serving HTTPS at
+  `capstone.eecs.oregonstate.edu` (`var.domain_name`). Two DNS records live in
+  the OSU-managed `eecs.oregonstate.edu` zone rather than in this Terraform
+  configuration: one validating the ACM certificate, and one pointing the
+  hostname at the CloudFront distribution. That is why the certificate is a
+  read-only `data` lookup in `infra/cloudfront.tf` instead of a managed
+  resource. CloudFront reaches an internal Application Load Balancer through a
+  VPC origin, so the ALB itself has no public IP.
 - **Data**: a private RDS Postgres instance and a private S3 bucket for
   uploaded images, the latter served through its own CloudFront distribution
   via Origin Access Control.

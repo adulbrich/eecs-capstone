@@ -323,7 +323,16 @@ export const inventoryItems = pgTable(
     currentHolderId: text("current_holder_id").references(() => user.id, {
       onDelete: "set null",
     }),
+    // The address a hold was assigned to. Mirrors projects.proposerEmail: it
+    // survives when no account matches, and current_holder_id is resolved
+    // from it when one does.
+    currentHolderEmail: text("current_holder_email"),
     currentHolderLabel: text("current_holder_label"),
+    // A hold does not need a request line (staff can reserve or check out an
+    // item that was never carted), so the current hold's dates live here
+    // rather than only on inventory_request_items.
+    currentPickupBy: timestamp("current_pickup_by", { withTimezone: true }),
+    currentDueAt: timestamp("current_due_at", { withTimezone: true }),
     currentRequestItemId: uuid("current_request_item_id"),
 
     searchVector: tsvector("search_vector")

@@ -6,6 +6,7 @@ import {
   inventoryItems,
   inventoryRequestItems,
   notifications,
+  user,
 } from "#/db/schema";
 
 type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
@@ -21,6 +22,8 @@ export type ItemStatus =
 export interface TransitionInput {
   comment?: string | null;
   dueAt?: Date | null;
+  /** Assigns the hold to an address, with or without a matching account. */
+  holderEmail?: string | null;
   holderId?: string | null;
   holderLabel?: string | null;
   itemId: string;
@@ -41,14 +44,21 @@ function assertStaff(viewer: Viewer) {
 }
 
 function validateInvariants(input: TransitionInput) {
-  const { nextStatus, holderId, holderLabel, requestItemId, pickupBy, dueAt } =
-    input;
+  const {
+    nextStatus,
+    holderId,
+    holderEmail,
+    holderLabel,
+    requestItemId,
+    pickupBy,
+    dueAt,
+  } = input;
 
   switch (nextStatus) {
     case "available":
     case "maintenance":
     case "retired":
-      if (holderId || holderLabel || requestItemId) {
+      if (holderId || holderEmail || holderLabel || requestItemId) {
         throw new Error(
           `Cannot set holder or request on transition to ${nextStatus}`
         );
@@ -60,22 +70,20 @@ function validateInvariants(input: TransitionInput) {
       }
       return;
     case "requested":
-      if (!(requestItemId && holderId) || holderLabel) {
+      if (!(requestItemId && holderId) || holderEmail || holderLabel) {
         throw new Error(
-          "requested status requires requestItemId + holderId, no label"
+          "requested status requires requestItemId + holderId, no email or label"
         );
       }
       return;
     case "reserved":
     case "checked_out": {
-      if (!requestItemId) {
-        throw new Error(`${nextStatus} requires requestItemId`);
-      }
-      const hasUser = !!holderId;
-      const hasLabel = !!holderLabel;
-      if (hasUser === hasLabel) {
+      // A request line is optional: staff reserve or check out walk-in items
+      // that were never carted, and those holds have no line to attach to.
+      const holders = [holderId, holderEmail, holderLabel].filter(Boolean);
+      if (holders.length !== 1) {
         throw new Error(
-          `${nextStatus} requires exactly one of holderId or holderLabel`
+          `${nextStatus} requires exactly one of holderId, holderEmail or holderLabel`
         );
       }
       if (nextStatus === "checked_out" && !dueAt) {
@@ -86,6 +94,28 @@ function validateInvariants(input: TransitionInput) {
     default:
       return;
   }
+}
+
+/**
+ * Links an email-assigned hold to an account when one already exists, the same
+ * way a project's proposerEmail resolves to a proposerId. Without this the
+ * holder would never be notified, even though they can sign in.
+ */
+async function resolveHolderId(
+  tx: Tx,
+  input: TransitionInput
+): Promise<string | null> {
+  if (input.holderId) {
+    return input.holderId;
+  }
+  if (!input.holderEmail) {
+    return null;
+  }
+  const [match] = await tx
+    .select({ id: user.id })
+    .from(user)
+    .where(eq(user.email, input.holderEmail));
+  return match?.id ?? null;
 }
 
 /**
@@ -120,8 +150,15 @@ export async function transitionItem(
 async function transitionItemInTx(
   tx: Tx,
   viewer: Viewer,
-  input: TransitionInput
+  rawInput: TransitionInput
 ) {
+  // Every write below reads the resolved holder, so an email that matches an
+  // account behaves exactly like a hold assigned through the user picker.
+  const input: TransitionInput = {
+    ...rawInput,
+    holderId: await resolveHolderId(tx, rawInput),
+  };
+
   const [current] = await tx
     .select()
     .from(inventoryItems)
@@ -146,7 +183,12 @@ async function transitionItemInTx(
     .set({
       status: input.nextStatus,
       currentHolderId: input.holderId ?? null,
+      currentHolderEmail: input.holderEmail ?? null,
       currentHolderLabel: input.holderLabel ?? null,
+      // Writing the hold's dates here on every transition means releasing an
+      // item clears them for free, with no separate reset path.
+      currentPickupBy: input.pickupBy ?? null,
+      currentDueAt: input.dueAt ?? null,
       currentRequestItemId: input.requestItemId ?? null,
       updatedAt: new Date(),
     })
@@ -160,7 +202,13 @@ async function transitionItemInTx(
     comment: input.comment ?? null,
     requestItemId: input.requestItemId ?? null,
     holderId: input.holderId ?? null,
-    holderLabel: input.holderLabel ?? null,
+    // Only an address that matched no account falls back to the label column:
+    // once holderId is resolved the row must look like every other
+    // account-backed hold, or the history list would render the raw email
+    // where it shows an account everywhere else.
+    holderLabel:
+      input.holderLabel ??
+      (input.holderId ? null : (input.holderEmail ?? null)),
   });
 
   if (input.requestItemId) {
@@ -241,8 +289,12 @@ async function maybeNotify(
   input: TransitionInput
 ) {
   // Identify a "release-from-hold" path: no new request context provided AND
-  // the item was holding one. The original holder is then the recipient.
-  const isReleaseFromHold = !input.requestItemId && !!prev.currentRequestItemId;
+  // the item was held by someone. The original holder is then the recipient.
+  // A walk-in hold has no request line, so testing only for one would silently
+  // drop the return notification for every staff-assigned checkout.
+  const isReleaseFromHold =
+    !input.requestItemId &&
+    (!!prev.currentRequestItemId || !!prev.currentHolderId);
 
   const recipientId =
     input.holderId ?? (isReleaseFromHold ? prev.currentHolderId : null);

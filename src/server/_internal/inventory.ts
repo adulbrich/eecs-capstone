@@ -55,6 +55,7 @@ export interface InventoryItemPublic {
 
 export type InventoryItemStaff = InventoryItemPublic & {
   createdAt: Date;
+  currentHolderEmail: string | null;
   currentHolderId: string | null;
   currentHolderLabel: string | null;
   currentRequestItemId: string | null;
@@ -79,8 +80,10 @@ function stripForPublic(
     category: row.category,
     imageUrl: row.imageUrl,
     status: row.status,
-    pickupBy: null,
-    dueAt: null,
+    // The hold's dates live on the item itself, so they are the same whether
+    // the hold came from a cart request or from staff assigning it directly.
+    pickupBy: row.currentPickupBy,
+    dueAt: row.currentDueAt,
   };
 }
 
@@ -94,11 +97,24 @@ function fullForStaff(
     label: row.label,
     location: row.location,
     notes: row.notes,
+    currentHolderEmail: row.currentHolderEmail,
     currentHolderId: row.currentHolderId,
     currentHolderLabel: row.currentHolderLabel,
     currentRequestItemId: row.currentRequestItemId,
     updatedAt: row.updatedAt,
   };
+}
+
+/**
+ * The joined account's address wins over the one stored on the hold: someone
+ * who changed their email is still the same holder. The stored address is
+ * authoritative only when the hold matched no account.
+ */
+function holderEmailOf(row: {
+  holderEmail: string | null;
+  item: { currentHolderEmail: string | null };
+}): string | null {
+  return row.holderEmail ?? row.item.currentHolderEmail;
 }
 
 /**
@@ -141,16 +157,10 @@ export async function listInventoryAs(
   const rows = await db
     .select({
       item: inventoryItems,
-      pickupBy: inventoryRequestItems.pickupBy,
-      dueAt: inventoryRequestItems.dueAt,
       holderName: user.name,
       holderEmail: user.email,
     })
     .from(inventoryItems)
-    .leftJoin(
-      inventoryRequestItems,
-      eq(inventoryItems.currentRequestItemId, inventoryRequestItems.id)
-    )
     .leftJoin(user, eq(inventoryItems.currentHolderId, user.id))
     .where(where)
     .orderBy(desc(inventoryItems.updatedAt))
@@ -167,12 +177,10 @@ export async function listInventoryAs(
       return {
         ...fullForStaff(r.item),
         currentHolderName: r.holderName,
-        currentHolderEmail: r.holderEmail,
-        pickupBy: r.pickupBy,
-        dueAt: r.dueAt,
+        currentHolderEmail: holderEmailOf(r),
       };
     }
-    return { ...stripForPublic(r.item), pickupBy: r.pickupBy, dueAt: r.dueAt };
+    return stripForPublic(r.item);
   });
 
   return {
@@ -190,11 +198,9 @@ export type InventoryItemStaffDetail = InventoryItemStaff & {
 };
 
 interface InventoryItemJoinedRow {
-  dueAt: Date | null;
   holderEmail: string | null;
   holderName: string | null;
   item: typeof inventoryItems.$inferSelect;
-  pickupBy: Date | null;
 }
 
 /**
@@ -210,16 +216,10 @@ async function loadInventoryItemRowFor(
   const [row] = await db
     .select({
       item: inventoryItems,
-      pickupBy: inventoryRequestItems.pickupBy,
-      dueAt: inventoryRequestItems.dueAt,
       holderName: user.name,
       holderEmail: user.email,
     })
     .from(inventoryItems)
-    .leftJoin(
-      inventoryRequestItems,
-      eq(inventoryItems.currentRequestItemId, inventoryRequestItems.id)
-    )
     .leftJoin(user, eq(inventoryItems.currentHolderId, user.id))
     .where(eq(inventoryItems.id, id));
   if (!row) {
@@ -235,18 +235,12 @@ function toStaffDetail(row: InventoryItemJoinedRow): InventoryItemStaffDetail {
   return {
     ...fullForStaff(row.item),
     currentHolderName: row.holderName,
-    currentHolderEmail: row.holderEmail,
-    pickupBy: row.pickupBy,
-    dueAt: row.dueAt,
+    currentHolderEmail: holderEmailOf(row),
   };
 }
 
 function toPublicDetail(row: InventoryItemJoinedRow): InventoryItemPublic {
-  return {
-    ...stripForPublic(row.item),
-    pickupBy: row.pickupBy,
-    dueAt: row.dueAt,
-  };
+  return stripForPublic(row.item);
 }
 
 export async function getInventoryItemAs(viewer: Viewer, data: { id: string }) {
@@ -292,7 +286,11 @@ export async function listAdminInventoryAs(
       ilike(inventoryItems.label, like),
       ilike(inventoryItems.location, like),
       ilike(user.name, like),
-      ilike(user.email, like)
+      ilike(user.email, like),
+      // A hold assigned to a bare address or an ad-hoc label has no account
+      // row to match, so search the item's own holder columns too.
+      ilike(inventoryItems.currentHolderEmail, like),
+      ilike(inventoryItems.currentHolderLabel, like)
     );
     if (match) {
       conditions.push(match);
@@ -301,17 +299,11 @@ export async function listAdminInventoryAs(
 
   const rows = await db
     .select({
-      dueAt: inventoryRequestItems.dueAt,
       holderEmail: user.email,
       holderName: user.name,
       item: inventoryItems,
-      pickupBy: inventoryRequestItems.pickupBy,
     })
     .from(inventoryItems)
-    .leftJoin(
-      inventoryRequestItems,
-      eq(inventoryItems.currentRequestItemId, inventoryRequestItems.id)
-    )
     .leftJoin(user, eq(inventoryItems.currentHolderId, user.id))
     .where(and(...conditions))
     .orderBy(desc(inventoryItems.updatedAt));
@@ -319,10 +311,8 @@ export async function listAdminInventoryAs(
   return {
     rows: rows.map((r) => ({
       ...fullForStaff(r.item),
-      currentHolderEmail: r.holderEmail,
+      currentHolderEmail: holderEmailOf(r),
       currentHolderName: r.holderName,
-      dueAt: r.dueAt,
-      pickupBy: r.pickupBy,
     })),
   };
 }
@@ -673,7 +663,10 @@ export async function submitCartAs(
         .set({
           status: "requested",
           currentHolderId: viewer.id,
+          currentHolderEmail: null,
           currentHolderLabel: null,
+          currentPickupBy: null,
+          currentDueAt: null,
           currentRequestItemId: line.id,
           updatedAt: new Date(),
         })
@@ -838,7 +831,10 @@ export async function rejectRequestItemAs(
       .set({
         status: "available",
         currentHolderId: null,
+        currentHolderEmail: null,
         currentHolderLabel: null,
+        currentPickupBy: null,
+        currentDueAt: null,
         currentRequestItemId: null,
         updatedAt: new Date(),
       })
@@ -916,7 +912,10 @@ export async function cancelRequestItemAs(
       .set({
         status: "available",
         currentHolderId: null,
+        currentHolderEmail: null,
         currentHolderLabel: null,
+        currentPickupBy: null,
+        currentDueAt: null,
         currentRequestItemId: null,
         updatedAt: new Date(),
       })

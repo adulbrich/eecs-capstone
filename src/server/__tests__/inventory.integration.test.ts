@@ -20,6 +20,7 @@ import {
   getInventoryItemAs,
   getInventoryItemDetailAs,
   hardDeleteInventoryItemAs,
+  listAdminInventoryAs,
   listInventoryAs,
   recordOverdueNotificationsAs,
   rejectRequestItemAs,
@@ -99,12 +100,14 @@ describe("transitionItem", () => {
     expect(history[0].comment).toBe("needs new cable");
   });
 
-  it("reserved transition requires requestItemId + exactly one holder", async () => {
+  it("reserved transition requires exactly one holder, with or without a line", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const item = await makeItem();
+    // No request line is needed any more, but a holder still is: an item
+    // cannot be reserved to nobody.
     await expect(
       transitionItem(admin, { itemId: item.id, nextStatus: "reserved" })
-    ).rejects.toThrow(/requestItemId/);
+    ).rejects.toThrow(/exactly one of holderId, holderEmail or holderLabel/);
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");
     const { line } = await makeRequestLine(student.id, item.id);
     await expect(
@@ -115,7 +118,7 @@ describe("transitionItem", () => {
         holderId: student.id,
         holderLabel: "X",
       })
-    ).rejects.toThrow(/exactly one of holderId or holderLabel/);
+    ).rejects.toThrow(/exactly one of holderId, holderEmail or holderLabel/);
   });
 
   it("reserved transition updates line to approved + sets pickupBy + notifies", async () => {
@@ -1023,5 +1026,159 @@ describe("defense in depth: impl re-checks role on every staff write", () => {
         reviewComment: "no",
       })
     ).rejects.toThrow(/Forbidden/);
+  });
+});
+
+describe("staff-assigned holds without a request line", () => {
+  it("checks out an available item to a bare label", async () => {
+    const admin = await makeUser(`wi-a-${Date.now()}@x.com`, "admin");
+    const item = await makeItem();
+    const dueAt = new Date(Date.now() + 3 * 86_400_000);
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderLabel: "Lab 204",
+      dueAt,
+    });
+
+    const [after] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(after.status).toBe("checked_out");
+    expect(after.currentHolderLabel).toBe("Lab 204");
+    expect(after.currentRequestItemId).toBeNull();
+    // The due date has to survive on the item itself; before this existed it
+    // could only live on a request line the item never had.
+    expect(after.currentDueAt?.getTime()).toBe(dueAt.getTime());
+  });
+
+  it("resolves an assigned email to the matching account and notifies it", async () => {
+    const admin = await makeUser(`wi-a2-${Date.now()}@x.com`, "admin");
+    const holderEmail = `wi-h2-${Date.now()}@x.com`;
+    const holder = await makeUser(holderEmail, "user");
+    const item = await makeItem();
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const [after] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(after.currentHolderId).toBe(holder.id);
+    expect(after.currentHolderEmail).toBe(holderEmail);
+    // The history row must look like any other account-backed hold: the
+    // address resolved, so it belongs in holderId, not in the label column
+    // the history list prefers when rendering.
+    const [historyRow] = await db
+      .select()
+      .from(inventoryItemStatusHistory)
+      .where(eq(inventoryItemStatusHistory.itemId, item.id));
+    expect(historyRow.holderId).toBe(holder.id);
+    expect(historyRow.holderLabel).toBeNull();
+    const notifs = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, holder.id));
+    expect(notifs.some((n) => n.type === "inventory_item_checked_out")).toBe(
+      true
+    );
+  });
+
+  it("records an address with no account and keeps it staff-only", async () => {
+    const admin = await makeUser(`wi-a3-${Date.now()}@x.com`, "admin");
+    const nosy = await makeUser(`wi-n3-${Date.now()}@x.com`, "user");
+    const holderEmail = `wi-ghost-${Date.now()}@x.com`;
+    const item = await makeItem();
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      holderEmail,
+      pickupBy: new Date(Date.now() + 86_400_000),
+    });
+
+    const staffView = await getInventoryItemDetailAs(admin, { id: item.id });
+    if (!staffView?.viewerIsStaff) {
+      throw new Error("expected the staff branch");
+    }
+    expect(staffView.item.currentHolderId).toBeNull();
+    expect(staffView.item.currentHolderEmail).toBe(holderEmail);
+    expect(staffView.item.pickupBy).toBeInstanceOf(Date);
+    // With no account to point at, the address is the only thing that can
+    // identify the holder in the history log.
+    const [historyRow] = await db
+      .select()
+      .from(inventoryItemStatusHistory)
+      .where(eq(inventoryItemStatusHistory.itemId, item.id));
+    expect(historyRow.holderLabel).toBe(holderEmail);
+
+    const publicView = await getInventoryItemDetailAs(nosy, { id: item.id });
+    expect(JSON.stringify(publicView)).not.toContain(holderEmail);
+  });
+
+  it("notifies the holder when a request-less checkout is returned", async () => {
+    const admin = await makeUser(`wi-a4-${Date.now()}@x.com`, "admin");
+    const holderEmail = `wi-h4-${Date.now()}@x.com`;
+    const holder = await makeUser(holderEmail, "user");
+    const item = await makeItem();
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+    await transitionItem(admin, { itemId: item.id, nextStatus: "available" });
+
+    const [after] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(after.currentHolderId).toBeNull();
+    expect(after.currentHolderEmail).toBeNull();
+    expect(after.currentDueAt).toBeNull();
+    const notifs = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, holder.id));
+    expect(notifs.some((n) => n.type === "inventory_item_returned")).toBe(true);
+  });
+
+  it("still refuses a checkout with no due date", async () => {
+    const admin = await makeUser(`wi-a5-${Date.now()}@x.com`, "admin");
+    const item = await makeItem();
+    await expect(
+      transitionItem(admin, {
+        itemId: item.id,
+        nextStatus: "checked_out",
+        holderLabel: "Lab 204",
+      })
+    ).rejects.toThrow(/checked_out requires dueAt/);
+  });
+
+  it("finds a request-less hold by holder email in the staff table", async () => {
+    const admin = await makeUser(`wi-a6-${Date.now()}@x.com`, "admin");
+    const holderEmail = `wi-find-${Date.now()}@x.com`;
+    const item = await makeItem();
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const { rows } = await listAdminInventoryAs(admin, {
+      category: null,
+      q: holderEmail,
+      status: null,
+    });
+    expect(rows.some((r) => r.id === item.id)).toBe(true);
   });
 });

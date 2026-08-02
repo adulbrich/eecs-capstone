@@ -45,5 +45,13 @@ export const STAFF_PANEL_AUDIENCE_HINT =
  * the proposer cannot use at all, and "never shown publicly" would be the
  * wrong claim for a field like Categories, which is public once set.
  */
-export const STAFF_FIELDS_AUDIENCE_HINT =
+export const STAFF_FIELDS_PROJECT_HINT =
   "These settings are only available to staff (instructors and admins). Not to the project proposer.";
+
+/**
+ * The inventory counterpart. Only staff can reach the item form at all, so
+ * "not available to X" would describe nobody. What the panel actually tells a
+ * staff member filling it in is which values stay off the public item page.
+ */
+export const STAFF_FIELDS_INVENTORY_HINT =
+  "These details never appear on the public item page. Only staff (instructors and admins) can see them.";

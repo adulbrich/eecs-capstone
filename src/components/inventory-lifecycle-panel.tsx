@@ -69,7 +69,61 @@ interface Props {
     currentHolderEmail?: string | null;
     currentHolderLabel: string | null;
     currentRequestItemId: string | null;
+    pickupBy?: Date | string | null;
+    dueAt?: Date | string | null;
   };
+}
+
+type AssignMode = "user" | "email" | "label";
+
+/**
+ * Reopen the dialog on whichever identity the item already carries, so a
+ * reserved -> checked-out step does not silently reassign the hold.
+ */
+function initialAssignMode(item: Props["item"]): AssignMode {
+  if (item.currentHolderId) {
+    return "user";
+  }
+  if (item.currentHolderEmail) {
+    return "email";
+  }
+  return item.currentHolderLabel ? "label" : "user";
+}
+
+/**
+ * Exactly one of the three holder fields, chosen by the active mode. The
+ * server enforces the same exclusivity, so building it in one place keeps the
+ * dialog from ever sending a combination it would reject.
+ */
+function selectedHolder({
+  email,
+  label,
+  mode,
+  user,
+}: {
+  email: string;
+  label: string;
+  mode: AssignMode;
+  user: SelectedUser | null;
+}): {
+  holderEmail: string | null;
+  holderId: string | null;
+  holderLabel: string | null;
+} {
+  return {
+    holderId: mode === "user" ? (user?.id ?? null) : null,
+    holderEmail: mode === "email" ? email.trim() || null : null,
+    holderLabel: mode === "label" ? label.trim() || null : null,
+  };
+}
+
+/** `<input type="date">` speaks YYYY-MM-DD, and reads back as UTC midnight. */
+function toDateInput(value: Date | string | null | undefined): string {
+  if (!value) {
+    return "";
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
 }
 
 function recommendedNext(status: Status): {
@@ -77,6 +131,11 @@ function recommendedNext(status: Status): {
   label: string;
 } | null {
   switch (status) {
+    // An available item can be handed out directly, without ever passing
+    // through the request queue. Surfacing it here is what makes a walk-in
+    // checkout discoverable instead of hidden behind the override select.
+    case "available":
+      return { next: "checked_out", label: "Check out" };
     case "reserved":
       return { next: "checked_out", label: "Check out" };
     case "checked_out":
@@ -184,6 +243,70 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
   );
 }
 
+/**
+ * The one input the chosen assignment mode needs. Split out of the dialog so
+ * the three-way branch does not push the panel over the complexity limit.
+ */
+function AssignFields({
+  assignEmail,
+  assignLabel,
+  assignUser,
+  mode,
+  onEmailChange,
+  onLabelChange,
+  onUserChange,
+}: {
+  assignEmail: string;
+  assignLabel: string;
+  assignUser: SelectedUser | null;
+  mode: AssignMode;
+  onEmailChange: (value: string) => void;
+  onLabelChange: (value: string) => void;
+  onUserChange: (value: SelectedUser | null) => void;
+}) {
+  if (mode === "user") {
+    return (
+      <div>
+        <Label>User</Label>
+        <div className="mt-1">
+          <UserPicker onChange={onUserChange} value={assignUser} />
+        </div>
+      </div>
+    );
+  }
+  if (mode === "email") {
+    return (
+      <div>
+        <Label htmlFor="assign-email">Email address</Label>
+        <Input
+          className="mt-1"
+          id="assign-email"
+          onChange={(e) => onEmailChange(e.target.value)}
+          placeholder="holder@oregonstate.edu"
+          type="email"
+          value={assignEmail}
+        />
+        <p className="mt-1 text-muted-foreground text-xs">
+          Links the hold to the matching account if there is one, so the holder
+          is notified. An address with no account is still recorded.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <Label htmlFor="assign-label">Label</Label>
+      <Input
+        className="mt-1"
+        id="assign-label"
+        onChange={(e) => onLabelChange(e.target.value)}
+        placeholder="e.g. Lab 204"
+        value={assignLabel}
+      />
+    </div>
+  );
+}
+
 export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
   const router = useRouter();
   const status = item.status as Status;
@@ -195,8 +318,9 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
   // Checkout / reserve dialog state
   const [dlgOpen, setDlgOpen] = useState(false);
   const [dlgTargetStatus, setDlgTargetStatus] = useState<Status>("checked_out");
-  const [assignMode, setAssignMode] = useState<"user" | "label">("user");
+  const [assignMode, setAssignMode] = useState<AssignMode>("user");
   const [assignUser, setAssignUser] = useState<SelectedUser | null>(null);
+  const [assignEmail, setAssignEmail] = useState("");
   const [assignLabel, setAssignLabel] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [pickupDate, setPickupDate] = useState("");
@@ -213,6 +337,7 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
     nextStatus: Status;
     requestItemId?: string | null;
     holderId?: string | null;
+    holderEmail?: string | null;
     holderLabel?: string | null;
     pickupBy?: Date | null;
     dueAt?: Date | null;
@@ -227,6 +352,7 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
           nextStatus: input.nextStatus,
           requestItemId: input.requestItemId ?? null,
           holderId: input.holderId ?? null,
+          holderEmail: input.holderEmail ?? null,
           holderLabel: input.holderLabel ?? null,
           pickupBy: input.pickupBy ?? null,
           dueAt: input.dueAt ?? null,
@@ -243,7 +369,7 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
 
   function openDialogFor(target: Status) {
     setDlgTargetStatus(target);
-    setAssignMode("user");
+    setAssignMode(initialAssignMode(item));
     setAssignUser(
       item.currentHolderId
         ? {
@@ -253,9 +379,13 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
           }
         : null
     );
+    setAssignEmail(item.currentHolderId ? "" : (item.currentHolderEmail ?? ""));
     setAssignLabel(item.currentHolderLabel ?? "");
-    setDueDate("");
-    setPickupDate("");
+    // Carrying the dates over matters on reserved -> checked_out: the pickup
+    // deadline is already set, and retyping the due date staff just entered
+    // would be busywork.
+    setDueDate(toDateInput(item.dueAt));
+    setPickupDate(toDateInput(item.pickupBy));
     setDlgComment("");
     setError(null);
     setDlgOpen(true);
@@ -264,26 +394,36 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
   async function onConfirmDialog() {
     const needsHolder =
       dlgTargetStatus === "reserved" || dlgTargetStatus === "checked_out";
-    if (needsHolder && !item.currentRequestItemId) {
-      setError(
-        "Cannot reserve / check-out from this state; there is no active request line."
-      );
+    const holder = selectedHolder({
+      email: assignEmail,
+      label: assignLabel,
+      mode: assignMode,
+      user: assignUser,
+    });
+    const hasHolder = Object.values(holder).some(Boolean);
+    if (needsHolder && !hasHolder) {
+      setError("Provide a user, an email address, or a label.");
       return;
     }
-    const holderId = assignMode === "user" && assignUser ? assignUser.id : null;
-    const holderLabel =
-      assignMode === "label" && assignLabel ? assignLabel : null;
-    if (needsHolder && !holderId && !holderLabel) {
-      setError("Provide a user or a label.");
+    if (dlgTargetStatus === "checked_out" && !dueDate) {
+      setError("A due date is required to check out an item.");
       return;
     }
     await runTransition({
       nextStatus: dlgTargetStatus,
+      // Null when the item was never requested through a cart. Staff-assigned
+      // holds are first-class, so the absence of a request line is not an
+      // error; the item's own columns carry the hold.
       requestItemId: needsHolder ? item.currentRequestItemId : null,
-      holderId,
-      holderLabel,
-      pickupBy: pickupDate ? new Date(pickupDate) : null,
-      dueAt: dueDate ? new Date(dueDate) : null,
+      ...holder,
+      // Only the deadline the dialog actually offered is sent; a checkout
+      // clears the pickup deadline it just satisfied.
+      pickupBy:
+        dlgTargetStatus === "reserved" && pickupDate
+          ? new Date(pickupDate)
+          : null,
+      dueAt:
+        dlgTargetStatus === "checked_out" && dueDate ? new Date(dueDate) : null,
       comment: dlgComment || null,
     });
     setDlgOpen(false);
@@ -419,11 +559,13 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
                 : "Reserve item"}
             </DialogTitle>
             <DialogDescription>
-              Assign the item to a user or to an ad-hoc label.
+              Assign the item to an account, to an email address, or to an
+              ad-hoc label. No prior request is needed.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="flex gap-4 text-sm">
+            <fieldset className="flex flex-wrap gap-4 text-sm">
+              <legend className="sr-only">Assign to</legend>
               <label className="flex items-center gap-1">
                 <input
                   checked={assignMode === "user"}
@@ -435,6 +577,15 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
               </label>
               <label className="flex items-center gap-1">
                 <input
+                  checked={assignMode === "email"}
+                  name="assignMode"
+                  onChange={() => setAssignMode("email")}
+                  type="radio"
+                />
+                Assign to email
+              </label>
+              <label className="flex items-center gap-1">
+                <input
                   checked={assignMode === "label"}
                   name="assignMode"
                   onChange={() => setAssignMode("label")}
@@ -442,26 +593,16 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
                 />
                 Assign to label
               </label>
-            </div>
-            {assignMode === "user" ? (
-              <div>
-                <Label>User</Label>
-                <div className="mt-1">
-                  <UserPicker onChange={setAssignUser} value={assignUser} />
-                </div>
-              </div>
-            ) : (
-              <div>
-                <Label htmlFor="assign-label">Label</Label>
-                <Input
-                  className="mt-1"
-                  id="assign-label"
-                  onChange={(e) => setAssignLabel(e.target.value)}
-                  placeholder="e.g. Lab 204"
-                  value={assignLabel}
-                />
-              </div>
-            )}
+            </fieldset>
+            <AssignFields
+              assignEmail={assignEmail}
+              assignLabel={assignLabel}
+              assignUser={assignUser}
+              mode={assignMode}
+              onEmailChange={setAssignEmail}
+              onLabelChange={setAssignLabel}
+              onUserChange={setAssignUser}
+            />
             {dlgTargetStatus === "checked_out" && (
               <div>
                 <Label htmlFor="due-date">Due date</Label>

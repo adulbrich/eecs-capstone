@@ -241,6 +241,9 @@ const transitionSchema = z.object({
   ]),
   requestItemId: z.string().uuid().nullable().default(null),
   holderId: z.string().nullable().default(null),
+  holderEmail: z
+    .union([z.string().email("Must be a valid email").max(200), z.null()])
+    .default(null),
   holderLabel: z.string().max(200).nullable().default(null),
   pickupBy: z.coerce.date().nullable().default(null),
   dueAt: z.coerce.date().nullable().default(null),

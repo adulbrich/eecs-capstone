@@ -148,10 +148,16 @@ const COLUMNS: AdminColumn<Row>[] = [
     sortingFn: "basic",
   },
   {
+    // Email before label: a hold assigned to a bare address has no account to
+    // name it, and the address is the only thing that identifies the holder.
     accessorFn: (row) =>
-      row.currentHolderName ?? row.currentHolderLabel ?? undefined,
+      row.currentHolderName ??
+      row.currentHolderEmail ??
+      row.currentHolderLabel ??
+      undefined,
     cell: ({ row }) =>
       row.original.currentHolderName ??
+      row.original.currentHolderEmail ??
       row.original.currentHolderLabel ??
       (row.original.currentHolderId ? "(user)" : "-"),
     header: "Holder",
