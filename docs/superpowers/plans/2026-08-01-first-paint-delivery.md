@@ -4,7 +4,7 @@
 
 **Goal:** Stop the app painting unstyled content on a cold production load, by compressing and edge-caching the render-blocking critical path and by making every element that occupies layout space declare its size before its payload arrives.
 
-**Architecture:** Compression lands at the origin first (Nitro `compressPublicAssets`) and the edge second (a CloudFront `/assets/*` cache behavior). That ordering is load-bearing: once the origin returns `Content-Encoding`, CloudFront never makes a compression decision, which sidesteps its documented best-effort skip caching an uncompressed object for a full TTL. Layout stability is separate and independent: the logo declares intrinsic dimensions, and the header's session slot reserves a fixed width across all three of its states.
+**Architecture:** Compression lands at the origin first (Nitro `compressPublicAssets`) and the edge second (a CloudFront `/assets/*` cache behavior). That ordering is load-bearing: once the origin returns `Content-Encoding`, CloudFront never makes a compression decision, which sidesteps its documented best-effort skip caching an uncompressed object for a full TTL. Layout stability is separate and independent: the logo declares intrinsic dimensions. Two tasks (5 and 6) are measurement gates that ship no code unless a recorded measurement demands it; treat "measured, nothing to do" as a successful outcome for those, not a skipped step.
 
 **Tech Stack:** TanStack Start + TanStack Router, Nitro (nitro-nightly) on the node-server preset, Vite 8, React 19, Tailwind v4, Vitest + Testing Library, Terraform (CloudFront, ALB, Fargate), Node 24.
 
@@ -36,7 +36,7 @@
 | --- | --- |
 | `scripts/check-compression.mjs` | Build assertion: every `/assets` bundle at or above 1 KB has a `.br` sibling. The only guard against Task 1 silently regressing. |
 | `src/test/institution-logo.test.tsx` | Asserts the logo declares intrinsic dimensions matching the source viewBox ratio. |
-| `src/test/site-header.test.tsx` | Asserts the header session slot reserves identical width in pending, signed-out, and signed-in states. |
+| `src/test/site-header.test.tsx` | **Conditional on Task 5's measurement.** Asserts the header session slot reserves identical width in pending, signed-out, and signed-in states. Not created if nothing moves. |
 | `svgo.config.mjs` | Keeps the logo minification reproducible for a future brand swap, and pins `removeViewBox: false`. |
 | `src/assets/logo-institution.svg` | The minified mark, moved out of `public/` so Vite hashes it. |
 
@@ -50,7 +50,8 @@
 | `biome.json` | Re-enable `correctness.useImageSize` for `institution-logo.tsx` only. |
 | `src/components/institution-logo.tsx` | Declare `width`/`height` on both `<img>` elements. |
 | `src/lib/brand.ts` | `logoUrl` becomes a `?url` import instead of a literal path. |
-| `src/components/site-header.tsx` | Reserve a fixed width on the desktop and mobile session slots. |
+| `src/components/site-header.tsx` | **Conditional on Task 5's measurement.** Reserve a fixed width on whichever bar actually moves. |
+| `docs/superpowers/specs/2026-08-01-first-paint-delivery-design.md` | Record Task 5's and Task 6's measurements, whichever way they come out. |
 | `infra/cloudfront.tf` | Add the `/assets/*` `ordered_cache_behavior`. |
 
 **Deleted**
@@ -440,8 +441,16 @@ export default {
 
 - [ ] **Step 3: Minify in place**
 
+Write to a temporary file and move it into place rather than passing the same
+path as both input and output. SVGO v3 tolerates in-place rewriting, but
+`npx --yes` resolves whatever version is current and a truncating write would
+destroy the source with no copy to recover from.
+
 ```bash
-npx --yes svgo --config svgo.config.mjs -i public/logo-institution.svg -o public/logo-institution.svg
+npx --yes svgo --config svgo.config.mjs \
+  -i public/logo-institution.svg \
+  -o public/logo-institution.min.svg
+mv public/logo-institution.min.svg public/logo-institution.svg
 ```
 
 - [ ] **Step 4: Verify size dropped and the viewBox survived**
@@ -597,32 +606,77 @@ logoUrlLight branch in institution-logo.tsx still works for a brand swap."
 
 ---
 
-## Task 5: Reserve width in the header session slot
+## Task 5: Measure the header session swap, and only then reserve width
+
+**This task corrects the design spec.** Feature C asserts that the session
+placeholder swap "reflows the nav beside it". Reading the flex containers says
+otherwise, and the reservation should not be built until a measurement settles
+it.
+
+The desktop bar (`site-header.tsx:33`) is
+`[logo] [nav flex-1] [session]`. The nav carries `flex flex-1`, so it absorbs
+any width change in the session slot, and the session slot is the last flex
+item, so its right edge already sits at the container's right edge. Growth
+extends leftward into space the nav gives up, and the nav's links are
+left-aligned inside it, so they do not move. The mobile bar (`:76`) is
+`justify-between` with only `[logo] [actions]`, so the actions block is
+right-anchored and the hamburger stays rightmost whether or not the bell and
+cart render.
+
+If that reading is right, nothing outside the session slot moves, the CLS
+contribution is approximately zero, and the correct outcome is to change no
+code and fix the spec. Build the reservation only if the measurement disagrees.
 
 **Files:**
-- Create: `src/test/site-header.test.tsx`
-- Modify: `src/components/site-header.tsx`
+- Modify: `docs/superpowers/specs/2026-08-01-first-paint-delivery-design.md` (always)
+- Create: `src/test/site-header.test.tsx` (**only if** Step 2 shows real movement)
+- Modify: `src/components/site-header.tsx` (**only if** Step 2 shows real movement)
 
 **Interfaces:**
 - Consumes: nothing from earlier tasks.
-- Produces: a desktop session container and a mobile action container that each carry `data-testid="header-session-slot"` / `"header-actions-slot"` and a stable `min-w-*` class in every session state.
+- Produces: either a spec correction, or a desktop session container carrying `data-testid="header-session-slot"` and a stable `min-w-*` class in every session state.
 
-Read the spec's Feature C before starting. It explicitly rejects server-rendering the signed-out state, which is the obvious fix and the wrong one here; do not re-derive it.
+- [ ] **Step 1: Put the page in the pending state long enough to see it**
 
-- [ ] **Step 1: Write the failing test**
+The swap is normally too fast to observe. Throttle it:
 
-Create `src/test/site-header.test.tsx`:
+```bash
+npm run dev
+```
+
+At `http://localhost:3000`, open DevTools, Network panel, set throttling to
+"Slow 4G". Hard-reload signed out, then sign in and hard-reload again. The
+`animate-pulse` placeholder should be visible for a beat on each load.
+
+- [ ] **Step 2: Measure whether anything outside the slot moves**
+
+With DevTools open, watch the **Projects** and **Inventory** nav links on the
+desktop bar as the placeholder resolves. Then narrow the window below 768px and
+watch the logo as the mobile bar's bell and cart appear.
+
+Record, for each of the two bars, whether any element outside the session slot
+changes position. Take a Lighthouse run on a cold load and record the CLS
+figure and whether the header appears in its layout-shift attribution.
+
+- **Nothing outside the slot moves** (the expected result): skip Steps 3
+  through 6. Go to Step 7.
+- **Something moves**: continue to Step 3, and record exactly what moved and by
+  how much, because that determines the width to reserve.
+
+- [ ] **Step 3: Write the failing test**
+
+Only if Step 2 found real movement. Create `src/test/site-header.test.tsx`:
 
 ```tsx
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import type * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const useSession = vi.fn();
+const { useSession } = vi.hoisted(() => ({ useSession: vi.fn() }));
 
 vi.mock("#/lib/auth-client", () => ({
-  authClient: { useSession: () => useSession() },
+  authClient: { useSession },
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -657,29 +711,34 @@ const SIGNED_IN = {
 const SIGNED_OUT = { data: null, isPending: false };
 const PENDING = { data: null, isPending: true };
 
-function slotClassName() {
-  return screen.getByTestId("header-session-slot").className;
-}
+// Replace with the class chosen in Step 4 after measuring.
+const RESERVED_WIDTH_CLASS = "min-w-36";
 
 afterEach(cleanup);
 
 describe("SiteHeader session slot", () => {
-  it("reserves the same width while the session is pending", () => {
+  it("reserves width while the session is pending", () => {
     useSession.mockReturnValue(PENDING);
     render(<SiteHeader />);
-    expect(slotClassName()).toContain("min-w-36");
+    expect(screen.getByTestId("header-session-slot").className).toContain(
+      RESERVED_WIDTH_CLASS
+    );
   });
 
   it("reserves the same width when signed out", () => {
     useSession.mockReturnValue(SIGNED_OUT);
     render(<SiteHeader />);
-    expect(slotClassName()).toContain("min-w-36");
+    expect(screen.getByTestId("header-session-slot").className).toContain(
+      RESERVED_WIDTH_CLASS
+    );
   });
 
   it("reserves the same width when signed in", () => {
     useSession.mockReturnValue(SIGNED_IN);
     render(<SiteHeader />);
-    expect(slotClassName()).toContain("min-w-36");
+    expect(screen.getByTestId("header-session-slot").className).toContain(
+      RESERVED_WIDTH_CLASS
+    );
   });
 
   it("keeps the pending placeholder inside the reserved slot", () => {
@@ -691,25 +750,41 @@ describe("SiteHeader session slot", () => {
 });
 ```
 
-The tests assert a shared class rather than a pixel value. That is what makes them meaningful: the point is that all three states occupy *identical* space, and the specific number is a measurement, not a contract.
+Two notes for whoever runs this. `vi.hoisted()` is required rather than a plain
+`const useSession = vi.fn()`: `vi.mock` factories are hoisted above module-level
+declarations, and referencing an un-hoisted binding from inside the factory
+throws `Cannot access 'useSession' before initialization`. And scope any future
+queries for `bell` or `cart` with `within(slot)`, since `SiteHeader` renders
+both the desktop and mobile bars unconditionally and both mount those
+components when signed in.
 
-- [ ] **Step 2: Run it to verify it fails**
+- [ ] **Step 4: Run it to verify it fails**
 
 ```bash
 ulimit -n 8192; CI=true npx vitest run src/test/site-header.test.tsx
 ```
 
-Expected: FAIL, all four cases, with `Unable to find an element by: [data-testid="header-session-slot"]`.
+Expected: FAIL, all four cases, with
+`Unable to find an element by: [data-testid="header-session-slot"]`.
 
-- [ ] **Step 3: Reserve the space**
+If instead it fails with `Cannot access 'useSession' before initialization`, the
+`vi.hoisted()` wrapper was dropped; restore it rather than restructuring the
+mocks.
 
-In `src/components/site-header.tsx`, the desktop session container (line 52) currently reads:
+- [ ] **Step 5: Reserve the space**
+
+Only on the bar Step 2 showed movement on. Do not change both by reflex; they
+have different geometry and the mobile bar's actions are roughly a third the
+width of the desktop bar's.
+
+For the desktop bar, `src/components/site-header.tsx:52` currently reads:
 
 ```tsx
         <div className="flex items-center gap-3 text-sm">
 ```
 
-Change it to:
+Change it to, substituting the class that clears the wider state measured in
+Step 2 (`min-w-36` is 144px, `min-w-40` is 160px, `min-w-44` is 176px):
 
 ```tsx
         <div
@@ -718,76 +793,69 @@ Change it to:
         >
 ```
 
-`min-w-36` is 9rem, 144px. It is a starting value derived from the wider of the two resolved states: signed-out is a "Sign in" link plus a `size="sm"` "Sign up" button, which is wider than the signed-in row of three icon-sized controls. Step 5 measures and confirms it.
+Keep `RESERVED_WIDTH_CLASS` in the test in step with whatever is chosen here.
 
-`justify-end` is added so the content pins to the right edge of the reserved box rather than sliding within it as the states swap.
+For the mobile bar, `:78` reads `<div className="flex items-center gap-2">`.
+Size it independently from its own measurement; it will almost certainly want a
+smaller class than the desktop bar, and it may want none.
 
-Then the mobile action container (line 78) currently reads:
-
-```tsx
-        <div className="flex items-center gap-2">
-```
-
-Change it to:
-
-```tsx
-        <div
-          className="flex min-w-36 items-center justify-end gap-2"
-          data-testid="header-actions-slot"
-        >
-```
-
-- [ ] **Step 4: Run the test to verify it passes**
+- [ ] **Step 6: Verify the fix and the suite**
 
 ```bash
 ulimit -n 8192; CI=true npx vitest run src/test/site-header.test.tsx
-```
-
-Expected: PASS, 4 tests.
-
-- [ ] **Step 5: Measure and confirm the reserved width**
-
-The class must be at least as wide as the widest state, or the reservation does not prevent reflow. Measure both:
-
-```bash
-npm run dev
-```
-
-At `http://localhost:3000`, signed out, open DevTools and read the rendered width of `[data-testid="header-session-slot"]`'s contents. Then sign in and read it again.
-
-- If both are at or below 144px, `min-w-36` is correct and nothing changes.
-- If either exceeds 144px, raise the class to the next Tailwind step that clears it (`min-w-40` is 160px, `min-w-44` is 176px) in **both** the component and all four assertions in the test.
-
-Record the two measured widths in the commit body.
-
-- [ ] **Step 6: Confirm no reflow**
-
-Still on `http://localhost:3000`, hard-reload signed in and watch the nav to the left of the slot. The links must not move when the pending placeholder resolves. Repeat signed out.
-
-- [ ] **Step 7: Verify the gates and commit**
-
-```bash
 ulimit -n 8192; CI=true npm test
-npm run check && npm run typecheck
-git add src/test/site-header.test.tsx src/components/site-header.tsx
-git commit -m "fix(header): reserve width for the session slot
-
-authClient.useSession is pending during SSR, so the server ships an
-animate-pulse placeholder that the client swaps for wider content, reflowing
-the nav beside it. Reserving a fixed width makes all three states occupy the
-same space.
-
-Deliberately not the useHasMounted pattern that routes/index.tsx uses. That
-works there because the swapping element is a CTA below the fold; in the
-header it would flash 'Sign in' at every returning signed-in user, trading a
-neutral wrong state for a confident one. See the design spec, Feature C."
 ```
 
----
+Expected: the new file passes, and the rest of the suite is unaffected.
+
+Then repeat Step 1's throttled reload and confirm the movement recorded in
+Step 2 is gone.
+
+- [ ] **Step 7: Record the outcome in the spec**
+
+Always, whichever branch was taken. In
+`docs/superpowers/specs/2026-08-01-first-paint-delivery-design.md`, under
+Feature C, replace the claim that the swap reflows the nav with what was
+actually measured.
+
+If nothing moved, the section becomes a record that the reservation was
+investigated and found unnecessary, with the flex reasoning from this task's
+preamble as the explanation. Do not delete the section: the next person to see
+the pulse will otherwise re-open it.
+
+- [ ] **Step 8: Verify the gates and commit**
+
+```bash
+npm run check && npm run typecheck
+```
+
+If nothing moved:
+
+```bash
+git add docs/superpowers/specs/2026-08-01-first-paint-delivery-design.md
+git commit -m "docs(header): correct Feature C, the session swap does not reflow
+
+The spec claimed the pending placeholder reflows the nav beside it. It does
+not. The desktop nav carries flex-1 and absorbs the session slot's width
+change, and the slot is the last flex item so its right edge is already pinned;
+the mobile bar is justify-between, so the hamburger stays rightmost. Measured
+under Slow 4G throttling: nothing outside the slot moves, CLS <N>.
+
+No code change. Recorded so the placeholder is not re-litigated on sight."
+```
+
+If something moved, commit the component, the test, and the spec correction
+together, and say in the body what moved and by how much.
 
 ## Task 6: Measure paint cost, and only then decide
 
 This task ships no code unless a measurement demands it. Its deliverable is a recorded number and a decision. Do not skip it and do not pre-emptively trim: the spec is explicit that these layers were never a cause.
+
+**Requires a real browser with DevTools.** If you are running without one, do not
+substitute a proxy metric, do not estimate from the CSS, and do not trim
+anything on the assumption that it must be slow. Stop and report that Task 6
+needs a human with Chrome. The same applies to Task 5, which needs a throttled
+browser to observe the swap at all.
 
 **Files:**
 - Modify: `src/styles.css`, **only if** Step 2's threshold is exceeded.
@@ -956,6 +1024,10 @@ Check 4 is the important one. If the root document ever reports a CloudFront hit
 
 **Spec coverage.** Feature A1 is Task 1, A2 is Task 7. Feature B1 is Task 2, B2 is Task 3, B3 is Task 4. Feature C is Task 5. Feature D is Task 6. The spec's three testing rows map to Tasks 2, 5, and 1 respectively. The spec's verification checklist is Task 7 Step 5, with the addition of check 4, which the spec implied through its non-goal on the default behavior but did not state as a test.
 
-**Ordering constraint.** Task 7 must deploy after Task 1, per the spec's origin-first argument. Tasks 2 through 5 are independent of both and of each other, except that Task 3 and Task 4 both operate on the logo file and must run in that order.
+**Ordering constraint.** Task 7 must deploy after Task 1, per the spec's origin-first argument. Tasks 1, 2, and 5 are independent of each other and of everything else. Task 3 and Task 4 both operate on the logo file and must run in that order, Task 3 first. Task 6 must run after Tasks 1 through 4, or its measurement is contaminated by the delivery problem this plan fixes.
 
-**Deliberate divergence from the spec.** Task 2 Step 5 adds the scoped `useImageSize` Biome override, which the spec does not mention. It was found while writing this plan: `biome.json` disables repo-wide the exact rule that would have prevented this defect. Scoping it to one file rather than fixing all eleven `<img>` elements keeps it inside the spec's scope.
+**Two deliberate divergences from the spec.**
+
+Task 2 Step 5 adds the scoped `useImageSize` Biome override, which the spec does not mention. It was found while writing this plan: `biome.json` disables repo-wide the exact rule that would have prevented this defect. Scoping it to one file rather than fixing all eleven `<img>` elements keeps it inside the spec's scope.
+
+Task 5 contradicts the spec's Feature C and is structured to prove or disprove it rather than implement it. Feature C asserts the session placeholder "reflows the nav beside it". Reading the flex containers says it does not: the desktop nav carries `flex-1` and absorbs the slot's width change while its links stay left-aligned, the slot is the last flex item so its right edge is already pinned, and the mobile bar is `justify-between` so the hamburger stays rightmost. That reading was reached from the class lists, not from a browser, which is why Task 5 measures before changing anything and records the result either way.
