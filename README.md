@@ -11,11 +11,14 @@ is not built yet. For the full, exhaustive feature list (built and planned), see
 
 ## Pending
 
-- SES Setup. DKIM keys are generated for capstone.eecs.oregonstate.edu; the
-  records still need to be published in the OSU-managed zone before the
-  identity verifies. The From address aims to be
-  noreply@capstone.eecs.oregonstate.edu and the Reply-To address still needs to
-  be defined. Until then the ECS task definition pins `EMAIL_TRANSPORT=console`.
+- SES Setup. The domain identity is done: the three DKIM records are published
+  in the OSU-managed zone and verify. Sending From
+  `noreply@capstone.eecs.oregonstate.edu` could be switched on by flipping
+  `EMAIL_TRANSPORT` to `ses` in `infra/ecs.tf`, which currently pins `console`.
+  What is left is the Reply-To address, and it needs code as well as a
+  decision: `SesEmailSender.dispatch` sets only `FromEmailAddress`, so
+  supporting one means adding `ReplyToAddresses` to the `SendEmailCommand`
+  input plus an `EMAIL_REPLY_TO` variable alongside `EMAIL_FROM`.
 
 ## Roadmap (not yet implemented)
 
@@ -217,9 +220,11 @@ version, this file could return to CLI generation; until then, edit it directly.
 - `ses`: real outbound mail through AWS SES v2 (`src/lib/email/ses-sender.ts`),
   which additionally requires `EMAIL_FROM` to be a verified sender identity.
 
-The SES path is implemented but not switched on in production yet: the sender
-identity is still pending (see [Pending](#pending) above), and the From address
-must align with the verified identity or DKIM fails.
+The SES path is implemented and its domain identity verifies, but production
+still runs the console transport pending a Reply-To address (see
+[Pending](#pending) above). `EMAIL_FROM` must align with the verified identity
+or DKIM fails, which is why both it and `var.domain_name` derive from the same
+variable in `infra/ecs.tf`.
 
 ## Object storage
 
