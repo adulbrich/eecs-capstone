@@ -125,6 +125,7 @@ const COLUMNS: AdminColumn<Row>[] = [
         </div>
       );
     },
+    cardHeader: true,
     enableHiding: false,
     header: "Name",
     id: "name",

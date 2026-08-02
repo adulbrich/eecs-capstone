@@ -162,6 +162,36 @@ describe("AdminDataTable", () => {
     expect(labels).toEqual(["Name", "Location"]);
   });
 
+  it("drops the field label on a cardHeader column and marks it instead", () => {
+    // The mobile card draws each field name from data-label. The column that
+    // titles the record must not carry one, or the card header renders as a
+    // labelled field with the title squeezed in beside it.
+    const columns = COLUMNS.map((column) =>
+      column.id === "name" ? { ...column, cardHeader: true } : column
+    );
+    const { container } = renderTable({ columns, hidden: [] });
+    const cells = container
+      .querySelectorAll("tbody tr")[0]
+      .querySelectorAll("td");
+
+    expect(cells[0].getAttribute("data-label")).toBeNull();
+    expect(cells[0].hasAttribute("data-card-header")).toBe(true);
+    // Every other column keeps its label, so the marking is opt-in per column
+    // rather than "the first cell is special".
+    expect(cells[1].getAttribute("data-label")).toBe("Location");
+    expect(cells[1].hasAttribute("data-card-header")).toBe(false);
+  });
+
+  it("keeps every cell labelled when no column opts into cardHeader", () => {
+    const { container } = renderTable({ hidden: [] });
+    const cells = container
+      .querySelectorAll("tbody tr")[0]
+      .querySelectorAll("td");
+    for (const cell of cells) {
+      expect(cell.hasAttribute("data-card-header")).toBe(false);
+    }
+  });
+
   it("reports the new hidden set and persists it when a column is toggled", () => {
     const onHiddenChange = vi.fn();
     // Location is default-hidden in COLUMNS, which collides with the case

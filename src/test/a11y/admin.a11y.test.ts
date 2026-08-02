@@ -354,20 +354,38 @@ test("admin table restacks into cards below 768px", async ({ page }) => {
 
   await expect(page.locator(".admin-table thead")).toBeHidden();
 
-  const cells = page.locator(".admin-table tbody tr").first().locator("td");
+  const row = page.locator(".admin-table tbody tr").first();
+  const cells = row.locator("td");
   const firstCell = cells.first();
   const secondCell = cells.nth(1);
   await expect(firstCell).toBeVisible();
 
-  const dataLabel = await firstCell.getAttribute("data-label");
-  expect(dataLabel).toBeTruthy();
+  // Inventory's Name column is the card header: it titles the record, so it
+  // spans the card and carries no field name. Anything else here would mean
+  // the title is sharing its row with a redundant "Name" label.
+  expect(await firstCell.getAttribute("data-card-header")).not.toBeNull();
+  expect(await firstCell.getAttribute("data-label")).toBeNull();
+  const headerBefore = await firstCell.evaluate(
+    (el) => window.getComputedStyle(el, "::before").content
+  );
+  expect(headerBefore).toBe("none");
 
-  // The field name on a mobile card comes entirely from a CSS
+  // Full horizontal space: the header cell is as wide as the card itself.
+  const rowBox = await row.boundingBox();
+  const headerBox = await firstCell.boundingBox();
+  if (!(rowBox && headerBox)) {
+    throw new Error("Row or header cell not found for the width check.");
+  }
+  expect(headerBox.width).toBeGreaterThan(rowBox.width * 0.9);
+
+  // Every other field still gets its name from a CSS
   // `content: attr(data-label)` pseudo-element, which is invisible to
   // getByText. Read the resolved pseudo-element content directly, which
   // fails if the attribute is missing, empty, or the CSS selector stops
   // matching.
-  const beforeContent = await firstCell.evaluate(
+  const dataLabel = await secondCell.getAttribute("data-label");
+  expect(dataLabel).toBeTruthy();
+  const beforeContent = await secondCell.evaluate(
     (el) => window.getComputedStyle(el, "::before").content
   );
   expect(beforeContent).toBe(`"${dataLabel}"`);

@@ -71,8 +71,16 @@ const localeCompareSortingFn: SortingFn<unknown> = (rowA, rowB, columnId) =>
  * `defaultHidden` is the single source of truth for a column's initial
  * visibility. There is deliberately no separate list of defaults to keep in
  * sync with it.
+ *
+ * `cardHeader` marks the column that titles the record: on mobile its cell
+ * becomes the card's header strip, spanning the full width with no field
+ * name in front of it. Use it for a column whose content already says what
+ * it is (a name or a title, usually beside a thumbnail), where a "Name"
+ * label would only squeeze the title into what is left of the row. At most
+ * one column per table should set it.
  */
 export type AdminColumn<T> = ColumnDef<T, unknown> & {
+  cardHeader?: boolean;
   defaultHidden?: boolean;
   header: string;
   id: string;
@@ -149,6 +157,13 @@ export function AdminDataTable<T>({
   // whose type also admits render functions.
   const labels = useMemo(
     () => new Map(columns.map((column) => [column.id, column.header])),
+    [columns]
+  );
+  const cardHeaderIds = useMemo(
+    () =>
+      new Set(
+        columns.filter((column) => column.cardHeader).map((column) => column.id)
+      ),
     [columns]
   );
   const defaultHidden = useMemo(
@@ -269,7 +284,12 @@ export function AdminDataTable<T>({
         */}
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="outline">
+            {/*
+              Default size, not sm: this button sits on the same row as the
+              page's search input and filter selects, which are all h-9. An
+              h-8 button beside them reads as misaligned rather than compact.
+            */}
+            <Button variant="outline">
               <Columns3 aria-hidden className="size-4" />
               Columns
             </Button>
@@ -339,14 +359,28 @@ export function AdminDataTable<T>({
           <TableBody>
             {rows.map((row) => (
               <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell
-                    data-label={labels.get(cell.column.id) ?? ""}
-                    key={cell.id}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
+                {row.getVisibleCells().map((cell) => {
+                  // A card-header cell carries no data-label on purpose: the
+                  // mobile field name is drawn from that attribute, and this
+                  // cell is the card's title rather than one of its fields.
+                  const isCardHeader = cardHeaderIds.has(cell.column.id);
+                  return (
+                    <TableCell
+                      data-card-header={isCardHeader ? "" : undefined}
+                      data-label={
+                        isCardHeader
+                          ? undefined
+                          : (labels.get(cell.column.id) ?? "")
+                      }
+                      key={cell.id}
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  );
+                })}
               </TableRow>
             ))}
           </TableBody>

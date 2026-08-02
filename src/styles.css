@@ -472,6 +472,16 @@ a {
     font-size: 0.8125rem;
     flex-shrink: 0;
   }
+  /* The column marked `cardHeader` titles the record, so it becomes the
+     card's header strip: full width, no field name in front of it. Without
+     this it renders as just another labelled field, and the 5.5rem label
+     column squeezes a title and its thumbnail into whatever is left. */
+  .admin-table tbody td[data-card-header] {
+    display: block;
+    padding: 0.75rem;
+    background: var(--secondary);
+    font-weight: 500;
+  }
 }
 
 @layer base {
