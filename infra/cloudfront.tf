@@ -75,6 +75,33 @@ resource "aws_cloudfront_distribution" "app" {
     origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer.id
   }
 
+  # Hashed build output only. Managed-CachingOptimized enables gzip and brotli
+  # in the cache key, which Managed-CachingDisabled on the default behavior
+  # does not, so `compress` is a no-op there. In practice the origin already
+  # returns Content-Encoding (see compressPublicAssets in vite.config.ts) and
+  # CloudFront forwards that untouched; `compress` here is the fallback.
+  #
+  # Deliberately no origin_request_policy_id. CloudFront then forwards the
+  # minimum and rewrites Host to the origin domain, which is safe because the
+  # ALB listener (infra/ecs.tf:30) forwards unconditionally to one target group
+  # with no host-header conditions and Nitro's static handler never reads Host.
+  # Do not copy Managed-AllViewer from the default behavior: forwarding every
+  # cookie on a behavior whose purpose is to avoid the origin is pure overhead.
+  #
+  # Never widen this path_pattern. CachingOptimized has a 1s minimum TTL, which
+  # caches even when the origin sends no-cache, no-store, or private. Harmless
+  # for content-hashed files, a signed-in-response leak on any auth-dependent
+  # path.
+  ordered_cache_behavior {
+    path_pattern           = "/assets/*"
+    target_origin_id       = "alb"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    cache_policy_id        = data.aws_cloudfront_cache_policy.caching_optimized.id
+    compress               = true
+  }
+
   restrictions {
     geo_restriction {
       restriction_type = "none"
