@@ -163,6 +163,40 @@ describe("admin user export", () => {
     expect(rows[0].updatedAt).toBeInstanceOf(Date);
   });
 
+  it("carries the listing's sort into the export", async () => {
+    // Inserted in reverse-email order with explicit createdAt timestamps, so
+    // the unsorted fallback (createdAt DESC) would yield sort-b, sort-a: the
+    // opposite of what email-ascending produces. That divergence is what
+    // makes the assertion decisive rather than a coincidental pass, matching
+    // the technique in admin-users-sort.integration.test.ts.
+    const stamp = Date.now();
+    const b = await makeUser(`sort-b-${stamp}@x.com`, "user");
+    const a = await makeUser(`sort-a-${stamp}@x.com`, "user");
+    // b is newer than a, so createdAt DESC (the fallback / pre-sort order)
+    // would yield b, a: the opposite of email-ascending's a, b. That
+    // divergence is what makes the assertion decisive.
+    await db
+      .update(user)
+      .set({ createdAt: new Date(stamp) })
+      .where(eq(user.id, a.id));
+    await db
+      .update(user)
+      .set({ createdAt: new Date(stamp + 1000) })
+      .where(eq(user.id, b.id));
+
+    const { rows } = await exportUsersImpl({
+      ...ALL_USERS,
+      q: `${stamp}@x.com`,
+      sort: "email",
+      dir: "asc",
+    });
+
+    expect(rows.map((r) => r.email)).toEqual([
+      `sort-a-${stamp}@x.com`,
+      `sort-b-${stamp}@x.com`,
+    ]);
+  });
+
   it("rejects an instructor as well as a student", async () => {
     const stamp = Date.now();
     const admin = await makeUser(`ga-${stamp}@x.com`, "admin");
