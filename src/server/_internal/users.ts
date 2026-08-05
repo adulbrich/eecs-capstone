@@ -316,12 +316,8 @@ export async function unbanUserForCurrentUser(data: { userId: string }) {
   return unbanUserAs(viewer, data);
 }
 
-export async function listMentorsAs(
-  viewer: AuthUser,
-  data: { q: string } = { q: "" }
-) {
-  assertStaff(viewer);
-  const conditions = [eq(user.wantsToMentor, true)];
+function buildMentorConditions(data: { q: string }): SQL[] {
+  const conditions: SQL[] = [eq(user.wantsToMentor, true)];
   const trimmed = data.q.trim();
   if (trimmed) {
     // The `user` table carries no tsvector, so this is substring matching.
@@ -336,6 +332,14 @@ export async function listMentorsAs(
       conditions.push(match);
     }
   }
+  return conditions;
+}
+
+export async function listMentorsAs(
+  viewer: AuthUser,
+  data: { q: string } = { q: "" }
+) {
+  assertStaff(viewer);
   const rows = await db
     .select({
       affiliation: user.affiliation,
@@ -345,9 +349,44 @@ export async function listMentorsAs(
       name: user.name,
     })
     .from(user)
-    .where(and(...conditions))
+    .where(and(...buildMentorConditions(data)))
     .orderBy(user.name);
   return { rows };
+}
+
+/**
+ * The staff CSV export. Widens the five-column listing with role,
+ * wantsToMentor and createdAt.
+ *
+ * `wantsToMentor` is constant true across the whole result set by
+ * construction. It is included anyway so a spreadsheet that gets filtered and
+ * re-sorted still says what it is a list of.
+ */
+export async function exportMentorsAs(
+  viewer: AuthUser,
+  data: { q: string } = { q: "" }
+) {
+  assertStaff(viewer);
+  const rows = await db
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      affiliation: user.affiliation,
+      role: user.role,
+      wantsToMentor: user.wantsToMentor,
+      mentorTeamCount: user.mentorTeamCount,
+      createdAt: user.createdAt,
+    })
+    .from(user)
+    .where(and(...buildMentorConditions(data)))
+    .orderBy(user.name);
+  return { rows };
+}
+
+export async function exportMentorsForCurrentUser(data: { q: string }) {
+  const viewer = await requireUser();
+  return exportMentorsAs(viewer, data);
 }
 
 export async function setUserMentorStatusAs(

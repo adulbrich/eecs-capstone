@@ -11,6 +11,7 @@ import {
   type AdminColumn,
   AdminDataTable,
 } from "#/components/admin-data-table";
+import { ExportCsvButton } from "#/components/export-csv-button";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -23,13 +24,18 @@ import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
+import { type CsvColumn, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import {
   type AdminTableSearch,
   type SortState,
   useAdminTableState,
 } from "#/lib/table-state";
-import { listMentors, setUserMentorStatus } from "#/server/users";
+import {
+  exportMentors,
+  listMentors,
+  setUserMentorStatus,
+} from "#/server/users";
 
 const searchSchema = z.object({
   cols: z.string().optional(),
@@ -120,6 +126,19 @@ function MentorControls({ mentor }: { mentor: Row }) {
     </div>
   );
 }
+
+type ExportRow = Awaited<ReturnType<typeof exportMentors>>["rows"][number];
+
+const EXPORT_COLUMNS: CsvColumn<ExportRow>[] = [
+  { header: "ID", value: (row) => row.id },
+  { header: "Name", value: (row) => row.name },
+  { header: "Email", value: (row) => row.email },
+  { header: "Affiliation", value: (row) => row.affiliation },
+  { header: "Role", value: (row) => row.role },
+  { header: "Wants to mentor", value: (row) => row.wantsToMentor },
+  { header: "Mentor team count", value: (row) => row.mentorTeamCount },
+  { header: "Created", value: (row) => row.createdAt },
+];
 
 const COLUMNS: AdminColumn<Row>[] = [
   {
@@ -215,6 +234,17 @@ function MentorsAdmin() {
       </p>
 
       <AdminDataTable
+        actions={
+          <ExportCsvButton
+            filename="mentors"
+            load={async () => {
+              const { rows: exportRows } = await exportMentors({
+                data: { q: search.q },
+              });
+              return toCsv(EXPORT_COLUMNS, exportRows);
+            }}
+          />
+        }
         caption="Mentors"
         columns={COLUMNS}
         data={rows}

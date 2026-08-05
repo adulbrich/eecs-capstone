@@ -101,6 +101,13 @@ export const listMentors = createServerFn({ method: "GET" })
     return listMentorsForCurrentUser(data);
   });
 
+export const exportMentors = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => listMentorsSchema.parse(data ?? {}))
+  .handler(async ({ data }) => {
+    const { exportMentorsForCurrentUser } = await import("./_internal/users");
+    return exportMentorsForCurrentUser(data);
+  });
+
 const setUserMentorStatusSchema = z.object({
   userId: z.string(),
   wantsToMentor: z.boolean(),

@@ -13,6 +13,7 @@ import {
   listAdminProjectsAs,
 } from "#/server/_internal/projects-queries";
 import {
+  exportMentorsAs,
   exportUsersAs,
   exportUsersImpl,
   listUsersImpl,
@@ -206,5 +207,35 @@ describe("admin user export", () => {
     await expect(exportUsersAs(admin, ALL_USERS)).resolves.toBeDefined();
     await expect(exportUsersAs(instructor, ALL_USERS)).rejects.toThrow();
     await expect(exportUsersAs(student, ALL_USERS)).rejects.toThrow();
+  });
+});
+
+describe("admin mentor export", () => {
+  it("carries fields the listing projection omits", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`m-admin-${stamp}@x.com`, "admin");
+    const mentor = await makeUser(`m-${stamp}@x.com`, "user");
+    await db
+      .update(user)
+      .set({ wantsToMentor: true, affiliation: "OSU" })
+      .where(eq(user.id, mentor.id));
+
+    const { rows } = await exportMentorsAs(admin, { q: `m-${stamp}@x.com` });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].affiliation).toBe("OSU");
+    expect(rows[0].createdAt).toBeInstanceOf(Date);
+    expect(rows[0].role).toBeDefined();
+  });
+
+  it("allows instructors and rejects students", async () => {
+    const stamp = Date.now();
+    const instructor = await makeUser(`mi-${stamp}@x.com`, "instructor");
+    const student = await makeUser(`ms-${stamp}@x.com`, "user");
+
+    await expect(exportMentorsAs(instructor, { q: "" })).resolves.toBeDefined();
+    await expect(exportMentorsAs(student, { q: "" })).rejects.toThrow(
+      "Forbidden"
+    );
   });
 });
