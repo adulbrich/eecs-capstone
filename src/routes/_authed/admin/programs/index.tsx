@@ -11,6 +11,7 @@ import {
   type AdminColumn,
   AdminDataTable,
 } from "#/components/admin-data-table";
+import { ExportCsvButton } from "#/components/export-csv-button";
 import { LocalTime } from "#/components/local-time";
 import {
   Breadcrumb,
@@ -33,6 +34,7 @@ import {
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
+import { type CsvColumn, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import {
   type AdminTableSearch,
@@ -120,6 +122,16 @@ const COLUMNS: AdminColumn<Row>[] = [
     header: "Actions",
     id: "actions",
   },
+];
+
+// Every field of the record, independent of which columns are visible.
+const EXPORT_COLUMNS: CsvColumn<Row>[] = [
+  { header: "ID", value: (row) => row.id },
+  { header: "Course ID", value: (row) => row.courseId },
+  { header: "Course name", value: (row) => row.courseName },
+  { header: "Description", value: (row) => row.description },
+  { header: "Created", value: (row) => row.createdAt },
+  { header: "Updated", value: (row) => row.updatedAt },
 ];
 
 function ProgramsAdmin() {
@@ -242,6 +254,12 @@ function ProgramsAdmin() {
       </div>
 
       <AdminDataTable
+        actions={
+          <ExportCsvButton
+            filename="programs"
+            load={() => Promise.resolve(toCsv(EXPORT_COLUMNS, rows))}
+          />
+        }
         caption="Programs"
         columns={COLUMNS}
         data={rows}

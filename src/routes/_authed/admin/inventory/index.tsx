@@ -10,6 +10,7 @@ import {
   type AdminColumn,
   AdminDataTable,
 } from "#/components/admin-data-table";
+import { ExportCsvButton } from "#/components/export-csv-button";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { LocalTime } from "#/components/local-time";
 import {
@@ -31,6 +32,7 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { getSession } from "#/lib/auth-guards";
+import { type CsvColumn, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import { getPublicUrl } from "#/lib/storage";
 import {
@@ -246,6 +248,33 @@ const COLUMNS: AdminColumn<Row>[] = [
   },
 ];
 
+// Every field of the record, independent of which columns are visible. The
+// only item column omitted is searchVector, a machine artifact.
+const EXPORT_COLUMNS: CsvColumn<Row>[] = [
+  { header: "ID", value: (row) => row.id },
+  { header: "Name", value: (row) => row.name },
+  { header: "Description", value: (row) => row.description },
+  { header: "Category", value: (row) => row.category },
+  { header: "Status", value: (row) => row.status },
+  { header: "Serial", value: (row) => row.serial },
+  { header: "Label", value: (row) => row.label },
+  { header: "Location", value: (row) => row.location },
+  { header: "Staff notes", value: (row) => row.notes },
+  { header: "Image URL", value: (row) => row.imageUrl },
+  { header: "Holder name", value: (row) => row.currentHolderName },
+  { header: "Holder email", value: (row) => row.currentHolderEmail },
+  { header: "Holder ID", value: (row) => row.currentHolderId },
+  { header: "Holder label", value: (row) => row.currentHolderLabel },
+  { header: "Pick up by", value: (row) => row.pickupBy },
+  { header: "Due", value: (row) => row.dueAt },
+  {
+    header: "Current request item ID",
+    value: (row) => row.currentRequestItemId,
+  },
+  { header: "Created", value: (row) => row.createdAt },
+  { header: "Updated", value: (row) => row.updatedAt },
+];
+
 function AdminInventory() {
   const navigate = useNavigate({ from: "/admin/inventory/" });
   const { categories, rows } = Route.useLoaderData();
@@ -316,6 +345,12 @@ function AdminInventory() {
       </div>
 
       <AdminDataTable
+        actions={
+          <ExportCsvButton
+            filename="inventory"
+            load={() => Promise.resolve(toCsv(EXPORT_COLUMNS, rows))}
+          />
+        }
         caption="Inventory items"
         columns={COLUMNS}
         data={rows}
