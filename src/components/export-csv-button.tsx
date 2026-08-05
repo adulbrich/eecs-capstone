@@ -15,6 +15,27 @@ interface Props {
  */
 const BOM = "\uFEFF";
 
+/** Shown when a rejection carries no usable message of its own. */
+const DEFAULT_ERROR_MESSAGE = "Export failed. Try again.";
+
+/**
+ * `load()` can reject with anything, not just an `Error`: a string, a plain
+ * object, a Response-shaped failure from a future server function. An
+ * unconditional `(err as Error).message` reads as `undefined` for all of
+ * those, and `{error && ...}` then renders nothing at all, so the export
+ * silently no-ops for the user. Every branch here returns a non-empty
+ * string.
+ */
+function errorMessage(err: unknown): string {
+  if (err instanceof Error && err.message) {
+    return err.message;
+  }
+  if (typeof err === "string" && err) {
+    return err;
+  }
+  return DEFAULT_ERROR_MESSAGE;
+}
+
 export function ExportCsvButton({ filename, load }: Props) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,13 +52,27 @@ export function ExportCsvButton({ filename, load }: Props) {
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = `${filename}-${new Date().toISOString().slice(0, 10)}.csv`;
+      // Appended before the click, not just constructed: Firefox can decline
+      // to start a download from an anchor that was never in the document.
+      document.body.appendChild(anchor);
       anchor.click();
-      URL.revokeObjectURL(url);
+      anchor.remove();
+      // Deferred, not synchronous: revoking the object URL in the same tick
+      // as the click has been observed to race the download in Firefox,
+      // which can end up reading a URL that already points nowhere. A
+      // macrotask is enough to run after the browser has queued the
+      // download, while still guaranteeing the URL is released rather than
+      // leaked.
+      setTimeout(() => URL.revokeObjectURL(url), 0);
       setAnnouncement(`${filename} exported.`);
     } catch (err) {
       // Rendered inline rather than thrown: a failed export must not blank
-      // the table it sits above.
-      setError((err as Error).message);
+      // the table it sits above. Also announced through the live region,
+      // the same way success is, so a screen reader user learns the export
+      // failed instead of hearing nothing at all.
+      const message = errorMessage(err);
+      setError(message);
+      setAnnouncement(`${filename} export failed: ${message}`);
     } finally {
       setPending(false);
     }
