@@ -87,6 +87,13 @@ export type AdminColumn<T> = ColumnDef<T, unknown> & {
 };
 
 export interface AdminDataTableProps<T> {
+  /**
+   * Controls rendered in the right-hand group, before the Columns menu.
+   * A slot rather than an `onExport` callback: the export needs per-route
+   * column definitions and filter state, and threading those through here
+   * would make the table know about exports.
+   */
+  actions?: ReactNode;
   caption: string;
   columns: AdminColumn<T>[];
   data: T[];
@@ -138,6 +145,7 @@ function SortIcon({ direction }: { direction: false | "asc" | "desc" }) {
  * render in tests without a router.
  */
 export function AdminDataTable<T>({
+  actions,
   caption,
   columns,
   data,
@@ -269,50 +277,54 @@ export function AdminDataTable<T>({
     <div className="mt-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-3">{toolbar}</div>
-        {/*
-          modal={false}: Radix's default modal DropdownMenu hides the rest of
-          the page from assistive tech via `aria-hidden` (not `inert`) while
-          it's open: @radix-ui/react-menu calls `hideOthers` from the
-          `aria-hidden` package directly rather than its `inert`-aware
-          `suppressOthers`. That leaves every focusable element outside the
-          menu (nav links, the search box, sort buttons) inside an
-          aria-hidden subtree, which axe correctly flags as
-          aria-hidden-focus. This menu is a lightweight column toggle, not a
-          workflow that needs a hard focus trap, so opting out of modal
-          behavior is the right fix here rather than living with the
-          violation or fighting Radix's internals.
-        */}
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            {/*
-              Default size, not sm: this button sits on the same row as the
-              page's search input and filter selects, which are all h-9. An
-              h-8 button beside them reads as misaligned rather than compact.
-            */}
-            <Button variant="outline">
-              <Columns3 aria-hidden className="size-4" />
-              Columns
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {hideable.map((column) => (
-              <DropdownMenuCheckboxItem
-                checked={column.getIsVisible()}
-                key={column.id}
-                onCheckedChange={(value) => column.toggleVisibility(value)}
-                onSelect={(event) => event.preventDefault()}
-              >
-                {labels.get(column.id) ?? column.id}
-              </DropdownMenuCheckboxItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={resetColumns}>
-              Reset columns
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-end gap-3">
+          {actions}
+          {/*
+            modal={false}: Radix's default modal DropdownMenu hides the rest
+            of the page from assistive tech via `aria-hidden` (not `inert`)
+            while it's open: @radix-ui/react-menu calls `hideOthers` from the
+            `aria-hidden` package directly rather than its `inert`-aware
+            `suppressOthers`. That leaves every focusable element outside the
+            menu (nav links, the search box, sort buttons) inside an
+            aria-hidden subtree, which axe correctly flags as
+            aria-hidden-focus. This menu is a lightweight column toggle, not
+            a workflow that needs a hard focus trap, so opting out of modal
+            behavior is the right fix here rather than living with the
+            violation or fighting Radix's internals.
+          */}
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              {/*
+                Default size, not sm: this button sits on the same row as
+                the page's search input and filter selects, which are all
+                h-9. An h-8 button beside them reads as misaligned rather
+                than compact.
+              */}
+              <Button variant="outline">
+                <Columns3 aria-hidden className="size-4" />
+                Columns
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {hideable.map((column) => (
+                <DropdownMenuCheckboxItem
+                  checked={column.getIsVisible()}
+                  key={column.id}
+                  onCheckedChange={(value) => column.toggleVisibility(value)}
+                  onSelect={(event) => event.preventDefault()}
+                >
+                  {labels.get(column.id) ?? column.id}
+                </DropdownMenuCheckboxItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={resetColumns}>
+                Reset columns
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <p aria-live="polite" className="sr-only">
