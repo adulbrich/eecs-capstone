@@ -10,7 +10,7 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table";
 import { ChevronDown, ChevronsUpDown, ChevronUp, Columns3 } from "lucide-react";
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo } from "react";
 import { EmptyState } from "#/components/empty-state";
 import { Button } from "#/components/ui/button";
 import {
@@ -104,6 +104,20 @@ export interface AdminDataTableProps<T> {
   onHiddenChange: (cols: string | undefined) => void;
   onSortChange: (sort: SortState) => void;
   /**
+   * Reports the ids of the rows in their current sorted (rendered) order,
+   * via `getRowId`, every time sorting or the underlying data changes. Not
+   * called when `serverSorted` is set: there the rows already arrived in
+   * server order, `data` already holds that order, and the caller has no use
+   * for a second copy of it.
+   *
+   * The intended consumer is an export handler: ordering the exported rows
+   * by this id sequence (see `orderBySortedIds` in `#/lib/csv`) makes the
+   * file's row order match the screen by construction, without a route
+   * hand-copying this table's sort comparators (the default locale-aware
+   * one, a column's own `sortingFn`, or a custom order like status).
+   */
+  onSortedIdsChange?: (ids: string[]) => void;
+  /**
    * Set when the server already ordered the rows and will reorder them on the
    * next request, which is the case for any paginated listing. Header clicks
    * still report through onSortChange and aria-sort still reflects the current
@@ -155,6 +169,7 @@ export function AdminDataTable<T>({
   hidden,
   onHiddenChange,
   onSortChange,
+  onSortedIdsChange,
   serverSorted,
   sort,
   storageKey,
@@ -250,6 +265,19 @@ export function AdminDataTable<T>({
 
   const rows = table.getRowModel().rows;
   const hideable = table.getAllLeafColumns().filter((c) => c.getCanHide());
+
+  // Reports the table's own sorted row order to the caller. Skipped when
+  // serverSorted: the rows there are not locally reordered at all (see
+  // manualSorting above), so `data`'s own order already is that order and
+  // there is nothing this effect would add. Guarded inside the effect,
+  // rather than by omitting the dependency, so a change to `serverSorted`
+  // itself is still tracked correctly.
+  useEffect(() => {
+    if (serverSorted) {
+      return;
+    }
+    onSortedIdsChange?.(rows.map((row) => row.id));
+  }, [rows, serverSorted, onSortedIdsChange]);
 
   // The row count alone leaves the table's order silently unannounced: when
   // the sorted column is hidden (its header, and the aria-sort it carries,

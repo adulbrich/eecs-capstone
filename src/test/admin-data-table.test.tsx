@@ -13,6 +13,7 @@ import {
   AdminDataTable,
   type AdminDataTableProps,
 } from "#/components/admin-data-table";
+import { orderBySortedIds, toCsv } from "#/lib/csv";
 
 // Radix's dropdown menu (Popper/floating-ui) relies on a few DOM APIs jsdom
 // omits. Same stub set as proposer-picker.test.tsx.
@@ -352,6 +353,50 @@ describe("AdminDataTable", () => {
       (tr) => within(tr as HTMLElement).getAllByRole("cell")[1].textContent
     );
     expect(descending).toEqual(["Lab 2", "Lab 1", "-"]);
+  });
+
+  it("reports sorted row ids that reproduce the on-screen order in an export", () => {
+    // Sort by "location" instead of the "name" default. Ascending location
+    // (nulls last) orders the three DATA rows id 3, 1, 2 -- different from
+    // both the natural DATA order (1, 2, 3) and the name-sorted default
+    // order (2, 1, 3), so this is decisive: a regression that reported
+    // `data`'s own order, or the default sort's order, instead of the
+    // table's actual sorted row model would produce a different sequence
+    // and this test would catch it.
+    const onSortedIdsChange = vi.fn();
+    const { container } = renderTable({
+      hidden: [],
+      onSortedIdsChange,
+      sort: { desc: false, id: "location" },
+    });
+
+    const renderedIds = [...container.querySelectorAll("tbody tr")].map(
+      (tr) =>
+        DATA.find((row) => row.name === tr.querySelector("td")?.textContent)?.id
+    );
+    // Positive control: the render itself is actually reordered, so a later
+    // failure of the assertion below is about the reported ids diverging
+    // from the screen, not about the fixture failing to exercise sorting.
+    expect(renderedIds).toEqual(["3", "1", "2"]);
+
+    expect(onSortedIdsChange).toHaveBeenLastCalledWith(renderedIds);
+
+    // Compose with the export helpers directly: ordering the source rows by
+    // the reported id sequence and serializing them must reproduce exactly
+    // the order rendered on screen, which is the guarantee Fix 1 exists for.
+    const lastCallIds = onSortedIdsChange.mock.calls.at(-1)?.[0] as string[];
+    const exportOrder = orderBySortedIds(DATA, lastCallIds, (row) => row.id);
+    const csv = toCsv(
+      [{ header: "Name", value: (row: Row) => row.name }],
+      exportOrder
+    );
+    expect(csv.split("\r\n").slice(1)).toEqual(["gamma", "beta", "Alpha"]);
+  });
+
+  it("does not report sorted ids when serverSorted is set", () => {
+    const onSortedIdsChange = vi.fn();
+    renderTable({ onSortedIdsChange, serverSorted: true });
+    expect(onSortedIdsChange).not.toHaveBeenCalled();
   });
 
   it("leaves row order to the caller when serverSorted is set", () => {
