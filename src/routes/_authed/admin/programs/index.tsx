@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { z } from "zod";
 import {
   type AdminColumn,
@@ -34,7 +34,7 @@ import {
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
-import { type CsvColumn, toCsv } from "#/lib/csv";
+import { defineCsvColumns, orderBySortedIds, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import {
   type AdminTableSearch,
@@ -125,14 +125,25 @@ const COLUMNS: AdminColumn<Row>[] = [
 ];
 
 // Every field of the record, independent of which columns are visible.
-const EXPORT_COLUMNS: CsvColumn<Row>[] = [
-  { header: "ID", value: (row) => row.id },
-  { header: "Course ID", value: (row) => row.courseId },
-  { header: "Course name", value: (row) => row.courseName },
-  { header: "Description", value: (row) => row.description },
-  { header: "Created", value: (row) => row.createdAt },
-  { header: "Updated", value: (row) => row.updatedAt },
-];
+// defineCsvColumns<Row>() fails npm run typecheck if a field of Row has no
+// column here, so a future field added to listProgramsImpl's projection
+// cannot silently miss the file.
+const EXPORT_COLUMNS = defineCsvColumns<Row>()([
+  { header: "ID", key: "id", value: (row) => row.id },
+  { header: "Course ID", key: "courseId", value: (row) => row.courseId },
+  {
+    header: "Course name",
+    key: "courseName",
+    value: (row) => row.courseName,
+  },
+  {
+    header: "Description",
+    key: "description",
+    value: (row) => row.description,
+  },
+  { header: "Created", key: "createdAt", value: (row) => row.createdAt },
+  { header: "Updated", key: "updatedAt", value: (row) => row.updatedAt },
+]);
 
 function ProgramsAdmin() {
   const router = useRouter();
@@ -144,6 +155,14 @@ function ProgramsAdmin() {
   const [courseName, setCourseName] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Populated by AdminDataTable's onSortedIdsChange every time the table's
+  // own sorted row order changes. A ref, not state: the export only reads it
+  // at click time, so there is no reason to re-render this component (or
+  // re-run the effect that populates it) on every sort change.
+  const sortedIdsRef = useRef<string[]>([]);
+  const onSortedIdsChange = useCallback((ids: string[]) => {
+    sortedIdsRef.current = ids;
+  }, []);
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -257,7 +276,14 @@ function ProgramsAdmin() {
         actions={
           <ExportCsvButton
             filename="programs"
-            load={() => Promise.resolve(toCsv(EXPORT_COLUMNS, rows))}
+            load={() =>
+              Promise.resolve(
+                toCsv(
+                  EXPORT_COLUMNS,
+                  orderBySortedIds(rows, sortedIdsRef.current, (row) => row.id)
+                )
+              )
+            }
           />
         }
         caption="Programs"
@@ -269,6 +295,7 @@ function ProgramsAdmin() {
         hidden={hidden}
         onHiddenChange={onHiddenChange}
         onSortChange={onSortChange}
+        onSortedIdsChange={onSortedIdsChange}
         sort={sort}
         storageKey="programs"
       />

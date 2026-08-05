@@ -4,7 +4,7 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import {
   type AdminColumn,
@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { getSession } from "#/lib/auth-guards";
-import { type CsvColumn, toCsv } from "#/lib/csv";
+import { defineCsvColumns, orderBySortedIds, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import { getPublicUrl } from "#/lib/storage";
 import {
@@ -248,32 +248,57 @@ const COLUMNS: AdminColumn<Row>[] = [
   },
 ];
 
-// Every field of the record, independent of which columns are visible. The
-// only item column omitted is searchVector, a machine artifact.
-const EXPORT_COLUMNS: CsvColumn<Row>[] = [
-  { header: "ID", value: (row) => row.id },
-  { header: "Name", value: (row) => row.name },
-  { header: "Description", value: (row) => row.description },
-  { header: "Category", value: (row) => row.category },
-  { header: "Status", value: (row) => row.status },
-  { header: "Serial", value: (row) => row.serial },
-  { header: "Label", value: (row) => row.label },
-  { header: "Location", value: (row) => row.location },
-  { header: "Staff notes", value: (row) => row.notes },
-  { header: "Image URL", value: (row) => row.imageUrl },
-  { header: "Holder name", value: (row) => row.currentHolderName },
-  { header: "Holder email", value: (row) => row.currentHolderEmail },
-  { header: "Holder ID", value: (row) => row.currentHolderId },
-  { header: "Holder label", value: (row) => row.currentHolderLabel },
-  { header: "Pick up by", value: (row) => row.pickupBy },
-  { header: "Due", value: (row) => row.dueAt },
+// Every field of the record, independent of which columns are visible.
+// defineCsvColumns<Row>() fails npm run typecheck if a field of Row (i.e. of
+// InventoryItemStaff plus currentHolderName) has no column here, so a future
+// field added to fullForStaff's projection cannot silently miss the file.
+// InventoryItemStaff is a hand-picked field list, not the bare table row, so
+// searchVector was never a member of Row to begin with.
+const EXPORT_COLUMNS = defineCsvColumns<Row>()([
+  { header: "ID", key: "id", value: (row) => row.id },
+  { header: "Name", key: "name", value: (row) => row.name },
+  {
+    header: "Description",
+    key: "description",
+    value: (row) => row.description,
+  },
+  { header: "Category", key: "category", value: (row) => row.category },
+  { header: "Status", key: "status", value: (row) => row.status },
+  { header: "Serial", key: "serial", value: (row) => row.serial },
+  { header: "Label", key: "label", value: (row) => row.label },
+  { header: "Location", key: "location", value: (row) => row.location },
+  { header: "Staff notes", key: "notes", value: (row) => row.notes },
+  { header: "Image URL", key: "imageUrl", value: (row) => row.imageUrl },
+  {
+    header: "Holder name",
+    key: "currentHolderName",
+    value: (row) => row.currentHolderName,
+  },
+  {
+    header: "Holder email",
+    key: "currentHolderEmail",
+    value: (row) => row.currentHolderEmail,
+  },
+  {
+    header: "Holder ID",
+    key: "currentHolderId",
+    value: (row) => row.currentHolderId,
+  },
+  {
+    header: "Holder label",
+    key: "currentHolderLabel",
+    value: (row) => row.currentHolderLabel,
+  },
+  { header: "Pick up by", key: "pickupBy", value: (row) => row.pickupBy },
+  { header: "Due", key: "dueAt", value: (row) => row.dueAt },
   {
     header: "Current request item ID",
+    key: "currentRequestItemId",
     value: (row) => row.currentRequestItemId,
   },
-  { header: "Created", value: (row) => row.createdAt },
-  { header: "Updated", value: (row) => row.updatedAt },
-];
+  { header: "Created", key: "createdAt", value: (row) => row.createdAt },
+  { header: "Updated", key: "updatedAt", value: (row) => row.updatedAt },
+]);
 
 function AdminInventory() {
   const navigate = useNavigate({ from: "/admin/inventory/" });
@@ -282,6 +307,14 @@ function AdminInventory() {
   const search = Route.useSearch();
   const { category, q, status } = search;
   const [qDraft, setQDraft] = useState(q);
+  // Populated by AdminDataTable's onSortedIdsChange every time the table's
+  // own sorted row order changes. A ref, not state: the export only reads it
+  // at click time, so there is no reason to re-render this component (or
+  // re-run the effect that populates it) on every sort change.
+  const sortedIdsRef = useRef<string[]>([]);
+  const onSortedIdsChange = useCallback((ids: string[]) => {
+    sortedIdsRef.current = ids;
+  }, []);
 
   useEffect(() => setQDraft(q), [q]);
 
@@ -348,7 +381,14 @@ function AdminInventory() {
         actions={
           <ExportCsvButton
             filename="inventory"
-            load={() => Promise.resolve(toCsv(EXPORT_COLUMNS, rows))}
+            load={() =>
+              Promise.resolve(
+                toCsv(
+                  EXPORT_COLUMNS,
+                  orderBySortedIds(rows, sortedIdsRef.current, (row) => row.id)
+                )
+              )
+            }
           />
         }
         caption="Inventory items"
@@ -360,6 +400,7 @@ function AdminInventory() {
         hidden={hidden}
         onHiddenChange={onHiddenChange}
         onSortChange={onSortChange}
+        onSortedIdsChange={onSortedIdsChange}
         sort={sort}
         storageKey="inventory"
         toolbar={

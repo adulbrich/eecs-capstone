@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { z } from "zod";
 import {
   type AdminColumn,
@@ -35,7 +35,7 @@ import {
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
-import { type CsvColumn, toCsv } from "#/lib/csv";
+import { defineCsvColumns, orderBySortedIds, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import {
   type AdminTableSearch,
@@ -122,12 +122,15 @@ const COLUMNS: AdminColumn<Row>[] = [
 ];
 
 // Every field of the record, independent of which columns are visible.
-const EXPORT_COLUMNS: CsvColumn<Row>[] = [
-  { header: "ID", value: (row) => row.id },
-  { header: "Name", value: (row) => row.name },
-  { header: "Type", value: (row) => row.type },
-  { header: "Created", value: (row) => row.createdAt },
-];
+// defineCsvColumns<Row>() fails npm run typecheck if a field of Row has no
+// column here, so a future field added to listCategoriesImpl's projection
+// cannot silently miss the file.
+const EXPORT_COLUMNS = defineCsvColumns<Row>()([
+  { header: "ID", key: "id", value: (row) => row.id },
+  { header: "Name", key: "name", value: (row) => row.name },
+  { header: "Type", key: "type", value: (row) => row.type },
+  { header: "Created", key: "createdAt", value: (row) => row.createdAt },
+]);
 
 function CategoriesAdmin() {
   const router = useRouter();
@@ -138,6 +141,14 @@ function CategoriesAdmin() {
   const [name, setName] = useState("");
   const [type, setType] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Populated by AdminDataTable's onSortedIdsChange every time the table's
+  // own sorted row order changes. A ref, not state: the export only reads it
+  // at click time, so there is no reason to re-render this component (or
+  // re-run the effect that populates it) on every sort change.
+  const sortedIdsRef = useRef<string[]>([]);
+  const onSortedIdsChange = useCallback((ids: string[]) => {
+    sortedIdsRef.current = ids;
+  }, []);
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -239,7 +250,14 @@ function CategoriesAdmin() {
         actions={
           <ExportCsvButton
             filename="categories"
-            load={() => Promise.resolve(toCsv(EXPORT_COLUMNS, rows))}
+            load={() =>
+              Promise.resolve(
+                toCsv(
+                  EXPORT_COLUMNS,
+                  orderBySortedIds(rows, sortedIdsRef.current, (row) => row.id)
+                )
+              )
+            }
           />
         }
         caption="Categories"
@@ -251,6 +269,7 @@ function CategoriesAdmin() {
         hidden={hidden}
         onHiddenChange={onHiddenChange}
         onSortChange={onSortChange}
+        onSortedIdsChange={onSortedIdsChange}
         sort={sort}
         storageKey="categories"
       />

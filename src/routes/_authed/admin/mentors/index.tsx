@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import {
   type AdminColumn,
@@ -24,7 +24,7 @@ import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
-import { type CsvColumn, toCsv } from "#/lib/csv";
+import { defineCsvColumns, orderBySortedIds, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import {
   type AdminTableSearch,
@@ -129,16 +129,31 @@ function MentorControls({ mentor }: { mentor: Row }) {
 
 type ExportRow = Awaited<ReturnType<typeof exportMentors>>["rows"][number];
 
-const EXPORT_COLUMNS: CsvColumn<ExportRow>[] = [
-  { header: "ID", value: (row) => row.id },
-  { header: "Name", value: (row) => row.name },
-  { header: "Email", value: (row) => row.email },
-  { header: "Affiliation", value: (row) => row.affiliation },
-  { header: "Role", value: (row) => row.role },
-  { header: "Wants to mentor", value: (row) => row.wantsToMentor },
-  { header: "Mentor team count", value: (row) => row.mentorTeamCount },
-  { header: "Created", value: (row) => row.createdAt },
-];
+// defineCsvColumns<ExportRow>() fails npm run typecheck if a field of
+// ExportRow has no column here, so a future field added to exportMentorsAs's
+// projection cannot silently miss the file.
+const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
+  { header: "ID", key: "id", value: (row) => row.id },
+  { header: "Name", key: "name", value: (row) => row.name },
+  { header: "Email", key: "email", value: (row) => row.email },
+  {
+    header: "Affiliation",
+    key: "affiliation",
+    value: (row) => row.affiliation,
+  },
+  { header: "Role", key: "role", value: (row) => row.role },
+  {
+    header: "Wants to mentor",
+    key: "wantsToMentor",
+    value: (row) => row.wantsToMentor,
+  },
+  {
+    header: "Mentor team count",
+    key: "mentorTeamCount",
+    value: (row) => row.mentorTeamCount,
+  },
+  { header: "Created", key: "createdAt", value: (row) => row.createdAt },
+]);
 
 const COLUMNS: AdminColumn<Row>[] = [
   {
@@ -177,6 +192,14 @@ function MentorsAdmin() {
   const { q } = search;
   const navigate = useNavigate({ from: "/admin/mentors/" });
   const [qDraft, setQDraft] = useState(q);
+  // Populated by AdminDataTable's onSortedIdsChange every time the table's
+  // own sorted row order changes. A ref, not state: the export only reads it
+  // at click time, so there is no reason to re-render this component (or
+  // re-run the effect that populates it) on every sort change.
+  const sortedIdsRef = useRef<string[]>([]);
+  const onSortedIdsChange = useCallback((ids: string[]) => {
+    sortedIdsRef.current = ids;
+  }, []);
 
   useEffect(() => setQDraft(q), [q]);
 
@@ -241,7 +264,19 @@ function MentorsAdmin() {
               const { rows: exportRows } = await exportMentors({
                 data: { q: search.q },
               });
-              return toCsv(EXPORT_COLUMNS, exportRows);
+              // The export's rows are a wider projection of the same
+              // records the table lists under the same filter, keyed by the
+              // same id, so ordering by the table's sorted id sequence
+              // still applies even though this array did not come from
+              // `rows`.
+              return toCsv(
+                EXPORT_COLUMNS,
+                orderBySortedIds(
+                  exportRows,
+                  sortedIdsRef.current,
+                  (row) => row.id
+                )
+              );
             }}
           />
         }
@@ -254,6 +289,7 @@ function MentorsAdmin() {
         hidden={hidden}
         onHiddenChange={onHiddenChange}
         onSortChange={onSortChange}
+        onSortedIdsChange={onSortedIdsChange}
         sort={sort}
         storageKey="mentors"
         toolbar={

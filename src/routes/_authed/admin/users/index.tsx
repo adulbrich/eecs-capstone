@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { getSession } from "#/lib/auth-guards";
-import { type CsvColumn, toCsv } from "#/lib/csv";
+import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import {
   type AdminTableSearch,
@@ -149,24 +149,42 @@ type ExportRow = Awaited<ReturnType<typeof exportUsers>>["rows"][number];
 
 // One entry per field the export projection selects (src/server/_internal/
 // users.ts, exportUsersImpl): the full user record minus authentication
-// material from account/session/verification.
-const EXPORT_COLUMNS: CsvColumn<ExportRow>[] = [
-  { header: "ID", value: (row) => row.id },
-  { header: "Name", value: (row) => row.name },
-  { header: "Email", value: (row) => row.email },
-  { header: "Email verified", value: (row) => row.emailVerified },
-  { header: "Image", value: (row) => row.image },
-  { header: "Role", value: (row) => row.role },
-  { header: "Banned", value: (row) => row.banned },
-  { header: "Ban reason", value: (row) => row.banReason },
-  { header: "Ban expires", value: (row) => row.banExpires },
-  { header: "Affiliation", value: (row) => row.affiliation },
-  { header: "LinkedIn", value: (row) => row.linkedin },
-  { header: "Wants to mentor", value: (row) => row.wantsToMentor },
-  { header: "Mentor team count", value: (row) => row.mentorTeamCount },
-  { header: "Created", value: (row) => row.createdAt },
-  { header: "Updated", value: (row) => row.updatedAt },
-];
+// material from account/session/verification. defineCsvColumns<ExportRow>()
+// fails npm run typecheck if a field of ExportRow has no column here, so a
+// future field added to that projection cannot silently miss the file.
+const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
+  { header: "ID", key: "id", value: (row) => row.id },
+  { header: "Name", key: "name", value: (row) => row.name },
+  { header: "Email", key: "email", value: (row) => row.email },
+  {
+    header: "Email verified",
+    key: "emailVerified",
+    value: (row) => row.emailVerified,
+  },
+  { header: "Image", key: "image", value: (row) => row.image },
+  { header: "Role", key: "role", value: (row) => row.role },
+  { header: "Banned", key: "banned", value: (row) => row.banned },
+  { header: "Ban reason", key: "banReason", value: (row) => row.banReason },
+  { header: "Ban expires", key: "banExpires", value: (row) => row.banExpires },
+  {
+    header: "Affiliation",
+    key: "affiliation",
+    value: (row) => row.affiliation,
+  },
+  { header: "LinkedIn", key: "linkedin", value: (row) => row.linkedin },
+  {
+    header: "Wants to mentor",
+    key: "wantsToMentor",
+    value: (row) => row.wantsToMentor,
+  },
+  {
+    header: "Mentor team count",
+    key: "mentorTeamCount",
+    value: (row) => row.mentorTeamCount,
+  },
+  { header: "Created", key: "createdAt", value: (row) => row.createdAt },
+  { header: "Updated", key: "updatedAt", value: (row) => row.updatedAt },
+]);
 
 function UsersAdmin() {
   const navigate = useNavigate({ from: "/admin/users/" });
