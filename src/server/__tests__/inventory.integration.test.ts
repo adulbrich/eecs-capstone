@@ -1333,8 +1333,13 @@ describe("active tab ordering (byDeadline)", () => {
 
     const soonItem = await makeItem({ name: "Soon Hold" });
     const laterItem = await makeItem({ name: "Later Request" });
-    const olderItem = await makeItem({ name: "Older Pending" });
-    const newerItem = await makeItem({ name: "Newer Pending" });
+    // Named so alphabetical order and recency order disagree: "Apple" sorts
+    // before "Zebra", but Zebra is the one created second and must still
+    // sort first once the tiebreak is recency rather than name. A test that
+    // used "Older"/"Newer" names here would pass under either tiebreak and
+    // would not catch a regression back to the old name-based one.
+    const olderItem = await makeItem({ name: "Apple Pending" });
+    const newerItem = await makeItem({ name: "Zebra Pending" });
 
     // A hold with the soonest deadline of the four.
     await transitionItem(admin, {
@@ -1356,22 +1361,80 @@ describe("active tab ordering (byDeadline)", () => {
       pickupBy: new Date(Date.now() + 5 * 86_400_000),
     });
 
-    // Two pending request lines with no deadline, submitted in order: with
-    // no deadline to sort by, these fall back to recency, newest first,
-    // which is the created_at DESC order the active list used before holds
-    // existed.
+    // Two pending request lines with no deadline. createdAt is set
+    // explicitly rather than relying on the two submitCartAs calls landing
+    // in different milliseconds, so the ordering this asserts cannot flake.
     await addToCartAs(viewer, { itemId: olderItem.id });
     await submitCartAs(viewer, { note: null });
     await addToCartAs(viewer, { itemId: newerItem.id });
     await submitCartAs(viewer, { note: null });
+    await db
+      .update(inventoryRequestItems)
+      .set({ createdAt: new Date("2020-01-01T00:00:00.000Z") })
+      .where(eq(inventoryRequestItems.itemId, olderItem.id));
+    await db
+      .update(inventoryRequestItems)
+      .set({ createdAt: new Date("2020-01-02T00:00:00.000Z") })
+      .where(eq(inventoryRequestItems.itemId, newerItem.id));
 
     const { active } = await listMyItemsAs(viewer);
 
+    // With no deadline to sort by, these fall back to recency, newest
+    // first: the created_at DESC order the active list used before holds
+    // existed. Under the old name tiebreak this would come back
+    // alphabetically ("Apple Pending" before "Zebra Pending") instead.
     expect(active.map((entry) => entry.item.name)).toEqual([
       "Soon Hold",
       "Later Request",
-      "Newer Pending",
-      "Older Pending",
+      "Zebra Pending",
+      "Apple Pending",
+    ]);
+  });
+
+  it("falls back to newest first when two entries share the same deadline", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ordeq-admin-${stamp}@x.com`, "admin");
+    const viewer = await makeUser(`ordeq-viewer-${stamp}@x.com`, "user");
+
+    // Named, like the case above, so alphabetical order and recency order
+    // disagree: "Ant" sorts before "Yak" alphabetically, but Yak is the one
+    // last written and must sort first under the recency tiebreak.
+    const olderItem = await makeItem({ name: "Ant Match" });
+    const newerItem = await makeItem({ name: "Yak Match" });
+    const sharedDeadline = new Date(Date.now() + 3 * 86_400_000);
+
+    await transitionItem(admin, {
+      itemId: olderItem.id,
+      nextStatus: "checked_out",
+      holderId: viewer.id,
+      dueAt: sharedDeadline,
+    });
+    await transitionItem(admin, {
+      itemId: newerItem.id,
+      nextStatus: "checked_out",
+      holderId: viewer.id,
+      dueAt: sharedDeadline,
+    });
+    // Recency for a hold comes from the item's updatedAt. Set both
+    // explicitly, rather than trusting the two transitionItem calls above to
+    // land in different milliseconds, so this cannot flake.
+    await db
+      .update(inventoryItems)
+      .set({ updatedAt: new Date("2020-01-01T00:00:00.000Z") })
+      .where(eq(inventoryItems.id, olderItem.id));
+    await db
+      .update(inventoryItems)
+      .set({ updatedAt: new Date("2020-01-02T00:00:00.000Z") })
+      .where(eq(inventoryItems.id, newerItem.id));
+
+    const { active } = await listMyItemsAs(viewer);
+
+    // Equal deadlines: falls back to recency, newest first. Under the old
+    // name tiebreak this would come back alphabetically ("Ant Match" before
+    // "Yak Match") instead.
+    expect(active.map((entry) => entry.item.name)).toEqual([
+      "Yak Match",
+      "Ant Match",
     ]);
   });
 });
