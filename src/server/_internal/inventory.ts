@@ -977,16 +977,27 @@ function deadlineOf(entry: ActiveEntry): Date | null {
   return entry.line.dueAt ?? entry.line.pickupBy;
 }
 
+// A hold has no request line, so its "created" moment is when the item row
+// was last written; a pending request line hasn't been touched since it was
+// created, so createdAt and updatedAt agree for it anyway.
+function recencyOf(entry: ActiveEntry): Date {
+  return entry.kind === "hold" ? entry.item.updatedAt : entry.line.createdAt;
+}
+
 /**
- * Soonest deadline first, entries without one last, then by item name so the
- * order is stable. "What is due soonest" is the question this tab answers.
+ * Soonest deadline first, entries without one last, newest first within a
+ * tie (including the common case of two entries that both have no
+ * deadline, e.g. two pending requests). This is the created_at DESC order
+ * the active list used before holds existed, kept as the fallback so it
+ * still applies to everything a deadline can't order.
  */
 function byDeadline(a: ActiveEntry, b: ActiveEntry): number {
   const left = deadlineOf(a);
   const right = deadlineOf(b);
   if (left && right) {
     return (
-      left.getTime() - right.getTime() || a.item.name.localeCompare(b.item.name)
+      left.getTime() - right.getTime() ||
+      recencyOf(b).getTime() - recencyOf(a).getTime()
     );
   }
   if (left) {
@@ -995,7 +1006,7 @@ function byDeadline(a: ActiveEntry, b: ActiveEntry): number {
   if (right) {
     return 1;
   }
-  return a.item.name.localeCompare(b.item.name);
+  return recencyOf(b).getTime() - recencyOf(a).getTime();
 }
 
 export async function listMyItemsAs(viewer: Viewer) {
@@ -1047,6 +1058,10 @@ export async function listMyItemsAs(viewer: Viewer) {
         and(
           // Disjoint from the request-line query above: an item held through
           // a request line is already in `active` and must not appear twice.
+          // Safe by construction, not by a DB constraint: closeRequestItemOnRelease
+          // (inventory-transitions.ts) closes the attached line whenever
+          // current_request_item_id goes null, so a live pending/approved
+          // line and a null current_request_item_id never coexist.
           isNull(inventoryItems.currentRequestItemId),
           inArray(inventoryItems.status, ["reserved", "checked_out"]),
           or(

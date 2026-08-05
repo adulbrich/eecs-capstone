@@ -1325,6 +1325,101 @@ describe("staff-assigned holds in my items", () => {
   });
 });
 
+describe("active tab ordering (byDeadline)", () => {
+  it("sorts by soonest deadline, then newest first when there is no deadline", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ord-admin-${stamp}@x.com`, "admin");
+    const viewer = await makeUser(`ord-viewer-${stamp}@x.com`, "user");
+
+    const soonItem = await makeItem({ name: "Soon Hold" });
+    const laterItem = await makeItem({ name: "Later Request" });
+    const olderItem = await makeItem({ name: "Older Pending" });
+    const newerItem = await makeItem({ name: "Newer Pending" });
+
+    // A hold with the soonest deadline of the four.
+    await transitionItem(admin, {
+      itemId: soonItem.id,
+      nextStatus: "checked_out",
+      holderId: viewer.id,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    // A request line with a later deadline: approved, so pickupBy is set.
+    await addToCartAs(viewer, { itemId: laterItem.id });
+    await submitCartAs(viewer, { note: null });
+    const [laterLine] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, laterItem.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: laterLine.id,
+      pickupBy: new Date(Date.now() + 5 * 86_400_000),
+    });
+
+    // Two pending request lines with no deadline, submitted in order: with
+    // no deadline to sort by, these fall back to recency, newest first,
+    // which is the created_at DESC order the active list used before holds
+    // existed.
+    await addToCartAs(viewer, { itemId: olderItem.id });
+    await submitCartAs(viewer, { note: null });
+    await addToCartAs(viewer, { itemId: newerItem.id });
+    await submitCartAs(viewer, { note: null });
+
+    const { active } = await listMyItemsAs(viewer);
+
+    expect(active.map((entry) => entry.item.name)).toEqual([
+      "Soon Hold",
+      "Later Request",
+      "Newer Pending",
+      "Older Pending",
+    ]);
+  });
+});
+
+describe("disjointness invariant between the hold and request-line queries", () => {
+  it("double-counts an item if it is ever forced into the orphaned state", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`orphan-admin-${stamp}@x.com`, "admin");
+    const requester = await makeUser(`orphan-req-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Orphan" });
+
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+
+    // closeRequestItemOnRelease closes the attached line whenever
+    // current_request_item_id goes null, so a live approved line and a
+    // null current_request_item_id never coexist on the write path. Force
+    // that pairing directly to check whether the read side has any defense
+    // of its own for it, or leans entirely on the write path never
+    // producing it: the item is still "reserved" and still held by
+    // requester, but current_request_item_id is cleared as if the item had
+    // been released while the line was left behind.
+    await db
+      .update(inventoryItems)
+      .set({ currentRequestItemId: null })
+      .where(eq(inventoryItems.id, item.id));
+
+    const { active } = await listMyItemsAs(requester);
+
+    // This pins the current (undesirable) behavior, not a guarantee: the
+    // request-line query does not check current_request_item_id at all,
+    // and the hold query matches once current_request_item_id is null, so
+    // the item comes back from both and appears twice. There is no
+    // independent read-side defense; disjointness holds only as long as
+    // closeRequestItemOnRelease is never bypassed. If a future change
+    // closes that gap, update this test to expect a single entry.
+    expect(active).toHaveLength(2);
+  });
+});
+
 describe("overdue notifications for staff holds", () => {
   it("notifies the holder of an overdue hold with no request line", async () => {
     const stamp = Date.now();
@@ -1422,9 +1517,12 @@ describe("overdue notifications for staff holds", () => {
     const walkIn = await makeUser(holderEmail, "user");
 
     // No ownerId: an ownerId scope would filter the null-holder row out on
-    // its own, masking the guard this test exists to pin. The unscoped scan
-    // is the one that would hit notifications.user_id's NOT NULL constraint
-    // and throw if the currentHolderId IS NOT NULL guard were ever dropped.
+    // its own, masking the guard this test exists to pin. What actually
+    // keeps this row out of the insert is the `r.userId !== null` filter
+    // applied after the two scans are merged (inventory.ts, just above the
+    // push loop), not the `currentHolderId IS NOT NULL` condition on the
+    // hold query: that condition could be dropped entirely and this test
+    // would still pass, since the JS filter catches the row first.
     await expect(
       recordOverdueNotificationsAs(walkIn, {})
     ).resolves.not.toThrow();
