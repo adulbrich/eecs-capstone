@@ -212,9 +212,16 @@ describe("admin user export", () => {
 
 describe("admin mentor export", () => {
   it("carries fields the listing projection omits", async () => {
+    // Fix 4: `role` is `notNull` with a default, so `toBeDefined()` could
+    // never fail regardless of whether the projection selected the right
+    // column. Seeding the mentor with "instructor" -- a role distinct from
+    // both the column's default ("user") and the querying admin's own role
+    // -- makes `toBe("instructor")` decisive: it fails if `role` is dropped
+    // from the select, or if the query pulls the querying viewer's role
+    // instead of the row's.
     const stamp = Date.now();
     const admin = await makeUser(`m-admin-${stamp}@x.com`, "admin");
-    const mentor = await makeUser(`m-${stamp}@x.com`, "user");
+    const mentor = await makeUser(`m-${stamp}@x.com`, "instructor");
     await db
       .update(user)
       .set({ wantsToMentor: true, affiliation: "OSU" })
@@ -225,7 +232,12 @@ describe("admin mentor export", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].affiliation).toBe("OSU");
     expect(rows[0].createdAt).toBeInstanceOf(Date);
-    expect(rows[0].role).toBeDefined();
+    expect(rows[0].role).toBe("instructor");
+    // wantsToMentor is constant true across the result set by construction
+    // (buildMentorConditions filters on it), but asserting it directly still
+    // catches a wrong or missing column in the projection itself, e.g. one
+    // that selected some other boolean field under the same key.
+    expect(rows[0].wantsToMentor).toBe(true);
   });
 
   it("allows instructors and rejects students", async () => {
