@@ -29,10 +29,6 @@ in [`PRD.md`](./PRD.md).
 - Check all the nice shadcn/ui components and see if we use them everywhere we can. Audit where we could update the app accordingly. The most important things are that the UI is consistent across the app + accessibility.
 - Ability to export admin tables to CSV (current selection)
 - categories for inventory items should be managed in /admin/categories as well, and be pulled from that store in the inventory/new and /edit routes
-- Show staff-assigned holds in the holder's `/my/items`. An item checked out to
-  an email address that matches an account notifies that account, but the
-  "My items" tabs still read from request lines only, so a walk-in hold does
-  not appear there.
 
 ### Authentication
 

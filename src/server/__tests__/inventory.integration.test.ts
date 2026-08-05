@@ -1324,3 +1324,122 @@ describe("staff-assigned holds in my items", () => {
     expect(active).toHaveLength(0);
   });
 });
+
+describe("overdue notifications for staff holds", () => {
+  it("notifies the holder of an overdue hold with no request line", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`o-admin-${stamp}@x.com`, "admin");
+    const holder = await makeUser(`o-holder-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Lathe" });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderId: holder.id,
+      dueAt: new Date("2020-01-01T00:00:00.000Z"),
+    });
+
+    await recordOverdueNotificationsAs(holder, { ownerId: holder.id });
+
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, holder.id));
+
+    expect(
+      rows.filter((r) => r.type === "inventory_checkout_overdue")
+    ).toHaveLength(1);
+  });
+
+  it("does not notify twice when run again", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`o2-admin-${stamp}@x.com`, "admin");
+    const holder = await makeUser(`o2-holder-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Press" });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderId: holder.id,
+      dueAt: new Date("2020-01-01T00:00:00.000Z"),
+    });
+
+    await recordOverdueNotificationsAs(holder, { ownerId: holder.id });
+    await recordOverdueNotificationsAs(holder, { ownerId: holder.id });
+
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, holder.id));
+
+    expect(
+      rows.filter((r) => r.type === "inventory_checkout_overdue")
+    ).toHaveLength(1);
+  });
+
+  it("notifies the holder of an overdue pickup with no request line", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`o3-admin-${stamp}@x.com`, "admin");
+    const holder = await makeUser(`o3-holder-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Router" });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      holderId: holder.id,
+      pickupBy: new Date("2020-01-01T00:00:00.000Z"),
+    });
+
+    await recordOverdueNotificationsAs(holder, { ownerId: holder.id });
+
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, holder.id));
+
+    expect(
+      rows.filter((r) => r.type === "inventory_pickup_overdue")
+    ).toHaveLength(1);
+  });
+
+  it("does not notify an email-matched hold with no resolved account", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`o4-admin-${stamp}@x.com`, "admin");
+    const holderEmail = `o4-walkin-${stamp}@x.com`;
+    const item = await makeItem({ name: "Grinder" });
+
+    // Assign to an address with no account yet, so resolveHolderId finds
+    // nothing and current_holder_id stays null: this hold is discoverable
+    // only through listMyItemsAs's verified-email match, which the
+    // notification write path deliberately does not repeat.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail,
+      dueAt: new Date("2020-01-01T00:00:00.000Z"),
+    });
+
+    const walkIn = await makeUser(holderEmail, "user");
+
+    // No ownerId: an ownerId scope would filter the null-holder row out on
+    // its own, masking the guard this test exists to pin. The unscoped scan
+    // is the one that would hit notifications.user_id's NOT NULL constraint
+    // and throw if the currentHolderId IS NOT NULL guard were ever dropped.
+    await expect(
+      recordOverdueNotificationsAs(walkIn, {})
+    ).resolves.not.toThrow();
+
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, walkIn.id));
+
+    expect(
+      rows.filter(
+        (r) =>
+          r.type === "inventory_checkout_overdue" ||
+          r.type === "inventory_pickup_overdue"
+      )
+    ).toHaveLength(0);
+  });
+});

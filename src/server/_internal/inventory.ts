@@ -1412,6 +1412,56 @@ export async function recordOverdueNotificationsAs(
       });
     }
   }
+  // Staff holds have no request line, so the scan above cannot see them.
+  // Restricted to holds with a resolved account: notifications.userId is a
+  // foreign key, and an email-matched hold has no id to attribute a message
+  // to. Resolving the address here would reintroduce, on a write path, the
+  // impersonation risk the read path in listMyItemsAs guards against.
+  const holdConditions = [
+    isNull(inventoryItems.currentRequestItemId),
+    isNotNull(inventoryItems.currentHolderId),
+    inArray(inventoryItems.status, ["reserved", "checked_out"]),
+  ];
+  if (opts.ownerId) {
+    holdConditions.push(eq(inventoryItems.currentHolderId, opts.ownerId));
+  }
+  const heldRows = await db
+    .select({
+      itemId: inventoryItems.id,
+      itemName: inventoryItems.name,
+      status: inventoryItems.status,
+      pickupBy: inventoryItems.currentPickupBy,
+      dueAt: inventoryItems.currentDueAt,
+      holderId: inventoryItems.currentHolderId,
+    })
+    .from(inventoryItems)
+    .where(and(...holdConditions));
+
+  for (const r of heldRows) {
+    if (!r.holderId) {
+      continue;
+    }
+    const { pickupOverdue, checkoutOverdue } = deriveDeadlineFlags(r);
+    if (pickupOverdue) {
+      values.push({
+        userId: r.holderId,
+        type: "inventory_pickup_overdue",
+        title: `Pickup window passed: ${r.itemName}`,
+        message: "Your reserved item is past its pickup window.",
+        link: `/inventory/${r.itemId}`,
+      });
+    }
+    if (checkoutOverdue) {
+      values.push({
+        userId: r.holderId,
+        type: "inventory_checkout_overdue",
+        title: `Overdue: ${r.itemName}`,
+        message: "Your checked-out item is past its due date.",
+        link: `/inventory/${r.itemId}`,
+      });
+    }
+  }
+
   if (values.length === 0) {
     return;
   }
