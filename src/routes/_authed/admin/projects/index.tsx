@@ -10,6 +10,7 @@ import {
   type AdminColumn,
   AdminDataTable,
 } from "#/components/admin-data-table";
+import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
 import { ImageOrFallback } from "#/components/image-or-fallback";
 import { LocalTime } from "#/components/local-time";
@@ -33,6 +34,7 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { getSession } from "#/lib/auth-guards";
+import { type CsvColumn, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import { projectImageSrc } from "#/lib/project-image";
 import {
@@ -41,7 +43,10 @@ import {
   useAdminTableState,
 } from "#/lib/table-state";
 import { listPrograms } from "#/server/programs";
-import { listAdminProjects } from "#/server/projects-queries";
+import {
+  exportAdminProjects,
+  listAdminProjects,
+} from "#/server/projects-queries";
 
 const STATUSES = [
   "all",
@@ -249,6 +254,40 @@ const COLUMNS: AdminColumn<Row>[] = [
   },
 ];
 
+type ExportRow = Awaited<
+  ReturnType<typeof exportAdminProjects>
+>["rows"][number];
+
+// Every meaningful field, independent of which columns the table shows. The
+// listing's loader returns a summary; this reads from the export server fn,
+// which widens the projection instead.
+const EXPORT_COLUMNS: CsvColumn<ExportRow>[] = [
+  { header: "ID", value: (row) => row.id },
+  { header: "Title", value: (row) => row.title },
+  { header: "Status", value: (row) => row.status },
+  { header: "Description", value: (row) => row.description },
+  { header: "Problem statement", value: (row) => row.problemStatement },
+  { header: "Objectives", value: (row) => row.objectives },
+  { header: "Min qualifications", value: (row) => row.minQualifications },
+  { header: "Pref qualifications", value: (row) => row.prefQualifications },
+  { header: "URL", value: (row) => row.url },
+  { header: "License restrictions", value: (row) => row.licenseRestrictions },
+  { header: "Staff notes", value: (row) => row.notes },
+  { header: "Categories", value: (row) => row.categories },
+  { header: "Contact name", value: (row) => row.contactName },
+  { header: "Contact email", value: (row) => row.contactEmail },
+  { header: "Proposer name", value: (row) => row.proposerName },
+  { header: "Proposer email", value: (row) => row.proposerEmail },
+  { header: "Program course ID", value: (row) => row.programCourseId },
+  { header: "Program course name", value: (row) => row.programCourseName },
+  { header: "Teams supported", value: (row) => row.teamsSupported },
+  { header: "Created", value: (row) => row.createdAt },
+  { header: "Published", value: (row) => row.publishedAt },
+  { header: "Archived", value: (row) => row.archivedAt },
+  { header: "Soft deleted", value: (row) => row.deletedAt },
+  { header: "Updated", value: (row) => row.updatedAt },
+];
+
 function AdminProjects() {
   const { rows, proposers } = Route.useLoaderData();
   // The whole search object goes to the hook, which reads cols/dir/sort.
@@ -333,6 +372,23 @@ function AdminProjects() {
       <h1 className="mt-2 font-semibold text-2xl">Projects</h1>
 
       <AdminDataTable
+        actions={
+          <ExportCsvButton
+            filename="projects"
+            load={async () => {
+              const { rows: exportRows } = await exportAdminProjects({
+                data: {
+                  includeSoftDeleted: search.includeSoftDeleted,
+                  program: search.program,
+                  proposer: search.proposer,
+                  q: search.q,
+                  status: search.status,
+                },
+              });
+              return toCsv(EXPORT_COLUMNS, exportRows);
+            }}
+          />
+        }
         caption="Projects"
         columns={COLUMNS}
         data={rows}
