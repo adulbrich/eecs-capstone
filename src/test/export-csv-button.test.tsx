@@ -115,7 +115,7 @@ afterEach(() => {
 });
 
 describe("ExportCsvButton", () => {
-  it("calls load on click and disables itself while the export is pending", async () => {
+  it("calls load on click and marks itself busy and aria-disabled while pending", async () => {
     const { promise, resolve } = deferred<string>();
     const load = vi.fn(() => promise);
     render(<ExportCsvButton filename="widgets" load={load} />);
@@ -124,7 +124,9 @@ describe("ExportCsvButton", () => {
     fireEvent.click(button);
 
     expect(load).toHaveBeenCalledTimes(1);
-    expect(button.hasAttribute("disabled")).toBe(true);
+    // aria-disabled, not the native `disabled` attribute: see Fix 5 below.
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(button.hasAttribute("disabled")).toBe(false);
     expect(button.getAttribute("aria-busy")).toBe("true");
 
     await act(async () => {
@@ -132,8 +134,62 @@ describe("ExportCsvButton", () => {
       await promise;
     });
 
-    await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false));
+    await waitFor(() =>
+      expect(button.getAttribute("aria-disabled")).toBe("false")
+    );
     expect(button.getAttribute("aria-busy")).toBe("false");
+  });
+
+  // Documents the behavior Fix 5 exists for: the native `disabled` attribute
+  // removes a focused element from the tab order and drops focus to <body>
+  // in a real browser, so a keyboard user mid-table loses their position for
+  // the length of the export. This assertion does NOT by itself distinguish
+  // the fix from the pre-fix code under jsdom: jsdom (confirmed directly,
+  // independent of React, against this project's jsdom version) never moves
+  // `document.activeElement` when an element gains the `disabled` attribute,
+  // however it is set. The actual mutation-provable guard against that
+  // regression is the `hasAttribute("disabled")` assertion above, in "marks
+  // itself busy and aria-disabled while pending": a real browser's
+  // focus-eviction is a direct, spec-mandated consequence of that attribute
+  // being present, so proving it is absent is what rules the regression out.
+  it("keeps the button focused while an export is pending", async () => {
+    const { promise, resolve } = deferred<string>();
+    const load = vi.fn(() => promise);
+    render(<ExportCsvButton filename="widgets" load={load} />);
+
+    const button = screen.getByRole("button", { name: "Export CSV" });
+    button.focus();
+    expect(document.activeElement).toBe(button);
+
+    fireEvent.click(button);
+
+    expect(document.activeElement).toBe(button);
+
+    await act(async () => {
+      resolve("a,b\r\n1,2");
+      await promise;
+    });
+  });
+
+  // Regression test for the double-click protection that moving off the
+  // native `disabled` attribute must not lose: without `disabled`, the
+  // button stays clickable while pending, so the handler itself has to
+  // refuse a second, overlapping run.
+  it("ignores a second click while the first export is still pending", async () => {
+    const { promise, resolve } = deferred<string>();
+    const load = vi.fn(() => promise);
+    render(<ExportCsvButton filename="widgets" load={load} />);
+
+    const button = screen.getByRole("button", { name: "Export CSV" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(load).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolve("a,b\r\n1,2");
+      await promise;
+    });
   });
 
   it("announces success and names the file <filename>-YYYY-MM-DD.csv", async () => {

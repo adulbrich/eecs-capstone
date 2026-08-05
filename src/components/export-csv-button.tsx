@@ -1,5 +1,5 @@
 import { Download } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
 
 interface Props {
@@ -40,8 +40,19 @@ export function ExportCsvButton({ filename, load }: Props) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  // The double-click guard reads this, not `pending`. `runExport` closes over
+  // whatever `pending` was at the render that created it; two clicks in the
+  // same tick both call the same handler instance, so both see the same
+  // (stale, still-false) `pending` and neither would see the other's write.
+  // A ref is mutated synchronously and read back synchronously, so the
+  // second click's check runs against the first click's write.
+  const pendingRef = useRef(false);
 
   async function runExport() {
+    if (pendingRef.current) {
+      return;
+    }
+    pendingRef.current = true;
     setPending(true);
     setError(null);
     setAnnouncement("");
@@ -74,6 +85,7 @@ export function ExportCsvButton({ filename, load }: Props) {
       setError(message);
       setAnnouncement(`${filename} export failed: ${message}`);
     } finally {
+      pendingRef.current = false;
       setPending(false);
     }
   }
@@ -83,10 +95,18 @@ export function ExportCsvButton({ filename, load }: Props) {
       {/*
         Default size, not sm: this sits beside the Columns button and the
         page's filter controls, which are all h-9.
+
+        aria-disabled, not disabled: the native `disabled` attribute removes
+        the element from the tab order and, if it was focused, drops focus to
+        <body>, so a keyboard user mid-table loses their position for the
+        length of the export. aria-disabled keeps the button focusable and
+        announces the same "not currently actionable" state; runExport's own
+        pendingRef guard above is what actually stops a second export from
+        starting while the first is in flight.
       */}
       <Button
         aria-busy={pending}
-        disabled={pending}
+        aria-disabled={pending}
         onClick={runExport}
         variant="outline"
       >
