@@ -44,7 +44,12 @@ describe("toCsv", () => {
     expect(csv.split("\r\n")).toHaveLength(3);
   });
 
-  it("renders dates as ISO 8601 and nulls as empty", () => {
+  it("renders dates as ISO 8601", () => {
+    const csv = toCsv(COLUMNS, [row()]);
+    expect(csv.split("\r\n")[1]).toContain("2026-08-05T12:00:00.000Z");
+  });
+
+  it("renders nulls as empty", () => {
     const csv = toCsv(COLUMNS, [row({ count: null, when: null })]);
     expect(csv.split("\r\n")[1]).toBe("Widget,,true,,a; b");
   });
