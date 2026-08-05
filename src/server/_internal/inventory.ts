@@ -1359,6 +1359,21 @@ export async function uploadInventoryImageForCurrentUser(form: FormData) {
   return uploadInventoryImageAs(viewer, form);
 }
 
+/**
+ * Common shape both scans below normalize their rows to before the single
+ * push loop. `userId` is nullable here on purpose: the hold scan's query
+ * conditions already exclude unresolved holds (see below), but the type
+ * stays honest about the column it came from until the explicit filter.
+ */
+interface OverdueCandidate {
+  dueAt: Date | null;
+  itemId: string;
+  itemName: string;
+  pickupBy: Date | null;
+  status: string;
+  userId: string | null;
+}
+
 export async function recordOverdueNotificationsAs(
   viewer: Viewer,
   opts: { ownerId?: string } = {}
@@ -1370,14 +1385,14 @@ export async function recordOverdueNotificationsAs(
   if (opts.ownerId) {
     conditions.push(eq(inventoryRequests.userId, opts.ownerId));
   }
-  const rows = await db
+  const requestRows: OverdueCandidate[] = await db
     .select({
       itemId: inventoryItems.id,
       itemName: inventoryItems.name,
       status: inventoryItems.status,
       pickupBy: inventoryRequestItems.pickupBy,
       dueAt: inventoryRequestItems.dueAt,
-      requesterId: inventoryRequests.userId,
+      userId: inventoryRequests.userId,
     })
     .from(inventoryRequestItems)
     .innerJoin(
@@ -1390,33 +1405,12 @@ export async function recordOverdueNotificationsAs(
     )
     .where(and(...conditions));
 
-  const values: (typeof notifications.$inferInsert)[] = [];
-  for (const r of rows) {
-    const { pickupOverdue, checkoutOverdue } = deriveDeadlineFlags(r);
-    if (pickupOverdue) {
-      values.push({
-        userId: r.requesterId,
-        type: "inventory_pickup_overdue",
-        title: `Pickup window passed: ${r.itemName}`,
-        message: "Your reserved item is past its pickup window.",
-        link: `/inventory/${r.itemId}`,
-      });
-    }
-    if (checkoutOverdue) {
-      values.push({
-        userId: r.requesterId,
-        type: "inventory_checkout_overdue",
-        title: `Overdue: ${r.itemName}`,
-        message: "Your checked-out item is past its due date.",
-        link: `/inventory/${r.itemId}`,
-      });
-    }
-  }
   // Staff holds have no request line, so the scan above cannot see them.
-  // Restricted to holds with a resolved account: notifications.userId is a
-  // foreign key, and an email-matched hold has no id to attribute a message
-  // to. Resolving the address here would reintroduce, on a write path, the
-  // impersonation risk the read path in listMyItemsAs guards against.
+  // Restricted to holds with a resolved account (currentHolderId IS NOT
+  // NULL): notifications.userId is a foreign key, and an email-matched hold
+  // has no id to attribute a message to. Resolving the address here would
+  // reintroduce, on a write path, the impersonation risk the read path in
+  // listMyItemsAs guards against.
   const holdConditions = [
     isNull(inventoryItems.currentRequestItemId),
     isNotNull(inventoryItems.currentHolderId),
@@ -1425,26 +1419,32 @@ export async function recordOverdueNotificationsAs(
   if (opts.ownerId) {
     holdConditions.push(eq(inventoryItems.currentHolderId, opts.ownerId));
   }
-  const heldRows = await db
+  const holdRows: OverdueCandidate[] = await db
     .select({
       itemId: inventoryItems.id,
       itemName: inventoryItems.name,
       status: inventoryItems.status,
       pickupBy: inventoryItems.currentPickupBy,
       dueAt: inventoryItems.currentDueAt,
-      holderId: inventoryItems.currentHolderId,
+      userId: inventoryItems.currentHolderId,
     })
     .from(inventoryItems)
     .where(and(...holdConditions));
 
-  for (const r of heldRows) {
-    if (!r.holderId) {
-      continue;
-    }
+  // Belt and suspenders with the query-level isNotNull above: keep the
+  // exclusion of unattributable rows visible here too, rather than trusting
+  // the query alone to have filtered them out before they reach the push
+  // loop that assumes a non-null userId.
+  const candidates = [...requestRows, ...holdRows].filter(
+    (r): r is OverdueCandidate & { userId: string } => r.userId !== null
+  );
+
+  const values: (typeof notifications.$inferInsert)[] = [];
+  for (const r of candidates) {
     const { pickupOverdue, checkoutOverdue } = deriveDeadlineFlags(r);
     if (pickupOverdue) {
       values.push({
-        userId: r.holderId,
+        userId: r.userId,
         type: "inventory_pickup_overdue",
         title: `Pickup window passed: ${r.itemName}`,
         message: "Your reserved item is past its pickup window.",
@@ -1453,7 +1453,7 @@ export async function recordOverdueNotificationsAs(
     }
     if (checkoutOverdue) {
       values.push({
-        userId: r.holderId,
+        userId: r.userId,
         type: "inventory_checkout_overdue",
         title: `Overdue: ${r.itemName}`,
         message: "Your checked-out item is past its due date.",
