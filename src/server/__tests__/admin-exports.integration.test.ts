@@ -12,6 +12,11 @@ import {
   exportAdminProjectsAs,
   listAdminProjectsAs,
 } from "#/server/_internal/projects-queries";
+import {
+  exportUsersAs,
+  exportUsersImpl,
+  listUsersImpl,
+} from "#/server/_internal/users";
 
 async function makeUser(email: string, role: "user" | "instructor" | "admin") {
   await auth.api.signUpEmail({
@@ -120,5 +125,52 @@ describe("admin project export", () => {
     await expect(exportAdminProjectsAs(student, ALL_PROJECTS)).rejects.toThrow(
       "Forbidden"
     );
+  });
+});
+
+const ALL_USERS = {
+  q: "",
+  role: null,
+  includeBanned: true,
+  page: 1,
+  pageSize: 20,
+};
+
+describe("admin user export", () => {
+  it("returns every match rather than one page", async () => {
+    const stamp = Date.now();
+    for (let i = 0; i < 25; i++) {
+      await makeUser(`bulk-${stamp}-${i}@x.com`, "user");
+    }
+    const filter = { ...ALL_USERS, q: `bulk-${stamp}-` };
+
+    const listed = await listUsersImpl({ ...filter, pageSize: 10 });
+    const exported = await exportUsersImpl(filter);
+
+    expect(listed.rows).toHaveLength(10);
+    expect(listed.total).toBe(25);
+    expect(exported.rows).toHaveLength(25);
+  });
+
+  it("carries fields the listing projection omits", async () => {
+    const stamp = Date.now();
+    await makeUser(`fields-${stamp}@x.com`, "user");
+    const { rows } = await exportUsersImpl({
+      ...ALL_USERS,
+      q: `fields-${stamp}@x.com`,
+    });
+    expect(rows[0].emailVerified).toBe(true);
+    expect(rows[0].updatedAt).toBeInstanceOf(Date);
+  });
+
+  it("rejects an instructor as well as a student", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ga-${stamp}@x.com`, "admin");
+    const instructor = await makeUser(`gi-${stamp}@x.com`, "instructor");
+    const student = await makeUser(`gs-${stamp}@x.com`, "user");
+
+    await expect(exportUsersAs(admin, ALL_USERS)).resolves.toBeDefined();
+    await expect(exportUsersAs(instructor, ALL_USERS)).rejects.toThrow();
+    await expect(exportUsersAs(student, ALL_USERS)).rejects.toThrow();
   });
 });

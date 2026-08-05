@@ -52,6 +52,18 @@ export const listUsers = createServerFn({ method: "GET" })
     return listUsersForCurrentUser(data);
   });
 
+export const exportUsers = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) =>
+    // page and pageSize carry the schema's defaults and are ignored:
+    // exportUsersImpl reads neither. Reusing listUsersSchema rather than a
+    // trimmed copy keeps the filter and sort rules in one place.
+    listUsersSchema.parse(data ?? {})
+  )
+  .handler(async ({ data }) => {
+    const { exportUsersForCurrentUser } = await import("./_internal/users");
+    return exportUsersForCurrentUser(data);
+  });
+
 export const getUser = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data }) => {
