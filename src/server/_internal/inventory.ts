@@ -6,6 +6,7 @@ import {
   ilike,
   inArray,
   isNotNull,
+  isNull,
   ne,
   or,
   type SQL,
@@ -956,6 +957,47 @@ export async function cancelRequestItemForCurrentUser(data: {
   return cancelRequestItemAs(viewer, data);
 }
 
+/**
+ * An entry in the Active tab. Holds have no request line by definition, so
+ * this is a union rather than a line with optional fields.
+ */
+export type ActiveEntry =
+  | {
+      kind: "request";
+      line: typeof inventoryRequestItems.$inferSelect;
+      item: typeof inventoryItems.$inferSelect;
+      request: typeof inventoryRequests.$inferSelect;
+    }
+  | { kind: "hold"; item: typeof inventoryItems.$inferSelect };
+
+function deadlineOf(entry: ActiveEntry): Date | null {
+  if (entry.kind === "hold") {
+    return entry.item.currentDueAt ?? entry.item.currentPickupBy;
+  }
+  return entry.line.dueAt ?? entry.line.pickupBy;
+}
+
+/**
+ * Soonest deadline first, entries without one last, then by item name so the
+ * order is stable. "What is due soonest" is the question this tab answers.
+ */
+function byDeadline(a: ActiveEntry, b: ActiveEntry): number {
+  const left = deadlineOf(a);
+  const right = deadlineOf(b);
+  if (left && right) {
+    return (
+      left.getTime() - right.getTime() || a.item.name.localeCompare(b.item.name)
+    );
+  }
+  if (left) {
+    return -1;
+  }
+  if (right) {
+    return 1;
+  }
+  return a.item.name.localeCompare(b.item.name);
+}
+
 export async function listMyItemsAs(viewer: Viewer) {
   if (!viewer) {
     throw new Error("Sign in required");
@@ -966,7 +1008,15 @@ export async function listMyItemsAs(viewer: Viewer) {
   } catch {
     // swallow; degraded notification recording must not 500 the page.
   }
-  const [cart, active, history] = await Promise.all([
+  // Only a verified address may claim a hold: otherwise anyone could take
+  // someone else's item by editing their own email in the profile form.
+  const [account] = await db
+    .select({ email: user.email, verified: user.emailVerified })
+    .from(user)
+    .where(eq(user.id, viewer.id));
+  const verifiedEmail = account?.verified ? account.email : null;
+
+  const [cart, activeLines, holds, history] = await Promise.all([
     getCartAs(viewer),
     db
       .select({
@@ -990,6 +1040,27 @@ export async function listMyItemsAs(viewer: Viewer) {
         )
       )
       .orderBy(desc(inventoryRequestItems.createdAt)),
+    db
+      .select({ item: inventoryItems })
+      .from(inventoryItems)
+      .where(
+        and(
+          // Disjoint from the request-line query above: an item held through
+          // a request line is already in `active` and must not appear twice.
+          isNull(inventoryItems.currentRequestItemId),
+          inArray(inventoryItems.status, ["reserved", "checked_out"]),
+          or(
+            eq(inventoryItems.currentHolderId, viewer.id),
+            verifiedEmail
+              ? and(
+                  // Never override an explicit account assignment.
+                  isNull(inventoryItems.currentHolderId),
+                  eq(inventoryItems.currentHolderEmail, verifiedEmail)
+                )
+              : undefined
+          )
+        )
+      ),
     db
       .select({
         line: inventoryRequestItems,
@@ -1018,6 +1089,12 @@ export async function listMyItemsAs(viewer: Viewer) {
       .orderBy(desc(inventoryRequestItems.updatedAt))
       .limit(50),
   ]);
+
+  const active: ActiveEntry[] = [
+    ...activeLines.map((row): ActiveEntry => ({ kind: "request", ...row })),
+    ...holds.map((row): ActiveEntry => ({ kind: "hold", item: row.item })),
+  ].sort(byDeadline);
+
   return { cart, active, history };
 }
 

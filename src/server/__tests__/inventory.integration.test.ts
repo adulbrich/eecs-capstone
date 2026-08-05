@@ -22,6 +22,7 @@ import {
   hardDeleteInventoryItemAs,
   listAdminInventoryAs,
   listInventoryAs,
+  listMyItemsAs,
   recordOverdueNotificationsAs,
   rejectRequestItemAs,
   submitCartAs,
@@ -1180,5 +1181,146 @@ describe("staff-assigned holds without a request line", () => {
       status: null,
     });
     expect(rows.some((r) => r.id === item.id)).toBe(true);
+  });
+});
+
+describe("staff-assigned holds in my items", () => {
+  it("shows a hold that has no request line", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h-admin-${stamp}@x.com`, "admin");
+    const holder = await makeUser(`h-holder-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Scope" });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderId: holder.id,
+      dueAt: new Date("2026-09-01T00:00:00.000Z"),
+    });
+
+    const { active } = await listMyItemsAs(holder);
+
+    expect(active).toHaveLength(1);
+    expect(active[0].kind).toBe("hold");
+    expect(active[0].item.id).toBe(item.id);
+  });
+
+  it("does not leak another user's hold", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h2-admin-${stamp}@x.com`, "admin");
+    const holder = await makeUser(`h2-holder-${stamp}@x.com`, "user");
+    const other = await makeUser(`h2-other-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Meter" });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      holderId: holder.id,
+    });
+
+    const { active } = await listMyItemsAs(other);
+    expect(active).toHaveLength(0);
+  });
+
+  it("does not duplicate an item that also has a request line", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h3-admin-${stamp}@x.com`, "admin");
+    const requester = await makeUser(`h3-req-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Iron" });
+
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    // Approve so the item lands in the same status ("reserved") and with
+    // the same holder the hold query looks for, and only the
+    // currentRequestItemId link tells the two queries apart.
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    const [afterApprove] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(afterApprove.status).toBe("reserved");
+    expect(afterApprove.currentHolderId).toBe(requester.id);
+    expect(afterApprove.currentRequestItemId).not.toBeNull();
+
+    const { active } = await listMyItemsAs(requester);
+
+    expect(active).toHaveLength(1);
+    expect(active[0].kind).toBe("request");
+  });
+
+  it("matches an unlinked hold by verified email", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h4-admin-${stamp}@x.com`, "admin");
+    const item = await makeItem({ name: "Drill" });
+
+    // Assign to an address with no account yet, so resolveHolderId finds
+    // nothing and current_holder_id stays null.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: `walkin-${stamp}@x.com`,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const walkIn = await makeUser(`walkin-${stamp}@x.com`, "user");
+    const { active } = await listMyItemsAs(walkIn);
+
+    expect(active).toHaveLength(1);
+    expect(active[0].kind).toBe("hold");
+  });
+
+  it("does not match by email when the address is unverified", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h5-admin-${stamp}@x.com`, "admin");
+    const item = await makeItem({ name: "Saw" });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: `unverified-${stamp}@x.com`,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const impostor = await makeUser(`unverified-${stamp}@x.com`, "user");
+    await db
+      .update(user)
+      .set({ emailVerified: false })
+      .where(eq(user.id, impostor.id));
+
+    const { active } = await listMyItemsAs(impostor);
+    expect(active).toHaveLength(0);
+  });
+
+  it("does not let a stale holder email override an explicit account assignment", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h6-admin-${stamp}@x.com`, "admin");
+    const holderA = await makeUser(`h6-a-${stamp}@x.com`, "user");
+    const holderB = await makeUser(`h6-b-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Level" });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderId: holderA.id,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+    // current_holder_id is an explicit account assignment to holderA. Force
+    // current_holder_email to collide with holderB's verified address, a
+    // state the write path never produces on its own but that the read
+    // side must still resolve in holderA's favor.
+    await db
+      .update(inventoryItems)
+      .set({ currentHolderEmail: `h6-b-${stamp}@x.com` })
+      .where(eq(inventoryItems.id, item.id));
+
+    const { active } = await listMyItemsAs(holderB);
+    expect(active).toHaveLength(0);
   });
 });
