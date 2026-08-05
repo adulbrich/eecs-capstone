@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { user } from "#/db/schema";
 import { auth } from "#/lib/auth";
+import {
+  createCategoryAs,
+  setProjectCategoriesAs,
+} from "#/server/_internal/categories";
 import { createProjectAs } from "#/server/_internal/projects";
 import {
   exportAdminProjectsAs,
@@ -74,6 +78,36 @@ describe("admin project export", () => {
 
     expect(rows[0].problemStatement).toBe("The stated problem");
     expect(rows[0].notes).toBe("Staff only");
+  });
+
+  it("joins categories as '; '-separated, ordered by type then name", async () => {
+    const admin = await makeUser(`c-${Date.now()}@x.com`, "admin");
+    const { id: projectId } = await createProjectAs(
+      admin,
+      baseProject("Delta lander")
+    );
+    // Chosen so name-only ordering ("Alpha" before "Zulu") and type-then-name
+    // ordering ("alpha" before "zulu", so the Zulu/alpha row comes first)
+    // disagree: this pins the ORDER BY, not just the join.
+    const { id: catInAlphaType } = await createCategoryAs(admin, {
+      name: "Zulu",
+      type: "alpha",
+    });
+    const { id: catInZuluType } = await createCategoryAs(admin, {
+      name: "Alpha",
+      type: "zulu",
+    });
+    await setProjectCategoriesAs(admin, {
+      projectId,
+      categoryIds: [catInZuluType, catInAlphaType],
+    });
+
+    const { rows } = await exportAdminProjectsAs(admin, {
+      ...ALL_PROJECTS,
+      q: "Delta",
+    });
+
+    expect(rows[0].categories).toBe("Zulu; Alpha");
   });
 
   it("allows instructors and rejects students", async () => {
