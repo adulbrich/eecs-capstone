@@ -41,16 +41,32 @@ Six routes render `AdminDataTable`. Their loaders differ in ways that matter:
 | --- | --- | --- | --- | --- |
 | `/admin/projects` | all matching | `adminProjectSummarySelect` (partial) | staff | **yes** — projection is a summary |
 | `/admin/users` | one page of 25 | six columns only | **admin** | **yes** — pagination truncates, projection is partial |
-| `/admin/inventory` | server-paginated | staff item shape | staff | **yes** — pagination truncates |
-| `/admin/mentors` | all matching | full row | staff | no |
-| `/admin/programs` | all | full row | staff | no |
-| `/admin/categories` | all | full row | staff | no |
+| `/admin/mentors` | all matching | five columns only | staff | **yes** — projection is a summary |
+| `/admin/inventory` | all matching | `fullForStaff`, complete | staff | no |
+| `/admin/programs` | all | `select()`, complete | staff | no |
+| `/admin/categories` | all | `select()`, complete | staff | no |
 
-`/admin/users` is the odd one out twice over. Its `beforeLoad` requires
-`role === "admin"` exactly, where every other admin route accepts
-`["admin", "instructor"]`, and `listUsersForCurrentUser` backs that with
-`assertAdmin`. Its projection is also narrower than it looks: `listUsersImpl`
-selects only `id`, `email`, `name`, `role`, `banned`, `createdAt`.
+Each row above was read rather than assumed, because the projections do not
+match what the page appears to show:
+
+- **`/admin/users` is the odd one out twice over.** Its `beforeLoad` requires
+  `role === "admin"` exactly, where every other admin route accepts
+  `["admin", "instructor"]`, and `listUsersForCurrentUser` backs that with
+  `assertAdmin`. Its projection is also narrower than it looks: `listUsersImpl`
+  selects only `id`, `email`, `name`, `role`, `banned`, `createdAt`.
+- **`/admin/mentors` looks complete but is not.** `listMentorsAs` selects only
+  `id`, `name`, `email`, `affiliation`, `mentorTeamCount` — no `role`, no
+  `createdAt`.
+- **`/admin/inventory` is not paginated.** `listAdminInventoryAs` has no
+  `limit`/`offset`; it returns the whole filtered set ordered by
+  `updatedAt desc`. This is the change
+  `2026-07-31-admin-data-tables-design.md` describes: "Only inventory changes
+  behavior here, from 20 rows per request to the whole filtered set." And
+  `fullForStaff` already carries `serial`, `label`, `location`, `notes`, and
+  every `current*` hold column, with the route adding the resolved
+  `currentHolderName`/`currentHolderEmail` on top. The only item column it
+  omits is `search_vector`, a machine artifact. Inventory therefore needs no
+  export function.
 
 The three "no" rows already hold every field of every matching record in the
 browser. Adding a server round-trip for them would buy nothing.
@@ -162,23 +178,31 @@ So each affected module extracts its condition builder first:
 
 | Module | Extract | New export function | Gate |
 | --- | --- | --- | --- |
-| `src/server/_internal/projects-queries.ts` | `buildAdminProjectConditions(data)` from `listAdminProjectsAs` | `exportAdminProjectsAs(viewer, data)` | `isStaff` throw |
-| `src/server/_internal/inventory.ts` | `buildInventorySearchClause(q)` from `listAdminInventoryAs` | `exportAdminInventoryAs(viewer, data)` | `assertStaff` |
+| `src/server/_internal/projects-queries.ts` | `buildAdminProjectListConditions(data)` from `listAdminProjectsAs` | `exportAdminProjectsAs(viewer, data)` | `isStaff` throw |
 | `src/server/_internal/users.ts` | `buildUserConditions(data)` from `listUsersImpl` | `exportUsersImpl(data)` + `exportUsersForCurrentUser(data)` | `assertAdmin` |
+| `src/server/_internal/users.ts` | `buildMentorConditions(data)` from `listMentorsAs` | `exportMentorsAs(viewer, data)` | `assertStaff` |
 
-Two module-specific notes:
+Three module-specific notes:
 
-- **Inventory needs less extraction than it looks.** `buildInventoryScope(data)`
-  is *already* factored out and shared. Only the `q` search block inside
-  `listAdminInventoryAs` (the tsvector plus eight `ILIKE`s, including the two
-  over the item's own holder columns) is inline and needs lifting.
+- **Extract `listConditions`, not `scope`.** `listAdminProjectsAs` maintains
+  *two* condition lists: `scope` (status, soft-delete, program), which also
+  feeds the proposer dropdown and deliberately excludes both `q` and the
+  proposer filter, and `listConditions` (`scope` plus proposer plus `q`), which
+  selects the rows. The export takes **`listConditions`**, which is why the
+  extracted function is named for it. `scope` stays inline; the dropdown is the
+  only thing that wants it.
 - **Users follows a different convention.** That module has no `*As(viewer, …)`
-  variant: it pairs an ungated `…Impl(data)` with a `…ForCurrentUser(data)`
-  wrapper that calls `requireUser()` then `assertAdmin`. The export matches its
-  neighbours rather than importing the `*As` convention into a module that does
-  not use it, and the gate is `assertAdmin`, **not** `assertStaff` — an
-  instructor must not be able to export the user table when they cannot even
-  open the page.
+  variant for its listing: it pairs an ungated `…Impl(data)` with a
+  `…ForCurrentUser(data)` wrapper that calls `requireUser()` then
+  `assertAdmin`. The users export matches its immediate neighbours rather than
+  importing the `*As` convention into a function that does not use it, and the
+  gate is `assertAdmin`, **not** `assertStaff` — an instructor must not be able
+  to export the user table when they cannot even open the page.
+- **Mentors live in the same module but use `*As`.** `listMentorsAs(viewer,
+  data)` does take a viewer and does use `assertStaff`, so `exportMentorsAs`
+  mirrors it. The two conventions coexisting inside `users.ts` is pre-existing;
+  this spec follows whichever the neighbouring function uses rather than
+  unifying them, which is out of scope.
 
 Every export function otherwise:
 
@@ -217,12 +241,15 @@ spreadsheet cell is noise.
 `createdAt`, `updatedAt`. Nothing from `account` or `session` is joined; those
 hold authentication material.
 
-**Inventory** widen the staff item shape with `serial`, `label`, `location`,
-`notes`, `imageUrl`, resolved category name, and the full hold:
-`currentHolderName`, `currentHolderEmail`, `currentHolderLabel`,
-`currentPickupBy`, `currentDueAt`.
+**Mentors** widen the five-column listing with `role`, `wantsToMentor`, and
+`createdAt`. `wantsToMentor` is constant `true` across the whole result set by
+construction, so it is included only because a spreadsheet that gets filtered
+and re-sorted should still say what it is a list of.
 
-**Mentors, programs, categories** export their loader rows directly.
+**Inventory, programs, categories** export their loader rows directly. For
+inventory that means `fullForStaff` plus the route's resolved
+`currentHolderName`/`currentHolderEmail`, and — after item 2 lands — the joined
+category name that the table already displays.
 
 Export column lists are defined as module constants in their route files,
 beside the existing `COLUMNS` constant. The table and its export are one
@@ -346,10 +373,19 @@ category picker the moment the migration runs.
 - `/admin/categories` keeps calling it unfiltered, so it manages every type.
   That is the "managed in /admin/categories as well" requirement.
 
-`listCategoryTypesImpl` is left alone. It derives types from existing rows, so
-`inventory` appears in the `CategoryTypeCombobox` as soon as the migration
-creates the first one, and staff can add more inventory categories through the
-existing New category dialog without any new UI.
+`listCategoryTypesImpl` derives its types from existing rows, which leaves a
+chicken-and-egg gap: on a database where no inventory item ever had a category
+string, the migration's backfill inserts zero rows, no `type = 'inventory'`
+exists, and `inventory` never appears in the `CategoryTypeCombobox`. Staff would
+have to know to type the magic string to create the first one, and a typo
+("Inventory") would silently produce a type that nothing reads.
+
+The fix stays in the UI rather than seeding fake data: `/admin/categories`
+passes the combobox the **union of the derived types and
+`INVENTORY_CATEGORY_TYPE`**, deduplicated. The option is always offerable, the
+first inventory category is created through the existing New category dialog,
+and no placeholder row is invented to prop up a dropdown. `listCategoryTypesImpl`
+itself is unchanged.
 
 ### Consumers
 
@@ -499,6 +535,20 @@ A second scan is added over held items, reusing `deriveDeadlineFlags`, which
 takes `{ status, pickupBy, dueAt }` structurally and works unchanged against
 `currentPickupBy`/`currentDueAt`.
 
+**The hold scan requires `currentHolderId IS NOT NULL`**, which makes it
+narrower than the read path above. `notifications.userId` is a foreign key to an
+account, and an email-matched hold has no account id on the row by definition —
+there is nothing to attribute the notification to. Widening the scan to resolve
+the email back to an account would reintroduce, on a write path, exactly the
+unverified-address impersonation the read path guards against.
+
+The resulting asymmetry is deliberate and should be understood before someone
+"fixes" it: a walk-in hold matched only by verified email **appears** in
+`/my/items` but **never fires** an overdue notice, until staff reassign it
+through the user picker or a future write-side linking job populates
+`currentHolderId`. Showing someone their own item is safe; sending mail based on
+an address match is where the risk lives.
+
 The existing dedupe needs no change. `onConflictDoNothing` targets
 `(userId, type, link)` where `link` is `/inventory/${itemId}` — it keys on the
 **item**, not the request line. So hold-derived notifications collapse into the
@@ -516,11 +566,16 @@ row set yields a header-only file.
 
 **Integration** (`src/server/__tests__/`, alongside the existing suites):
 
-- Each export function returns every matching row, ignoring pagination, and
-  respects the active filters — asserted by seeding rows that do and do not
-  match and comparing against what the listing returns for the same filter.
-- Each export function throws for a `student` viewer and succeeds for `admin`
-  and `instructor`.
+- Each of the three export functions respects the active filters, asserted by
+  seeding rows that do and do not match and comparing against what the listing
+  returns for the same filter.
+- `exportUsersImpl` returns every match rather than one page: seed more than
+  `pageSize` users and assert the export count equals the listing's `total`.
+- Gates, per function rather than as one blanket assertion, because they differ:
+  `exportAdminProjectsAs` and `exportMentorsAs` succeed for `admin` and
+  `instructor` and throw for `student`; `exportUsersForCurrentUser` succeeds for
+  `admin` and **throws for `instructor`** as well as `student`. That last case
+  is the regression test for the gate mismatch this spec exists to avoid.
 - `listMyItemsAs` surfaces a hold with no request line; does not duplicate an
   item that has both; does not leak another user's hold; matches an unlinked
   hold by verified email; **does not** match it when `emailVerified` is false.
