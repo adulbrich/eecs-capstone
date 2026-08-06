@@ -96,7 +96,7 @@ describe("CategoryMultiSelect", () => {
       />
     );
     await screen.findByText("Laptop");
-    fireEvent.change(screen.getByLabelText("New category name"), {
+    fireEvent.change(screen.getByLabelText("Add a new category"), {
       target: { value: "Projector" },
     });
     expect(await screen.findByText('Create "Projector"')).toBeTruthy();
@@ -112,7 +112,7 @@ describe("CategoryMultiSelect", () => {
       />
     );
     await screen.findByText("Laptop");
-    fireEvent.change(screen.getByLabelText("New category name"), {
+    fireEvent.change(screen.getByLabelText("Add a new category"), {
       target: { value: "laptop" },
     });
     expect(screen.queryByText(/^Create "/)).toBeNull();
@@ -130,7 +130,7 @@ describe("CategoryMultiSelect", () => {
       <CategoryMultiSelect domain="inventory" onChange={onChange} value={[]} />
     );
     await screen.findByText("Laptop");
-    fireEvent.change(screen.getByLabelText("New category name"), {
+    fireEvent.change(screen.getByLabelText("Add a new category"), {
       target: { value: "Projector" },
     });
     fireEvent.click(await screen.findByText('Create "Projector"'));
@@ -157,7 +157,7 @@ describe("CategoryMultiSelect", () => {
       <CategoryMultiSelect domain="inventory" onChange={onChange} value={[]} />
     );
     await screen.findByText("Laptop");
-    fireEvent.change(screen.getByLabelText("New category name"), {
+    fireEvent.change(screen.getByLabelText("Add a new category"), {
       target: { value: "Projector" },
     });
     fireEvent.click(await screen.findByText('Create "Projector"'));
@@ -197,7 +197,7 @@ describe("CategoryMultiSelect", () => {
     await waitFor(() =>
       expect(mockedList).toHaveBeenCalledWith({ data: { domain: "inventory" } })
     );
-    expect(screen.getByLabelText("New category name")).toBeTruthy();
+    expect(screen.getByLabelText("Add a new category")).toBeTruthy();
     expect(screen.queryByText(/create some in/i)).toBeNull();
   });
 
@@ -211,7 +211,7 @@ describe("CategoryMultiSelect", () => {
       />
     );
     await screen.findByText("AI");
-    fireEvent.change(screen.getByLabelText("New category name"), {
+    fireEvent.change(screen.getByLabelText("Add a new category"), {
       target: { value: "Robotics" },
     });
     const createButton = (await screen.findByText(
@@ -236,7 +236,7 @@ describe("CategoryMultiSelect", () => {
     );
     await screen.findByText("AI");
 
-    fireEvent.change(screen.getByLabelText("New category name"), {
+    fireEvent.change(screen.getByLabelText("Add a new category"), {
       target: { value: "Robotics" },
     });
     const createButton = (await screen.findByText(

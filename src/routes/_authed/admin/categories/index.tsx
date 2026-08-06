@@ -253,7 +253,11 @@ function CategoriesAdmin() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>New category</DialogTitle>
+              <DialogTitle>
+                {tab === "project"
+                  ? "New project category"
+                  : "New inventory category"}
+              </DialogTitle>
               <DialogDescription>
                 {tab === "project"
                   ? "Add a category and assign it a type. Pick an existing type or create a new one."

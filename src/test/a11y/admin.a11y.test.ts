@@ -679,7 +679,7 @@ test("admin categories: create dialog and Columns dropdown coexist", async ({
 
   try {
     await page.getByRole("button", { name: "+ New category" }).click();
-    const dialog = page.getByRole("dialog", { name: "New category" });
+    const dialog = page.getByRole("dialog", { name: "New project category" });
     await dialog.getByLabel("Name").fill(uniqueName);
     // The Type field's accessible name is ambiguous between its <label> text
     // ("Type") and its own visible content ("Select or create a type"), so

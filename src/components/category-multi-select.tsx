@@ -156,10 +156,10 @@ export function CategoryMultiSelect({ domain, value, onChange }: Props) {
         </div>
       )}
 
-      <div className="space-y-2 border-neutral-200 border-t pt-3 dark:border-neutral-800">
+      <div className="space-y-2">
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">
-            <Label htmlFor={nameInputId}>New category name</Label>
+            <Label htmlFor={nameInputId}>Add a new category</Label>
             <Input
               id={nameInputId}
               onChange={(e) => setNewName(e.target.value)}
