@@ -184,6 +184,15 @@ Expected: a new `drizzle/00NN_*.sql` containing `CREATE INDEX "project_categorie
 
 Append to `src/server/_internal/categories.ts`. The `inventoryItems`, `projects` and `sql` imports may already be present; add whatever is missing.
 
+Note the doubled `sql` wrapper on `usageCount`. It is not decoration. Drizzle's
+single-table selection builder strips table qualifiers from every column inside
+a computed field when the outer query has no joins, so the single-layer form
+emits `where "category_id" = "id"`, where `"id"` binds to `projects.id` rather
+than the correlated `categories.id`, and the count silently returns 0. One more
+`sql` layer preserves the qualifiers, emitting
+`where "project_categories"."category_id" = "categories"."id"`. The SQL text is
+otherwise identical. Do not "simplify" this by removing the outer layer.
+
 ```ts
 /**
  * Counts what is filed under each category, in the same round trip that
@@ -200,7 +209,7 @@ Append to `src/server/_internal/categories.ts`. The `inventoryItems`, `projects`
  * a string: without the cast the column arrives as "12" and sorts
  * lexicographically, putting 9 after 12.
  */
-const usageCount = sql<number>`(
+const usageCount = sql<number>`${sql`(
   case ${categories.domain}
     when 'project' then (
       select count(*)::int
@@ -216,7 +225,7 @@ const usageCount = sql<number>`(
       where ${inventoryItemCategories.categoryId} = ${categories.id})
     else 0
   end
-)`;
+)`}`;
 
 /**
  * The staff-only sibling of listCategoriesImpl. Deliberately a separate
