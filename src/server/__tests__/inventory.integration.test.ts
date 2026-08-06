@@ -2097,6 +2097,16 @@ describe("holder resolution", () => {
       .from(inventoryRequestItems)
       .where(eq(inventoryRequestItems.itemId, item.id));
 
+    // submitCartAs now writes the requester's address, so clear it first.
+    // The point of the assertions below is that approveRequestItemAs passes
+    // only an account id, and resolveHolder derives the address from it. With
+    // the address left in place, they would pass on leftover state even if
+    // the derivation were broken.
+    await db
+      .update(inventoryItems)
+      .set({ currentHolderEmail: null })
+      .where(eq(inventoryItems.id, item.id));
+
     await approveRequestItemAs(admin, {
       requestItemId: line.id,
       pickupBy: null,
@@ -2114,9 +2124,8 @@ describe("holder resolution", () => {
       .select()
       .from(inventoryItems)
       .where(eq(inventoryItems.id, item.id));
-    // approveRequestItemAs passes only holderId; resolveHolder derives the
-    // address from it, which is what keeps the invariant true on the one
-    // production path that never supplies an address.
+    // The address was cleared above, so this can only pass if
+    // approveRequestItemAs's holderId re-derived it via resolveHolder.
     expect(held.currentHolderId).toBe(student.id);
     expect(held.currentHolderEmail).toBe("approve-student@x.com");
     expect(held.currentHolderLabel).toBeNull();
