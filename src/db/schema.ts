@@ -66,7 +66,9 @@ export const programInstructors = pgTable(
 export const categories = pgTable("categories", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
-  type: text("type").notNull(), // 'project_type', 'technology', 'industry', 'field'
+  // Project domains: 'project_type', 'technology', 'industry', 'field'.
+  // Inventory domain: INVENTORY_CATEGORY_TYPE (src/lib/category-types.ts).
+  type: text("type").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
