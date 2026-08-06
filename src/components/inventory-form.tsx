@@ -17,12 +17,23 @@ import { Panel, PanelHeader, PanelNote } from "./panel";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import { Textarea } from "./ui/textarea";
+
+// Radix Select cannot hold an empty-string value, so "no category" needs a
+// sentinel that is mapped back to null on change.
+const NO_CATEGORY = "_none_";
 
 export const inventoryFormSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
   description: z.string().max(5000).default(""),
-  category: z.string().max(120).default(""),
+  categoryId: z.string().uuid().nullable().default(null),
   serial: z.string().max(120).default(""),
   label: z.string().max(120).default(""),
   location: z.string().max(200).default(""),
@@ -33,6 +44,8 @@ export const inventoryFormSchema = z.object({
 export type InventoryFormValues = z.infer<typeof inventoryFormSchema>;
 
 interface Props {
+  /** Inventory categories from /admin/categories, for the picker. */
+  categories: { id: string; name: string }[];
   initial?: Partial<InventoryFormValues>;
   itemId?: string;
   onSaved?: (itemId: string) => void;
@@ -40,6 +53,7 @@ interface Props {
 }
 
 export function InventoryForm({
+  categories,
   itemId,
   initial,
   submitLabel,
@@ -56,7 +70,7 @@ export function InventoryForm({
     defaultValues: {
       name: initial?.name ?? "",
       description: initial?.description ?? "",
-      category: initial?.category ?? "",
+      categoryId: initial?.categoryId ?? null,
       serial: initial?.serial ?? "",
       label: initial?.label ?? "",
       location: initial?.location ?? "",
@@ -85,7 +99,7 @@ export function InventoryForm({
         const payload = {
           name: value.name,
           description: value.description || null,
-          category: value.category || null,
+          categoryId: value.categoryId,
           serial: value.serial || null,
           label: value.label || null,
           location: value.location || null,
@@ -143,7 +157,31 @@ export function InventoryForm({
         rows={4}
         textarea
       />
-      <Field form={form} label="Category" name="category" />
+      <form.Field name="categoryId">
+        {(field: AnyForm) => (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="item-category">Category</Label>
+            <Select
+              onValueChange={(value) =>
+                field.handleChange(value === NO_CATEGORY ? null : value)
+              }
+              value={(field.state.value as string | null) ?? NO_CATEGORY}
+            >
+              <SelectTrigger className="w-full" id="item-category">
+                <SelectValue placeholder="No category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_CATEGORY}>No category</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </form.Field>
       <form.Field name="imageUrl">
         {(field: AnyForm) => (
           <div>
