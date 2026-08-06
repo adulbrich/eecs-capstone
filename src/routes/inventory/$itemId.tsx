@@ -76,9 +76,9 @@ function ItemDetail() {
                   | "retired"
               }
             />
-            {item.category && (
+            {item.categoryName && (
               <span className="rounded bg-secondary px-2 py-0.5 text-muted-foreground text-xs">
-                {item.category}
+                {item.categoryName}
               </span>
             )}
           </div>

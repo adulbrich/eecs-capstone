@@ -29,7 +29,10 @@ const searchSchema = z.object({
     .enum(["available", "requested", "reserved", "checked_out", "maintenance"])
     .nullable()
     .default(null),
-  category: z.string().nullable().default(null),
+  // A stale `?category=Electronics` link (pre-UUID) fails `.uuid()`; caught
+  // and treated as "no filter" rather than a router error, per the brief:
+  // old links intentionally break as filters but should not 500 the page.
+  category: z.string().uuid().nullable().catch(null).default(null),
   // Optional so a param-less visit is detectable; the stored preference then
   // seeds it. Absent from the URL defaults to "card" at render.
   view: z.enum(["card", "row"]).optional(),

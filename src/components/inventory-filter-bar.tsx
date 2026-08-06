@@ -19,7 +19,7 @@ type StatusFilter =
   | null;
 
 interface Props {
-  categories: string[];
+  categories: { id: string; name: string }[];
   category: string | null;
   onCategoryChange: (c: string | null) => void;
   onQChange: (q: string) => void;
@@ -76,8 +76,8 @@ export function InventoryFilterBar(props: Props) {
             <SelectContent>
               <SelectItem value="_all_">All categories</SelectItem>
               {props.categories.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c}
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -56,7 +56,9 @@ const STATUSES = [
 type Status = (typeof STATUSES)[number];
 
 const searchSchema = z.object({
-  category: z.string().nullable().default(null),
+  // A stale pre-UUID `?category=` link fails `.uuid()`; caught and treated
+  // as "no filter" instead of a router error. Matches the public listing.
+  category: z.string().uuid().nullable().catch(null).default(null),
   cols: z.string().optional(),
   dir: z.enum(["asc", "desc"]).optional(),
   q: z.string().default(""),
@@ -174,8 +176,8 @@ const COLUMNS: AdminColumn<Row>[] = [
     sortUndefined: "last",
   },
   {
-    accessorFn: (row) => row.category ?? undefined,
-    cell: ({ row }) => row.original.category ?? "-",
+    accessorFn: (row) => row.categoryName ?? undefined,
+    cell: ({ row }) => row.original.categoryName ?? "-",
     header: "Category",
     id: "category",
     sortUndefined: "last",
@@ -262,7 +264,16 @@ const EXPORT_COLUMNS = defineCsvColumns<Row>()([
     key: "description",
     value: (row) => row.description,
   },
-  { header: "Category", key: "category", value: (row) => row.category },
+  {
+    header: "Category",
+    key: "categoryName",
+    value: (row) => row.categoryName,
+  },
+  {
+    header: "Category ID",
+    key: "categoryId",
+    value: (row) => row.categoryId,
+  },
   { header: "Status", key: "status", value: (row) => row.status },
   { header: "Serial", key: "serial", value: (row) => row.serial },
   { header: "Label", key: "label", value: (row) => row.label },
@@ -461,8 +472,8 @@ function AdminInventory() {
                 <SelectContent>
                   <SelectItem value="_all_">All categories</SelectItem>
                   {categories.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -1,7 +1,9 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { db } from "#/db";
 import {
+  categories,
   inventoryCartItems,
   inventoryItemEditLog,
   inventoryItemStatusHistory,
@@ -12,6 +14,7 @@ import {
   user,
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
+import { INVENTORY_CATEGORY_TYPE } from "#/lib/category-types";
 import {
   addToCartAs,
   approveRequestItemAs,
@@ -22,6 +25,7 @@ import {
   hardDeleteInventoryItemAs,
   listAdminInventoryAs,
   listInventoryAs,
+  listInventoryCategoriesImpl,
   listMyItemsAs,
   recordOverdueNotificationsAs,
   rejectRequestItemAs,
@@ -29,6 +33,7 @@ import {
   updateInventoryItemAs,
 } from "#/server/_internal/inventory";
 import { transitionItem } from "#/server/_internal/inventory-transitions";
+import { itemPayloadSchema } from "#/server/inventory";
 
 async function makeUser(email: string, role: "user" | "admin" | "instructor") {
   await auth.api.signUpEmail({
@@ -50,6 +55,14 @@ async function makeItem(
     .values({ name: `Item-${Date.now()}-${Math.random()}`, ...overrides })
     .returning();
   return item;
+}
+
+async function makeCategory(name: string) {
+  const [row] = await db
+    .insert(categories)
+    .values({ name, type: INVENTORY_CATEGORY_TYPE })
+    .returning();
+  return row;
 }
 
 async function makeRequestLine(userId: string, itemId: string) {
@@ -544,7 +557,7 @@ describe("catalog CRUD", () => {
     const blank = {
       name: "X",
       description: null,
-      category: null,
+      categoryId: null,
       serial: null,
       label: null,
       location: null,
@@ -575,7 +588,7 @@ describe("catalog CRUD", () => {
       id: item.id,
       name: "New",
       description: null,
-      category: null,
+      categoryId: null,
       serial: null,
       label: null,
       location: "Shelf B",
@@ -605,7 +618,7 @@ describe("catalog CRUD", () => {
     const created = await createInventoryItemAs(admin, {
       name: "Camera",
       description: null,
-      category: null,
+      categoryId: null,
       serial: "SN-9",
       label: "LAB-042",
       location: null,
@@ -626,7 +639,7 @@ describe("catalog CRUD", () => {
     const created = await createInventoryItemAs(admin, {
       name: "Camera",
       description: null,
-      category: null,
+      categoryId: null,
       serial: null,
       label: "OLD-1",
       location: null,
@@ -637,7 +650,7 @@ describe("catalog CRUD", () => {
       id: created.id,
       name: "Camera",
       description: null,
-      category: null,
+      categoryId: null,
       serial: null,
       label: "NEW-2",
       location: null,
@@ -729,6 +742,133 @@ describe("catalog CRUD", () => {
     await expect(
       hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Cabled" })
     ).rejects.toThrow(/historical/i);
+  });
+});
+
+describe("category write path", () => {
+  // Routes the payload through itemPayloadSchema, exactly like
+  // createInventoryItem's server function does, rather than calling
+  // createInventoryItemAs directly. That is the point: the bug this test
+  // guards against was Zod silently stripping `categoryId` at that exact
+  // boundary while every direct-call test kept passing. Reading the row back
+  // from the database (not trusting the function's return value) is what
+  // makes the assertion end-to-end.
+  it("persists category_id when an item is created through the payload schema", async () => {
+    const admin = await makeUser(`catw-${Date.now()}@x.com`, "admin");
+    const category = await makeCategory("Cameras");
+    const rawPayload: unknown = {
+      name: "Payload Camera",
+      categoryId: category.id,
+    };
+    const parsed = itemPayloadSchema.parse(rawPayload);
+    const created = await createInventoryItemAs(admin, parsed);
+
+    const [row] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, created.id));
+    expect(row.categoryId).toBe(category.id);
+  });
+
+  it("persists category_id when an item is updated through the payload schema", async () => {
+    const admin = await makeUser(`catw2-${Date.now()}@x.com`, "admin");
+    const category = await makeCategory("Microscopes");
+    const item = await makeItem({ name: "Uncategorized scope" });
+    const rawPayload: unknown = {
+      id: item.id,
+      name: item.name,
+      categoryId: category.id,
+    };
+    // Same `.extend` shape as updatePayloadSchema in src/server/inventory.ts,
+    // built from the same base so this test breaks the same way that schema
+    // would if `categoryId` were ever dropped from it.
+    const updateSchema = itemPayloadSchema.extend({ id: z.string().uuid() });
+    const validated = updateSchema.parse(rawPayload);
+    await updateInventoryItemAs(admin, validated);
+
+    const [row] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(row.categoryId).toBe(category.id);
+  });
+});
+
+describe("category read path: left join and id filter", () => {
+  it("keeps an uncategorized item visible and reports the joined category name for a categorized one", async () => {
+    const category = await makeCategory(`Robotics-${Date.now()}`);
+    const categorized = await makeItem({
+      name: "Categorized Bot",
+      categoryId: category.id,
+    });
+    const uncategorized = await makeItem({ name: "Loose Bot" });
+
+    const result = await listInventoryAs(null, {
+      q: "",
+      status: null,
+      category: null,
+      page: 1,
+      pageSize: 50,
+    });
+
+    const foundCategorized = result.rows.find(
+      (r) => r.id === categorized.id
+    ) as unknown as { categoryId: string | null; categoryName: string | null };
+    const foundUncategorized = result.rows.find(
+      (r) => r.id === uncategorized.id
+    ) as unknown as { categoryId: string | null; categoryName: string | null };
+
+    // An inner join here would silently drop the uncategorized item; its
+    // presence is the whole point of this assertion.
+    expect(foundUncategorized).toBeDefined();
+    expect(foundUncategorized.categoryId).toBeNull();
+    expect(foundUncategorized.categoryName).toBeNull();
+
+    expect(foundCategorized).toBeDefined();
+    expect(foundCategorized.categoryId).toBe(category.id);
+    expect(foundCategorized.categoryName).toBe(category.name);
+  });
+
+  it("filters by category id and excludes the uncategorized item", async () => {
+    const category = await makeCategory(`Filters-${Date.now()}`);
+    const categorized = await makeItem({
+      name: "Filtered Bot",
+      categoryId: category.id,
+    });
+    await makeItem({ name: "Unfiltered Bot" });
+
+    const result = await listInventoryAs(null, {
+      q: "",
+      status: null,
+      category: category.id,
+      page: 1,
+      pageSize: 50,
+    });
+
+    expect(result.rows.map((r) => r.id)).toEqual([categorized.id]);
+  });
+});
+
+describe("listInventoryCategoriesImpl", () => {
+  it("returns only categories actually assigned to a non-retired item, joined by id", async () => {
+    const used = await makeCategory(`Used-${Date.now()}`);
+    const unused = await makeCategory(`Unused-${Date.now()}`);
+    await makeItem({ name: "Has category", categoryId: used.id });
+    const retiredItem = await makeItem({
+      name: "Retired with category",
+      categoryId: unused.id,
+    });
+    await db
+      .update(inventoryItems)
+      .set({ status: "retired" })
+      .where(eq(inventoryItems.id, retiredItem.id));
+
+    const { categories: rows } = await listInventoryCategoriesImpl();
+
+    expect(rows.some((c) => c.id === used.id && c.name === used.name)).toBe(
+      true
+    );
+    expect(rows.some((c) => c.id === unused.id)).toBe(false);
   });
 });
 
@@ -991,7 +1131,7 @@ describe("defense in depth: impl re-checks role on every staff write", () => {
       createInventoryItemAs(student, {
         name: "Sneaky",
         description: null,
-        category: null,
+        categoryId: null,
         serial: null,
         label: null,
         location: null,

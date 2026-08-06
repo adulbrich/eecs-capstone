@@ -14,6 +14,7 @@ import {
 } from "drizzle-orm";
 import { db } from "#/db";
 import {
+  categories,
   inventoryCartItems,
   inventoryItemEditLog,
   inventoryItemStatusHistory,
@@ -44,7 +45,8 @@ export interface ListInventoryInput {
 }
 
 export interface InventoryItemPublic {
-  category: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
   description: string | null;
   dueAt: Date | null;
   id: string;
@@ -72,13 +74,15 @@ function isStaff(viewer: Viewer): boolean {
 }
 
 function stripForPublic(
-  row: typeof inventoryItems.$inferSelect
+  row: typeof inventoryItems.$inferSelect,
+  categoryName: string | null
 ): InventoryItemPublic {
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    category: row.category,
+    categoryId: row.categoryId,
+    categoryName,
     imageUrl: row.imageUrl,
     status: row.status,
     // The hold's dates live on the item itself, so they are the same whether
@@ -89,10 +93,11 @@ function stripForPublic(
 }
 
 function fullForStaff(
-  row: typeof inventoryItems.$inferSelect
+  row: typeof inventoryItems.$inferSelect,
+  categoryName: string | null
 ): InventoryItemStaff {
   return {
-    ...stripForPublic(row),
+    ...stripForPublic(row, categoryName),
     createdAt: row.createdAt,
     serial: row.serial,
     label: row.label,
@@ -133,7 +138,7 @@ function buildInventoryScope(data: {
     conditions.push(eq(inventoryItems.status, data.status));
   }
   if (data.category) {
-    conditions.push(eq(inventoryItems.category, data.category));
+    conditions.push(eq(inventoryItems.categoryId, data.category));
   }
   return conditions;
 }
@@ -160,9 +165,11 @@ export async function listInventoryAs(
       item: inventoryItems,
       holderName: user.name,
       holderEmail: user.email,
+      categoryName: categories.name,
     })
     .from(inventoryItems)
     .leftJoin(user, eq(inventoryItems.currentHolderId, user.id))
+    .leftJoin(categories, eq(inventoryItems.categoryId, categories.id))
     .where(where)
     .orderBy(desc(inventoryItems.updatedAt))
     .limit(data.pageSize)
@@ -176,12 +183,12 @@ export async function listInventoryAs(
   const mapped = rows.map((r) => {
     if (isStaff(viewer)) {
       return {
-        ...fullForStaff(r.item),
+        ...fullForStaff(r.item, r.categoryName),
         currentHolderName: r.holderName,
         currentHolderEmail: holderEmailOf(r),
       };
     }
-    return stripForPublic(r.item);
+    return stripForPublic(r.item, r.categoryName);
   });
 
   return {
@@ -199,6 +206,7 @@ export type InventoryItemStaffDetail = InventoryItemStaff & {
 };
 
 interface InventoryItemJoinedRow {
+  categoryName: string | null;
   holderEmail: string | null;
   holderName: string | null;
   item: typeof inventoryItems.$inferSelect;
@@ -219,9 +227,11 @@ async function loadInventoryItemRowFor(
       item: inventoryItems,
       holderName: user.name,
       holderEmail: user.email,
+      categoryName: categories.name,
     })
     .from(inventoryItems)
     .leftJoin(user, eq(inventoryItems.currentHolderId, user.id))
+    .leftJoin(categories, eq(inventoryItems.categoryId, categories.id))
     .where(eq(inventoryItems.id, id));
   if (!row) {
     return null;
@@ -234,14 +244,14 @@ async function loadInventoryItemRowFor(
 
 function toStaffDetail(row: InventoryItemJoinedRow): InventoryItemStaffDetail {
   return {
-    ...fullForStaff(row.item),
+    ...fullForStaff(row.item, row.categoryName),
     currentHolderName: row.holderName,
     currentHolderEmail: holderEmailOf(row),
   };
 }
 
 function toPublicDetail(row: InventoryItemJoinedRow): InventoryItemPublic {
-  return stripForPublic(row.item);
+  return stripForPublic(row.item, row.categoryName);
 }
 
 export async function getInventoryItemAs(viewer: Viewer, data: { id: string }) {
@@ -300,18 +310,20 @@ export async function listAdminInventoryAs(
 
   const rows = await db
     .select({
+      categoryName: categories.name,
       holderEmail: user.email,
       holderName: user.name,
       item: inventoryItems,
     })
     .from(inventoryItems)
     .leftJoin(user, eq(inventoryItems.currentHolderId, user.id))
+    .leftJoin(categories, eq(inventoryItems.categoryId, categories.id))
     .where(and(...conditions))
     .orderBy(desc(inventoryItems.updatedAt));
 
   return {
     rows: rows.map((r) => ({
-      ...fullForStaff(r.item),
+      ...fullForStaff(r.item, r.categoryName),
       currentHolderEmail: holderEmailOf(r),
       currentHolderName: r.holderName,
     })),
@@ -326,19 +338,15 @@ export async function listAdminInventoryForCurrentUser(
 }
 
 export async function listInventoryCategoriesImpl() {
+  // Restricted to categories actually in use, so the dropdown never offers a
+  // filter that returns nothing.
   const rows = await db
-    .selectDistinct({ category: inventoryItems.category })
+    .selectDistinct({ id: categories.id, name: categories.name })
     .from(inventoryItems)
-    .where(
-      and(
-        ne(inventoryItems.status, "retired"),
-        isNotNull(inventoryItems.category)
-      )
-    )
-    .orderBy(inventoryItems.category);
-  return {
-    categories: rows.map((r) => r.category).filter((c): c is string => !!c),
-  };
+    .innerJoin(categories, eq(inventoryItems.categoryId, categories.id))
+    .where(ne(inventoryItems.status, "retired"))
+    .orderBy(categories.name);
+  return { categories: rows };
 }
 
 export async function getInventoryItemForCurrentUser(data: { id: string }) {
@@ -347,7 +355,7 @@ export async function getInventoryItemForCurrentUser(data: { id: string }) {
 }
 
 export interface CreateInventoryItemInput {
-  category: string | null;
+  categoryId: string | null;
   description: string | null;
   imageUrl: string | null;
   label: string | null;
@@ -363,6 +371,32 @@ function assertStaff(viewer: Viewer): asserts viewer is NonNullable<Viewer> {
   }
 }
 
+/**
+ * `insert(...).returning()` and a locked `select()` cannot carry a join, so
+ * the create/update paths resolve the category name with this instead of
+ * leaving it null (and silently wrong) whenever a category is set.
+ *
+ * Takes an explicit executor (defaulting to the module `db`) so a caller
+ * inside a transaction can pass `tx`: reaching for the module-level `db`
+ * from inside `updateInventoryItemAs`'s transaction would check out a
+ * second pooled connection while the first still holds the row's
+ * `FOR UPDATE` lock, which is exactly the kind of transaction-boundary
+ * change this task was told not to make.
+ */
+async function categoryNameFor(
+  categoryId: string | null,
+  executor: Tx | typeof db = db
+): Promise<string | null> {
+  if (!categoryId) {
+    return null;
+  }
+  const [row] = await executor
+    .select({ name: categories.name })
+    .from(categories)
+    .where(eq(categories.id, categoryId));
+  return row?.name ?? null;
+}
+
 export async function createInventoryItemAs(
   viewer: Viewer,
   data: CreateInventoryItemInput
@@ -373,7 +407,7 @@ export async function createInventoryItemAs(
     .values({
       name: data.name,
       description: data.description,
-      category: data.category,
+      categoryId: data.categoryId,
       serial: data.serial,
       label: data.label,
       location: data.location,
@@ -381,7 +415,7 @@ export async function createInventoryItemAs(
       imageUrl: data.imageUrl,
     })
     .returning();
-  return fullForStaff(row);
+  return fullForStaff(row, await categoryNameFor(row.categoryId));
 }
 
 export type UpdateInventoryItemInput = CreateInventoryItemInput & {
@@ -391,7 +425,7 @@ export type UpdateInventoryItemInput = CreateInventoryItemInput & {
 const EDITABLE_FIELDS = [
   "name",
   "description",
-  "category",
+  "categoryId",
   "serial",
   "label",
   "location",
@@ -430,7 +464,7 @@ export async function updateInventoryItemAs(
       }
     }
     if (changed.length === 0) {
-      return fullForStaff(before);
+      return fullForStaff(before, await categoryNameFor(before.categoryId, tx));
     }
 
     await tx
@@ -438,7 +472,7 @@ export async function updateInventoryItemAs(
       .set({
         name: data.name,
         description: data.description,
-        category: data.category,
+        categoryId: data.categoryId,
         serial: data.serial,
         label: data.label,
         location: data.location,
@@ -457,10 +491,11 @@ export async function updateInventoryItemAs(
     });
 
     const [after] = await tx
-      .select()
+      .select({ item: inventoryItems, categoryName: categories.name })
       .from(inventoryItems)
+      .leftJoin(categories, eq(inventoryItems.categoryId, categories.id))
       .where(eq(inventoryItems.id, data.id));
-    return fullForStaff(after);
+    return fullForStaff(after.item, after.categoryName);
   });
 }
 
