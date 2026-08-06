@@ -46,6 +46,7 @@ import {
   createCategory,
   listCategories,
   listCategoryTypes,
+  type listSchema,
 } from "#/server/categories";
 
 const searchSchema = z.object({
@@ -69,8 +70,11 @@ export const Route = createFileRoute("/_authed/admin/categories/")({
   },
   loaderDeps: ({ search }) => ({ tab: search.tab }),
   loader: async ({ deps }) => {
+    const listData = {
+      domain: deps.tab,
+    } satisfies z.input<typeof listSchema>;
     const [{ rows }, { types }] = await Promise.all([
-      listCategories({ data: { domain: deps.tab } }),
+      listCategories({ data: listData }),
       listCategoryTypes(),
     ]);
     return { rows, types };

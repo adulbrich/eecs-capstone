@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useId, useState } from "react";
+import type { z } from "zod";
 import { CategoryTypeCombobox } from "#/components/category-type-combobox";
 import { Button } from "#/components/ui/button";
 import { Checkbox } from "#/components/ui/checkbox";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
-import { createCategory, listCategories } from "#/server/categories";
+import {
+  createCategory,
+  listCategories,
+  type listSchema,
+} from "#/server/categories";
 
 interface Category {
   id: string;
@@ -31,7 +36,8 @@ export function CategoryMultiSelect({ domain, value, onChange }: Props) {
 
   const loadCategories = useCallback(async () => {
     try {
-      const { rows } = await listCategories({ data: { domain } });
+      const data = { domain } satisfies z.input<typeof listSchema>;
+      const { rows } = await listCategories({ data });
       setCategories(rows as Category[]);
     } catch {
       setCategories([]);
