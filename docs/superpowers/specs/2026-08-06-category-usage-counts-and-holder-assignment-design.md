@@ -71,10 +71,11 @@ select c.*,
         and p.deleted_at is null
         and p.status <> 'draft'
        where pc.category_id = c.id)
-     else (
+     when 'inventory' then (
        select count(*)::int
        from inventory_item_categories iic
        where iic.category_id = c.id)
+     else 0
    end) as usage_count
 from categories c
 where c.domain = $1
@@ -86,6 +87,11 @@ Three properties make this the efficient shape:
 - **`CASE` short-circuits per row.** A project category never scans
   `inventory_item_categories`, and the reverse. Two `LEFT JOIN`s onto grouped
   subqueries would build both aggregates for every row regardless of domain.
+- **Both domains are named explicitly**, with `else 0` rather than an `else`
+  that falls through to the inventory count. `category_domain` has exactly two
+  values today, so the fall-through would be correct; it would also silently
+  report an inventory count for every row of a third domain the day one is
+  added.
 - **`categories.domain` is immutable** (`updateCategoryAs` rejects a domain
   change, `src/server/_internal/categories.ts:130`), so the cross-domain count
   is always zero and there is never a reason to render both.
@@ -165,8 +171,14 @@ count for its own domain.
 
 > **`current_holder_label` is non-null if and only if `current_holder_email`
 > is null.** A hold is on a person, identified by an address, or on a thing,
-> identified by a label. `current_holder_id` is never an input; it is always
-> derived from the address.
+> identified by a label. Never both, never neither.
+
+`current_holder_id` is not a third kind of identity. It is the account that the
+address resolved to, or null when it resolved to nothing. Staff cannot assign a
+hold by account id: the dialog has no way to post one. The two internal callers
+that already hold an account id (`approveRequestItemAs` and `submitCartAs`) may
+still pass it, and the address is derived from it, so the invariant above holds
+on every write path.
 
 ### Current behavior
 
@@ -288,29 +300,53 @@ No backfill. The app is pre-production and dev seeds reset.
 
 **`inventory-transitions.ts`**
 
-- `TransitionInput` drops `holderId` and gains `holderName` and
+The cut is at the wire, not at the internal call path. `holderId` is removed
+from `transitionSchema` (`src/server/inventory.ts:252`), so the dialog can no
+longer post one, but it stays on `TransitionInput` as an optional
+already-resolved hint for the two internal callers that legitimately hold an
+account id. Removing it from both would force 25 `holderId:` arguments in
+`inventory.integration.test.ts` to be rewritten and would make
+`approveRequestItemAs` depend on the requester's address round-tripping
+through a lookup, for no gain: the invariant this design is about concerns
+what the columns mean and what the dialog sends.
+
+- `TransitionInput` keeps `holderId` and gains `holderName` and
   `holderProgram`.
+- `resolveHolderId` becomes `resolveHolder`, returning `{ id, email }` rather
+  than an id:
+  - `holderEmail` supplied: look the address up in `user`. Returns
+    `{ id: match?.id ?? null, email: holderEmail }`. An address supplied by
+    the caller always wins over a supplied id, because it is the address the
+    hold was assigned to.
+  - otherwise `holderId` supplied: look the account up by id. Returns
+    `{ id: holderId, email: account.email }`.
+  - neither: `{ id: null, email: null }`, the label path.
+
+  Deriving the address in the second case is what keeps the column invariant
+  true for callers that only have an id, without those callers having to fetch
+  an address themselves.
 - `validateInvariants`, the `reserved | checked_out` arm: require exactly one
-  of `holderEmail` and `holderLabel`. Name and program are attributes, not
-  identity, and are excluded from that count. `checked_out` still requires
-  `dueAt`.
+  of "a person" (`holderId` or `holderEmail`, either or both) and "a thing"
+  (`holderLabel`). Name and program are attributes, not identity, and are
+  excluded from that test. `checked_out` still requires `dueAt`.
 - `validateInvariants`, the `available | maintenance | retired` arm: reject
   name and program alongside the holder fields it already rejects.
-- `validateInvariants`, the `requested` arm: require `requestItemId` and
-  `holderEmail`, and reject `holderLabel`. A request always comes from an
-  account, so it always has an address.
-- `resolveHolderId` is unchanged and becomes the sole writer of
-  `current_holder_id`.
-- When `resolveHolderId` returns an id, `holderName` and `holderProgram` are
-  discarded before the write. The account is authoritative for both.
+- `validateInvariants`, the `requested` arm: unchanged. It requires
+  `requestItemId` and `holderId` and rejects email and label. Nothing exercises
+  it today, because `submitCartAs` performs the requested transition inline
+  rather than through `transitionItem` (it runs as the student, and
+  `transitionItem` asserts staff); tightening a dead arm would be theater.
+- When `resolveHolder` returns a non-null id, `holderName` and `holderProgram`
+  are discarded before the write. The account is authoritative for both.
 - The history insert writes `holder_email`, `holder_name` and `holder_program`
   straight through; the `holderLabel ?? (holderId ? null : holderEmail)`
   expression is deleted.
 
 **`inventory.ts`**
 
-- `approveRequestItemAs` passes the requester's `email` rather than
-  `requesterId`. Its locked select gains `innerJoin(user, eq(inventoryRequests.userId, user.id))`.
+- `approveRequestItemAs` is unchanged. It keeps passing `holderId: line.requesterId`,
+  and `resolveHolder` derives the requester's address from it, so the approve
+  notification path keeps working with no new join and no new failure mode.
 - `submitCartAs` writes `current_holder_email` alongside `current_holder_id`
   using a scalar subselect on `user`, so a self-submitted request hold obeys
   the same invariant as every other person hold. Its inline history insert
@@ -368,7 +404,9 @@ are about to return, and merge the result in memory.
 
 **`src/server/inventory.ts`**: `transitionSchema` drops `holderId`, gains
 `holderName` and `holderProgram` (`z.string().max(200).nullable().default(null)`
-each), and keeps the existing email validation.
+each), and keeps the existing email validation. This is the only place
+`holderId` is removed, and it is what makes the dialog incapable of assigning a
+hold by anything other than an address or a label.
 
 ### UI changes
 
@@ -444,6 +482,15 @@ Integration (`src/server/__tests__/`):
   `current_request_item_id` attached, and the item appears in the requester's
   `/my/items` as a request line and in the picker's as a hold, exactly once
   each.
+- That same cross-person checkout leaves the request line's own status at
+  `approved`, asserted directly rather than inferred from the row being
+  present. `listMyItemsAs` only puts `pending` and `approved` lines in the
+  Active tab (`inventory.ts:1175`), and `syncRequestItem`'s `checked_out` arm
+  sets `dueAt` without touching status, so the requester's view of a
+  teammate's pickup depends on that arm continuing to leave status alone.
+- An approve still notifies the requester, asserted after `resolveHolder`
+  replaces `resolveHolderId`. This is the regression the id-derives-address
+  path exists to prevent.
 - An overdue item held by B against A's request produces two notifications with
   two different `user_id`s; the same item held by its own requester produces
   one.
@@ -455,15 +502,14 @@ Integration (`src/server/__tests__/`):
 
 Unit:
 
-- `validateInvariants` against the new exclusivity rule, including the name and
-  program fields being ignored by it.
+- `validateInvariants` against the new exclusivity rule: an id alone, an
+  address alone, and an id with an address all pass; a label with either fails;
+  nothing at all fails; and name and program never affect the outcome.
 
-**Known migration cost.** `src/server/__tests__/inventory.integration.test.ts`
-has 25 `holderId:` arguments across roughly 50 `transitionItem` calls. Dropping
-`holderId` from `TransitionInput` turns every one of them into a `holderEmail:`
-with a seeded address. This is mechanical but it is the single largest block of
-edits in Part B, and the plan should budget a step for it rather than treating
-it as incidental cleanup.
+The roughly 50 existing `transitionItem` calls in
+`inventory.integration.test.ts`, 25 of which pass `holderId`, keep working
+unchanged. That is the point of cutting at the wire schema rather than at
+`TransitionInput`.
 
 ### Non-goals
 
