@@ -402,8 +402,12 @@ describe("listInventoryAs privacy", () => {
   it("keeps private notes off the detail page for a signed-in non-staff user", async () => {
     const admin = await makeUser(`pnd-a-${Date.now()}@x.com`, "admin");
     const student = await makeUser(`pnd-s-${Date.now()}@x.com`, "user");
+    // ZQXNOTES is alphabetic and appears nowhere else in this file's item
+    // names (Item-${Date.now()}-${Math.random()}, all digits and a dot), so
+    // unlike a numeric substring it cannot turn up in the serialized payload
+    // by chance.
     const item = await makeItem({
-      notes: "Locker B4, code 1180.",
+      notes: "Locker B4, code ZQXNOTES.",
       serial: "SN-777",
       location: "Kelley 2063",
     });
@@ -413,11 +417,11 @@ describe("listInventoryAs privacy", () => {
     expect("notes" in (studentView as object)).toBe(false);
     expect("serial" in (studentView as object)).toBe(false);
     expect("location" in (studentView as object)).toBe(false);
-    expect(JSON.stringify(studentView)).not.toContain("1180");
+    expect(JSON.stringify(studentView)).not.toContain("ZQXNOTES");
 
     const staffView = await getInventoryItemAs(admin, { id: item.id });
     expect((staffView as unknown as { notes: string }).notes).toBe(
-      "Locker B4, code 1180."
+      "Locker B4, code ZQXNOTES."
     );
   });
 

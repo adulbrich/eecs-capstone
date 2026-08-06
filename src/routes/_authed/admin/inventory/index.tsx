@@ -166,7 +166,7 @@ const COLUMNS: AdminColumn<Row>[] = [
       row.original.currentHolderName ??
       row.original.currentHolderEmail ??
       row.original.currentHolderLabel ??
-      (row.original.currentHolderId ? "(user)" : "-"),
+      "-",
     header: "Holder",
     id: "holder",
     sortUndefined: "last",

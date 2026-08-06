@@ -158,9 +158,16 @@ function formatHolderDisplay(
 ): string | null {
   const name = holderName ?? item.currentHolderName;
   if (item.currentHolderEmail) {
-    return name
-      ? `${name} (${item.currentHolderEmail})`
-      : item.currentHolderEmail;
+    // Program is an attribute of the address, not the label (see
+    // holderFields above), so it is only ever appended on this branch.
+    const suffix = item.currentHolderProgram
+      ? ` · ${item.currentHolderProgram}`
+      : "";
+    return (
+      (name
+        ? `${name} (${item.currentHolderEmail})`
+        : item.currentHolderEmail) + suffix
+    );
   }
   return item.currentHolderLabel ?? null;
 }
@@ -202,6 +209,7 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
                   <p className="mt-1 text-muted-foreground text-xs">
                     Holder: {h.holderName ?? h.holderEmail ?? h.holderLabel}
                     {h.holderName && h.holderEmail ? ` (${h.holderEmail})` : ""}
+                    {h.holderProgram ? ` · ${h.holderProgram}` : ""}
                   </p>
                 )}
                 {h.comment && (

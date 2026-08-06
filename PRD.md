@@ -170,6 +170,9 @@ Each project carries:
   form).
 - 🟡 Multiple category types exist and can be filtered, but per-type faceted
   filtering on the public listing is not broken out into separate filters.
+- ✅ The admin categories table shows a usage count per category: published,
+  non-draft projects for the project domain, inventory items for the
+  inventory domain. Counted from the matching junction table, not cached.
 - ✅ Programs = course ID + course name (+ description) with per-program
   instructors.
 - ✅ Programs created/edited/deleted by admins (`/admin/programs`); instructors
@@ -232,12 +235,16 @@ Each project carries:
 - ✅ Staff change item status and assign holders; items auto-assign to the
   requesting user on reserve, with manual override on checkout.
 - ✅ Staff-assigned holds need no request line: an item that was never carted
-  can be reserved or checked out directly, assigned to an account, to an email
-  address, or to an ad-hoc label. An address that matches an account links to
-  it (and so notifies the holder) the same way a project's proposer email
-  resolves to a proposer; an address with no account is still recorded.
-  The hold's pickup-by and due-at live on the item, so they survive whether or
-  not a request line exists.
+  can be reserved or checked out directly, assigned to an address, or to an
+  ad-hoc label when the hold is not on a person at all. An address that
+  matches an account resolves to it (and so notifies the holder) the same way
+  a project's proposer email resolves to a proposer; an address with no
+  account still records the typed name and program instead. The hold's
+  pickup-by and due-at live on the item, so they survive whether or not a
+  request line exists.
+- ✅ When staff assign a hold to an address other than the requester's, the
+  request queue and My Items surface who is actually collecting the item, so
+  a requester is not left thinking the pickup is theirs.
 - ✅ The item form groups every non-public field (serial, label, location,
   private notes) into a staff panel, matching the project form's staff panel,
   so the split between public and internal values is visible while filling it

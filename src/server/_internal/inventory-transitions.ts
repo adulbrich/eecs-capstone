@@ -90,9 +90,16 @@ function validateInvariants(input: TransitionInput) {
       }
       return;
     case "requested":
-      if (!(requestItemId && holderId) || holderEmail || holderLabel) {
+      // A requested row always comes from an account (the requester), so it
+      // has both an id and an address; it never carries a label, because a
+      // request is always on a person, never on a thing. No current caller
+      // reaches this arm: submitCartAs writes the requested transition
+      // inline rather than calling transitionItem, and the lifecycle panel
+      // refuses to offer "requested" as a direct target. Kept correct anyway,
+      // as the shape a requested row would actually have.
+      if (!(requestItemId && (holderId || holderEmail)) || holderLabel) {
         throw new Error(
-          "requested status requires requestItemId + holderId, no email or label"
+          "requested status requires requestItemId and a holder account or address, no label"
         );
       }
       return;
