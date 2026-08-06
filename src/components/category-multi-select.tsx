@@ -33,14 +33,22 @@ export function CategoryMultiSelect({ domain, value, onChange }: Props) {
   const [newType, setNewType] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadCategories = useCallback(async () => {
     try {
       const data = { domain } satisfies z.input<typeof listSchema>;
       const { rows } = await listCategories({ data });
       setCategories(rows as Category[]);
-    } catch {
-      setCategories([]);
+      setLoadError(null);
+    } catch (err) {
+      // Keep the last-good list on failure instead of blanking it: this
+      // runs again after a successful create (see handleCreate), and a
+      // failed refetch must not wipe out categories that `value` still
+      // references and that submit will still write.
+      setLoadError(
+        err instanceof Error ? err.message : "Could not load categories"
+      );
     }
   }, [domain]);
 
@@ -108,7 +116,8 @@ export function CategoryMultiSelect({ domain, value, onChange }: Props) {
 
   return (
     <div className="space-y-3">
-      {categories.length === 0 && (
+      {loadError && <p className="text-destructive text-sm">{loadError}</p>}
+      {!loadError && categories.length === 0 && (
         <p className="text-neutral-500 text-sm">No categories yet.</p>
       )}
       {domain === "project" &&

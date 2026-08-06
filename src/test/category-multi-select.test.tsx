@@ -141,6 +141,50 @@ describe("CategoryMultiSelect", () => {
     expect(mockedList).toHaveBeenCalledTimes(2);
   });
 
+  // Regression test for Fix 3: the pre-fix code called setCategories([]) on
+  // any load failure, including the refetch loadCategories runs again after
+  // a successful create. That wiped out categories that `value` (the
+  // parent's selected ids) still referenced, so a user could no longer see
+  // or uncheck a selection that submit would still write. The fix keeps the
+  // last-good list and surfaces the error instead.
+  it("keeps the last-good list and surfaces an error when the post-create refetch fails", async () => {
+    mockedList
+      .mockResolvedValueOnce({ rows: INVENTORY_ROWS } as never)
+      .mockRejectedValueOnce(new Error("network down"));
+    mockedCreate.mockResolvedValue({ id: "i3" } as never);
+    const onChange = vi.fn();
+    render(
+      <CategoryMultiSelect domain="inventory" onChange={onChange} value={[]} />
+    );
+    await screen.findByText("Laptop");
+    fireEvent.change(screen.getByLabelText("New category name"), {
+      target: { value: "Projector" },
+    });
+    fireEvent.click(await screen.findByText('Create "Projector"'));
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(["i3"]));
+    await waitFor(() => expect(screen.getByText("network down")).toBeTruthy());
+    // The stale-but-last-good rows are still visible, not wiped by the
+    // failed refetch.
+    expect(screen.getByText("Laptop")).toBeTruthy();
+    expect(screen.getByText("Monitor")).toBeTruthy();
+  });
+
+  // Regression test for the sibling bug this codebase has already shipped
+  // once (see export-csv-button.test.tsx): `err instanceof Error ? ... :`
+  // must not silently render nothing when the rejection isn't an Error.
+  it("still shows a visible message when the initial load rejects with a non-Error value", async () => {
+    mockedList.mockRejectedValue("boom");
+    render(
+      <CategoryMultiSelect
+        domain="inventory"
+        onChange={() => undefined}
+        value={[]}
+      />
+    );
+    expect(await screen.findByText("Could not load categories")).toBeTruthy();
+  });
+
   it("shows a starting-point create control, not a dead end, with zero categories", async () => {
     mockedList.mockResolvedValue({ rows: [] } as never);
     render(
