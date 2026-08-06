@@ -23,6 +23,7 @@ import {
   addToCartAs,
   approveRequestItemAs,
   cancelRequestItemAs,
+  collectedByForRequestItems,
   createInventoryItemAs,
   getInventoryItemAs,
   getInventoryItemDetailAs,
@@ -2283,5 +2284,75 @@ describe("holder resolution", () => {
     expect(held.currentHolderId).toBe(student.id);
     expect(held.currentHolderEmail).toBe("approve-student@x.com");
     expect(held.currentHolderLabel).toBeNull();
+  });
+});
+
+describe("collected by", () => {
+  it("survives the return", async () => {
+    const admin = await makeUser("collected-admin@x.com", "admin");
+    const requester = await makeUser("collected-requester@x.com", "user");
+    const item = await makeItem();
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: "walkin-collector@nowhere.test",
+      holderName: "Walk In Collector",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+    // Returned: the item's holder columns are cleared, the line is closed.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "available",
+    });
+
+    const collected = await collectedByForRequestItems([line.id]);
+    expect(collected.get(line.id)?.email).toBe("walkin-collector@nowhere.test");
+    expect(collected.get(line.id)?.name).toBe("Walk In Collector");
+  });
+
+  it("prefers the account's name over the typed one", async () => {
+    const admin = await makeUser("collected-admin-2@x.com", "admin");
+    // Created so the address below resolves to an account; the returned
+    // handle is not needed, and an unused binding fails the linter.
+    await makeUser("collected-picker@x.com", "user");
+    const requester = await makeUser("collected-requester-2@x.com", "user");
+    const item = await makeItem();
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: "collected-picker@x.com",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const collected = await collectedByForRequestItems([line.id]);
+    expect(collected.get(line.id)?.email).toBe("collected-picker@x.com");
+    expect(collected.get(line.id)?.name).toBe("collected-picker@x.com");
+  });
+
+  it("returns an empty map for no ids without querying", async () => {
+    const collected = await collectedByForRequestItems([]);
+    expect(collected.size).toBe(0);
   });
 });

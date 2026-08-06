@@ -1115,6 +1115,7 @@ export async function cancelRequestItemForCurrentUser(data: {
 export type ActiveEntry =
   | {
       kind: "request";
+      collectedBy: CollectedBy | null;
       line: typeof inventoryRequestItems.$inferSelect;
       item: typeof inventoryItems.$inferSelect;
       request: typeof inventoryRequests.$inferSelect;
@@ -1271,12 +1272,91 @@ export async function listMyItemsAs(viewer: Viewer) {
       .limit(50),
   ]);
 
+  const collected = await collectedByForRequestItems([
+    ...activeLines.map((r) => r.line.id),
+    ...history.map((r) => r.line.id),
+  ]);
+
   const active: ActiveEntry[] = [
-    ...activeLines.map((row): ActiveEntry => ({ kind: "request", ...row })),
+    ...activeLines.map(
+      (row): ActiveEntry => ({
+        kind: "request",
+        collectedBy: collected.get(row.line.id) ?? null,
+        ...row,
+      })
+    ),
     ...holds.map((row): ActiveEntry => ({ kind: "hold", item: row.item })),
   ].sort(byDeadline);
 
-  return { cart, active, history };
+  return {
+    cart,
+    active,
+    history: history.map((row) => ({
+      ...row,
+      collectedBy: collected.get(row.line.id) ?? null,
+    })),
+  };
+}
+
+export interface CollectedBy {
+  email: string | null;
+  name: string | null;
+}
+
+/**
+ * Who physically collected each request line, read off the checked_out row in
+ * the status history.
+ *
+ * History is the record rather than a pair of picked_up_by columns on
+ * inventory_request_items: transitionItem is already the single writer of
+ * that table, so there is nothing to keep in sync, and the fact survives the
+ * return, which clears the item's own holder columns.
+ *
+ * One DISTINCT ON for a whole page of lines, not one query per line. The
+ * ORDER BY must lead with the same column as the DISTINCT ON; the createdAt
+ * DESC that follows is what picks the most recent checkout when a line was
+ * checked out more than once.
+ */
+export async function collectedByForRequestItems(
+  lineIds: string[]
+): Promise<Map<string, CollectedBy>> {
+  if (lineIds.length === 0) {
+    return new Map();
+  }
+  const rows = await db
+    .selectDistinctOn([inventoryItemStatusHistory.requestItemId], {
+      requestItemId: inventoryItemStatusHistory.requestItemId,
+      holderEmail: inventoryItemStatusHistory.holderEmail,
+      holderName: inventoryItemStatusHistory.holderName,
+      accountEmail: user.email,
+      accountName: user.name,
+    })
+    .from(inventoryItemStatusHistory)
+    .leftJoin(user, eq(inventoryItemStatusHistory.holderId, user.id))
+    .where(
+      and(
+        eq(inventoryItemStatusHistory.newStatus, "checked_out"),
+        inArray(inventoryItemStatusHistory.requestItemId, lineIds)
+      )
+    )
+    .orderBy(
+      inventoryItemStatusHistory.requestItemId,
+      desc(inventoryItemStatusHistory.createdAt)
+    );
+
+  const map = new Map<string, CollectedBy>();
+  for (const r of rows) {
+    if (!r.requestItemId) {
+      continue;
+    }
+    // Same rule as holderEmailOf and holderNameOf: the account wins, the
+    // stored values cover a collector who had no account.
+    map.set(r.requestItemId, {
+      email: r.accountEmail ?? r.holderEmail,
+      name: r.accountName ?? r.holderName,
+    });
+  }
+  return map;
 }
 
 export async function listInventoryRequestsAs(
@@ -1312,6 +1392,14 @@ export async function listInventoryRequestsAs(
     .where(statusFilter)
     .orderBy(desc(inventoryRequests.createdAt));
 
+  const collected = await collectedByForRequestItems(
+    rows.map((r) => r.line.id)
+  );
+  const enriched = rows.map((r) => ({
+    ...r,
+    collectedBy: collected.get(r.line.id) ?? null,
+  }));
+
   // Group by requestId so the admin queue can render one card per batch.
   const byRequest = new Map<
     string,
@@ -1320,10 +1408,10 @@ export async function listInventoryRequestsAs(
       requester: { id: string; email: string; name: string | null };
       createdAt: Date;
       note: string | null;
-      lines: typeof rows;
+      lines: typeof enriched;
     }
   >();
-  for (const r of rows) {
+  for (const r of enriched) {
     const id = r.request.id;
     const existing = byRequest.get(id);
     if (existing) {
