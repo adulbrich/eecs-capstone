@@ -349,6 +349,13 @@ export const inventoryItems = pgTable(
     // from it when one does.
     currentHolderEmail: text("current_holder_email"),
     currentHolderLabel: text("current_holder_label"),
+    // Only meaningful for a hold whose address matched no account: when there
+    // is an account, it is authoritative for both and these stay null.
+    // Program is free text, not a reference to `programs`, because a walk-in
+    // may name a course the table does not have and staff should not be
+    // blocked at the counter by that.
+    currentHolderName: text("current_holder_name"),
+    currentHolderProgram: text("current_holder_program"),
     // A hold does not need a request line (staff can reserve or check out an
     // item that was never carted), so the current hold's dates live here
     // rather than only on inventory_request_items.
@@ -490,6 +497,13 @@ export const inventoryItemStatusHistory = pgTable(
       onDelete: "set null",
     }),
     holderLabel: text("holder_label"),
+    // Recording the address separately is what lets holder_label go back to
+    // meaning a label. Before this, an address that matched no account was
+    // written into holder_label, so history could not tell "assigned to an
+    // address with no account" from "assigned to the label bob@example.com".
+    holderEmail: text("holder_email"),
+    holderName: text("holder_name"),
+    holderProgram: text("holder_program"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
