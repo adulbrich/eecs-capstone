@@ -1626,7 +1626,9 @@ export async function recordOverdueNotificationsAs(
   const seen = new Set<string>();
   const push = (row: typeof notifications.$inferInsert) => {
     // Requester and picker are the same person on most checkouts, so the two
-    // scans return the same row twice. One notice, not two.
+    // scans return the same row twice. onConflictDoNothing would collapse
+    // those intra-batch duplicates anyway; deduping here keeps the statement
+    // smaller and makes the intent explicit rather than implicit in an index.
     const key = `${row.userId}|${row.type}|${row.link}`;
     if (seen.has(key)) {
       return;
