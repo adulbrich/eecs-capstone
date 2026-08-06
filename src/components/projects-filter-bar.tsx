@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { INVENTORY_CATEGORY_TYPE } from "#/lib/category-types";
 import { listCategories } from "#/server/categories";
 import { getMyInterests } from "#/server/interests";
 import { listPrograms } from "#/server/programs";
@@ -54,7 +55,7 @@ export function ProjectsFilterBar({
     void (async () => {
       try {
         const [{ rows: cats }, { rows: progs }] = await Promise.all([
-          listCategories({ data: {} }),
+          listCategories({ data: { excludeTypes: [INVENTORY_CATEGORY_TYPE] } }),
           listPrograms(),
         ]);
         setAllCategories(cats as Category[]);

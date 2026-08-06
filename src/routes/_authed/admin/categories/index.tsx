@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import {
   type AdminColumn,
@@ -35,6 +35,7 @@ import {
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
+import { INVENTORY_CATEGORY_TYPE } from "#/lib/category-types";
 import { defineCsvColumns, orderBySortedIds, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import {
@@ -149,6 +150,12 @@ function CategoriesAdmin() {
   const onSortedIdsChange = useCallback((ids: string[]) => {
     sortedIdsRef.current = ids;
   }, []);
+  // The inventory type must be offerable even before the first inventory
+  // category exists, since listCategoryTypes only knows types already in use.
+  const offeredTypes = useMemo(
+    () => [...new Set([...types, INVENTORY_CATEGORY_TYPE])].sort(),
+    [types]
+  );
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -231,7 +238,7 @@ function CategoriesAdmin() {
                 <CategoryTypeCombobox
                   id="cat-type"
                   onChange={setType}
-                  types={types}
+                  types={offeredTypes}
                   value={type}
                 />
               </div>

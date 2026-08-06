@@ -18,6 +18,7 @@ const idSchema = z.object({ id: z.string().uuid() });
 
 const listSchema = z.object({
   type: z.string().nullable().optional(),
+  excludeTypes: z.array(z.string()).max(20).nullable().optional(),
 });
 
 const setProjectCategoriesSchema = z.object({

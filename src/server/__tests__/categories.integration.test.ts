@@ -6,6 +6,7 @@ import { auth } from "#/lib/auth";
 import {
   createCategoryAs,
   deleteCategoryAs,
+  listCategoriesImpl,
   setProjectCategoriesAs,
 } from "#/server/_internal/categories";
 import { createProjectAs } from "#/server/_internal/projects";
@@ -105,5 +106,20 @@ describe("categories", () => {
       .from(projectCategories)
       .where(eq(projectCategories.projectId, projId));
     expect(rows.map((r) => r.categoryId)).toEqual([c3]);
+  });
+
+  it("excludes types the caller asked to omit", async () => {
+    const admin = await makeUser(`ex-${Date.now()}@x.com`, "admin");
+    await createCategoryAs(admin, { name: "React", type: "technology" });
+    await createCategoryAs(admin, { name: "Electronics", type: "inventory" });
+
+    const all = await listCategoriesImpl({});
+    const projectOnly = await listCategoriesImpl({
+      excludeTypes: ["inventory"],
+    });
+
+    expect(all.rows.map((r) => r.name)).toContain("Electronics");
+    expect(projectOnly.rows.map((r) => r.name)).not.toContain("Electronics");
+    expect(projectOnly.rows.map((r) => r.name)).toContain("React");
   });
 });

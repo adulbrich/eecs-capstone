@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, notInArray, type SQL } from "drizzle-orm";
 import { db } from "#/db";
 import { categories, projectCategories, projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
@@ -24,17 +24,24 @@ function assertStaff(viewer: AuthUser) {
   }
 }
 
-export async function listCategoriesImpl(data: { type?: string | null }) {
-  const rows = data.type
-    ? await db
-        .select()
-        .from(categories)
-        .where(eq(categories.type, data.type))
-        .orderBy(categories.name)
-    : await db
-        .select()
-        .from(categories)
-        .orderBy(categories.type, categories.name);
+export async function listCategoriesImpl(data: {
+  type?: string | null;
+  excludeTypes?: string[] | null;
+}) {
+  const conditions: SQL[] = [];
+  if (data.type) {
+    conditions.push(eq(categories.type, data.type));
+  }
+  if (data.excludeTypes?.length) {
+    conditions.push(notInArray(categories.type, data.excludeTypes));
+  }
+  const rows = await db
+    .select()
+    .from(categories)
+    .where(conditions.length ? and(...conditions) : undefined)
+    // Ordering by type first is what groups the project pickers; a single
+    // type filter makes the first key a no-op, which is harmless.
+    .orderBy(categories.type, categories.name);
   return { rows };
 }
 
