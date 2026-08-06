@@ -8,18 +8,23 @@ import { InventoryForm } from "#/components/inventory-form";
 import { getSession } from "#/lib/auth-guards";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
-import { getInventoryItem } from "#/server/inventory";
+import {
+  getInventoryItem,
+  type InventoryItemPublic,
+  type InventoryItemStaffDetail,
+} from "#/server/inventory";
 
-interface StaffItem {
-  category: string | null;
-  description: string | null;
-  id: string;
-  imageUrl: string | null;
-  label?: string | null;
-  location: string | null;
-  name: string;
-  notes?: string | null;
-  serial?: string | null;
+/**
+ * `getInventoryItem` returns a plain union (not a discriminated one): a
+ * public and a staff shape that overlap structurally, so TypeScript cannot
+ * narrow between them from a runtime check alone. `serial` exists only on
+ * the staff shape, so testing for it is a real (compiler-checked) narrowing
+ * instead of the double cast this used to be.
+ */
+function isStaffItem(
+  item: InventoryItemPublic | InventoryItemStaffDetail
+): item is InventoryItemStaffDetail {
+  return "serial" in item;
 }
 
 export const Route = createFileRoute("/_authed/inventory/$itemId/edit")({
@@ -46,30 +51,37 @@ export const Route = createFileRoute("/_authed/inventory/$itemId/edit")({
     if (!item) {
       throw notFound();
     }
-    return item;
+    if (!isStaffItem(item)) {
+      // `beforeLoad` above already restricts this route to admin/instructor,
+      // so `getInventoryItem` (which gates on the same session) cannot
+      // actually return the public shape here. This only narrows the type
+      // for the compiler; it is not a reachable runtime branch.
+      throw notFound();
+    }
+    return { item };
   },
   component: EditInventoryItem,
 });
 
 function EditInventoryItem() {
   const navigate = useNavigate();
-  const loaded = Route.useLoaderData() as unknown as StaffItem;
+  const { item } = Route.useLoaderData();
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
       <h1 className="font-semibold text-2xl">Edit inventory item</h1>
       <div className="mt-6">
         <InventoryForm
           initial={{
-            name: loaded.name,
-            description: loaded.description ?? "",
-            category: loaded.category ?? "",
-            serial: loaded.serial ?? "",
-            label: loaded.label ?? "",
-            location: loaded.location ?? "",
-            notes: loaded.notes ?? "",
-            imageUrl: loaded.imageUrl ?? "",
+            name: item.name,
+            description: item.description ?? "",
+            categoryIds: item.categories.map((c) => c.id),
+            serial: item.serial ?? "",
+            label: item.label ?? "",
+            location: item.location ?? "",
+            notes: item.notes ?? "",
+            imageUrl: item.imageUrl ?? "",
           }}
-          itemId={loaded.id}
+          itemId={item.id}
           onSaved={(itemId) =>
             navigate({ to: "/inventory/$itemId", params: { itemId } })
           }

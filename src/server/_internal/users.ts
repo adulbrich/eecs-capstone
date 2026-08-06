@@ -101,7 +101,7 @@ export async function searchUsersForCurrentUser(data: { q: string }) {
   return searchUsersAs(viewer, data);
 }
 
-export async function listUsersImpl(data: ListUsersInput) {
+function buildUserConditions(data: ListUsersInput): SQL[] {
   const conditions: SQL[] = [];
   if (data.q) {
     const q = or(
@@ -121,7 +121,11 @@ export async function listUsersImpl(data: ListUsersInput) {
       conditions.push(notBanned);
     }
   }
+  return conditions;
+}
 
+export async function listUsersImpl(data: ListUsersInput) {
+  const conditions = buildUserConditions(data);
   const where = conditions.length ? and(...conditions) : undefined;
   const offset = (data.page - 1) * data.pageSize;
 
@@ -152,6 +156,55 @@ export async function listUsersForCurrentUser(data: ListUsersInput) {
   const viewer = await requireUser();
   assertAdmin(viewer);
   return listUsersImpl(data);
+}
+
+/**
+ * The admin CSV export. Same conditions and order as the listing, no
+ * pagination, and every user column except authentication material: nothing
+ * from `account` or `session` is joined.
+ */
+export async function exportUsersImpl(data: ListUsersInput) {
+  const conditions = buildUserConditions(data);
+  const rows = await db
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      emailVerified: user.emailVerified,
+      image: user.image,
+      role: user.role,
+      banned: user.banned,
+      banReason: user.banReason,
+      banExpires: user.banExpires,
+      affiliation: user.affiliation,
+      linkedin: user.linkedin,
+      wantsToMentor: user.wantsToMentor,
+      mentorTeamCount: user.mentorTeamCount,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    })
+    .from(user)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(userOrderBy(data.sort, data.dir));
+  return { rows };
+}
+
+/**
+ * Gated with assertAdmin, not assertStaff. /admin/users requires
+ * `role === "admin"` exactly, unlike every other admin route, and a server
+ * function is a public endpoint rather than a page the router can redirect.
+ *
+ * Split out from the wrapper below so integration tests can exercise the gate
+ * with a plain viewer, the way they do for every other *As helper.
+ */
+export async function exportUsersAs(viewer: AuthUser, data: ListUsersInput) {
+  assertAdmin(viewer);
+  return await exportUsersImpl(data);
+}
+
+export async function exportUsersForCurrentUser(data: ListUsersInput) {
+  const viewer = await requireUser();
+  return exportUsersAs(viewer, data);
 }
 
 export async function getUserImpl(data: { id: string }) {
@@ -263,12 +316,8 @@ export async function unbanUserForCurrentUser(data: { userId: string }) {
   return unbanUserAs(viewer, data);
 }
 
-export async function listMentorsAs(
-  viewer: AuthUser,
-  data: { q: string } = { q: "" }
-) {
-  assertStaff(viewer);
-  const conditions = [eq(user.wantsToMentor, true)];
+function buildMentorConditions(data: { q: string }): SQL[] {
+  const conditions: SQL[] = [eq(user.wantsToMentor, true)];
   const trimmed = data.q.trim();
   if (trimmed) {
     // The `user` table carries no tsvector, so this is substring matching.
@@ -283,6 +332,14 @@ export async function listMentorsAs(
       conditions.push(match);
     }
   }
+  return conditions;
+}
+
+export async function listMentorsAs(
+  viewer: AuthUser,
+  data: { q: string } = { q: "" }
+) {
+  assertStaff(viewer);
   const rows = await db
     .select({
       affiliation: user.affiliation,
@@ -292,9 +349,44 @@ export async function listMentorsAs(
       name: user.name,
     })
     .from(user)
-    .where(and(...conditions))
+    .where(and(...buildMentorConditions(data)))
     .orderBy(user.name);
   return { rows };
+}
+
+/**
+ * The staff CSV export. Widens the five-column listing with role,
+ * wantsToMentor and createdAt.
+ *
+ * `wantsToMentor` is constant true across the whole result set by
+ * construction. It is included anyway so a spreadsheet that gets filtered and
+ * re-sorted still says what it is a list of.
+ */
+export async function exportMentorsAs(
+  viewer: AuthUser,
+  data: { q: string } = { q: "" }
+) {
+  assertStaff(viewer);
+  const rows = await db
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      affiliation: user.affiliation,
+      role: user.role,
+      wantsToMentor: user.wantsToMentor,
+      mentorTeamCount: user.mentorTeamCount,
+      createdAt: user.createdAt,
+    })
+    .from(user)
+    .where(and(...buildMentorConditions(data)))
+    .orderBy(user.name);
+  return { rows };
+}
+
+export async function exportMentorsForCurrentUser(data: { q: string }) {
+  const viewer = await requireUser();
+  return exportMentorsAs(viewer, data);
 }
 
 export async function setUserMentorStatusAs(

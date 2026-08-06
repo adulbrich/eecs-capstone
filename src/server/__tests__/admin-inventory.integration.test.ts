@@ -25,7 +25,7 @@ async function makeHolder(email: string, name: string) {
   return u.id;
 }
 
-const EMPTY = { category: null, q: "", status: null } as const;
+const EMPTY = { categories: [] as string[], q: "", status: null } as const;
 
 describe("listAdminInventoryAs", () => {
   it("returns every matching row rather than one page", async () => {
@@ -122,7 +122,7 @@ describe("public inventory search stays narrow", () => {
       .insert(inventoryItems)
       .values([{ name: "Oscilloscope", serial: "SN-99812" }]);
     const { rows } = await listInventoryAs(null, {
-      category: null,
+      categories: [],
       page: 1,
       pageSize: 24,
       q: "99812",

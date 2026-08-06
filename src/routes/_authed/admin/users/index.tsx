@@ -10,6 +10,7 @@ import {
   type AdminColumn,
   AdminDataTable,
 } from "#/components/admin-data-table";
+import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
 import { LocalTime } from "#/components/local-time";
 import {
@@ -30,13 +31,14 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { getSession } from "#/lib/auth-guards";
+import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import {
   type AdminTableSearch,
   type SortState,
   useAdminTableState,
 } from "#/lib/table-state";
-import { listUsers } from "#/server/users";
+import { exportUsers, listUsers } from "#/server/users";
 
 const ROLES = ["user", "instructor", "admin"] as const;
 
@@ -143,6 +145,47 @@ const COLUMNS: AdminColumn<Row>[] = [
   },
 ];
 
+type ExportRow = Awaited<ReturnType<typeof exportUsers>>["rows"][number];
+
+// One entry per field the export projection selects (src/server/_internal/
+// users.ts, exportUsersImpl): the full user record minus authentication
+// material from account/session/verification. defineCsvColumns<ExportRow>()
+// fails npm run typecheck if a field of ExportRow has no column here, so a
+// future field added to that projection cannot silently miss the file.
+const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
+  { header: "ID", key: "id", value: (row) => row.id },
+  { header: "Name", key: "name", value: (row) => row.name },
+  { header: "Email", key: "email", value: (row) => row.email },
+  {
+    header: "Email verified",
+    key: "emailVerified",
+    value: (row) => row.emailVerified,
+  },
+  { header: "Image", key: "image", value: (row) => row.image },
+  { header: "Role", key: "role", value: (row) => row.role },
+  { header: "Banned", key: "banned", value: (row) => row.banned },
+  { header: "Ban reason", key: "banReason", value: (row) => row.banReason },
+  { header: "Ban expires", key: "banExpires", value: (row) => row.banExpires },
+  {
+    header: "Affiliation",
+    key: "affiliation",
+    value: (row) => row.affiliation,
+  },
+  { header: "LinkedIn", key: "linkedin", value: (row) => row.linkedin },
+  {
+    header: "Wants to mentor",
+    key: "wantsToMentor",
+    value: (row) => row.wantsToMentor,
+  },
+  {
+    header: "Mentor team count",
+    key: "mentorTeamCount",
+    value: (row) => row.mentorTeamCount,
+  },
+  { header: "Created", key: "createdAt", value: (row) => row.createdAt },
+  { header: "Updated", key: "updatedAt", value: (row) => row.updatedAt },
+]);
+
 function UsersAdmin() {
   const navigate = useNavigate({ from: "/admin/users/" });
   const { page, pageSize, rows, total } = Route.useLoaderData();
@@ -217,6 +260,23 @@ function UsersAdmin() {
       <h1 className="mt-2 font-semibold text-2xl">Users</h1>
 
       <AdminDataTable
+        actions={
+          <ExportCsvButton
+            filename="users"
+            load={async () => {
+              const { rows: exportRows } = await exportUsers({
+                data: {
+                  dir: search.dir,
+                  includeBanned: search.includeBanned,
+                  q: search.q,
+                  role: search.role,
+                  sort: search.sort,
+                },
+              });
+              return toCsv(EXPORT_COLUMNS, exportRows);
+            }}
+          />
+        }
         caption="Users"
         columns={COLUMNS}
         data={rows}

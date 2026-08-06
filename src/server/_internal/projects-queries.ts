@@ -106,22 +106,13 @@ interface AdminProjectsFilter {
 }
 
 /**
- * Test seam. Integration tests call this directly with a viewer instead of
- * going through the request session, matching the `*As(viewer, ...)`
- * convention used by the mutation helpers.
+ * The scope the proposer dropdown is built from: status, program and the
+ * soft-delete switch, but NOT the search text or the proposer choice itself.
+ * Excluding the proposer keeps the option you picked from being the only one
+ * left; excluding `q` keeps typing in the search box from emptying the
+ * dropdown underneath you.
  */
-export async function listAdminProjectsAs(
-  viewer: Viewer,
-  data: AdminProjectsFilter
-) {
-  if (!isStaff(viewer)) {
-    throw new Error("Forbidden");
-  }
-  // The scope the proposer dropdown is built from: status, program and the
-  // soft-delete switch, but NOT the search text or the proposer choice itself.
-  // Excluding the proposer keeps the option you picked from being the only one
-  // left; excluding `q` keeps typing in the search box from emptying the
-  // dropdown underneath you.
+function buildAdminProjectScope(data: AdminProjectsFilter): SQL[] {
   const scope: SQL[] = [];
   if (data.status !== "all") {
     scope.push(eq(projects.status, data.status as ProjectStatus));
@@ -132,8 +123,16 @@ export async function listAdminProjectsAs(
   if (data.program) {
     scope.push(eq(projects.programId, data.program));
   }
+  return scope;
+}
 
-  const listConditions: SQL[] = [...scope];
+/**
+ * The conditions that select the listing's rows: the scope, plus the proposer
+ * filter, plus the search text. The CSV export calls this too, so the file can
+ * never disagree with the table about which rows match.
+ */
+function buildAdminProjectListConditions(data: AdminProjectsFilter): SQL[] {
+  const listConditions: SQL[] = [...buildAdminProjectScope(data)];
   if (data.proposer) {
     listConditions.push(eq(projects.proposerId, data.proposer));
   }
@@ -156,6 +155,23 @@ export async function listAdminProjectsAs(
       listConditions.push(match);
     }
   }
+  return listConditions;
+}
+
+/**
+ * Test seam. Integration tests call this directly with a viewer instead of
+ * going through the request session, matching the `*As(viewer, ...)`
+ * convention used by the mutation helpers.
+ */
+export async function listAdminProjectsAs(
+  viewer: Viewer,
+  data: AdminProjectsFilter
+) {
+  if (!isStaff(viewer)) {
+    throw new Error("Forbidden");
+  }
+  const scope = buildAdminProjectScope(data);
+  const listConditions = buildAdminProjectListConditions(data);
 
   const [rows, proposers] = await Promise.all([
     db
@@ -183,6 +199,55 @@ export async function listAdminProjectsAs(
 
 export async function listAdminProjectsImpl(data: AdminProjectsFilter) {
   return listAdminProjectsAs(await getViewer(), data);
+}
+
+/**
+ * The staff CSV export. Same conditions and same order as the listing, no
+ * pagination, and a projection widened to every meaningful column.
+ *
+ * `notes` is included even though it is staff-only, because this function is
+ * staff-gated and an export that silently dropped the staff notes would be
+ * the more surprising behavior. The gate is what makes that safe.
+ */
+export async function exportAdminProjectsAs(
+  viewer: Viewer,
+  data: AdminProjectsFilter
+) {
+  if (!isStaff(viewer)) {
+    throw new Error("Forbidden");
+  }
+  const conditions = buildAdminProjectListConditions(data);
+  const rows = await db
+    .select({
+      ...adminProjectSummarySelect,
+      problemStatement: projects.problemStatement,
+      objectives: projects.objectives,
+      minQualifications: projects.minQualifications,
+      prefQualifications: projects.prefQualifications,
+      url: projects.url,
+      licenseRestrictions: projects.licenseRestrictions,
+      notes: projects.notes,
+      archivedAt: projects.archivedAt,
+      programManagerId: projects.programManagerId,
+      // Correlated rather than joined: a join would multiply project rows by
+      // their category count and need a GROUP BY over the whole projection.
+      categories: sql<string | null>`(
+        SELECT string_agg(c.name, '; ' ORDER BY c.type, c.name)
+        FROM project_categories pc
+        JOIN categories c ON c.id = pc.category_id
+        WHERE pc.project_id = ${projects.id}
+      )`,
+    })
+    .from(projects)
+    .leftJoin(programs, eq(projects.programId, programs.id))
+    .leftJoin(user, eq(projects.proposerId, user.id))
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(projects.updatedAt));
+  return { rows };
+}
+
+export async function exportAdminProjectsImpl(data: AdminProjectsFilter) {
+  return exportAdminProjectsAs(await getViewer(), data);
 }
 
 /**

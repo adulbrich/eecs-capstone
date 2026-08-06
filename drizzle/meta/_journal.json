@@ -71,6 +71,13 @@
       "when": 1785642316169,
       "tag": "0009_warm_cammi",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786029829563,
+      "tag": "0010_category_domains",
+      "breakpoints": true
     }
   ]
 }

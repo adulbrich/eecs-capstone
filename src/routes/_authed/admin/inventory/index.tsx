@@ -4,12 +4,15 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import {
   type AdminColumn,
   AdminDataTable,
 } from "#/components/admin-data-table";
+import { CategoryChip } from "#/components/category-chip";
+import { CategoryFilterCombobox } from "#/components/category-filter-combobox";
+import { ExportCsvButton } from "#/components/export-csv-button";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { LocalTime } from "#/components/local-time";
 import {
@@ -31,6 +34,7 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { getSession } from "#/lib/auth-guards";
+import { defineCsvColumns, orderBySortedIds, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import { getPublicUrl } from "#/lib/storage";
 import {
@@ -54,7 +58,10 @@ const STATUSES = [
 type Status = (typeof STATUSES)[number];
 
 const searchSchema = z.object({
-  category: z.string().nullable().default(null),
+  // A stale pre-UUID `?category=` link (singular) fails
+  // `.array().uuid()`; caught and treated as "no filter" instead of a
+  // router error. Matches the public listing.
+  categories: z.array(z.string().uuid()).max(20).catch([]).default([]),
   cols: z.string().optional(),
   dir: z.enum(["asc", "desc"]).optional(),
   q: z.string().default(""),
@@ -77,7 +84,7 @@ export const Route = createFileRoute("/_authed/admin/inventory/")({
   // Only the filter fields: sort and column visibility are client state and
   // must not re-run the loader.
   loaderDeps: ({ search }) => ({
-    category: search.category,
+    categories: search.categories,
     q: search.q,
     status: search.status,
   }),
@@ -172,8 +179,23 @@ const COLUMNS: AdminColumn<Row>[] = [
     sortUndefined: "last",
   },
   {
-    accessorFn: (row) => row.category ?? undefined,
-    cell: ({ row }) => row.original.category ?? "-",
+    accessorFn: (row) =>
+      row.categories.length > 0
+        ? row.categories.map((c) => c.name).join("; ")
+        : undefined,
+    cell: ({ row }) =>
+      row.original.categories.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {row.original.categories.map((category) => (
+            <CategoryChip
+              category={{ ...category, type: null }}
+              key={category.id}
+            />
+          ))}
+        </div>
+      ) : (
+        "-"
+      ),
     header: "Category",
     id: "category",
     sortUndefined: "last",
@@ -246,13 +268,77 @@ const COLUMNS: AdminColumn<Row>[] = [
   },
 ];
 
+// Every field of the record, independent of which columns are visible.
+// defineCsvColumns<Row>() fails npm run typecheck if a field of Row (i.e. of
+// InventoryItemStaff plus currentHolderName) has no column here, so a future
+// field added to fullForStaff's projection cannot silently miss the file.
+// InventoryItemStaff is a hand-picked field list, not the bare table row, so
+// searchVector was never a member of Row to begin with.
+const EXPORT_COLUMNS = defineCsvColumns<Row>()([
+  { header: "ID", key: "id", value: (row) => row.id },
+  { header: "Name", key: "name", value: (row) => row.name },
+  {
+    header: "Description",
+    key: "description",
+    value: (row) => row.description,
+  },
+  {
+    header: "Categories",
+    key: "categories",
+    value: (row) => row.categories.map((c) => c.name).join("; "),
+  },
+  { header: "Status", key: "status", value: (row) => row.status },
+  { header: "Serial", key: "serial", value: (row) => row.serial },
+  { header: "Label", key: "label", value: (row) => row.label },
+  { header: "Location", key: "location", value: (row) => row.location },
+  { header: "Staff notes", key: "notes", value: (row) => row.notes },
+  { header: "Image URL", key: "imageUrl", value: (row) => row.imageUrl },
+  {
+    header: "Holder name",
+    key: "currentHolderName",
+    value: (row) => row.currentHolderName,
+  },
+  {
+    header: "Holder email",
+    key: "currentHolderEmail",
+    value: (row) => row.currentHolderEmail,
+  },
+  {
+    header: "Holder ID",
+    key: "currentHolderId",
+    value: (row) => row.currentHolderId,
+  },
+  {
+    header: "Holder label",
+    key: "currentHolderLabel",
+    value: (row) => row.currentHolderLabel,
+  },
+  { header: "Pick up by", key: "pickupBy", value: (row) => row.pickupBy },
+  { header: "Due", key: "dueAt", value: (row) => row.dueAt },
+  {
+    header: "Current request item ID",
+    key: "currentRequestItemId",
+    value: (row) => row.currentRequestItemId,
+  },
+  { header: "Created", key: "createdAt", value: (row) => row.createdAt },
+  { header: "Updated", key: "updatedAt", value: (row) => row.updatedAt },
+]);
+
 function AdminInventory() {
   const navigate = useNavigate({ from: "/admin/inventory/" });
   const { categories, rows } = Route.useLoaderData();
   // The whole search object goes to the hook, which reads cols/dir/sort.
   const search = Route.useSearch();
-  const { category, q, status } = search;
+  const { categories: selectedCategories, q, status } = search;
   const [qDraft, setQDraft] = useState(q);
+  // Populated by AdminDataTable's onSortedIdsChange every time the table's
+  // own sorted row order changes. A ref, not state: the export only reads it
+  // at click time, so there is no reason to re-render this component (or
+  // re-run the effect that populates it) on every sort change.
+  const sortedIdsRef = useRef<string[]>([]);
+  const onSortedIdsChange = useCallback((ids: string[]) => {
+    sortedIdsRef.current = ids;
+  }, []);
 
   useEffect(() => setQDraft(q), [q]);
 
@@ -316,6 +402,19 @@ function AdminInventory() {
       </div>
 
       <AdminDataTable
+        actions={
+          <ExportCsvButton
+            filename="inventory"
+            load={() =>
+              Promise.resolve(
+                toCsv(
+                  EXPORT_COLUMNS,
+                  orderBySortedIds(rows, sortedIdsRef.current, (row) => row.id)
+                )
+              )
+            }
+          />
+        }
         caption="Inventory items"
         columns={COLUMNS}
         data={rows}
@@ -325,6 +424,7 @@ function AdminInventory() {
         hidden={hidden}
         onHiddenChange={onHiddenChange}
         onSortChange={onSortChange}
+        onSortedIdsChange={onSortedIdsChange}
         sort={sort}
         storageKey="inventory"
         toolbar={
@@ -367,30 +467,21 @@ function AdminInventory() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="inv-category">Category</Label>
-              <Select
-                onValueChange={(v) =>
-                  void navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      category: v === "_all_" ? null : v,
-                    }),
-                  })
-                }
-                value={category ?? "_all_"}
-              >
-                <SelectTrigger className="mt-1 w-40" id="inv-category">
-                  <SelectValue placeholder="All categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all_">All categories</SelectItem>
-                  {categories.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="inv-category">
+                Categories (matches all selected)
+              </Label>
+              <div className="mt-1 w-56">
+                <CategoryFilterCombobox
+                  categories={categories}
+                  id="inv-category"
+                  onChange={(next) =>
+                    void navigate({
+                      search: (prev) => ({ ...prev, categories: next }),
+                    })
+                  }
+                  value={selectedCategories}
+                />
+              </div>
             </div>
           </>
         }

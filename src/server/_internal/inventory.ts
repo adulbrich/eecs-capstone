@@ -6,6 +6,7 @@ import {
   ilike,
   inArray,
   isNotNull,
+  isNull,
   ne,
   or,
   type SQL,
@@ -13,7 +14,9 @@ import {
 } from "drizzle-orm";
 import { db } from "#/db";
 import {
+  categories,
   inventoryCartItems,
+  inventoryItemCategories,
   inventoryItemEditLog,
   inventoryItemStatusHistory,
   inventoryItems,
@@ -23,13 +26,18 @@ import {
   user,
 } from "#/db/schema";
 import { readSession, requireUser } from "#/lib/_internal/auth-guards";
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+import { setInventoryItemCategoriesAs } from "./categories";
+import type { Tx } from "./inventory-transitions";
 
 type Viewer = { id: string; role?: string | null | undefined } | null;
 
+export interface ItemCategory {
+  id: string;
+  name: string;
+}
+
 export interface ListInventoryInput {
-  category: string | null;
+  categories: string[];
   page: number;
   pageSize: number;
   q: string;
@@ -43,7 +51,7 @@ export interface ListInventoryInput {
 }
 
 export interface InventoryItemPublic {
-  category: string | null;
+  categories: ItemCategory[];
   description: string | null;
   dueAt: Date | null;
   id: string;
@@ -71,13 +79,14 @@ function isStaff(viewer: Viewer): boolean {
 }
 
 function stripForPublic(
-  row: typeof inventoryItems.$inferSelect
+  row: typeof inventoryItems.$inferSelect,
+  categories: ItemCategory[]
 ): InventoryItemPublic {
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    category: row.category,
+    categories,
     imageUrl: row.imageUrl,
     status: row.status,
     // The hold's dates live on the item itself, so they are the same whether
@@ -88,10 +97,11 @@ function stripForPublic(
 }
 
 function fullForStaff(
-  row: typeof inventoryItems.$inferSelect
+  row: typeof inventoryItems.$inferSelect,
+  categories: ItemCategory[]
 ): InventoryItemStaff {
   return {
-    ...stripForPublic(row),
+    ...stripForPublic(row, categories),
     createdAt: row.createdAt,
     serial: row.serial,
     label: row.label,
@@ -124,18 +134,44 @@ function holderEmailOf(row: {
  * those must never become publicly searchable.
  */
 function buildInventoryScope(data: {
-  category: string | null;
+  categories: string[];
   status: ListInventoryInput["status"];
 }): SQL[] {
   const conditions: SQL[] = [ne(inventoryItems.status, "retired")];
   if (data.status) {
     conditions.push(eq(inventoryItems.status, data.status));
   }
-  if (data.category) {
-    conditions.push(eq(inventoryItems.category, data.category));
+  if (data.categories.length > 0) {
+    // All-match, not any-match: mirrors searchProjectsImpl
+    // (src/server/_internal/search.ts:40-46). A subquery grouped by itemId
+    // with count = the number of requested categories is the only shape
+    // that discriminates "has every selected category" from "has at least
+    // one of them" — a plain inArray on the join table would give the
+    // any-match semantics this task explicitly rejects.
+    const matching = db
+      .select({ itemId: inventoryItemCategories.itemId })
+      .from(inventoryItemCategories)
+      .where(inArray(inventoryItemCategories.categoryId, data.categories))
+      .groupBy(inventoryItemCategories.itemId)
+      .having(sql`count(*) = ${data.categories.length}`);
+    conditions.push(inArray(inventoryItems.id, matching));
   }
   return conditions;
 }
+
+/**
+ * A correlated subquery, not a join: joining inventory_item_categories would
+ * multiply each item row by its category count, corrupting both the row set
+ * and the `count(*)` used for pagination. json_agg with coalesce keeps an
+ * uncategorized item's array `[]` rather than dropping the row or leaving it
+ * null.
+ */
+const categoriesForItem = sql<ItemCategory[]>`coalesce((
+  SELECT json_agg(json_build_object('id', c.id, 'name', c.name) ORDER BY c.name)
+  FROM inventory_item_categories iic
+  JOIN categories c ON c.id = iic.category_id
+  WHERE iic.item_id = ${inventoryItems.id}
+), '[]'::json)`;
 
 export async function listInventoryAs(
   viewer: Viewer,
@@ -159,6 +195,7 @@ export async function listInventoryAs(
       item: inventoryItems,
       holderName: user.name,
       holderEmail: user.email,
+      categories: categoriesForItem,
     })
     .from(inventoryItems)
     .leftJoin(user, eq(inventoryItems.currentHolderId, user.id))
@@ -175,12 +212,12 @@ export async function listInventoryAs(
   const mapped = rows.map((r) => {
     if (isStaff(viewer)) {
       return {
-        ...fullForStaff(r.item),
+        ...fullForStaff(r.item, r.categories),
         currentHolderName: r.holderName,
         currentHolderEmail: holderEmailOf(r),
       };
     }
-    return stripForPublic(r.item);
+    return stripForPublic(r.item, r.categories);
   });
 
   return {
@@ -198,6 +235,7 @@ export type InventoryItemStaffDetail = InventoryItemStaff & {
 };
 
 interface InventoryItemJoinedRow {
+  categories: ItemCategory[];
   holderEmail: string | null;
   holderName: string | null;
   item: typeof inventoryItems.$inferSelect;
@@ -218,6 +256,7 @@ async function loadInventoryItemRowFor(
       item: inventoryItems,
       holderName: user.name,
       holderEmail: user.email,
+      categories: categoriesForItem,
     })
     .from(inventoryItems)
     .leftJoin(user, eq(inventoryItems.currentHolderId, user.id))
@@ -233,14 +272,14 @@ async function loadInventoryItemRowFor(
 
 function toStaffDetail(row: InventoryItemJoinedRow): InventoryItemStaffDetail {
   return {
-    ...fullForStaff(row.item),
+    ...fullForStaff(row.item, row.categories),
     currentHolderName: row.holderName,
     currentHolderEmail: holderEmailOf(row),
   };
 }
 
 function toPublicDetail(row: InventoryItemJoinedRow): InventoryItemPublic {
-  return stripForPublic(row.item);
+  return stripForPublic(row.item, row.categories);
 }
 
 export async function getInventoryItemAs(viewer: Viewer, data: { id: string }) {
@@ -257,7 +296,7 @@ export async function listInventoryForCurrentUser(data: ListInventoryInput) {
 }
 
 export interface ListAdminInventoryInput {
-  category: string | null;
+  categories: string[];
   q: string;
   status: ListInventoryInput["status"];
 }
@@ -299,6 +338,7 @@ export async function listAdminInventoryAs(
 
   const rows = await db
     .select({
+      categories: categoriesForItem,
       holderEmail: user.email,
       holderName: user.name,
       item: inventoryItems,
@@ -310,7 +350,7 @@ export async function listAdminInventoryAs(
 
   return {
     rows: rows.map((r) => ({
-      ...fullForStaff(r.item),
+      ...fullForStaff(r.item, r.categories),
       currentHolderEmail: holderEmailOf(r),
       currentHolderName: r.holderName,
     })),
@@ -325,19 +365,34 @@ export async function listAdminInventoryForCurrentUser(
 }
 
 export async function listInventoryCategoriesImpl() {
+  // Restricted to categories actually in use, so the dropdown never offers a
+  // filter that returns nothing. Reads through the join table now that an
+  // item can carry more than one category; distinct on category id collapses
+  // the fan-out from items with multiple categories. The domain filter is a
+  // belt-and-suspenders guard, not a defense against something that can
+  // happen today: nothing currently writes a project-domain category into
+  // inventory_item_categories, but no database constraint stops it either,
+  // so this keeps a future cross-domain row from surfacing in the public
+  // inventory filter dropdown.
   const rows = await db
-    .selectDistinct({ category: inventoryItems.category })
-    .from(inventoryItems)
+    .selectDistinct({ id: categories.id, name: categories.name })
+    .from(inventoryItemCategories)
+    .innerJoin(
+      inventoryItems,
+      eq(inventoryItemCategories.itemId, inventoryItems.id)
+    )
+    .innerJoin(
+      categories,
+      eq(inventoryItemCategories.categoryId, categories.id)
+    )
     .where(
       and(
-        ne(inventoryItems.status, "retired"),
-        isNotNull(inventoryItems.category)
+        eq(categories.domain, "inventory"),
+        ne(inventoryItems.status, "retired")
       )
     )
-    .orderBy(inventoryItems.category);
-  return {
-    categories: rows.map((r) => r.category).filter((c): c is string => !!c),
-  };
+    .orderBy(categories.name);
+  return { categories: rows };
 }
 
 export async function getInventoryItemForCurrentUser(data: { id: string }) {
@@ -346,7 +401,7 @@ export async function getInventoryItemForCurrentUser(data: { id: string }) {
 }
 
 export interface CreateInventoryItemInput {
-  category: string | null;
+  categoryIds: string[];
   description: string | null;
   imageUrl: string | null;
   label: string | null;
@@ -362,41 +417,81 @@ function assertStaff(viewer: Viewer): asserts viewer is NonNullable<Viewer> {
   }
 }
 
+/**
+ * Resolves an item's categories to `{id, name}[]`, ordered by name.
+ *
+ * Takes an explicit executor (defaulting to the module `db`) so a caller
+ * inside a transaction can pass `tx`: reaching for the module-level `db`
+ * from inside `updateInventoryItemAs`'s transaction would check out a
+ * second pooled connection while the first still holds the row's
+ * `FOR UPDATE` lock, which is exactly the kind of transaction-boundary
+ * change this task was told not to make.
+ */
+async function categoriesFor(
+  itemId: string,
+  executor: Tx | typeof db = db
+): Promise<ItemCategory[]> {
+  return await executor
+    .select({ id: categories.id, name: categories.name })
+    .from(inventoryItemCategories)
+    .innerJoin(
+      categories,
+      eq(inventoryItemCategories.categoryId, categories.id)
+    )
+    .where(eq(inventoryItemCategories.itemId, itemId))
+    .orderBy(categories.name);
+}
+
 export async function createInventoryItemAs(
   viewer: Viewer,
   data: CreateInventoryItemInput
 ) {
   assertStaff(viewer);
-  const [row] = await db
-    .insert(inventoryItems)
-    .values({
-      name: data.name,
-      description: data.description,
-      category: data.category,
-      serial: data.serial,
-      label: data.label,
-      location: data.location,
-      notes: data.notes,
-      imageUrl: data.imageUrl,
-    })
-    .returning();
-  return fullForStaff(row);
+  return await db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(inventoryItems)
+      .values({
+        name: data.name,
+        description: data.description,
+        serial: data.serial,
+        label: data.label,
+        location: data.location,
+        notes: data.notes,
+        imageUrl: data.imageUrl,
+      })
+      .returning();
+    // Written inside the same transaction as the item itself, so a failure
+    // here rolls back the insert instead of leaving an item with no
+    // categories.
+    await setInventoryItemCategoriesAs(
+      viewer,
+      { itemId: row.id, categoryIds: data.categoryIds },
+      tx
+    );
+    return fullForStaff(row, await categoriesFor(row.id, tx));
+  });
 }
 
 export type UpdateInventoryItemInput = CreateInventoryItemInput & {
   id: string;
 };
 
+// `satisfies` (not a type annotation) so the array keeps its literal tuple
+// type for the loop below, while a renamed or removed column here still
+// fails the build: a drifted entry silently makes `changed` empty for an
+// edit that only touched that field, hitting the early return below and
+// discarding the whole update while the caller still sees a success.
+// Categories are not in this list: they moved off inventory_items onto the
+// join table and are diffed separately, below.
 const EDITABLE_FIELDS = [
   "name",
   "description",
-  "category",
   "serial",
   "label",
   "location",
   "notes",
   "imageUrl",
-] as const;
+] as const satisfies readonly (keyof typeof inventoryItems.$inferSelect)[];
 
 export async function updateInventoryItemAs(
   viewer: Viewer,
@@ -419,17 +514,38 @@ export async function updateInventoryItemAs(
     for (const f of EDITABLE_FIELDS) {
       // Match projects.ts: normalize undefined to null on both sides and
       // compare with JSON.stringify so a wrapper passing `undefined`
-      // for an unset field does not spuriously log a change.
-      const oldVal = (before as Record<string, unknown>)[f] ?? null;
-      const newVal = (data as unknown as Record<string, unknown>)[f] ?? null;
+      // for an unset field does not spuriously log a change. `f` is one of
+      // the literal EDITABLE_FIELDS keys (not a bare `string`), so both
+      // reads below are real, checked property accesses rather than casts.
+      const oldVal = before[f] ?? null;
+      const newVal = data[f] ?? null;
       if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
         changed.push(f);
         oldValues[f] = oldVal;
         newValues[f] = newVal;
       }
     }
+
+    // Categories left EDITABLE_FIELDS's loop above along with the column, so
+    // they need their own diff, computed before the early return: otherwise
+    // a request that changes only categoryIds would compute changed.length
+    // === 0 above and silently discard the category write entirely, the
+    // same silent-write class the rest of this function guards against.
+    // Logged as names, not ids, joined with "; ": the edit log previously
+    // held readable category names and nothing renders it yet, so whoever
+    // builds that view should not inherit opaque identifiers.
+    const beforeCategories = await categoriesFor(data.id, tx);
+    const beforeCategoryIds = beforeCategories.map((c) => c.id).sort();
+    const afterCategoryIds = [...data.categoryIds].sort();
+    const categoriesChanged =
+      JSON.stringify(beforeCategoryIds) !== JSON.stringify(afterCategoryIds);
+    if (categoriesChanged) {
+      changed.push("categories");
+      oldValues.categories = beforeCategories.map((c) => c.name).join("; ");
+    }
+
     if (changed.length === 0) {
-      return fullForStaff(before);
+      return fullForStaff(before, beforeCategories);
     }
 
     await tx
@@ -437,7 +553,6 @@ export async function updateInventoryItemAs(
       .set({
         name: data.name,
         description: data.description,
-        category: data.category,
         serial: data.serial,
         label: data.label,
         location: data.location,
@@ -446,6 +561,17 @@ export async function updateInventoryItemAs(
         updatedAt: new Date(),
       })
       .where(eq(inventoryItems.id, data.id));
+
+    let afterCategories = beforeCategories;
+    if (categoriesChanged) {
+      await setInventoryItemCategoriesAs(
+        viewer,
+        { itemId: data.id, categoryIds: data.categoryIds },
+        tx
+      );
+      afterCategories = await categoriesFor(data.id, tx);
+      newValues.categories = afterCategories.map((c) => c.name).join("; ");
+    }
 
     await tx.insert(inventoryItemEditLog).values({
       itemId: data.id,
@@ -459,7 +585,7 @@ export async function updateInventoryItemAs(
       .select()
       .from(inventoryItems)
       .where(eq(inventoryItems.id, data.id));
-    return fullForStaff(after);
+    return fullForStaff(after, afterCategories);
   });
 }
 
@@ -956,6 +1082,58 @@ export async function cancelRequestItemForCurrentUser(data: {
   return cancelRequestItemAs(viewer, data);
 }
 
+/**
+ * An entry in the Active tab. Holds have no request line by definition, so
+ * this is a union rather than a line with optional fields.
+ */
+export type ActiveEntry =
+  | {
+      kind: "request";
+      line: typeof inventoryRequestItems.$inferSelect;
+      item: typeof inventoryItems.$inferSelect;
+      request: typeof inventoryRequests.$inferSelect;
+    }
+  | { kind: "hold"; item: typeof inventoryItems.$inferSelect };
+
+function deadlineOf(entry: ActiveEntry): Date | null {
+  if (entry.kind === "hold") {
+    return entry.item.currentDueAt ?? entry.item.currentPickupBy;
+  }
+  return entry.line.dueAt ?? entry.line.pickupBy;
+}
+
+// A hold has no request line, so its "created" moment is when the item row
+// was last written; a pending request line hasn't been touched since it was
+// created, so createdAt and updatedAt agree for it anyway.
+function recencyOf(entry: ActiveEntry): Date {
+  return entry.kind === "hold" ? entry.item.updatedAt : entry.line.createdAt;
+}
+
+/**
+ * Soonest deadline first, entries without one last, newest first within a
+ * tie (including the common case of two entries that both have no
+ * deadline, e.g. two pending requests). This is the created_at DESC order
+ * the active list used before holds existed, kept as the fallback so it
+ * still applies to everything a deadline can't order.
+ */
+function byDeadline(a: ActiveEntry, b: ActiveEntry): number {
+  const left = deadlineOf(a);
+  const right = deadlineOf(b);
+  if (left && right) {
+    return (
+      left.getTime() - right.getTime() ||
+      recencyOf(b).getTime() - recencyOf(a).getTime()
+    );
+  }
+  if (left) {
+    return -1;
+  }
+  if (right) {
+    return 1;
+  }
+  return recencyOf(b).getTime() - recencyOf(a).getTime();
+}
+
 export async function listMyItemsAs(viewer: Viewer) {
   if (!viewer) {
     throw new Error("Sign in required");
@@ -966,7 +1144,15 @@ export async function listMyItemsAs(viewer: Viewer) {
   } catch {
     // swallow; degraded notification recording must not 500 the page.
   }
-  const [cart, active, history] = await Promise.all([
+  // Only a verified address may claim a hold: otherwise anyone could take
+  // someone else's item by editing their own email in the profile form.
+  const [account] = await db
+    .select({ email: user.email, verified: user.emailVerified })
+    .from(user)
+    .where(eq(user.id, viewer.id));
+  const verifiedEmail = account?.verified ? account.email : null;
+
+  const [cart, activeLines, holds, history] = await Promise.all([
     getCartAs(viewer),
     db
       .select({
@@ -990,6 +1176,31 @@ export async function listMyItemsAs(viewer: Viewer) {
         )
       )
       .orderBy(desc(inventoryRequestItems.createdAt)),
+    db
+      .select({ item: inventoryItems })
+      .from(inventoryItems)
+      .where(
+        and(
+          // Disjoint from the request-line query above: an item held through
+          // a request line is already in `active` and must not appear twice.
+          // Safe by construction, not by a DB constraint: closeRequestItemOnRelease
+          // (inventory-transitions.ts) closes the attached line whenever
+          // current_request_item_id goes null, so a live pending/approved
+          // line and a null current_request_item_id never coexist.
+          isNull(inventoryItems.currentRequestItemId),
+          inArray(inventoryItems.status, ["reserved", "checked_out"]),
+          or(
+            eq(inventoryItems.currentHolderId, viewer.id),
+            verifiedEmail
+              ? and(
+                  // Never override an explicit account assignment.
+                  isNull(inventoryItems.currentHolderId),
+                  eq(inventoryItems.currentHolderEmail, verifiedEmail)
+                )
+              : undefined
+          )
+        )
+      ),
     db
       .select({
         line: inventoryRequestItems,
@@ -1018,6 +1229,12 @@ export async function listMyItemsAs(viewer: Viewer) {
       .orderBy(desc(inventoryRequestItems.updatedAt))
       .limit(50),
   ]);
+
+  const active: ActiveEntry[] = [
+    ...activeLines.map((row): ActiveEntry => ({ kind: "request", ...row })),
+    ...holds.map((row): ActiveEntry => ({ kind: "hold", item: row.item })),
+  ].sort(byDeadline);
+
   return { cart, active, history };
 }
 
@@ -1282,6 +1499,21 @@ export async function uploadInventoryImageForCurrentUser(form: FormData) {
   return uploadInventoryImageAs(viewer, form);
 }
 
+/**
+ * Common shape both scans below normalize their rows to before the single
+ * push loop. `userId` is nullable here on purpose: the hold scan's query
+ * conditions already exclude unresolved holds (see below), but the type
+ * stays honest about the column it came from until the explicit filter.
+ */
+interface OverdueCandidate {
+  dueAt: Date | null;
+  itemId: string;
+  itemName: string;
+  pickupBy: Date | null;
+  status: string;
+  userId: string | null;
+}
+
 export async function recordOverdueNotificationsAs(
   viewer: Viewer,
   opts: { ownerId?: string } = {}
@@ -1293,14 +1525,14 @@ export async function recordOverdueNotificationsAs(
   if (opts.ownerId) {
     conditions.push(eq(inventoryRequests.userId, opts.ownerId));
   }
-  const rows = await db
+  const requestRows: OverdueCandidate[] = await db
     .select({
       itemId: inventoryItems.id,
       itemName: inventoryItems.name,
       status: inventoryItems.status,
       pickupBy: inventoryRequestItems.pickupBy,
       dueAt: inventoryRequestItems.dueAt,
-      requesterId: inventoryRequests.userId,
+      userId: inventoryRequests.userId,
     })
     .from(inventoryRequestItems)
     .innerJoin(
@@ -1313,12 +1545,46 @@ export async function recordOverdueNotificationsAs(
     )
     .where(and(...conditions));
 
+  // Staff holds have no request line, so the scan above cannot see them.
+  // Restricted to holds with a resolved account (currentHolderId IS NOT
+  // NULL): notifications.userId is a foreign key, and an email-matched hold
+  // has no id to attribute a message to. Resolving the address here would
+  // reintroduce, on a write path, the impersonation risk the read path in
+  // listMyItemsAs guards against.
+  const holdConditions = [
+    isNull(inventoryItems.currentRequestItemId),
+    isNotNull(inventoryItems.currentHolderId),
+    inArray(inventoryItems.status, ["reserved", "checked_out"]),
+  ];
+  if (opts.ownerId) {
+    holdConditions.push(eq(inventoryItems.currentHolderId, opts.ownerId));
+  }
+  const holdRows: OverdueCandidate[] = await db
+    .select({
+      itemId: inventoryItems.id,
+      itemName: inventoryItems.name,
+      status: inventoryItems.status,
+      pickupBy: inventoryItems.currentPickupBy,
+      dueAt: inventoryItems.currentDueAt,
+      userId: inventoryItems.currentHolderId,
+    })
+    .from(inventoryItems)
+    .where(and(...holdConditions));
+
+  // Belt and suspenders with the query-level isNotNull above: keep the
+  // exclusion of unattributable rows visible here too, rather than trusting
+  // the query alone to have filtered them out before they reach the push
+  // loop that assumes a non-null userId.
+  const candidates = [...requestRows, ...holdRows].filter(
+    (r): r is OverdueCandidate & { userId: string } => r.userId !== null
+  );
+
   const values: (typeof notifications.$inferInsert)[] = [];
-  for (const r of rows) {
+  for (const r of candidates) {
     const { pickupOverdue, checkoutOverdue } = deriveDeadlineFlags(r);
     if (pickupOverdue) {
       values.push({
-        userId: r.requesterId,
+        userId: r.userId,
         type: "inventory_pickup_overdue",
         title: `Pickup window passed: ${r.itemName}`,
         message: "Your reserved item is past its pickup window.",
@@ -1327,7 +1593,7 @@ export async function recordOverdueNotificationsAs(
     }
     if (checkoutOverdue) {
       values.push({
-        userId: r.requesterId,
+        userId: r.userId,
         type: "inventory_checkout_overdue",
         title: `Overdue: ${r.itemName}`,
         message: "Your checked-out item is past its due date.",
@@ -1335,6 +1601,7 @@ export async function recordOverdueNotificationsAs(
       });
     }
   }
+
   if (values.length === 0) {
     return;
   }

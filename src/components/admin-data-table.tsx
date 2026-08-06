@@ -10,7 +10,7 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table";
 import { ChevronDown, ChevronsUpDown, ChevronUp, Columns3 } from "lucide-react";
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo } from "react";
 import { EmptyState } from "#/components/empty-state";
 import { Button } from "#/components/ui/button";
 import {
@@ -87,6 +87,13 @@ export type AdminColumn<T> = ColumnDef<T, unknown> & {
 };
 
 export interface AdminDataTableProps<T> {
+  /**
+   * Controls rendered in the right-hand group, before the Columns menu.
+   * A slot rather than an `onExport` callback: the export needs per-route
+   * column definitions and filter state, and threading those through here
+   * would make the table know about exports.
+   */
+  actions?: ReactNode;
   caption: string;
   columns: AdminColumn<T>[];
   data: T[];
@@ -96,6 +103,20 @@ export interface AdminDataTableProps<T> {
   hidden: string[];
   onHiddenChange: (cols: string | undefined) => void;
   onSortChange: (sort: SortState) => void;
+  /**
+   * Reports the ids of the rows in their current sorted (rendered) order,
+   * via `getRowId`, every time sorting or the underlying data changes. Not
+   * called when `serverSorted` is set: there the rows already arrived in
+   * server order, `data` already holds that order, and the caller has no use
+   * for a second copy of it.
+   *
+   * The intended consumer is an export handler: ordering the exported rows
+   * by this id sequence (see `orderBySortedIds` in `#/lib/csv`) makes the
+   * file's row order match the screen by construction, without a route
+   * hand-copying this table's sort comparators (the default locale-aware
+   * one, a column's own `sortingFn`, or a custom order like status).
+   */
+  onSortedIdsChange?: (ids: string[]) => void;
   /**
    * Set when the server already ordered the rows and will reorder them on the
    * next request, which is the case for any paginated listing. Header clicks
@@ -138,6 +159,7 @@ function SortIcon({ direction }: { direction: false | "asc" | "desc" }) {
  * render in tests without a router.
  */
 export function AdminDataTable<T>({
+  actions,
   caption,
   columns,
   data,
@@ -147,6 +169,7 @@ export function AdminDataTable<T>({
   hidden,
   onHiddenChange,
   onSortChange,
+  onSortedIdsChange,
   serverSorted,
   sort,
   storageKey,
@@ -243,6 +266,19 @@ export function AdminDataTable<T>({
   const rows = table.getRowModel().rows;
   const hideable = table.getAllLeafColumns().filter((c) => c.getCanHide());
 
+  // Reports the table's own sorted row order to the caller. Skipped when
+  // serverSorted: the rows there are not locally reordered at all (see
+  // manualSorting above), so `data`'s own order already is that order and
+  // there is nothing this effect would add. Guarded inside the effect,
+  // rather than by omitting the dependency, so a change to `serverSorted`
+  // itself is still tracked correctly.
+  useEffect(() => {
+    if (serverSorted) {
+      return;
+    }
+    onSortedIdsChange?.(rows.map((row) => row.id));
+  }, [rows, serverSorted, onSortedIdsChange]);
+
   // The row count alone leaves the table's order silently unannounced: when
   // the sorted column is hidden (its header, and the aria-sort it carries,
   // are not in the DOM at all), nothing else tells a screen reader user which
@@ -269,50 +305,54 @@ export function AdminDataTable<T>({
     <div className="mt-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-3">{toolbar}</div>
-        {/*
-          modal={false}: Radix's default modal DropdownMenu hides the rest of
-          the page from assistive tech via `aria-hidden` (not `inert`) while
-          it's open: @radix-ui/react-menu calls `hideOthers` from the
-          `aria-hidden` package directly rather than its `inert`-aware
-          `suppressOthers`. That leaves every focusable element outside the
-          menu (nav links, the search box, sort buttons) inside an
-          aria-hidden subtree, which axe correctly flags as
-          aria-hidden-focus. This menu is a lightweight column toggle, not a
-          workflow that needs a hard focus trap, so opting out of modal
-          behavior is the right fix here rather than living with the
-          violation or fighting Radix's internals.
-        */}
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            {/*
-              Default size, not sm: this button sits on the same row as the
-              page's search input and filter selects, which are all h-9. An
-              h-8 button beside them reads as misaligned rather than compact.
-            */}
-            <Button variant="outline">
-              <Columns3 aria-hidden className="size-4" />
-              Columns
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {hideable.map((column) => (
-              <DropdownMenuCheckboxItem
-                checked={column.getIsVisible()}
-                key={column.id}
-                onCheckedChange={(value) => column.toggleVisibility(value)}
-                onSelect={(event) => event.preventDefault()}
-              >
-                {labels.get(column.id) ?? column.id}
-              </DropdownMenuCheckboxItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={resetColumns}>
-              Reset columns
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-end gap-3">
+          {actions}
+          {/*
+            modal={false}: Radix's default modal DropdownMenu hides the rest
+            of the page from assistive tech via `aria-hidden` (not `inert`)
+            while it's open: @radix-ui/react-menu calls `hideOthers` from the
+            `aria-hidden` package directly rather than its `inert`-aware
+            `suppressOthers`. That leaves every focusable element outside the
+            menu (nav links, the search box, sort buttons) inside an
+            aria-hidden subtree, which axe correctly flags as
+            aria-hidden-focus. This menu is a lightweight column toggle, not
+            a workflow that needs a hard focus trap, so opting out of modal
+            behavior is the right fix here rather than living with the
+            violation or fighting Radix's internals.
+          */}
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              {/*
+                Default size, not sm: this button sits on the same row as
+                the page's search input and filter selects, which are all
+                h-9. An h-8 button beside them reads as misaligned rather
+                than compact.
+              */}
+              <Button variant="outline">
+                <Columns3 aria-hidden className="size-4" />
+                Columns
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {hideable.map((column) => (
+                <DropdownMenuCheckboxItem
+                  checked={column.getIsVisible()}
+                  key={column.id}
+                  onCheckedChange={(value) => column.toggleVisibility(value)}
+                  onSelect={(event) => event.preventDefault()}
+                >
+                  {labels.get(column.id) ?? column.id}
+                </DropdownMenuCheckboxItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={resetColumns}>
+                Reset columns
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <p aria-live="polite" className="sr-only">

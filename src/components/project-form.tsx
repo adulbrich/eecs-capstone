@@ -431,6 +431,7 @@ export function ProjectForm({
                 <Label>Categories</Label>
                 <div className="mt-1">
                   <CategoryMultiSelect
+                    domain="project"
                     onChange={setCategoryIds}
                     value={categoryIds}
                   />

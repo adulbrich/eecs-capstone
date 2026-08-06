@@ -1,22 +1,44 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const categorySchema = z.object({
-  name: z.string().trim().min(1).max(100),
-  type: z.string().trim().min(1).max(50),
-});
+export const categorySchema = z.discriminatedUnion("domain", [
+  z.object({
+    domain: z.literal("project"),
+    name: z.string().trim().min(1).max(100),
+    type: z.string().trim().min(1).max(50),
+  }),
+  z.object({
+    domain: z.literal("inventory"),
+    name: z.string().trim().min(1).max(100),
+    type: z.null(),
+  }),
+]);
 
 export type CategoryInput = z.infer<typeof categorySchema>;
 
-const categoryUpdateSchema = categorySchema.extend({
-  id: z.string().uuid(),
-});
+// z.discriminatedUnion does not support .extend(); each variant is rebuilt
+// with id added instead.
+const categoryUpdateSchema = z.discriminatedUnion("domain", [
+  z.object({
+    id: z.string().uuid(),
+    domain: z.literal("project"),
+    name: z.string().trim().min(1).max(100),
+    type: z.string().trim().min(1).max(50),
+  }),
+  z.object({
+    id: z.string().uuid(),
+    domain: z.literal("inventory"),
+    name: z.string().trim().min(1).max(100),
+    type: z.null(),
+  }),
+]);
 
 export type CategoryUpdateInput = z.infer<typeof categoryUpdateSchema>;
 
 const idSchema = z.object({ id: z.string().uuid() });
 
-const listSchema = z.object({
+export const listSchema = z.object({
+  domain: z.enum(["project", "inventory"]).nullable().optional(),
   type: z.string().nullable().optional(),
 });
 

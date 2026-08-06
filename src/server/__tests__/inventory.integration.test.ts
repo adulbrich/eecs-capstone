@@ -1,8 +1,11 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { db } from "#/db";
 import {
+  categories,
   inventoryCartItems,
+  inventoryItemCategories,
   inventoryItemEditLog,
   inventoryItemStatusHistory,
   inventoryItems,
@@ -13,6 +16,10 @@ import {
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import {
+  createCategoryAs,
+  deleteCategoryAs,
+} from "#/server/_internal/categories";
+import {
   addToCartAs,
   approveRequestItemAs,
   cancelRequestItemAs,
@@ -22,12 +29,15 @@ import {
   hardDeleteInventoryItemAs,
   listAdminInventoryAs,
   listInventoryAs,
+  listInventoryCategoriesImpl,
+  listMyItemsAs,
   recordOverdueNotificationsAs,
   rejectRequestItemAs,
   submitCartAs,
   updateInventoryItemAs,
 } from "#/server/_internal/inventory";
 import { transitionItem } from "#/server/_internal/inventory-transitions";
+import { itemPayloadSchema } from "#/server/inventory";
 
 async function makeUser(email: string, role: "user" | "admin" | "instructor") {
   await auth.api.signUpEmail({
@@ -49,6 +59,27 @@ async function makeItem(
     .values({ name: `Item-${Date.now()}-${Math.random()}`, ...overrides })
     .returning();
   return item;
+}
+
+async function makeCategory(name: string) {
+  const [row] = await db
+    .insert(categories)
+    .values({ name, domain: "inventory", type: null })
+    .returning();
+  return row;
+}
+
+/** The non-category fields createInventoryItemAs/updateInventoryItemAs require. */
+function baseItemInput(name: string) {
+  return {
+    name,
+    description: null,
+    serial: null,
+    label: null,
+    location: null,
+    notes: null,
+    imageUrl: null,
+  };
 }
 
 async function makeRequestLine(userId: string, itemId: string) {
@@ -318,7 +349,7 @@ describe("listInventoryAs privacy", () => {
     const result = await listInventoryAs(null, {
       q: "",
       status: null,
-      category: null,
+      categories: [],
       page: 1,
       pageSize: 50,
     });
@@ -335,7 +366,7 @@ describe("listInventoryAs privacy", () => {
     const result = await listInventoryAs(admin, {
       q: "",
       status: null,
-      category: null,
+      categories: [],
       page: 1,
       pageSize: 50,
     });
@@ -352,7 +383,7 @@ describe("listInventoryAs privacy", () => {
     const result = await listInventoryAs(admin, {
       q: "",
       status: null,
-      category: null,
+      categories: [],
       page: 1,
       pageSize: 50,
     });
@@ -392,7 +423,7 @@ describe("listInventoryAs privacy", () => {
     const result = await listInventoryAs(student, {
       q: "",
       status: null,
-      category: null,
+      categories: [],
       page: 1,
       pageSize: 50,
     });
@@ -458,7 +489,7 @@ describe("listInventoryAs privacy", () => {
     const anonList = await listInventoryAs(null, {
       q: "",
       status: null,
-      category: null,
+      categories: [],
       page: 1,
       pageSize: 50,
     });
@@ -543,7 +574,7 @@ describe("catalog CRUD", () => {
     const blank = {
       name: "X",
       description: null,
-      category: null,
+      categoryIds: [],
       serial: null,
       label: null,
       location: null,
@@ -574,7 +605,7 @@ describe("catalog CRUD", () => {
       id: item.id,
       name: "New",
       description: null,
-      category: null,
+      categoryIds: [],
       serial: null,
       label: null,
       location: "Shelf B",
@@ -599,12 +630,53 @@ describe("catalog CRUD", () => {
     });
   });
 
+  // Pins the failure mode a drifted EDITABLE_FIELDS entry would cause: if the
+  // field list disagrees with what `.set()` actually writes, an edit that
+  // touches only the drifted field computes `changed.length === 0` and hits
+  // the early return, so the whole update is silently discarded while the
+  // caller still gets back a success response. A type annotation on
+  // EDITABLE_FIELDS only catches a *renamed* column; it says nothing about
+  // this early-return path staying correct, which is what this test checks
+  // by asserting the write actually reached the row, not just the log.
+  it("a single-field update persists to the row, not just the edit log", async () => {
+    const admin = await makeUser(`a1-${Date.now()}@x.com`, "admin");
+    const item = await makeItem({ name: "Widget", location: "Shelf A" });
+
+    const result = await updateInventoryItemAs(admin, {
+      id: item.id,
+      name: "Widget",
+      description: null,
+      categoryIds: [],
+      serial: null,
+      label: null,
+      location: "Shelf B",
+      notes: null,
+      imageUrl: null,
+    });
+    expect(result.location).toBe("Shelf B");
+
+    const [row] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(row.location).toBe("Shelf B");
+
+    const logs = await db
+      .select()
+      .from(inventoryItemEditLog)
+      .where(eq(inventoryItemEditLog.itemId, item.id));
+    expect(logs).toHaveLength(1);
+    expect(logs[0].changedFields).toEqual(["location"]);
+    expect(logs[0].oldValues).toMatchObject({ location: "Shelf A" });
+    expect(logs[0].newValues).toMatchObject({ location: "Shelf B" });
+  });
+
   it("persists label, exposing it to staff but not the public", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const created = await createInventoryItemAs(admin, {
       name: "Camera",
       description: null,
-      category: null,
+      categoryIds: [],
       serial: "SN-9",
       label: "LAB-042",
       location: null,
@@ -625,7 +697,7 @@ describe("catalog CRUD", () => {
     const created = await createInventoryItemAs(admin, {
       name: "Camera",
       description: null,
-      category: null,
+      categoryIds: [],
       serial: null,
       label: "OLD-1",
       location: null,
@@ -636,7 +708,7 @@ describe("catalog CRUD", () => {
       id: created.id,
       name: "Camera",
       description: null,
-      category: null,
+      categoryIds: [],
       serial: null,
       label: "NEW-2",
       location: null,
@@ -728,6 +800,275 @@ describe("catalog CRUD", () => {
     await expect(
       hardDeleteInventoryItemAs(admin, { id: item.id, confirmName: "Cabled" })
     ).rejects.toThrow(/historical/i);
+  });
+});
+
+describe("category write path", () => {
+  // Routes the payload through itemPayloadSchema, exactly like
+  // createInventoryItem's server function does, rather than calling
+  // createInventoryItemAs directly. That is the point: the bug this test
+  // guards against was Zod silently stripping `categoryIds` at that exact
+  // boundary while every direct-call test kept passing. Reading the join
+  // table back from the database (not trusting the function's return value)
+  // is what makes the assertion end-to-end.
+  it("persists categoryIds when an item is created through the payload schema", async () => {
+    const admin = await makeUser(`catw-${Date.now()}@x.com`, "admin");
+    const category = await makeCategory("Cameras");
+    const rawPayload: unknown = {
+      name: "Payload Camera",
+      categoryIds: [category.id],
+    };
+    const parsed = itemPayloadSchema.parse(rawPayload);
+    const created = await createInventoryItemAs(admin, parsed);
+
+    const rows = await db
+      .select()
+      .from(inventoryItemCategories)
+      .where(eq(inventoryItemCategories.itemId, created.id));
+    expect(rows.map((r) => r.categoryId)).toEqual([category.id]);
+  });
+
+  it("persists categoryIds when an item is updated through the payload schema", async () => {
+    const admin = await makeUser(`catw2-${Date.now()}@x.com`, "admin");
+    const category = await makeCategory("Microscopes");
+    const item = await makeItem({ name: "Uncategorized scope" });
+    const rawPayload: unknown = {
+      id: item.id,
+      name: item.name,
+      categoryIds: [category.id],
+    };
+    // Same `.extend` shape as updatePayloadSchema in src/server/inventory.ts,
+    // built from the same base so this test breaks the same way that schema
+    // would if `categoryIds` were ever dropped from it.
+    const updateSchema = itemPayloadSchema.extend({ id: z.string().uuid() });
+    const validated = updateSchema.parse(rawPayload);
+    await updateInventoryItemAs(admin, validated);
+
+    const rows = await db
+      .select()
+      .from(inventoryItemCategories)
+      .where(eq(inventoryItemCategories.itemId, item.id));
+    expect(rows.map((r) => r.categoryId)).toEqual([category.id]);
+  });
+});
+
+describe("category read path: correlated subquery and all-match filter", () => {
+  it("keeps an uncategorized item visible and reports its categories for a categorized one", async () => {
+    const admin = await makeUser(`crp-${Date.now()}@x.com`, "admin");
+    const category = await makeCategory(`Robotics-${Date.now()}`);
+    const categorized = await createInventoryItemAs(admin, {
+      ...baseItemInput("Categorized Bot"),
+      categoryIds: [category.id],
+    });
+    const uncategorized = await makeItem({ name: "Loose Bot" });
+
+    const result = await listInventoryAs(null, {
+      q: "",
+      status: null,
+      categories: [],
+      page: 1,
+      pageSize: 50,
+    });
+
+    const foundCategorized = result.rows.find((r) => r.id === categorized.id);
+    const foundUncategorized = result.rows.find(
+      (r) => r.id === uncategorized.id
+    );
+
+    // A correlated subquery cannot drop a row the way an inner join would;
+    // the uncategorized item's presence with an empty array is the point.
+    expect(foundUncategorized).toBeDefined();
+    expect(foundUncategorized?.categories).toEqual([]);
+
+    expect(foundCategorized).toBeDefined();
+    expect(foundCategorized?.categories).toEqual([
+      { id: category.id, name: category.name },
+    ]);
+  });
+
+  it("filters by category id and excludes the uncategorized item", async () => {
+    const admin = await makeUser(`crp2-${Date.now()}@x.com`, "admin");
+    const category = await makeCategory(`Filters-${Date.now()}`);
+    const categorized = await createInventoryItemAs(admin, {
+      ...baseItemInput("Filtered Bot"),
+      categoryIds: [category.id],
+    });
+    await makeItem({ name: "Unfiltered Bot" });
+
+    const result = await listInventoryAs(null, {
+      q: "",
+      status: null,
+      categories: [category.id],
+      page: 1,
+      pageSize: 50,
+    });
+
+    expect(result.rows.map((r) => r.id)).toEqual([categorized.id]);
+  });
+});
+
+describe("listInventoryCategoriesImpl", () => {
+  it("returns only categories actually assigned to a non-retired item, joined by id", async () => {
+    const used = await makeCategory(`Used-${Date.now()}`);
+    const unused = await makeCategory(`Unused-${Date.now()}`);
+    const hasCategory = await makeItem({ name: "Has category" });
+    await db
+      .insert(inventoryItemCategories)
+      .values({ itemId: hasCategory.id, categoryId: used.id });
+    const retiredItem = await makeItem({ name: "Retired with category" });
+    await db
+      .insert(inventoryItemCategories)
+      .values({ itemId: retiredItem.id, categoryId: unused.id });
+    await db
+      .update(inventoryItems)
+      .set({ status: "retired" })
+      .where(eq(inventoryItems.id, retiredItem.id));
+
+    const { categories: rows } = await listInventoryCategoriesImpl();
+
+    expect(rows.some((c) => c.id === used.id && c.name === used.name)).toBe(
+      true
+    );
+    expect(rows.some((c) => c.id === unused.id)).toBe(false);
+  });
+});
+
+describe("inventory item categories", () => {
+  it("round-trips two categories through create and read", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ic-${stamp}@x.com`, "admin");
+    const a = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `Alpha-${stamp}`,
+      type: null,
+    });
+    const b = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `Beta-${stamp}`,
+      type: null,
+    });
+
+    const { id } = await createInventoryItemAs(admin, {
+      ...baseItemInput(`Widget-${stamp}`),
+      categoryIds: [a.id, b.id],
+    });
+
+    const item = await getInventoryItemAs(admin, { id });
+    expect(item?.categories.map((c) => c.name).sort()).toEqual(
+      [`Alpha-${stamp}`, `Beta-${stamp}`].sort()
+    );
+  });
+
+  // Categories left EDITABLE_FIELDS's loop for their own diff, computed
+  // separately before the same early return. This pins that the two diffs
+  // agree on "nothing changed": a truly identical update (including
+  // categoryIds) must still take the zero-log early return, not log a
+  // spurious "categories" change because the two diffs disagree.
+  it("a truly no-op update, including unchanged categoryIds, writes zero edit-log rows", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ic5-${stamp}@x.com`, "admin");
+    const a = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `Same-${stamp}`,
+      type: null,
+    });
+    const { id } = await createInventoryItemAs(admin, {
+      ...baseItemInput(`Widget5-${stamp}`),
+      categoryIds: [a.id],
+    });
+
+    await updateInventoryItemAs(admin, {
+      id,
+      ...baseItemInput(`Widget5-${stamp}`),
+      categoryIds: [a.id],
+    });
+
+    const logs = await db
+      .select()
+      .from(inventoryItemEditLog)
+      .where(eq(inventoryItemEditLog.itemId, id));
+    expect(logs).toHaveLength(0);
+  });
+
+  it("removing one category leaves the other", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ic2-${stamp}@x.com`, "admin");
+    const a = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `Keep-${stamp}`,
+      type: null,
+    });
+    const b = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `Drop-${stamp}`,
+      type: null,
+    });
+    const { id } = await createInventoryItemAs(admin, {
+      ...baseItemInput(`Widget2-${stamp}`),
+      categoryIds: [a.id, b.id],
+    });
+
+    await updateInventoryItemAs(admin, {
+      id,
+      ...baseItemInput(`Widget2-${stamp}`),
+      categoryIds: [a.id],
+    });
+
+    const item = await getInventoryItemAs(admin, { id });
+    expect(item?.categories.map((c) => c.name)).toEqual([`Keep-${stamp}`]);
+  });
+
+  it("deleting a category removes the assignment and keeps the item", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ic3-${stamp}@x.com`, "admin");
+    const a = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `Doomed-${stamp}`,
+      type: null,
+    });
+    const { id } = await createInventoryItemAs(admin, {
+      ...baseItemInput(`Widget3-${stamp}`),
+      categoryIds: [a.id],
+    });
+
+    await deleteCategoryAs(admin, a.id);
+
+    const item = await getInventoryItemAs(admin, { id });
+    expect(item).toBeDefined();
+    expect(item?.categories).toEqual([]);
+  });
+
+  it("filters on ALL selected categories, not any", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ic4-${stamp}@x.com`, "admin");
+    const a = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `A-${stamp}`,
+      type: null,
+    });
+    const b = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `B-${stamp}`,
+      type: null,
+    });
+    const both = await createInventoryItemAs(admin, {
+      ...baseItemInput(`Both-${stamp}`),
+      categoryIds: [a.id, b.id],
+    });
+    await createInventoryItemAs(admin, {
+      ...baseItemInput(`OnlyA-${stamp}`),
+      categoryIds: [a.id],
+    });
+
+    const result = await listInventoryAs(admin, {
+      categories: [a.id, b.id],
+      page: 1,
+      pageSize: 24,
+      q: "",
+      status: null,
+    });
+
+    expect(result.rows.map((r) => r.id)).toEqual([both.id]);
   });
 });
 
@@ -990,7 +1331,7 @@ describe("defense in depth: impl re-checks role on every staff write", () => {
       createInventoryItemAs(student, {
         name: "Sneaky",
         description: null,
-        category: null,
+        categoryIds: [],
         serial: null,
         label: null,
         location: null,
@@ -1175,10 +1516,431 @@ describe("staff-assigned holds without a request line", () => {
     });
 
     const { rows } = await listAdminInventoryAs(admin, {
-      category: null,
+      categories: [],
       q: holderEmail,
       status: null,
     });
     expect(rows.some((r) => r.id === item.id)).toBe(true);
+  });
+});
+
+describe("staff-assigned holds in my items", () => {
+  it("shows a hold that has no request line", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h-admin-${stamp}@x.com`, "admin");
+    const holder = await makeUser(`h-holder-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Scope" });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderId: holder.id,
+      dueAt: new Date("2026-09-01T00:00:00.000Z"),
+    });
+
+    const { active } = await listMyItemsAs(holder);
+
+    expect(active).toHaveLength(1);
+    expect(active[0].kind).toBe("hold");
+    expect(active[0].item.id).toBe(item.id);
+  });
+
+  it("does not leak another user's hold", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h2-admin-${stamp}@x.com`, "admin");
+    const holder = await makeUser(`h2-holder-${stamp}@x.com`, "user");
+    const other = await makeUser(`h2-other-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Meter" });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      holderId: holder.id,
+    });
+
+    const { active } = await listMyItemsAs(other);
+    expect(active).toHaveLength(0);
+  });
+
+  it("does not duplicate an item that also has a request line", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h3-admin-${stamp}@x.com`, "admin");
+    const requester = await makeUser(`h3-req-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Iron" });
+
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    // Approve so the item lands in the same status ("reserved") and with
+    // the same holder the hold query looks for, and only the
+    // currentRequestItemId link tells the two queries apart.
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    const [afterApprove] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(afterApprove.status).toBe("reserved");
+    expect(afterApprove.currentHolderId).toBe(requester.id);
+    expect(afterApprove.currentRequestItemId).not.toBeNull();
+
+    const { active } = await listMyItemsAs(requester);
+
+    expect(active).toHaveLength(1);
+    expect(active[0].kind).toBe("request");
+  });
+
+  it("matches an unlinked hold by verified email", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h4-admin-${stamp}@x.com`, "admin");
+    const item = await makeItem({ name: "Drill" });
+
+    // Assign to an address with no account yet, so resolveHolderId finds
+    // nothing and current_holder_id stays null.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: `walkin-${stamp}@x.com`,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const walkIn = await makeUser(`walkin-${stamp}@x.com`, "user");
+    const { active } = await listMyItemsAs(walkIn);
+
+    expect(active).toHaveLength(1);
+    expect(active[0].kind).toBe("hold");
+  });
+
+  it("does not match by email when the address is unverified", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h5-admin-${stamp}@x.com`, "admin");
+    const item = await makeItem({ name: "Saw" });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: `unverified-${stamp}@x.com`,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const impostor = await makeUser(`unverified-${stamp}@x.com`, "user");
+    await db
+      .update(user)
+      .set({ emailVerified: false })
+      .where(eq(user.id, impostor.id));
+
+    const { active } = await listMyItemsAs(impostor);
+    expect(active).toHaveLength(0);
+  });
+
+  it("does not let a stale holder email override an explicit account assignment", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h6-admin-${stamp}@x.com`, "admin");
+    const holderA = await makeUser(`h6-a-${stamp}@x.com`, "user");
+    const holderB = await makeUser(`h6-b-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Level" });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderId: holderA.id,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+    // current_holder_id is an explicit account assignment to holderA. Force
+    // current_holder_email to collide with holderB's verified address, a
+    // state the write path never produces on its own but that the read
+    // side must still resolve in holderA's favor.
+    await db
+      .update(inventoryItems)
+      .set({ currentHolderEmail: `h6-b-${stamp}@x.com` })
+      .where(eq(inventoryItems.id, item.id));
+
+    const { active } = await listMyItemsAs(holderB);
+    expect(active).toHaveLength(0);
+  });
+});
+
+describe("active tab ordering (byDeadline)", () => {
+  it("sorts by soonest deadline, then newest first when there is no deadline", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ord-admin-${stamp}@x.com`, "admin");
+    const viewer = await makeUser(`ord-viewer-${stamp}@x.com`, "user");
+
+    const soonItem = await makeItem({ name: "Soon Hold" });
+    const laterItem = await makeItem({ name: "Later Request" });
+    // Named so alphabetical order and recency order disagree: "Apple" sorts
+    // before "Zebra", but Zebra is the one created second and must still
+    // sort first once the tiebreak is recency rather than name. A test that
+    // used "Older"/"Newer" names here would pass under either tiebreak and
+    // would not catch a regression back to the old name-based one.
+    const olderItem = await makeItem({ name: "Apple Pending" });
+    const newerItem = await makeItem({ name: "Zebra Pending" });
+
+    // A hold with the soonest deadline of the four.
+    await transitionItem(admin, {
+      itemId: soonItem.id,
+      nextStatus: "checked_out",
+      holderId: viewer.id,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    // A request line with a later deadline: approved, so pickupBy is set.
+    await addToCartAs(viewer, { itemId: laterItem.id });
+    await submitCartAs(viewer, { note: null });
+    const [laterLine] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, laterItem.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: laterLine.id,
+      pickupBy: new Date(Date.now() + 5 * 86_400_000),
+    });
+
+    // Two pending request lines with no deadline. createdAt is set
+    // explicitly rather than relying on the two submitCartAs calls landing
+    // in different milliseconds, so the ordering this asserts cannot flake.
+    await addToCartAs(viewer, { itemId: olderItem.id });
+    await submitCartAs(viewer, { note: null });
+    await addToCartAs(viewer, { itemId: newerItem.id });
+    await submitCartAs(viewer, { note: null });
+    await db
+      .update(inventoryRequestItems)
+      .set({ createdAt: new Date("2020-01-01T00:00:00.000Z") })
+      .where(eq(inventoryRequestItems.itemId, olderItem.id));
+    await db
+      .update(inventoryRequestItems)
+      .set({ createdAt: new Date("2020-01-02T00:00:00.000Z") })
+      .where(eq(inventoryRequestItems.itemId, newerItem.id));
+
+    const { active } = await listMyItemsAs(viewer);
+
+    // With no deadline to sort by, these fall back to recency, newest
+    // first: the created_at DESC order the active list used before holds
+    // existed. Under the old name tiebreak this would come back
+    // alphabetically ("Apple Pending" before "Zebra Pending") instead.
+    expect(active.map((entry) => entry.item.name)).toEqual([
+      "Soon Hold",
+      "Later Request",
+      "Zebra Pending",
+      "Apple Pending",
+    ]);
+  });
+
+  it("falls back to newest first when two entries share the same deadline", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ordeq-admin-${stamp}@x.com`, "admin");
+    const viewer = await makeUser(`ordeq-viewer-${stamp}@x.com`, "user");
+
+    // Named, like the case above, so alphabetical order and recency order
+    // disagree: "Ant" sorts before "Yak" alphabetically, but Yak is the one
+    // last written and must sort first under the recency tiebreak.
+    const olderItem = await makeItem({ name: "Ant Match" });
+    const newerItem = await makeItem({ name: "Yak Match" });
+    const sharedDeadline = new Date(Date.now() + 3 * 86_400_000);
+
+    await transitionItem(admin, {
+      itemId: olderItem.id,
+      nextStatus: "checked_out",
+      holderId: viewer.id,
+      dueAt: sharedDeadline,
+    });
+    await transitionItem(admin, {
+      itemId: newerItem.id,
+      nextStatus: "checked_out",
+      holderId: viewer.id,
+      dueAt: sharedDeadline,
+    });
+    // Recency for a hold comes from the item's updatedAt. Set both
+    // explicitly, rather than trusting the two transitionItem calls above to
+    // land in different milliseconds, so this cannot flake.
+    await db
+      .update(inventoryItems)
+      .set({ updatedAt: new Date("2020-01-01T00:00:00.000Z") })
+      .where(eq(inventoryItems.id, olderItem.id));
+    await db
+      .update(inventoryItems)
+      .set({ updatedAt: new Date("2020-01-02T00:00:00.000Z") })
+      .where(eq(inventoryItems.id, newerItem.id));
+
+    const { active } = await listMyItemsAs(viewer);
+
+    // Equal deadlines: falls back to recency, newest first. Under the old
+    // name tiebreak this would come back alphabetically ("Ant Match" before
+    // "Yak Match") instead.
+    expect(active.map((entry) => entry.item.name)).toEqual([
+      "Yak Match",
+      "Ant Match",
+    ]);
+  });
+});
+
+describe("disjointness invariant between the hold and request-line queries", () => {
+  it("double-counts an item if it is ever forced into the orphaned state", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`orphan-admin-${stamp}@x.com`, "admin");
+    const requester = await makeUser(`orphan-req-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Orphan" });
+
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+
+    // closeRequestItemOnRelease closes the attached line whenever
+    // current_request_item_id goes null, so a live approved line and a
+    // null current_request_item_id never coexist on the write path. Force
+    // that pairing directly to check whether the read side has any defense
+    // of its own for it, or leans entirely on the write path never
+    // producing it: the item is still "reserved" and still held by
+    // requester, but current_request_item_id is cleared as if the item had
+    // been released while the line was left behind.
+    await db
+      .update(inventoryItems)
+      .set({ currentRequestItemId: null })
+      .where(eq(inventoryItems.id, item.id));
+
+    const { active } = await listMyItemsAs(requester);
+
+    // This pins the current (undesirable) behavior, not a guarantee: the
+    // request-line query does not check current_request_item_id at all,
+    // and the hold query matches once current_request_item_id is null, so
+    // the item comes back from both and appears twice. There is no
+    // independent read-side defense; disjointness holds only as long as
+    // closeRequestItemOnRelease is never bypassed. If a future change
+    // closes that gap, update this test to expect a single entry.
+    expect(active).toHaveLength(2);
+  });
+});
+
+describe("overdue notifications for staff holds", () => {
+  it("notifies the holder of an overdue hold with no request line", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`o-admin-${stamp}@x.com`, "admin");
+    const holder = await makeUser(`o-holder-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Lathe" });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderId: holder.id,
+      dueAt: new Date("2020-01-01T00:00:00.000Z"),
+    });
+
+    await recordOverdueNotificationsAs(holder, { ownerId: holder.id });
+
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, holder.id));
+
+    expect(
+      rows.filter((r) => r.type === "inventory_checkout_overdue")
+    ).toHaveLength(1);
+  });
+
+  it("does not notify twice when run again", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`o2-admin-${stamp}@x.com`, "admin");
+    const holder = await makeUser(`o2-holder-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Press" });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderId: holder.id,
+      dueAt: new Date("2020-01-01T00:00:00.000Z"),
+    });
+
+    await recordOverdueNotificationsAs(holder, { ownerId: holder.id });
+    await recordOverdueNotificationsAs(holder, { ownerId: holder.id });
+
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, holder.id));
+
+    expect(
+      rows.filter((r) => r.type === "inventory_checkout_overdue")
+    ).toHaveLength(1);
+  });
+
+  it("notifies the holder of an overdue pickup with no request line", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`o3-admin-${stamp}@x.com`, "admin");
+    const holder = await makeUser(`o3-holder-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Router" });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      holderId: holder.id,
+      pickupBy: new Date("2020-01-01T00:00:00.000Z"),
+    });
+
+    await recordOverdueNotificationsAs(holder, { ownerId: holder.id });
+
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, holder.id));
+
+    expect(
+      rows.filter((r) => r.type === "inventory_pickup_overdue")
+    ).toHaveLength(1);
+  });
+
+  it("does not notify an email-matched hold with no resolved account", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`o4-admin-${stamp}@x.com`, "admin");
+    const holderEmail = `o4-walkin-${stamp}@x.com`;
+    const item = await makeItem({ name: "Grinder" });
+
+    // Assign to an address with no account yet, so resolveHolderId finds
+    // nothing and current_holder_id stays null: this hold is discoverable
+    // only through listMyItemsAs's verified-email match, which the
+    // notification write path deliberately does not repeat.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail,
+      dueAt: new Date("2020-01-01T00:00:00.000Z"),
+    });
+
+    const walkIn = await makeUser(holderEmail, "user");
+
+    // No ownerId: an ownerId scope would filter the null-holder row out on
+    // its own, masking the guard this test exists to pin. What actually
+    // keeps this row out of the insert is the `r.userId !== null` filter
+    // applied after the two scans are merged (inventory.ts, just above the
+    // push loop), not the `currentHolderId IS NOT NULL` condition on the
+    // hold query: that condition could be dropped entirely and this test
+    // would still pass, since the JS filter catches the row first.
+    await expect(
+      recordOverdueNotificationsAs(walkIn, {})
+    ).resolves.not.toThrow();
+
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, walkIn.id));
+
+    expect(
+      rows.filter(
+        (r) =>
+          r.type === "inventory_checkout_overdue" ||
+          r.type === "inventory_pickup_overdue"
+      )
+    ).toHaveLength(0);
   });
 });

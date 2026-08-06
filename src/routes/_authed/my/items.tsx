@@ -133,10 +133,43 @@ function MyItems() {
 
       {tab === "active" && (
         <div className="mt-4 space-y-2">
-          {data.active.length === 0 && (
-            <p className="text-muted-foreground">No active requests.</p>
-          )}
-          {data.active.map(({ line, item }) => {
+          {data.active.length === 0 && <EmptyState>Nothing active.</EmptyState>}
+          {data.active.map((entry) => {
+            if (entry.kind === "hold") {
+              return (
+                <div
+                  className="flex items-center justify-between rounded-md border border-border bg-card p-3"
+                  key={entry.item.id}
+                >
+                  <div>
+                    <p className="font-medium">{entry.item.name}</p>
+                    <InventoryStatusBadge
+                      status={entry.item.status as "available"}
+                    />
+                    {entry.item.currentPickupBy && (
+                      <p className="text-muted-foreground text-xs">
+                        Pick up by{" "}
+                        <LocalTime
+                          dateOnly
+                          value={entry.item.currentPickupBy}
+                        />
+                      </p>
+                    )}
+                    {entry.item.currentDueAt && (
+                      <p className="text-muted-foreground text-xs">
+                        Due{" "}
+                        <LocalTime dateOnly value={entry.item.currentDueAt} />
+                      </p>
+                    )}
+                    <p className="text-muted-foreground text-xs">
+                      Assigned by staff
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+
+            const { line, item } = entry;
             const canCancel =
               (line.status === "pending" || line.status === "approved") &&
               item.status !== "checked_out";

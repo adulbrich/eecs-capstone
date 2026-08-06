@@ -9,7 +9,7 @@ import {
   user,
 } from "#/db/schema";
 
-type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
+export type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
 
 export type ItemStatus =
   | "available"

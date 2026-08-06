@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import {
@@ -19,13 +20,13 @@ type StatusFilter =
   | null;
 
 interface Props {
-  categories: string[];
-  category: string | null;
-  onCategoryChange: (c: string | null) => void;
+  categories: { id: string; name: string }[];
+  onCategoriesChange: (next: string[]) => void;
   onQChange: (q: string) => void;
   onStatusChange: (s: StatusFilter) => void;
   onViewChange: (v: "card" | "row") => void;
   q: string;
+  selectedCategories: string[];
   status: StatusFilter;
   view: "card" | "row";
 }
@@ -49,6 +50,13 @@ export function InventoryFilterBar(props: Props) {
     return () => clearTimeout(t);
   }, [localQ, props]);
 
+  function toggleCategory(id: string) {
+    const next = props.selectedCategories.includes(id)
+      ? props.selectedCategories.filter((c) => c !== id)
+      : [...props.selectedCategories, id];
+    props.onCategoriesChange(next);
+  }
+
   return (
     <div className="rounded-lg border border-border p-4">
       <div className="flex items-center gap-3">
@@ -62,28 +70,6 @@ export function InventoryFilterBar(props: Props) {
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="inv-filter-category">Category</Label>
-          <Select
-            onValueChange={(v) =>
-              props.onCategoryChange(v === "_all_" ? null : v)
-            }
-            value={props.category ?? "_all_"}
-          >
-            <SelectTrigger className="w-full" id="inv-filter-category">
-              <SelectValue placeholder="All categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="_all_">All categories</SelectItem>
-              {props.categories.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
         <div className="flex flex-col gap-1">
           <Label htmlFor="inv-filter-status">Status</Label>
           <Select
@@ -106,6 +92,25 @@ export function InventoryFilterBar(props: Props) {
           </Select>
         </div>
       </div>
+
+      {props.categories.length > 0 && (
+        <fieldset className="mt-3">
+          <legend className="font-medium text-muted-foreground text-xs">
+            Categories (matches all selected)
+          </legend>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {props.categories.map((c) => (
+              <Label className="font-normal" key={c.id}>
+                <Checkbox
+                  checked={props.selectedCategories.includes(c.id)}
+                  onCheckedChange={() => toggleCategory(c.id)}
+                />
+                {c.name}
+              </Label>
+            ))}
+          </div>
+        </fieldset>
+      )}
     </div>
   );
 }

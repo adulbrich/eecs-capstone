@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { listCategories } from "#/server/categories";
+import type { z } from "zod";
+import { listCategories, type listSchema } from "#/server/categories";
 import { getMyInterests } from "#/server/interests";
 import { listPrograms } from "#/server/programs";
 import { FilterSwitch } from "./filter-switch";
@@ -53,8 +54,11 @@ export function ProjectsFilterBar({
   useEffect(() => {
     void (async () => {
       try {
+        const listData = {
+          domain: "project",
+        } satisfies z.input<typeof listSchema>;
         const [{ rows: cats }, { rows: progs }] = await Promise.all([
-          listCategories({ data: {} }),
+          listCategories({ data: listData }),
           listPrograms(),
         ]);
         setAllCategories(cats as Category[]);

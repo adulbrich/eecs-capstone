@@ -4,12 +4,13 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import {
   type AdminColumn,
   AdminDataTable,
 } from "#/components/admin-data-table";
+import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
 import { ImageOrFallback } from "#/components/image-or-fallback";
 import { LocalTime } from "#/components/local-time";
@@ -33,6 +34,7 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { getSession } from "#/lib/auth-guards";
+import { defineCsvColumns, orderBySortedIds, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import { projectImageSrc } from "#/lib/project-image";
 import {
@@ -41,7 +43,10 @@ import {
   useAdminTableState,
 } from "#/lib/table-state";
 import { listPrograms } from "#/server/programs";
-import { listAdminProjects } from "#/server/projects-queries";
+import {
+  exportAdminProjects,
+  listAdminProjects,
+} from "#/server/projects-queries";
 
 const STATUSES = [
   "all",
@@ -249,6 +254,103 @@ const COLUMNS: AdminColumn<Row>[] = [
   },
 ];
 
+type ExportRow = Awaited<
+  ReturnType<typeof exportAdminProjects>
+>["rows"][number];
+
+// Every meaningful field, independent of which columns the table shows. The
+// listing's loader returns a summary; this reads from the export server fn,
+// which widens the projection instead. defineCsvColumns<ExportRow>() fails
+// npm run typecheck if a field of ExportRow has no column here, so a future
+// field added to exportAdminProjectsAs's projection cannot silently miss the
+// file.
+const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
+  { header: "ID", key: "id", value: (row) => row.id },
+  { header: "Title", key: "title", value: (row) => row.title },
+  { header: "Status", key: "status", value: (row) => row.status },
+  {
+    header: "Description",
+    key: "description",
+    value: (row) => row.description,
+  },
+  { header: "Image URL", key: "imageUrl", value: (row) => row.imageUrl },
+  {
+    header: "Problem statement",
+    key: "problemStatement",
+    value: (row) => row.problemStatement,
+  },
+  {
+    header: "Objectives",
+    key: "objectives",
+    value: (row) => row.objectives,
+  },
+  {
+    header: "Min qualifications",
+    key: "minQualifications",
+    value: (row) => row.minQualifications,
+  },
+  {
+    header: "Pref qualifications",
+    key: "prefQualifications",
+    value: (row) => row.prefQualifications,
+  },
+  { header: "URL", key: "url", value: (row) => row.url },
+  {
+    header: "License restrictions",
+    key: "licenseRestrictions",
+    value: (row) => row.licenseRestrictions,
+  },
+  { header: "Staff notes", key: "notes", value: (row) => row.notes },
+  { header: "Categories", key: "categories", value: (row) => row.categories },
+  {
+    header: "Contact name",
+    key: "contactName",
+    value: (row) => row.contactName,
+  },
+  {
+    header: "Contact email",
+    key: "contactEmail",
+    value: (row) => row.contactEmail,
+  },
+  { header: "Proposer ID", key: "proposerId", value: (row) => row.proposerId },
+  {
+    header: "Proposer name",
+    key: "proposerName",
+    value: (row) => row.proposerName,
+  },
+  {
+    header: "Proposer email",
+    key: "proposerEmail",
+    value: (row) => row.proposerEmail,
+  },
+  { header: "Program ID", key: "programId", value: (row) => row.programId },
+  {
+    header: "Program course ID",
+    key: "programCourseId",
+    value: (row) => row.programCourseId,
+  },
+  {
+    header: "Program course name",
+    key: "programCourseName",
+    value: (row) => row.programCourseName,
+  },
+  {
+    header: "Program manager ID",
+    key: "programManagerId",
+    value: (row) => row.programManagerId,
+  },
+  {
+    header: "Teams supported",
+    key: "teamsSupported",
+    value: (row) => row.teamsSupported,
+  },
+  { header: "Created", key: "createdAt", value: (row) => row.createdAt },
+  { header: "Published", key: "publishedAt", value: (row) => row.publishedAt },
+  { header: "Archived", key: "archivedAt", value: (row) => row.archivedAt },
+  { header: "Soft deleted", key: "deletedAt", value: (row) => row.deletedAt },
+  { header: "Updated", key: "updatedAt", value: (row) => row.updatedAt },
+]);
+
 function AdminProjects() {
   const { rows, proposers } = Route.useLoaderData();
   // The whole search object goes to the hook, which reads cols/dir/sort.
@@ -258,6 +360,14 @@ function AdminProjects() {
   const [allPrograms, setAllPrograms] = useState<
     { courseId: string; courseName: string; id: string }[]
   >([]);
+  // Populated by AdminDataTable's onSortedIdsChange every time the table's
+  // own sorted row order changes. A ref, not state: the export only reads it
+  // at click time, so there is no reason to re-render this component (or
+  // re-run the effect that populates it) on every sort change.
+  const sortedIdsRef = useRef<string[]>([]);
+  const onSortedIdsChange = useCallback((ids: string[]) => {
+    sortedIdsRef.current = ids;
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -333,6 +443,35 @@ function AdminProjects() {
       <h1 className="mt-2 font-semibold text-2xl">Projects</h1>
 
       <AdminDataTable
+        actions={
+          <ExportCsvButton
+            filename="projects"
+            load={async () => {
+              const { rows: exportRows } = await exportAdminProjects({
+                data: {
+                  includeSoftDeleted: search.includeSoftDeleted,
+                  program: search.program,
+                  proposer: search.proposer,
+                  q: search.q,
+                  status: search.status,
+                },
+              });
+              // The export's rows are a wider projection of the same
+              // records the table lists under the same filters, keyed by
+              // the same id, so ordering by the table's sorted id sequence
+              // still applies even though this array did not come from
+              // `rows`.
+              return toCsv(
+                EXPORT_COLUMNS,
+                orderBySortedIds(
+                  exportRows,
+                  sortedIdsRef.current,
+                  (row) => row.id
+                )
+              );
+            }}
+          />
+        }
         caption="Projects"
         columns={COLUMNS}
         data={rows}
@@ -342,6 +481,7 @@ function AdminProjects() {
         hidden={hidden}
         onHiddenChange={onHiddenChange}
         onSortChange={onSortChange}
+        onSortedIdsChange={onSortedIdsChange}
         sort={sort}
         storageKey="projects"
         toolbar={

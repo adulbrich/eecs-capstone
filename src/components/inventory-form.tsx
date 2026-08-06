@@ -9,9 +9,11 @@ import {
 } from "#/lib/private-notes";
 import {
   createInventoryItem,
+  type itemPayloadSchema,
   updateInventoryItem,
   uploadInventoryImage,
 } from "#/server/inventory";
+import { CategoryMultiSelect } from "./category-multi-select";
 import { InventoryImageUploader } from "./inventory-image-uploader";
 import { Panel, PanelHeader, PanelNote } from "./panel";
 import { Button } from "./ui/button";
@@ -22,7 +24,7 @@ import { Textarea } from "./ui/textarea";
 export const inventoryFormSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
   description: z.string().max(5000).default(""),
-  category: z.string().max(120).default(""),
+  categoryIds: z.array(z.string().uuid()).max(20).default([]),
   serial: z.string().max(120).default(""),
   label: z.string().max(120).default(""),
   location: z.string().max(200).default(""),
@@ -56,7 +58,7 @@ export function InventoryForm({
     defaultValues: {
       name: initial?.name ?? "",
       description: initial?.description ?? "",
-      category: initial?.category ?? "",
+      categoryIds: initial?.categoryIds ?? [],
       serial: initial?.serial ?? "",
       label: initial?.label ?? "",
       location: initial?.location ?? "",
@@ -82,16 +84,20 @@ export function InventoryForm({
     onSubmit: async ({ value }) => {
       setFormError(null);
       try {
+        // `satisfies` makes a missing or misspelled key a compile error right
+        // here, at the point the payload is built, instead of one that
+        // typechecks and then writes `null` (via itemPayloadSchema's
+        // `.nullable().default(null)`) for a field nobody set.
         const payload = {
           name: value.name,
           description: value.description || null,
-          category: value.category || null,
+          categoryIds: value.categoryIds,
           serial: value.serial || null,
           label: value.label || null,
           location: value.location || null,
           notes: value.notes || null,
           imageUrl: pendingImage === null ? null : value.imageUrl || null,
-        };
+        } satisfies Required<z.input<typeof itemPayloadSchema>>;
 
         let savedId: string;
         if (itemId) {
@@ -143,7 +149,18 @@ export function InventoryForm({
         rows={4}
         textarea
       />
-      <Field form={form} label="Category" name="category" />
+      <form.Field name="categoryIds">
+        {(field: AnyForm) => (
+          <div className="flex flex-col gap-2">
+            <Label>Categories</Label>
+            <CategoryMultiSelect
+              domain="inventory"
+              onChange={(ids) => field.handleChange(ids)}
+              value={field.state.value as string[]}
+            />
+          </div>
+        )}
+      </form.Field>
       <form.Field name="imageUrl">
         {(field: AnyForm) => (
           <div>

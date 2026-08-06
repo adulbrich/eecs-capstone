@@ -1,12 +1,15 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
-import { projectCategories, user } from "#/db/schema";
+import { categories, projectCategories, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import {
   createCategoryAs,
   deleteCategoryAs,
+  listCategoriesImpl,
+  listCategoryTypesImpl,
   setProjectCategoriesAs,
+  updateCategoryAs,
 } from "#/server/_internal/categories";
 import { createProjectAs } from "#/server/_internal/projects";
 
@@ -44,6 +47,7 @@ describe("categories", () => {
   it("staff can create; deletion cascades project_categories", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const { id: catId } = await createCategoryAs(admin, {
+      domain: "project",
       name: "react",
       type: "technology",
     });
@@ -71,21 +75,24 @@ describe("categories", () => {
   it("non-staff cannot create", async () => {
     const u = await makeUser(`u-${Date.now()}@x.com`, "user");
     await expect(
-      createCategoryAs(u, { name: "x", type: "technology" })
+      createCategoryAs(u, { domain: "project", name: "x", type: "technology" })
     ).rejects.toThrow();
   });
 
   it("setProjectCategories replaces atomically", async () => {
     const admin = await makeUser(`a2-${Date.now()}@x.com`, "admin");
     const { id: c1 } = await createCategoryAs(admin, {
+      domain: "project",
       name: "a",
       type: "technology",
     });
     const { id: c2 } = await createCategoryAs(admin, {
+      domain: "project",
       name: "b",
       type: "technology",
     });
     const { id: c3 } = await createCategoryAs(admin, {
+      domain: "project",
       name: "c",
       type: "technology",
     });
@@ -105,5 +112,96 @@ describe("categories", () => {
       .from(projectCategories)
       .where(eq(projectCategories.projectId, projId));
     expect(rows.map((r) => r.categoryId)).toEqual([c3]);
+  });
+
+  it("lists only the requested domain", async () => {
+    const admin = await makeUser(`dom-${Date.now()}@x.com`, "admin");
+    await createCategoryAs(admin, {
+      domain: "project",
+      name: "React",
+      type: "technology",
+    });
+    await createCategoryAs(admin, {
+      domain: "inventory",
+      name: "Electronics",
+      type: null,
+    });
+
+    const projectOnly = await listCategoriesImpl({ domain: "project" });
+    const inventoryOnly = await listCategoriesImpl({ domain: "inventory" });
+
+    expect(projectOnly.rows.map((r) => r.name)).toEqual(["React"]);
+    expect(inventoryOnly.rows.map((r) => r.name)).toEqual(["Electronics"]);
+  });
+
+  it("requires a type for a project category", async () => {
+    const admin = await makeUser(`v1-${Date.now()}@x.com`, "admin");
+    await expect(
+      // @ts-expect-error a project category requires a non-null type; this
+      // deliberately violates CategoryInput to prove the runtime assertion
+      // catches what the type system also forbids at the call site.
+      createCategoryAs(admin, { domain: "project", name: "Nope", type: null })
+    ).rejects.toThrow(/requires a type/);
+  });
+
+  it("rejects a type on an inventory category rather than stripping it", async () => {
+    const admin = await makeUser(`v2-${Date.now()}@x.com`, "admin");
+    await expect(
+      // @ts-expect-error an inventory category cannot carry a type; this
+      // deliberately violates CategoryInput to prove the runtime assertion
+      // catches what the type system also forbids at the call site.
+      createCategoryAs(admin, {
+        domain: "inventory",
+        name: "Nope",
+        type: "technology",
+      })
+    ).rejects.toThrow(/cannot have a type/);
+  });
+
+  it("derives types from project categories only", async () => {
+    const admin = await makeUser(`t-${Date.now()}@x.com`, "admin");
+    await createCategoryAs(admin, {
+      domain: "project",
+      name: "React",
+      type: "technology",
+    });
+    await createCategoryAs(admin, {
+      domain: "inventory",
+      name: "Electronics",
+      type: null,
+    });
+
+    const { types } = await listCategoryTypesImpl();
+    expect(types).toEqual(["technology"]);
+  });
+
+  it("rejects changing a category's domain on update", async () => {
+    const admin = await makeUser(`flip-${Date.now()}@x.com`, "admin");
+    const { id: catId } = await createCategoryAs(admin, {
+      domain: "project",
+      name: "React",
+      type: "technology",
+    });
+
+    // This object is a perfectly valid CategoryUpdateInput on its own (the
+    // inventory variant); nothing about its shape is statically wrong. Only
+    // the runtime guard knows catId belongs to a stored project-domain row,
+    // which is exactly why the guard has to exist: the type system cannot
+    // see the mismatch between an id and its own database row.
+    await expect(
+      updateCategoryAs(admin, {
+        id: catId,
+        domain: "inventory",
+        name: "React",
+        type: null,
+      })
+    ).rejects.toThrow(/domain cannot be changed/);
+
+    const [row] = await db
+      .select()
+      .from(categories)
+      .where(eq(categories.id, catId));
+    expect(row.domain).toBe("project");
+    expect(row.type).toBe("technology");
   });
 });
