@@ -422,6 +422,11 @@ export type UpdateInventoryItemInput = CreateInventoryItemInput & {
   id: string;
 };
 
+// `satisfies` (not a type annotation) so the array keeps its literal tuple
+// type for the loop below, while a renamed or removed column here still
+// fails the build: a drifted entry silently makes `changed` empty for an
+// edit that only touched that field, hitting the early return below and
+// discarding the whole update while the caller still sees a success.
 const EDITABLE_FIELDS = [
   "name",
   "description",
@@ -431,7 +436,7 @@ const EDITABLE_FIELDS = [
   "location",
   "notes",
   "imageUrl",
-] as const;
+] as const satisfies readonly (keyof typeof inventoryItems.$inferSelect)[];
 
 export async function updateInventoryItemAs(
   viewer: Viewer,
@@ -454,9 +459,11 @@ export async function updateInventoryItemAs(
     for (const f of EDITABLE_FIELDS) {
       // Match projects.ts: normalize undefined to null on both sides and
       // compare with JSON.stringify so a wrapper passing `undefined`
-      // for an unset field does not spuriously log a change.
-      const oldVal = (before as Record<string, unknown>)[f] ?? null;
-      const newVal = (data as unknown as Record<string, unknown>)[f] ?? null;
+      // for an unset field does not spuriously log a change. `f` is one of
+      // the literal EDITABLE_FIELDS keys (not a bare `string`), so both
+      // reads below are real, checked property accesses rather than casts.
+      const oldVal = before[f] ?? null;
+      const newVal = data[f] ?? null;
       if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
         changed.push(f);
         oldValues[f] = oldVal;

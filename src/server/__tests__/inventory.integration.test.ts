@@ -613,6 +613,47 @@ describe("catalog CRUD", () => {
     });
   });
 
+  // Pins the failure mode a drifted EDITABLE_FIELDS entry would cause: if the
+  // field list disagrees with what `.set()` actually writes, an edit that
+  // touches only the drifted field computes `changed.length === 0` and hits
+  // the early return, so the whole update is silently discarded while the
+  // caller still gets back a success response. A type annotation on
+  // EDITABLE_FIELDS only catches a *renamed* column; it says nothing about
+  // this early-return path staying correct, which is what this test checks
+  // by asserting the write actually reached the row, not just the log.
+  it("a single-field update persists to the row, not just the edit log", async () => {
+    const admin = await makeUser(`a1-${Date.now()}@x.com`, "admin");
+    const item = await makeItem({ name: "Widget", location: "Shelf A" });
+
+    const result = await updateInventoryItemAs(admin, {
+      id: item.id,
+      name: "Widget",
+      description: null,
+      categoryId: null,
+      serial: null,
+      label: null,
+      location: "Shelf B",
+      notes: null,
+      imageUrl: null,
+    });
+    expect(result.location).toBe("Shelf B");
+
+    const [row] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(row.location).toBe("Shelf B");
+
+    const logs = await db
+      .select()
+      .from(inventoryItemEditLog)
+      .where(eq(inventoryItemEditLog.itemId, item.id));
+    expect(logs).toHaveLength(1);
+    expect(logs[0].changedFields).toEqual(["location"]);
+    expect(logs[0].oldValues).toMatchObject({ location: "Shelf A" });
+    expect(logs[0].newValues).toMatchObject({ location: "Shelf B" });
+  });
+
   it("persists label, exposing it to staff but not the public", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const created = await createInventoryItemAs(admin, {
