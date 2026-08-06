@@ -194,7 +194,13 @@ export const projectCategories = pgTable(
       .references(() => categories.id, { onDelete: "cascade" })
       .notNull(),
   },
-  (t) => [primaryKey({ columns: [t.projectId, t.categoryId] })]
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.categoryId] }),
+    // The primary key only serves project -> categories. Counting "how many
+    // projects carry this category" reads the other way, exactly as
+    // inventory_item_categories_category_idx already serves the item side.
+    index("project_categories_category_idx").on(t.categoryId),
+  ]
 );
 
 export const projectCollaborators = pgTable(
