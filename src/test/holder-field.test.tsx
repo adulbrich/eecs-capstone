@@ -18,6 +18,7 @@ function renderField(overrides: Partial<Parameters<typeof HolderField>[0]>) {
       email=""
       label=""
       name=""
+      onAccountMatchChange={noop}
       onEmailChange={noop}
       onLabelChange={noop}
       onNameChange={noop}
@@ -44,5 +45,11 @@ describe("HolderField", () => {
     renderField({ email: "someone@nowhere.test" });
     expect(screen.getByLabelText(/^name$/i)).toBeTruthy();
     expect(screen.getByLabelText(/program/i)).toBeTruthy();
+  });
+
+  it("reports no account match synchronously when the email is blank", () => {
+    const onAccountMatchChange = vi.fn();
+    renderField({ onAccountMatchChange });
+    expect(onAccountMatchChange).toHaveBeenCalledWith(false);
   });
 });

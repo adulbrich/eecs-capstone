@@ -29,6 +29,7 @@ interface Props {
   email: string;
   label: string;
   name: string;
+  onAccountMatchChange: (matched: boolean) => void;
   onEmailChange: (value: string) => void;
   onLabelChange: (value: string) => void;
   onNameChange: (value: string) => void;
@@ -52,16 +53,29 @@ function AccountSearch({ onPick }: { onPick: (email: string) => void }) {
       setMatches([]);
       return;
     }
+    let cancelled = false;
     const handle = setTimeout(() => {
       void (async () => {
         try {
-          setMatches((await searchUsers({ data: { q: query } })) as Account[]);
+          const rows = (await searchUsers({
+            data: { q: query },
+          })) as Account[];
+          if (cancelled) {
+            return;
+          }
+          setMatches(rows);
         } catch {
+          if (cancelled) {
+            return;
+          }
           setMatches([]);
         }
       })();
     }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [query]);
 
   return (
@@ -116,6 +130,7 @@ export function HolderField({
   email,
   label,
   name,
+  onAccountMatchChange,
   onEmailChange,
   onLabelChange,
   onNameChange,
@@ -128,22 +143,36 @@ export function HolderField({
   useEffect(() => {
     if (!trimmed) {
       setAccount(null);
+      onAccountMatchChange(false);
       return;
     }
+    let cancelled = false;
     const handle = setTimeout(() => {
       void (async () => {
         try {
           const rows = (await searchUsers({ data: { q: trimmed } })) as
             | Account[]
             | undefined;
-          setAccount(exactMatch(rows ?? [], trimmed));
+          if (cancelled) {
+            return;
+          }
+          const match = exactMatch(rows ?? [], trimmed);
+          setAccount(match);
+          onAccountMatchChange(Boolean(match));
         } catch {
+          if (cancelled) {
+            return;
+          }
           setAccount(null);
+          onAccountMatchChange(false);
         }
       })();
     }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(handle);
-  }, [trimmed]);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [trimmed, onAccountMatchChange]);
 
   return (
     <div className="space-y-3">

@@ -86,16 +86,22 @@ function toDateInput(value: Date | string | null | undefined): string {
 
 /**
  * An address means the hold is on a person and carries a name/program; a
- * blank address means it is on a thing and carries a label instead. Building
+ * blank address means it is on a thing and carries a label instead. Name and
+ * program are dropped once the address matches an account: the field that
+ * collects them is already hidden at that point, and sending them anyway
+ * would make the payload's correctness depend on `transitionItemInTx`
+ * discarding them on the server, elsewhere, rather than on this file. Building
  * this in one place keeps the dialog from ever sending a combination the
  * server's invariant would reject.
  */
 function holderFields({
+  accountMatched,
   email,
   label,
   name,
   program,
 }: {
+  accountMatched: boolean;
   email: string;
   label: string;
   name: string;
@@ -107,11 +113,16 @@ function holderFields({
   holderProgram: string | null;
 } {
   const trimmedEmail = email.trim();
+  // Name and program are only meaningful for an address with no account, so
+  // both conditions gate them: a blank address (label mode) never sends
+  // leftover text typed while the address field held something else, and a
+  // matched address defers to the account's own name.
+  const carriesNameAndProgram = Boolean(trimmedEmail) && !accountMatched;
   return {
     holderEmail: trimmedEmail || null,
     holderLabel: trimmedEmail ? null : label.trim() || null,
-    holderName: trimmedEmail ? name.trim() || null : null,
-    holderProgram: trimmedEmail ? program.trim() || null : null,
+    holderName: carriesNameAndProgram ? name.trim() || null : null,
+    holderProgram: carriesNameAndProgram ? program.trim() || null : null,
   };
 }
 
@@ -247,6 +258,12 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
   const [assignName, setAssignName] = useState("");
   const [assignProgram, setAssignProgram] = useState("");
   const [assignLabel, setAssignLabel] = useState("");
+  // Whether the typed/picked address matches an existing account, reported by
+  // HolderField from its own debounced lookup. The payload needs this too: an
+  // account's name is authoritative, so a matched address must never carry
+  // the name/program fields, and that decision should not depend on the
+  // server independently re-deriving and discarding them.
+  const [accountMatched, setAccountMatched] = useState(false);
   const [dueDate, setDueDate] = useState("");
   const [pickupDate, setPickupDate] = useState("");
   const [dlgComment, setDlgComment] = useState("");
@@ -304,6 +321,9 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
     setAssignName(item.currentHolderName ?? "");
     setAssignProgram(item.currentHolderProgram ?? "");
     setAssignLabel(item.currentHolderLabel ?? "");
+    // HolderField's own lookup recomputes this from the prefilled address; it
+    // just should not carry the previous dialog's result into a new one.
+    setAccountMatched(false);
     setDueDate(toDateInput(item.dueAt));
     setPickupDate(toDateInput(item.pickupBy));
     setDlgComment("");
@@ -315,6 +335,7 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
     const needsHolder =
       dlgTargetStatus === "reserved" || dlgTargetStatus === "checked_out";
     const holder = holderFields({
+      accountMatched,
       email: assignEmail,
       label: assignLabel,
       name: assignName,
@@ -487,6 +508,7 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
               email={assignEmail}
               label={assignLabel}
               name={assignName}
+              onAccountMatchChange={setAccountMatched}
               onEmailChange={setAssignEmail}
               onLabelChange={setAssignLabel}
               onNameChange={setAssignName}
