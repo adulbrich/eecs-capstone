@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Checkbox } from "#/components/ui/checkbox";
 import { Label } from "#/components/ui/label";
-import { INVENTORY_CATEGORY_TYPE } from "#/lib/category-types";
 import { listCategories } from "#/server/categories";
 
 interface Category {
@@ -22,7 +21,7 @@ export function CategoryMultiSelect({ value, onChange }: Props) {
     void (async () => {
       try {
         const { rows } = await listCategories({
-          data: { excludeTypes: [INVENTORY_CATEGORY_TYPE] },
+          data: { domain: "project" },
         });
         setCategories(rows as Category[]);
       } catch {

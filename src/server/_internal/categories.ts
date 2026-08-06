@@ -1,6 +1,11 @@
-import { and, eq, notInArray, type SQL } from "drizzle-orm";
+import { and, eq, isNotNull, type SQL } from "drizzle-orm";
 import { db } from "#/db";
-import { categories, projectCategories, projects } from "#/db/schema";
+import {
+  categories,
+  type categoryDomainEnum,
+  projectCategories,
+  projects,
+} from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { canSeeProject, isStaff } from "#/lib/project-visibility";
 import type {
@@ -8,6 +13,8 @@ import type {
   CategoryUpdateInput,
   SetProjectCategoriesInput,
 } from "../categories";
+
+type CategoryDomain = (typeof categoryDomainEnum.enumValues)[number];
 
 interface AuthUser {
   id: string;
@@ -25,22 +32,22 @@ function assertStaff(viewer: AuthUser) {
 }
 
 export async function listCategoriesImpl(data: {
+  domain?: CategoryDomain | null;
   type?: string | null;
-  excludeTypes?: string[] | null;
 }) {
   const conditions: SQL[] = [];
+  if (data.domain) {
+    conditions.push(eq(categories.domain, data.domain));
+  }
   if (data.type) {
     conditions.push(eq(categories.type, data.type));
-  }
-  if (data.excludeTypes?.length) {
-    conditions.push(notInArray(categories.type, data.excludeTypes));
   }
   const rows = await db
     .select()
     .from(categories)
     .where(conditions.length ? and(...conditions) : undefined)
-    // Ordering by type first is what groups the project pickers; a single
-    // type filter makes the first key a no-op, which is harmless.
+    // Type first groups the project pickers. Inventory rows all have a null
+    // type, so within that domain this collapses to name order.
     .orderBy(categories.type, categories.name);
   return { rows };
 }
@@ -49,9 +56,28 @@ export async function listCategoryTypesImpl() {
   const rows = await db
     .select({ type: categories.type })
     .from(categories)
+    // Facets exist only in the project domain; inventory categories are flat.
+    .where(and(eq(categories.domain, "project"), isNotNull(categories.type)))
     .groupBy(categories.type)
     .orderBy(categories.type);
-  return { types: rows.map((r) => r.type) };
+  return { types: rows.map((r) => r.type).filter((t): t is string => !!t) };
+}
+
+/**
+ * A project category is filed under a facet; an inventory category is flat.
+ * Rejecting a supplied inventory type rather than discarding it is deliberate:
+ * silent stripping is the failure class this redesign removes.
+ */
+function assertDomainShape(data: {
+  domain: CategoryDomain;
+  type: string | null;
+}) {
+  if (data.domain === "project" && !data.type?.trim()) {
+    throw new Error("A project category requires a type");
+  }
+  if (data.domain === "inventory" && data.type !== null) {
+    throw new Error("An inventory category cannot have a type");
+  }
 }
 
 export async function getCategoryImpl(data: { id: string }) {
@@ -67,9 +93,10 @@ export async function getCategoryImpl(data: { id: string }) {
 
 export async function createCategoryAs(viewer: AuthUser, data: CategoryInput) {
   assertStaff(viewer);
+  assertDomainShape(data);
   const [row] = await db
     .insert(categories)
-    .values({ name: data.name, type: data.type })
+    .values({ name: data.name, domain: data.domain, type: data.type })
     .returning();
   return { id: row.id };
 }
@@ -84,9 +111,10 @@ export async function updateCategoryAs(
   data: CategoryUpdateInput
 ) {
   assertStaff(viewer);
+  assertDomainShape(data);
   await db
     .update(categories)
-    .set({ name: data.name, type: data.type })
+    .set({ name: data.name, domain: data.domain, type: data.type })
     .where(eq(categories.id, data.id));
   return { id: data.id };
 }

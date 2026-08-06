@@ -137,7 +137,11 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   if (!category) {
     [category] = await db
       .insert(schema.categories)
-      .values({ name: "a11y-test-category", type: "technology" })
+      .values({
+        name: "a11y-test-category",
+        domain: "project",
+        type: "technology",
+      })
       .returning();
   }
 

@@ -96,10 +96,12 @@ describe("admin project export", () => {
     // ordering ("alpha" before "zulu", so the Zulu/alpha row comes first)
     // disagree: this pins the ORDER BY, not just the join.
     const { id: catInAlphaType } = await createCategoryAs(admin, {
+      domain: "project",
       name: "Zulu",
       type: "alpha",
     });
     const { id: catInZuluType } = await createCategoryAs(admin, {
+      domain: "project",
       name: "Alpha",
       type: "zulu",
     });
