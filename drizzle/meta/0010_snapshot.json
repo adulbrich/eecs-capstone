@@ -1,5 +1,5 @@
 {
-  "id": "6cdff2e9-2845-4110-9751-d24bc235a363",
+  "id": "adc7a461-9633-4f52-ae8a-7316991ea2e3",
   "prevId": "7379e5f1-282f-4102-9dd9-64536e3b8e8c",
   "version": "7",
   "dialect": "postgresql",
@@ -21,11 +21,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "domain": {
+          "name": "domain",
+          "type": "category_domain",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
         "type": {
           "name": "type",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -102,6 +109,82 @@
           "columns": [
             "user_id",
             "item_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.inventory_item_categories": {
+      "name": "inventory_item_categories",
+      "schema": "",
+      "columns": {
+        "item_id": {
+          "name": "item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "inventory_item_categories_category_idx": {
+          "name": "inventory_item_categories_category_idx",
+          "columns": [
+            {
+              "expression": "category_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "inventory_item_categories_item_id_inventory_items_id_fk": {
+          "name": "inventory_item_categories_item_id_inventory_items_id_fk",
+          "tableFrom": "inventory_item_categories",
+          "tableTo": "inventory_items",
+          "columnsFrom": [
+            "item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "inventory_item_categories_category_id_categories_id_fk": {
+          "name": "inventory_item_categories_category_id_categories_id_fk",
+          "tableFrom": "inventory_item_categories",
+          "tableTo": "categories",
+          "columnsFrom": [
+            "category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "inventory_item_categories_item_id_category_id_pk": {
+          "name": "inventory_item_categories_item_id_category_id_pk",
+          "columns": [
+            "item_id",
+            "category_id"
           ]
         }
       },
@@ -391,12 +474,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "category_id": {
-          "name": "category_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "serial": {
           "name": "serial",
           "type": "text",
@@ -512,21 +589,6 @@
           "method": "btree",
           "with": {}
         },
-        "inventory_items_category_id_idx": {
-          "name": "inventory_items_category_id_idx",
-          "columns": [
-            {
-              "expression": "category_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "inventory_items_current_holder_idx": {
           "name": "inventory_items_current_holder_idx",
           "columns": [
@@ -550,19 +612,6 @@
           "tableTo": "user",
           "columnsFrom": [
             "current_holder_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "inventory_items_category_id_fkey": {
-          "name": "inventory_items_category_id_fkey",
-          "tableFrom": "inventory_items",
-          "tableTo": "categories",
-          "columnsFrom": [
-            "category_id"
           ],
           "columnsTo": [
             "id"
@@ -2664,6 +2713,14 @@
     }
   },
   "enums": {
+    "public.category_domain": {
+      "name": "category_domain",
+      "schema": "public",
+      "values": [
+        "project",
+        "inventory"
+      ]
+    },
     "public.inventory_item_status": {
       "name": "inventory_item_status",
       "schema": "public",

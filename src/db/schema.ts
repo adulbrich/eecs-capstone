@@ -37,6 +37,11 @@ export const projectStatusEnum = pgEnum("project_status", [
   "archived",
 ]);
 
+export const categoryDomainEnum = pgEnum("category_domain", [
+  "project",
+  "inventory",
+]);
+
 export const programs = pgTable("programs", {
   id: uuid("id").defaultRandom().primaryKey(),
   courseId: text("course_id").notNull(),
@@ -66,9 +71,18 @@ export const programInstructors = pgTable(
 export const categories = pgTable("categories", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
-  // Project domains: 'project_type', 'technology', 'industry', 'field'.
-  // Inventory domain: INVENTORY_CATEGORY_TYPE (src/lib/category-types.ts).
-  type: text("type").notNull(),
+  /**
+   * What this category classifies. A closed set, unlike `type`: domains are
+   * known at design time, facets are invented by staff. Conflating the two in
+   * one column is what made "inventory" render as a fifth project facet.
+   */
+  domain: categoryDomainEnum("domain").notNull(),
+  /**
+   * The facet within the project domain: project_type, technology, industry,
+   * field, or anything staff create. Null for inventory categories, which are
+   * flat.
+   */
+  type: text("type"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -314,9 +328,6 @@ export const inventoryItems = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     name: text("name").notNull(),
     description: text("description"),
-    categoryId: uuid("category_id").references(() => categories.id, {
-      onDelete: "set null",
-    }),
     serial: text("serial"),
     label: text("label"),
     location: text("location"),
@@ -354,8 +365,25 @@ export const inventoryItems = pgTable(
   },
   (t) => [
     index("inventory_items_status_idx").on(t.status),
-    index("inventory_items_category_id_idx").on(t.categoryId),
     index("inventory_items_current_holder_idx").on(t.currentHolderId),
+  ]
+);
+
+export const inventoryItemCategories = pgTable(
+  "inventory_item_categories",
+  {
+    itemId: uuid("item_id")
+      .references(() => inventoryItems.id, { onDelete: "cascade" })
+      .notNull(),
+    categoryId: uuid("category_id")
+      .references(() => categories.id, { onDelete: "cascade" })
+      .notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.itemId, t.categoryId] }),
+    // The primary key only serves item -> categories. "Which items have this
+    // category" and "which categories are in use" both read the other way.
+    index("inventory_item_categories_category_idx").on(t.categoryId),
   ]
 );
 
