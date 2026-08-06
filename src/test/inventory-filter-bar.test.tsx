@@ -12,12 +12,12 @@ function renderBar(
   return render(
     <InventoryFilterBar
       categories={[]}
-      category={null}
-      onCategoryChange={() => {}}
+      onCategoriesChange={() => {}}
       onQChange={() => {}}
       onStatusChange={() => {}}
       onViewChange={() => {}}
       q=""
+      selectedCategories={[]}
       status={null}
       view="card"
       {...overrides}
@@ -41,12 +41,44 @@ describe("InventoryFilterBar", () => {
     vi.useRealTimers();
   });
 
-  it("renders category and status dropdowns and the view toggle", () => {
+  it("renders the status dropdown and the view toggle", () => {
     const { getByLabelText } = renderBar();
     // Select triggers are labelled via their associated <Label htmlFor>.
-    expect(getByLabelText("Category")).toBeTruthy();
     expect(getByLabelText("Status")).toBeTruthy();
     expect(getByLabelText("Card view")).toBeTruthy();
     expect(getByLabelText("Row view")).toBeTruthy();
+  });
+
+  it("renders a checkbox per category, checked according to selection", () => {
+    const categories = [
+      { id: "11111111-1111-4111-8111-111111111111", name: "Cameras" },
+      { id: "22222222-2222-4222-8222-222222222222", name: "Drills" },
+    ];
+    const { getByLabelText } = renderBar({
+      categories,
+      selectedCategories: [categories[0].id],
+    });
+    expect(getByLabelText("Cameras").getAttribute("aria-checked")).toBe("true");
+    expect(getByLabelText("Drills").getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("toggles a category on and off via onCategoriesChange", () => {
+    const categories = [
+      { id: "11111111-1111-4111-8111-111111111111", name: "Cameras" },
+      { id: "22222222-2222-4222-8222-222222222222", name: "Drills" },
+    ];
+    const onCategoriesChange = vi.fn();
+    const { getByLabelText } = renderBar({
+      categories,
+      onCategoriesChange,
+      selectedCategories: [categories[0].id],
+    });
+    fireEvent.click(getByLabelText("Drills"));
+    expect(onCategoriesChange).toHaveBeenCalledWith([
+      categories[0].id,
+      categories[1].id,
+    ]);
+    fireEvent.click(getByLabelText("Cameras"));
+    expect(onCategoriesChange).toHaveBeenCalledWith([]);
   });
 });

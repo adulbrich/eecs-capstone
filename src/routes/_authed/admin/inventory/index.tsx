@@ -11,6 +11,7 @@ import {
   AdminDataTable,
 } from "#/components/admin-data-table";
 import { CategoryChip } from "#/components/category-chip";
+import { CategoryFilterCombobox } from "#/components/category-filter-combobox";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { LocalTime } from "#/components/local-time";
@@ -57,9 +58,10 @@ const STATUSES = [
 type Status = (typeof STATUSES)[number];
 
 const searchSchema = z.object({
-  // A stale pre-UUID `?category=` link fails `.uuid()`; caught and treated
-  // as "no filter" instead of a router error. Matches the public listing.
-  category: z.string().uuid().nullable().catch(null).default(null),
+  // A stale pre-UUID `?category=` link (singular) fails
+  // `.array().uuid()`; caught and treated as "no filter" instead of a
+  // router error. Matches the public listing.
+  categories: z.array(z.string().uuid()).max(20).catch([]).default([]),
   cols: z.string().optional(),
   dir: z.enum(["asc", "desc"]).optional(),
   q: z.string().default(""),
@@ -82,7 +84,7 @@ export const Route = createFileRoute("/_authed/admin/inventory/")({
   // Only the filter fields: sort and column visibility are client state and
   // must not re-run the loader.
   loaderDeps: ({ search }) => ({
-    category: search.category,
+    categories: search.categories,
     q: search.q,
     status: search.status,
   }),
@@ -327,7 +329,7 @@ function AdminInventory() {
   const { categories, rows } = Route.useLoaderData();
   // The whole search object goes to the hook, which reads cols/dir/sort.
   const search = Route.useSearch();
-  const { category, q, status } = search;
+  const { categories: selectedCategories, q, status } = search;
   const [qDraft, setQDraft] = useState(q);
   // Populated by AdminDataTable's onSortedIdsChange every time the table's
   // own sorted row order changes. A ref, not state: the export only reads it
@@ -465,30 +467,21 @@ function AdminInventory() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="inv-category">Category</Label>
-              <Select
-                onValueChange={(v) =>
-                  void navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      category: v === "_all_" ? null : v,
-                    }),
-                  })
-                }
-                value={category ?? "_all_"}
-              >
-                <SelectTrigger className="mt-1 w-40" id="inv-category">
-                  <SelectValue placeholder="All categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all_">All categories</SelectItem>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="inv-category">
+                Categories (matches all selected)
+              </Label>
+              <div className="mt-1 w-56">
+                <CategoryFilterCombobox
+                  categories={categories}
+                  id="inv-category"
+                  onChange={(next) =>
+                    void navigate({
+                      search: (prev) => ({ ...prev, categories: next }),
+                    })
+                  }
+                  value={selectedCategories}
+                />
+              </div>
             </div>
           </>
         }

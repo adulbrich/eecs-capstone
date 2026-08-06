@@ -29,10 +29,11 @@ const searchSchema = z.object({
     .enum(["available", "requested", "reserved", "checked_out", "maintenance"])
     .nullable()
     .default(null),
-  // A stale `?category=Electronics` link (pre-UUID) fails `.uuid()`; caught
-  // and treated as "no filter" rather than a router error, per the brief:
-  // old links intentionally break as filters but should not 500 the page.
-  category: z.string().uuid().nullable().catch(null).default(null),
+  // A stale `?category=Electronics` link (pre-UUID, singular) fails
+  // `.array().uuid()`; caught and treated as "no filter" rather than a
+  // router error, per the brief: old links intentionally break as filters
+  // but should not 500 the page.
+  categories: z.array(z.string().uuid()).max(20).catch([]).default([]),
   // Optional so a param-less visit is detectable; the stored preference then
   // seeds it. Absent from the URL defaults to "card" at render.
   view: z.enum(["card", "row"]).optional(),
@@ -48,7 +49,7 @@ export const Route = createFileRoute("/inventory/")({
         data: {
           q: deps.q,
           status: deps.status,
-          category: deps.category,
+          categories: deps.categories,
           page: deps.page,
           pageSize: 20,
         },
@@ -91,9 +92,8 @@ function InventoryIndex() {
         <div className="mt-4">
           <InventoryFilterBar
             categories={data.categories}
-            category={search.category}
-            onCategoryChange={(category) =>
-              navigate({ search: (s) => ({ ...s, category, page: 1 }) })
+            onCategoriesChange={(categories) =>
+              navigate({ search: (s) => ({ ...s, categories, page: 1 }) })
             }
             onQChange={(q) =>
               navigate({ search: (s) => ({ ...s, q, page: 1 }) })
@@ -105,6 +105,7 @@ function InventoryIndex() {
               navigate({ search: (s) => ({ ...s, view }) })
             }
             q={search.q}
+            selectedCategories={search.categories}
             status={search.status}
             view={view}
           />
