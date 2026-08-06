@@ -66,6 +66,7 @@ export type InventoryItemStaff = InventoryItemPublic & {
   currentHolderEmail: string | null;
   currentHolderId: string | null;
   currentHolderLabel: string | null;
+  currentHolderProgram: string | null;
   currentRequestItemId: string | null;
   label: string | null;
   location: string | null;
@@ -110,6 +111,7 @@ function fullForStaff(
     currentHolderEmail: row.currentHolderEmail,
     currentHolderId: row.currentHolderId,
     currentHolderLabel: row.currentHolderLabel,
+    currentHolderProgram: row.currentHolderProgram,
     currentRequestItemId: row.currentRequestItemId,
     updatedAt: row.updatedAt,
   };
@@ -125,6 +127,18 @@ function holderEmailOf(row: {
   item: { currentHolderEmail: string | null };
 }): string | null {
   return row.holderEmail ?? row.item.currentHolderEmail;
+}
+
+/**
+ * Mirrors holderEmailOf. The joined account's name wins, because someone who
+ * renamed their account is still the same holder; the stored name is
+ * authoritative only for a hold that matched no account.
+ */
+function holderNameOf(row: {
+  holderName: string | null;
+  item: { currentHolderName: string | null };
+}): string | null {
+  return row.holderName ?? row.item.currentHolderName;
 }
 
 /**
@@ -213,7 +227,7 @@ export async function listInventoryAs(
     if (isStaff(viewer)) {
       return {
         ...fullForStaff(r.item, r.categories),
-        currentHolderName: r.holderName,
+        currentHolderName: holderNameOf(r),
         currentHolderEmail: holderEmailOf(r),
       };
     }
@@ -273,7 +287,7 @@ async function loadInventoryItemRowFor(
 function toStaffDetail(row: InventoryItemJoinedRow): InventoryItemStaffDetail {
   return {
     ...fullForStaff(row.item, row.categories),
-    currentHolderName: row.holderName,
+    currentHolderName: holderNameOf(row),
     currentHolderEmail: holderEmailOf(row),
   };
 }
@@ -352,7 +366,7 @@ export async function listAdminInventoryAs(
     rows: rows.map((r) => ({
       ...fullForStaff(r.item, r.categories),
       currentHolderEmail: holderEmailOf(r),
-      currentHolderName: r.holderName,
+      currentHolderName: holderNameOf(r),
     })),
   };
 }
@@ -758,6 +772,14 @@ export async function submitCartAs(
       return { requestId: null, submitted: [], skipped };
     }
 
+    // The invariant applies to every person hold, including one a student
+    // created for themselves. Fetched once here rather than as a correlated
+    // subselect inside each item update below.
+    const [requester] = await tx
+      .select({ email: user.email })
+      .from(user)
+      .where(eq(user.id, viewer.id));
+
     // Phase 2: only now insert the request envelope (so we never leave an
     // orphaned inventoryRequests row when every line races) and the lines.
     const [req] = await tx
@@ -789,8 +811,10 @@ export async function submitCartAs(
         .set({
           status: "requested",
           currentHolderId: viewer.id,
-          currentHolderEmail: null,
+          currentHolderEmail: requester?.email ?? null,
           currentHolderLabel: null,
+          currentHolderName: null,
+          currentHolderProgram: null,
           currentPickupBy: null,
           currentDueAt: null,
           currentRequestItemId: line.id,
@@ -804,6 +828,7 @@ export async function submitCartAs(
         changedBy: viewer.id,
         requestItemId: line.id,
         holderId: viewer.id,
+        holderEmail: requester?.email ?? null,
       });
     }
 

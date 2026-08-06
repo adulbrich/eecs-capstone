@@ -313,6 +313,11 @@ const EXPORT_COLUMNS = defineCsvColumns<Row>()([
     key: "currentHolderLabel",
     value: (row) => row.currentHolderLabel,
   },
+  {
+    header: "Holder program",
+    key: "currentHolderProgram",
+    value: (row) => row.currentHolderProgram,
+  },
   { header: "Pick up by", key: "pickupBy", value: (row) => row.pickupBy },
   { header: "Due", key: "dueAt", value: (row) => row.dueAt },
   {

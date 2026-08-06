@@ -2065,6 +2065,26 @@ describe("holder resolution", () => {
     ).rejects.toThrow();
   });
 
+  it("gives a self-submitted request hold an address", async () => {
+    const student = await makeUser("cart-address@x.com", "user");
+    const item = await makeItem();
+    await addToCartAs(student, { itemId: item.id });
+    await submitCartAs(student, { note: null });
+
+    const [row] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(row.currentHolderId).toBe(student.id);
+    expect(row.currentHolderEmail).toBe("cart-address@x.com");
+
+    const [h] = await db
+      .select()
+      .from(inventoryItemStatusHistory)
+      .where(eq(inventoryItemStatusHistory.itemId, item.id));
+    expect(h.holderEmail).toBe("cart-address@x.com");
+  });
+
   it("still notifies the requester on approve", async () => {
     const admin = await makeUser("approve-admin@x.com", "admin");
     const student = await makeUser("approve-student@x.com", "user");
@@ -2089,5 +2109,16 @@ describe("holder resolution", () => {
     expect(notes.some((n) => n.type === "inventory_request_approved")).toBe(
       true
     );
+
+    const [held] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    // approveRequestItemAs passes only holderId; resolveHolder derives the
+    // address from it, which is what keeps the invariant true on the one
+    // production path that never supplies an address.
+    expect(held.currentHolderId).toBe(student.id);
+    expect(held.currentHolderEmail).toBe("approve-student@x.com");
+    expect(held.currentHolderLabel).toBeNull();
   });
 });
