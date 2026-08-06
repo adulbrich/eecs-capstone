@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { INVENTORY_CATEGORY_TYPE } from "#/lib/category-types";
 import { listSchema } from "#/server/categories";
 
 // listCategoriesImpl is exercised through this schema by every server call;
@@ -8,7 +9,9 @@ import { listSchema } from "#/server/categories";
 // category pickers would regress to leaking inventory categories, unnoticed.
 describe("categories listSchema", () => {
   it("keeps excludeTypes through the zod boundary", () => {
-    const parsed = listSchema.parse({ excludeTypes: ["inventory"] });
-    expect(parsed.excludeTypes).toEqual(["inventory"]);
+    const parsed = listSchema.parse({
+      excludeTypes: [INVENTORY_CATEGORY_TYPE],
+    });
+    expect(parsed.excludeTypes).toEqual([INVENTORY_CATEGORY_TYPE]);
   });
 });
