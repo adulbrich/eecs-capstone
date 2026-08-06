@@ -68,7 +68,7 @@ function CategoryEdit() {
           data: { id: category.id, domain: "inventory", name, type: null },
         });
       }
-      navigate({ to: "/admin/categories" });
+      navigate({ search: { tab: category.domain }, to: "/admin/categories" });
     } catch (err) {
       setError((err as Error).message);
     }
@@ -85,7 +85,7 @@ function CategoryEdit() {
     setError(null);
     try {
       await deleteCategory({ data: { id: category.id } });
-      navigate({ to: "/admin/categories" });
+      navigate({ search: { tab: category.domain }, to: "/admin/categories" });
     } catch (err) {
       setError((err as Error).message);
     }
