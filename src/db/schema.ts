@@ -312,7 +312,9 @@ export const inventoryItems = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     name: text("name").notNull(),
     description: text("description"),
-    category: text("category"),
+    categoryId: uuid("category_id").references(() => categories.id, {
+      onDelete: "set null",
+    }),
     serial: text("serial"),
     label: text("label"),
     location: text("location"),
@@ -338,7 +340,7 @@ export const inventoryItems = pgTable(
     searchVector: tsvector("search_vector")
       .notNull()
       .generatedAlwaysAs(
-        sql`setweight(to_tsvector('english', coalesce(name, '')), 'A') || setweight(to_tsvector('english', coalesce(description, '')), 'B') || setweight(to_tsvector('english', coalesce(category, '')), 'C')`
+        sql`setweight(to_tsvector('english', coalesce(name, '')), 'A') || setweight(to_tsvector('english', coalesce(description, '')), 'B')`
       ),
 
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -350,7 +352,7 @@ export const inventoryItems = pgTable(
   },
   (t) => [
     index("inventory_items_status_idx").on(t.status),
-    index("inventory_items_category_idx").on(t.category),
+    index("inventory_items_category_id_idx").on(t.categoryId),
     index("inventory_items_current_holder_idx").on(t.currentHolderId),
   ]
 );
