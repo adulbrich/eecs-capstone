@@ -9,6 +9,7 @@ interface Props {
     id: string;
     name: string;
     description: string | null;
+    categoryName: string | null;
     imageUrl: string | null;
     status:
       | "available"
@@ -42,8 +43,13 @@ export function InventoryCard({ item, signedIn, onAddToCart }: Props) {
               {item.description}
             </p>
           )}
-          <div className="mt-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <InventoryStatusBadge status={item.status} />
+            {item.categoryName && (
+              <span className="rounded bg-secondary px-2 py-0.5 text-muted-foreground text-xs">
+                {item.categoryName}
+              </span>
+            )}
           </div>
         </div>
       </Link>

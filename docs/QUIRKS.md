@@ -226,6 +226,12 @@ The column is created in a hand-written migration as `GENERATED ALWAYS AS (...) 
 
 If you ever need to change the weight expression, drop the column and re-add it. Generated-always-stored columns cannot be altered in place.
 
+Dropping a `GENERATED ALWAYS AS ... STORED` column also drops every index defined on it; Postgres does not preserve or warn about this. `drizzle/0010_inventory_category_fk.sql` drops and recreates `inventory_items.search_vector` (to migrate `category` off the table and onto a FK) and its migration explicitly re-issues `CREATE INDEX ... USING GIN ("search_vector")` in the same file, after the `ADD COLUMN`. Skipping that step leaves full-text search working (Postgres will still plan a sequential scan) but silently un-indexed. Confirm the index exists after any such migration:
+
+```sql
+SELECT indexname FROM pg_indexes WHERE tablename = 'inventory_items';
+```
+
 ### Self-referential FKs need the AnyPgColumn cast
 
 ```ts

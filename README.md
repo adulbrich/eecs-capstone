@@ -27,7 +27,6 @@ in [`PRD.md`](./PRD.md).
 
 - Have a preview deployment on AWS that uses a very small DB, but otherwise the same stack as the rest. This means having another "Deploy (Preview)" GitHub Actions workflow that, in addition to the jobs/steps in the normal Deploy: resets the preview DB with the dev seeds and data, deploys on another container/url, and shows a big "PREVIEW DEPLOYMENT" banner at the top all pages. Spec this. This should work for specific branches if possible (e.g., someone opens a PR, and we manually deploy a preview with that branch).
 - Check all the nice shadcn/ui components and see if we use them everywhere we can. Audit where we could update the app accordingly. The most important things are that the UI is consistent across the app + accessibility.
-- categories for inventory items should be managed in /admin/categories as well, and be pulled from that store in the inventory/new and /edit routes
 
 ### Authentication
 

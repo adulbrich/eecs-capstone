@@ -20,18 +20,27 @@ const item = {
   id: "00000000-0000-0000-0000-000000000001",
   name: "Arduino Uno",
   description: "Microcontroller board for prototyping.",
+  categoryName: "Microcontroller",
   imageUrl: null,
   status: "available" as const,
 };
 
 describe("InventoryCard", () => {
-  it("renders name, description, and status", () => {
+  it("renders name, description, status, and category", () => {
     const { getByText } = render(
       <InventoryCard item={item} signedIn={false} />
     );
     expect(getByText("Arduino Uno")).toBeTruthy();
     expect(getByText("Microcontroller board for prototyping.")).toBeTruthy();
     expect(getByText("Available")).toBeTruthy();
+    expect(getByText("Microcontroller")).toBeTruthy();
+  });
+
+  it("omits the category badge when categoryName is null", () => {
+    const { queryByText } = render(
+      <InventoryCard item={{ ...item, categoryName: null }} signedIn={false} />
+    );
+    expect(queryByText("Microcontroller")).toBeNull();
   });
 
   it("shows Add to cart only when signed in and available", () => {

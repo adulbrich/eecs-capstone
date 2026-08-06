@@ -15,6 +15,7 @@ import {
   user,
 } from "../src/db/schema";
 import { auth } from "../src/lib/auth";
+import { INVENTORY_CATEGORY_TYPE } from "../src/lib/category-types";
 
 const PASSWORD = "password";
 
@@ -216,6 +217,27 @@ async function ensureCategory(c: Cat) {
   return row;
 }
 
+// Inventory categories (type: INVENTORY_CATEGORY_TYPE). Named as a const
+// tuple so item literals below are checked against this exact set at compile
+// time: a typo here or in an item's categoryName is a type error, not a
+// silent null categoryId.
+const INVENTORY_CATEGORY_NAMES = [
+  "Single-Board Computer",
+  "VR / AR Headset",
+  "Microcontroller",
+  "Sensor",
+  "AI Accelerator",
+  "Drone",
+  "Peripheral",
+] as const;
+
+type InventoryCategoryName = (typeof INVENTORY_CATEGORY_NAMES)[number];
+
+const INVENTORY_CATEGORIES: Cat[] = INVENTORY_CATEGORY_NAMES.map((name) => ({
+  name,
+  type: INVENTORY_CATEGORY_TYPE,
+}));
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -244,6 +266,13 @@ async function main() {
   const catRows = await Promise.all(CATEGORIES.map(ensureCategory));
   const cat = new Map(catRows.map((c) => [c.name, c.id]));
   console.log(`categories: ${catRows.length} ready`);
+
+  // Inventory categories, kept in their own map: same table, different
+  // domain (INVENTORY_CATEGORY_TYPE), so a name collision with a project
+  // category type must not resolve to the wrong row.
+  const invCatRows = await Promise.all(INVENTORY_CATEGORIES.map(ensureCategory));
+  const invCat = new Map(invCatRows.map((c) => [c.name, c.id]));
+  console.log(`inventory categories: ${invCatRows.length} ready`);
 
   const now = new Date();
   const daysAgo = (n: number) => new Date(now.getTime() - n * 86_400_000);
@@ -558,23 +587,21 @@ async function main() {
   console.log(`projects: ${created} created, ${PROJECTS.length} total defined`);
 
   // Inventory items. All fields populated. Holder fields set for held statuses.
-  type SeedItem = {
-    name: string;
-    description: string;
-    category: string;
+  //
+  // The insert shape is derived from the Drizzle schema itself, not
+  // hand-mirrored: if a column is added, renamed, or removed, every item
+  // literal below fails to typecheck instead of silently writing nothing for
+  // it. `categoryName` is the one field that is not a column: it is
+  // resolved to a real `categoryId` below and stripped before insert, the
+  // same pattern already used for `PROJECTS[].categories`.
+  type SeedItem = Omit<
+    typeof inventoryItems.$inferInsert,
+    "categoryId" | "createdAt" | "id" | "searchVector" | "updatedAt"
+  > & {
+    categoryName: InventoryCategoryName;
+    // Narrowed from the column's nullable type: every seed item is matched
+    // by serial for idempotency, so it must be a real string here.
     serial: string;
-    location: string;
-    notes: string;
-    imageUrl: string;
-    status:
-      | "available"
-      | "requested"
-      | "reserved"
-      | "checked_out"
-      | "maintenance"
-      | "retired";
-    currentHolderId: string | null;
-    currentHolderLabel: string | null;
   };
 
   const ITEMS: SeedItem[] = [
@@ -582,7 +609,7 @@ async function main() {
       name: "Raspberry Pi 5 (8GB)",
       description:
         "Quad-core Arm Cortex-A76 single-board computer with 8GB RAM. Includes official 27W USB-C PSU, active cooler, and a 64GB microSD card preloaded with Raspberry Pi OS.",
-      category: "Single-Board Computer",
+      categoryName: "Single-Board Computer",
       serial: "RPI5-8G-0001",
       location: "Kelley Engineering — Capstone Lab, Cabinet A, Bin 1",
       notes:
@@ -597,7 +624,7 @@ async function main() {
       name: "NVIDIA Jetson Orin Nano Developer Kit",
       description:
         "Edge-AI dev kit delivering up to 40 TOPS for on-device inference. Includes carrier board, power supply, and a preimaged microSD with JetPack.",
-      category: "Single-Board Computer",
+      categoryName: "Single-Board Computer",
       serial: "JETSON-ORIN-N-0001",
       location: "Kelley Engineering — Capstone Lab, Cabinet A, Bin 2",
       notes:
@@ -612,7 +639,7 @@ async function main() {
       name: "Meta Quest 3 (128GB)",
       description:
         "Standalone mixed-reality headset with color passthrough, two Touch Plus controllers, charging cable, and head strap. Developer mode enabled.",
-      category: "VR / AR Headset",
+      categoryName: "VR / AR Headset",
       serial: "QUEST3-128-0007",
       location: "Kelley Engineering — HCI Lab, Locked Cabinet",
       notes:
@@ -627,7 +654,7 @@ async function main() {
       name: "HTC Vive Pro 2 Kit",
       description:
         "Tethered PC-VR headset with 5K combined resolution, two base stations, and two controllers. Requires a VR-capable workstation.",
-      category: "VR / AR Headset",
+      categoryName: "VR / AR Headset",
       serial: "VIVEPRO2-0002",
       location: "Kelley Engineering — HCI Lab, Shelf 3",
       notes:
@@ -642,7 +669,7 @@ async function main() {
       name: "Arduino Uno R4 WiFi",
       description:
         "Renesas RA4M1 microcontroller board with onboard ESP32-S3 Wi-Fi/Bluetooth and a 12x8 LED matrix. Includes USB-C cable.",
-      category: "Microcontroller",
+      categoryName: "Microcontroller",
       serial: "ARD-UNOR4W-0014",
       location: "Kelley Engineering — Capstone Lab, Parts Drawer 4",
       notes: "Several units available; good for IoT prototyping.",
@@ -656,7 +683,7 @@ async function main() {
       name: "ESP32-S3-DevKitC-1",
       description:
         "Dual-core Xtensa LX7 dev board with Wi-Fi and Bluetooth LE, USB-C, and 8MB flash. Ideal for low-cost connected sensors.",
-      category: "Microcontroller",
+      categoryName: "Microcontroller",
       serial: "ESP32S3-DK-0031",
       location: "Kelley Engineering — Capstone Lab, Parts Drawer 5",
       notes: "Bulk stock; no need to reserve more than two per team.",
@@ -670,7 +697,7 @@ async function main() {
       name: "Intel RealSense Depth Camera D435i",
       description:
         "Stereo depth camera with an integrated IMU for robotics and 3D scanning. Includes USB-C cable and mounting tripod adapter.",
-      category: "Sensor",
+      categoryName: "Sensor",
       serial: "RS-D435I-0005",
       location: "Kelley Engineering — Robotics & Vision Lab, Bin 7",
       notes: "Reserved for the warehouse robot fleet team's perception work.",
@@ -684,7 +711,7 @@ async function main() {
       name: "Google Coral USB Accelerator",
       description:
         "Edge TPU coprocessor over USB-C providing fast, low-power TensorFlow Lite inference. Pairs with SBCs for accelerated on-device ML.",
-      category: "AI Accelerator",
+      categoryName: "AI Accelerator",
       serial: "CORAL-USB-0009",
       location: "Kelley Engineering — Capstone Lab, Cabinet A, Bin 3",
       notes: "Use with the Edge AI benchmarking project.",
@@ -698,7 +725,7 @@ async function main() {
       name: "DJI Tello EDU Drone",
       description:
         "Lightweight programmable quadcopter with a Python/Scratch SDK, 720p camera, and swarm support. Includes three batteries and a charging hub.",
-      category: "Drone",
+      categoryName: "Drone",
       serial: "TELLO-EDU-0003",
       location: "Kelley Engineering — Capstone Lab, Cabinet B (foam case)",
       notes:
@@ -713,7 +740,7 @@ async function main() {
       name: "Logitech BRIO 4K Webcam",
       description:
         "4K UHD webcam with HDR and a wide field of view. Useful for computer-vision capture, demos, and remote Expo presentations. Includes clip mount and USB-C cable.",
-      category: "Peripheral",
+      categoryName: "Peripheral",
       serial: "BRIO-4K-0021",
       location: "Kelley Engineering — Capstone Lab, Cabinet A, Bin 4",
       notes: "Checked out for the camera-trap classifier team's demo rig.",
@@ -735,7 +762,14 @@ async function main() {
       console.log(`item: "${item.name}" (exists)`);
       continue;
     }
-    await db.insert(inventoryItems).values(item);
+    const { categoryName, ...values } = item;
+    const categoryId = invCat.get(categoryName);
+    if (!categoryId) {
+      throw new Error(
+        `item "${item.name}" references unknown inventory category "${categoryName}"`
+      );
+    }
+    await db.insert(inventoryItems).values({ ...values, categoryId });
     itemsCreated += 1;
     console.log(`item: "${item.name}" (created, status=${item.status})`);
   }

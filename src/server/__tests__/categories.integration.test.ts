@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { projectCategories, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
+import { INVENTORY_CATEGORY_TYPE } from "#/lib/category-types";
 import {
   createCategoryAs,
   deleteCategoryAs,
@@ -111,11 +112,14 @@ describe("categories", () => {
   it("excludes types the caller asked to omit", async () => {
     const admin = await makeUser(`ex-${Date.now()}@x.com`, "admin");
     await createCategoryAs(admin, { name: "React", type: "technology" });
-    await createCategoryAs(admin, { name: "Electronics", type: "inventory" });
+    await createCategoryAs(admin, {
+      name: "Electronics",
+      type: INVENTORY_CATEGORY_TYPE,
+    });
 
     const all = await listCategoriesImpl({});
     const projectOnly = await listCategoriesImpl({
-      excludeTypes: ["inventory"],
+      excludeTypes: [INVENTORY_CATEGORY_TYPE],
     });
 
     expect(all.rows.map((r) => r.name)).toContain("Electronics");
