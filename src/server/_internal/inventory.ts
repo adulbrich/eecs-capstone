@@ -1277,11 +1277,30 @@ export async function listMyItemsAs(viewer: Viewer) {
     ...history.map((r) => r.line.id),
   ]);
 
+  // Every row on this page belongs to the viewer as requester, so a collector
+  // who is the viewer is the ordinary case, not news: drop it. A collector
+  // identified only by an address that happens to be the viewer's own is the
+  // same case with no resolved account. A collector with neither a name nor
+  // an address to print (a label hold) has nothing worth showing either.
+  const collectedByForViewer = (lineId: string): CollectedBy | null => {
+    const collector = collected.get(lineId) ?? null;
+    if (!collector) {
+      return null;
+    }
+    const isViewer =
+      collector.id === viewer.id ||
+      (account?.email != null && collector.email === account.email);
+    if (isViewer) {
+      return null;
+    }
+    return collector.name || collector.email ? collector : null;
+  };
+
   const active: ActiveEntry[] = [
     ...activeLines.map(
       (row): ActiveEntry => ({
         kind: "request",
-        collectedBy: collected.get(row.line.id) ?? null,
+        collectedBy: collectedByForViewer(row.line.id),
         ...row,
       })
     ),
@@ -1293,13 +1312,14 @@ export async function listMyItemsAs(viewer: Viewer) {
     active,
     history: history.map((row) => ({
       ...row,
-      collectedBy: collected.get(row.line.id) ?? null,
+      collectedBy: collectedByForViewer(row.line.id),
     })),
   };
 }
 
 export interface CollectedBy {
   email: string | null;
+  id: string | null;
   name: string | null;
 }
 
@@ -1326,6 +1346,7 @@ export async function collectedByForRequestItems(
   const rows = await db
     .selectDistinctOn([inventoryItemStatusHistory.requestItemId], {
       requestItemId: inventoryItemStatusHistory.requestItemId,
+      holderId: inventoryItemStatusHistory.holderId,
       holderEmail: inventoryItemStatusHistory.holderEmail,
       holderName: inventoryItemStatusHistory.holderName,
       accountEmail: user.email,
@@ -1352,6 +1373,7 @@ export async function collectedByForRequestItems(
     // Same rule as holderEmailOf and holderNameOf: the account wins, the
     // stored values cover a collector who had no account.
     map.set(r.requestItemId, {
+      id: r.holderId,
       email: r.accountEmail ?? r.holderEmail,
       name: r.accountName ?? r.holderName,
     });

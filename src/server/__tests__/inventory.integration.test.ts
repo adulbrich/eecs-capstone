@@ -2356,3 +2356,70 @@ describe("collected by", () => {
     expect(collected.size).toBe(0);
   });
 });
+
+describe("listMyItemsAs collectedBy gate", () => {
+  it("hides the collector when the requester collected their own item", async () => {
+    const admin = await makeUser("gate-admin-1@x.com", "admin");
+    const requester = await makeUser("gate-requester-1@x.com", "user");
+    const item = await makeItem();
+
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    // The requester walks in and collects their own item; staff leave the
+    // prefilled address alone.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: "gate-requester-1@x.com",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const { active } = await listMyItemsAs(requester);
+    const entry = active.find((e) => e.item.id === item.id);
+    expect(entry?.kind).toBe("request");
+    if (entry?.kind === "request") {
+      expect(entry.collectedBy).toBeNull();
+    }
+  });
+
+  it("names a teammate who collected the item", async () => {
+    const admin = await makeUser("gate-admin-2@x.com", "admin");
+    const requester = await makeUser("gate-requester-2@x.com", "user");
+    await makeUser("gate-picker-2@x.com", "user");
+    const item = await makeItem();
+
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: "gate-picker-2@x.com",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const { active } = await listMyItemsAs(requester);
+    const entry = active.find((e) => e.item.id === item.id);
+    expect(entry?.kind).toBe("request");
+    if (entry?.kind === "request") {
+      expect(entry.collectedBy?.email).toBe("gate-picker-2@x.com");
+    }
+  });
+});

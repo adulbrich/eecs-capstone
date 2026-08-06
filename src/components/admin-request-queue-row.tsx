@@ -84,9 +84,13 @@ export function AdminRequestQueueRow({
           <div className="mt-1 flex items-center gap-2 text-muted-foreground text-xs">
             <InventoryStatusBadge status={item.status as "available"} />
             <span>line: {line.status}</span>
-            {collectedBy && collectedBy.email !== requesterEmail && (
-              <span>collected by {collectedBy.name ?? collectedBy.email}</span>
-            )}
+            {collectedBy &&
+              (collectedBy.name || collectedBy.email) &&
+              collectedBy.email !== requesterEmail && (
+                <span>
+                  collected by {collectedBy.name ?? collectedBy.email}
+                </span>
+              )}
           </div>
         </div>
         {isPending && mode === null && (
