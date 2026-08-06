@@ -12,6 +12,7 @@ export interface StaffPanelItem {
   currentHolderId?: string | null;
   currentHolderLabel?: string | null;
   currentHolderName?: string | null;
+  currentHolderProgram?: string | null;
   currentRequestItemId?: string | null;
   dueAt?: Date | string | null;
   id: string;
@@ -88,6 +89,7 @@ export function StaffInventoryPanel({
           currentHolderName: item.currentHolderName ?? null,
           currentHolderEmail: item.currentHolderEmail ?? null,
           currentHolderLabel: item.currentHolderLabel ?? null,
+          currentHolderProgram: item.currentHolderProgram ?? null,
           currentRequestItemId: item.currentRequestItemId ?? null,
           pickupBy: item.pickupBy ?? null,
           dueAt: item.dueAt ?? null,

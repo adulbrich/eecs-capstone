@@ -249,11 +249,15 @@ const transitionSchema = z.object({
     "retired",
   ]),
   requestItemId: z.string().uuid().nullable().default(null),
-  holderId: z.string().nullable().default(null),
+  // No holderId. Staff assign a hold by address or by label; the account is
+  // resolved from the address server-side. Only the two internal callers that
+  // already hold an account id pass one, and they never come through here.
   holderEmail: z
     .union([z.string().email("Must be a valid email").max(200), z.null()])
     .default(null),
   holderLabel: z.string().max(200).nullable().default(null),
+  holderName: z.string().max(200).nullable().default(null),
+  holderProgram: z.string().max(200).nullable().default(null),
   pickupBy: z.coerce.date().nullable().default(null),
   dueAt: z.coerce.date().nullable().default(null),
   comment: z.string().max(2000).nullable().default(null),
