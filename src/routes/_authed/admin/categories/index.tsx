@@ -44,7 +44,7 @@ import {
 } from "#/lib/table-state";
 import {
   createCategory,
-  listCategories,
+  listCategoriesWithUsage,
   listCategoryTypes,
   type listSchema,
 } from "#/server/categories";
@@ -74,7 +74,7 @@ export const Route = createFileRoute("/_authed/admin/categories/")({
       domain: deps.tab,
     } satisfies z.input<typeof listSchema>;
     const [{ rows }, { types }] = await Promise.all([
-      listCategories({ data: listData }),
+      listCategoriesWithUsage({ data: listData }),
       listCategoryTypes(),
     ]);
     return { rows, types };
@@ -82,7 +82,7 @@ export const Route = createFileRoute("/_authed/admin/categories/")({
   component: CategoriesAdmin,
 });
 
-type Row = Awaited<ReturnType<typeof listCategories>>["rows"][number];
+type Row = Awaited<ReturnType<typeof listCategoriesWithUsage>>["rows"][number];
 
 const PROJECT_DEFAULT_SORT: SortState = { desc: false, id: "type" };
 const INVENTORY_DEFAULT_SORT: SortState = { desc: false, id: "name" };
@@ -93,6 +93,24 @@ const NAME_COLUMN: AdminColumn<Row> = {
   enableHiding: false,
   header: "Name",
   id: "name",
+};
+
+// One column definition per tab rather than one shared "Usage": the header
+// has to name what was counted, and the domain decides which junction table
+// the count came from.
+const PROJECT_USAGE_COLUMN: AdminColumn<Row> = {
+  accessorFn: (row) => row.usageCount,
+  cell: ({ row }) => row.original.usageCount,
+  header: "Projects",
+  id: "usageCount",
+  // Numeric, not the locale-compare default, which would compare String(n)
+  // and sort 10 before 2.
+  sortingFn: "basic",
+};
+
+const INVENTORY_USAGE_COLUMN: AdminColumn<Row> = {
+  ...PROJECT_USAGE_COLUMN,
+  header: "Items",
 };
 
 const TYPE_COLUMN: AdminColumn<Row> = {
@@ -133,6 +151,7 @@ const ACTIONS_COLUMN: AdminColumn<Row> = {
 // domain is flat, so its table never renders a Type column at all.
 const PROJECT_COLUMNS: AdminColumn<Row>[] = [
   NAME_COLUMN,
+  PROJECT_USAGE_COLUMN,
   TYPE_COLUMN,
   CREATED_COLUMN,
   ACTIONS_COLUMN,
@@ -140,6 +159,7 @@ const PROJECT_COLUMNS: AdminColumn<Row>[] = [
 
 const INVENTORY_COLUMNS: AdminColumn<Row>[] = [
   NAME_COLUMN,
+  INVENTORY_USAGE_COLUMN,
   CREATED_COLUMN,
   ACTIONS_COLUMN,
 ];
@@ -154,6 +174,7 @@ const EXPORT_COLUMNS = defineCsvColumns<Row>()([
   { header: "Name", key: "name", value: (row) => row.name },
   { header: "Type", key: "type", value: (row) => row.type },
   { header: "Domain", key: "domain", value: (row) => row.domain },
+  { header: "Usage", key: "usageCount", value: (row) => row.usageCount },
   { header: "Created", key: "createdAt", value: (row) => row.createdAt },
 ]);
 
