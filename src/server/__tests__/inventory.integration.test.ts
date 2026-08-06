@@ -1829,6 +1829,83 @@ describe("disjointness invariant between the hold and request-line queries", () 
   });
 });
 
+describe("a teammate collects a requested item", () => {
+  it("shows the request to the requester and the hold to the picker", async () => {
+    const admin = await makeUser("cross-admin@x.com", "admin");
+    const requester = await makeUser("cross-requester@x.com", "user");
+    const picker = await makeUser("cross-picker@x.com", "user");
+    const item = await makeItem();
+
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+
+    // The teammate walks in. Staff replace the prefilled address.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: "cross-picker@x.com",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const requesterView = await listMyItemsAs(requester);
+    const requesterEntries = requesterView.active.filter(
+      (e) => e.item.id === item.id
+    );
+    expect(requesterEntries).toHaveLength(1);
+    expect(requesterEntries[0].kind).toBe("request");
+
+    const pickerView = await listMyItemsAs(picker);
+    const pickerEntries = pickerView.active.filter(
+      (e) => e.item.id === item.id
+    );
+    expect(pickerEntries).toHaveLength(1);
+    expect(pickerEntries[0].kind).toBe("hold");
+  });
+
+  it("leaves the request line approved so the requester keeps seeing it", async () => {
+    const admin = await makeUser("cross-admin-2@x.com", "admin");
+    const requester = await makeUser("cross-requester-2@x.com", "user");
+    const item = await makeItem();
+
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: "someone-else@nowhere.test",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const [after] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.id, line.id));
+    // listMyItemsAs only puts pending and approved lines in the Active tab,
+    // and syncRequestItem's checked_out arm sets dueAt without touching
+    // status. Asserted directly, because the requester's whole view of a
+    // teammate's pickup depends on that arm continuing to leave it alone.
+    expect(after.status).toBe("approved");
+  });
+});
+
 describe("overdue notifications for staff holds", () => {
   it("notifies the holder of an overdue hold with no request line", async () => {
     const stamp = Date.now();

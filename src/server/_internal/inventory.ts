@@ -8,6 +8,7 @@ import {
   isNotNull,
   isNull,
   ne,
+  notExists,
   or,
   type SQL,
   sql,
@@ -1206,13 +1207,28 @@ export async function listMyItemsAs(viewer: Viewer) {
       .from(inventoryItems)
       .where(
         and(
-          // Disjoint from the request-line query above: an item held through
-          // a request line is already in `active` and must not appear twice.
-          // Safe by construction, not by a DB constraint: closeRequestItemOnRelease
-          // (inventory-transitions.ts) closes the attached line whenever
-          // current_request_item_id goes null, so a live pending/approved
-          // line and a null current_request_item_id never coexist.
-          isNull(inventoryItems.currentRequestItemId),
+          // The point of this condition was always "an item must not appear
+          // twice on one person's page", not "a held item has no request".
+          // Stated that way it also lets a teammate who collected someone
+          // else's requested item see the hold they are actually carrying.
+          notExists(
+            db
+              .select({ one: sql`1` })
+              .from(inventoryRequestItems)
+              .innerJoin(
+                inventoryRequests,
+                eq(inventoryRequestItems.requestId, inventoryRequests.id)
+              )
+              .where(
+                and(
+                  eq(
+                    inventoryRequestItems.id,
+                    inventoryItems.currentRequestItemId
+                  ),
+                  eq(inventoryRequests.userId, viewer.id)
+                )
+              )
+          ),
           inArray(inventoryItems.status, ["reserved", "checked_out"]),
           or(
             eq(inventoryItems.currentHolderId, viewer.id),
