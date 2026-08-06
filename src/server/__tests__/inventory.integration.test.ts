@@ -1251,6 +1251,60 @@ describe("request lifecycle", () => {
       })
     ).rejects.toThrow(/checkout/);
   });
+
+  it("clears the walk-in name and program when a cancel releases the item", async () => {
+    // Regression for the two release paths (reject, cancel) writing the
+    // available arm's holder columns by hand instead of going through
+    // transitionItem: they nulled the id/email/label trio but left the two
+    // walk-in columns behind, so a cancelled reservation could still show a
+    // stale name/program on an item the status badge reports as available.
+    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    await addToCartAs(student, { itemId: item.id });
+    await submitCartAs(student, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+
+    // Staff reserves the request to a walk-in address with no matching
+    // account, typing a name and program. The address must not resolve to
+    // any account created in this file, or resolveHolder would clear the
+    // name/program at write time and the test would prove nothing.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      requestItemId: line.id,
+      holderEmail: "cancel-stale-walkin@nowhere.test",
+      holderName: "Stale Walkin",
+      holderProgram: "CS 461",
+    });
+
+    const [reserved] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    // Confirm the columns actually got populated before the cancel, so a
+    // silent failure to store them can't masquerade as the fix working.
+    expect(reserved.currentHolderName).toBe("Stale Walkin");
+    expect(reserved.currentHolderProgram).toBe("CS 461");
+
+    // The line is now 'approved', which cancelRequestItemAs still permits as
+    // long as the item is not checked_out.
+    await cancelRequestItemAs(student, {
+      requestItemId: line.id,
+      note: "changed my mind",
+    });
+
+    const [released] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(released.status).toBe("available");
+    expect(released.currentHolderName).toBeNull();
+    expect(released.currentHolderProgram).toBeNull();
+  });
 });
 
 describe("bulk approve in a batch is atomic", () => {
