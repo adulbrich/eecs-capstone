@@ -138,7 +138,9 @@ describe("transitionItem", () => {
     // cannot be reserved to nobody.
     await expect(
       transitionItem(admin, { itemId: item.id, nextStatus: "reserved" })
-    ).rejects.toThrow(/exactly one of holderId, holderEmail or holderLabel/);
+    ).rejects.toThrow(
+      /holder email or a holder label, not both and not neither/
+    );
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");
     const { line } = await makeRequestLine(student.id, item.id);
     await expect(
@@ -149,7 +151,9 @@ describe("transitionItem", () => {
         holderId: student.id,
         holderLabel: "X",
       })
-    ).rejects.toThrow(/exactly one of holderId, holderEmail or holderLabel/);
+    ).rejects.toThrow(
+      /holder email or a holder label, not both and not neither/
+    );
   });
 
   it("reserved transition updates line to approved + sets pickupBy + notifies", async () => {
@@ -1453,12 +1457,14 @@ describe("staff-assigned holds without a request line", () => {
     expect(staffView.item.currentHolderEmail).toBe(holderEmail);
     expect(staffView.item.pickupBy).toBeInstanceOf(Date);
     // With no account to point at, the address is the only thing that can
-    // identify the holder in the history log.
+    // identify the holder in the history log, and it lives in its own
+    // column rather than being smuggled into holderLabel.
     const [historyRow] = await db
       .select()
       .from(inventoryItemStatusHistory)
       .where(eq(inventoryItemStatusHistory.itemId, item.id));
-    expect(historyRow.holderLabel).toBe(holderEmail);
+    expect(historyRow.holderEmail).toBe(holderEmail);
+    expect(historyRow.holderLabel).toBeNull();
 
     const publicView = await getInventoryItemDetailAs(nosy, { id: item.id });
     expect(JSON.stringify(publicView)).not.toContain(holderEmail);
@@ -1942,5 +1948,146 @@ describe("overdue notifications for staff holds", () => {
           r.type === "inventory_pickup_overdue"
       )
     ).toHaveLength(0);
+  });
+});
+
+describe("holder resolution", () => {
+  it("stores the address when only an account id is given", async () => {
+    const admin = await makeUser("resolve-admin@x.com", "admin");
+    const holder = await makeUser("resolve-holder@x.com", "user");
+    const item = await makeItem();
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderId: holder.id,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const [row] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(row.currentHolderId).toBe(holder.id);
+    expect(row.currentHolderEmail).toBe("resolve-holder@x.com");
+    expect(row.currentHolderLabel).toBeNull();
+  });
+
+  it("resolves an address to an account and ignores a supplied name", async () => {
+    const admin = await makeUser("resolve-admin-2@x.com", "admin");
+    const holder = await makeUser("resolve-holder-2@x.com", "user");
+    const item = await makeItem();
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: "resolve-holder-2@x.com",
+      holderName: "Typed Name",
+      holderProgram: "CS 461",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const [row] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(row.currentHolderId).toBe(holder.id);
+    expect(row.currentHolderName).toBeNull();
+    expect(row.currentHolderProgram).toBeNull();
+  });
+
+  it("keeps name and program for an address with no account", async () => {
+    const admin = await makeUser("resolve-admin-3@x.com", "admin");
+    const item = await makeItem();
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: "walkin@nowhere.test",
+      holderName: "Walk In",
+      holderProgram: "CS 462",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const [row] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(row.currentHolderId).toBeNull();
+    expect(row.currentHolderEmail).toBe("walkin@nowhere.test");
+    expect(row.currentHolderName).toBe("Walk In");
+    expect(row.currentHolderProgram).toBe("CS 462");
+    expect(row.currentHolderLabel).toBeNull();
+  });
+
+  it("records the address on the history row instead of the label", async () => {
+    const admin = await makeUser("resolve-admin-4@x.com", "admin");
+    const item = await makeItem();
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: "history@nowhere.test",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const [h] = await db
+      .select()
+      .from(inventoryItemStatusHistory)
+      .where(eq(inventoryItemStatusHistory.itemId, item.id));
+    expect(h.holderEmail).toBe("history@nowhere.test");
+    expect(h.holderLabel).toBeNull();
+  });
+
+  it("rejects a hold with both an address and a label", async () => {
+    const admin = await makeUser("resolve-admin-5@x.com", "admin");
+    const item = await makeItem();
+    await expect(
+      transitionItem(admin, {
+        itemId: item.id,
+        nextStatus: "checked_out",
+        holderEmail: "both@nowhere.test",
+        holderLabel: "Lab 204",
+        dueAt: new Date(Date.now() + 86_400_000),
+      })
+    ).rejects.toThrow();
+  });
+
+  it("rejects a hold with neither", async () => {
+    const admin = await makeUser("resolve-admin-6@x.com", "admin");
+    const item = await makeItem();
+    await expect(
+      transitionItem(admin, {
+        itemId: item.id,
+        nextStatus: "checked_out",
+        dueAt: new Date(Date.now() + 86_400_000),
+      })
+    ).rejects.toThrow();
+  });
+
+  it("still notifies the requester on approve", async () => {
+    const admin = await makeUser("approve-admin@x.com", "admin");
+    const student = await makeUser("approve-student@x.com", "user");
+    const item = await makeItem();
+    await addToCartAs(student, { itemId: item.id });
+    const { requestId } = await submitCartAs(student, { note: null });
+    expect(requestId).not.toBeNull();
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+
+    const notes = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, student.id));
+    expect(notes.some((n) => n.type === "inventory_request_approved")).toBe(
+      true
+    );
   });
 });

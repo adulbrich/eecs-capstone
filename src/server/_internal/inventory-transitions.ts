@@ -24,8 +24,17 @@ export interface TransitionInput {
   dueAt?: Date | null;
   /** Assigns the hold to an address, with or without a matching account. */
   holderEmail?: string | null;
+  /**
+   * An already-resolved account. Not reachable from the dialog: transitionSchema
+   * omits it, so staff cannot assign a hold by id. Only approveRequestItemAs
+   * and submitCartAs pass it, because they already hold the id and the address
+   * is derived from it.
+   */
   holderId?: string | null;
   holderLabel?: string | null;
+  /** Describes a holder with no account. Discarded when one is resolved. */
+  holderName?: string | null;
+  holderProgram?: string | null;
   itemId: string;
   nextStatus: ItemStatus;
   pickupBy?: Date | null;
@@ -49,6 +58,8 @@ function validateInvariants(input: TransitionInput) {
     holderId,
     holderEmail,
     holderLabel,
+    holderName,
+    holderProgram,
     requestItemId,
     pickupBy,
     dueAt,
@@ -58,7 +69,14 @@ function validateInvariants(input: TransitionInput) {
     case "available":
     case "maintenance":
     case "retired":
-      if (holderId || holderEmail || holderLabel || requestItemId) {
+      if (
+        holderId ||
+        holderEmail ||
+        holderLabel ||
+        holderName ||
+        holderProgram ||
+        requestItemId
+      ) {
         throw new Error(
           `Cannot set holder or request on transition to ${nextStatus}`
         );
@@ -78,12 +96,15 @@ function validateInvariants(input: TransitionInput) {
       return;
     case "reserved":
     case "checked_out": {
-      // A request line is optional: staff reserve or check out walk-in items
-      // that were never carted, and those holds have no line to attach to.
-      const holders = [holderId, holderEmail, holderLabel].filter(Boolean);
-      if (holders.length !== 1) {
+      // A hold is on a person or on a thing, never both and never neither.
+      // An id and an address both identify the same person, so they count as
+      // one; name and program are attributes of that person, not a third
+      // identity, and are excluded from the test entirely.
+      const onAPerson = Boolean(holderId || holderEmail);
+      const onAThing = Boolean(holderLabel);
+      if (onAPerson === onAThing) {
         throw new Error(
-          `${nextStatus} requires exactly one of holderId, holderEmail or holderLabel`
+          `${nextStatus} requires either a holder email or a holder label, not both and not neither`
         );
       }
       if (nextStatus === "checked_out" && !dueAt) {
@@ -96,26 +117,40 @@ function validateInvariants(input: TransitionInput) {
   }
 }
 
+interface ResolvedHolder {
+  email: string | null;
+  id: string | null;
+}
+
 /**
- * Links an email-assigned hold to an account when one already exists, the same
- * way a project's proposerEmail resolves to a proposerId. Without this the
- * holder would never be notified, even though they can sign in.
+ * Completes the (account, address) pair from whichever half the caller had,
+ * the same way a project's proposerEmail resolves to a proposerId.
+ *
+ * An address supplied by the caller always wins over a supplied id, because
+ * it is the address the hold was actually assigned to. Deriving the address
+ * in the id-only direction is what keeps current_holder_email populated for
+ * callers that never had one to give (approveRequestItemAs), which is what
+ * makes "a person hold always has an address" true on every write path.
  */
-async function resolveHolderId(
+async function resolveHolder(
   tx: Tx,
   input: TransitionInput
-): Promise<string | null> {
+): Promise<ResolvedHolder> {
+  if (input.holderEmail) {
+    const [match] = await tx
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.email, input.holderEmail));
+    return { email: input.holderEmail, id: match?.id ?? null };
+  }
   if (input.holderId) {
-    return input.holderId;
+    const [account] = await tx
+      .select({ email: user.email })
+      .from(user)
+      .where(eq(user.id, input.holderId));
+    return { email: account?.email ?? null, id: input.holderId };
   }
-  if (!input.holderEmail) {
-    return null;
-  }
-  const [match] = await tx
-    .select({ id: user.id })
-    .from(user)
-    .where(eq(user.email, input.holderEmail));
-  return match?.id ?? null;
+  return { email: null, id: null };
 }
 
 /**
@@ -150,14 +185,13 @@ export async function transitionItem(
 async function transitionItemInTx(
   tx: Tx,
   viewer: Viewer,
-  rawInput: TransitionInput
+  input: TransitionInput
 ) {
-  // Every write below reads the resolved holder, so an email that matches an
-  // account behaves exactly like a hold assigned through the user picker.
-  const input: TransitionInput = {
-    ...rawInput,
-    holderId: await resolveHolderId(tx, rawInput),
-  };
+  const holder = await resolveHolder(tx, input);
+  // The account is authoritative for anyone who has one, so a typed name or
+  // program is dropped rather than stored alongside it and left to drift.
+  const holderName = holder.id ? null : (input.holderName ?? null);
+  const holderProgram = holder.id ? null : (input.holderProgram ?? null);
 
   const [current] = await tx
     .select()
@@ -182,9 +216,11 @@ async function transitionItemInTx(
     .update(inventoryItems)
     .set({
       status: input.nextStatus,
-      currentHolderId: input.holderId ?? null,
-      currentHolderEmail: input.holderEmail ?? null,
+      currentHolderId: holder.id,
+      currentHolderEmail: holder.email,
       currentHolderLabel: input.holderLabel ?? null,
+      currentHolderName: holderName,
+      currentHolderProgram: holderProgram,
       // Writing the hold's dates here on every transition means releasing an
       // item clears them for free, with no separate reset path.
       currentPickupBy: input.pickupBy ?? null,
@@ -201,14 +237,11 @@ async function transitionItemInTx(
     changedBy: viewer.id,
     comment: input.comment ?? null,
     requestItemId: input.requestItemId ?? null,
-    holderId: input.holderId ?? null,
-    // Only an address that matched no account falls back to the label column:
-    // once holderId is resolved the row must look like every other
-    // account-backed hold, or the history list would render the raw email
-    // where it shows an account everywhere else.
-    holderLabel:
-      input.holderLabel ??
-      (input.holderId ? null : (input.holderEmail ?? null)),
+    holderId: holder.id,
+    holderEmail: holder.email,
+    holderLabel: input.holderLabel ?? null,
+    holderName,
+    holderProgram,
   });
 
   if (input.requestItemId) {
@@ -224,7 +257,7 @@ async function transitionItemInTx(
     );
   }
 
-  await maybeNotify(tx, current, input);
+  await maybeNotify(tx, current, input, holder.id);
 }
 
 async function syncRequestItem(tx: Tx, input: TransitionInput) {
@@ -286,7 +319,8 @@ async function maybeNotify(
     currentHolderId: string | null;
     currentRequestItemId: string | null;
   },
-  input: TransitionInput
+  input: TransitionInput,
+  holderId: string | null
 ) {
   // Identify a "release-from-hold" path: no new request context provided AND
   // the item was held by someone. The original holder is then the recipient.
@@ -297,7 +331,7 @@ async function maybeNotify(
     (!!prev.currentRequestItemId || !!prev.currentHolderId);
 
   const recipientId =
-    input.holderId ?? (isReleaseFromHold ? prev.currentHolderId : null);
+    holderId ?? (isReleaseFromHold ? prev.currentHolderId : null);
   if (!recipientId) {
     return;
   }
