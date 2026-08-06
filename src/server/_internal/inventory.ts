@@ -1586,14 +1586,16 @@ export async function recordOverdueNotificationsAs(
     )
     .where(and(...conditions));
 
-  // Staff holds have no request line, so the scan above cannot see them.
-  // Restricted to holds with a resolved account (currentHolderId IS NOT
-  // NULL): notifications.userId is a foreign key, and an email-matched hold
-  // has no id to attribute a message to. Resolving the address here would
-  // reintroduce, on a write path, the impersonation risk the read path in
-  // listMyItemsAs guards against.
+  // The hold scan and the request scan used to be disjoint, because a held
+  // item always had either a request line or a holder, never both meaningfully.
+  // Now that a teammate can collect someone else's requested item, the two
+  // deliberately overlap: the requester is accountable for the request and the
+  // picker is holding the thing, so both are told. Restricted to holds with a
+  // resolved account (current_holder_id IS NOT NULL): notifications.userId is
+  // a foreign key, and an email-matched hold has no id to attribute a message
+  // to. Resolving the address here would reintroduce, on a write path, the
+  // impersonation risk the read path in listMyItemsAs guards against.
   const holdConditions = [
-    isNull(inventoryItems.currentRequestItemId),
     isNotNull(inventoryItems.currentHolderId),
     inArray(inventoryItems.status, ["reserved", "checked_out"]),
   ];
@@ -1621,10 +1623,22 @@ export async function recordOverdueNotificationsAs(
   );
 
   const values: (typeof notifications.$inferInsert)[] = [];
+  const seen = new Set<string>();
+  const push = (row: typeof notifications.$inferInsert) => {
+    // Requester and picker are the same person on most checkouts, so the two
+    // scans return the same row twice. One notice, not two.
+    const key = `${row.userId}|${row.type}|${row.link}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    values.push(row);
+  };
+
   for (const r of candidates) {
     const { pickupOverdue, checkoutOverdue } = deriveDeadlineFlags(r);
     if (pickupOverdue) {
-      values.push({
+      push({
         userId: r.userId,
         type: "inventory_pickup_overdue",
         title: `Pickup window passed: ${r.itemName}`,
@@ -1633,7 +1647,7 @@ export async function recordOverdueNotificationsAs(
       });
     }
     if (checkoutOverdue) {
-      values.push({
+      push({
         userId: r.userId,
         type: "inventory_checkout_overdue",
         title: `Overdue: ${r.itemName}`,

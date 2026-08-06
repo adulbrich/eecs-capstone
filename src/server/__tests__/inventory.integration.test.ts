@@ -2028,6 +2028,83 @@ describe("overdue notifications for staff holds", () => {
   });
 });
 
+describe("overdue notifications with two parties", () => {
+  async function checkedOutToSomeoneElse(prefix: string) {
+    const admin = await makeUser(`${prefix}-admin@x.com`, "admin");
+    const requester = await makeUser(`${prefix}-requester@x.com`, "user");
+    const picker = await makeUser(`${prefix}-picker@x.com`, "user");
+    const item = await makeItem();
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: `${prefix}-picker@x.com`,
+      dueAt: new Date(Date.now() - 86_400_000),
+    });
+    return { admin, item, picker, requester };
+  }
+
+  it("notifies the requester and the picker", async () => {
+    const { admin, item, picker, requester } =
+      await checkedOutToSomeoneElse("overdue-two");
+    await recordOverdueNotificationsAs(admin);
+
+    const notes = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.link, `/inventory/${item.id}`));
+    const overdue = notes.filter(
+      (n) => n.type === "inventory_checkout_overdue"
+    );
+    expect(overdue.map((n) => n.userId).sort()).toEqual(
+      [requester.id, picker.id].sort()
+    );
+  });
+
+  it("notifies a requester who collected their own item exactly once", async () => {
+    const admin = await makeUser("overdue-one-admin@x.com", "admin");
+    const student = await makeUser("overdue-one-student@x.com", "user");
+    const item = await makeItem();
+    await addToCartAs(student, { itemId: item.id });
+    await submitCartAs(student, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: "overdue-one-student@x.com",
+      dueAt: new Date(Date.now() - 86_400_000),
+    });
+
+    await recordOverdueNotificationsAs(admin);
+
+    const notes = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.link, `/inventory/${item.id}`));
+    expect(
+      notes.filter((n) => n.type === "inventory_checkout_overdue")
+    ).toHaveLength(1);
+  });
+});
+
 describe("holder resolution", () => {
   it("stores the address when only an account id is given", async () => {
     const admin = await makeUser("resolve-admin@x.com", "admin");
