@@ -112,6 +112,22 @@ export async function updateCategoryAs(
 ) {
   assertStaff(viewer);
   assertDomainShape(data);
+  const [existing] = await db
+    .select({ domain: categories.domain })
+    .from(categories)
+    .where(eq(categories.id, data.id));
+  if (!existing) {
+    throw new Error("Category not found");
+  }
+  // domain is a partition key fixed at creation, not an editable attribute:
+  // a live project category flipped to inventory (or the reverse) would drop
+  // out of listCategoriesImpl/listCategoryTypesImpl for its old domain while
+  // its project_categories or inventory_item_categories rows silently stay
+  // behind, orphaned. No database constraint ties domain to join-table
+  // membership, so this has to be enforced here.
+  if (existing.domain !== data.domain) {
+    throw new Error("A category's domain cannot be changed");
+  }
   await db
     .update(categories)
     .set({ name: data.name, domain: data.domain, type: data.type })

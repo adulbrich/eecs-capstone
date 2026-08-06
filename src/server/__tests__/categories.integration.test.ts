@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
-import { projectCategories, user } from "#/db/schema";
+import { categories, projectCategories, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import {
   createCategoryAs,
@@ -9,6 +9,7 @@ import {
   listCategoriesImpl,
   listCategoryTypesImpl,
   setProjectCategoriesAs,
+  updateCategoryAs,
 } from "#/server/_internal/categories";
 import { createProjectAs } from "#/server/_internal/projects";
 
@@ -172,5 +173,35 @@ describe("categories", () => {
 
     const { types } = await listCategoryTypesImpl();
     expect(types).toEqual(["technology"]);
+  });
+
+  it("rejects changing a category's domain on update", async () => {
+    const admin = await makeUser(`flip-${Date.now()}@x.com`, "admin");
+    const { id: catId } = await createCategoryAs(admin, {
+      domain: "project",
+      name: "React",
+      type: "technology",
+    });
+
+    // This object is a perfectly valid CategoryUpdateInput on its own (the
+    // inventory variant); nothing about its shape is statically wrong. Only
+    // the runtime guard knows catId belongs to a stored project-domain row,
+    // which is exactly why the guard has to exist: the type system cannot
+    // see the mismatch between an id and its own database row.
+    await expect(
+      updateCategoryAs(admin, {
+        id: catId,
+        domain: "inventory",
+        name: "React",
+        type: null,
+      })
+    ).rejects.toThrow(/domain cannot be changed/);
+
+    const [row] = await db
+      .select()
+      .from(categories)
+      .where(eq(categories.id, catId));
+    expect(row.domain).toBe("project");
+    expect(row.type).toBe("technology");
   });
 });
