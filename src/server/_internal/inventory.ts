@@ -368,7 +368,12 @@ export async function listInventoryCategoriesImpl() {
   // Restricted to categories actually in use, so the dropdown never offers a
   // filter that returns nothing. Reads through the join table now that an
   // item can carry more than one category; distinct on category id collapses
-  // the fan-out from items with multiple categories.
+  // the fan-out from items with multiple categories. The domain filter is a
+  // belt-and-suspenders guard, not a defense against something that can
+  // happen today: nothing currently writes a project-domain category into
+  // inventory_item_categories, but no database constraint stops it either,
+  // so this keeps a future cross-domain row from surfacing in the public
+  // inventory filter dropdown.
   const rows = await db
     .selectDistinct({ id: categories.id, name: categories.name })
     .from(inventoryItemCategories)
@@ -380,7 +385,12 @@ export async function listInventoryCategoriesImpl() {
       categories,
       eq(inventoryItemCategories.categoryId, categories.id)
     )
-    .where(ne(inventoryItems.status, "retired"))
+    .where(
+      and(
+        eq(categories.domain, "inventory"),
+        ne(inventoryItems.status, "retired")
+      )
+    )
     .orderBy(categories.name);
   return { categories: rows };
 }

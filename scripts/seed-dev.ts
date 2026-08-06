@@ -780,15 +780,8 @@ async function main() {
   ];
 
   let itemsCreated = 0;
+  let itemsRepaired = 0;
   for (const item of ITEMS) {
-    const [existing] = await db
-      .select({ id: inventoryItems.id })
-      .from(inventoryItems)
-      .where(eq(inventoryItems.serial, item.serial));
-    if (existing) {
-      console.log(`item: "${item.name}" (exists)`);
-      continue;
-    }
     const { categoryNames, ...values } = item;
     const categoryIds = categoryNames.map((name) => {
       const id = invCat.get(name);
@@ -799,21 +792,68 @@ async function main() {
       }
       return id;
     });
-    const [row] = await db
-      .insert(inventoryItems)
-      .values(values)
-      .returning({ id: inventoryItems.id });
-    if (categoryIds.length > 0) {
-      await db.insert(inventoryItemCategories).values(
-        categoryIds.map((categoryId) => ({ itemId: row.id, categoryId }))
-      );
-    }
-    itemsCreated += 1;
-    console.log(
-      `item: "${item.name}" (created, ${categoryIds.length} categories, status=${item.status})`
-    );
+
+    // The item insert and its join-row insert are written inside one
+    // transaction, matching this task's own rule for the app's write path
+    // (createInventoryItemAs): a failure partway through must not leave an
+    // item with no categories.
+    //
+    // Idempotency has to run in both directions, not just "skip if the item
+    // already exists": an item that exists but carries zero join rows (a
+    // partially completed prior run, or an item seeded before this task
+    // added categories at all) is repaired here instead of silently
+    // skipped, which is the asymmetric bug this replaced. An item that
+    // already has any join rows is left untouched so a second full run
+    // never duplicates or overwrites them.
+    await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ id: inventoryItems.id })
+        .from(inventoryItems)
+        .where(eq(inventoryItems.serial, item.serial));
+
+      let itemId: string;
+      const created = !existing;
+      if (existing) {
+        itemId = existing.id;
+      } else {
+        const [row] = await tx
+          .insert(inventoryItems)
+          .values(values)
+          .returning({ id: inventoryItems.id });
+        itemId = row.id;
+      }
+
+      const existingCategoryRows = await tx
+        .select({ categoryId: inventoryItemCategories.categoryId })
+        .from(inventoryItemCategories)
+        .where(eq(inventoryItemCategories.itemId, itemId));
+      const needsCategoryRepair =
+        !created && existingCategoryRows.length === 0 && categoryIds.length > 0;
+
+      if ((created || needsCategoryRepair) && categoryIds.length > 0) {
+        await tx.insert(inventoryItemCategories).values(
+          categoryIds.map((categoryId) => ({ itemId, categoryId }))
+        );
+      }
+
+      if (created) {
+        itemsCreated += 1;
+        console.log(
+          `item: "${item.name}" (created, ${categoryIds.length} categories, status=${item.status})`
+        );
+      } else if (needsCategoryRepair) {
+        itemsRepaired += 1;
+        console.log(
+          `item: "${item.name}" (exists, repaired ${categoryIds.length} categories)`
+        );
+      } else {
+        console.log(`item: "${item.name}" (exists)`);
+      }
+    });
   }
-  console.log(`inventory: ${itemsCreated} created, ${ITEMS.length} total defined`);
+  console.log(
+    `inventory: ${itemsCreated} created, ${itemsRepaired} repaired, ${ITEMS.length} total defined`
+  );
 }
 
 main().then(() => process.exit(0));
