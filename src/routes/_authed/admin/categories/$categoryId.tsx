@@ -50,15 +50,24 @@ export const Route = createFileRoute("/_authed/admin/categories/$categoryId")({
 function CategoryEdit() {
   const navigate = useNavigate();
   const { category, types } = Route.useLoaderData();
+  const isProject = category.domain === "project";
   const [name, setName] = useState(category.name);
-  const [type, setType] = useState(category.type);
+  const [type, setType] = useState(category.type ?? "");
   const [error, setError] = useState<string | null>(null);
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     try {
-      await updateCategory({ data: { id: category.id, name, type } });
+      if (isProject) {
+        await updateCategory({
+          data: { id: category.id, domain: "project", name, type },
+        });
+      } else {
+        await updateCategory({
+          data: { id: category.id, domain: "inventory", name, type: null },
+        });
+      }
       navigate({ to: "/admin/categories" });
     } catch (err) {
       setError((err as Error).message);
@@ -68,7 +77,7 @@ function CategoryEdit() {
   async function onDelete() {
     if (
       !confirm(
-        `Delete category "${category.name}"? Projects tagged with it will lose the tag, and inventory items using it will lose their category.`
+        `Delete category "${category.name}"? It will be removed from any projects and inventory items that use it; those projects and items are unaffected otherwise.`
       )
     ) {
       return;
@@ -114,15 +123,17 @@ function CategoryEdit() {
             value={name}
           />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="cat-type">Type</Label>
-          <CategoryTypeCombobox
-            id="cat-type"
-            onChange={setType}
-            types={types}
-            value={type}
-          />
-        </div>
+        {isProject && (
+          <div className="space-y-1.5">
+            <Label htmlFor="cat-type">Type</Label>
+            <CategoryTypeCombobox
+              id="cat-type"
+              onChange={setType}
+              types={types}
+              value={type}
+            />
+          </div>
+        )}
         <div className="flex gap-2">
           <Button size="sm" type="submit">
             Save
