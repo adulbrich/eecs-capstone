@@ -10,18 +10,23 @@ import { INVENTORY_CATEGORY_TYPE } from "#/lib/category-types";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
 import { listCategories } from "#/server/categories";
-import { getInventoryItem } from "#/server/inventory";
+import {
+  getInventoryItem,
+  type InventoryItemPublic,
+  type InventoryItemStaffDetail,
+} from "#/server/inventory";
 
-interface StaffItem {
-  categoryId: string | null;
-  description: string | null;
-  id: string;
-  imageUrl: string | null;
-  label?: string | null;
-  location: string | null;
-  name: string;
-  notes?: string | null;
-  serial?: string | null;
+/**
+ * `getInventoryItem` returns a plain union (not a discriminated one): a
+ * public and a staff shape that overlap structurally, so TypeScript cannot
+ * narrow between them from a runtime check alone. `serial` exists only on
+ * the staff shape, so testing for it is a real (compiler-checked) narrowing
+ * instead of the double cast this used to be.
+ */
+function isStaffItem(
+  item: InventoryItemPublic | InventoryItemStaffDetail
+): item is InventoryItemStaffDetail {
+  return "serial" in item;
 }
 
 export const Route = createFileRoute("/_authed/inventory/$itemId/edit")({
@@ -51,6 +56,13 @@ export const Route = createFileRoute("/_authed/inventory/$itemId/edit")({
     if (!item) {
       throw notFound();
     }
+    if (!isStaffItem(item)) {
+      // `beforeLoad` above already restricts this route to admin/instructor,
+      // so `getInventoryItem` (which gates on the same session) cannot
+      // actually return the public shape here. This only narrows the type
+      // for the compiler; it is not a reachable runtime branch.
+      throw notFound();
+    }
     return { item, categories };
   },
   component: EditInventoryItem,
@@ -59,7 +71,6 @@ export const Route = createFileRoute("/_authed/inventory/$itemId/edit")({
 function EditInventoryItem() {
   const navigate = useNavigate();
   const { item, categories } = Route.useLoaderData();
-  const loaded = item as unknown as StaffItem;
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
       <h1 className="font-semibold text-2xl">Edit inventory item</h1>
@@ -67,16 +78,16 @@ function EditInventoryItem() {
         <InventoryForm
           categories={categories}
           initial={{
-            name: loaded.name,
-            description: loaded.description ?? "",
-            categoryId: loaded.categoryId,
-            serial: loaded.serial ?? "",
-            label: loaded.label ?? "",
-            location: loaded.location ?? "",
-            notes: loaded.notes ?? "",
-            imageUrl: loaded.imageUrl ?? "",
+            name: item.name,
+            description: item.description ?? "",
+            categoryId: item.categoryId,
+            serial: item.serial ?? "",
+            label: item.label ?? "",
+            location: item.location ?? "",
+            notes: item.notes ?? "",
+            imageUrl: item.imageUrl ?? "",
           }}
-          itemId={loaded.id}
+          itemId={item.id}
           onSaved={(itemId) =>
             navigate({ to: "/inventory/$itemId", params: { itemId } })
           }

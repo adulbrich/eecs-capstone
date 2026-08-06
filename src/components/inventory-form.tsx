@@ -9,6 +9,7 @@ import {
 } from "#/lib/private-notes";
 import {
   createInventoryItem,
+  type itemPayloadSchema,
   updateInventoryItem,
   uploadInventoryImage,
 } from "#/server/inventory";
@@ -96,6 +97,10 @@ export function InventoryForm({
     onSubmit: async ({ value }) => {
       setFormError(null);
       try {
+        // `satisfies` makes a missing or misspelled key a compile error right
+        // here, at the point the payload is built, instead of one that
+        // typechecks and then writes `null` (via itemPayloadSchema's
+        // `.nullable().default(null)`) for a field nobody set.
         const payload = {
           name: value.name,
           description: value.description || null,
@@ -105,7 +110,7 @@ export function InventoryForm({
           location: value.location || null,
           notes: value.notes || null,
           imageUrl: pendingImage === null ? null : value.imageUrl || null,
-        };
+        } satisfies Required<z.input<typeof itemPayloadSchema>>;
 
         let savedId: string;
         if (itemId) {
