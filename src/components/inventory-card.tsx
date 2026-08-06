@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { getPublicUrl } from "#/lib/storage";
+import { CategoryChip } from "./category-chip";
 import { ImageOrFallback } from "./image-or-fallback";
 import { InventoryStatusBadge } from "./inventory-status-badge";
 import { Button } from "./ui/button";
@@ -9,7 +10,7 @@ interface Props {
     id: string;
     name: string;
     description: string | null;
-    categoryName: string | null;
+    categories: { id: string; name: string }[];
     imageUrl: string | null;
     status:
       | "available"
@@ -45,11 +46,12 @@ export function InventoryCard({ item, signedIn, onAddToCart }: Props) {
           )}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <InventoryStatusBadge status={item.status} />
-            {item.categoryName && (
-              <span className="rounded bg-secondary px-2 py-0.5 text-muted-foreground text-xs">
-                {item.categoryName}
-              </span>
-            )}
+            {item.categories.map((category) => (
+              <CategoryChip
+                category={{ ...category, type: null }}
+                key={category.id}
+              />
+            ))}
           </div>
         </div>
       </Link>

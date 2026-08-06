@@ -20,7 +20,7 @@ const item = {
   id: "00000000-0000-0000-0000-000000000001",
   name: "Arduino Uno",
   description: "Microcontroller board for prototyping.",
-  categoryName: "Microcontroller",
+  categories: [{ id: "cat-1", name: "Microcontroller" }],
   imageUrl: null,
   status: "available" as const,
 };
@@ -36,9 +36,9 @@ describe("InventoryCard", () => {
     expect(getByText("Microcontroller")).toBeTruthy();
   });
 
-  it("omits the category badge when categoryName is null", () => {
+  it("omits the category chips when categories is empty", () => {
     const { queryByText } = render(
-      <InventoryCard item={{ ...item, categoryName: null }} signedIn={false} />
+      <InventoryCard item={{ ...item, categories: [] }} signedIn={false} />
     );
     expect(queryByText("Microcontroller")).toBeNull();
   });

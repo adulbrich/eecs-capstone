@@ -10,6 +10,7 @@ import {
   type AdminColumn,
   AdminDataTable,
 } from "#/components/admin-data-table";
+import { CategoryChip } from "#/components/category-chip";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { LocalTime } from "#/components/local-time";
@@ -176,8 +177,23 @@ const COLUMNS: AdminColumn<Row>[] = [
     sortUndefined: "last",
   },
   {
-    accessorFn: (row) => row.categoryName ?? undefined,
-    cell: ({ row }) => row.original.categoryName ?? "-",
+    accessorFn: (row) =>
+      row.categories.length > 0
+        ? row.categories.map((c) => c.name).join("; ")
+        : undefined,
+    cell: ({ row }) =>
+      row.original.categories.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {row.original.categories.map((category) => (
+            <CategoryChip
+              category={{ ...category, type: null }}
+              key={category.id}
+            />
+          ))}
+        </div>
+      ) : (
+        "-"
+      ),
     header: "Category",
     id: "category",
     sortUndefined: "last",
@@ -265,14 +281,9 @@ const EXPORT_COLUMNS = defineCsvColumns<Row>()([
     value: (row) => row.description,
   },
   {
-    header: "Category",
-    key: "categoryName",
-    value: (row) => row.categoryName,
-  },
-  {
-    header: "Category ID",
-    key: "categoryId",
-    value: (row) => row.categoryId,
+    header: "Categories",
+    key: "categories",
+    value: (row) => row.categories.map((c) => c.name).join("; "),
   },
   { header: "Status", key: "status", value: (row) => row.status },
   { header: "Serial", key: "serial", value: (row) => row.serial },

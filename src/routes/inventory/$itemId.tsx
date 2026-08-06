@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { CategoryChip } from "#/components/category-chip";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { StaffInventoryPanel } from "#/components/staff-inventory-panel";
 import { Button } from "#/components/ui/button";
@@ -76,11 +77,12 @@ function ItemDetail() {
                   | "retired"
               }
             />
-            {item.categoryName && (
-              <span className="rounded bg-secondary px-2 py-0.5 text-muted-foreground text-xs">
-                {item.categoryName}
-              </span>
-            )}
+            {item.categories.map((category) => (
+              <CategoryChip
+                category={{ ...category, type: null }}
+                key={category.id}
+              />
+            ))}
           </div>
           {item.description && (
             <p className="mt-4 whitespace-pre-wrap">{item.description}</p>

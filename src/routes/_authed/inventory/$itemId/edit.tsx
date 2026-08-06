@@ -6,10 +6,8 @@ import {
 } from "@tanstack/react-router";
 import { InventoryForm } from "#/components/inventory-form";
 import { getSession } from "#/lib/auth-guards";
-import { INVENTORY_CATEGORY_TYPE } from "#/lib/category-types";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
-import { listCategories } from "#/server/categories";
 import {
   getInventoryItem,
   type InventoryItemPublic,
@@ -49,10 +47,7 @@ export const Route = createFileRoute("/_authed/inventory/$itemId/edit")({
     if (!isUuid(params.itemId)) {
       throw notFound();
     }
-    const [item, { rows: categories }] = await Promise.all([
-      getInventoryItem({ data: { id: params.itemId } }),
-      listCategories({ data: { type: INVENTORY_CATEGORY_TYPE } }),
-    ]);
+    const item = await getInventoryItem({ data: { id: params.itemId } });
     if (!item) {
       throw notFound();
     }
@@ -63,24 +58,23 @@ export const Route = createFileRoute("/_authed/inventory/$itemId/edit")({
       // for the compiler; it is not a reachable runtime branch.
       throw notFound();
     }
-    return { item, categories };
+    return { item };
   },
   component: EditInventoryItem,
 });
 
 function EditInventoryItem() {
   const navigate = useNavigate();
-  const { item, categories } = Route.useLoaderData();
+  const { item } = Route.useLoaderData();
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
       <h1 className="font-semibold text-2xl">Edit inventory item</h1>
       <div className="mt-6">
         <InventoryForm
-          categories={categories}
           initial={{
             name: item.name,
             description: item.description ?? "",
-            categoryId: item.categoryId,
+            categoryIds: item.categories.map((c) => c.id),
             serial: item.serial ?? "",
             label: item.label ?? "",
             location: item.location ?? "",
