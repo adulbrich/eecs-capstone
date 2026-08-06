@@ -5,6 +5,7 @@ import { db } from "#/db";
 import {
   categories,
   inventoryCartItems,
+  inventoryItemCategories,
   inventoryItemEditLog,
   inventoryItemStatusHistory,
   inventoryItems,
@@ -14,7 +15,10 @@ import {
   user,
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
-import { INVENTORY_CATEGORY_TYPE } from "#/lib/category-types";
+import {
+  createCategoryAs,
+  deleteCategoryAs,
+} from "#/server/_internal/categories";
 import {
   addToCartAs,
   approveRequestItemAs,
@@ -60,9 +64,22 @@ async function makeItem(
 async function makeCategory(name: string) {
   const [row] = await db
     .insert(categories)
-    .values({ name, type: INVENTORY_CATEGORY_TYPE })
+    .values({ name, domain: "inventory", type: null })
     .returning();
   return row;
+}
+
+/** The non-category fields createInventoryItemAs/updateInventoryItemAs require. */
+function baseItemInput(name: string) {
+  return {
+    name,
+    description: null,
+    serial: null,
+    label: null,
+    location: null,
+    notes: null,
+    imageUrl: null,
+  };
 }
 
 async function makeRequestLine(userId: string, itemId: string) {
@@ -332,7 +349,7 @@ describe("listInventoryAs privacy", () => {
     const result = await listInventoryAs(null, {
       q: "",
       status: null,
-      category: null,
+      categories: [],
       page: 1,
       pageSize: 50,
     });
@@ -349,7 +366,7 @@ describe("listInventoryAs privacy", () => {
     const result = await listInventoryAs(admin, {
       q: "",
       status: null,
-      category: null,
+      categories: [],
       page: 1,
       pageSize: 50,
     });
@@ -366,7 +383,7 @@ describe("listInventoryAs privacy", () => {
     const result = await listInventoryAs(admin, {
       q: "",
       status: null,
-      category: null,
+      categories: [],
       page: 1,
       pageSize: 50,
     });
@@ -406,7 +423,7 @@ describe("listInventoryAs privacy", () => {
     const result = await listInventoryAs(student, {
       q: "",
       status: null,
-      category: null,
+      categories: [],
       page: 1,
       pageSize: 50,
     });
@@ -472,7 +489,7 @@ describe("listInventoryAs privacy", () => {
     const anonList = await listInventoryAs(null, {
       q: "",
       status: null,
-      category: null,
+      categories: [],
       page: 1,
       pageSize: 50,
     });
@@ -557,7 +574,7 @@ describe("catalog CRUD", () => {
     const blank = {
       name: "X",
       description: null,
-      categoryId: null,
+      categoryIds: [],
       serial: null,
       label: null,
       location: null,
@@ -588,7 +605,7 @@ describe("catalog CRUD", () => {
       id: item.id,
       name: "New",
       description: null,
-      categoryId: null,
+      categoryIds: [],
       serial: null,
       label: null,
       location: "Shelf B",
@@ -629,7 +646,7 @@ describe("catalog CRUD", () => {
       id: item.id,
       name: "Widget",
       description: null,
-      categoryId: null,
+      categoryIds: [],
       serial: null,
       label: null,
       location: "Shelf B",
@@ -659,7 +676,7 @@ describe("catalog CRUD", () => {
     const created = await createInventoryItemAs(admin, {
       name: "Camera",
       description: null,
-      categoryId: null,
+      categoryIds: [],
       serial: "SN-9",
       label: "LAB-042",
       location: null,
@@ -680,7 +697,7 @@ describe("catalog CRUD", () => {
     const created = await createInventoryItemAs(admin, {
       name: "Camera",
       description: null,
-      categoryId: null,
+      categoryIds: [],
       serial: null,
       label: "OLD-1",
       location: null,
@@ -691,7 +708,7 @@ describe("catalog CRUD", () => {
       id: created.id,
       name: "Camera",
       description: null,
-      categoryId: null,
+      categoryIds: [],
       serial: null,
       label: "NEW-2",
       location: null,
@@ -790,98 +807,98 @@ describe("category write path", () => {
   // Routes the payload through itemPayloadSchema, exactly like
   // createInventoryItem's server function does, rather than calling
   // createInventoryItemAs directly. That is the point: the bug this test
-  // guards against was Zod silently stripping `categoryId` at that exact
-  // boundary while every direct-call test kept passing. Reading the row back
-  // from the database (not trusting the function's return value) is what
-  // makes the assertion end-to-end.
-  it("persists category_id when an item is created through the payload schema", async () => {
+  // guards against was Zod silently stripping `categoryIds` at that exact
+  // boundary while every direct-call test kept passing. Reading the join
+  // table back from the database (not trusting the function's return value)
+  // is what makes the assertion end-to-end.
+  it("persists categoryIds when an item is created through the payload schema", async () => {
     const admin = await makeUser(`catw-${Date.now()}@x.com`, "admin");
     const category = await makeCategory("Cameras");
     const rawPayload: unknown = {
       name: "Payload Camera",
-      categoryId: category.id,
+      categoryIds: [category.id],
     };
     const parsed = itemPayloadSchema.parse(rawPayload);
     const created = await createInventoryItemAs(admin, parsed);
 
-    const [row] = await db
+    const rows = await db
       .select()
-      .from(inventoryItems)
-      .where(eq(inventoryItems.id, created.id));
-    expect(row.categoryId).toBe(category.id);
+      .from(inventoryItemCategories)
+      .where(eq(inventoryItemCategories.itemId, created.id));
+    expect(rows.map((r) => r.categoryId)).toEqual([category.id]);
   });
 
-  it("persists category_id when an item is updated through the payload schema", async () => {
+  it("persists categoryIds when an item is updated through the payload schema", async () => {
     const admin = await makeUser(`catw2-${Date.now()}@x.com`, "admin");
     const category = await makeCategory("Microscopes");
     const item = await makeItem({ name: "Uncategorized scope" });
     const rawPayload: unknown = {
       id: item.id,
       name: item.name,
-      categoryId: category.id,
+      categoryIds: [category.id],
     };
     // Same `.extend` shape as updatePayloadSchema in src/server/inventory.ts,
     // built from the same base so this test breaks the same way that schema
-    // would if `categoryId` were ever dropped from it.
+    // would if `categoryIds` were ever dropped from it.
     const updateSchema = itemPayloadSchema.extend({ id: z.string().uuid() });
     const validated = updateSchema.parse(rawPayload);
     await updateInventoryItemAs(admin, validated);
 
-    const [row] = await db
+    const rows = await db
       .select()
-      .from(inventoryItems)
-      .where(eq(inventoryItems.id, item.id));
-    expect(row.categoryId).toBe(category.id);
+      .from(inventoryItemCategories)
+      .where(eq(inventoryItemCategories.itemId, item.id));
+    expect(rows.map((r) => r.categoryId)).toEqual([category.id]);
   });
 });
 
-describe("category read path: left join and id filter", () => {
-  it("keeps an uncategorized item visible and reports the joined category name for a categorized one", async () => {
+describe("category read path: correlated subquery and all-match filter", () => {
+  it("keeps an uncategorized item visible and reports its categories for a categorized one", async () => {
+    const admin = await makeUser(`crp-${Date.now()}@x.com`, "admin");
     const category = await makeCategory(`Robotics-${Date.now()}`);
-    const categorized = await makeItem({
-      name: "Categorized Bot",
-      categoryId: category.id,
+    const categorized = await createInventoryItemAs(admin, {
+      ...baseItemInput("Categorized Bot"),
+      categoryIds: [category.id],
     });
     const uncategorized = await makeItem({ name: "Loose Bot" });
 
     const result = await listInventoryAs(null, {
       q: "",
       status: null,
-      category: null,
+      categories: [],
       page: 1,
       pageSize: 50,
     });
 
-    const foundCategorized = result.rows.find(
-      (r) => r.id === categorized.id
-    ) as unknown as { categoryId: string | null; categoryName: string | null };
+    const foundCategorized = result.rows.find((r) => r.id === categorized.id);
     const foundUncategorized = result.rows.find(
       (r) => r.id === uncategorized.id
-    ) as unknown as { categoryId: string | null; categoryName: string | null };
+    );
 
-    // An inner join here would silently drop the uncategorized item; its
-    // presence is the whole point of this assertion.
+    // A correlated subquery cannot drop a row the way an inner join would;
+    // the uncategorized item's presence with an empty array is the point.
     expect(foundUncategorized).toBeDefined();
-    expect(foundUncategorized.categoryId).toBeNull();
-    expect(foundUncategorized.categoryName).toBeNull();
+    expect(foundUncategorized?.categories).toEqual([]);
 
     expect(foundCategorized).toBeDefined();
-    expect(foundCategorized.categoryId).toBe(category.id);
-    expect(foundCategorized.categoryName).toBe(category.name);
+    expect(foundCategorized?.categories).toEqual([
+      { id: category.id, name: category.name },
+    ]);
   });
 
   it("filters by category id and excludes the uncategorized item", async () => {
+    const admin = await makeUser(`crp2-${Date.now()}@x.com`, "admin");
     const category = await makeCategory(`Filters-${Date.now()}`);
-    const categorized = await makeItem({
-      name: "Filtered Bot",
-      categoryId: category.id,
+    const categorized = await createInventoryItemAs(admin, {
+      ...baseItemInput("Filtered Bot"),
+      categoryIds: [category.id],
     });
     await makeItem({ name: "Unfiltered Bot" });
 
     const result = await listInventoryAs(null, {
       q: "",
       status: null,
-      category: category.id,
+      categories: [category.id],
       page: 1,
       pageSize: 50,
     });
@@ -894,11 +911,14 @@ describe("listInventoryCategoriesImpl", () => {
   it("returns only categories actually assigned to a non-retired item, joined by id", async () => {
     const used = await makeCategory(`Used-${Date.now()}`);
     const unused = await makeCategory(`Unused-${Date.now()}`);
-    await makeItem({ name: "Has category", categoryId: used.id });
-    const retiredItem = await makeItem({
-      name: "Retired with category",
-      categoryId: unused.id,
-    });
+    const hasCategory = await makeItem({ name: "Has category" });
+    await db
+      .insert(inventoryItemCategories)
+      .values({ itemId: hasCategory.id, categoryId: used.id });
+    const retiredItem = await makeItem({ name: "Retired with category" });
+    await db
+      .insert(inventoryItemCategories)
+      .values({ itemId: retiredItem.id, categoryId: unused.id });
     await db
       .update(inventoryItems)
       .set({ status: "retired" })
@@ -910,6 +930,145 @@ describe("listInventoryCategoriesImpl", () => {
       true
     );
     expect(rows.some((c) => c.id === unused.id)).toBe(false);
+  });
+});
+
+describe("inventory item categories", () => {
+  it("round-trips two categories through create and read", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ic-${stamp}@x.com`, "admin");
+    const a = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `Alpha-${stamp}`,
+      type: null,
+    });
+    const b = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `Beta-${stamp}`,
+      type: null,
+    });
+
+    const { id } = await createInventoryItemAs(admin, {
+      ...baseItemInput(`Widget-${stamp}`),
+      categoryIds: [a.id, b.id],
+    });
+
+    const item = await getInventoryItemAs(admin, { id });
+    expect(item?.categories.map((c) => c.name).sort()).toEqual(
+      [`Alpha-${stamp}`, `Beta-${stamp}`].sort()
+    );
+  });
+
+  // Categories left EDITABLE_FIELDS's loop for their own diff, computed
+  // separately before the same early return. This pins that the two diffs
+  // agree on "nothing changed": a truly identical update (including
+  // categoryIds) must still take the zero-log early return, not log a
+  // spurious "categories" change because the two diffs disagree.
+  it("a truly no-op update, including unchanged categoryIds, writes zero edit-log rows", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ic5-${stamp}@x.com`, "admin");
+    const a = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `Same-${stamp}`,
+      type: null,
+    });
+    const { id } = await createInventoryItemAs(admin, {
+      ...baseItemInput(`Widget5-${stamp}`),
+      categoryIds: [a.id],
+    });
+
+    await updateInventoryItemAs(admin, {
+      id,
+      ...baseItemInput(`Widget5-${stamp}`),
+      categoryIds: [a.id],
+    });
+
+    const logs = await db
+      .select()
+      .from(inventoryItemEditLog)
+      .where(eq(inventoryItemEditLog.itemId, id));
+    expect(logs).toHaveLength(0);
+  });
+
+  it("removing one category leaves the other", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ic2-${stamp}@x.com`, "admin");
+    const a = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `Keep-${stamp}`,
+      type: null,
+    });
+    const b = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `Drop-${stamp}`,
+      type: null,
+    });
+    const { id } = await createInventoryItemAs(admin, {
+      ...baseItemInput(`Widget2-${stamp}`),
+      categoryIds: [a.id, b.id],
+    });
+
+    await updateInventoryItemAs(admin, {
+      id,
+      ...baseItemInput(`Widget2-${stamp}`),
+      categoryIds: [a.id],
+    });
+
+    const item = await getInventoryItemAs(admin, { id });
+    expect(item?.categories.map((c) => c.name)).toEqual([`Keep-${stamp}`]);
+  });
+
+  it("deleting a category removes the assignment and keeps the item", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ic3-${stamp}@x.com`, "admin");
+    const a = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `Doomed-${stamp}`,
+      type: null,
+    });
+    const { id } = await createInventoryItemAs(admin, {
+      ...baseItemInput(`Widget3-${stamp}`),
+      categoryIds: [a.id],
+    });
+
+    await deleteCategoryAs(admin, a.id);
+
+    const item = await getInventoryItemAs(admin, { id });
+    expect(item).toBeDefined();
+    expect(item?.categories).toEqual([]);
+  });
+
+  it("filters on ALL selected categories, not any", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`ic4-${stamp}@x.com`, "admin");
+    const a = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `A-${stamp}`,
+      type: null,
+    });
+    const b = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: `B-${stamp}`,
+      type: null,
+    });
+    const both = await createInventoryItemAs(admin, {
+      ...baseItemInput(`Both-${stamp}`),
+      categoryIds: [a.id, b.id],
+    });
+    await createInventoryItemAs(admin, {
+      ...baseItemInput(`OnlyA-${stamp}`),
+      categoryIds: [a.id],
+    });
+
+    const result = await listInventoryAs(admin, {
+      categories: [a.id, b.id],
+      page: 1,
+      pageSize: 24,
+      q: "",
+      status: null,
+    });
+
+    expect(result.rows.map((r) => r.id)).toEqual([both.id]);
   });
 });
 
@@ -1172,7 +1331,7 @@ describe("defense in depth: impl re-checks role on every staff write", () => {
       createInventoryItemAs(student, {
         name: "Sneaky",
         description: null,
-        categoryId: null,
+        categoryIds: [],
         serial: null,
         label: null,
         location: null,
@@ -1357,7 +1516,7 @@ describe("staff-assigned holds without a request line", () => {
     });
 
     const { rows } = await listAdminInventoryAs(admin, {
-      category: null,
+      categories: [],
       q: holderEmail,
       status: null,
     });

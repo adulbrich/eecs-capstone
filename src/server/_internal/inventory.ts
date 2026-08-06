@@ -16,6 +16,7 @@ import { db } from "#/db";
 import {
   categories,
   inventoryCartItems,
+  inventoryItemCategories,
   inventoryItemEditLog,
   inventoryItemStatusHistory,
   inventoryItems,
@@ -25,13 +26,18 @@ import {
   user,
 } from "#/db/schema";
 import { readSession, requireUser } from "#/lib/_internal/auth-guards";
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+import { setInventoryItemCategoriesAs } from "./categories";
+import type { Tx } from "./inventory-transitions";
 
 type Viewer = { id: string; role?: string | null | undefined } | null;
 
+export interface ItemCategory {
+  id: string;
+  name: string;
+}
+
 export interface ListInventoryInput {
-  category: string | null;
+  categories: string[];
   page: number;
   pageSize: number;
   q: string;
@@ -45,8 +51,7 @@ export interface ListInventoryInput {
 }
 
 export interface InventoryItemPublic {
-  categoryId: string | null;
-  categoryName: string | null;
+  categories: ItemCategory[];
   description: string | null;
   dueAt: Date | null;
   id: string;
@@ -75,14 +80,13 @@ function isStaff(viewer: Viewer): boolean {
 
 function stripForPublic(
   row: typeof inventoryItems.$inferSelect,
-  categoryName: string | null
+  categories: ItemCategory[]
 ): InventoryItemPublic {
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    categoryId: row.categoryId,
-    categoryName,
+    categories,
     imageUrl: row.imageUrl,
     status: row.status,
     // The hold's dates live on the item itself, so they are the same whether
@@ -94,10 +98,10 @@ function stripForPublic(
 
 function fullForStaff(
   row: typeof inventoryItems.$inferSelect,
-  categoryName: string | null
+  categories: ItemCategory[]
 ): InventoryItemStaff {
   return {
-    ...stripForPublic(row, categoryName),
+    ...stripForPublic(row, categories),
     createdAt: row.createdAt,
     serial: row.serial,
     label: row.label,
@@ -130,18 +134,44 @@ function holderEmailOf(row: {
  * those must never become publicly searchable.
  */
 function buildInventoryScope(data: {
-  category: string | null;
+  categories: string[];
   status: ListInventoryInput["status"];
 }): SQL[] {
   const conditions: SQL[] = [ne(inventoryItems.status, "retired")];
   if (data.status) {
     conditions.push(eq(inventoryItems.status, data.status));
   }
-  if (data.category) {
-    conditions.push(eq(inventoryItems.categoryId, data.category));
+  if (data.categories.length > 0) {
+    // All-match, not any-match: mirrors searchProjectsImpl
+    // (src/server/_internal/search.ts:40-46). A subquery grouped by itemId
+    // with count = the number of requested categories is the only shape
+    // that discriminates "has every selected category" from "has at least
+    // one of them" — a plain inArray on the join table would give the
+    // any-match semantics this task explicitly rejects.
+    const matching = db
+      .select({ itemId: inventoryItemCategories.itemId })
+      .from(inventoryItemCategories)
+      .where(inArray(inventoryItemCategories.categoryId, data.categories))
+      .groupBy(inventoryItemCategories.itemId)
+      .having(sql`count(*) = ${data.categories.length}`);
+    conditions.push(inArray(inventoryItems.id, matching));
   }
   return conditions;
 }
+
+/**
+ * A correlated subquery, not a join: joining inventory_item_categories would
+ * multiply each item row by its category count, corrupting both the row set
+ * and the `count(*)` used for pagination. json_agg with coalesce keeps an
+ * uncategorized item's array `[]` rather than dropping the row or leaving it
+ * null.
+ */
+const categoriesForItem = sql<ItemCategory[]>`coalesce((
+  SELECT json_agg(json_build_object('id', c.id, 'name', c.name) ORDER BY c.name)
+  FROM inventory_item_categories iic
+  JOIN categories c ON c.id = iic.category_id
+  WHERE iic.item_id = ${inventoryItems.id}
+), '[]'::json)`;
 
 export async function listInventoryAs(
   viewer: Viewer,
@@ -165,11 +195,10 @@ export async function listInventoryAs(
       item: inventoryItems,
       holderName: user.name,
       holderEmail: user.email,
-      categoryName: categories.name,
+      categories: categoriesForItem,
     })
     .from(inventoryItems)
     .leftJoin(user, eq(inventoryItems.currentHolderId, user.id))
-    .leftJoin(categories, eq(inventoryItems.categoryId, categories.id))
     .where(where)
     .orderBy(desc(inventoryItems.updatedAt))
     .limit(data.pageSize)
@@ -183,12 +212,12 @@ export async function listInventoryAs(
   const mapped = rows.map((r) => {
     if (isStaff(viewer)) {
       return {
-        ...fullForStaff(r.item, r.categoryName),
+        ...fullForStaff(r.item, r.categories),
         currentHolderName: r.holderName,
         currentHolderEmail: holderEmailOf(r),
       };
     }
-    return stripForPublic(r.item, r.categoryName);
+    return stripForPublic(r.item, r.categories);
   });
 
   return {
@@ -206,7 +235,7 @@ export type InventoryItemStaffDetail = InventoryItemStaff & {
 };
 
 interface InventoryItemJoinedRow {
-  categoryName: string | null;
+  categories: ItemCategory[];
   holderEmail: string | null;
   holderName: string | null;
   item: typeof inventoryItems.$inferSelect;
@@ -227,11 +256,10 @@ async function loadInventoryItemRowFor(
       item: inventoryItems,
       holderName: user.name,
       holderEmail: user.email,
-      categoryName: categories.name,
+      categories: categoriesForItem,
     })
     .from(inventoryItems)
     .leftJoin(user, eq(inventoryItems.currentHolderId, user.id))
-    .leftJoin(categories, eq(inventoryItems.categoryId, categories.id))
     .where(eq(inventoryItems.id, id));
   if (!row) {
     return null;
@@ -244,14 +272,14 @@ async function loadInventoryItemRowFor(
 
 function toStaffDetail(row: InventoryItemJoinedRow): InventoryItemStaffDetail {
   return {
-    ...fullForStaff(row.item, row.categoryName),
+    ...fullForStaff(row.item, row.categories),
     currentHolderName: row.holderName,
     currentHolderEmail: holderEmailOf(row),
   };
 }
 
 function toPublicDetail(row: InventoryItemJoinedRow): InventoryItemPublic {
-  return stripForPublic(row.item, row.categoryName);
+  return stripForPublic(row.item, row.categories);
 }
 
 export async function getInventoryItemAs(viewer: Viewer, data: { id: string }) {
@@ -268,7 +296,7 @@ export async function listInventoryForCurrentUser(data: ListInventoryInput) {
 }
 
 export interface ListAdminInventoryInput {
-  category: string | null;
+  categories: string[];
   q: string;
   status: ListInventoryInput["status"];
 }
@@ -310,20 +338,19 @@ export async function listAdminInventoryAs(
 
   const rows = await db
     .select({
-      categoryName: categories.name,
+      categories: categoriesForItem,
       holderEmail: user.email,
       holderName: user.name,
       item: inventoryItems,
     })
     .from(inventoryItems)
     .leftJoin(user, eq(inventoryItems.currentHolderId, user.id))
-    .leftJoin(categories, eq(inventoryItems.categoryId, categories.id))
     .where(and(...conditions))
     .orderBy(desc(inventoryItems.updatedAt));
 
   return {
     rows: rows.map((r) => ({
-      ...fullForStaff(r.item, r.categoryName),
+      ...fullForStaff(r.item, r.categories),
       currentHolderEmail: holderEmailOf(r),
       currentHolderName: r.holderName,
     })),
@@ -339,11 +366,20 @@ export async function listAdminInventoryForCurrentUser(
 
 export async function listInventoryCategoriesImpl() {
   // Restricted to categories actually in use, so the dropdown never offers a
-  // filter that returns nothing.
+  // filter that returns nothing. Reads through the join table now that an
+  // item can carry more than one category; distinct on category id collapses
+  // the fan-out from items with multiple categories.
   const rows = await db
     .selectDistinct({ id: categories.id, name: categories.name })
-    .from(inventoryItems)
-    .innerJoin(categories, eq(inventoryItems.categoryId, categories.id))
+    .from(inventoryItemCategories)
+    .innerJoin(
+      inventoryItems,
+      eq(inventoryItemCategories.itemId, inventoryItems.id)
+    )
+    .innerJoin(
+      categories,
+      eq(inventoryItemCategories.categoryId, categories.id)
+    )
     .where(ne(inventoryItems.status, "retired"))
     .orderBy(categories.name);
   return { categories: rows };
@@ -355,7 +391,7 @@ export async function getInventoryItemForCurrentUser(data: { id: string }) {
 }
 
 export interface CreateInventoryItemInput {
-  categoryId: string | null;
+  categoryIds: string[];
   description: string | null;
   imageUrl: string | null;
   label: string | null;
@@ -372,9 +408,7 @@ function assertStaff(viewer: Viewer): asserts viewer is NonNullable<Viewer> {
 }
 
 /**
- * `insert(...).returning()` and a locked `select()` cannot carry a join, so
- * the create/update paths resolve the category name with this instead of
- * leaving it null (and silently wrong) whenever a category is set.
+ * Resolves an item's categories to `{id, name}[]`, ordered by name.
  *
  * Takes an explicit executor (defaulting to the module `db`) so a caller
  * inside a transaction can pass `tx`: reaching for the module-level `db`
@@ -383,18 +417,19 @@ function assertStaff(viewer: Viewer): asserts viewer is NonNullable<Viewer> {
  * `FOR UPDATE` lock, which is exactly the kind of transaction-boundary
  * change this task was told not to make.
  */
-async function categoryNameFor(
-  categoryId: string | null,
+async function categoriesFor(
+  itemId: string,
   executor: Tx | typeof db = db
-): Promise<string | null> {
-  if (!categoryId) {
-    return null;
-  }
-  const [row] = await executor
-    .select({ name: categories.name })
-    .from(categories)
-    .where(eq(categories.id, categoryId));
-  return row?.name ?? null;
+): Promise<ItemCategory[]> {
+  return await executor
+    .select({ id: categories.id, name: categories.name })
+    .from(inventoryItemCategories)
+    .innerJoin(
+      categories,
+      eq(inventoryItemCategories.categoryId, categories.id)
+    )
+    .where(eq(inventoryItemCategories.itemId, itemId))
+    .orderBy(categories.name);
 }
 
 export async function createInventoryItemAs(
@@ -402,20 +437,29 @@ export async function createInventoryItemAs(
   data: CreateInventoryItemInput
 ) {
   assertStaff(viewer);
-  const [row] = await db
-    .insert(inventoryItems)
-    .values({
-      name: data.name,
-      description: data.description,
-      categoryId: data.categoryId,
-      serial: data.serial,
-      label: data.label,
-      location: data.location,
-      notes: data.notes,
-      imageUrl: data.imageUrl,
-    })
-    .returning();
-  return fullForStaff(row, await categoryNameFor(row.categoryId));
+  return await db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(inventoryItems)
+      .values({
+        name: data.name,
+        description: data.description,
+        serial: data.serial,
+        label: data.label,
+        location: data.location,
+        notes: data.notes,
+        imageUrl: data.imageUrl,
+      })
+      .returning();
+    // Written inside the same transaction as the item itself, so a failure
+    // here rolls back the insert instead of leaving an item with no
+    // categories.
+    await setInventoryItemCategoriesAs(
+      viewer,
+      { itemId: row.id, categoryIds: data.categoryIds },
+      tx
+    );
+    return fullForStaff(row, await categoriesFor(row.id, tx));
+  });
 }
 
 export type UpdateInventoryItemInput = CreateInventoryItemInput & {
@@ -427,10 +471,11 @@ export type UpdateInventoryItemInput = CreateInventoryItemInput & {
 // fails the build: a drifted entry silently makes `changed` empty for an
 // edit that only touched that field, hitting the early return below and
 // discarding the whole update while the caller still sees a success.
+// Categories are not in this list: they moved off inventory_items onto the
+// join table and are diffed separately, below.
 const EDITABLE_FIELDS = [
   "name",
   "description",
-  "categoryId",
   "serial",
   "label",
   "location",
@@ -470,8 +515,27 @@ export async function updateInventoryItemAs(
         newValues[f] = newVal;
       }
     }
+
+    // Categories left EDITABLE_FIELDS's loop above along with the column, so
+    // they need their own diff, computed before the early return: otherwise
+    // a request that changes only categoryIds would compute changed.length
+    // === 0 above and silently discard the category write entirely, the
+    // same silent-write class the rest of this function guards against.
+    // Logged as names, not ids, joined with "; ": the edit log previously
+    // held readable category names and nothing renders it yet, so whoever
+    // builds that view should not inherit opaque identifiers.
+    const beforeCategories = await categoriesFor(data.id, tx);
+    const beforeCategoryIds = beforeCategories.map((c) => c.id).sort();
+    const afterCategoryIds = [...data.categoryIds].sort();
+    const categoriesChanged =
+      JSON.stringify(beforeCategoryIds) !== JSON.stringify(afterCategoryIds);
+    if (categoriesChanged) {
+      changed.push("categories");
+      oldValues.categories = beforeCategories.map((c) => c.name).join("; ");
+    }
+
     if (changed.length === 0) {
-      return fullForStaff(before, await categoryNameFor(before.categoryId, tx));
+      return fullForStaff(before, beforeCategories);
     }
 
     await tx
@@ -479,7 +543,6 @@ export async function updateInventoryItemAs(
       .set({
         name: data.name,
         description: data.description,
-        categoryId: data.categoryId,
         serial: data.serial,
         label: data.label,
         location: data.location,
@@ -488,6 +551,17 @@ export async function updateInventoryItemAs(
         updatedAt: new Date(),
       })
       .where(eq(inventoryItems.id, data.id));
+
+    let afterCategories = beforeCategories;
+    if (categoriesChanged) {
+      await setInventoryItemCategoriesAs(
+        viewer,
+        { itemId: data.id, categoryIds: data.categoryIds },
+        tx
+      );
+      afterCategories = await categoriesFor(data.id, tx);
+      newValues.categories = afterCategories.map((c) => c.name).join("; ");
+    }
 
     await tx.insert(inventoryItemEditLog).values({
       itemId: data.id,
@@ -498,11 +572,10 @@ export async function updateInventoryItemAs(
     });
 
     const [after] = await tx
-      .select({ item: inventoryItems, categoryName: categories.name })
+      .select()
       .from(inventoryItems)
-      .leftJoin(categories, eq(inventoryItems.categoryId, categories.id))
       .where(eq(inventoryItems.id, data.id));
-    return fullForStaff(after.item, after.categoryName);
+    return fullForStaff(after, afterCategories);
   });
 }
 

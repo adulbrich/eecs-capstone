@@ -17,10 +17,10 @@ describe("inventory schemas", () => {
     expect(() => itemPayloadSchema.parse({ name: "" })).toThrow();
   });
 
-  it("itemPayload keeps categoryId rather than stripping it", () => {
-    const categoryId = "11111111-1111-4111-8111-111111111111";
-    const parsed = itemPayloadSchema.parse({ name: "Drill", categoryId });
-    expect(parsed.categoryId).toBe(categoryId);
+  it("itemPayload keeps categoryIds rather than stripping it", () => {
+    const categoryIds = ["11111111-1111-4111-8111-111111111111"];
+    const parsed = itemPayloadSchema.parse({ name: "Drill", categoryIds });
+    expect(parsed.categoryIds).toEqual(categoryIds);
   });
 
   it("approveSchema coerces ISO date string", () => {

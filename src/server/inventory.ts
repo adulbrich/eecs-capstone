@@ -28,7 +28,7 @@ const itemStatusEnum = z.enum([
 const listInventorySchema = z.object({
   q: z.string().default(""),
   status: itemStatusEnum.nullable().default(null),
-  category: z.string().uuid().nullable().default(null),
+  categories: z.array(z.string().uuid()).max(20).default([]),
   page: z.number().int().positive().default(1),
   pageSize: z.number().int().positive().max(100).default(24),
 });
@@ -45,7 +45,7 @@ export const listInventory = createServerFn({ method: "GET" })
   });
 
 const listAdminInventorySchema = z.object({
-  category: z.string().uuid().nullable().default(null),
+  categories: z.array(z.string().uuid()).max(20).default([]),
   q: z.string().default(""),
   status: itemStatusEnum.nullable().default(null),
 });
@@ -98,7 +98,7 @@ export const getInventoryItemDetail = createServerFn({ method: "GET" })
 export const itemPayloadSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(5000).nullable().default(null),
-  categoryId: z.string().uuid().nullable().default(null),
+  categoryIds: z.array(z.string().uuid()).max(20).default([]),
   serial: z.string().max(120).nullable().default(null),
   label: z.string().max(120).nullable().default(null),
   location: z.string().max(200).nullable().default(null),

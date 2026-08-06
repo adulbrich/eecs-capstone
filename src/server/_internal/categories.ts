@@ -3,6 +3,7 @@ import { db } from "#/db";
 import {
   categories,
   type categoryDomainEnum,
+  inventoryItemCategories,
   projectCategories,
   projects,
 } from "#/db/schema";
@@ -13,6 +14,7 @@ import type {
   CategoryUpdateInput,
   SetProjectCategoriesInput,
 } from "../categories";
+import type { Tx } from "./inventory-transitions";
 
 type CategoryDomain = (typeof categoryDomainEnum.enumValues)[number];
 
@@ -187,6 +189,39 @@ export async function setProjectCategoriesForCurrentUser(
 ) {
   const viewer = await requireUser();
   return setProjectCategoriesAs(viewer, data);
+}
+
+/**
+ * Mirrors setProjectCategoriesAs's delete-then-insert shape, but takes an
+ * optional transaction: item create and update already open a transaction
+ * for the item write itself, and this needs to join it rather than open a
+ * second pooled connection.
+ */
+export async function setInventoryItemCategoriesAs(
+  viewer: AuthUser,
+  data: { itemId: string; categoryIds: string[] },
+  tx?: Tx
+) {
+  assertStaff(viewer);
+  const run = async (executor: Tx) => {
+    await executor
+      .delete(inventoryItemCategories)
+      .where(eq(inventoryItemCategories.itemId, data.itemId));
+    if (data.categoryIds.length > 0) {
+      await executor.insert(inventoryItemCategories).values(
+        data.categoryIds.map((cid) => ({
+          itemId: data.itemId,
+          categoryId: cid,
+        }))
+      );
+    }
+  };
+  if (tx) {
+    await run(tx);
+  } else {
+    await db.transaction(run);
+  }
+  return { itemId: data.itemId, count: data.categoryIds.length };
 }
 
 export async function listProjectCategoriesImpl(data: { projectId: string }) {
