@@ -68,7 +68,7 @@ function CategoryEdit() {
   async function onDelete() {
     if (
       !confirm(
-        `Delete category "${category.name}"? Projects tagged with it will lose the tag.`
+        `Delete category "${category.name}"? Projects tagged with it will lose the tag, and inventory items using it will lose their category.`
       )
     ) {
       return;
