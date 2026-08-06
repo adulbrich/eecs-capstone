@@ -50,8 +50,11 @@ export interface HistoryRow {
   changedByName: string | null;
   comment: string | null;
   createdAt: Date | string;
+  holderEmail: string | null;
   holderId: string | null;
   holderLabel: string | null;
+  holderName: string | null;
+  holderProgram: string | null;
   id: string;
   newStatus: string;
   oldStatus: string | null;
@@ -153,21 +156,13 @@ function formatHolderDisplay(
   item: Props["item"],
   holderName?: string | null
 ): string | null {
-  if (holderName) {
-    return holderName;
-  }
-  if (item.currentHolderName) {
-    return item.currentHolderEmail
-      ? `${item.currentHolderName} (${item.currentHolderEmail})`
-      : item.currentHolderName;
-  }
+  const name = holderName ?? item.currentHolderName;
   if (item.currentHolderEmail) {
-    return item.currentHolderEmail;
+    return name
+      ? `${name} (${item.currentHolderEmail})`
+      : item.currentHolderEmail;
   }
-  if (item.currentHolderLabel) {
-    return item.currentHolderLabel;
-  }
-  return item.currentHolderId ? "(user)" : null;
+  return item.currentHolderLabel ?? null;
 }
 
 const HISTORY_PAGE_SIZE = 10;
@@ -203,9 +198,10 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
                     <LocalTime value={h.createdAt} />
                   </span>
                 </div>
-                {(h.holderId || h.holderLabel) && (
+                {(h.holderEmail || h.holderLabel) && (
                   <p className="mt-1 text-muted-foreground text-xs">
-                    Holder: {h.holderLabel ?? h.holderId}
+                    Holder: {h.holderName ?? h.holderEmail ?? h.holderLabel}
+                    {h.holderName && h.holderEmail ? ` (${h.holderEmail})` : ""}
                   </p>
                 )}
                 {h.comment && (

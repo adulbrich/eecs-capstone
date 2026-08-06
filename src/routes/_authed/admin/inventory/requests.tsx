@@ -110,6 +110,7 @@ function AdminRequestQueue() {
             <div className="space-y-2">
               {batch.lines.map((row) => (
                 <AdminRequestQueueRow
+                  collectedBy={row.collectedBy}
                   item={{
                     id: row.item.id,
                     name: row.item.name,
@@ -117,6 +118,7 @@ function AdminRequestQueue() {
                   }}
                   key={row.line.id}
                   line={{ id: row.line.id, status: row.line.status }}
+                  requesterEmail={batch.requester.email}
                 />
               ))}
             </div>

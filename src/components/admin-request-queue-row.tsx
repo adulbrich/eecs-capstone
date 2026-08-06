@@ -7,6 +7,7 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 
 interface Props {
+  collectedBy: { email: string | null; name: string | null } | null;
   item: {
     id: string;
     name: string;
@@ -16,9 +17,15 @@ interface Props {
     id: string;
     status: string;
   };
+  requesterEmail: string;
 }
 
-export function AdminRequestQueueRow({ line, item }: Props) {
+export function AdminRequestQueueRow({
+  line,
+  item,
+  collectedBy,
+  requesterEmail,
+}: Props) {
   const router = useRouter();
   const [mode, setMode] = useState<null | "approve" | "reject">(null);
   const [pickupBy, setPickupBy] = useState("");
@@ -77,6 +84,9 @@ export function AdminRequestQueueRow({ line, item }: Props) {
           <div className="mt-1 flex items-center gap-2 text-muted-foreground text-xs">
             <InventoryStatusBadge status={item.status as "available"} />
             <span>line: {line.status}</span>
+            {collectedBy && collectedBy.email !== requesterEmail && (
+              <span>collected by {collectedBy.name ?? collectedBy.email}</span>
+            )}
           </div>
         </div>
         {isPending && mode === null && (
