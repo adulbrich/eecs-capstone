@@ -25,10 +25,12 @@ export interface TransitionInput {
   /** Assigns the hold to an address, with or without a matching account. */
   holderEmail?: string | null;
   /**
-   * An already-resolved account. Not reachable from the dialog: transitionSchema
-   * omits it, so staff cannot assign a hold by id. Only approveRequestItemAs
-   * and submitCartAs pass it, because they already hold the id and the address
-   * is derived from it.
+   * An already-resolved account, supplied only by an internal caller that
+   * already has one. Today that means approveRequestItemAs, passing the
+   * requester's id. submitCartAs performs its requested transition inline and
+   * never reaches here at all. Staff cannot assign a hold this way, because
+   * transitionSchema does not accept a holder id. The address is derived from
+   * the id, so the column invariant holds on this path too.
    */
   holderId?: string | null;
   holderLabel?: string | null;
