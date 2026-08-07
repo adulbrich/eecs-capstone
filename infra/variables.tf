@@ -93,9 +93,9 @@ variable "github_repo" {
 }
 
 variable "email_reply_to" {
-  description = "Optional Reply-To address for outbound mail. Empty means replies land on EMAIL_FROM. It is not part of DKIM alignment, so it need not be a verified identity or even sit on the sending domain."
+  description = "Reply-To address for outbound mail. Empty means replies land on the unattended noreply@ mailbox. It is not part of DKIM alignment, so it need not be a verified identity or even sit on the sending domain, which is why an ordinary OSU mailbox works here."
   type        = string
-  default     = ""
+  default     = "eecs-capstone@oregonstate.edu"
 }
 
 variable "github_client_id" {

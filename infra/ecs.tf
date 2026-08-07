@@ -95,18 +95,27 @@ resource "aws_ecs_task_definition" "app" {
         { name = "BEDROCK_MODEL_ID", value = var.bedrock_model_id },
         { name = "BEDROCK_EMBEDDING_MODEL_ID", value = var.bedrock_embedding_model_id },
         { name = "BEDROCK_EMBEDDING_DIMENSIONS", value = var.bedrock_embedding_dimensions },
-        # Logs verification/reset links to CloudWatch instead of sending real
-        # email. Flip to "ses" only after the DKIM CNAMEs resolve and the
-        # identity reads SUCCESS; sending from an unverified domain fails
-        # outright, which would break sign-up rather than degrade it.
-        { name = "EMAIL_TRANSPORT", value = "console" },
-        # Inert while EMAIL_TRANSPORT=console. Set now so the cutover is a
-        # one-line change. The From domain must match the verified identity or
-        # DKIM alignment fails, so both derive from var.domain_name.
+        # Real outbound mail through SES. Both preconditions are met: the
+        # domain identity reads VerifiedForSendingStatus=true with DKIM
+        # SUCCESS, and the account has left the sandbox
+        # (ProductionAccessEnabled=true), so SES will deliver to recipients
+        # who are not themselves verified identities.
+        #
+        # EMAIL_FROM below is not optional under this value. getEmailSender()
+        # runs at module scope in src/lib/auth.ts, and createSesEmailSender
+        # throws without it, so the pair arriving separately would fail the
+        # app's boot rather than just its email. Terraform sets them in one
+        # revision, which is why the cutover is apply *then* deploy and never
+        # a hand-edit of this variable in the console.
+        { name = "EMAIL_TRANSPORT", value = "ses" },
+        # Required under EMAIL_TRANSPORT=ses; see the note above. The From
+        # domain must match the verified identity or DKIM alignment fails, so
+        # both derive from var.domain_name.
         { name = "EMAIL_FROM", value = "noreply@${var.domain_name}" },
-        # Optional, and empty until a Reply-To address is decided. The app
-        # treats "" as unset and omits the header, so this can ship blank; it
-        # plays no part in DKIM alignment, unlike EMAIL_FROM above.
+        # Where replies land, since noreply@ has no mailbox. Plays no part in
+        # DKIM alignment, unlike EMAIL_FROM above, so it needs no SES identity
+        # and sits on oregonstate.edu rather than the sending domain. The app
+        # treats "" as unset and omits the header entirely.
         { name = "EMAIL_REPLY_TO", value = var.email_reply_to },
         # src/lib/email/ses-sender.ts falls back to us-east-1. The identity
         # lives in var.region, and the mismatch surfaces only as an opaque

@@ -408,14 +408,18 @@ Migrations run during deploy. To run them out of band, use the same
 ## 9. Adding real email delivery
 
 The app sends from `noreply@capstone.eecs.oregonstate.edu` via SES
-(`src/lib/email/ses-sender.ts`). The code is done, and so is the identity: the
-three DKIM records below are published and the domain verifies. What remains is
-production access (9.4) and the cutover itself (9.5).
+(`src/lib/email/ses-sender.ts`), with replies going to
+`eecs-capstone@oregonstate.edu`. Everything in AWS is ready: the code is done,
+the three DKIM records below are published and the domain verifies, and
+production access is granted (9.4). `infra/ecs.tf` selects `EMAIL_TRANSPORT=ses`.
+
+What remains is entirely a deployment step (9.5), and it is the part most likely
+to be got wrong: Terraform changes do not reach the running service on their own,
+so a successful `terraform apply` is not evidence that email works. Confirm with
+a real sign-up.
 
 `infra/ses.tf` and the `SendEmail` statement in `infra/iam.tf` are already in
-place. `EMAIL_FROM`, `EMAIL_REPLY_TO` and `SES_REGION` are already set in
-`infra/ecs.tf` and are inert while `EMAIL_TRANSPORT=console`, so the cutover is
-a one-line change.
+place, as are `EMAIL_FROM`, `EMAIL_REPLY_TO` and `SES_REGION` in `infra/ecs.tf`.
 
 Sections 9.1 through 9.3 record how the identity was set up; they are kept
 because the records are permanent and someone will eventually have to explain
@@ -492,10 +496,30 @@ aws --profile aws-capstone1 sesv2 get-account --region us-west-2 \
   --query 'ProductionAccessEnabled'
 ```
 
-`false` means sandbox. Request production access from the SES console (Account
-dashboard → Request production access). It goes to AWS Support with roughly a
-day's turnaround and is independent of the DNS work, so file it early. Expect
-to describe the sending use case, volume, and how bounces are handled.
+`false` means sandbox. **This is now `true`: production access was granted, and
+the quota rose from 200/day at 1/sec to 50,000/day at 14/sec.** The section is
+kept because the sandbox is easy to overlook (nothing about the domain looks
+wrong while it applies) and because a new account in a rebuilt environment
+starts there again.
+
+Sandbox imposes three limits, and the third is the one that matters:
+
+| Limit | Sandbox | Effect here |
+|---|---|---|
+| Daily volume | 200 / day | Tolerable at capstone scale |
+| Send rate | 1 / second | Tolerable; sends are one-at-a-time |
+| **Recipients** | **Verified identities only** | **Every real student's verification email is rejected** |
+
+Request production access from the SES console (Account dashboard → Request
+production access). It goes to AWS Support with roughly a day's turnaround and
+is independent of the DNS work, so file it early. Expect to describe the
+sending use case, volume, and how bounces are handled. For this app the honest
+answers are: transactional only (email verification and password reset, no
+marketing), recipients are self-selected users who typed their own address into
+a sign-up form, a few hundred messages per term with bursts at term start, and
+bounces handled by the account-level suppression list, which is adequate at this
+volume. There are no configuration sets, so there is no SNS bounce plumbing to
+describe; do not claim otherwise.
 
 To test before it clears, verify individual recipients:
 
@@ -506,11 +530,33 @@ aws --profile aws-capstone1 sesv2 create-email-identity \
 
 ### 9.5 Cut over
 
-Only once `VerifiedForSendingStatus` is `true` **and** production access is
-granted, flip `EMAIL_TRANSPORT` to `"ses"` in `infra/ecs.tf` and apply.
-Sending from an unverified domain fails outright, so flipping early breaks
-sign-up rather than degrading it. Set `email_reply_to` in the same apply if an
-address has been agreed (9.6); it is optional and does not gate the cutover.
+**This is done.** Both preconditions were met (`VerifiedForSendingStatus` is
+`true`, production access granted), `infra/ecs.tf` selects `"ses"`, and the
+apply and deploy have run: task definition revision 22 carries
+`EMAIL_TRANSPORT=ses`, `EMAIL_FROM=noreply@capstone.eecs.oregonstate.edu`,
+`EMAIL_REPLY_TO=eecs-capstone@oregonstate.edu` and `SES_REGION=us-west-2`, and
+the service is running it. What follows is why the order matters, for whoever
+changes these variables next.
+
+**Apply before deploying, not after.** This is not only a question of when a new
+value takes effect. `getEmailSender()` runs at module scope in
+`src/lib/auth.ts`, and `createSesEmailSender` throws when `EMAIL_FROM` is unset,
+so a container that received `EMAIL_TRANSPORT=ses` without it would fail to boot
+at all rather than merely fail to send. `terraform apply` writes all four
+variables into a single revision, so they can only arrive together. Never
+hand-edit the transport in the ECS console, which is the one path that can
+separate them.
+
+**Check the right task definition family.** It is `eecs-capstone`
+(`var.project`), and a stale `cs-capstone` family also exists in the account,
+frozen at revision 4 with an old `EMAIL_TRANSPORT=console`. Querying that one by
+mistake reports the cutover as not applied when it is:
+
+```bash
+aws --profile aws-capstone1 --region us-west-2 ecs describe-task-definition \
+  --task-definition eecs-capstone \
+  --query "taskDefinition.{rev:revision,env:containerDefinitions[0].environment[?starts_with(name,'EMAIL')]}"
+```
 
 **Applying is not enough.** `aws_ecs_service.app` carries
 `ignore_changes = [task_definition, desired_count]`, so `terraform apply`
@@ -524,29 +570,33 @@ evidence that email is on; confirm with a real sign-up instead.
 Until then sign-up still works, but verification and reset links reach only
 CloudWatch logs (section 6), not real inboxes.
 
-### 9.6 Reply-To (optional)
+### 9.6 Reply-To
 
 `noreply@capstone.eecs.oregonstate.edu` has no mailbox, so a reply to a
 verification or reset email disappears. `EMAIL_REPLY_TO` names an address that
 does receive mail, and the app puts it in `ReplyToAddresses` on every message
 it sends.
 
-It is genuinely optional at every layer: `var.email_reply_to` defaults to `""`,
-the task definition always passes the variable, and
-`createSesEmailSender` treats blank as unset and omits the header. Only
-`EMAIL_FROM` is required under `EMAIL_TRANSPORT=ses`, so email works with no
-Reply-To at all, which is how it ships today.
-
-To set one:
+The address is decided: `eecs-capstone@oregonstate.edu`, carried as the default
+of `var.email_reply_to` in `infra/variables.tf` rather than in
+`terraform.tfvars`, which is gitignored and so would not reach anyone else's
+checkout. Override per-apply if needed:
 
 ```bash
 cd infra
-terraform apply -var 'email_reply_to=capstone@oregonstate.edu'
+terraform apply -var 'email_reply_to=someone-else@oregonstate.edu'
 ```
 
-Or add `email_reply_to` to `terraform.tfvars` alongside the other variables
-(3.3). Then run the deploy workflow: as in 9.5, `terraform apply` alone
-registers a new task definition revision without moving the service onto it.
+It remains optional at every layer, which matters only as a failure mode: the
+task definition always passes the variable, and `createSesEmailSender` treats
+blank as unset and omits the header. Only `EMAIL_FROM` is required under
+`EMAIL_TRANSPORT=ses`, so a blank Reply-To degrades rather than breaks.
+
+**This address must be a real, monitored mailbox or distribution list.**
+`oregonstate.edu` MX points at Exchange Online, so it is a tenant-side object
+that someone has to create and watch. Nothing in AWS validates it: SES does not
+verify Reply-To, and a nonexistent address fails invisibly, since the mail still
+sends and only the human's reply vanishes.
 
 Unlike `EMAIL_FROM`, this address plays no part in DMARC: alignment is checked
 against the `From:` domain and the DKIM `d=` domain, and `Reply-To` is not an

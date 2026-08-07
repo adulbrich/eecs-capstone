@@ -11,14 +11,13 @@ conventions, see [`AGENTS.md`](./AGENTS.md).
 
 ## Pending
 
-- SES Setup. The domain identity is done: the three DKIM records are published
-  in the OSU-managed zone and verify. Sending From
-  `noreply@capstone.eecs.oregonstate.edu` is a one-line cutover, flipping
-  `EMAIL_TRANSPORT` to `ses` in `infra/ecs.tf`, which currently pins `console`.
-  Still to decide: the Reply-To address. `EMAIL_REPLY_TO` (Terraform
-  `email_reply_to`) is wired end to end but optional and currently blank, so it
-  does not block the cutover; unset just means replies land on the unattended
-  `noreply@` mailbox. See [`DEPLOYMENT.md`](./DEPLOYMENT.md) §9.6.
+- Confirm `eecs-capstone@oregonstate.edu` is a real, monitored mailbox or
+  distribution list. It is the `Reply-To` on every message the app sends, and
+  `oregonstate.edu` MX points at Exchange Online, so it is a tenant-side object
+  someone has to create and watch. Nothing in AWS validates it: SES does not
+  verify `Reply-To`, so a wrong address fails invisibly. Mail still sends and
+  only the human's reply vanishes. This is the last open item on email; SES
+  itself is live (see [Email transport](#email-transport)).
 
 ## Known issues
 
@@ -56,7 +55,10 @@ in [`PRD.md`](./PRD.md).
 
 ### Authentication
 
-- Additional SSO providers beyond GitHub: Oregon State University ONID.
+- Additional SSO providers beyond GitHub: Oregon State University ONID. Nothing
+  is built yet and the next step is a request to OSU, not code: what to ask for,
+  the paste-able ticket, and what each answer costs to implement are in
+  [`docs/ONID-SSO.md`](./docs/ONID-SSO.md).
 
 ### Discovery & taxonomy
 
@@ -235,18 +237,27 @@ version, this file could return to CLI generation; until then, edit it directly.
 `EMAIL_TRANSPORT` selects the sender behind the `EmailSender` interface in
 `src/lib/email/sender.ts`:
 
-- `console` (default, and what the ECS task definition currently pins): email
-  verification and password-reset URLs are written to the server's stderr.
+- `console` (the default, and what local development uses): email verification
+  and password-reset URLs are written to the server's stderr.
 - `ses`: real outbound mail through AWS SES v2 (`src/lib/email/ses-sender.ts`),
   which additionally requires `EMAIL_FROM` to be a verified sender identity.
   `EMAIL_REPLY_TO` is optional: set it and every message carries that
   `Reply-To`, leave it blank and the header is omitted.
 
-The SES path is implemented and its domain identity verifies, but production
-still runs the console transport pending a Reply-To address (see
-[Pending](#pending) above). `EMAIL_FROM` must align with the verified identity
-or DKIM fails, which is why both it and `var.domain_name` derive from the same
-variable in `infra/ecs.tf`.
+Production runs `ses` and has done since task definition revision 22: the domain
+identity verifies with DKIM `SUCCESS`, the account has production access (so the
+sandbox recipient restriction no longer applies), and mail sends From
+`noreply@capstone.eecs.oregonstate.edu`.
+
+`EMAIL_FROM` must align with the verified identity or DKIM fails, which is why
+both it and `var.domain_name` derive from the same variable in `infra/ecs.tf`.
+It is also not optional under `ses`: `getEmailSender()` runs at module scope in
+`src/lib/auth.ts`, so a missing `EMAIL_FROM` throws during import and stops the
+app booting rather than merely stopping its email. Terraform always writes the
+two into the same task definition revision, which is why the transport must
+never be flipped by hand in the ECS console. `EMAIL_REPLY_TO` is not
+DKIM-aligned and so carries an ordinary OSU mailbox,
+`eecs-capstone@oregonstate.edu`.
 
 ## Object storage
 
