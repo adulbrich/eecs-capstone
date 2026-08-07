@@ -1032,6 +1032,16 @@ existing `makeUser` and `baseProject` helpers.
 
 ```ts
 describe("review emails", () => {
+  // These tests mutate process.env, and this config sets `fileParallelism:
+  // false`, so every integration file shares one process. Without this restore
+  // a corrupted BETTER_AUTH_URL would leak out of this block and into every
+  // later test file, where `auth.api.signUpEmail` reads it. Snapshot and put it
+  // back, the same way the Task 3 unit tests do.
+  const ORIGINAL_ENV = { ...process.env };
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
   it("emails the review inbox on submit, the proposer on approve, nobody on publish", async () => {
     process.env.BETTER_AUTH_URL = "https://app";
     process.env.EMAIL_REVIEW_INBOX = "review@oregonstate.edu";
@@ -1141,7 +1151,7 @@ describe("review emails", () => {
 });
 ```
 
-Add `vi` to the existing `vitest` import at the top of the file.
+Add `vi` and `afterEach` to the existing `vitest` import at the top of the file.
 
 Note the tests pass `send` inside the options object, so `TransitionOptions`
 carries the seam through: `{ embed?: EmbedFn; send?: SendEmailFn; sendEmail?: boolean }`.
@@ -1560,6 +1570,15 @@ options object the task was already creating.
 "touches existing call sites and their tests". In fact only six lines in
 `project-embeddings.integration.test.ts` pass `embed` positionally; every other
 caller passes three or four arguments and is unaffected.
+
+**Defect found during execution, fixed in Task 4 Step 1.** The integration tests
+as first written set `process.env.BETTER_AUTH_URL` and never restored it. Since
+`vitest.integration.config.ts` sets `fileParallelism: false`, every integration
+file shares one process, so that value would have leaked out of this block into
+every later test file, where `auth.api.signUpEmail` reads it. The Task 3 unit
+tests got this right and these did not. An `afterEach` now restores the
+snapshot. Any future test in this suite that touches `process.env` must do the
+same.
 
 **Correction to the spec's recipient rule.** The spec said the proposer email
 resolves to "`proposerEmail` when set, otherwise the account address via
