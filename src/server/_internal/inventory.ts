@@ -342,9 +342,16 @@ export async function listAdminInventoryAs(
       ilike(user.name, like),
       ilike(user.email, like),
       // A hold assigned to a bare address or an ad-hoc label has no account
-      // row to match, so search the item's own holder columns too.
+      // row to match, so search the item's own holder columns too. The stored
+      // name earns its place here because the Holder column renders it: a
+      // staff member can otherwise read a name off the table and find nothing
+      // when they type it into the box above. Program is searchable so that
+      // "CS 461" answers "what is out to that course", which is the question
+      // the column exists to record.
       ilike(inventoryItems.currentHolderEmail, like),
-      ilike(inventoryItems.currentHolderLabel, like)
+      ilike(inventoryItems.currentHolderLabel, like),
+      ilike(inventoryItems.currentHolderName, like),
+      ilike(inventoryItems.currentHolderProgram, like)
     );
     if (match) {
       conditions.push(match);
@@ -776,10 +783,24 @@ export async function submitCartAs(
     // The invariant applies to every person hold, including one a student
     // created for themselves. Fetched once here rather than as a correlated
     // subselect inside each item update below.
+    //
+    // This is the one holder write that never reaches validateInvariants: it
+    // runs as the student, and transitionItem asserts staff, so the requested
+    // transition is performed inline. Throwing rather than falling back to
+    // null is what makes "a person hold always carries an address" true by
+    // construction here rather than merely true in practice. No current route
+    // can reach the throw, because a live session implies the row it points
+    // at, but a silent null would leave a hold with neither an address nor a
+    // label, which is precisely the state the invariant forbids.
     const [requester] = await tx
       .select({ email: user.email })
       .from(user)
       .where(eq(user.id, viewer.id));
+    if (!requester) {
+      throw new Error(
+        "Cannot submit a request for an account that no longer exists"
+      );
+    }
 
     // Phase 2: only now insert the request envelope (so we never leave an
     // orphaned inventoryRequests row when every line races) and the lines.
@@ -812,7 +833,7 @@ export async function submitCartAs(
         .set({
           status: "requested",
           currentHolderId: viewer.id,
-          currentHolderEmail: requester?.email ?? null,
+          currentHolderEmail: requester.email,
           currentHolderLabel: null,
           currentHolderName: null,
           currentHolderProgram: null,
@@ -829,7 +850,7 @@ export async function submitCartAs(
         changedBy: viewer.id,
         requestItemId: line.id,
         holderId: viewer.id,
-        holderEmail: requester?.email ?? null,
+        holderEmail: requester.email,
       });
     }
 

@@ -1587,6 +1587,50 @@ describe("staff-assigned holds without a request line", () => {
     });
     expect(rows.some((r) => r.id === item.id)).toBe(true);
   });
+
+  it("finds a walk-in hold by the stored name the Holder column renders", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`wi-a7-${stamp}@x.com`, "admin");
+    const item = await makeItem();
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: `wi-name-${stamp}@nowhere.test`,
+      holderName: `Wilhelmina Walkin ${stamp}`,
+      holderProgram: `CS ${stamp}`,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    // The staff table puts currentHolderName first in the Holder column's
+    // fallback chain, so a name that cannot be searched is a name staff can
+    // read off the screen and then fail to find.
+    const byName = await listAdminInventoryAs(admin, {
+      categories: [],
+      q: `Wilhelmina Walkin ${stamp}`,
+      status: null,
+    });
+    expect(byName.rows.some((r) => r.id === item.id)).toBe(true);
+  });
+
+  it("finds a walk-in hold by the stored program", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`wi-a8-${stamp}@x.com`, "admin");
+    const item = await makeItem();
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: `wi-prog-${stamp}@nowhere.test`,
+      holderProgram: `CS ${stamp}`,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const byProgram = await listAdminInventoryAs(admin, {
+      categories: [],
+      q: `CS ${stamp}`,
+      status: null,
+    });
+    expect(byProgram.rows.some((r) => r.id === item.id)).toBe(true);
+  });
 });
 
 describe("staff-assigned holds in my items", () => {
