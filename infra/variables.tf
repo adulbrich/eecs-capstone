@@ -98,6 +98,12 @@ variable "email_reply_to" {
   default     = "eecs-capstone@oregonstate.edu"
 }
 
+variable "email_review_inbox" {
+  description = "Address that receives the notification when a project is submitted for review. Distinct from email_reply_to even where the address matches: one is where replies land, the other is who reviews submissions. Empty disables the submission email."
+  type        = string
+  default     = "eecs-capstone@oregonstate.edu"
+}
+
 variable "github_client_id" {
   description = "GitHub OAuth app client ID (not secret). The client secret lives in Secrets Manager."
   type        = string
