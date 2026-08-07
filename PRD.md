@@ -163,16 +163,24 @@ Each project carries:
 
 ## 9. Categories & Programs
 
-- ✅ Categories have a free-text `type` (e.g. project type, technology,
-  industry, field); the admin form autocompletes existing types.
+- ✅ Every category belongs to one `domain`, `project` or `inventory`, fixed
+  at creation and immutable afterwards, so a category can only ever appear in
+  the picker it was made for. `/admin/categories` has a tab per domain.
+- ✅ Project categories additionally have a free-text `type` (e.g. project
+  type, technology, industry, field) that groups them in the pickers; the
+  admin form autocompletes existing types. Inventory categories are flat and
+  carry no type.
 - ✅ Categories created/edited/deleted by admins (`/admin/categories`).
-- ✅ Categories assigned to projects by staff only (multi-select on the project
-  form).
+- ✅ Categories assigned by staff only, many per record, through a
+  multi-select on both the project form and the item form.
 - 🟡 Multiple category types exist and can be filtered, but per-type faceted
   filtering on the public listing is not broken out into separate filters.
-- ✅ The admin categories table shows a usage count per category: published,
-  non-draft projects for the project domain, inventory items for the
-  inventory domain. Counted from the matching junction table, not cached.
+- ✅ The admin categories table shows a usage count per category: for the
+  project domain, every project filed under it except drafts and
+  soft-deleted ones, so submitted, approved, changes-requested, published
+  and archived all count; for the inventory domain, every item, with no
+  status filter. Counted from the matching junction table on read, not
+  cached, and computed in the same query that fetches the rows.
 - ✅ Programs = course ID + course name (+ description) with per-program
   instructors.
 - ✅ Programs created/edited/deleted by admins (`/admin/programs`); instructors
@@ -208,8 +216,8 @@ Each project carries:
 
 - ✅ Item statuses: `available`, `requested`, `reserved`, `checked_out`,
   `maintenance`, `retired`.
-- ✅ Item fields: name, description, category, serial, label, location, image,
-  current holder.
+- ✅ Item fields: name, description, categories (many, from the inventory
+  domain), serial, label, location, image, current holder.
 - ✅ Private notes: a staff-only free-text field for details like locker codes
   and storage quirks, using the same "Private notes" wording as projects (§3).
   Stripped from every non-staff list row and detail payload; the audience line
@@ -224,9 +232,12 @@ Each project carries:
   request queue. This mirrors how projects are laid out.
 - ✅ One item detail page for everyone: every viewer sees image, name,
   status, category, and description; signed-in users additionally see
-  Add to cart when the item is available; staff additionally render a
-  staff panel with serial, label, location, private notes, the Edit link and
-  the lifecycle controls.
+  Add to cart when the item is available; staff additionally render two
+  panels, splitting what the item is from what is happening to it. A
+  "Private" panel holds its serial, label, location and private notes with
+  the Edit link beside them, mirroring the project page's private panel; a
+  staff panel holds the lifecycle controls, the status history and the
+  danger zone.
 - ✅ Cart-style requests: users request several items at once (`/my/items`
   cart, request items table).
 - ✅ Staff approve or reject inventory requests (`/admin/inventory/requests`).
@@ -242,13 +253,20 @@ Each project carries:
   account still records the typed name and program instead. The hold's
   pickup-by and due-at live on the item, so they survive whether or not a
   request line exists.
-- ✅ When staff assign a hold to an address other than the requester's, the
-  request queue and My Items surface who is actually collecting the item, so
-  a requester is not left thinking the pickup is theirs.
-- ✅ The item form groups every non-public field (serial, label, location,
-  private notes) into a staff panel, matching the project form's staff panel,
-  so the split between public and internal values is visible while filling it
-  in. It matches the server's public/staff split exactly.
+- ✅ One item can involve two people: the student who requested it and the
+  teammate who collected it. The request stays attributed to its requester,
+  while the item's holder columns describe whoever is actually carrying it.
+  The request queue and the requester's My Items both name the collector,
+  and the collector sees the item in their own My Items, which is what tells
+  them they are holding something. Read from the status history rather than
+  copied onto the request line, so it survives the return that clears the
+  item's holder columns.
+- ✅ The item form marks every non-public field individually rather than
+  boxing them together: serial, label and location each carry "Only visible
+  to staff." under their label, and private notes carries its own longer
+  line. The set matches the server's public/staff split exactly, so a staff
+  member filling the form can tell field by field what will be public
+  without having to look elsewhere on the page.
 - ✅ Users cannot change item status except to request available items.
 - ✅ Users cancel a request while it is still `requested` or `reserved`.
 - ✅ Request-item lifecycle: `pending`, `approved`, `rejected`, `cancelled`,
@@ -261,6 +279,11 @@ Each project carries:
   read state).
 - ✅ Notification bell in the site header.
 - ✅ Used to inform users when an inventory request status changes.
+- ✅ Overdue and past-pickup notices, written lazily on read rather than by a
+  scheduler, and deduplicated so a re-read does not repeat one. When a
+  request and the hold on its item name two different people, both are
+  notified: the requester is accountable for the request, and the collector
+  is the one holding the thing.
 - ✅ Used for project proposer notifications (skipped when a project has no
   linked account).
 
