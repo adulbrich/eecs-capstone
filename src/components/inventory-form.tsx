@@ -5,7 +5,7 @@ import { applyServerErrors } from "#/lib/apply-server-errors";
 import {
   PRIVATE_NOTES_INVENTORY_HINT,
   PRIVATE_NOTES_LABEL,
-  STAFF_FIELDS_INVENTORY_HINT,
+  STAFF_ONLY_FIELD_HINT,
 } from "#/lib/private-notes";
 import {
   createInventoryItem,
@@ -15,7 +15,6 @@ import {
 } from "#/server/inventory";
 import { CategoryMultiSelect } from "./category-multi-select";
 import { InventoryImageUploader } from "./inventory-image-uploader";
-import { Panel, PanelHeader, PanelNote } from "./panel";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -183,31 +182,40 @@ export function InventoryForm({
           </div>
         )}
       </form.Field>
-      {/* Everything the public item page never renders, grouped and labelled
-          the way the project form's staff panel is, so it is obvious while
-          filling the form which values stay internal. The split matches
+      {/* These four never reach the public item page, and the split matches
           `stripForPublic` on the server exactly: name, description, category
           and image are public; serial, label, location and notes are not.
-          Unlike the project form's Private notes, the item's notes belong
-          inside the panel: an item has no proposer, so staff are their only
-          audience. */}
-      <Panel tone="staff">
-        <PanelHeader title="Staff panel" />
-        <PanelNote>{STAFF_FIELDS_INVENTORY_HINT}</PanelNote>
-        <div className="mt-4 space-y-4">
-          <Field form={form} label="Serial" name="serial" />
-          <Field form={form} label="Label" name="label" />
-          <Field form={form} label="Location" name="location" />
-          <Field
-            description={PRIVATE_NOTES_INVENTORY_HINT}
-            form={form}
-            label={PRIVATE_NOTES_LABEL}
-            name="notes"
-            rows={3}
-            textarea
-          />
-        </div>
-      </Panel>
+          That used to be said once, by a panel drawn around them. Saying it
+          per field instead keeps the form a single column of inputs, and a
+          reader scanning one field no longer has to look upward to find out
+          whether what they type will be public. Notes carries its own,
+          longer line, which already says the same thing with examples. */}
+      <Field
+        description={STAFF_ONLY_FIELD_HINT}
+        form={form}
+        label="Serial"
+        name="serial"
+      />
+      <Field
+        description={STAFF_ONLY_FIELD_HINT}
+        form={form}
+        label="Label"
+        name="label"
+      />
+      <Field
+        description={STAFF_ONLY_FIELD_HINT}
+        form={form}
+        label="Location"
+        name="location"
+      />
+      <Field
+        description={PRIVATE_NOTES_INVENTORY_HINT}
+        form={form}
+        label={PRIVATE_NOTES_LABEL}
+        name="notes"
+        rows={3}
+        textarea
+      />
 
       {formError && (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-destructive text-sm">
