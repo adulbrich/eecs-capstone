@@ -270,10 +270,10 @@ const COLUMNS: AdminColumn<Row>[] = [
 
 // Every field of the record, independent of which columns are visible.
 // defineCsvColumns<Row>() fails npm run typecheck if a field of Row (i.e. of
-// InventoryItemStaff plus currentHolderName) has no column here, so a future
-// field added to fullForStaff's projection cannot silently miss the file.
-// InventoryItemStaff is a hand-picked field list, not the bare table row, so
-// searchVector was never a member of Row to begin with.
+// InventoryItemStaff) has no column here, so a future field added to
+// fullForStaff's projection cannot silently miss the file. InventoryItemStaff
+// is a hand-picked field list, not the bare table row, so searchVector was
+// never a member of Row to begin with.
 const EXPORT_COLUMNS = defineCsvColumns<Row>()([
   { header: "ID", key: "id", value: (row) => row.id },
   { header: "Name", key: "name", value: (row) => row.name },

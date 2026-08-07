@@ -74,7 +74,7 @@ const idOnlySchema = z.object({ id: z.string().uuid() });
 // pull `_internal/inventory`'s runtime code into any bundle.
 export type {
   InventoryItemPublic,
-  InventoryItemStaffDetail,
+  InventoryItemStaff,
 } from "./_internal/inventory";
 
 export const getInventoryItem = createServerFn({ method: "GET" })

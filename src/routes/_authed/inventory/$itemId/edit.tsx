@@ -11,7 +11,7 @@ import { pageTitle } from "#/lib/page-title";
 import {
   getInventoryItem,
   type InventoryItemPublic,
-  type InventoryItemStaffDetail,
+  type InventoryItemStaff,
 } from "#/server/inventory";
 
 /**
@@ -22,8 +22,8 @@ import {
  * instead of the double cast this used to be.
  */
 function isStaffItem(
-  item: InventoryItemPublic | InventoryItemStaffDetail
-): item is InventoryItemStaffDetail {
+  item: InventoryItemPublic | InventoryItemStaff
+): item is InventoryItemStaff {
   return "serial" in item;
 }
 

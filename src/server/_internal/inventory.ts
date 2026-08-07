@@ -67,6 +67,7 @@ export type InventoryItemStaff = InventoryItemPublic & {
   currentHolderEmail: string | null;
   currentHolderId: string | null;
   currentHolderLabel: string | null;
+  currentHolderName: string | null;
   currentHolderProgram: string | null;
   currentRequestItemId: string | null;
   label: string | null;
@@ -75,6 +76,16 @@ export type InventoryItemStaff = InventoryItemPublic & {
   serial: string | null;
   updatedAt: Date;
 };
+
+/**
+ * Who a hold is on, after the item's own columns and the joined account have
+ * been reconciled. Passed into fullForStaff rather than derived inside it,
+ * because the reconciliation needs a join the item row alone cannot supply.
+ */
+export interface HolderIdentity {
+  email: string | null;
+  name: string | null;
+}
 
 function isStaff(viewer: Viewer): boolean {
   return viewer?.role === "admin" || viewer?.role === "instructor";
@@ -100,7 +111,8 @@ function stripForPublic(
 
 function fullForStaff(
   row: typeof inventoryItems.$inferSelect,
-  categories: ItemCategory[]
+  categories: ItemCategory[],
+  holder: HolderIdentity
 ): InventoryItemStaff {
   return {
     ...stripForPublic(row, categories),
@@ -109,7 +121,13 @@ function fullForStaff(
     label: row.label,
     location: row.location,
     notes: row.notes,
-    currentHolderEmail: row.currentHolderEmail,
+    // Both halves of the holder's identity arrive the same way. They used to
+    // differ: email came from the row here and was then overwritten by each
+    // caller, while name was bolted on by those callers alone. Two attributes
+    // of one person travelling by two mechanisms is what let the release
+    // paths fall out of sync when a third attribute was added.
+    currentHolderEmail: holder.email,
+    currentHolderName: holder.name,
     currentHolderId: row.currentHolderId,
     currentHolderLabel: row.currentHolderLabel,
     currentHolderProgram: row.currentHolderProgram,
@@ -140,6 +158,29 @@ function holderNameOf(row: {
   item: { currentHolderName: string | null };
 }): string | null {
   return row.holderName ?? row.item.currentHolderName;
+}
+
+/** The reconciled identity for a read path, which has the account joined. */
+function joinedHolderIdentity(row: {
+  holderEmail: string | null;
+  holderName: string | null;
+  item: { currentHolderEmail: string | null; currentHolderName: string | null };
+}): HolderIdentity {
+  return { email: holderEmailOf(row), name: holderNameOf(row) };
+}
+
+/**
+ * The identity a write path can see: the stored columns as they stand, with
+ * no account joined. Named rather than inlined so the difference from
+ * joinedHolderIdentity is visible at the call site. Create and update return
+ * their item only so the caller can read back an id, and neither renders the
+ * holder, so the unreconciled name costs nothing there.
+ */
+function storedHolderIdentity(row: {
+  currentHolderEmail: string | null;
+  currentHolderName: string | null;
+}): HolderIdentity {
+  return { email: row.currentHolderEmail, name: row.currentHolderName };
 }
 
 /**
@@ -226,11 +267,7 @@ export async function listInventoryAs(
 
   const mapped = rows.map((r) => {
     if (isStaff(viewer)) {
-      return {
-        ...fullForStaff(r.item, r.categories),
-        currentHolderName: holderNameOf(r),
-        currentHolderEmail: holderEmailOf(r),
-      };
+      return fullForStaff(r.item, r.categories, joinedHolderIdentity(r));
     }
     return stripForPublic(r.item, r.categories);
   });
@@ -242,12 +279,6 @@ export async function listInventoryAs(
     pageSize: data.pageSize,
   };
 }
-
-/** A staff item plus the joined holder identity. */
-export type InventoryItemStaffDetail = InventoryItemStaff & {
-  currentHolderEmail: string | null;
-  currentHolderName: string | null;
-};
 
 interface InventoryItemJoinedRow {
   categories: ItemCategory[];
@@ -285,12 +316,8 @@ async function loadInventoryItemRowFor(
   return row;
 }
 
-function toStaffDetail(row: InventoryItemJoinedRow): InventoryItemStaffDetail {
-  return {
-    ...fullForStaff(row.item, row.categories),
-    currentHolderName: holderNameOf(row),
-    currentHolderEmail: holderEmailOf(row),
-  };
+function toStaffDetail(row: InventoryItemJoinedRow): InventoryItemStaff {
+  return fullForStaff(row.item, row.categories, joinedHolderIdentity(row));
 }
 
 function toPublicDetail(row: InventoryItemJoinedRow): InventoryItemPublic {
@@ -371,11 +398,9 @@ export async function listAdminInventoryAs(
     .orderBy(desc(inventoryItems.updatedAt));
 
   return {
-    rows: rows.map((r) => ({
-      ...fullForStaff(r.item, r.categories),
-      currentHolderEmail: holderEmailOf(r),
-      currentHolderName: holderNameOf(r),
-    })),
+    rows: rows.map((r) =>
+      fullForStaff(r.item, r.categories, joinedHolderIdentity(r))
+    ),
   };
 }
 
@@ -490,7 +515,11 @@ export async function createInventoryItemAs(
       { itemId: row.id, categoryIds: data.categoryIds },
       tx
     );
-    return fullForStaff(row, await categoriesFor(row.id, tx));
+    return fullForStaff(
+      row,
+      await categoriesFor(row.id, tx),
+      storedHolderIdentity(row)
+    );
   });
 }
 
@@ -567,7 +596,11 @@ export async function updateInventoryItemAs(
     }
 
     if (changed.length === 0) {
-      return fullForStaff(before, beforeCategories);
+      return fullForStaff(
+        before,
+        beforeCategories,
+        storedHolderIdentity(before)
+      );
     }
 
     await tx
@@ -607,7 +640,7 @@ export async function updateInventoryItemAs(
       .select()
       .from(inventoryItems)
       .where(eq(inventoryItems.id, data.id));
-    return fullForStaff(after, afterCategories);
+    return fullForStaff(after, afterCategories, storedHolderIdentity(after));
   });
 }
 
@@ -1534,7 +1567,7 @@ export async function getItemHistoryAs(
 export type InventoryItemDetail =
   | {
       history: Awaited<ReturnType<typeof getItemHistoryAs>>;
-      item: InventoryItemStaffDetail;
+      item: InventoryItemStaff;
       viewerIsStaff: true;
     }
   | { history: never[]; item: InventoryItemPublic; viewerIsStaff: false };
