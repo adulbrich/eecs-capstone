@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { CategoryChip } from "#/components/category-chip";
+import { InventoryPrivatePanel } from "#/components/inventory-private-panel";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { StaffInventoryPanel } from "#/components/staff-inventory-panel";
 import { Button } from "#/components/ui/button";
@@ -101,8 +102,13 @@ function ItemDetail() {
         </div>
       </div>
 
+      {/* Private first, then staff: what the item is, then what is happening
+          to it. Matches the project page's ordering of the same two regions. */}
       {detail.viewerIsStaff && (
-        <StaffInventoryPanel history={detail.history} item={detail.item} />
+        <>
+          <InventoryPrivatePanel item={detail.item} />
+          <StaffInventoryPanel history={detail.history} item={detail.item} />
+        </>
       )}
     </div>
   );

@@ -313,6 +313,32 @@ export function StaffProjectPanel({
         <p className="mt-2 text-destructive text-sm">{error}</p>
       )}
 
+      {/* Private notes render on the shared project page, above this panel:
+          they are visible to the proposer as well, so they are not staff-only
+          content and would be duplicated here. */}
+
+      <PanelSection title="Edit log">
+        {editLog.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No edits yet.</p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {editLog.map((row) => (
+              <li className="border-border border-l-2 pl-3" key={row.id}>
+                <div className="text-muted-foreground text-xs">
+                  {row.editorId.slice(0, 8)} at{" "}
+                  <LocalTime value={row.createdAt} />
+                </div>
+                <div className="text-xs">
+                  Changed: {row.changedFields.join(", ")}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </PanelSection>
+
+      {/* Last, as on the item page: the irreversible actions sit at the far
+          end of the panel rather than between two things staff read. */}
       <PanelSection title="Danger zone" tone="danger">
         <div className="flex flex-wrap gap-2">
           {!project.deletedAt && project.status !== "draft" && (
@@ -346,30 +372,6 @@ export function StaffProjectPanel({
             </Button>
           )}
         </div>
-      </PanelSection>
-
-      {/* Private notes render on the shared project page, above this panel:
-          they are visible to the proposer as well, so they are not staff-only
-          content and would be duplicated here. */}
-
-      <PanelSection title="Edit log">
-        {editLog.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No edits yet.</p>
-        ) : (
-          <ul className="space-y-2 text-sm">
-            {editLog.map((row) => (
-              <li className="border-border border-l-2 pl-3" key={row.id}>
-                <div className="text-muted-foreground text-xs">
-                  {row.editorId.slice(0, 8)} at{" "}
-                  <LocalTime value={row.createdAt} />
-                </div>
-                <div className="text-xs">
-                  Changed: {row.changedFields.join(", ")}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
       </PanelSection>
     </Panel>
   );
