@@ -4,7 +4,8 @@ import {
   type SendEmailCommandInput,
   type SendEmailCommandOutput,
 } from "@aws-sdk/client-sesv2";
-import type { EmailMessage, EmailSender } from "./sender";
+import type { EmailSender } from "./sender";
+import type { RenderedEmail } from "./templates";
 
 const DEFAULT_REGION = "us-east-1";
 
@@ -17,66 +18,39 @@ export type SesSendFn = (
   input: SendEmailCommandInput
 ) => Promise<SendEmailCommandOutput>;
 
-interface EmailContent {
-  cta: string;
-  intro: string;
-  subject: string;
-}
-
-const VERIFICATION: EmailContent = {
-  subject: "Verify your email",
-  intro: "Confirm your email address to finish setting up your account.",
-  cta: "Verify email",
-};
-
-const PASSWORD_RESET: EmailContent = {
-  subject: "Reset your password",
-  intro: "We received a request to reset your password.",
-  cta: "Reset password",
-};
-
 export class SesEmailSender implements EmailSender {
   private readonly from: string;
   private readonly replyTo: string | null;
-  private readonly send: SesSendFn;
+  private readonly sendCommand: SesSendFn;
 
   /**
    * `replyTo` is optional because `from` is the address DMARC aligns against;
    * a reply-to only decides where a human's reply lands, so mail sends
    * correctly without one.
    */
-  constructor(from: string, send: SesSendFn, replyTo: string | null = null) {
+  constructor(
+    from: string,
+    sendCommand: SesSendFn,
+    replyTo: string | null = null
+  ) {
     this.from = from;
-    this.send = send;
+    this.sendCommand = sendCommand;
     this.replyTo = replyTo;
   }
 
-  sendVerification(msg: EmailMessage): Promise<void> {
-    return this.dispatch(VERIFICATION, msg);
-  }
-
-  sendPasswordReset(msg: EmailMessage): Promise<void> {
-    return this.dispatch(PASSWORD_RESET, msg);
-  }
-
-  private async dispatch(
-    content: EmailContent,
-    msg: EmailMessage
-  ): Promise<void> {
-    await this.send({
+  async send(to: string, email: RenderedEmail): Promise<void> {
+    await this.sendCommand({
       FromEmailAddress: this.from,
       // `undefined` is dropped by the SDK serializer, so an unconfigured
       // reply-to leaves the header off rather than sending an empty list.
       ReplyToAddresses: this.replyTo ? [this.replyTo] : undefined,
-      Destination: { ToAddresses: [msg.to] },
+      Destination: { ToAddresses: [to] },
       Content: {
         Simple: {
-          Subject: { Data: content.subject },
+          Subject: { Data: email.subject },
           Body: {
-            Text: { Data: `${content.intro}\n\n${content.cta}: ${msg.url}\n` },
-            Html: {
-              Data: `<p>${content.intro}</p><p><a href="${msg.url}">${content.cta}</a></p>`,
-            },
+            Text: { Data: email.text },
+            Html: { Data: email.html },
           },
         },
       },

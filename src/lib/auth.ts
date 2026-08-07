@@ -4,6 +4,7 @@ import { admin } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { db } from "#/db";
 import { getEmailSender } from "#/lib/email/sender";
+import { passwordResetEmail, verificationEmail } from "#/lib/email/templates";
 
 const emailSender = getEmailSender();
 
@@ -20,7 +21,7 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: true,
     sendResetPassword: async ({ user, url }) => {
-      await emailSender.sendPasswordReset({ to: user.email, url });
+      await emailSender.send(user.email, passwordResetEmail({ url }));
     },
   },
   emailVerification: {
@@ -28,7 +29,7 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     callbackURL: "/verify-email",
     sendVerificationEmail: async ({ user, url }) => {
-      await emailSender.sendVerification({ to: user.email, url });
+      await emailSender.send(user.email, verificationEmail({ url }));
     },
   },
   socialProviders: {

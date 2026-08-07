@@ -1,14 +1,9 @@
 import { ConsoleEmailSender } from "./console-sender";
 import { createSesEmailSender } from "./ses-sender";
-
-export interface EmailMessage {
-  to: string;
-  url: string;
-}
+import type { RenderedEmail } from "./templates";
 
 export interface EmailSender {
-  sendPasswordReset(msg: EmailMessage): Promise<void>;
-  sendVerification(msg: EmailMessage): Promise<void>;
+  send(to: string, email: RenderedEmail): Promise<void>;
 }
 
 export function getEmailSender(): EmailSender {
