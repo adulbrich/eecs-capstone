@@ -427,7 +427,7 @@ describe("listInventoryAs privacy", () => {
 
   it("keeps private notes out of a non-staff list row", async () => {
     const student = await makeUser(`pnl-s-${Date.now()}@x.com`, "user");
-    const item = await makeItem({ notes: "Locker B4, code 1180." });
+    const item = await makeItem({ notes: "Locker B4, code ZQXNOTES." });
 
     const result = await listInventoryAs(student, {
       q: "",
@@ -439,7 +439,7 @@ describe("listInventoryAs privacy", () => {
     const found = result.rows.find((r) => r.id === item.id);
     expect(found).toBeDefined();
     expect("notes" in (found as object)).toBe(false);
-    expect(JSON.stringify(found)).not.toContain("1180");
+    expect(JSON.stringify(found)).not.toContain("ZQXNOTES");
   });
 
   it("carries the joined holder identity through the staff detail payload", async () => {
@@ -511,7 +511,7 @@ describe("listInventoryAs privacy", () => {
 
   it("gives an anonymous viewer no history and no staff fields", async () => {
     const admin = await makeUser(`dtl-a-${Date.now()}@x.com`, "admin");
-    const item = await makeItem({ notes: "Locker B4, code 1180." });
+    const item = await makeItem({ notes: "Locker B4, code ZQXNOTES." });
     await transitionItem(admin, {
       itemId: item.id,
       nextStatus: "maintenance",
@@ -522,13 +522,13 @@ describe("listInventoryAs privacy", () => {
     expect(view?.viewerIsStaff).toBe(false);
     expect(view?.history).toEqual([]);
     expect("notes" in (view?.item as object)).toBe(false);
-    expect(JSON.stringify(view)).not.toContain("1180");
+    expect(JSON.stringify(view)).not.toContain("ZQXNOTES");
   });
 
   it("gives a signed-in non-staff user no history and no staff fields", async () => {
     const admin = await makeUser(`dtl-a2-${Date.now()}@x.com`, "admin");
     const student = await makeUser(`dtl-s2-${Date.now()}@x.com`, "user");
-    const item = await makeItem({ notes: "Locker B4, code 1180." });
+    const item = await makeItem({ notes: "Locker B4, code ZQXNOTES." });
     await transitionItem(admin, {
       itemId: item.id,
       nextStatus: "maintenance",
@@ -543,7 +543,7 @@ describe("listInventoryAs privacy", () => {
 
   it("gives staff the history and the staff fields", async () => {
     const admin = await makeUser(`dtl-a3-${Date.now()}@x.com`, "admin");
-    const item = await makeItem({ notes: "Locker B4, code 1180." });
+    const item = await makeItem({ notes: "Locker B4, code ZQXNOTES." });
     await transitionItem(admin, {
       itemId: item.id,
       nextStatus: "maintenance",
@@ -553,7 +553,7 @@ describe("listInventoryAs privacy", () => {
     expect(view?.viewerIsStaff).toBe(true);
     expect(view?.history.length).toBeGreaterThan(0);
     expect((view?.item as unknown as { notes: string }).notes).toBe(
-      "Locker B4, code 1180."
+      "Locker B4, code ZQXNOTES."
     );
   });
 
@@ -2456,6 +2456,109 @@ describe("collected by", () => {
   it("returns an empty map for no ids without querying", async () => {
     const collected = await collectedByForRequestItems([]);
     expect(collected.size).toBe(0);
+  });
+
+  it("reports the most recent checkout when a line was collected twice", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`twice-admin-${stamp}@x.com`, "admin");
+    const requester = await makeUser(`twice-requester-${stamp}@x.com`, "user");
+    const item = await makeItem();
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+
+    // Collected, brought back to the counter, then collected again by
+    // someone else. Both checkouts hang off the same request line, which is
+    // the only state that can distinguish an ascending tiebreak from a
+    // descending one.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: `first-collector-${stamp}@nowhere.test`,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      requestItemId: line.id,
+      holderEmail: `first-collector-${stamp}@nowhere.test`,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: `second-collector-${stamp}@nowhere.test`,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    // DISTINCT ON picks arbitrarily among tied sort keys, so a test that
+    // relied on ordering without confirming the keys differ would pass or
+    // fail by luck. Each transitionItem is its own transaction and Postgres
+    // now() is transaction start time, so these must differ.
+    const checkouts = await db
+      .select({ createdAt: inventoryItemStatusHistory.createdAt })
+      .from(inventoryItemStatusHistory)
+      .where(
+        and(
+          eq(inventoryItemStatusHistory.requestItemId, line.id),
+          eq(inventoryItemStatusHistory.newStatus, "checked_out")
+        )
+      );
+    expect(checkouts).toHaveLength(2);
+    expect(checkouts[0].createdAt.getTime()).not.toBe(
+      checkouts[1].createdAt.getTime()
+    );
+
+    const collected = await collectedByForRequestItems([line.id]);
+    expect(collected.get(line.id)?.email).toBe(
+      `second-collector-${stamp}@nowhere.test`
+    );
+  });
+
+  it("prefers the account's current address over the one stored at checkout", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`rename-admin-${stamp}@x.com`, "admin");
+    const requester = await makeUser(`rename-requester-${stamp}@x.com`, "user");
+    const oldAddress = `rename-picker-${stamp}@x.com`;
+    const picker = await makeUser(oldAddress, "user");
+    const item = await makeItem();
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: oldAddress,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    // The history row keeps the address the hold was assigned to. The person
+    // then changes their account address. They are still the same collector,
+    // so the read must follow the account rather than the frozen string.
+    const newAddress = `renamed-${stamp}@x.com`;
+    await db
+      .update(user)
+      .set({ email: newAddress })
+      .where(eq(user.id, picker.id));
+
+    const collected = await collectedByForRequestItems([line.id]);
+    expect(collected.get(line.id)?.email).toBe(newAddress);
   });
 });
 
