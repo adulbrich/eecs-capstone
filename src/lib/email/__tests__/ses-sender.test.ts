@@ -51,8 +51,8 @@ describe("SesEmailSender", () => {
 
     await sender.send("a@b.com", EMAIL);
 
-    expect(sendCommand.mock.calls[0]?.[0].ReplyToAddresses).toEqual([
-      "replies@example.edu",
-    ]);
+    const input = sendCommand.mock.calls[0]?.[0];
+    expect(input.FromEmailAddress).toBe("noreply@example.edu");
+    expect(input.ReplyToAddresses).toEqual(["replies@example.edu"]);
   });
 });
