@@ -58,6 +58,15 @@ export const listCategories = createServerFn({ method: "GET" })
     return listCategoriesImpl(data);
   });
 
+export const listCategoriesWithUsage = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => listSchema.parse(data ?? {}))
+  .handler(async ({ data }) => {
+    const { listCategoriesWithUsageForCurrentUser } = await import(
+      "./_internal/categories"
+    );
+    return listCategoriesWithUsageForCurrentUser(data);
+  });
+
 export const listCategoryTypes = createServerFn({ method: "GET" }).handler(
   async () => {
     const { listCategoryTypesImpl } = await import("./_internal/categories");

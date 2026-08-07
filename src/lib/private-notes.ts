@@ -49,9 +49,11 @@ export const STAFF_FIELDS_PROJECT_HINT =
   "These settings are only available to staff (instructors and admins). Not to the project proposer.";
 
 /**
- * The inventory counterpart. Only staff can reach the item form at all, so
- * "not available to X" would describe nobody. What the panel actually tells a
- * staff member filling it in is which values stay off the public item page.
+ * Per-field version, for the inventory form's staff-only inputs. Only staff
+ * can reach that form at all, so the useful thing to say is not who may edit
+ * a field but which values stay off the public item page. It sits under each
+ * label rather than over a group, because the fields it applies to are no
+ * longer boxed together and a reader scanning one input should not have to
+ * look upward to learn whether it is public.
  */
-export const STAFF_FIELDS_INVENTORY_HINT =
-  "These details never appear on the public item page. Only staff (instructors and admins) can see them.";
+export const STAFF_ONLY_FIELD_HINT = "Only visible to staff.";

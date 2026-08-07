@@ -1,12 +1,20 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
-import { categories, projectCategories, user } from "#/db/schema";
+import {
+  categories,
+  inventoryItemCategories,
+  inventoryItems,
+  projectCategories,
+  projects,
+  user,
+} from "#/db/schema";
 import { auth } from "#/lib/auth";
 import {
   createCategoryAs,
   deleteCategoryAs,
   listCategoriesImpl,
+  listCategoriesWithUsageAs,
   listCategoryTypesImpl,
   setProjectCategoriesAs,
   updateCategoryAs,
@@ -203,5 +211,76 @@ describe("categories", () => {
       .where(eq(categories.id, catId));
     expect(row.domain).toBe("project");
     expect(row.type).toBe("technology");
+  });
+});
+
+describe("listCategoriesWithUsageAs", () => {
+  it("counts published and archived projects but not drafts or deleted ones", async () => {
+    const admin = await makeUser("usage-admin@x.com", "admin");
+    const { id: categoryId } = await createCategoryAs(admin, {
+      domain: "project",
+      name: "Robotics",
+      type: "technology",
+    });
+
+    const inserted = await db
+      .insert(projects)
+      .values([
+        { title: "Published", status: "published" },
+        { title: "Archived", status: "archived" },
+        { title: "Draft", status: "draft" },
+        { title: "Deleted", status: "published", deletedAt: new Date() },
+      ])
+      .returning({ id: projects.id });
+    await db
+      .insert(projectCategories)
+      .values(inserted.map((p) => ({ projectId: p.id, categoryId })));
+
+    const { rows } = await listCategoriesWithUsageAs(admin, {
+      domain: "project",
+    });
+    const row = rows.find((r) => r.id === categoryId);
+    expect(row?.usageCount).toBe(2);
+  });
+
+  it("counts inventory items for an inventory category", async () => {
+    const admin = await makeUser("usage-admin-2@x.com", "admin");
+    const { id: categoryId } = await createCategoryAs(admin, {
+      domain: "inventory",
+      name: "Cables",
+      type: null,
+    });
+    const items = await db
+      .insert(inventoryItems)
+      .values([{ name: "USB-C" }, { name: "HDMI" }])
+      .returning({ id: inventoryItems.id });
+    await db
+      .insert(inventoryItemCategories)
+      .values(items.map((i) => ({ itemId: i.id, categoryId })));
+
+    const { rows } = await listCategoriesWithUsageAs(admin, {
+      domain: "inventory",
+    });
+    expect(rows.find((r) => r.id === categoryId)?.usageCount).toBe(2);
+  });
+
+  it("returns a number, not a bigint string", async () => {
+    const admin = await makeUser("usage-admin-3@x.com", "admin");
+    await createCategoryAs(admin, {
+      domain: "inventory",
+      name: "Empty",
+      type: null,
+    });
+    const { rows } = await listCategoriesWithUsageAs(admin, {
+      domain: "inventory",
+    });
+    expect(typeof rows[0].usageCount).toBe("number");
+  });
+
+  it("refuses a non-staff viewer", async () => {
+    const student = await makeUser("usage-student@x.com", "user");
+    await expect(
+      listCategoriesWithUsageAs(student, { domain: "project" })
+    ).rejects.toThrow("Forbidden");
   });
 });

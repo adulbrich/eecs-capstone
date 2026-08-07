@@ -74,7 +74,7 @@ const idOnlySchema = z.object({ id: z.string().uuid() });
 // pull `_internal/inventory`'s runtime code into any bundle.
 export type {
   InventoryItemPublic,
-  InventoryItemStaffDetail,
+  InventoryItemStaff,
 } from "./_internal/inventory";
 
 export const getInventoryItem = createServerFn({ method: "GET" })
@@ -249,11 +249,17 @@ const transitionSchema = z.object({
     "retired",
   ]),
   requestItemId: z.string().uuid().nullable().default(null),
-  holderId: z.string().nullable().default(null),
+  // No holderId. Staff assign a hold by address or by label; the account is
+  // resolved from the address server-side. The one caller that passes an
+  // account id to transitionItem, approveRequestItemAs, calls it directly and
+  // never goes through this schema. submitCartAs does not reach transitionItem
+  // at all: it performs its requested transition inline instead.
   holderEmail: z
     .union([z.string().email("Must be a valid email").max(200), z.null()])
     .default(null),
   holderLabel: z.string().max(200).nullable().default(null),
+  holderName: z.string().max(200).nullable().default(null),
+  holderProgram: z.string().max(200).nullable().default(null),
   pickupBy: z.coerce.date().nullable().default(null),
   dueAt: z.coerce.date().nullable().default(null),
   comment: z.string().max(2000).nullable().default(null),

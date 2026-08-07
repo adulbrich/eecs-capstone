@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, type SQL } from "drizzle-orm";
+import { and, eq, isNotNull, type SQL, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
   categories,
@@ -222,6 +222,96 @@ export async function setInventoryItemCategoriesAs(
     await db.transaction(run);
   }
   return { itemId: data.itemId, count: data.categoryIds.length };
+}
+
+/**
+ * Counts what is filed under each category, in the same round trip that
+ * fetches the rows.
+ *
+ * A CASE with both domains named explicitly, rather than one aggregate per
+ * junction table joined onto every row: `categories.domain` is immutable
+ * (see updateCategoryAs), so a project category can never have inventory
+ * rows and Postgres evaluates only the arm its domain selects. `else 0`
+ * rather than falling through to the inventory count, so a third domain
+ * added later reports zero instead of silently reporting the wrong table.
+ *
+ * `::int` because count() returns bigint, which node-postgres hands back as
+ * a string: without the cast the column arrives as "12" and sorts
+ * lexicographically, putting 9 after 12.
+ *
+ * The whole fragment is wrapped in one extra `sql` layer. The outer query
+ * below selects only from `categories`, no joins, so Drizzle's single-table
+ * selection builder (pg-core/dialect.js) strips every column reference it
+ * finds in a computed field down to a bare, unqualified name, assuming a
+ * single-table query can only ever mean that table's own columns. That
+ * assumption breaks a correlated subquery: unqualified "id" resolved to the
+ * closer `projects.id` instead of the correlated `categories.id`, so
+ * `category_id = id` compared a category uuid to a project uuid and always
+ * counted 0. Nesting the fragment inside `sql\`${...}\`` keeps it out of
+ * that shallow rewrite (it only rewrites bare Column chunks, not nested SQL
+ * objects), so every column below renders fully table-qualified. Do not
+ * unwrap this "for readability": it is the fix, not decoration.
+ */
+const usageCount = sql<number>`${sql`(
+  case ${categories.domain}
+    when 'project' then (
+      select count(*)::int
+      from ${projectCategories}
+      join ${projects}
+        on ${projects.id} = ${projectCategories.projectId}
+       and ${projects.deletedAt} is null
+       and ${projects.status} <> 'draft'
+      where ${projectCategories.categoryId} = ${categories.id})
+    when 'inventory' then (
+      select count(*)::int
+      from ${inventoryItemCategories}
+      where ${inventoryItemCategories.categoryId} = ${categories.id})
+    else 0
+  end
+)`}`;
+
+/**
+ * The staff-only sibling of listCategoriesImpl. Deliberately a separate
+ * function rather than a flag: listCategories is reachable without a session
+ * (the public project filter bar calls it), and it feeds two dropdowns that
+ * have no use for an aggregate.
+ *
+ * A draft project is not counted. It is visible only to its owner, so
+ * counting it would inflate the answer to "how much is filed here".
+ */
+export async function listCategoriesWithUsageAs(
+  viewer: AuthUser,
+  data: { domain?: CategoryDomain | null; type?: string | null }
+) {
+  assertStaff(viewer);
+  const conditions: SQL[] = [];
+  if (data.domain) {
+    conditions.push(eq(categories.domain, data.domain));
+  }
+  if (data.type) {
+    conditions.push(eq(categories.type, data.type));
+  }
+  const rows = await db
+    .select({
+      id: categories.id,
+      name: categories.name,
+      domain: categories.domain,
+      type: categories.type,
+      createdAt: categories.createdAt,
+      usageCount,
+    })
+    .from(categories)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(categories.type, categories.name);
+  return { rows };
+}
+
+export async function listCategoriesWithUsageForCurrentUser(data: {
+  domain?: CategoryDomain | null;
+  type?: string | null;
+}) {
+  const viewer = await requireUser();
+  return listCategoriesWithUsageAs(viewer, data);
 }
 
 export async function listProjectCategoriesImpl(data: { projectId: string }) {

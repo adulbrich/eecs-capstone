@@ -23,6 +23,7 @@ import {
   addToCartAs,
   approveRequestItemAs,
   cancelRequestItemAs,
+  collectedByForRequestItems,
   createInventoryItemAs,
   getInventoryItemAs,
   getInventoryItemDetailAs,
@@ -138,7 +139,9 @@ describe("transitionItem", () => {
     // cannot be reserved to nobody.
     await expect(
       transitionItem(admin, { itemId: item.id, nextStatus: "reserved" })
-    ).rejects.toThrow(/exactly one of holderId, holderEmail or holderLabel/);
+    ).rejects.toThrow(
+      /holder email or a holder label, not both and not neither/
+    );
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");
     const { line } = await makeRequestLine(student.id, item.id);
     await expect(
@@ -149,7 +152,9 @@ describe("transitionItem", () => {
         holderId: student.id,
         holderLabel: "X",
       })
-    ).rejects.toThrow(/exactly one of holderId, holderEmail or holderLabel/);
+    ).rejects.toThrow(
+      /holder email or a holder label, not both and not neither/
+    );
   });
 
   it("reserved transition updates line to approved + sets pickupBy + notifies", async () => {
@@ -397,8 +402,12 @@ describe("listInventoryAs privacy", () => {
   it("keeps private notes off the detail page for a signed-in non-staff user", async () => {
     const admin = await makeUser(`pnd-a-${Date.now()}@x.com`, "admin");
     const student = await makeUser(`pnd-s-${Date.now()}@x.com`, "user");
+    // ZQXNOTES is alphabetic and appears nowhere else in this file's item
+    // names (Item-${Date.now()}-${Math.random()}, all digits and a dot), so
+    // unlike a numeric substring it cannot turn up in the serialized payload
+    // by chance.
     const item = await makeItem({
-      notes: "Locker B4, code 1180.",
+      notes: "Locker B4, code ZQXNOTES.",
       serial: "SN-777",
       location: "Kelley 2063",
     });
@@ -408,17 +417,17 @@ describe("listInventoryAs privacy", () => {
     expect("notes" in (studentView as object)).toBe(false);
     expect("serial" in (studentView as object)).toBe(false);
     expect("location" in (studentView as object)).toBe(false);
-    expect(JSON.stringify(studentView)).not.toContain("1180");
+    expect(JSON.stringify(studentView)).not.toContain("ZQXNOTES");
 
     const staffView = await getInventoryItemAs(admin, { id: item.id });
     expect((staffView as unknown as { notes: string }).notes).toBe(
-      "Locker B4, code 1180."
+      "Locker B4, code ZQXNOTES."
     );
   });
 
   it("keeps private notes out of a non-staff list row", async () => {
     const student = await makeUser(`pnl-s-${Date.now()}@x.com`, "user");
-    const item = await makeItem({ notes: "Locker B4, code 1180." });
+    const item = await makeItem({ notes: "Locker B4, code ZQXNOTES." });
 
     const result = await listInventoryAs(student, {
       q: "",
@@ -430,7 +439,7 @@ describe("listInventoryAs privacy", () => {
     const found = result.rows.find((r) => r.id === item.id);
     expect(found).toBeDefined();
     expect("notes" in (found as object)).toBe(false);
-    expect(JSON.stringify(found)).not.toContain("1180");
+    expect(JSON.stringify(found)).not.toContain("ZQXNOTES");
   });
 
   it("carries the joined holder identity through the staff detail payload", async () => {
@@ -502,7 +511,7 @@ describe("listInventoryAs privacy", () => {
 
   it("gives an anonymous viewer no history and no staff fields", async () => {
     const admin = await makeUser(`dtl-a-${Date.now()}@x.com`, "admin");
-    const item = await makeItem({ notes: "Locker B4, code 1180." });
+    const item = await makeItem({ notes: "Locker B4, code ZQXNOTES." });
     await transitionItem(admin, {
       itemId: item.id,
       nextStatus: "maintenance",
@@ -513,13 +522,13 @@ describe("listInventoryAs privacy", () => {
     expect(view?.viewerIsStaff).toBe(false);
     expect(view?.history).toEqual([]);
     expect("notes" in (view?.item as object)).toBe(false);
-    expect(JSON.stringify(view)).not.toContain("1180");
+    expect(JSON.stringify(view)).not.toContain("ZQXNOTES");
   });
 
   it("gives a signed-in non-staff user no history and no staff fields", async () => {
     const admin = await makeUser(`dtl-a2-${Date.now()}@x.com`, "admin");
     const student = await makeUser(`dtl-s2-${Date.now()}@x.com`, "user");
-    const item = await makeItem({ notes: "Locker B4, code 1180." });
+    const item = await makeItem({ notes: "Locker B4, code ZQXNOTES." });
     await transitionItem(admin, {
       itemId: item.id,
       nextStatus: "maintenance",
@@ -534,7 +543,7 @@ describe("listInventoryAs privacy", () => {
 
   it("gives staff the history and the staff fields", async () => {
     const admin = await makeUser(`dtl-a3-${Date.now()}@x.com`, "admin");
-    const item = await makeItem({ notes: "Locker B4, code 1180." });
+    const item = await makeItem({ notes: "Locker B4, code ZQXNOTES." });
     await transitionItem(admin, {
       itemId: item.id,
       nextStatus: "maintenance",
@@ -544,7 +553,7 @@ describe("listInventoryAs privacy", () => {
     expect(view?.viewerIsStaff).toBe(true);
     expect(view?.history.length).toBeGreaterThan(0);
     expect((view?.item as unknown as { notes: string }).notes).toBe(
-      "Locker B4, code 1180."
+      "Locker B4, code ZQXNOTES."
     );
   });
 
@@ -1246,6 +1255,60 @@ describe("request lifecycle", () => {
       })
     ).rejects.toThrow(/checkout/);
   });
+
+  it("clears the walk-in name and program when a cancel releases the item", async () => {
+    // Regression for the two release paths (reject, cancel) writing the
+    // available arm's holder columns by hand instead of going through
+    // transitionItem: they nulled the id/email/label trio but left the two
+    // walk-in columns behind, so a cancelled reservation could still show a
+    // stale name/program on an item the status badge reports as available.
+    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    await addToCartAs(student, { itemId: item.id });
+    await submitCartAs(student, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+
+    // Staff reserves the request to a walk-in address with no matching
+    // account, typing a name and program. The address must not resolve to
+    // any account created in this file, or resolveHolder would clear the
+    // name/program at write time and the test would prove nothing.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      requestItemId: line.id,
+      holderEmail: "cancel-stale-walkin@nowhere.test",
+      holderName: "Stale Walkin",
+      holderProgram: "CS 461",
+    });
+
+    const [reserved] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    // Confirm the columns actually got populated before the cancel, so a
+    // silent failure to store them can't masquerade as the fix working.
+    expect(reserved.currentHolderName).toBe("Stale Walkin");
+    expect(reserved.currentHolderProgram).toBe("CS 461");
+
+    // The line is now 'approved', which cancelRequestItemAs still permits as
+    // long as the item is not checked_out.
+    await cancelRequestItemAs(student, {
+      requestItemId: line.id,
+      note: "changed my mind",
+    });
+
+    const [released] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(released.status).toBe("available");
+    expect(released.currentHolderName).toBeNull();
+    expect(released.currentHolderProgram).toBeNull();
+  });
 });
 
 describe("bulk approve in a batch is atomic", () => {
@@ -1453,12 +1516,14 @@ describe("staff-assigned holds without a request line", () => {
     expect(staffView.item.currentHolderEmail).toBe(holderEmail);
     expect(staffView.item.pickupBy).toBeInstanceOf(Date);
     // With no account to point at, the address is the only thing that can
-    // identify the holder in the history log.
+    // identify the holder in the history log, and it lives in its own
+    // column rather than being smuggled into holderLabel.
     const [historyRow] = await db
       .select()
       .from(inventoryItemStatusHistory)
       .where(eq(inventoryItemStatusHistory.itemId, item.id));
-    expect(historyRow.holderLabel).toBe(holderEmail);
+    expect(historyRow.holderEmail).toBe(holderEmail);
+    expect(historyRow.holderLabel).toBeNull();
 
     const publicView = await getInventoryItemDetailAs(nosy, { id: item.id });
     expect(JSON.stringify(publicView)).not.toContain(holderEmail);
@@ -1521,6 +1586,50 @@ describe("staff-assigned holds without a request line", () => {
       status: null,
     });
     expect(rows.some((r) => r.id === item.id)).toBe(true);
+  });
+
+  it("finds a walk-in hold by the stored name the Holder column renders", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`wi-a7-${stamp}@x.com`, "admin");
+    const item = await makeItem();
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: `wi-name-${stamp}@nowhere.test`,
+      holderName: `Wilhelmina Walkin ${stamp}`,
+      holderProgram: `CS ${stamp}`,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    // The staff table puts currentHolderName first in the Holder column's
+    // fallback chain, so a name that cannot be searched is a name staff can
+    // read off the screen and then fail to find.
+    const byName = await listAdminInventoryAs(admin, {
+      categories: [],
+      q: `Wilhelmina Walkin ${stamp}`,
+      status: null,
+    });
+    expect(byName.rows.some((r) => r.id === item.id)).toBe(true);
+  });
+
+  it("finds a walk-in hold by the stored program", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`wi-a8-${stamp}@x.com`, "admin");
+    const item = await makeItem();
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: `wi-prog-${stamp}@nowhere.test`,
+      holderProgram: `CS ${stamp}`,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const byProgram = await listAdminInventoryAs(admin, {
+      categories: [],
+      q: `CS ${stamp}`,
+      status: null,
+    });
+    expect(byProgram.rows.some((r) => r.id === item.id)).toBe(true);
   });
 });
 
@@ -1823,6 +1932,83 @@ describe("disjointness invariant between the hold and request-line queries", () 
   });
 });
 
+describe("a teammate collects a requested item", () => {
+  it("shows the request to the requester and the hold to the picker", async () => {
+    const admin = await makeUser("cross-admin@x.com", "admin");
+    const requester = await makeUser("cross-requester@x.com", "user");
+    const picker = await makeUser("cross-picker@x.com", "user");
+    const item = await makeItem();
+
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+
+    // The teammate walks in. Staff replace the prefilled address.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: "cross-picker@x.com",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const requesterView = await listMyItemsAs(requester);
+    const requesterEntries = requesterView.active.filter(
+      (e) => e.item.id === item.id
+    );
+    expect(requesterEntries).toHaveLength(1);
+    expect(requesterEntries[0].kind).toBe("request");
+
+    const pickerView = await listMyItemsAs(picker);
+    const pickerEntries = pickerView.active.filter(
+      (e) => e.item.id === item.id
+    );
+    expect(pickerEntries).toHaveLength(1);
+    expect(pickerEntries[0].kind).toBe("hold");
+  });
+
+  it("leaves the request line approved so the requester keeps seeing it", async () => {
+    const admin = await makeUser("cross-admin-2@x.com", "admin");
+    const requester = await makeUser("cross-requester-2@x.com", "user");
+    const item = await makeItem();
+
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: "someone-else@nowhere.test",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const [after] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.id, line.id));
+    // listMyItemsAs only puts pending and approved lines in the Active tab,
+    // and syncRequestItem's checked_out arm sets dueAt without touching
+    // status. Asserted directly, because the requester's whole view of a
+    // teammate's pickup depends on that arm continuing to leave it alone.
+    expect(after.status).toBe("approved");
+  });
+});
+
 describe("overdue notifications for staff holds", () => {
   it("notifies the holder of an overdue hold with no request line", async () => {
     const stamp = Date.now();
@@ -1942,5 +2128,503 @@ describe("overdue notifications for staff holds", () => {
           r.type === "inventory_pickup_overdue"
       )
     ).toHaveLength(0);
+  });
+});
+
+describe("overdue notifications with two parties", () => {
+  async function checkedOutToSomeoneElse(prefix: string) {
+    const admin = await makeUser(`${prefix}-admin@x.com`, "admin");
+    const requester = await makeUser(`${prefix}-requester@x.com`, "user");
+    const picker = await makeUser(`${prefix}-picker@x.com`, "user");
+    const item = await makeItem();
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: `${prefix}-picker@x.com`,
+      dueAt: new Date(Date.now() - 86_400_000),
+    });
+    return { admin, item, picker, requester };
+  }
+
+  it("notifies the requester and the picker", async () => {
+    const { admin, item, picker, requester } =
+      await checkedOutToSomeoneElse("overdue-two");
+    await recordOverdueNotificationsAs(admin);
+
+    const notes = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.link, `/inventory/${item.id}`));
+    const overdue = notes.filter(
+      (n) => n.type === "inventory_checkout_overdue"
+    );
+    expect(overdue.map((n) => n.userId).sort()).toEqual(
+      [requester.id, picker.id].sort()
+    );
+  });
+
+  it("notifies a requester who collected their own item exactly once", async () => {
+    const admin = await makeUser("overdue-one-admin@x.com", "admin");
+    const student = await makeUser("overdue-one-student@x.com", "user");
+    const item = await makeItem();
+    await addToCartAs(student, { itemId: item.id });
+    await submitCartAs(student, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: "overdue-one-student@x.com",
+      dueAt: new Date(Date.now() - 86_400_000),
+    });
+
+    await recordOverdueNotificationsAs(admin);
+
+    const notes = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.link, `/inventory/${item.id}`));
+    expect(
+      notes.filter((n) => n.type === "inventory_checkout_overdue")
+    ).toHaveLength(1);
+  });
+});
+
+describe("holder resolution", () => {
+  it("stores the address when only an account id is given", async () => {
+    const admin = await makeUser("resolve-admin@x.com", "admin");
+    const holder = await makeUser("resolve-holder@x.com", "user");
+    const item = await makeItem();
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderId: holder.id,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const [row] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(row.currentHolderId).toBe(holder.id);
+    expect(row.currentHolderEmail).toBe("resolve-holder@x.com");
+    expect(row.currentHolderLabel).toBeNull();
+  });
+
+  it("resolves an address to an account and ignores a supplied name", async () => {
+    const admin = await makeUser("resolve-admin-2@x.com", "admin");
+    const holder = await makeUser("resolve-holder-2@x.com", "user");
+    const item = await makeItem();
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: "resolve-holder-2@x.com",
+      holderName: "Typed Name",
+      holderProgram: "CS 461",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const [row] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(row.currentHolderId).toBe(holder.id);
+    expect(row.currentHolderName).toBeNull();
+    expect(row.currentHolderProgram).toBeNull();
+  });
+
+  it("keeps name and program for an address with no account", async () => {
+    const admin = await makeUser("resolve-admin-3@x.com", "admin");
+    const item = await makeItem();
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: "walkin@nowhere.test",
+      holderName: "Walk In",
+      holderProgram: "CS 462",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const [row] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(row.currentHolderId).toBeNull();
+    expect(row.currentHolderEmail).toBe("walkin@nowhere.test");
+    expect(row.currentHolderName).toBe("Walk In");
+    expect(row.currentHolderProgram).toBe("CS 462");
+    expect(row.currentHolderLabel).toBeNull();
+  });
+
+  it("records the address on the history row instead of the label", async () => {
+    const admin = await makeUser("resolve-admin-4@x.com", "admin");
+    const item = await makeItem();
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: "history@nowhere.test",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const [h] = await db
+      .select()
+      .from(inventoryItemStatusHistory)
+      .where(eq(inventoryItemStatusHistory.itemId, item.id));
+    expect(h.holderEmail).toBe("history@nowhere.test");
+    expect(h.holderLabel).toBeNull();
+  });
+
+  it("rejects a hold with both an address and a label", async () => {
+    const admin = await makeUser("resolve-admin-5@x.com", "admin");
+    const item = await makeItem();
+    await expect(
+      transitionItem(admin, {
+        itemId: item.id,
+        nextStatus: "checked_out",
+        holderEmail: "both@nowhere.test",
+        holderLabel: "Lab 204",
+        dueAt: new Date(Date.now() + 86_400_000),
+      })
+    ).rejects.toThrow();
+  });
+
+  it("rejects a hold with neither", async () => {
+    const admin = await makeUser("resolve-admin-6@x.com", "admin");
+    const item = await makeItem();
+    await expect(
+      transitionItem(admin, {
+        itemId: item.id,
+        nextStatus: "checked_out",
+        dueAt: new Date(Date.now() + 86_400_000),
+      })
+    ).rejects.toThrow();
+  });
+
+  it("gives a self-submitted request hold an address", async () => {
+    const student = await makeUser("cart-address@x.com", "user");
+    const item = await makeItem();
+    await addToCartAs(student, { itemId: item.id });
+    await submitCartAs(student, { note: null });
+
+    const [row] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(row.currentHolderId).toBe(student.id);
+    expect(row.currentHolderEmail).toBe("cart-address@x.com");
+
+    const [h] = await db
+      .select()
+      .from(inventoryItemStatusHistory)
+      .where(eq(inventoryItemStatusHistory.itemId, item.id));
+    expect(h.holderEmail).toBe("cart-address@x.com");
+  });
+
+  it("still notifies the requester on approve", async () => {
+    const admin = await makeUser("approve-admin@x.com", "admin");
+    const student = await makeUser("approve-student@x.com", "user");
+    const item = await makeItem();
+    await addToCartAs(student, { itemId: item.id });
+    const { requestId } = await submitCartAs(student, { note: null });
+    expect(requestId).not.toBeNull();
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+
+    // submitCartAs now writes the requester's address, so clear it first.
+    // The point of the assertions below is that approveRequestItemAs passes
+    // only an account id, and resolveHolder derives the address from it. With
+    // the address left in place, they would pass on leftover state even if
+    // the derivation were broken.
+    await db
+      .update(inventoryItems)
+      .set({ currentHolderEmail: null })
+      .where(eq(inventoryItems.id, item.id));
+
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+
+    const notes = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, student.id));
+    expect(notes.some((n) => n.type === "inventory_request_approved")).toBe(
+      true
+    );
+
+    const [held] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    // The address was cleared above, so this can only pass if
+    // approveRequestItemAs's holderId re-derived it via resolveHolder.
+    expect(held.currentHolderId).toBe(student.id);
+    expect(held.currentHolderEmail).toBe("approve-student@x.com");
+    expect(held.currentHolderLabel).toBeNull();
+  });
+});
+
+describe("collected by", () => {
+  it("survives the return", async () => {
+    const admin = await makeUser("collected-admin@x.com", "admin");
+    const requester = await makeUser("collected-requester@x.com", "user");
+    const item = await makeItem();
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: "walkin-collector@nowhere.test",
+      holderName: "Walk In Collector",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+    // Returned: the item's holder columns are cleared, the line is closed.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "available",
+    });
+
+    const collected = await collectedByForRequestItems([line.id]);
+    expect(collected.get(line.id)?.email).toBe("walkin-collector@nowhere.test");
+    expect(collected.get(line.id)?.name).toBe("Walk In Collector");
+  });
+
+  it("prefers the account's name over the typed one", async () => {
+    const admin = await makeUser("collected-admin-2@x.com", "admin");
+    // Created so the address below resolves to an account; the returned
+    // handle is not needed, and an unused binding fails the linter.
+    await makeUser("collected-picker@x.com", "user");
+    const requester = await makeUser("collected-requester-2@x.com", "user");
+    const item = await makeItem();
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: "collected-picker@x.com",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const collected = await collectedByForRequestItems([line.id]);
+    expect(collected.get(line.id)?.email).toBe("collected-picker@x.com");
+    expect(collected.get(line.id)?.name).toBe("collected-picker@x.com");
+  });
+
+  it("returns an empty map for no ids without querying", async () => {
+    const collected = await collectedByForRequestItems([]);
+    expect(collected.size).toBe(0);
+  });
+
+  it("reports the most recent checkout when a line was collected twice", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`twice-admin-${stamp}@x.com`, "admin");
+    const requester = await makeUser(`twice-requester-${stamp}@x.com`, "user");
+    const item = await makeItem();
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+
+    // Collected, brought back to the counter, then collected again by
+    // someone else. Both checkouts hang off the same request line, which is
+    // the only state that can distinguish an ascending tiebreak from a
+    // descending one.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: `first-collector-${stamp}@nowhere.test`,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      requestItemId: line.id,
+      holderEmail: `first-collector-${stamp}@nowhere.test`,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: `second-collector-${stamp}@nowhere.test`,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    // DISTINCT ON picks arbitrarily among tied sort keys, so a test that
+    // relied on ordering without confirming the keys differ would pass or
+    // fail by luck. Each transitionItem is its own transaction and Postgres
+    // now() is transaction start time, so these must differ.
+    const checkouts = await db
+      .select({ createdAt: inventoryItemStatusHistory.createdAt })
+      .from(inventoryItemStatusHistory)
+      .where(
+        and(
+          eq(inventoryItemStatusHistory.requestItemId, line.id),
+          eq(inventoryItemStatusHistory.newStatus, "checked_out")
+        )
+      );
+    expect(checkouts).toHaveLength(2);
+    expect(checkouts[0].createdAt.getTime()).not.toBe(
+      checkouts[1].createdAt.getTime()
+    );
+
+    const collected = await collectedByForRequestItems([line.id]);
+    expect(collected.get(line.id)?.email).toBe(
+      `second-collector-${stamp}@nowhere.test`
+    );
+  });
+
+  it("prefers the account's current address over the one stored at checkout", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`rename-admin-${stamp}@x.com`, "admin");
+    const requester = await makeUser(`rename-requester-${stamp}@x.com`, "user");
+    const oldAddress = `rename-picker-${stamp}@x.com`;
+    const picker = await makeUser(oldAddress, "user");
+    const item = await makeItem();
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: oldAddress,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    // The history row keeps the address the hold was assigned to. The person
+    // then changes their account address. They are still the same collector,
+    // so the read must follow the account rather than the frozen string.
+    const newAddress = `renamed-${stamp}@x.com`;
+    await db
+      .update(user)
+      .set({ email: newAddress })
+      .where(eq(user.id, picker.id));
+
+    const collected = await collectedByForRequestItems([line.id]);
+    expect(collected.get(line.id)?.email).toBe(newAddress);
+  });
+});
+
+describe("listMyItemsAs collectedBy gate", () => {
+  it("hides the collector when the requester collected their own item", async () => {
+    const admin = await makeUser("gate-admin-1@x.com", "admin");
+    const requester = await makeUser("gate-requester-1@x.com", "user");
+    const item = await makeItem();
+
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    // The requester walks in and collects their own item; staff leave the
+    // prefilled address alone.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: "gate-requester-1@x.com",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const { active } = await listMyItemsAs(requester);
+    const entry = active.find((e) => e.item.id === item.id);
+    expect(entry?.kind).toBe("request");
+    if (entry?.kind === "request") {
+      expect(entry.collectedBy).toBeNull();
+    }
+  });
+
+  it("names a teammate who collected the item", async () => {
+    const admin = await makeUser("gate-admin-2@x.com", "admin");
+    const requester = await makeUser("gate-requester-2@x.com", "user");
+    await makeUser("gate-picker-2@x.com", "user");
+    const item = await makeItem();
+
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: "gate-picker-2@x.com",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const { active } = await listMyItemsAs(requester);
+    const entry = active.find((e) => e.item.id === item.id);
+    expect(entry?.kind).toBe("request");
+    if (entry?.kind === "request") {
+      expect(entry.collectedBy?.email).toBe("gate-picker-2@x.com");
+    }
   });
 });

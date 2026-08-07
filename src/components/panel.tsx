@@ -10,9 +10,12 @@ import { cn } from "#/lib/utils.ts";
  * of separating their sections. Routing every panel through these primitives
  * is what keeps a fifth from appearing.
  *
- * Tone carries the audience, and only the audience: `staff` is brand-tinted
- * and staff-only, `private` is neutral and shared with the proposer. A staff
- * viewer on a project page renders both, stacked, so they must not look alike.
+ * Tone separates two stacked regions rather than naming an audience: a staff
+ * viewer renders both on the project page and on the item page, so identical
+ * borders would read as one region. `staff` is brand-tinted, `private` is
+ * neutral. The audience itself is stated by each panel's own PanelNote, and
+ * it differs: a project's private panel is shared with the proposer, while an
+ * item has no proposer and its private panel is staff-only.
  */
 const TONE_CLASS = {
   private: "border border-border bg-(--surface-sunken)",

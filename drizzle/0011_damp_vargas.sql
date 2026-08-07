@@ -1,0 +1,1 @@
+CREATE INDEX "project_categories_category_idx" ON "project_categories" USING btree ("category_id");

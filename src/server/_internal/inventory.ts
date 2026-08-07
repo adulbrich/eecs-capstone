@@ -8,6 +8,7 @@ import {
   isNotNull,
   isNull,
   ne,
+  notExists,
   or,
   type SQL,
   sql,
@@ -66,6 +67,8 @@ export type InventoryItemStaff = InventoryItemPublic & {
   currentHolderEmail: string | null;
   currentHolderId: string | null;
   currentHolderLabel: string | null;
+  currentHolderName: string | null;
+  currentHolderProgram: string | null;
   currentRequestItemId: string | null;
   label: string | null;
   location: string | null;
@@ -73,6 +76,16 @@ export type InventoryItemStaff = InventoryItemPublic & {
   serial: string | null;
   updatedAt: Date;
 };
+
+/**
+ * Who a hold is on, after the item's own columns and the joined account have
+ * been reconciled. Passed into fullForStaff rather than derived inside it,
+ * because the reconciliation needs a join the item row alone cannot supply.
+ */
+export interface HolderIdentity {
+  email: string | null;
+  name: string | null;
+}
 
 function isStaff(viewer: Viewer): boolean {
   return viewer?.role === "admin" || viewer?.role === "instructor";
@@ -98,7 +111,8 @@ function stripForPublic(
 
 function fullForStaff(
   row: typeof inventoryItems.$inferSelect,
-  categories: ItemCategory[]
+  categories: ItemCategory[],
+  holder: HolderIdentity
 ): InventoryItemStaff {
   return {
     ...stripForPublic(row, categories),
@@ -107,9 +121,16 @@ function fullForStaff(
     label: row.label,
     location: row.location,
     notes: row.notes,
-    currentHolderEmail: row.currentHolderEmail,
+    // Both halves of the holder's identity arrive the same way. They used to
+    // differ: email came from the row here and was then overwritten by each
+    // caller, while name was bolted on by those callers alone. Two attributes
+    // of one person travelling by two mechanisms is what let the release
+    // paths fall out of sync when a third attribute was added.
+    currentHolderEmail: holder.email,
+    currentHolderName: holder.name,
     currentHolderId: row.currentHolderId,
     currentHolderLabel: row.currentHolderLabel,
+    currentHolderProgram: row.currentHolderProgram,
     currentRequestItemId: row.currentRequestItemId,
     updatedAt: row.updatedAt,
   };
@@ -125,6 +146,41 @@ function holderEmailOf(row: {
   item: { currentHolderEmail: string | null };
 }): string | null {
   return row.holderEmail ?? row.item.currentHolderEmail;
+}
+
+/**
+ * Mirrors holderEmailOf. The joined account's name wins, because someone who
+ * renamed their account is still the same holder; the stored name is
+ * authoritative only for a hold that matched no account.
+ */
+function holderNameOf(row: {
+  holderName: string | null;
+  item: { currentHolderName: string | null };
+}): string | null {
+  return row.holderName ?? row.item.currentHolderName;
+}
+
+/** The reconciled identity for a read path, which has the account joined. */
+function joinedHolderIdentity(row: {
+  holderEmail: string | null;
+  holderName: string | null;
+  item: { currentHolderEmail: string | null; currentHolderName: string | null };
+}): HolderIdentity {
+  return { email: holderEmailOf(row), name: holderNameOf(row) };
+}
+
+/**
+ * The identity a write path can see: the stored columns as they stand, with
+ * no account joined. Named rather than inlined so the difference from
+ * joinedHolderIdentity is visible at the call site. Create and update return
+ * their item only so the caller can read back an id, and neither renders the
+ * holder, so the unreconciled name costs nothing there.
+ */
+function storedHolderIdentity(row: {
+  currentHolderEmail: string | null;
+  currentHolderName: string | null;
+}): HolderIdentity {
+  return { email: row.currentHolderEmail, name: row.currentHolderName };
 }
 
 /**
@@ -211,11 +267,7 @@ export async function listInventoryAs(
 
   const mapped = rows.map((r) => {
     if (isStaff(viewer)) {
-      return {
-        ...fullForStaff(r.item, r.categories),
-        currentHolderName: r.holderName,
-        currentHolderEmail: holderEmailOf(r),
-      };
+      return fullForStaff(r.item, r.categories, joinedHolderIdentity(r));
     }
     return stripForPublic(r.item, r.categories);
   });
@@ -227,12 +279,6 @@ export async function listInventoryAs(
     pageSize: data.pageSize,
   };
 }
-
-/** A staff item plus the joined holder identity. */
-export type InventoryItemStaffDetail = InventoryItemStaff & {
-  currentHolderEmail: string | null;
-  currentHolderName: string | null;
-};
 
 interface InventoryItemJoinedRow {
   categories: ItemCategory[];
@@ -270,12 +316,8 @@ async function loadInventoryItemRowFor(
   return row;
 }
 
-function toStaffDetail(row: InventoryItemJoinedRow): InventoryItemStaffDetail {
-  return {
-    ...fullForStaff(row.item, row.categories),
-    currentHolderName: row.holderName,
-    currentHolderEmail: holderEmailOf(row),
-  };
+function toStaffDetail(row: InventoryItemJoinedRow): InventoryItemStaff {
+  return fullForStaff(row.item, row.categories, joinedHolderIdentity(row));
 }
 
 function toPublicDetail(row: InventoryItemJoinedRow): InventoryItemPublic {
@@ -327,9 +369,16 @@ export async function listAdminInventoryAs(
       ilike(user.name, like),
       ilike(user.email, like),
       // A hold assigned to a bare address or an ad-hoc label has no account
-      // row to match, so search the item's own holder columns too.
+      // row to match, so search the item's own holder columns too. The stored
+      // name earns its place here because the Holder column renders it: a
+      // staff member can otherwise read a name off the table and find nothing
+      // when they type it into the box above. Program is searchable so that
+      // "CS 461" answers "what is out to that course", which is the question
+      // the column exists to record.
       ilike(inventoryItems.currentHolderEmail, like),
-      ilike(inventoryItems.currentHolderLabel, like)
+      ilike(inventoryItems.currentHolderLabel, like),
+      ilike(inventoryItems.currentHolderName, like),
+      ilike(inventoryItems.currentHolderProgram, like)
     );
     if (match) {
       conditions.push(match);
@@ -349,11 +398,9 @@ export async function listAdminInventoryAs(
     .orderBy(desc(inventoryItems.updatedAt));
 
   return {
-    rows: rows.map((r) => ({
-      ...fullForStaff(r.item, r.categories),
-      currentHolderEmail: holderEmailOf(r),
-      currentHolderName: r.holderName,
-    })),
+    rows: rows.map((r) =>
+      fullForStaff(r.item, r.categories, joinedHolderIdentity(r))
+    ),
   };
 }
 
@@ -468,7 +515,11 @@ export async function createInventoryItemAs(
       { itemId: row.id, categoryIds: data.categoryIds },
       tx
     );
-    return fullForStaff(row, await categoriesFor(row.id, tx));
+    return fullForStaff(
+      row,
+      await categoriesFor(row.id, tx),
+      storedHolderIdentity(row)
+    );
   });
 }
 
@@ -545,7 +596,11 @@ export async function updateInventoryItemAs(
     }
 
     if (changed.length === 0) {
-      return fullForStaff(before, beforeCategories);
+      return fullForStaff(
+        before,
+        beforeCategories,
+        storedHolderIdentity(before)
+      );
     }
 
     await tx
@@ -585,7 +640,7 @@ export async function updateInventoryItemAs(
       .select()
       .from(inventoryItems)
       .where(eq(inventoryItems.id, data.id));
-    return fullForStaff(after, afterCategories);
+    return fullForStaff(after, afterCategories, storedHolderIdentity(after));
   });
 }
 
@@ -758,6 +813,28 @@ export async function submitCartAs(
       return { requestId: null, submitted: [], skipped };
     }
 
+    // The invariant applies to every person hold, including one a student
+    // created for themselves. Fetched once here rather than as a correlated
+    // subselect inside each item update below.
+    //
+    // This is the one holder write that never reaches validateInvariants: it
+    // runs as the student, and transitionItem asserts staff, so the requested
+    // transition is performed inline. Throwing rather than falling back to
+    // null is what makes "a person hold always carries an address" true by
+    // construction here rather than merely true in practice. No current route
+    // can reach the throw, because a live session implies the row it points
+    // at, but a silent null would leave a hold with neither an address nor a
+    // label, which is precisely the state the invariant forbids.
+    const [requester] = await tx
+      .select({ email: user.email })
+      .from(user)
+      .where(eq(user.id, viewer.id));
+    if (!requester) {
+      throw new Error(
+        "Cannot submit a request for an account that no longer exists"
+      );
+    }
+
     // Phase 2: only now insert the request envelope (so we never leave an
     // orphaned inventoryRequests row when every line races) and the lines.
     const [req] = await tx
@@ -789,8 +866,10 @@ export async function submitCartAs(
         .set({
           status: "requested",
           currentHolderId: viewer.id,
-          currentHolderEmail: null,
+          currentHolderEmail: requester.email,
           currentHolderLabel: null,
+          currentHolderName: null,
+          currentHolderProgram: null,
           currentPickupBy: null,
           currentDueAt: null,
           currentRequestItemId: line.id,
@@ -804,6 +883,7 @@ export async function submitCartAs(
         changedBy: viewer.id,
         requestItemId: line.id,
         holderId: viewer.id,
+        holderEmail: requester.email,
       });
     }
 
@@ -959,6 +1039,8 @@ export async function rejectRequestItemAs(
         currentHolderId: null,
         currentHolderEmail: null,
         currentHolderLabel: null,
+        currentHolderName: null,
+        currentHolderProgram: null,
         currentPickupBy: null,
         currentDueAt: null,
         currentRequestItemId: null,
@@ -1040,6 +1122,8 @@ export async function cancelRequestItemAs(
         currentHolderId: null,
         currentHolderEmail: null,
         currentHolderLabel: null,
+        currentHolderName: null,
+        currentHolderProgram: null,
         currentPickupBy: null,
         currentDueAt: null,
         currentRequestItemId: null,
@@ -1089,6 +1173,7 @@ export async function cancelRequestItemForCurrentUser(data: {
 export type ActiveEntry =
   | {
       kind: "request";
+      collectedBy: CollectedBy | null;
       line: typeof inventoryRequestItems.$inferSelect;
       item: typeof inventoryItems.$inferSelect;
       request: typeof inventoryRequests.$inferSelect;
@@ -1181,13 +1266,28 @@ export async function listMyItemsAs(viewer: Viewer) {
       .from(inventoryItems)
       .where(
         and(
-          // Disjoint from the request-line query above: an item held through
-          // a request line is already in `active` and must not appear twice.
-          // Safe by construction, not by a DB constraint: closeRequestItemOnRelease
-          // (inventory-transitions.ts) closes the attached line whenever
-          // current_request_item_id goes null, so a live pending/approved
-          // line and a null current_request_item_id never coexist.
-          isNull(inventoryItems.currentRequestItemId),
+          // The point of this condition was always "an item must not appear
+          // twice on one person's page", not "a held item has no request".
+          // Stated that way it also lets a teammate who collected someone
+          // else's requested item see the hold they are actually carrying.
+          notExists(
+            db
+              .select({ one: sql`1` })
+              .from(inventoryRequestItems)
+              .innerJoin(
+                inventoryRequests,
+                eq(inventoryRequestItems.requestId, inventoryRequests.id)
+              )
+              .where(
+                and(
+                  eq(
+                    inventoryRequestItems.id,
+                    inventoryItems.currentRequestItemId
+                  ),
+                  eq(inventoryRequests.userId, viewer.id)
+                )
+              )
+          ),
           inArray(inventoryItems.status, ["reserved", "checked_out"]),
           or(
             eq(inventoryItems.currentHolderId, viewer.id),
@@ -1230,12 +1330,113 @@ export async function listMyItemsAs(viewer: Viewer) {
       .limit(50),
   ]);
 
+  const collected = await collectedByForRequestItems([
+    ...activeLines.map((r) => r.line.id),
+    ...history.map((r) => r.line.id),
+  ]);
+
+  // Every row on this page belongs to the viewer as requester, so a collector
+  // who is the viewer is the ordinary case, not news: drop it. A collector
+  // identified only by an address that happens to be the viewer's own is the
+  // same case with no resolved account. A collector with neither a name nor
+  // an address to print (a label hold) has nothing worth showing either.
+  const collectedByForViewer = (lineId: string): CollectedBy | null => {
+    const collector = collected.get(lineId) ?? null;
+    if (!collector) {
+      return null;
+    }
+    const isViewer =
+      collector.id === viewer.id ||
+      (account?.email != null && collector.email === account.email);
+    if (isViewer) {
+      return null;
+    }
+    return collector.name || collector.email ? collector : null;
+  };
+
   const active: ActiveEntry[] = [
-    ...activeLines.map((row): ActiveEntry => ({ kind: "request", ...row })),
+    ...activeLines.map(
+      (row): ActiveEntry => ({
+        kind: "request",
+        collectedBy: collectedByForViewer(row.line.id),
+        ...row,
+      })
+    ),
     ...holds.map((row): ActiveEntry => ({ kind: "hold", item: row.item })),
   ].sort(byDeadline);
 
-  return { cart, active, history };
+  return {
+    cart,
+    active,
+    history: history.map((row) => ({
+      ...row,
+      collectedBy: collectedByForViewer(row.line.id),
+    })),
+  };
+}
+
+export interface CollectedBy {
+  email: string | null;
+  id: string | null;
+  name: string | null;
+}
+
+/**
+ * Who physically collected each request line, read off the checked_out row in
+ * the status history.
+ *
+ * History is the record rather than a pair of picked_up_by columns on
+ * inventory_request_items: transitionItem is already the single writer of
+ * that table, so there is nothing to keep in sync, and the fact survives the
+ * return, which clears the item's own holder columns.
+ *
+ * One DISTINCT ON for a whole page of lines, not one query per line. The
+ * ORDER BY must lead with the same column as the DISTINCT ON; the createdAt
+ * DESC that follows is what picks the most recent checkout when a line was
+ * checked out more than once.
+ */
+export async function collectedByForRequestItems(
+  lineIds: string[]
+): Promise<Map<string, CollectedBy>> {
+  if (lineIds.length === 0) {
+    return new Map();
+  }
+  const rows = await db
+    .selectDistinctOn([inventoryItemStatusHistory.requestItemId], {
+      requestItemId: inventoryItemStatusHistory.requestItemId,
+      holderId: inventoryItemStatusHistory.holderId,
+      holderEmail: inventoryItemStatusHistory.holderEmail,
+      holderName: inventoryItemStatusHistory.holderName,
+      accountEmail: user.email,
+      accountName: user.name,
+    })
+    .from(inventoryItemStatusHistory)
+    .leftJoin(user, eq(inventoryItemStatusHistory.holderId, user.id))
+    .where(
+      and(
+        eq(inventoryItemStatusHistory.newStatus, "checked_out"),
+        inArray(inventoryItemStatusHistory.requestItemId, lineIds)
+      )
+    )
+    .orderBy(
+      inventoryItemStatusHistory.requestItemId,
+      desc(inventoryItemStatusHistory.createdAt)
+    );
+
+  const map = new Map<string, CollectedBy>();
+  for (const r of rows) {
+    if (!r.requestItemId) {
+      continue;
+    }
+    // Same rule as holderEmailOf and holderNameOf: the account wins, the
+    // stored values cover a collector who had no account.
+    map.set(r.requestItemId, {
+      id: r.holderId,
+      email: r.accountEmail ?? r.holderEmail,
+      name: r.accountName ?? r.holderName,
+    });
+  }
+  return map;
 }
 
 export async function listInventoryRequestsAs(
@@ -1271,6 +1472,14 @@ export async function listInventoryRequestsAs(
     .where(statusFilter)
     .orderBy(desc(inventoryRequests.createdAt));
 
+  const collected = await collectedByForRequestItems(
+    rows.map((r) => r.line.id)
+  );
+  const enriched = rows.map((r) => ({
+    ...r,
+    collectedBy: collected.get(r.line.id) ?? null,
+  }));
+
   // Group by requestId so the admin queue can render one card per batch.
   const byRequest = new Map<
     string,
@@ -1279,10 +1488,10 @@ export async function listInventoryRequestsAs(
       requester: { id: string; email: string; name: string | null };
       createdAt: Date;
       note: string | null;
-      lines: typeof rows;
+      lines: typeof enriched;
     }
   >();
-  for (const r of rows) {
+  for (const r of enriched) {
     const id = r.request.id;
     const existing = byRequest.get(id);
     if (existing) {
@@ -1331,6 +1540,9 @@ export async function getItemHistoryAs(
       requestItemId: inventoryItemStatusHistory.requestItemId,
       holderId: inventoryItemStatusHistory.holderId,
       holderLabel: inventoryItemStatusHistory.holderLabel,
+      holderEmail: inventoryItemStatusHistory.holderEmail,
+      holderName: inventoryItemStatusHistory.holderName,
+      holderProgram: inventoryItemStatusHistory.holderProgram,
       createdAt: inventoryItemStatusHistory.createdAt,
       changedById: user.id,
       changedByName: user.name,
@@ -1355,7 +1567,7 @@ export async function getItemHistoryAs(
 export type InventoryItemDetail =
   | {
       history: Awaited<ReturnType<typeof getItemHistoryAs>>;
-      item: InventoryItemStaffDetail;
+      item: InventoryItemStaff;
       viewerIsStaff: true;
     }
   | { history: never[]; item: InventoryItemPublic; viewerIsStaff: false };
@@ -1545,14 +1757,16 @@ export async function recordOverdueNotificationsAs(
     )
     .where(and(...conditions));
 
-  // Staff holds have no request line, so the scan above cannot see them.
-  // Restricted to holds with a resolved account (currentHolderId IS NOT
-  // NULL): notifications.userId is a foreign key, and an email-matched hold
-  // has no id to attribute a message to. Resolving the address here would
-  // reintroduce, on a write path, the impersonation risk the read path in
-  // listMyItemsAs guards against.
+  // The hold scan and the request scan used to be disjoint, because a held
+  // item always had either a request line or a holder, never both meaningfully.
+  // Now that a teammate can collect someone else's requested item, the two
+  // deliberately overlap: the requester is accountable for the request and the
+  // picker is holding the thing, so both are told. Restricted to holds with a
+  // resolved account (current_holder_id IS NOT NULL): notifications.userId is
+  // a foreign key, and an email-matched hold has no id to attribute a message
+  // to. Resolving the address here would reintroduce, on a write path, the
+  // impersonation risk the read path in listMyItemsAs guards against.
   const holdConditions = [
-    isNull(inventoryItems.currentRequestItemId),
     isNotNull(inventoryItems.currentHolderId),
     inArray(inventoryItems.status, ["reserved", "checked_out"]),
   ];
@@ -1580,10 +1794,24 @@ export async function recordOverdueNotificationsAs(
   );
 
   const values: (typeof notifications.$inferInsert)[] = [];
+  const seen = new Set<string>();
+  const push = (row: typeof notifications.$inferInsert) => {
+    // Requester and picker are the same person on most checkouts, so the two
+    // scans return the same row twice. onConflictDoNothing would collapse
+    // those intra-batch duplicates anyway; deduping here keeps the statement
+    // smaller and makes the intent explicit rather than implicit in an index.
+    const key = `${row.userId}|${row.type}|${row.link}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    values.push(row);
+  };
+
   for (const r of candidates) {
     const { pickupOverdue, checkoutOverdue } = deriveDeadlineFlags(r);
     if (pickupOverdue) {
-      values.push({
+      push({
         userId: r.userId,
         type: "inventory_pickup_overdue",
         title: `Pickup window passed: ${r.itemName}`,
@@ -1592,7 +1820,7 @@ export async function recordOverdueNotificationsAs(
       });
     }
     if (checkoutOverdue) {
-      values.push({
+      push({
         userId: r.userId,
         type: "inventory_checkout_overdue",
         title: `Overdue: ${r.itemName}`,

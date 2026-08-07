@@ -191,6 +191,12 @@ function MyItems() {
                       Due <LocalTime dateOnly value={line.dueAt} />
                     </p>
                   )}
+                  {entry.collectedBy && (
+                    <p className="text-muted-foreground text-xs">
+                      Collected by{" "}
+                      {entry.collectedBy.name ?? entry.collectedBy.email}
+                    </p>
+                  )}
                 </div>
                 {canCancel && (
                   <Button
@@ -217,7 +223,7 @@ function MyItems() {
           {data.history.length === 0 && (
             <EmptyState>No history yet.</EmptyState>
           )}
-          {data.history.map(({ line, item }) => (
+          {data.history.map(({ line, item, collectedBy }) => (
             <div
               className="rounded-md border border-border bg-card p-3"
               key={line.id}
@@ -226,6 +232,11 @@ function MyItems() {
               <p className="text-muted-foreground text-xs">
                 Status: {line.status}
               </p>
+              {collectedBy && (
+                <p className="text-muted-foreground text-xs">
+                  Collected by {collectedBy.name ?? collectedBy.email}
+                </p>
+              )}
               {line.closedReason && (
                 <p className="mt-1 text-sm">{line.closedReason}</p>
               )}
