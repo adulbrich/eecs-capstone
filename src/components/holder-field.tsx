@@ -25,11 +25,21 @@ interface Account {
   name: string | null;
 }
 
+/**
+ * Whether the typed address belongs to an account. `unknown` is not a
+ * placeholder for `unmatched`: the lookup is debounced, so every address
+ * spends a moment in a state where the answer is genuinely not in yet.
+ * Treating that moment as "no account" is what made the dialog flash the
+ * Name and Program inputs open and shut whenever it opened on a request
+ * whose requester has an account.
+ */
+export type AccountStatus = "matched" | "unknown" | "unmatched";
+
 interface Props {
   email: string;
   label: string;
   name: string;
-  onAccountMatchChange: (matched: boolean) => void;
+  onAccountStatusChange: (status: AccountStatus) => void;
   onEmailChange: (value: string) => void;
   onLabelChange: (value: string) => void;
   onNameChange: (value: string) => void;
@@ -130,7 +140,7 @@ export function HolderField({
   email,
   label,
   name,
-  onAccountMatchChange,
+  onAccountStatusChange,
   onEmailChange,
   onLabelChange,
   onNameChange,
@@ -138,17 +148,28 @@ export function HolderField({
   program,
 }: Props) {
   const [account, setAccount] = useState<Account | null>(null);
+  const [status, setStatus] = useState<AccountStatus>("unknown");
   const trimmed = email.trim();
 
   useEffect(() => {
+    // Every address starts unknown, including one this effect is about to
+    // resolve in 250ms. Nothing downstream may assume "no account" until the
+    // lookup has actually said so.
+    setAccount(null);
+    setStatus("unknown");
+    onAccountStatusChange("unknown");
     if (!trimmed) {
-      setAccount(null);
-      onAccountMatchChange(false);
       return;
     }
     let cancelled = false;
     const handle = setTimeout(() => {
       void (async () => {
+        const settle = (match: Account | null) => {
+          setAccount(match);
+          const next: AccountStatus = match ? "matched" : "unmatched";
+          setStatus(next);
+          onAccountStatusChange(next);
+        };
         try {
           const rows = (await searchUsers({ data: { q: trimmed } })) as
             | Account[]
@@ -156,15 +177,15 @@ export function HolderField({
           if (cancelled) {
             return;
           }
-          const match = exactMatch(rows ?? [], trimmed);
-          setAccount(match);
-          onAccountMatchChange(Boolean(match));
+          settle(exactMatch(rows ?? [], trimmed));
         } catch {
           if (cancelled) {
             return;
           }
-          setAccount(null);
-          onAccountMatchChange(false);
+          // A failed lookup is not evidence of no account, but staff still
+          // need a way to record a walk-in, so treat it as unmatched and let
+          // the server have the final say when it resolves the address.
+          settle(null);
         }
       })();
     }, SEARCH_DEBOUNCE_MS);
@@ -172,7 +193,7 @@ export function HolderField({
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [trimmed, onAccountMatchChange]);
+  }, [trimmed, onAccountStatusChange]);
 
   return (
     <div className="space-y-3">
@@ -195,7 +216,10 @@ export function HolderField({
         )}
       </div>
 
-      {trimmed && !account && (
+      {/* Gated on the resolved answer, not on the absence of one. While the
+          lookup is still out these stay closed, so an address that turns out
+          to have an account never opens them at all. */}
+      {trimmed && status === "unmatched" && (
         <>
           <div>
             <Label htmlFor="holder-name">Name</Label>

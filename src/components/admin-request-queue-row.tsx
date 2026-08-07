@@ -118,8 +118,10 @@ export function AdminRequestQueueRow({
             >
               Pickup by (optional)
             </label>
+            {/* h-8 to match the sm buttons beside it. The row bottom-aligns,
+                so the default h-9 input left them a step short of each other. */}
             <Input
-              className="mt-1 w-40"
+              className="mt-1 h-8 w-40"
               id={`pickup-${line.id}`}
               onChange={(e) => setPickupBy(e.target.value)}
               type="date"

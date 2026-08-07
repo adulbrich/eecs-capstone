@@ -1,10 +1,10 @@
 import { useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   hardDeleteInventoryItem,
   transitionInventoryItem,
 } from "#/server/inventory";
-import { HolderField } from "./holder-field";
+import { type AccountStatus, HolderField } from "./holder-field";
 import { InventoryStatusBadge } from "./inventory-status-badge";
 import { LocalTime } from "./local-time";
 import { PanelSection } from "./panel";
@@ -98,13 +98,13 @@ function toDateInput(value: Date | string | null | undefined): string {
  * server's invariant would reject.
  */
 function holderFields({
-  accountMatched,
+  accountStatus,
   email,
   label,
   name,
   program,
 }: {
-  accountMatched: boolean;
+  accountStatus: AccountStatus;
   email: string;
   label: string;
   name: string;
@@ -118,9 +118,13 @@ function holderFields({
   const trimmedEmail = email.trim();
   // Name and program are only meaningful for an address with no account, so
   // both conditions gate them: a blank address (label mode) never sends
-  // leftover text typed while the address field held something else, and a
-  // matched address defers to the account's own name.
-  const carriesNameAndProgram = Boolean(trimmedEmail) && !accountMatched;
+  // leftover text typed while the address field held something else, and an
+  // address that has an account defers to the account's own name. Requiring
+  // "unmatched" rather than "not matched" also covers the moment before the
+  // lookup answers, when the inputs are not on screen and anything still in
+  // them would belong to a previous address.
+  const carriesNameAndProgram =
+    Boolean(trimmedEmail) && accountStatus === "unmatched";
   return {
     holderEmail: trimmedEmail || null,
     holderLabel: trimmedEmail ? null : label.trim() || null,
@@ -262,12 +266,18 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
   const [assignName, setAssignName] = useState("");
   const [assignProgram, setAssignProgram] = useState("");
   const [assignLabel, setAssignLabel] = useState("");
-  // Whether the typed/picked address matches an existing account, reported by
-  // HolderField from its own debounced lookup. The payload needs this too: an
-  // account's name is authoritative, so a matched address must never carry
+  // Whether the typed or picked address matches an existing account, reported
+  // by HolderField from its own debounced lookup. The payload needs this too:
+  // an account's name is authoritative, so a matched address must never carry
   // the name/program fields, and that decision should not depend on the
   // server independently re-deriving and discarding them.
-  const [accountMatched, setAccountMatched] = useState(false);
+  const [accountStatus, setAccountStatus] = useState<AccountStatus>("unknown");
+  // The address the name and program on screen were entered for. Name and
+  // program describe one particular person, so they cannot outlive the
+  // address they belong to: staff who open a request prefilled with the
+  // requester and then type a teammate's address must not be left holding
+  // the requester's details under the teammate's name.
+  const holderDetailsAddress = useRef("");
   const [dueDate, setDueDate] = useState("");
   const [pickupDate, setPickupDate] = useState("");
   const [dlgComment, setDlgComment] = useState("");
@@ -325,9 +335,12 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
     setAssignName(item.currentHolderName ?? "");
     setAssignProgram(item.currentHolderProgram ?? "");
     setAssignLabel(item.currentHolderLabel ?? "");
+    // The prefilled name and program describe the prefilled address, so that
+    // is the address they are recorded against.
+    holderDetailsAddress.current = (item.currentHolderEmail ?? "").trim();
     // HolderField's own lookup recomputes this from the prefilled address; it
     // just should not carry the previous dialog's result into a new one.
-    setAccountMatched(false);
+    setAccountStatus("unknown");
     setDueDate(toDateInput(item.dueAt));
     setPickupDate(toDateInput(item.pickupBy));
     setDlgComment("");
@@ -335,11 +348,28 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
     setDlgOpen(true);
   }
 
+  /**
+   * Name and program belong to one address. Changing the address, whether by
+   * typing or by picking from the account search, therefore drops them: the
+   * common case is a request prefilled with its requester, where leaving the
+   * details in place would file the requester's name against the teammate
+   * who actually walked in.
+   */
+  function onHolderEmailChange(next: string) {
+    const trimmed = next.trim();
+    if (trimmed !== holderDetailsAddress.current) {
+      holderDetailsAddress.current = trimmed;
+      setAssignName("");
+      setAssignProgram("");
+    }
+    setAssignEmail(next);
+  }
+
   async function onConfirmDialog() {
     const needsHolder =
       dlgTargetStatus === "reserved" || dlgTargetStatus === "checked_out";
     const holder = holderFields({
-      accountMatched,
+      accountStatus,
       email: assignEmail,
       label: assignLabel,
       name: assignName,
@@ -512,8 +542,8 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
               email={assignEmail}
               label={assignLabel}
               name={assignName}
-              onAccountMatchChange={setAccountMatched}
-              onEmailChange={setAssignEmail}
+              onAccountStatusChange={setAccountStatus}
+              onEmailChange={onHolderEmailChange}
               onLabelChange={setAssignLabel}
               onNameChange={setAssignName}
               onProgramChange={setAssignProgram}
