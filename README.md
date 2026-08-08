@@ -148,6 +148,10 @@ A few conventions worth knowing before you contribute:
 - The project workflow state machine (`src/lib/project-workflow.ts`) and
   visibility rules (`src/lib/project-visibility.ts`) are pure modules. Keep
   business logic there, not in routes.
+- A project's proposer is `proposer_id` when an account exists and
+  `proposer_email` otherwise. Staff cannot retype a linked address directly;
+  the edit form routes that through a re-assign modal (see
+  [`docs/QUIRKS.md`](./docs/QUIRKS.md)).
 - Every project/comment/inventory mutation is one server function in
   `src/server/`, each enforcing its own gate and wrapping writes in a
   transaction. The companion `*As(viewer, ...)` helpers next to each

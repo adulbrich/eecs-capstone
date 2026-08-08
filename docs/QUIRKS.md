@@ -566,6 +566,32 @@ Every status change to an inventory item must go through `src/server/_internal/i
 
 ### Proposer linking is by email; `proposer_id` is canonical
 
-A project's proposer is either linked to an account (`proposer_id`, a nullable FK) or pending (`proposer_email` set with no account yet). Email is the link key; `proposer_id` is the source of truth once an account exists. Staff set it through the proposer email field on the project form; the server resolves the email to an account id on every write via `resolveProposerId` (`src/server/_internal/projects.ts`), and a non-staff request carrying `proposer_email` is ignored, not honored. `proposer_id` is never accepted from the client.
+A project's proposer is either linked to an account (`proposer_id`, a nullable FK) or pending (`proposer_email` set with no account yet). Email is the link key; `proposer_id` is the source of truth once an account exists. Staff set it through the proposer field on the project form (`ProposerPicker`, see below); the server resolves the email to an account id on every write via `resolveProposerId` (`src/server/_internal/projects.ts`), and a non-staff request carrying `proposer_email` is ignored, not honored. `proposer_id` is never accepted from the client.
 
-Two emails, do not conflate them: `proposer_email` is the private link key (stripped from public reads, see above); `contact_email` is a separate, manually entered, publicly visible field. The edit form prefills `proposer_email` from the linked account's CURRENT email (`getProposerEmailForEdit`) so an untouched staff save re-resolves to the same proposer; a blank email on create defaults the proposer to the creator, while clearing it on edit is an explicit unlink. OSU ONID auto-link (a sign-in `databaseHook` that back-links by `proposer_email`) is future work; see `docs/superpowers/specs/2026-06-07-proposer-account-linking-design.md`.
+Two emails, do not conflate them: `proposer_email` is the private link key (stripped from public reads, see above); `contact_email` is a separate, manually entered, publicly visible field. The edit form prefills `proposer_email` from the linked account's CURRENT email (`getProposerForEditAs` / `getProposerForEditImpl` in `src/server/_internal/projects-queries.ts`, returning a `ProposerForEdit`) so an untouched staff save re-resolves to the same proposer; a blank email on create defaults the proposer to the creator, while clearing it on edit is an explicit unlink. Once an account is linked, the field is read-only: `ProposerPicker` (`src/components/proposer-picker.tsx`) locks the input and routes any change through a "Re-assign" modal instead of letting staff retype the address; picking a new account, or explicitly unlinking, in that modal unlocks the field for the rest of the session (the lock is keyed off a mount-time snapshot of the saved value, not the live one). The design spec's Phase B listed a "live back-fill hook" as future work alongside the OSU ONID provider itself; the hook is built now, see "Projects are claimed only by a verified address" below, and it applies to any provider whose create hook reports `emailVerified`. Only the ONID provider configuration is still future work; see `docs/superpowers/specs/2026-06-07-proposer-account-linking-design.md`.
+
+### Projects are claimed only by a verified address
+
+`projects.proposer_id` is set at write time by `resolveProposerId`, which only
+matches accounts that already exist. A project proposed for someone who has not
+signed up yet stays unlinked, and an unlinked proposer gets no "My projects"
+entry, no status notifications, and no review emails.
+
+`claimProjectsForVerifiedUser` closes that gap from two hooks in
+`src/lib/auth.ts`: `afterEmailVerification` for the password path, and
+`databaseHooks.user.create.after` for OAuth, guarded on `emailVerified`.
+
+The guard is the point. Claiming on account creation alone would let anyone take
+a colleague's projects by registering at their address. Anything that adds a
+third claim path must be able to name the proof of ownership it relies on.
+
+The guard bounds the ordinary paths, not every path. Better Auth's admin plugin
+takes an open `data` record on create-user, so an admin can set `emailVerified`
+for an address nobody has proven and the create hook will claim for it. That is
+tolerated only because an admin is already trusted with far more; it is not a
+license to add a third caller on the same reasoning.
+
+Note that one address with both a password account and GitHub ends up as a
+single user row with two `account` rows: Better Auth links them implicitly, and
+only when the local row is already verified. So no third hook is needed, and the
+`proposer_id is null` guard makes the claim idempotent anyway.
