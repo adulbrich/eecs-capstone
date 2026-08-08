@@ -232,8 +232,8 @@ version, this file could return to CLI generation; until then, edit it directly.
 `EMAIL_TRANSPORT` selects the sender behind the `EmailSender` interface in
 `src/lib/email/sender.ts`:
 
-- `console` (the default, and what local development uses): email verification
-  and password-reset URLs are written to the server's stderr.
+- `console` (the default, and what local development uses): every email below is
+  written to the server's stderr instead of being sent, review notices included.
 - `ses`: real outbound mail through AWS SES v2 (`src/lib/email/ses-sender.ts`),
   which additionally requires `EMAIL_FROM` to be a verified sender identity.
   `EMAIL_REPLY_TO` is optional: set it and every message carries that

@@ -182,7 +182,7 @@ If you change Better Auth plugins or `additionalFields` and re-run `npx @better-
 
 ### Console email transport in dev
 
-`EMAIL_TRANSPORT=console` (set in `.env.local`) routes verification and password-reset emails to stderr. Watch the dev server console for the link blocks. The SES transport behind the same `EmailSender` interface (`src/lib/email/ses-sender.ts`) is what production selects in `infra/ecs.tf`, though it reaches the running container only after a `terraform apply` and a deploy.
+`EMAIL_TRANSPORT=console` (set in `.env.local`) routes every email the app sends to stderr, not just the auth ones: review notices go through the same `getEmailSender()`. Watch the dev server console for the link blocks. The SES transport behind the same `EmailSender` interface (`src/lib/email/ses-sender.ts`) is what production selects in `infra/ecs.tf`, though it reaches the running container only after a `terraform apply` and a deploy.
 
 Note that `EMAIL_TRANSPORT=ses` requires `EMAIL_FROM`, and the failure is louder than it looks: `getEmailSender()` is called at module scope in `src/lib/auth.ts`, so `createSesEmailSender`'s throw happens during import and takes down the whole app rather than just email. The two are always set together by Terraform. See DEPLOYMENT.md §9.5.
 

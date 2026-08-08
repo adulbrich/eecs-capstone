@@ -59,6 +59,12 @@ async function sendSubmitted(
 ): Promise<void> {
   const inbox = process.env.EMAIL_REVIEW_INBOX?.trim();
   if (!inbox) {
+    // Say so rather than returning silently. An unset review inbox means staff
+    // are never told a project was submitted, and nothing else in the app
+    // surfaces that: the transition succeeds and the queue fills up unwatched.
+    console.warn(
+      `EMAIL_REVIEW_INBOX is unset, so no submission notice was sent for project ${project.id}`
+    );
     return;
   }
   const account = await lookupProposer(project.proposerId);
