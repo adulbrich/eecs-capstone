@@ -6,10 +6,17 @@ import { projects } from "#/db/schema";
  * Links every unclaimed project whose proposer email matches `email` to
  * `userId`, and returns how many were claimed.
  *
- * Only ever called for an address whose owner has proven control of it.
- * Claiming on sign-up alone would let anyone take a colleague's projects by
- * registering at their address, so both call sites in `src/lib/auth.ts` gate on
- * verification.
+ * The two call sites in `src/lib/auth.ts` both gate on a verified address,
+ * which is the point: claiming on sign-up alone would let anyone take a
+ * colleague's projects by registering at their address.
+ *
+ * That gate is not a universal invariant, though, and this function must not be
+ * written as if it were. Better Auth's admin plugin accepts an open `data`
+ * record on create-user, so an admin can set `emailVerified: true` for an
+ * address nobody has proven, and the create hook will claim for it. That is
+ * acceptable only because an admin is already trusted with far more; it is not
+ * acceptable to add a third caller on the same reasoning. Any new call site
+ * must be able to name the proof of ownership it relies on.
  *
  * Idempotent: the `proposer_id is null` guard means a repeat call claims
  * nothing. Soft-deleted projects are claimed too, so restoring one does not
