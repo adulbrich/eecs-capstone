@@ -165,7 +165,11 @@ describe("StaffProjectPanel review-email control", () => {
     });
   });
 
-  it("sends sendEmail: false when there is no address on file, even though the box is still visually checked-by-default", async () => {
+  it("still sends sendEmail: true with no address on file, leaving the server to decide who is reachable", async () => {
+    // The flag means "staff did not opt out", not "there is someone to mail".
+    // Gating it on the proposer's address here used to mute the review-inbox
+    // notice on a Submitted transition, which does not involve the proposer at
+    // all. The server declines to mail a proposer it cannot resolve.
     getProposerForEdit.mockResolvedValue({
       accountLinked: false,
       accountName: null,
@@ -187,7 +191,37 @@ describe("StaffProjectPanel review-email control", () => {
         id: PROJECT_ID,
         status: "approved",
         comment: "",
-        sendEmail: false,
+        sendEmail: true,
+      },
+    });
+  });
+
+  it("sends sendEmail: true on a Submitted transition, which emails the review inbox", async () => {
+    // No checkbox renders for this transition, so nothing in the UI could ever
+    // set the flag false. Every other assertion in this suite checks for
+    // false, which is how a panel that always muted mail passed the whole
+    // suite once already.
+    getProposerForEdit.mockResolvedValue({
+      accountLinked: false,
+      accountName: null,
+      email: "",
+    });
+    renderPanel("draft");
+    fireEvent.click(screen.getByTitle("Move to Submitted"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy()
+    );
+    expect(screen.queryByRole("checkbox")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => expect(performTransition).toHaveBeenCalledTimes(1));
+    expect(performTransition).toHaveBeenCalledWith({
+      data: {
+        id: PROJECT_ID,
+        status: "submitted",
+        comment: "",
+        sendEmail: true,
       },
     });
   });

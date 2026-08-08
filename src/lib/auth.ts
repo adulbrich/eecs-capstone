@@ -12,11 +12,6 @@ const emailSender = getEmailSender();
 const isProduction = process.env.NODE_ENV === "production";
 
 /**
- * Claims a newly verified user's projects. Swallows failure on purpose: a
- * claim must never block a sign-in or a verification, and the operation is
- * idempotent, so the next verification or sign-in retries it for free.
- */
-/**
  * Claims a newly verified user's projects, swallowing any failure.
  *
  * The swallow is load-bearing rather than defensive habit. Better Auth runs

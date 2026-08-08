@@ -131,7 +131,13 @@ export function StaffProjectPanel({
         id: project.id,
         status: pending.target,
         comment,
-        sendEmail: sendEmail && proposerAddress !== null,
+        // Send the staff decision as-is. Do NOT also gate on whether the
+        // proposer has an address: this flag mutes every email the transition
+        // would send, including the review-inbox notice on `submitted`, which
+        // has nothing to do with the proposer. Gating here silently dropped
+        // that notice for address-less projects and during the address fetch.
+        // The server already declines to mail a proposer it cannot resolve.
+        sendEmail,
       };
       if (pending.force) {
         await forceSetProjectStatus({ data });
