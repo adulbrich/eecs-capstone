@@ -39,7 +39,12 @@ describe("ProposerPicker", () => {
   it("renders the email value and lets you type a new one", () => {
     const onChange = vi.fn();
     const { getByLabelText } = render(
-      <ProposerPicker onChange={onChange} value="known@example.edu" />
+      <ProposerPicker
+        accountLinked={false}
+        accountName={null}
+        onChange={onChange}
+        value="known@example.edu"
+      />
     );
     const input = getByLabelText("Proposer email") as HTMLInputElement;
     expect(input.value).toBe("known@example.edu");
@@ -53,7 +58,12 @@ describe("ProposerPicker", () => {
     ] as never);
     const onChange = vi.fn();
     const { getByText, getByPlaceholderText, findByText } = render(
-      <ProposerPicker onChange={onChange} value="" />
+      <ProposerPicker
+        accountLinked={false}
+        accountName={null}
+        onChange={onChange}
+        value=""
+      />
     );
     fireEvent.click(getByText("Find account"));
     fireEvent.change(getByPlaceholderText("Search accounts..."), {
@@ -71,7 +81,12 @@ describe("ProposerPicker", () => {
     ] as never);
     const onChange = vi.fn();
     const { getByText, getByPlaceholderText, findByText } = render(
-      <ProposerPicker onChange={onChange} value="" />
+      <ProposerPicker
+        accountLinked={false}
+        accountName={null}
+        onChange={onChange}
+        value=""
+      />
     );
     fireEvent.click(getByText("Find account"));
     const search = getByPlaceholderText("Search accounts...");
@@ -82,5 +97,92 @@ describe("ProposerPicker", () => {
     await waitFor(() =>
       expect(onChange).toHaveBeenCalledWith("pat@example.edu")
     );
+  });
+});
+
+describe("ProposerPicker when an account is linked", () => {
+  it("locks the field and offers Re-assign instead of Find account", () => {
+    const { getByLabelText, getByText, queryByText } = render(
+      <ProposerPicker
+        accountLinked
+        accountName="Alex Kim"
+        onChange={vi.fn()}
+        value="alex@oregonstate.edu"
+      />
+    );
+
+    const input = getByLabelText("Proposer email") as HTMLInputElement;
+    expect(input.readOnly).toBe(true);
+    expect(getByText("Re-assign")).toBeTruthy();
+    expect(queryByText("Find account")).toBeNull();
+  });
+
+  it("names the linked account so staff know who they would displace", () => {
+    const { getByText } = render(
+      <ProposerPicker
+        accountLinked
+        accountName="Alex Kim"
+        onChange={vi.fn()}
+        value="alex@oregonstate.edu"
+      />
+    );
+
+    expect(getByText(/Alex Kim/)).toBeTruthy();
+  });
+
+  it("re-assigns to a selected account", async () => {
+    mockedSearch.mockResolvedValue([
+      { email: "jo@oregonstate.edu", id: "u2", name: "Jo Diaz" },
+    ] as never);
+    const onChange = vi.fn();
+    const { getByText, getByPlaceholderText } = render(
+      <ProposerPicker
+        accountLinked
+        accountName="Alex Kim"
+        onChange={onChange}
+        value="alex@oregonstate.edu"
+      />
+    );
+
+    fireEvent.click(getByText("Re-assign"));
+    fireEvent.change(getByPlaceholderText("Search accounts..."), {
+      target: { value: "jo" },
+    });
+    await waitFor(() => getByText("Jo Diaz"));
+    fireEvent.click(getByText("Jo Diaz"));
+
+    expect(onChange).toHaveBeenCalledWith("jo@oregonstate.edu");
+  });
+
+  it("unlinks to an external proposer", () => {
+    const onChange = vi.fn();
+    const { getByText } = render(
+      <ProposerPicker
+        accountLinked
+        accountName="Alex Kim"
+        onChange={onChange}
+        value="alex@oregonstate.edu"
+      />
+    );
+
+    fireEvent.click(getByText("Re-assign"));
+    fireEvent.click(getByText("Remove the link and set an external proposer"));
+
+    expect(onChange).toHaveBeenCalledWith("");
+  });
+
+  it("leaves the field editable when no account is linked", () => {
+    const { getByLabelText, getByText } = render(
+      <ProposerPicker
+        accountLinked={false}
+        accountName={null}
+        onChange={vi.fn()}
+        value="outsider@example.com"
+      />
+    );
+
+    const input = getByLabelText("Proposer email") as HTMLInputElement;
+    expect(input.readOnly).toBe(false);
+    expect(getByText("Find account")).toBeTruthy();
   });
 });
