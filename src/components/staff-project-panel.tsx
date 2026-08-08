@@ -9,10 +9,14 @@ import {
   restoreProject,
   softDeleteProject,
 } from "#/server/projects";
-import { listProjectEditLog } from "#/server/projects-queries";
+import {
+  getProposerEmailForEdit,
+  listProjectEditLog,
+} from "#/server/projects-queries";
 import { LocalTime } from "./local-time";
 import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { Button } from "./ui/button";
+import { Checkbox } from "./ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -72,6 +76,8 @@ export function StaffProjectPanel({
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [editLog, setEditLog] = useState<EditLogRow[]>([]);
+  const [sendEmail, setSendEmail] = useState(true);
+  const [proposerAddress, setProposerAddress] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -86,11 +92,26 @@ export function StaffProjectPanel({
     })();
   }, [project.id]);
 
+  useEffect(() => {
+    void (async () => {
+      try {
+        const email = await getProposerEmailForEdit({
+          data: { projectId: project.id },
+        });
+        setProposerAddress(email || null);
+      } catch {
+        // Staff-only endpoint; on failure the dialog degrades to "no address
+        // on file" and sends nothing, which is the safe direction.
+      }
+    })();
+  }, [project.id]);
+
   const currentStatus = project.status as Status;
 
   function openTransition(target: Status, force: boolean) {
     setError(null);
     setComment("");
+    setSendEmail(true);
     setPending({ target, force });
   }
 
@@ -106,7 +127,12 @@ export function StaffProjectPanel({
     setError(null);
     setBusy(true);
     try {
-      const data = { id: project.id, status: pending.target, comment };
+      const data = {
+        id: project.id,
+        status: pending.target,
+        comment,
+        sendEmail: sendEmail && proposerAddress !== null,
+      };
       if (pending.force) {
         await forceSetProjectStatus({ data });
       } else {
@@ -143,6 +169,11 @@ export function StaffProjectPanel({
   }
 
   const isChangesRequested = pending?.target === "changes_requested";
+
+  // Only these two transitions email anyone. Publishing is deliberately silent,
+  // which is what the approval email promises.
+  const emailsProposer =
+    pending?.target === "approved" || pending?.target === "changes_requested";
 
   return (
     <Panel tone="staff">
@@ -287,6 +318,25 @@ export function StaffProjectPanel({
               The project proposer can see this comment.
             </p>
           </div>
+          {emailsProposer && (
+            <div className="space-y-1">
+              <Label className="font-normal">
+                <Checkbox
+                  checked={sendEmail && proposerAddress !== null}
+                  disabled={proposerAddress === null}
+                  onCheckedChange={(checked) => setSendEmail(checked === true)}
+                />
+                {proposerAddress
+                  ? `Email the proposer (${proposerAddress})`
+                  : "No address on file, no email will be sent"}
+              </Label>
+              {proposerAddress && (
+                <p className="text-muted-foreground text-xs">
+                  Uncheck to change the status silently.
+                </p>
+              )}
+            </div>
+          )}
           {error && <p className="text-destructive text-sm">{error}</p>}
           <DialogFooter>
             <Button
