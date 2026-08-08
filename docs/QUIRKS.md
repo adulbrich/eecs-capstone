@@ -186,7 +186,7 @@ If you change Better Auth plugins or `additionalFields` and re-run `npx @better-
 
 Note that `EMAIL_TRANSPORT=ses` requires `EMAIL_FROM`, and the failure is louder than it looks: `getEmailSender()` is called at module scope in `src/lib/auth.ts`, so `createSesEmailSender`'s throw happens during import and takes down the whole app rather than just email. The two are always set together by Terraform. See DEPLOYMENT.md §9.5.
 
-All four emails render through `src/lib/email/templates.ts`, which owns the HTML escaping. Interpolating a project title or staff comment into `html` without `escapeHtml` is an injection into the staff review inbox, so the templates are the only place that builds email markup.
+Every email renders through `src/lib/email/templates.ts`, which owns the HTML escaping. There are five render functions; the README's table shows four rows because it merges the approved and changes-requested outcomes. Interpolating a project title or staff comment into `html` without `escapeHtml` is an injection into the staff review inbox, so the templates are the only place that builds email markup.
 
 ### `trustHost` is enabled in non-development
 
