@@ -72,11 +72,34 @@ describe("notifyTransitionByEmail", () => {
   it("skips the submission email when the review inbox is unset", async () => {
     process.env.BETTER_AUTH_URL = "https://app";
     process.env.EMAIL_REVIEW_INBOX = "";
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const send = vi.fn().mockResolvedValue(undefined);
 
     await notifyTransitionByEmail(PROJECT, "submitted", null, true, send);
 
     expect(send).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("warns when the review inbox is unset rather than failing silently", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    process.env.EMAIL_REVIEW_INBOX = "";
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await notifyTransitionByEmail(
+      PROJECT,
+      "submitted",
+      null,
+      true,
+      vi.fn().mockResolvedValue(undefined)
+    );
+
+    // Not cosmetic. With no inbox configured, staff are never told a project
+    // was submitted, the transition still succeeds, and nothing else in the app
+    // surfaces the gap. The warning is the only signal that exists.
+    expect(warn).toHaveBeenCalledOnce();
+    expect(String(warn.mock.calls[0]?.[0])).toContain("EMAIL_REVIEW_INBOX");
+    warn.mockRestore();
   });
 
   it("skips everything when the app base url is unset", async () => {
@@ -96,6 +119,19 @@ describe("notifyTransitionByEmail", () => {
     expect(resolveProposerAddress("stale@old.edu", "current@x.edu")).toBe(
       "current@x.edu"
     );
+    expect(resolveProposerAddress("stored@x.edu", null)).toBe("stored@x.edu");
+    expect(resolveProposerAddress(null, null)).toBeNull();
+  });
+
+  it("pins what an empty account address does", async () => {
+    // resolveProposerAddress uses ?? while getProposerEmailForEditImpl uses a
+    // truthiness check, so an account email of "" resolves differently in the
+    // two. user.email is not-null and unique, so this is unreachable in
+    // practice; the test exists so that if it ever becomes reachable, the
+    // divergence shows up here rather than as mail to the wrong person. The
+    // safe direction holds: "" means no address, so nothing is sent.
+    const { resolveProposerAddress } = await import("../project-emails");
+    expect(resolveProposerAddress("stored@x.edu", "")).toBe("");
     expect(resolveProposerAddress("stored@x.edu", null)).toBe("stored@x.edu");
     expect(resolveProposerAddress(null, null)).toBeNull();
   });

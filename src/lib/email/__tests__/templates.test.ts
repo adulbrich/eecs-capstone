@@ -85,6 +85,21 @@ describe("projectSubmittedEmail", () => {
     expect(email.text).toContain("<img src=x onerror=alert(1)>");
   });
 
+  it("leaves a description at exactly the limit untouched", () => {
+    // 600 is the boundary and the check is `<=`, so exactly-600 must not gain
+    // an ellipsis or the trailing sentence. Off-by-one here would truncate a
+    // description that fits.
+    const email = projectSubmittedEmail({
+      description: "z".repeat(600),
+      proposerEmail: null,
+      proposerName: null,
+      title: "T",
+      url: "https://app/projects/p1",
+    });
+    expect(email.text).toContain("z".repeat(600));
+    expect(email.text).not.toContain("Open the project to read the full proposal.");
+  });
+
   it("truncates a long description and says where to read the rest", () => {
     const email = projectSubmittedEmail({
       description: "z".repeat(900),

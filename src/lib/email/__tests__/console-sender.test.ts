@@ -30,4 +30,20 @@ describe("ConsoleEmailSender", () => {
     expect(output).toContain("Verify your email");
     expect(output).toContain(EMAIL.text);
   });
+
+  it("keeps the shape auth.integration.test.ts parses", async () => {
+    const sender = new ConsoleEmailSender();
+    await sender.send("a@b.com", EMAIL);
+    const output = stderrSpy.mock.calls
+      .map((c: unknown[]) => String(c[0]))
+      .join("");
+
+    // That suite locates the message by a "subject: <subject>" line and then
+    // pulls the link out of a "<call to action>: <url>" line. Both shapes are a
+    // contract, not incidental formatting: changing them silently broke the
+    // whole integration suite once already, because the assertions above pass
+    // on any output that merely mentions the same words.
+    expect(output).toContain("subject: Verify your email");
+    expect(output).toMatch(/^\s*\S[^\n]*?: https?:\/\/\S+$/m);
+  });
 });
