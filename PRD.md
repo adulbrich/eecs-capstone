@@ -49,9 +49,12 @@ For developer setup, architecture notes, and the active roadmap, see
 - ⬜ LinkedIn SSO.
 - ⬜ Discord SSO.
 - ⬜ Oregon State University ONID SSO.
-- ✅ Profile management: name, email, affiliation, LinkedIn, avatar, and a
-  private free-text interests statement that drives personalized project
-  recommendations (see §8).
+- ✅ Profile management: name, affiliation, LinkedIn, avatar, and a private
+  free-text interests statement that drives personalized project
+  recommendations (see §8). The email address is displayed but not editable:
+  `profileSchema` does not accept it, and Better Auth's change-email endpoint
+  stays disabled because `user.changeEmail.enabled` is never set. This applies
+  to every account, not only to GitHub sign-ins.
 - ✅ Mentorship opt-in: a profile toggle ("I want to mentor a team", labelled
   "For professionals and faculty, not students") and a teams-to-mentor count
   (1-5, default 1). Opting in requires an affiliation. Staff act on these via
