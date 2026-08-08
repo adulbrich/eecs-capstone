@@ -96,15 +96,20 @@ export function ProposerPicker({
 }) {
   const [findOpen, setFindOpen] = useState(false);
   const [reassignOpen, setReassignOpen] = useState(false);
+  // Captured once at mount: the address that was actually saved. accountLinked
+  // and accountName describe that saved state, not whatever staff have typed
+  // or picked since. Comparing the live value against this snapshot is how we
+  // know the on-screen state has diverged from what those props still claim.
+  const [savedEmail] = useState(value);
+  const pendingChange = value !== savedEmail;
+  const locked = accountLinked && !pendingChange;
 
   return (
     <div className="space-y-1.5">
       <Label htmlFor="proposerEmail">Proposer email</Label>
       <div className="flex gap-2">
         <Input
-          className={
-            accountLinked ? "bg-muted text-muted-foreground" : undefined
-          }
+          className={locked ? "bg-muted text-muted-foreground" : undefined}
           id="proposerEmail"
           name="proposerEmail"
           onChange={(e) => onChange(e.target.value)}
@@ -112,11 +117,11 @@ export function ProposerPicker({
           // Read-only rather than disabled: a disabled input is skipped by
           // keyboard navigation and announced poorly, and staff still need to
           // read and copy the address.
-          readOnly={accountLinked}
+          readOnly={locked}
           type="email"
           value={value}
         />
-        {accountLinked ? (
+        {locked ? (
           <Button
             className="h-9"
             onClick={() => setReassignOpen(true)}
@@ -144,9 +149,17 @@ export function ProposerPicker({
         )}
       </div>
       <p className="text-muted-foreground text-xs">
-        {accountLinked
-          ? `Linked to ${accountName ?? "an account"}. Re-assign to move this project to a different person.`
-          : "Links to the proposer's account once they verify this email address. Leave blank for an external proposer."}
+        {(() => {
+          if (locked) {
+            return `Linked to ${accountName ?? "an account"}. Re-assign to move this project to a different person.`;
+          }
+          if (pendingChange) {
+            return value
+              ? `This project will be re-assigned to ${value} when saved.`
+              : "The link will be removed when saved. Enter an external proposer's address, or leave it blank.";
+          }
+          return "Links to the proposer's account once they verify this email address. Leave blank for an external proposer.";
+        })()}
       </p>
 
       <Dialog onOpenChange={setReassignOpen} open={reassignOpen}>
