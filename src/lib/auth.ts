@@ -5,10 +5,24 @@ import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { db } from "#/db";
 import { getEmailSender } from "#/lib/email/sender";
 import { passwordResetEmail, verificationEmail } from "#/lib/email/templates";
+import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
 
 const emailSender = getEmailSender();
 
 const isProduction = process.env.NODE_ENV === "production";
+
+/**
+ * Claims a newly verified user's projects. Swallows failure on purpose: a
+ * claim must never block a sign-in or a verification, and the operation is
+ * idempotent, so the next verification or sign-in retries it for free.
+ */
+async function claimProjectsFor(userId: string, email: string): Promise<void> {
+  try {
+    await claimProjectsForVerifiedUser(userId, email);
+  } catch (error) {
+    console.error(`Claiming projects failed for user ${userId}`, error);
+  }
+}
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
@@ -30,6 +44,29 @@ export const auth = betterAuth({
     callbackURL: "/verify-email",
     sendVerificationEmail: async ({ user, url }) => {
       await emailSender.send(user.email, verificationEmail({ url }));
+    },
+    // The address is proven at exactly this moment, so this is where a project
+    // may be linked to its proposer.
+    afterEmailVerification: async (verified) => {
+      await claimProjectsFor(verified.id, verified.email);
+    },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        // Covers OAuth, which never visits the email-verification routes and so
+        // never fires afterEmailVerification. The guard is what keeps this from
+        // claiming for an unverified password sign-up, where emailVerified is
+        // false at creation. GitHub sign-ups arrive here with emailVerified set
+        // to GitHub's own verified flag for the chosen email (see
+        // @better-auth/core/dist/social-providers/github.mjs getUserInfo), so a
+        // GitHub account with a GitHub-verified email is claimed at creation.
+        after: async (created) => {
+          if (created.emailVerified) {
+            await claimProjectsFor(created.id, created.email);
+          }
+        },
+      },
     },
   },
   socialProviders: {
