@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { auth } from "#/lib/auth";
 
+const CONSOLE_EMAIL_URL = /^\s*\S[^\n]*?: (https?:\/\/\S+)$/m;
+
+/**
+ * Runs `fn` and pulls the link out of whatever the console transport printed.
+ *
+ * Matches on the rendered subject rather than a bracketed label: content moved
+ * into `src/lib/email/templates.ts`, so the transport now prints the real
+ * subject and body instead of a per-message tag and a `url:` field. The link
+ * arrives inside the body as "<call to action>: <url>".
+ */
 async function captureConsoleEmail(
-  label: string,
+  subject: string,
   fn: () => Promise<unknown>
 ): Promise<string> {
   let captured = "";
@@ -16,12 +26,15 @@ async function captureConsoleEmail(
   } finally {
     process.stderr.write = orig;
   }
-  const match = captured.match(
-    new RegExp(`\\[${label}\\][\\s\\S]*?url: (https?://\\S+)`)
-  );
+  if (!captured.includes(`subject: ${subject}`)) {
+    throw new Error(
+      `No console email with subject "${subject}". Got:\n${captured}`
+    );
+  }
+  const match = captured.match(CONSOLE_EMAIL_URL);
   if (!match) {
     throw new Error(
-      `No console email captured for ${label}. Got:\n${captured}`
+      `Console email "${subject}" carried no link. Got:\n${captured}`
     );
   }
   return match[1];
@@ -32,11 +45,14 @@ describe("auth integration", () => {
     const email = `it-${Date.now()}@example.com`;
     const password = "Password1!";
 
-    const verifyUrl = await captureConsoleEmail("VERIFY EMAIL", async () => {
-      await auth.api.signUpEmail({
-        body: { email, password, name: "It User" },
-      });
-    });
+    const verifyUrl = await captureConsoleEmail(
+      "Verify your email",
+      async () => {
+        await auth.api.signUpEmail({
+          body: { email, password, name: "It User" },
+        });
+      }
+    );
 
     const token = new URL(verifyUrl).searchParams.get("token");
     expect(token).toBeTruthy();
