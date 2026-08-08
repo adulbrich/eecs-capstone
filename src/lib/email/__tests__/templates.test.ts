@@ -97,7 +97,9 @@ describe("projectSubmittedEmail", () => {
       url: "https://app/projects/p1",
     });
     expect(email.text).toContain("z".repeat(600));
-    expect(email.text).not.toContain("Open the project to read the full proposal.");
+    expect(email.text).not.toContain(
+      "Open the project to read the full proposal."
+    );
   });
 
   it("truncates a long description and says where to read the rest", () => {
