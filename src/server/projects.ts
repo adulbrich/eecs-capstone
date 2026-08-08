@@ -49,9 +49,14 @@ const updateProjectSchema = projectInputSchema.extend({
 
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 
+// Defaults true so a partial caller sends mail rather than silently swallowing
+// it. Staff opt out per action from the transition dialog.
+const SEND_EMAIL_FIELD = { sendEmail: z.boolean().default(true) };
+
 const transitionInputSchema = z.object({
   id: z.string().uuid(),
   comment: z.string().max(2000).optional(),
+  ...SEND_EMAIL_FIELD,
 });
 
 const idOnlySchema = z.object({ id: z.string().uuid() });
@@ -80,7 +85,12 @@ export const submitProject = createServerFn({ method: "POST" })
     const { performTransitionForCurrentUser } = await import(
       "./_internal/projects"
     );
-    return performTransitionForCurrentUser(data.id, "submitted", data.comment);
+    return performTransitionForCurrentUser(
+      data.id,
+      "submitted",
+      data.comment,
+      data.sendEmail
+    );
   });
 
 export const returnToDraft = createServerFn({ method: "POST" })
@@ -89,7 +99,12 @@ export const returnToDraft = createServerFn({ method: "POST" })
     const { performTransitionForCurrentUser } = await import(
       "./_internal/projects"
     );
-    return performTransitionForCurrentUser(data.id, "draft", data.comment);
+    return performTransitionForCurrentUser(
+      data.id,
+      "draft",
+      data.comment,
+      data.sendEmail
+    );
   });
 
 export const requestChanges = createServerFn({ method: "POST" })
@@ -101,7 +116,8 @@ export const requestChanges = createServerFn({ method: "POST" })
     return performTransitionForCurrentUser(
       data.id,
       "changes_requested",
-      data.comment
+      data.comment,
+      data.sendEmail
     );
   });
 
@@ -111,7 +127,12 @@ export const approveProject = createServerFn({ method: "POST" })
     const { performTransitionForCurrentUser } = await import(
       "./_internal/projects"
     );
-    return performTransitionForCurrentUser(data.id, "approved", data.comment);
+    return performTransitionForCurrentUser(
+      data.id,
+      "approved",
+      data.comment,
+      data.sendEmail
+    );
   });
 
 export const publishProject = createServerFn({ method: "POST" })
@@ -120,7 +141,12 @@ export const publishProject = createServerFn({ method: "POST" })
     const { performTransitionForCurrentUser } = await import(
       "./_internal/projects"
     );
-    return performTransitionForCurrentUser(data.id, "published", data.comment);
+    return performTransitionForCurrentUser(
+      data.id,
+      "published",
+      data.comment,
+      data.sendEmail
+    );
   });
 
 export const archiveProject = createServerFn({ method: "POST" })
@@ -129,7 +155,12 @@ export const archiveProject = createServerFn({ method: "POST" })
     const { performTransitionForCurrentUser } = await import(
       "./_internal/projects"
     );
-    return performTransitionForCurrentUser(data.id, "archived", data.comment);
+    return performTransitionForCurrentUser(
+      data.id,
+      "archived",
+      data.comment,
+      data.sendEmail
+    );
   });
 
 export const restoreArchived = createServerFn({ method: "POST" })
@@ -138,7 +169,12 @@ export const restoreArchived = createServerFn({ method: "POST" })
     const { performTransitionForCurrentUser } = await import(
       "./_internal/projects"
     );
-    return performTransitionForCurrentUser(data.id, "published", data.comment);
+    return performTransitionForCurrentUser(
+      data.id,
+      "published",
+      data.comment,
+      data.sendEmail
+    );
   });
 
 export const softDeleteProject = createServerFn({ method: "POST" })
@@ -172,6 +208,7 @@ const statusTransitionSchema = z.object({
   id: z.string().uuid(),
   status: z.enum(STATUS_VALUES),
   comment: z.string().max(2000).optional(),
+  ...SEND_EMAIL_FIELD,
 });
 
 export const performTransition = createServerFn({ method: "POST" })
@@ -183,7 +220,8 @@ export const performTransition = createServerFn({ method: "POST" })
     return performTransitionForCurrentUser(
       data.id,
       data.status as Status,
-      data.comment
+      data.comment,
+      data.sendEmail
     );
   });
 
@@ -196,6 +234,7 @@ export const forceSetProjectStatus = createServerFn({ method: "POST" })
     return forceTransitionForCurrentUser(
       data.id,
       data.status as Status,
-      data.comment
+      data.comment,
+      data.sendEmail
     );
   });

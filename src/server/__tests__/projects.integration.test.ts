@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "#/db";
 import {
   notifications,
@@ -431,5 +431,131 @@ describe("private notes", () => {
     expect((await getProjectAs(admin, { id })).project?.proposerEmail).toBe(
       owner.email
     );
+  });
+});
+
+describe("review emails", () => {
+  // These tests mutate process.env, and vitest.integration.config.ts sets
+  // fileParallelism: false, so every integration file shares one process.
+  // Without this restore a bogus BETTER_AUTH_URL would leak out of this block
+  // into every later file, where auth.api.signUpEmail reads it.
+  const ORIGINAL_ENV = { ...process.env };
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  it("emails the review inbox on submit, the proposer on approve, nobody on publish", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    process.env.EMAIL_REVIEW_INBOX = "review@oregonstate.edu";
+    const owner = await makeUser("owner-mail@x.edu", "user");
+    const admin = await makeUser("admin-mail@x.edu", "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await performTransitionAs(owner, id, "submitted", undefined, { send });
+    await performTransitionAs(admin, id, "approved", undefined, { send });
+    await performTransitionAs(admin, id, "published", undefined, { send });
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[0]?.[0]).toBe("review@oregonstate.edu");
+    expect(send.mock.calls[1]?.[0]).toBe("owner-mail@x.edu");
+    expect(send.mock.calls[1]?.[1].text).toContain(
+      "will not receive another email"
+    );
+  });
+
+  it("emails the proposer the staff note when changes are requested", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const owner = await makeUser("owner-cr@x.edu", "user");
+    const admin = await makeUser("admin-cr@x.edu", "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await performTransitionAs(owner, id, "submitted", undefined, { send });
+    send.mockClear();
+    await performTransitionAs(
+      admin,
+      id,
+      "changes_requested",
+      "Add objectives.",
+      {
+        send,
+      }
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("owner-cr@x.edu");
+    expect(send.mock.calls[0]?.[1].text).toContain("Add objectives.");
+  });
+
+  it("sends nothing when staff opt out, but still records the transition", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const owner = await makeUser("owner-skip@x.edu", "user");
+    const admin = await makeUser("admin-skip@x.edu", "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await performTransitionAs(owner, id, "submitted", undefined, { send });
+    send.mockClear();
+    await performTransitionAs(admin, id, "approved", undefined, {
+      send,
+      sendEmail: false,
+    });
+
+    expect(send).not.toHaveBeenCalled();
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.status).toBe("approved");
+    const history = await db
+      .select()
+      .from(projectStatusHistory)
+      .where(eq(projectStatusHistory.projectId, id));
+    expect(history.some((h) => h.newStatus === "approved")).toBe(true);
+  });
+
+  it("emails a proposer who has an address but no account", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser("admin-noacct@x.edu", "admin");
+    const { id } = await createProjectAs(admin, {
+      ...baseProject(),
+      proposerEmail: "outsider@example.com",
+    });
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await performTransitionAs(admin, id, "submitted", undefined, { send });
+    send.mockClear();
+    await performTransitionAs(admin, id, "approved", undefined, { send });
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("outsider@example.com");
+  });
+
+  it("does not roll back the transition when the email fails", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const owner = await makeUser("owner-fail@x.edu", "user");
+    const admin = await makeUser("admin-fail@x.edu", "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+    const ok = vi.fn().mockResolvedValue(undefined);
+    const boom = vi.fn().mockRejectedValue(new Error("SES is down"));
+
+    await performTransitionAs(owner, id, "submitted", undefined, { send: ok });
+    await expect(
+      performTransitionAs(admin, id, "approved", undefined, { send: boom })
+    ).resolves.toMatchObject({ status: "approved" });
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.status).toBe("approved");
+  });
+
+  it("emails from the force path too", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const owner = await makeUser("owner-force@x.edu", "user");
+    const admin = await makeUser("admin-force@x.edu", "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await forceTransitionAs(admin, id, "approved", undefined, { send });
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("owner-force@x.edu");
   });
 });

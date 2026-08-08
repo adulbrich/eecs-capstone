@@ -138,11 +138,11 @@ describe("embedding triggers", () => {
     const { id } = await createProjectAs(admin, baseProject("Live"));
     const embed = vi.fn().mockResolvedValue(VECTOR);
 
-    await performTransitionAs(admin, id, "submitted", undefined, embed);
+    await performTransitionAs(admin, id, "submitted", undefined, { embed });
     expect(embed).not.toHaveBeenCalled();
 
-    await performTransitionAs(admin, id, "approved", undefined, embed);
-    await performTransitionAs(admin, id, "published", undefined, embed);
+    await performTransitionAs(admin, id, "approved", undefined, { embed });
+    await performTransitionAs(admin, id, "published", undefined, { embed });
 
     expect(embed).toHaveBeenCalledTimes(1);
     expect((await readRow(id)).embedding?.length).toBe(1024);
@@ -153,10 +153,10 @@ describe("embedding triggers", () => {
     const { id } = await createProjectAs(admin, baseProject("Live"));
     const embed = vi.fn().mockRejectedValue(new Error("bedrock down"));
 
-    await performTransitionAs(admin, id, "submitted", undefined, embed);
-    await performTransitionAs(admin, id, "approved", undefined, embed);
+    await performTransitionAs(admin, id, "submitted", undefined, { embed });
+    await performTransitionAs(admin, id, "approved", undefined, { embed });
     await expect(
-      performTransitionAs(admin, id, "published", undefined, embed)
+      performTransitionAs(admin, id, "published", undefined, { embed })
     ).resolves.toMatchObject({ status: "published" });
 
     const row = await readRow(id);
