@@ -5,6 +5,41 @@ import { projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
 
+const CONSOLE_EMAIL_URL = /^\s*\S[^\n]*?: (https?:\/\/\S+)$/m;
+
+/**
+ * Runs `fn` and pulls the link out of whatever the console transport printed.
+ * Mirrors the helper in `src/lib/__tests__/auth.integration.test.ts`.
+ */
+async function captureConsoleEmail(
+  subject: string,
+  fn: () => Promise<unknown>
+): Promise<string> {
+  let captured = "";
+  const orig = process.stderr.write.bind(process.stderr);
+  process.stderr.write = ((chunk: unknown) => {
+    captured += String(chunk);
+    return true;
+  }) as typeof process.stderr.write;
+  try {
+    await fn();
+  } finally {
+    process.stderr.write = orig;
+  }
+  if (!captured.includes(`subject: ${subject}`)) {
+    throw new Error(
+      `No console email with subject "${subject}". Got:\n${captured}`
+    );
+  }
+  const match = captured.match(CONSOLE_EMAIL_URL);
+  if (!match) {
+    throw new Error(
+      `Console email "${subject}" carried no link. Got:\n${captured}`
+    );
+  }
+  return match[1];
+}
+
 async function makeProject(fields: {
   proposerEmail: string | null;
   proposerId?: string | null;
@@ -119,5 +154,25 @@ describe("the verification boundary", () => {
     // must not claim its projects.
     expect(account.emailVerified).toBe(false);
     expect((await statusOf(project.id)).proposerId).toBeNull();
+  });
+
+  it("claims the project once auth.api.verifyEmail actually runs, proving afterEmailVerification is wired up and not a silent no-op", async () => {
+    const email = "hook-wired@x.edu";
+    const project = await makeProject({ proposerEmail: email });
+
+    const verifyUrl = await captureConsoleEmail("Verify your email", () =>
+      auth.api.signUpEmail({
+        body: { email, password: "Password1!", name: email },
+      })
+    );
+    const token = new URL(verifyUrl).searchParams.get("token");
+    expect(token).toBeTruthy();
+
+    expect((await statusOf(project.id)).proposerId).toBeNull();
+
+    await auth.api.verifyEmail({ query: { token: token as string } });
+
+    const [account] = await db.select().from(user).where(eq(user.email, email));
+    expect((await statusOf(project.id)).proposerId).toBe(account.id);
   });
 });
