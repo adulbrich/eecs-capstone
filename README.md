@@ -11,13 +11,7 @@ conventions, see [`AGENTS.md`](./AGENTS.md).
 
 ## Pending
 
-- Confirm `eecs-capstone@oregonstate.edu` is a real, monitored mailbox or
-  distribution list. It is the `Reply-To` on every message the app sends, and
-  `oregonstate.edu` MX points at Exchange Online, so it is a tenant-side object
-  someone has to create and watch. Nothing in AWS validates it: SES does not
-  verify `Reply-To`, so a wrong address fails invisibly. Mail still sends and
-  only the human's reply vanishes. This is the last open item on email; SES
-  itself is live (see [Email transport](#email-transport)).
+None.
 
 ## Known issues
 
@@ -52,6 +46,7 @@ in [`PRD.md`](./PRD.md).
 
 - Have a preview deployment on AWS that uses a very small DB, but otherwise the same stack as the rest. This means having another "Deploy (Preview)" GitHub Actions workflow that, in addition to the jobs/steps in the normal Deploy: resets the preview DB with the dev seeds and data, deploys on another container/url, and shows a big "PREVIEW DEPLOYMENT" banner at the top all pages. Spec this. This should work for specific branches if possible (e.g., someone opens a PR, and we manually deploy a preview with that branch).
 - Check all the nice shadcn/ui components and see if we use them everywhere we can. Audit where we could update the app accordingly. The most important things are that the UI is consistent across the app + accessibility.
+- Ability to delete users (only with modal to confirm) for admins only (not instructors). Decide what to do with linked records (e.g., projects).
 
 ### Authentication
 
@@ -243,6 +238,19 @@ version, this file could return to CLI generation; until then, edit it directly.
   which additionally requires `EMAIL_FROM` to be a verified sender identity.
   `EMAIL_REPLY_TO` is optional: set it and every message carries that
   `Reply-To`, leave it blank and the header is omitted.
+
+The app sends four emails, all through `src/lib/email/templates.ts`:
+
+| Email | Trigger | Recipient |
+|---|---|---|
+| Verify your email | Sign-up | The new account |
+| Reset your password | Forgot-password form | The account |
+| New project submitted | A project moves to `submitted` | `EMAIL_REVIEW_INBOX` |
+| Approved / Changes requested | Staff review a project | The proposer |
+
+Everything else the app notifies about is in-app only, a row in `notifications`
+rendered by the bell, and never reaches an inbox. Staff can skip either review
+email per action from the transition dialog.
 
 Production runs `ses` and has done since task definition revision 22: the domain
 identity verifies with DKIM `SUCCESS`, the account has production access (so the
