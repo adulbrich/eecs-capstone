@@ -39,13 +39,13 @@ vi.mock("#/server/projects", () => ({
   softDeleteProject,
 }));
 
-const { listProjectEditLog, getProposerEmailForEdit } = vi.hoisted(() => ({
+const { listProjectEditLog, getProposerForEdit } = vi.hoisted(() => ({
   listProjectEditLog: vi.fn(),
-  getProposerEmailForEdit: vi.fn(),
+  getProposerForEdit: vi.fn(),
 }));
 vi.mock("#/server/projects-queries", () => ({
   listProjectEditLog,
-  getProposerEmailForEdit,
+  getProposerForEdit,
 }));
 
 // Radix's Checkbox measures itself on mount; jsdom ships no ResizeObserver.
@@ -73,12 +73,16 @@ beforeEach(() => {
   restoreProject.mockReset();
   softDeleteProject.mockReset();
   listProjectEditLog.mockReset();
-  getProposerEmailForEdit.mockReset();
+  getProposerForEdit.mockReset();
 
   performTransition.mockResolvedValue({});
   forceSetProjectStatus.mockResolvedValue({});
   listProjectEditLog.mockResolvedValue({ rows: [] });
-  getProposerEmailForEdit.mockResolvedValue("proposer@example.com");
+  getProposerForEdit.mockResolvedValue({
+    accountLinked: true,
+    accountName: "proposer@example.com",
+    email: "proposer@example.com",
+  });
 });
 
 const PROJECT_ID = "00000000-0000-0000-0000-0000000000p1";
@@ -124,7 +128,11 @@ describe("StaffProjectPanel review-email control", () => {
   });
 
   it("shows the disabled no-address-on-file state when the proposer has no address", async () => {
-    getProposerEmailForEdit.mockResolvedValue("");
+    getProposerForEdit.mockResolvedValue({
+      accountLinked: false,
+      accountName: null,
+      email: "",
+    });
     renderPanel("submitted");
     fireEvent.click(screen.getByTitle("Move to Approved"));
 
@@ -158,7 +166,11 @@ describe("StaffProjectPanel review-email control", () => {
   });
 
   it("sends sendEmail: false when there is no address on file, even though the box is still visually checked-by-default", async () => {
-    getProposerEmailForEdit.mockResolvedValue("");
+    getProposerForEdit.mockResolvedValue({
+      accountLinked: false,
+      accountName: null,
+      email: "",
+    });
     renderPanel("submitted");
     fireEvent.click(screen.getByTitle("Move to Approved"));
     await waitFor(() =>

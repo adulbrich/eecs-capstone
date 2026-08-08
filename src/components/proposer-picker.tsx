@@ -26,9 +26,16 @@ interface Match {
 }
 
 export function ProposerPicker({
+  // Both accepted but unused: Task 3 wires them up to lock this field behind
+  // a re-assign modal when an account is linked. Optional so existing callers
+  // and tests that predate that behavior keep compiling.
+  accountLinked: _accountLinked = false,
+  accountName: _accountName = null,
   value,
   onChange,
 }: {
+  accountLinked?: boolean;
+  accountName?: string | null;
   value: string;
   onChange: (email: string) => void;
 }) {

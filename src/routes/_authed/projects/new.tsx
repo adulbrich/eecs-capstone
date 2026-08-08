@@ -49,6 +49,7 @@ function NewProject() {
               params: { projectId: id },
             });
           }}
+          proposer={{ accountLinked: false, accountName: null, email: "" }}
           showCategories={isStaff}
           showNotes
           showProposer={isStaff}

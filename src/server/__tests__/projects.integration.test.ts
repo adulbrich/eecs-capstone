@@ -17,7 +17,10 @@ import {
   softDeleteProjectAs,
   updateProjectAs,
 } from "#/server/_internal/projects";
-import { getProjectAs } from "#/server/_internal/projects-queries";
+import {
+  getProjectAs,
+  getProposerForEditAs,
+} from "#/server/_internal/projects-queries";
 
 async function makeUser(email: string, role: "user" | "admin") {
   await auth.api.signUpEmail({
@@ -377,7 +380,7 @@ describe("private notes", () => {
     const owner = await makeUser(`pn-o4-${Date.now()}@x.com`, "user");
     const admin = await makeUser(`pn-a4-${Date.now()}@x.com`, "admin");
     const { id } = await createProjectAs(owner, baseProject());
-    // The staff edit form prefills proposerEmail from getProposerEmailForEdit,
+    // The staff edit form prefills proposerEmail from getProposerForEdit,
     // so a staff save always sends it back. Omitting it here would be an
     // explicit unlink, which would drop the owner and make this test pass for
     // the wrong reason.
@@ -557,5 +560,56 @@ describe("review emails", () => {
 
     expect(send).toHaveBeenCalledOnce();
     expect(send.mock.calls[0]?.[0]).toBe("owner-force@x.edu");
+  });
+});
+
+describe("getProposerForEditImpl", () => {
+  it("reports a linked account with its current email and name", async () => {
+    const staff = await makeUser("staff-pfe@x.edu", "admin");
+    const owner = await makeUser("owner-pfe@x.edu", "user");
+    const { id } = await createProjectAs(owner, baseProject());
+
+    const result = await getProposerForEditAs(staff, { projectId: id });
+
+    expect(result.accountLinked).toBe(true);
+    expect(result.email).toBe("owner-pfe@x.edu");
+    expect(result.accountName).toBe("owner-pfe@x.edu");
+  });
+
+  it("reports an external proposer as unlinked", async () => {
+    const staff = await makeUser("staff-pfe2@x.edu", "admin");
+    const { id } = await createProjectAs(staff, {
+      ...baseProject(),
+      proposerEmail: "outsider@example.com",
+    });
+
+    const result = await getProposerForEditAs(staff, { projectId: id });
+
+    expect(result.accountLinked).toBe(false);
+    expect(result.email).toBe("outsider@example.com");
+    expect(result.accountName).toBeNull();
+  });
+
+  it("reports a project with no proposer at all as unlinked and blank", async () => {
+    const staff = await makeUser("staff-pfe3@x.edu", "admin");
+    const { id } = await createProjectAs(staff, baseProject());
+    await db
+      .update(projects)
+      .set({ proposerId: null, proposerEmail: null })
+      .where(eq(projects.id, id));
+
+    const result = await getProposerForEditAs(staff, { projectId: id });
+
+    expect(result.accountLinked).toBe(false);
+    expect(result.email).toBe("");
+  });
+
+  it("refuses a non-staff viewer", async () => {
+    const owner = await makeUser("owner-pfe4@x.edu", "user");
+    const { id } = await createProjectAs(owner, baseProject());
+
+    await expect(
+      getProposerForEditAs(owner, { projectId: id })
+    ).rejects.toThrow("Forbidden");
   });
 });

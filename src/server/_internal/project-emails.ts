@@ -41,7 +41,7 @@ async function lookupProposer(
  * stale. Falls back to the stored address only when no account is linked, which
  * is how a proposer without an account is still reachable.
  *
- * This precedence deliberately matches `getProposerEmailForEditImpl` in
+ * This precedence deliberately matches `getProposerForEditAs` in
  * `projects-queries.ts`. That function is what the staff dialog displays, so
  * diverging here would name one address in the UI and mail another.
  */

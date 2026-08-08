@@ -113,7 +113,7 @@ describe("notifyTransitionByEmail", () => {
   });
 
   it("prefers the account address over a stale stored one", async () => {
-    // Matches getProposerEmailForEditImpl: proposerId is canonical, so the UI
+    // Matches getProposerForEditAs: proposerId is canonical, so the UI
     // and the mail agree on the recipient. Covered end to end in Task 4.
     const { resolveProposerAddress } = await import("../project-emails");
     expect(resolveProposerAddress("stale@old.edu", "current@x.edu")).toBe(
@@ -124,7 +124,7 @@ describe("notifyTransitionByEmail", () => {
   });
 
   it("pins what an empty account address does", async () => {
-    // resolveProposerAddress uses ?? while getProposerEmailForEditImpl uses a
+    // resolveProposerAddress uses ?? while getProposerForEditAs uses a
     // truthiness check, so an account email of "" resolves differently in the
     // two. user.email is not-null and unique, so this is unreachable in
     // practice; the test exists so that if it ever becomes reachable, the

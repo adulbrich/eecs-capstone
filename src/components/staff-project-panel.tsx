@@ -10,7 +10,7 @@ import {
   softDeleteProject,
 } from "#/server/projects";
 import {
-  getProposerEmailForEdit,
+  getProposerForEdit,
   listProjectEditLog,
 } from "#/server/projects-queries";
 import { LocalTime } from "./local-time";
@@ -95,7 +95,7 @@ export function StaffProjectPanel({
   useEffect(() => {
     void (async () => {
       try {
-        const email = await getProposerEmailForEdit({
+        const { email } = await getProposerForEdit({
           data: { projectId: project.id },
         });
         setProposerAddress(email || null);

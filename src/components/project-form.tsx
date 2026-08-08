@@ -55,6 +55,15 @@ export const projectFormSchema = z.object({
 
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
 
+// Redeclared rather than imported from `#/server/_internal/projects-queries`:
+// nothing in this codebase imports server internals into a component, so this
+// keeps that boundary intact. Keep this in sync with `ProposerForEdit` there.
+interface ProposerForEdit {
+  accountLinked: boolean;
+  accountName: string | null;
+  email: string;
+}
+
 interface Props {
   enableAiReview?: boolean;
   initial?: Partial<ProjectFormValues>;
@@ -65,6 +74,7 @@ interface Props {
     pendingImage: File | null
   ) => Promise<unknown>;
   projectId?: string;
+  proposer?: ProposerForEdit;
   showCategories: boolean;
   showNotes: boolean;
   showProposer?: boolean;
@@ -81,6 +91,7 @@ export function ProjectForm({
   onSubmit,
   enableAiReview,
   projectId,
+  proposer,
   showProposer,
 }: Props) {
   const [formError, setFormError] = useState<string | null>(null);
@@ -420,6 +431,8 @@ export function ProjectForm({
               <form.Field name="proposerEmail">
                 {(field: AnyForm) => (
                   <ProposerPicker
+                    accountLinked={proposer?.accountLinked ?? false}
+                    accountName={proposer?.accountName ?? null}
                     onChange={(email) => field.handleChange(email)}
                     value={field.state.value as string}
                   />

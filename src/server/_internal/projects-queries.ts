@@ -327,10 +327,16 @@ export async function getProjectImpl(data: { id: string }) {
   return getProjectAs(await getViewer(), data);
 }
 
-export async function getProposerEmailForEditImpl(data: {
-  projectId: string;
-}): Promise<string> {
-  const viewer = await getViewer();
+export interface ProposerForEdit {
+  accountLinked: boolean;
+  accountName: string | null;
+  email: string;
+}
+
+export async function getProposerForEditAs(
+  viewer: Viewer,
+  data: { projectId: string }
+): Promise<ProposerForEdit> {
   if (!isStaff(viewer)) {
     throw new Error("Forbidden");
   }
@@ -342,21 +348,39 @@ export async function getProposerEmailForEditImpl(data: {
     .from(projects)
     .where(eq(projects.id, data.projectId));
   if (!project) {
-    return "";
+    return { accountLinked: false, accountName: null, email: "" };
   }
   // proposerId is canonical: when the project is linked to an account, prefill
   // that account's current email so an untouched staff save re-resolves to the
   // same proposer. Fall back to the stored email only when no account is linked.
   if (project.proposerId) {
     const [account] = await db
-      .select({ email: user.email })
+      .select({ email: user.email, name: user.name })
       .from(user)
       .where(eq(user.id, project.proposerId));
     if (account?.email) {
-      return account.email;
+      return {
+        accountLinked: true,
+        accountName: account.name ?? null,
+        email: account.email,
+      };
     }
   }
-  return project.proposerEmail ?? "";
+  return {
+    accountLinked: false,
+    accountName: null,
+    email: project.proposerEmail ?? "",
+  };
+}
+
+/**
+ * Request-context wrapper. Mirrors the *As / *Impl split the rest of this file
+ * uses so integration tests can call the As form directly.
+ */
+export async function getProposerForEditImpl(data: {
+  projectId: string;
+}): Promise<ProposerForEdit> {
+  return getProposerForEditAs(await getViewer(), data);
 }
 
 export async function listProjectEditLogImpl(data: { id: string }) {
