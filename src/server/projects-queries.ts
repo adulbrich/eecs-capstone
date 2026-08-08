@@ -1,6 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+// Re-exported so components can type the shape `getProposerForEdit` returns
+// without importing server internals. A type-only export; `verbatimModuleSyntax`
+// erases it entirely, so it pulls no runtime code into any bundle. Mirrors how
+// `src/server/inventory.ts` re-exports its staff detail types.
+export type { ProposerForEdit } from "./_internal/projects-queries";
+
 const STATUS_FILTER_VALUES = [
   "all",
   "draft",

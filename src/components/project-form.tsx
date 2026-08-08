@@ -12,6 +12,7 @@ import type {
   ImprovableField,
 } from "#/lib/project-review-fields";
 import { reviewProject } from "#/server/project-review";
+import type { ProposerForEdit } from "#/server/projects-queries";
 import { CategoryMultiSelect } from "./category-multi-select";
 import { MarkdownField } from "./markdown-field";
 import { Panel, PanelHeader, PanelNote } from "./panel";
@@ -54,15 +55,6 @@ export const projectFormSchema = z.object({
 });
 
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
-
-// Redeclared rather than imported from `#/server/_internal/projects-queries`:
-// nothing in this codebase imports server internals into a component, so this
-// keeps that boundary intact. Keep this in sync with `ProposerForEdit` there.
-interface ProposerForEdit {
-  accountLinked: boolean;
-  accountName: string | null;
-  email: string;
-}
 
 interface Props {
   enableAiReview?: boolean;
