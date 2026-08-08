@@ -50,13 +50,13 @@ Accounts and access:
   workflow runs).
 - The ability to create a GitHub OAuth app (org or personal settings).
 
-> **Email is not switched on yet.** SES *is* provisioned (`infra/ses.tf`) and
-> the domain identity verifies, but the app still runs with
-> `EMAIL_TRANSPORT=console`, which logs verification/reset links to CloudWatch
-> instead of emailing them. Sign-up still works, but only someone with log
-> access can complete it. See section 6 for how to retrieve those links (once
-> the app is actually deployed), and section 9 for what is left before the
-> cutover.
+> **Email is live.** SES is provisioned (`infra/ses.tf`), the domain identity
+> verifies, the account has production access, and the app runs with
+> `EMAIL_TRANSPORT=ses` from `noreply@capstone.eecs.oregonstate.edu`. Section 9
+> covers the setup and the one ordering rule that matters: apply, then deploy,
+> because `EMAIL_TRANSPORT=ses` without `EMAIL_FROM` fails the app's boot rather
+> than only its email. In local development `EMAIL_TRANSPORT=console` still
+> writes links to stderr instead of sending them.
 
 ---
 
