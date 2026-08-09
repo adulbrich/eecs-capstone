@@ -36,7 +36,7 @@ export const adminProjectSummarySelect = {
   // email who has no account yet, and the project links up automatically the
   // first time that person signs in. Until then, `user.email` from the join
   // resolves to null, so fall back to the stored snapshot column, same as
-  // `getProposerEmailForEditImpl` does. Do not simplify this to `user.email`.
+  // `getProposerForEditAs` does. Do not simplify this to `user.email`.
   proposerEmail: sql<
     string | null
   >`coalesce(${user.email}, ${projects.proposerEmail})`,

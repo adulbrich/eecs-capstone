@@ -12,6 +12,7 @@ import type {
   ImprovableField,
 } from "#/lib/project-review-fields";
 import { reviewProject } from "#/server/project-review";
+import type { ProposerForEdit } from "#/server/projects-queries";
 import { CategoryMultiSelect } from "./category-multi-select";
 import { MarkdownField } from "./markdown-field";
 import { Panel, PanelHeader, PanelNote } from "./panel";
@@ -65,6 +66,7 @@ interface Props {
     pendingImage: File | null
   ) => Promise<unknown>;
   projectId?: string;
+  proposer?: ProposerForEdit;
   showCategories: boolean;
   showNotes: boolean;
   showProposer?: boolean;
@@ -81,6 +83,7 @@ export function ProjectForm({
   onSubmit,
   enableAiReview,
   projectId,
+  proposer,
   showProposer,
 }: Props) {
   const [formError, setFormError] = useState<string | null>(null);
@@ -420,6 +423,8 @@ export function ProjectForm({
               <form.Field name="proposerEmail">
                 {(field: AnyForm) => (
                   <ProposerPicker
+                    accountLinked={proposer?.accountLinked ?? false}
+                    accountName={proposer?.accountName ?? null}
                     onChange={(email) => field.handleChange(email)}
                     value={field.state.value as string}
                   />

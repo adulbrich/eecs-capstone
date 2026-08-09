@@ -40,14 +40,21 @@ For developer setup, architecture notes, and the active roadmap, see
 - ✅ Email verification required after sign-up (verification link sent on
   sign-up; auto sign-in after verification).
 - ✅ Password reset by email.
+- ✅ A project proposed for someone before they have an account links to that
+  account once they verify the address. Only verification does this, never
+  sign-up alone, so nobody can claim another person's projects by registering
+  at their address.
 - ✅ GitHub SSO.
 - ⬜ Google SSO.
 - ⬜ LinkedIn SSO.
 - ⬜ Discord SSO.
 - ⬜ Oregon State University ONID SSO.
-- ✅ Profile management: name, email, affiliation, LinkedIn, avatar, and a
-  private free-text interests statement that drives personalized project
-  recommendations (see §8).
+- ✅ Profile management: name, affiliation, LinkedIn, avatar, and a private
+  free-text interests statement that drives personalized project
+  recommendations (see §8). The email address is displayed but not editable:
+  `profileSchema` does not accept it, and Better Auth's change-email endpoint
+  stays disabled because `user.changeEmail.enabled` is never set. This applies
+  to every account, not only to GitHub sign-ins.
 - ✅ Mentorship opt-in: a profile toggle ("I want to mentor a team", labelled
   "For professionals and faculty, not students") and a teams-to-mentor count
   (1-5, default 1). Opting in requires an affiliation. Staff act on these via
@@ -101,6 +108,10 @@ Each project carries:
 - ✅ Draft projects are hard-deleted; non-draft statuses are soft-deleted.
 - ✅ Visibility rules implemented as a pure module
   (`src/lib/project-visibility.ts`).
+- ✅ The proposer email field is read-only once a real account is linked, and
+  changing it goes through a re-assign modal that names both people and offers
+  an explicit unlink for genuinely external proposers. It is free text when no
+  account is linked.
 
 ## 5. Project Comments & Review
 
@@ -286,6 +297,19 @@ Each project carries:
   is the one holding the thing.
 - ✅ Used for project proposer notifications (skipped when a project has no
   linked account).
+- ✅ Outbound email, four messages in total. Two for accounts: verification on
+  sign-up, and password reset. Two for project review: a notice to the capstone
+  review inbox when a project is submitted, carrying the title, the proposer,
+  the description and a link; and the outcome to the proposer when staff
+  approve or request changes, carrying the staff note. The approval message
+  says the project will be published later and that no further email follows,
+  which is true because publishing deliberately emails nobody.
+- ✅ Staff can skip the proposer email per action from the transition dialog,
+  which names the recipient so the decision is visible rather than implicit.
+- ✅ Email is sent after the transaction commits, never inside it, and its
+  failure is swallowed. A rejected email must not undo an approval.
+- ✅ Every other signal in the app is in-app only, a row in `notifications`
+  rendered by the bell, and never reaches an inbox.
 
 ## 14. User Administration
 

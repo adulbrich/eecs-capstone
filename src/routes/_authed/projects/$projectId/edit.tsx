@@ -12,7 +12,7 @@ import {
   setProjectCategories,
 } from "#/server/categories";
 import { updateProject } from "#/server/projects";
-import { getProject, getProposerEmailForEdit } from "#/server/projects-queries";
+import { getProject, getProposerForEdit } from "#/server/projects-queries";
 import { uploadProjectImage } from "#/server/uploads";
 
 export const Route = createFileRoute("/_authed/projects/$projectId/edit")({
@@ -34,15 +34,13 @@ export const Route = createFileRoute("/_authed/projects/$projectId/edit")({
     const { rows: categoryRows } = await listProjectCategories({
       data: { projectId: params.projectId },
     });
-    const proposerEmail = data.viewerIsStaff
-      ? await getProposerEmailForEdit({
-          data: { projectId: params.projectId },
-        })
-      : "";
+    const proposer = data.viewerIsStaff
+      ? await getProposerForEdit({ data: { projectId: params.projectId } })
+      : { accountLinked: false, accountName: null, email: "" };
     return {
       ...data,
       categoryIds: categoryRows.map((c) => c.id),
-      proposerEmail,
+      proposer,
     };
   },
   component: EditProject,
@@ -50,7 +48,7 @@ export const Route = createFileRoute("/_authed/projects/$projectId/edit")({
 
 function EditProject() {
   const navigate = useNavigate();
-  const { project, viewerIsStaff, categoryIds, proposerEmail } =
+  const { project, viewerIsStaff, categoryIds, proposer } =
     Route.useLoaderData();
   if (!project) {
     return null;
@@ -76,7 +74,7 @@ function EditProject() {
             licenseRestrictions: (project.licenseRestrictions as string) ?? "",
             programId: (project.programId as string) ?? "",
             notes: (project.notes as string) ?? "",
-            proposerEmail,
+            proposerEmail: proposer.email,
             teamsSupported: (project.teamsSupported as number) ?? 1,
           }}
           initialCategoryIds={categoryIds}
@@ -109,6 +107,7 @@ function EditProject() {
             });
           }}
           projectId={projectId}
+          proposer={proposer}
           showCategories={viewerIsStaff}
           showNotes
           showProposer={viewerIsStaff}

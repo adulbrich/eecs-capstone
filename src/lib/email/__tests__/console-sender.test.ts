@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConsoleEmailSender } from "../console-sender";
 
+const EMAIL = {
+  html: "<p>Hi</p>",
+  subject: "Verify your email",
+  text: "Hi\n\nVerify email: https://x/verify?t=abc\n",
+};
+
 describe("ConsoleEmailSender", () => {
   let stderrSpy: ReturnType<typeof vi.spyOn>;
 
@@ -14,31 +20,30 @@ describe("ConsoleEmailSender", () => {
     stderrSpy.mockRestore();
   });
 
-  it("writes a verification block containing the recipient and url", async () => {
+  it("writes a block containing the recipient, subject, and text body", async () => {
     const sender = new ConsoleEmailSender();
-    await sender.sendVerification({
-      to: "a@b.com",
-      url: "https://x/verify?t=abc",
-    });
+    await sender.send("a@b.com", EMAIL);
     const output = stderrSpy.mock.calls
       .map((c: unknown[]) => String(c[0]))
       .join("");
-    expect(output).toContain("VERIFY EMAIL");
     expect(output).toContain("a@b.com");
-    expect(output).toContain("https://x/verify?t=abc");
+    expect(output).toContain("Verify your email");
+    expect(output).toContain(EMAIL.text);
   });
 
-  it("writes a password-reset block containing the recipient and url", async () => {
+  it("keeps the shape auth.integration.test.ts parses", async () => {
     const sender = new ConsoleEmailSender();
-    await sender.sendPasswordReset({
-      to: "a@b.com",
-      url: "https://x/reset?t=abc",
-    });
+    await sender.send("a@b.com", EMAIL);
     const output = stderrSpy.mock.calls
       .map((c: unknown[]) => String(c[0]))
       .join("");
-    expect(output).toContain("RESET PASSWORD");
-    expect(output).toContain("a@b.com");
-    expect(output).toContain("https://x/reset?t=abc");
+
+    // That suite locates the message by a "subject: <subject>" line and then
+    // pulls the link out of a "<call to action>: <url>" line. Both shapes are a
+    // contract, not incidental formatting: changing them silently broke the
+    // whole integration suite once already, because the assertions above pass
+    // on any output that merely mentions the same words.
+    expect(output).toContain("subject: Verify your email");
+    expect(output).toMatch(/^\s*\S[^\n]*?: https?:\/\/\S+$/m);
   });
 });

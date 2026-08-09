@@ -37,7 +37,7 @@
 | `src/server/_internal/project-emails.ts` (new) | Recipient resolution, link building, failure swallowing. |
 | `src/server/_internal/projects.ts` (modify) | Options object on both transition functions; calls the notifier after commit. |
 | `src/server/projects.ts` (modify) | `sendEmail` on the wire schema, threaded through the wrappers. |
-| `src/components/staff-project-panel.tsx` (modify) | Recipient hint and opt-out checkbox in the transition dialog. Reads the address from the existing `getProposerEmailForEdit`. |
+| `src/components/staff-project-panel.tsx` (modify) | Recipient hint and opt-out checkbox in the transition dialog. Reads the address from the existing `getProposerForEdit`. |
 | `infra/variables.tf`, `infra/ecs.tf`, `.env.example` (modify) | `EMAIL_REVIEW_INBOX`. |
 | `README.md`, `DEPLOYMENT.md`, `docs/QUIRKS.md` (modify) | Four emails, not two. |
 
@@ -757,7 +757,7 @@ describe("notifyTransitionByEmail", () => {
   });
 
   it("prefers the account address over a stale stored one", async () => {
-    // Matches getProposerEmailForEditImpl: proposerId is canonical, so the UI
+    // Matches getProposerForEditAs: proposerId is canonical, so the UI
     // and the mail agree on the recipient. Covered end to end in Task 4.
     const { resolveProposerAddress } = await import("../project-emails");
     expect(resolveProposerAddress("stale@old.edu", "current@x.edu")).toBe(
@@ -849,7 +849,7 @@ async function lookupProposer(
  * stale. Falls back to the stored address only when no account is linked, which
  * is how a proposer without an account is still reachable.
  *
- * This precedence deliberately matches `getProposerEmailForEditImpl` in
+ * This precedence deliberately matches `getProposerForEditAs` in
  * `projects-queries.ts`. That function is what the staff dialog displays, so
  * diverging here would name one address in the UI and mail another.
  */
@@ -1032,6 +1032,16 @@ existing `makeUser` and `baseProject` helpers.
 
 ```ts
 describe("review emails", () => {
+  // These tests mutate process.env, and this config sets `fileParallelism:
+  // false`, so every integration file shares one process. Without this restore
+  // a corrupted BETTER_AUTH_URL would leak out of this block and into every
+  // later test file, where `auth.api.signUpEmail` reads it. Snapshot and put it
+  // back, the same way the Task 3 unit tests do.
+  const ORIGINAL_ENV = { ...process.env };
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
   it("emails the review inbox on submit, the proposer on approve, nobody on publish", async () => {
     process.env.BETTER_AUTH_URL = "https://app";
     process.env.EMAIL_REVIEW_INBOX = "review@oregonstate.edu";
@@ -1141,7 +1151,7 @@ describe("review emails", () => {
 });
 ```
 
-Add `vi` to the existing `vitest` import at the top of the file.
+Add `vi` and `afterEach` to the existing `vitest` import at the top of the file.
 
 Note the tests pass `send` inside the options object, so `TransitionOptions`
 carries the seam through: `{ embed?: EmbedFn; send?: SendEmailFn; sendEmail?: boolean }`.
@@ -1327,12 +1337,12 @@ git commit -m "feat(projects): send review emails after each transition commits"
 - Modify: `src/components/staff-project-panel.tsx`
 
 **Interfaces:**
-- Consumes: the `sendEmail` field on `statusTransitionSchema` from Task 4, and the existing `getProposerEmailForEdit` server function.
+- Consumes: the `sendEmail` field on `statusTransitionSchema` from Task 4, and the existing `getProposerForEdit` server function.
 - Produces: no prop changes. `$projectId.tsx` is not touched.
 
 - [ ] **Step 1: Fetch the address the same way the panel already fetches the edit log**
 
-Do **not** add a prop. `getProposerEmailForEdit` already exists, is staff-gated,
+Do **not** add a prop. `getProposerForEdit` already exists, is staff-gated,
 and resolves the address with exactly the precedence the notifier uses (account
 first, stored address as fallback). Reusing it is what keeps the dialog's label
 and the actual recipient in agreement.
@@ -1341,7 +1351,7 @@ Add to the existing import from `#/server/projects-queries`:
 
 ```ts
 import {
-  getProposerEmailForEdit,
+  getProposerForEdit,
   listProjectEditLog,
 } from "#/server/projects-queries";
 ```
@@ -1354,7 +1364,7 @@ Add state and a fetch beside the existing `editLog` effect:
   useEffect(() => {
     void (async () => {
       try {
-        const email = await getProposerEmailForEdit({
+        const email = await getProposerForEdit({
           data: { projectId: project.id },
         });
         setProposerAddress(email || null);
@@ -1368,7 +1378,7 @@ Add state and a fetch beside the existing `editLog` effect:
 
 Confirm the exported server function's name and its argument key in
 `src/server/projects-queries.ts` before writing this; the internal
-implementation is `getProposerEmailForEditImpl` and takes `{ projectId }`.
+implementation is `getProposerForEditAs` and takes `{ projectId }`.
 
 - [ ] **Step 2: Add the state and the control**
 
@@ -1561,10 +1571,19 @@ options object the task was already creating.
 `project-embeddings.integration.test.ts` pass `embed` positionally; every other
 caller passes three or four arguments and is unaffected.
 
+**Defect found during execution, fixed in Task 4 Step 1.** The integration tests
+as first written set `process.env.BETTER_AUTH_URL` and never restored it. Since
+`vitest.integration.config.ts` sets `fileParallelism: false`, every integration
+file shares one process, so that value would have leaked out of this block into
+every later test file, where `auth.api.signUpEmail` reads it. The Task 3 unit
+tests got this right and these did not. An `afterEach` now restores the
+snapshot. Any future test in this suite that touches `process.env` must do the
+same.
+
 **Correction to the spec's recipient rule.** The spec said the proposer email
 resolves to "`proposerEmail` when set, otherwise the account address via
 `proposerId`". That is backwards from the convention already in the codebase:
-`getProposerEmailForEditImpl` (`projects-queries.ts:330`) documents that
+`getProposerForEditAs` (`projects-queries.ts:330`) documents that
 "proposerId is canonical" and prefers the account's current email, treating the
 stored column as the fallback for a proposer with no account. Task 3 follows the
 existing convention rather than the spec, in a shared `resolveProposerAddress`.
@@ -1572,7 +1591,7 @@ Had it not, the staff dialog and the mail would have disagreed about the
 recipient, since the dialog reads that same function.
 
 **Correction to the spec's component list.** The spec had the panel taking the
-address as a new prop through `$projectId.tsx`. `getProposerEmailForEdit`
+address as a new prop through `$projectId.tsx`. `getProposerForEdit`
 already exists, is staff-gated, and applies the precedence above, so Task 5
 calls it the way the panel already calls `listProjectEditLog`. The route file is
 not touched.

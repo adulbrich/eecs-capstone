@@ -24,11 +24,19 @@ import {
   recordSoftDeleteNotification,
   recordStatusChangeNotifications,
 } from "./notify";
+import { notifyTransitionByEmail, type SendEmailFn } from "./project-emails";
 import { refreshProjectEmbedding } from "./project-embeddings";
 
 export interface AuthUser {
   id: string;
   role?: string | null | undefined;
+}
+
+export interface TransitionOptions {
+  embed?: EmbedFn;
+  /** Test seam. Production callers omit it and the notifier resolves its own transport. */
+  send?: SendEmailFn;
+  sendEmail?: boolean;
 }
 
 const PROJECT_EDITABLE_FIELDS = [
@@ -217,7 +225,7 @@ export async function performTransitionAs(
   id: string,
   target: Status,
   comment?: string,
-  embed?: EmbedFn
+  opts?: TransitionOptions
 ): Promise<{ id: string; status: Status }> {
   const visibility = viewerToVisibility(viewer);
   const project = await loadProjectOr404(id);
@@ -261,8 +269,24 @@ export async function performTransitionAs(
   // After the transaction, never inside it: a Bedrock call must not hold a
   // database transaction open, and its failure must not roll back the publish.
   if (target === "published") {
-    await refreshProjectEmbedding(id, embed);
+    await refreshProjectEmbedding(id, opts?.embed);
   }
+
+  // Same reasoning, and it matters more here: a failed email must not undo an
+  // approval. notifyTransitionByEmail swallows its own errors.
+  await notifyTransitionByEmail(
+    {
+      description: project.description,
+      id: project.id,
+      proposerEmail: project.proposerEmail,
+      proposerId: project.proposerId,
+      title: project.title,
+    },
+    target,
+    comment ?? null,
+    opts?.sendEmail ?? true,
+    opts?.send
+  );
 
   return { id, status: target };
 }
@@ -346,7 +370,7 @@ export async function forceTransitionAs(
   id: string,
   target: Status,
   comment?: string,
-  embed?: EmbedFn
+  opts?: TransitionOptions
 ): Promise<{ id: string; status: Status }> {
   const visibility = viewerToVisibility(viewer);
   if (!isStaff(visibility)) {
@@ -391,8 +415,24 @@ export async function forceTransitionAs(
   // After the transaction, never inside it: a Bedrock call must not hold a
   // database transaction open, and its failure must not roll back the publish.
   if (target === "published") {
-    await refreshProjectEmbedding(id, embed);
+    await refreshProjectEmbedding(id, opts?.embed);
   }
+
+  // Same reasoning, and it matters more here: a failed email must not undo an
+  // approval. notifyTransitionByEmail swallows its own errors.
+  await notifyTransitionByEmail(
+    {
+      description: project.description,
+      id: project.id,
+      proposerEmail: project.proposerEmail,
+      proposerId: project.proposerId,
+      title: project.title,
+    },
+    target,
+    comment ?? null,
+    opts?.sendEmail ?? true,
+    opts?.send
+  );
 
   return { id, status: target };
 }
@@ -414,19 +454,21 @@ export async function updateProjectForCurrentUser(data: UpdateProjectInput) {
 export async function performTransitionForCurrentUser(
   id: string,
   target: Status,
-  comment?: string
+  comment?: string,
+  sendEmail?: boolean
 ) {
   const viewer = await requireUser();
-  return performTransitionAs(viewer, id, target, comment);
+  return performTransitionAs(viewer, id, target, comment, { sendEmail });
 }
 
 export async function forceTransitionForCurrentUser(
   id: string,
   target: Status,
-  comment?: string
+  comment?: string,
+  sendEmail?: boolean
 ) {
   const viewer = await requireUser();
-  return forceTransitionAs(viewer, id, target, comment);
+  return forceTransitionAs(viewer, id, target, comment, { sendEmail });
 }
 
 export async function softDeleteProjectForCurrentUser(id: string) {

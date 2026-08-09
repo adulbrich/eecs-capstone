@@ -1,26 +1,19 @@
-import type { EmailMessage, EmailSender } from "./sender";
+import type { EmailSender } from "./sender";
+import type { RenderedEmail } from "./templates";
 
 export class ConsoleEmailSender implements EmailSender {
-  sendVerification(msg: EmailMessage): Promise<void> {
-    this.write("VERIFY EMAIL", msg);
-    return Promise.resolve();
-  }
-
-  sendPasswordReset(msg: EmailMessage): Promise<void> {
-    this.write("RESET PASSWORD", msg);
-    return Promise.resolve();
-  }
-
-  private write(label: string, msg: EmailMessage) {
+  send(to: string, email: RenderedEmail): Promise<void> {
     const lines = [
       "",
       "==================== EMAIL (console transport) ====================",
-      `[${label}]`,
-      `  to:  ${msg.to}`,
-      `  url: ${msg.url}`,
+      `  to:      ${to}`,
+      `  subject: ${email.subject}`,
+      "",
+      email.text,
       "===================================================================",
       "",
     ];
     process.stderr.write(`${lines.join("\n")}\n`);
+    return Promise.resolve();
   }
 }
