@@ -157,6 +157,61 @@ describe("transitionItem", () => {
     );
   });
 
+  it("refuses a request line that is already closed", async () => {
+    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    const { line } = await makeRequestLine(student.id, item.id);
+    await db
+      .update(inventoryRequestItems)
+      .set({ status: "cancelled", closedAt: new Date() })
+      .where(eq(inventoryRequestItems.id, line.id));
+    await expect(
+      transitionItem(admin, {
+        itemId: item.id,
+        nextStatus: "reserved",
+        requestItemId: line.id,
+        holderId: student.id,
+      })
+    ).rejects.toThrow(/no longer open/);
+    const [after] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(after.status).toBe("available");
+    expect(after.currentRequestItemId).toBeNull();
+  });
+
+  it("refuses a request line that belongs to a different item", async () => {
+    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    const other = await makeItem();
+    const { line } = await makeRequestLine(student.id, other.id);
+    await expect(
+      transitionItem(admin, {
+        itemId: item.id,
+        nextStatus: "reserved",
+        requestItemId: line.id,
+        holderId: student.id,
+      })
+    ).rejects.toThrow(/different item/);
+  });
+
+  it("refuses a request line that does not exist", async () => {
+    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    await expect(
+      transitionItem(admin, {
+        itemId: item.id,
+        nextStatus: "reserved",
+        requestItemId: "00000000-0000-0000-0000-000000000000",
+        holderId: student.id,
+      })
+    ).rejects.toThrow(/Request line not found/);
+  });
+
   it("reserved transition updates line to approved + sets pickupBy + notifies", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");
@@ -1745,6 +1800,37 @@ describe("staff-assigned holds in my items", () => {
 
     const { active } = await listMyItemsAs(impostor);
     expect(active).toHaveLength(0);
+  });
+
+  it("still shows a hold whose request line was closed behind it", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h7-admin-${stamp}@x.com`, "admin");
+    const holder = await makeUser(`h7-holder-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Anemometer" });
+
+    await addToCartAs(holder, { itemId: item.id });
+    await submitCartAs(holder, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    // Close the line while the item still points at it. transitionItem now
+    // refuses to create this state, but a row written before that guard
+    // existed still has to render rather than disappear from both halves.
+    await db
+      .update(inventoryRequestItems)
+      .set({ status: "returned", closedAt: new Date() })
+      .where(eq(inventoryRequestItems.id, line.id));
+
+    const { active } = await listMyItemsAs(holder);
+
+    expect(active).toHaveLength(1);
+    expect(active[0].kind).toBe("hold");
+    expect(active[0].item.id).toBe(item.id);
   });
 
   it("does not let a stale holder email override an explicit account assignment", async () => {

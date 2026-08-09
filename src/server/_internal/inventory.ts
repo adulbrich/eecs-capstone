@@ -1270,6 +1270,11 @@ export async function listMyItemsAs(viewer: Viewer) {
           // twice on one person's page", not "a held item has no request".
           // Stated that way it also lets a teammate who collected someone
           // else's requested item see the hold they are actually carrying.
+          //
+          // The status filter has to be the same one the request half above
+          // uses, or the two stop partitioning: an item pointing at a closed
+          // line would be excluded here as a duplicate of a row that half
+          // never returns, and would vanish from the tab entirely.
           notExists(
             db
               .select({ one: sql`1` })
@@ -1284,7 +1289,8 @@ export async function listMyItemsAs(viewer: Viewer) {
                     inventoryRequestItems.id,
                     inventoryItems.currentRequestItemId
                   ),
-                  eq(inventoryRequests.userId, viewer.id)
+                  eq(inventoryRequests.userId, viewer.id),
+                  inArray(inventoryRequestItems.status, ["pending", "approved"])
                 )
               )
           ),

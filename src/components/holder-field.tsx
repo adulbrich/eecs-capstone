@@ -12,7 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "#/components/ui/popover";
-import { searchUsers } from "#/server/users";
+import { lookupUserByEmail, searchUsers } from "#/server/users";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -45,12 +45,6 @@ interface Props {
   onNameChange: (value: string) => void;
   onProgramChange: (value: string) => void;
   program: string;
-}
-
-/** The account whose address is exactly what is typed, if there is one. */
-function exactMatch(rows: Account[], email: string): Account | null {
-  const wanted = email.trim().toLowerCase();
-  return rows.find((r) => r.email.toLowerCase() === wanted) ?? null;
 }
 
 function AccountSearch({ onPick }: { onPick: (email: string) => void }) {
@@ -171,13 +165,17 @@ export function HolderField({
           onAccountStatusChange(next);
         };
         try {
-          const rows = (await searchUsers({ data: { q: trimmed } })) as
-            | Account[]
-            | undefined;
+          // An exact-address lookup, not the search endpoint: search caps
+          // and orders its results, so a real account can sit outside the
+          // window and read as "no account". Existence is not a question a
+          // result limit may answer.
+          const match = (await lookupUserByEmail({
+            data: { email: trimmed },
+          })) as Account | null;
           if (cancelled) {
             return;
           }
-          settle(exactMatch(rows ?? [], trimmed));
+          settle(match);
         } catch {
           if (cancelled) {
             return;

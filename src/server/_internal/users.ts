@@ -101,6 +101,39 @@ export async function searchUsersForCurrentUser(data: { q: string }) {
   return searchUsersAs(viewer, data);
 }
 
+/**
+ * The account at exactly this address, if there is one. Deliberately not
+ * `searchUsersAs` with a full address: that one substring-matches, orders by
+ * email and truncates at SEARCH_LIMIT, so an address whose text is contained
+ * in enough other addresses falls outside the returned window and reads as
+ * "no account". A caller deciding whether an account exists needs an answer
+ * that no result limit can change.
+ *
+ * `lower(email) = lower(input)` rather than `ilike`, because LIKE treats `_`
+ * as a single-character wildcard and underscores are ordinary in addresses.
+ */
+export async function lookupUserByEmailAs(
+  viewer: AuthUser,
+  data: { email: string }
+): Promise<{ id: string; name: string; email: string } | null> {
+  assertStaff(viewer);
+  const email = data.email.trim().toLowerCase();
+  if (!email) {
+    return null;
+  }
+  const [match] = await db
+    .select({ id: user.id, name: user.name, email: user.email })
+    .from(user)
+    .where(eq(sql`lower(${user.email})`, email))
+    .limit(1);
+  return match ?? null;
+}
+
+export async function lookupUserByEmailForCurrentUser(data: { email: string }) {
+  const viewer = await requireUser();
+  return lookupUserByEmailAs(viewer, data);
+}
+
 function buildUserConditions(data: ListUsersInput): SQL[] {
   const conditions: SQL[] = [];
   if (data.q) {

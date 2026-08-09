@@ -28,6 +28,19 @@ export const searchUsers = createServerFn({ method: "GET" })
     return searchUsersForCurrentUser(data);
   });
 
+const lookupUserByEmailSchema = z.object({
+  email: z.string().trim().max(320).default(""),
+});
+
+export const lookupUserByEmail = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => lookupUserByEmailSchema.parse(data ?? {}))
+  .handler(async ({ data }) => {
+    const { lookupUserByEmailForCurrentUser } = await import(
+      "./_internal/users"
+    );
+    return lookupUserByEmailForCurrentUser(data);
+  });
+
 const setUserRoleSchema = z.object({
   userId: z.string(),
   role: roleEnum,

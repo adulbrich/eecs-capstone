@@ -15,29 +15,7 @@ None.
 
 ## Known issues
 
-Defects and rough edges in code that is already built, as opposed to the feature
-roadmap below. Both of these predate the work that surfaced them and neither is
-currently reachable in a way that corrupts data.
-
-- **`transitionItem` does not revalidate the request line it is handed.** A
-  caller can pass a `requestItemId` for a line that is already `rejected`,
-  `cancelled` or `returned`, and the transition will attach it to the item
-  anyway. Nothing in the UI does this today, because the dialog only ever sends
-  the item's own `current_request_item_id`. The knock-on is in
-  `listMyItemsAs`: its `NOT EXISTS` guard deliberately has no status filter, so
-  an item pointing at a closed line would drop out of both halves of the Active
-  tab and vanish from the page. Fixing the validation upstream is the real
-  repair; adding `inArray(status, ["pending", "approved"])` to that subquery is
-  defence in depth. See `src/server/_internal/inventory-transitions.ts` and
-  `listMyItemsAs` in `src/server/_internal/inventory.ts`.
-- **The holder dialog can offer Name and Program to someone who has an
-  account.** `exactMatch` in `src/components/holder-field.tsx` decides "no
-  account" from the results of `searchUsers`, which applies a result limit and
-  orders by email, so a full address whose substring is shared by many others
-  can fall outside the returned window. Cosmetic only: the stored row is still
-  correct, because `resolveHolder` does its own exact lookup server-side and
-  discards a typed name once it resolves an account. An exact-address lookup
-  endpoint, rather than reusing the search one, would close it.
+None.
 
 ## Roadmap (not yet implemented)
 

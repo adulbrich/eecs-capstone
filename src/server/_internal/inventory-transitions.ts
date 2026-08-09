@@ -126,6 +126,48 @@ function validateInvariants(input: TransitionInput) {
   }
 }
 
+/**
+ * The statuses a request line can be in while an item still points at it.
+ * The same pair filters the Active tab's request half in `listMyItemsAs`,
+ * and the two have to agree: an item whose `current_request_item_id` names
+ * a line outside this set falls out of the request half without being
+ * picked up by the hold half, and the item disappears from the page.
+ */
+function isOpenRequestLine(status: string): boolean {
+  return status === "pending" || status === "approved";
+}
+
+/**
+ * A request line is only attachable to the item it was raised for, and only
+ * while it is still open. Runs before the item is locked, matching the
+ * line-then-item order `approveRequestItemAs` already takes; reversing it
+ * would deadlock the two paths against each other.
+ */
+async function lockAttachableRequestLine(
+  tx: Tx,
+  requestItemId: string,
+  itemId: string
+) {
+  const [line] = await tx
+    .select({
+      id: inventoryRequestItems.id,
+      itemId: inventoryRequestItems.itemId,
+      status: inventoryRequestItems.status,
+    })
+    .from(inventoryRequestItems)
+    .where(eq(inventoryRequestItems.id, requestItemId))
+    .for("update");
+  if (!line) {
+    throw new Error("Request line not found");
+  }
+  if (line.itemId !== itemId) {
+    throw new Error("Request line belongs to a different item");
+  }
+  if (!isOpenRequestLine(line.status)) {
+    throw new Error(`Request line is no longer open (${line.status})`);
+  }
+}
+
 interface ResolvedHolder {
   email: string | null;
   id: string | null;
@@ -196,6 +238,10 @@ async function transitionItemInTx(
   viewer: Viewer,
   input: TransitionInput
 ) {
+  if (input.requestItemId) {
+    await lockAttachableRequestLine(tx, input.requestItemId, input.itemId);
+  }
+
   const holder = await resolveHolder(tx, input);
   // The account is authoritative for anyone who has one, so a typed name or
   // program is dropped rather than stored alongside it and left to drift.
