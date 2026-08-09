@@ -1,4 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// `project-emails.ts` statically imports `#/db`, and that module's body throws
+// when DATABASE_URL is unset. Locally Vitest loads `.env.local` and supplies
+// one, but `.env.local` is gitignored, so CI's unit run has none and merely
+// importing the module under test kills the suite. That asymmetry means a
+// local `npm test` can never reproduce the failure.
+//
+// These tests genuinely never reach the database: every case uses a null
+// proposerId, so `lookupProposer` short circuits before touching `db`. Mocking
+// the module keeps the import harmless without weakening anything asserted
+// here. The database-backed paths are covered by the integration suite.
+vi.mock("#/db", () => ({ db: {} }));
+
 import { notifyTransitionByEmail } from "../project-emails";
 
 const PROJECT = {
