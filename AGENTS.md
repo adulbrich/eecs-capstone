@@ -52,8 +52,9 @@ when your change touches the database layer or the UI. Other scripts live in
   model wrote the commit.
 - **Stage files by name.** Never `git add -A` or `git add .`, which sweeps up
   unrelated work in progress.
-- **Work on `main`.** The user has consented to assistant commits landing there.
-  Create a branch only when asked.
+- **Never commit to `main`.** A branch ruleset rejects direct pushes, including the
+  user's. Branch, push, open a PR, and let the `verify` check go green. The PR needs
+  no approving review, so you can merge your own once CI passes.
 - **Check the docs for the fast-moving libraries with the context7 MCP server**
   rather than recalling them. TanStack Start is pre-v1, and Better Auth and Drizzle
   both move faster than training data. `docs/QUIRKS.md` outranks upstream docs
