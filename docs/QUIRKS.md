@@ -275,7 +275,26 @@ Long-term fix: use a separate `eecs_capstone_test` database with its own `DATABA
 
 ## Vitest test infrastructure
 
-### Scripts: dotenv inside the script does NOT work; use `tsx --env-file`
+### Run the tests on the Node in `.nvmrc`, not whatever is on PATH
+
+`.nvmrc` pins 24.16.0 and CI uses the same. On Node 26 the jsdom environment
+comes up without `localStorage`, and every test that touches it dies with
+`TypeError: Cannot read properties of undefined (reading 'clear')`. That is
+about 65 tests across `table-state`, `view-preference`, `use-seed-view`,
+`view-toggle` and `admin-data-table`, none of which have anything to do with
+whatever you were changing.
+
+`package.json` says `"engines": { "node": ">=24" }`, which Node 26 satisfies,
+so nothing warns you. A Homebrew or system Node is the usual way to end up
+there.
+
+The trap worth knowing: if your shell loads nvm through a function (the common
+lazy-load pattern), anything that bypasses shell function resolution silently
+gets the *other* Node. `env FOO=bar npx vitest ...` does exactly that, and so
+does any wrapper that execs a binary directly. `npx vitest` passes and
+`env npx vitest` fails, on the same machine, in the same directory, with no
+other difference. Check `node --version` from inside the same invocation before
+believing a strange test failure.
 
 ESM imports hoist above all statements. Writing `import { config } from "dotenv"; config({ path: ".env.local" }); import { db } from "..."` looks correct but is wrong: the `db` import runs at module-load time BEFORE the `config()` call ever fires, so `DATABASE_URL` is unset when `src/db/index.ts` evaluates and the script crashes.
 
