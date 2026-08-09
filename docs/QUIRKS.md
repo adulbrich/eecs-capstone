@@ -12,8 +12,12 @@ The stack is fast-moving: **TanStack Start** is pre-v1 as of 2026, **Better Auth
 4. [Better Auth](#better-auth)
 5. [Drizzle ORM + Postgres](#drizzle-orm--postgres)
 6. [Vitest test infrastructure](#vitest-test-infrastructure)
-7. [Biome and code style](#biome-and-code-style)
+7. [Biome / Ultracite and code style](#biome--ultracite-and-code-style)
 8. [Project conventions](#project-conventions)
+9. [Object storage (S3-compatible)](#object-storage-s3-compatible)
+10. [When you add a quirk](#when-you-add-a-quirk)
+11. [Inventory](#inventory)
+12. [Projects](#projects)
 
 ---
 
@@ -45,10 +49,10 @@ TanStack Start's `import-protection` plugin denies any client-chain import (stat
 
 We use the `_internal/` directory convention instead:
 
-- `src/server/x.ts` — client-importable wrapper. Imports ONLY `createServerFn`, `z`, types. Each `createServerFn().handler()` does `const { xImpl } = await import("./_internal/x"); return xImpl(...)`.
-- `src/server/_internal/x.ts` — server-only impl. Can statically import `db`, schema, drizzle, auth helpers, anything.
-- `src/lib/_internal/auth-guards.ts` — the server-only auth helpers (`readSession`, `requireUser`, `requireRole`).
-- `src/lib/auth-guards.ts` — the client-safe wrapper exposing `getSession` as a server function.
+- `src/server/x.ts`: client-importable wrapper. Imports ONLY `createServerFn`, `z`, types. Each `createServerFn().handler()` does `const { xImpl } = await import("./_internal/x"); return xImpl(...)`.
+- `src/server/_internal/x.ts`: server-only impl. Can statically import `db`, schema, drizzle, auth helpers, anything.
+- `src/lib/_internal/auth-guards.ts`: the server-only auth helpers (`readSession`, `requireUser`, `requireRole`).
+- `src/lib/auth-guards.ts`: the client-safe wrapper exposing `getSession` as a server function.
 
 The wrapper does ONE dynamic import per handler (just `./_internal/x`). The impl handles auth itself (statically imports `requireUser` and calls it). Two dynamic imports per handler (one for impl, one for auth) also works, but doubles the warning surface if anything goes wrong.
 
@@ -226,7 +230,7 @@ const tsvector = customType<{ data: string; driverData: string }>({
 searchVector: tsvector("search_vector").notNull(),
 ```
 
-The column is created in a hand-written migration as `GENERATED ALWAYS AS (...) STORED`. Drizzle's `db:generate` will not produce this for you; do not write the migration by tweaking the generated SQL — author it directly.
+The column is created in a hand-written migration as `GENERATED ALWAYS AS (...) STORED`. Drizzle's `db:generate` will not produce this for you. Do not write the migration by tweaking the generated SQL; author it directly.
 
 If you ever need to change the weight expression, drop the column and re-add it. Generated-always-stored columns cannot be altered in place.
 
@@ -326,8 +330,8 @@ Older docs show `test.poolOptions.forks.singleFork: true`. Vitest 4 removed that
 
 `npm test` runs print two harmless warnings:
 
-- `ReferenceError: module is not defined at .../react/index.js` — React's CJS module loading under Vite's ESM runner.
-- `Tests closed successfully but something prevents Vite server from exiting` — connection-lingering, no impact.
+- `ReferenceError: module is not defined at .../react/index.js`: React's CJS module loading under Vite's ESM runner.
+- `Tests closed successfully but something prevents Vite server from exiting`: connection-lingering, no impact.
 
 Tests still pass. Ignore both.
 
@@ -380,10 +384,10 @@ The unsafe autofix rewrote `viewer!.id` to `viewer?.id` (changing a throw into a
 
 ### Soft rules / project conventions
 
-- **No emdashes** anywhere in prose, comments, commit messages, or string literals. Also no `--` substitutes used as sentence dashes (hyphens in compound words like `read-only` are fine). Use commas, colons, semicolons, parens, or new sentences.
-- **No emojis** unless explicitly requested by the user.
-- **Lowercase imperative commit messages**, no Conventional Commits prefix. Examples: `add foo`, `fix bar in baz`, `move x into _internal/`.
-- **Co-author trailer** on every assistant-authored commit: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`. Use a HEREDOC to keep the multi-line body intact.
+The prose and commit-message rules (no emdashes, no emojis, lowercase imperative
+subject) bind every turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of
+here.
+
 - **Component file naming** is `kebab-case.tsx` (`project-card.tsx`, `status-badge.tsx`).
 - **`#/` import alias** for cross-directory imports inside `src/` (defined in `package.json`). Avoid `../../../...` chains.
 
@@ -396,18 +400,8 @@ The unsafe autofix rewrote `viewer!.id` to `viewer?.id` (changing a throw into a
 
 ## Project conventions
 
-### `AGENTS.md` is permanently dirty
-
-The user has uncommitted edits to `AGENTS.md`. Agents must NEVER:
-
-- `git add AGENTS.md`
-- `git add -A` or `git add .`
-
-Always name files explicitly when staging. The user commits `AGENTS.md` themselves when they want to.
-
-### Stay on `main`
-
-The user has explicitly consented to assistant commits landing on `main` for this project. Do not create feature branches unless the user asks.
+The git rules (stage by name, stay on `main`, leave `AGENTS.md` unstaged) bind every
+turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
 
 ### Path-by-path convention summary
 
@@ -428,6 +422,7 @@ The user has explicitly consented to assistant commits landing on `main` for thi
 | `docs/superpowers/specs/*` | Design docs per feature. One per "spec". |
 | `docs/superpowers/plans/*` | Implementation plans per spec. One per "spec". |
 | `docs/QUIRKS.md` | This file. |
+| `docs/UI-CONVENTIONS.md` | Design system rules: components, tokens, responsive layout. |
 
 ### Workflow conventions
 
@@ -549,9 +544,9 @@ When updating, keep the structure: short headline, one-paragraph explanation, co
 
 ### Categories: `domain` is closed, `type` is an open project-only facet, filtering is all-match
 
-`categories.domain` is a closed enum (`"project" | "inventory"`) fixed at creation and immutable on update; it decides which picker a category can appear in and, for inventory, is enforced again at the junction-table read (`listInventoryCategoriesImpl` in `src/server/_internal/inventory.ts` re-filters on `domain = 'inventory'` even though nothing today writes a project-domain row into `inventory_item_categories` — belt and suspenders, not a defense against something that currently happens). `categories.type` is a separate, nullable, free-text facet (grouping label like "technology" or "industry") that only the project domain uses for grouping in the UI; inventory categories always carry `type = null` and are rendered as one flat list, not grouped. An inventory item can carry many categories through `inventory_item_categories` (many-to-many), the same shape `project_categories` already used for projects.
+`categories.domain` is a closed enum (`"project" | "inventory"`) fixed at creation and immutable on update; it decides which picker a category can appear in and, for inventory, is enforced again at the junction-table read (`listInventoryCategoriesImpl` in `src/server/_internal/inventory.ts` re-filters on `domain = 'inventory'` even though nothing today writes a project-domain row into `inventory_item_categories`: belt and suspenders, not a defense against something that currently happens). `categories.type` is a separate, nullable, free-text facet (grouping label like "technology" or "industry") that only the project domain uses for grouping in the UI; inventory categories always carry `type = null` and are rendered as one flat list, not grouped. An inventory item can carry many categories through `inventory_item_categories` (many-to-many), the same shape `project_categories` already used for projects.
 
-Both listings filter categories as all-match, not any-match: every selected category id must be present on the item/project, not merely one of them. The shape is a subquery grouped by item/project id with `HAVING count(*) = <number of selected ids>` (`buildInventoryScope` in `src/server/_internal/inventory.ts`, mirroring `searchProjectsImpl` in `src/server/_internal/search.ts:40-46`); a plain `inArray` on the junction table would silently give any-match semantics instead. Every category filter's `.inputValidator` therefore expects `categories: z.array(z.string().uuid())`, not a singular `category: z.string().uuid().nullable()` — a route that still sends the singular key gets it silently stripped by Zod (the array param defaults to `[]`), and the filter does nothing while looking fine. `.catch([])` on the array schema is what lets a stale pre-multi-select `?category=<slug>` link degrade to "no filter" instead of a 500.
+Both listings filter categories as all-match, not any-match: every selected category id must be present on the item/project, not merely one of them. The shape is a subquery grouped by item/project id with `HAVING count(*) = <number of selected ids>` (`buildInventoryScope` in `src/server/_internal/inventory.ts`, mirroring `searchProjectsImpl` in `src/server/_internal/search.ts:40-46`); a plain `inArray` on the junction table would silently give any-match semantics instead. Every category filter's `.inputValidator` therefore expects `categories: z.array(z.string().uuid())`, not a singular `category: z.string().uuid().nullable()`. A route that still sends the singular key gets it silently stripped by Zod (the array param defaults to `[]`), and the filter does nothing while looking fine. `.catch([])` on the array schema is what lets a stale pre-multi-select `?category=<slug>` link degrade to "no filter" instead of a 500.
 
 Inventory full-text search no longer matches category names. Before this feature, `inventory_items.search_vector` weighted a `category` text column into the vector (`drizzle/0003_last_invaders.sql:61`, weight `'C'`). That column is gone; categories now live in the `categories` table, reached through the `inventory_item_categories` junction table. `search_vector` is a `GENERATED ALWAYS AS (...) STORED` column (see the tsvector quirk above), and a generated column can only read other columns on the same row, so it cannot follow that join to pull category names back in. The rebuilt column (`drizzle/0010_category_domains.sql`) simply drops the category term rather than trying to fake it. This is treated as an accepted gap, not a bug to fix: searching "electronics" no longer also surfaces every item merely tagged with a category named "electronics," but the all-match category filter documented above already covers that use case directly, and correctly, for a caller who wants it.
 

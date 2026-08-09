@@ -1,305 +1,99 @@
 # AI Agent Instructions
 
-This project is a TanStack Start application with React SSR, TanStack Query, TanStack Router, Drizzle ORM, and Better Auth. Object storage is handled with S3-compatible RustFS locally. The UI is built with shadcn/ui components and Radix primitives.
+The Oregon State University EECS Capstone app: browse and propose capstone projects,
+run them through a review workflow, and manage shared inventory.
 
-## Quick Start
+Stack: TanStack Start (React SSR) with TanStack Router, Query, Form, and Table;
+Drizzle ORM on PostgreSQL; Better Auth; shadcn/ui on Radix; Tailwind v4; S3-compatible
+object storage (RustFS locally, S3 in AWS).
 
-```bash
-# Install dependencies
-npm install
+This file is the entry point. It carries the rules that bind every turn and points at
+the reference docs for everything else.
 
-# Start local PostgreSQL database and S3 storage
-docker compose up -d
+`CLAUDE.md` in the repo root is a symlink to this file, and it is load-bearing:
+Claude Code auto-loads `CLAUDE.md` and does not read `AGENTS.md` on its own, so
+deleting the symlink leaves it with no project instructions at all. Keep both names
+pointing at this one file rather than maintaining a second copy.
 
-# Start development server
-npm run dev
-```
-
-To stop the database:
-
-```bash
-docker compose down
-```
-
-## Key Commands
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start dev server on port 3000 |
-| `npm run build` | Build for production |
-| `npm run db:generate` | Generate Drizzle migrations |
-| `npm run db:migrate` | Run Drizzle migrations |
-| `npm run db:push` | Push schema to database |
-| `npm run db:studio` | Open Drizzle Studio |
-| `npm run format` | Format with Ultracite (`ultracite fix`) |
-| `npm run lint` | Lint with Ultracite (`ultracite check`) |
-| `npm run check` | Run Ultracite checks |
-| `npm run typecheck` | Type-check with `tsc --noEmit` |
-| `npm test` | Run Vitest tests |
-
-## Architecture
-
-- **Routing**: TanStack Router with SSR (`src/router.tsx`, `src/routes/`)
-- **Data fetching**: TanStack Query with SSR integration (`src/integrations/tanstack-query/`)
-- **Auth**: Better Auth (`src/lib/auth.ts`, `src/integrations/better-auth/`)
-- **Database**: Drizzle ORM with PostgreSQL (`src/db/schema.ts`)
-- **UI**: shadcn/ui components with Radix primitives (`src/components/ui/`)
-
-## Database
-
-Database schema is defined in `src/db/schema.ts`. Use Drizzle commands to manage migrations:
+## Before you commit
 
 ```bash
-npm run db:generate
-npm run db:migrate
+npm run check      # ultracite check (Biome). Use npm run format to auto-fix.
+npm run typecheck  # tsc --noEmit
+npm test           # unit tests only
 ```
 
-## UI Components
-
-Use shadcn/ui with the `npx shadcn@latest add <component>` command. Existing components are in `src/components/ui/`.
-
-## Server functions
-
-Always import `createServerFn` from `@tanstack/react-start`, not `@tanstack/start`:
-
-```ts
-import { createServerFn } from "@tanstack/react-start";
-```
-
-## Code Quality
-
-This project uses **Ultracite** (a strict Biome preset) for formatting and linting.
-
-- `npm run check` runs `ultracite check` (read-only); `npm run format` runs `ultracite fix`.
-- `npm run typecheck` runs `tsc --noEmit`. Config lives in `biome.json`, extending `ultracite/biome/core` and `ultracite/biome/react`.
-- Always run `npm run check` and `npm run typecheck` after finishing work, and fix issues before committing. CI (`.github/workflows/ci.yml`) enforces check, typecheck, test, and build.
-- See `docs/QUIRKS.md` for the rules that are deliberately disabled, relaxed in tests, or deferred, and why.
-
-## Library documentation
-
-The stack moves fast (TanStack Start is pre-v1, Better Auth 1.5.x, Drizzle 0.45). Prefer the **context7** MCP server for current, version-accurate docs on these libraries rather than relying on training data. `docs/QUIRKS.md` is the ground truth for this codebase's specific gotchas.
-
-## Configuration
-
-- `biome.json` - Biome configuration
-- `drizzle.config.ts` - Drizzle configuration
-- `vite.config.ts` - Vite configuration
-- `tsconfig.json` - TypeScript configuration
-
-## UI Component Guidelines
-
-### Brand and design system
-
-The design system is defined in `src/lib/brand.ts` (single file for multi-institution portability) and `src/styles.css` (CSS custom properties). The primary brand color is Beaver Orange (`#D73F09`). Never hardcode hex colors in components; always reference CSS custom properties or Tailwind token aliases.
-
-### Button usage: always use `<Button>`
-
-Use the shadcn `Button` component from `#/components/ui/button` (or `./ui/button` within components) for **all interactive actions**. Never write raw `<button className="bg-brand ...">` or `<button className="border ...">`.
-
-| Variant | Use when |
-|---|---|
-| `default` | Primary CTA (Submit, Save, Create, Sign in, Sign up) |
-| `outline` | Secondary actions (Cancel, Edit, Sign out, Withdraw) |
-| `ghost` | Tertiary / low-emphasis (Reply, Remove in lists) |
-| `destructive` | Irreversible danger (Delete, Ban) |
-| `link` | Inline text links that look like buttons |
-
-Size guidance: `size="sm"` for most contextual buttons; `size="default"` for standalone form submits; `size="lg"` for hero/landing CTAs; `size="xs"` for inline micro-actions (Post reply, Cancel reply).
-
-### Links that look like buttons: use `asChild`
-
-When a navigation link needs button styling, use `asChild` to merge the Button styles onto the `<Link>` without nesting DOM elements:
-
-```tsx
-// Correct
-<Button asChild size="sm">
-  <Link to="/projects/new">New project</Link>
-</Button>
-
-// Wrong — do not do this
-<Link to="/projects/new" className="bg-brand px-3 py-1.5 text-white rounded">
-  New project
-</Link>
-```
-
-### Links that are plain navigation
-
-Nav links (Projects, My projects, Admin) use the `.nav-link` CSS class defined in `styles.css`. They get the brand-colored underline animation on hover/active. Do not use `.nav-link` on buttons.
-
-### Form inputs: always use shadcn components
-
-Use `<Input>`, `<Textarea>`, and `<Label>` from `#/components/ui/` for all form fields. Wrap label+input pairs with `space-y-1.5` for consistent vertical rhythm:
-
-```tsx
-<div className="space-y-1.5">
-  <Label htmlFor="email">Email</Label>
-  <Input id="email" name="email" type="email" required />
-</div>
-```
-
-Never use raw `<input className="w-full border p-2">` or `<textarea className="w-full border p-2">`.
-
-### Color tokens: use semantic Tailwind classes or CSS variables
-
-| Instead of | Use |
-|---|---|
-| `text-neutral-500` | `text-muted-foreground` |
-| `border-neutral-200`, `border-neutral-300` | `border-border` |
-| `bg-neutral-50`, `bg-neutral-100` | `bg-secondary` |
-| `bg-white` | `bg-card` |
-| `text-red-600`, `text-red-700` | `text-destructive` |
-| `text-blue-700` on links | Remove — the global `a` style handles it |
-| `bg-blue-50` for highlights | `bg-[var(--brand-primary-tint)]` |
-| `dark:bg-neutral-900` | `dark:bg-card` |
-| `dark:border-neutral-800` | `dark:border-border` |
-
-For status colors not covered by Tailwind aliases, use CSS variables directly:
-- Success: `style={{ color: "var(--status-success)" }}`
-- Warning: `style={{ color: "var(--status-warning)" }}`
-
-### Border radius
-
-All interactive elements use `rounded-md` (8px) consistently — this is the default in the Button and Input components. Cards and panels use `rounded-lg` or `rounded-xl`. Chips/badges use `rounded`. Avatars use `rounded-full`.
-
-### Auth pages
-
-Auth forms (sign-in, sign-up, forgot-password, reset-password) are wrapped in an `island-shell` card centered on the page:
-
-```tsx
-<div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">
-  <div className="island-shell w-full max-w-sm rounded-xl p-8">
-    ...
-  </div>
-</div>
-```
-
-### Status tabs
-
-Active status tabs use a brand-colored bottom border, not `border-black`:
-
-```tsx
-className={s === status ? "border-b-2 px-2 py-1 font-medium" : "px-2 py-1 text-muted-foreground hover:text-foreground"}
-style={s === status ? { borderBottomColor: "var(--brand-primary)" } : undefined}
-```
-
-### Pagination disabled state
-
-Disabled pagination links use `pointer-events-none text-muted-foreground/40`, not `text-neutral-300`.
-
-## Mobile-First Design
-
-This project is mobile-first. Write styles for small screens first, then add `md:` (768px+) overrides. Avoid `sm:` breakpoint overrides -- we use a two-tier system: mobile and desktop.
-
-### Page wrapper padding
-
-Every route page root element uses responsive padding:
-
-```tsx
-<div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
-```
-
-`px-4 py-6` gives comfortable touch-screen margins. `md:p-8` expands to the desktop-standard 32px all-around. Never use `p-8` alone on a page wrapper.
-
-### Interactive element height
-
-All inline form controls share `h-9` (36px) so adjacent elements align without magic numbers:
-
-| Component | How |
-|---|---|
-| `<Input>` | shadcn default is `h-9` |
-| `<Select>` (`<SelectTrigger>`) | shadcn default is `h-9` |
-| `<Button size="default">` | shadcn default is `h-9` |
-| `<ViewToggle>` | explicit `h-9` in component |
-
-When adding new controls that appear inline with an Input or Select, explicitly set `h-9` to stay aligned.
-
-### Mobile navigation
-
-The header uses a two-layout pattern. Desktop and mobile nodes both live in `SiteHeader` but only one is rendered at a time:
-
-```tsx
-{/* Desktop -- hidden on mobile */}
-<div className="hidden md:flex h-14 ...">...</div>
-
-{/* Mobile -- hidden on desktop */}
-<div className="flex h-14 md:hidden ...">...</div>
-```
-
-The mobile layout uses a **shadcn Sheet** (`side="left"`) as the navigation drawer, triggered by a hamburger `<Button variant="ghost">`. The Sheet is focus-trapped and accessible (Radix Dialog under the hood). Key rules:
-
-- Call `setOpen(false)` on every `<Link>` click so the drawer closes after navigation.
-- Keep the `SheetHeader` with a visible title (`Navigation`) for screen readers.
-- Notification bell renders outside the Sheet, directly in the mobile header bar, so it's always reachable.
-
-```tsx
-<Sheet open={open} onOpenChange={setOpen}>
-  <SheetTrigger asChild>
-    <Button variant="ghost" size="sm" aria-label="Open navigation">
-      <Menu className="h-5 w-5" />
-    </Button>
-  </SheetTrigger>
-  <SheetContent side="left" className="w-72 p-0">
-    ...
-  </SheetContent>
-</Sheet>
-```
-
-### Admin tables on mobile
-
-Admin tables (`<AdminTable>`) use the CSS `data-label` card pattern -- no JavaScript, no duplicated markup. On mobile, each row becomes a card and each cell shows its column heading inline.
-
-**Step 1 -- add `data-label` to every `<td>` that has a column heading:**
-
-```tsx
-<td data-label="Name" className="border border-border p-2">{row.name}</td>
-<td data-label="Type" className="border border-border p-2 text-muted-foreground">{row.type}</td>
-<td className="border border-border p-2">  {/* action cell -- no label */}
-  <Link to="...">Edit</Link>
-</td>
-```
-
-**Step 2 -- the `.admin-table` CSS class** (defined in `src/styles.css`) handles the rest automatically at `max-width: 767px`. It hides the `<thead>`, turns each `<tr>` into a card, and injects the label as a `::before` pseudo-element using `content: attr(data-label)`.
-
-Never use a `<table>` inside an admin page without wrapping it in `<AdminTable>` and adding `data-label` attributes.
-
-### Responsive steppers
-
-Multi-step progress indicators (like the staff status stepper) use a two-axis layout:
-
-```tsx
-{/* One item: vertical stack on mobile, horizontal row on desktop */}
-<div className="flex flex-col md:flex-row md:items-center">
-  {i > 0 && (
-    <>
-      {/* Connector line -- vertical on mobile */}
-      <div aria-hidden className="ml-3.5 h-4 w-px bg-border md:hidden" />
-      {/* Connector line -- horizontal on desktop */}
-      <div aria-hidden className="hidden h-px w-5 bg-border md:block" />
-    </>
-  )}
-  <button ...>{label}</button>
-</div>
-```
-
-The connector renders as a sibling of the pill button inside a `flex-col` container. On mobile the connector appears above the pill (vertical track). On desktop `md:flex-row` puts the connector to the left (horizontal track). The outer stepper container uses `md:overflow-x-auto` for long status lists.
-
-### Select with empty / "all" sentinel
-
-Radix UI `SelectItem` does not accept `value=""`. When a Select needs an "All" / unset option, use the `"_all_"` sentinel and convert it at the call site:
-
-```tsx
-<Select
-  value={filter ?? "_all_"}
-  onValueChange={(v) => setFilter(v === "_all_" ? null : v)}
->
-  <SelectTrigger className="h-9 w-full">
-    <SelectValue placeholder="All" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="_all_">All</SelectItem>
-    {items.map((item) => (
-      <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
-    ))}
-  </SelectContent>
-</Select>
-```
+All three must be clean. CI (`.github/workflows/ci.yml`) enforces check, typecheck,
+test, and build, so a red local run is a red PR.
+
+`npm test` deliberately excludes the integration and accessibility suites. Run
+`npm run test:integration` (needs docker Postgres up) and `npm run test:accessibility`
+when your change touches the database layer or the UI. Other scripts live in
+`package.json`.
+
+## Always
+
+- **Prose contains no emdashes and no emojis.** This covers commit messages, code
+  comments, string literals, docs, and chat replies. Use commas, colons, semicolons,
+  parens, or a new sentence. A `--` standing in for a sentence dash is the same
+  violation; hyphens inside compound words like `read-only` are fine. Emojis only
+  when the user asks for one.
+- **Commit messages use Conventional Commits with a lowercase imperative subject:**
+  `fix(projects): stop the proposer field lying about pending changes`. The types in
+  use are `feat`, `fix`, `docs`, `test`, `refactor`, and `style`, each with the
+  affected area in parentheses.
+- **Keep the body short, or leave it out.** A sentence or two on why, and only when
+  the subject does not already carry it. Cut anything that does not change what a
+  reader will do or understand. Commits before 2026-08-09 run to several paragraphs;
+  they are history, not the pattern to copy. Use a HEREDOC when a body needs more
+  than one line.
+- **Keep the `Co-Authored-By` trailer** your harness supplies on assistant-authored
+  commits. Do not pin a model version in these docs; the harness fills in whichever
+  model wrote the commit.
+- **Stage files by name.** Never `git add -A` or `git add .`, which sweeps up
+  unrelated work in progress.
+- **Work on `main`.** The user has consented to assistant commits landing there.
+  Create a branch only when asked.
+- **Check the docs for the fast-moving libraries with the context7 MCP server**
+  rather than recalling them. TanStack Start is pre-v1, and Better Auth and Drizzle
+  both move faster than training data. `docs/QUIRKS.md` outranks upstream docs
+  wherever the two disagree about this codebase.
+- **Import `createServerFn` from `@tanstack/react-start`.** The bare
+  `@tanstack/start` package is not what this project uses.
+
+## Reference docs
+
+Read the matching doc before you start; each one is the source of truth for its area.
+
+- **[`docs/QUIRKS.md`](./docs/QUIRKS.md)** is the ground truth for how this codebase
+  actually behaves, and the first stop when something that should work does not. It
+  covers `createServerFn` and the server/client boundary, route layouts and search
+  params, TanStack Form validators, Better Auth sessions and bans, Drizzle tsvector
+  columns and FK rules, Vitest and integration-test setup, Sharp and S3 storage keys,
+  which Biome rules are relaxed and why, the path-by-path layout of `src/`, the
+  spec-then-plan-then-implement workflow, and the inventory and project domain rules.
+
+- **[`docs/UI-CONVENTIONS.md`](./docs/UI-CONVENTIONS.md)** is the design system:
+  brand tokens and why hex codes never go in a component, `Button` variants and
+  sizes, `asChild` for links, shadcn form inputs, semantic color classes, border
+  radius, mobile-first breakpoints and page padding, the `Sheet` mobile nav, and
+  `AdminDataTable` for responsive admin tables.
+
+- **[`README.md`](./README.md)** covers install, docker compose, seeding, running the
+  dev server, and the current known issues and roadmap.
+
+- **[`PRD.md`](./PRD.md)** is the exhaustive feature list, built and planned. Check it
+  before assuming a feature is missing.
+
+- **[`DEPLOYMENT.md`](./DEPLOYMENT.md)** and **[`infra/`](./infra/)** cover the AWS
+  deployment, Terraform, and environment variables.
+
+- **[`docs/ONID-SSO.md`](./docs/ONID-SSO.md)** covers the OSU SAML / ONID single
+  sign-on request, which is blocked on the university rather than on code.
+
+## Adding to these docs
+
+A new gotcha goes in `docs/QUIRKS.md` under the subsystem it belongs to, following the
+pattern in its "When you add a quirk" section. A new design system rule goes in
+`docs/UI-CONVENTIONS.md`. Add to this file only when the rule binds every turn
+regardless of what is being worked on.
