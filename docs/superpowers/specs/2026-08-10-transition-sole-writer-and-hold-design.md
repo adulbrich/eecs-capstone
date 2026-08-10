@@ -182,9 +182,24 @@ in `validateInvariants` and becomes unrepresentable.
 
 `transitionSchema` stays loose, accepting the four nullable fields it accepts
 today. The Hold constructor is the single place that turns loose fields into a
-union, and the single place that throws on an illegal combination.
-`validateInvariants`'s `reserved` and `checked_out` arm is deleted as
-redundant once every path goes through the constructor.
+union, and it throws on an illegal combination.
+
+**`validateInvariants` keeps its `reserved` and `checked_out` arm.** An earlier
+draft of this design deleted it as redundant. Two facts in
+`inventory.integration.test.ts:140-157` say otherwise:
+
+1. It asserts the arm's exact wording, `holder email or a holder label, not
+   both and not neither`. The constructor's message differs, so deleting the
+   arm breaks two assertions and violates the additive constraint.
+2. It passes `holderId` together with `holderLabel` and expects a throw. The
+   `holderId` path resolves an already-known account directly rather than
+   through the constructor, because that id may name an account that no longer
+   exists and the constructor derives identity from the address. So the
+   constructor never sees that combination.
+
+The arm is therefore the wire-level guard with a stable message, and the
+constructor is what makes the illegal states unrepresentable downstream of it.
+Both, not one.
 
 Tightening the wire schema into a Zod discriminated union was considered and
 rejected: it is a wire-format change, out of bounds under the additive

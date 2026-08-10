@@ -1,6 +1,8 @@
 # Transition Sole Writer and Hold Module Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Implement inline, phase by phase, with a code review gate at the end of each phase. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> This plan deliberately does **not** use `superpowers:subagent-driven-development`, unlike most plans in this directory. Phase 2 is a verification checkpoint whose entire value is that the whole integration suite passes with zero test edits, and phases 3 through 5 build directly on it. Parallel agents would be producing work that cannot be verified until that checkpoint clears, so the phases are sequential by nature and there is nothing to fan out.
 
 **Goal:** Make `transitionItem` the sole writer of inventory item status, holder columns and status history that `docs/QUIRKS.md` already claims it is, and give the hold identity rules one pure module instead of six copies spread across three tiers.
 
@@ -22,6 +24,8 @@
   - Integration: `ulimit -n 8192; CI=true npm run test:integration` (needs docker Postgres up; truncates every table in `beforeEach`, wiping dev seed data)
 - **Before every commit:** `npm run check` and `npm run typecheck` in full, never per-file. `npm exec -- ultracite fix` resolves most formatting failures.
 - **Never commit to `main`.** Work happens on `refactor/transition-sole-writer-and-hold`.
+- **Every phase ends with a code review before the next one starts.** Run `/code-review` on the phase's diff, or `superpowers:requesting-code-review`. Findings are resolved in the same phase, not deferred. This matters more than usual here: the integration suite is the only executable specification of this behavior, it does not run in CI, and there is no end-to-end coverage beneath it.
+- **Phase 2 cannot be verified without docker Postgres.** If it is not running, stop rather than proceeding to phase 3 on an unrun checkpoint.
 
 ## File Structure
 
@@ -49,7 +53,8 @@
 ## Phase 2: the write path uses Hold
 
 - [ ] In `inventory-transitions.ts`, have `resolveHolder` return a `Hold` and `transitionItemInTx` flatten it through the Hold writer instead of hand-assigning five columns in two places (the item update and the history insert).
-- [ ] Delete the `reserved` and `checked_out` arm of `validateInvariants`; the constructor now enforces it. Leave the other arms alone.
+- [ ] **Keep** the `reserved` and `checked_out` arm of `validateInvariants`. `inventory.integration.test.ts:140-157` asserts its exact wording, and it also catches `holderId` plus `holderLabel`, which the `holderId` resolution path never routes through the constructor. Add a comment recording both reasons so a later reader does not delete it as redundant.
+- [ ] Comment the `holderId` branch of `resolveHold` to say it bypasses the constructor deliberately, that `approveRequestItemAs` is its only caller, and that the caller passes no label.
 - [ ] No interface change in this phase. Run `ulimit -n 8192; CI=true npm run test:integration` and confirm green with zero test edits. This is the checkpoint that proves the union is behavior-preserving.
 - [ ] Commit: `refactor(inventory): write holds through the Hold module`
 
