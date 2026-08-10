@@ -39,6 +39,7 @@ None.
   than a flake usually would, because the integration suite is the only executable
   specification of this behavior and it does not run in CI, so nobody is watching it
   go red.
+- No proper end-to-end (e2e) tests but for accessibility. All features in PRD should be e2e tested. In addition, we should have smoke tests for the most important flows and run the smoke test in CI.
 
 ## Roadmap (not yet implemented)
 
