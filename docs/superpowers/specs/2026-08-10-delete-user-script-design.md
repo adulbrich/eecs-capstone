@@ -54,14 +54,24 @@ Deleting the `user` row cascades `session`, `account`, `notifications`,
 its categories, collaborators, comments, status history, edit log, and
 bookmarks.
 
-Two columns are `ON DELETE SET NULL` and need thought rather than acceptance:
+The `ON DELETE SET NULL` columns are the ones that need thought rather than
+acceptance. `RESTRICT` fails loudly when the script gets it wrong; `SET NULL`
+succeeds and quietly degrades a record, so each one needs an explicit guard or
+an explicit reason it does not.
 
-- `projects.proposer_id` nulls out while `proposer_email` survives. This script
-  deletes the account's own projects outright, so the case does not arise for
-  them.
-- `inventory_items.current_holder_id` nulls out. This one is a trap: an item
-  the account has checked out would stay in `checked_out` with no holder, and
-  nothing in the app can return it from there.
+- `projects.proposer_id` nulls out while `proposer_email` survives. The script
+  deletes the account's own projects outright, so the case does not arise.
+- `inventory_items.current_holder_id` nulls out without changing `status`. An
+  item the account has checked out would stay in `checked_out` with no holder,
+  and nothing in the app can return it from there.
+- `inventory_item_status_history.holder_id`, and `.request_item_id` via the
+  account's own request lines. Both would strip attribution off a *real* item's
+  history.
+- `inventory_request_items.reviewed_by` and `.closed_by`. An account that
+  reviewed someone else's request would have that attribution nulled.
+
+The last three are why the inventory blockers check every reference rather than
+only the `RESTRICT` ones.
 
 ## Design
 
@@ -102,8 +112,9 @@ count. "Their project" means a project whose `proposer_id` is the target.
 | `project_comments` authored on a project that is not theirs | Removing them edits another person's thread |
 | `project_status_history.changed_by` on a project that is not theirs | They reviewed real work |
 | `project_edit_log.editor_id` on a project that is not theirs | They edited real work |
-| Any `inventory_item_status_history.changed_by` row | Items are never user-owned, so every such row is an action on shared data |
+| Any `inventory_item_status_history` row naming them as changer or holder, or reached through their own request lines | Items are never user-owned, so every such row is an action on shared data |
 | Any `inventory_item_edit_log.editor_id` row | Same |
+| `inventory_request_items` they reviewed or closed on someone else's request | Same |
 | `projects.program_manager_id` on a project that is not theirs | `RESTRICT`, and a real assignment |
 | Any `project_bids` or `project_assignments` row naming them, in any column | `RESTRICT`, and neither table has a UI to clean up through |
 | Bids or assignments by anyone on one of their projects | Would block deleting that project |

@@ -4,10 +4,18 @@ import pg from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import { db } from "#/db";
 import {
+  inventoryItemEditLog,
+  inventoryItemStatusHistory,
   inventoryItems,
+  inventoryRequestItems,
+  inventoryRequests,
   notifications,
+  programs,
+  projectAssignments,
+  projectBids,
   projectBookmarks,
   projectComments,
+  projectEditLog,
   projectStatusHistory,
   projects,
   user,
@@ -36,6 +44,28 @@ async function makeProject(proposerId: string | null, title = "A project") {
     .returning({ id: projects.id });
   return row.id;
 }
+
+async function makeItem(name = "Multimeter") {
+  const [row] = await db
+    .insert(inventoryItems)
+    .values({ name })
+    .returning({ id: inventoryItems.id });
+  return row.id;
+}
+
+async function makeRequest(userId: string, itemId: string) {
+  const [request] = await db
+    .insert(inventoryRequests)
+    .values({ userId })
+    .returning({ id: inventoryRequests.id });
+  const [line] = await db
+    .insert(inventoryRequestItems)
+    .values({ requestId: request.id, itemId })
+    .returning({ id: inventoryRequestItems.id });
+  return { requestId: request.id, lineId: line.id };
+}
+
+const EMPTY_LOG = { changedFields: ["title"], oldValues: {}, newValues: {} };
 
 describe("delete-user script", () => {
   it("reports nothing for an address with no account", async () => {
@@ -179,6 +209,153 @@ describe("delete-user script", () => {
     expect(result.deleted).toBe(false);
     expect(result.blockers.map((b) => b.relation)).toContain(
       "inventory_items.current_holder_id"
+    );
+  });
+
+  it("refuses when they edited someone else's project", async () => {
+    const target = await makeUser();
+    const bystander = await makeUser();
+    const otherProject = await makeProject(bystander.id);
+    await db
+      .insert(projectEditLog)
+      .values({ projectId: otherProject, editorId: target.id, ...EMPTY_LOG });
+
+    const result = await purgeUser(pool, target.email);
+
+    expect(result.deleted).toBe(false);
+    expect(result.blockers.map((b) => b.relation)).toContain(
+      "project_edit_log"
+    );
+  });
+
+  it("refuses when they changed an inventory item's status", async () => {
+    const target = await makeUser();
+    await db.insert(inventoryItemStatusHistory).values({
+      itemId: await makeItem(),
+      newStatus: "reserved",
+      changedBy: target.id,
+    });
+
+    const result = await purgeUser(pool, target.email);
+
+    expect(result.deleted).toBe(false);
+    expect(result.blockers.map((b) => b.relation)).toContain(
+      "inventory_item_status_history"
+    );
+  });
+
+  // holder_id is ON DELETE SET NULL, so without an explicit guard this deletes
+  // cleanly and silently strips the holder off a real item's history.
+  it("refuses when inventory history records them as a past holder", async () => {
+    const target = await makeUser();
+    const staff = await makeUser();
+    await db.insert(inventoryItemStatusHistory).values({
+      itemId: await makeItem(),
+      newStatus: "checked_out",
+      changedBy: staff.id,
+      holderId: target.id,
+    });
+
+    const result = await purgeUser(pool, target.email);
+
+    expect(result.deleted).toBe(false);
+    expect(result.blockers.map((b) => b.relation)).toContain(
+      "inventory_item_status_history"
+    );
+  });
+
+  it("refuses when they edited an inventory item", async () => {
+    const target = await makeUser();
+    await db
+      .insert(inventoryItemEditLog)
+      .values({ itemId: await makeItem(), editorId: target.id, ...EMPTY_LOG });
+
+    const result = await purgeUser(pool, target.email);
+
+    expect(result.deleted).toBe(false);
+    expect(result.blockers.map((b) => b.relation)).toContain(
+      "inventory_item_edit_log"
+    );
+  });
+
+  // reviewed_by is also SET NULL. Their own request lines are not a blocker;
+  // someone else's are.
+  it("refuses when they reviewed someone else's inventory request", async () => {
+    const target = await makeUser();
+    const requester = await makeUser();
+    const { lineId } = await makeRequest(requester.id, await makeItem());
+    await db
+      .update(inventoryRequestItems)
+      .set({ reviewedBy: target.id })
+      .where(eq(inventoryRequestItems.id, lineId));
+
+    const result = await purgeUser(pool, target.email);
+
+    expect(result.deleted).toBe(false);
+    expect(result.blockers.map((b) => b.relation)).toContain(
+      "inventory_request_items"
+    );
+  });
+
+  it("purges their own inventory request, reviewed or not", async () => {
+    const target = await makeUser();
+    const staff = await makeUser();
+    const { requestId, lineId } = await makeRequest(
+      target.id,
+      await makeItem()
+    );
+    await db
+      .update(inventoryRequestItems)
+      .set({ reviewedBy: staff.id, status: "returned" })
+      .where(eq(inventoryRequestItems.id, lineId));
+
+    const result = await purgeUser(pool, target.email);
+
+    expect(result.blockers).toEqual([]);
+    expect(result.deleted).toBe(true);
+    expect(
+      await db
+        .select()
+        .from(inventoryRequests)
+        .where(eq(inventoryRequests.id, requestId))
+    ).toHaveLength(0);
+  });
+
+  it("refuses when they have a project bid", async () => {
+    const target = await makeUser();
+    const bystander = await makeUser();
+    const [program] = await db
+      .insert(programs)
+      .values({ courseId: "CS461", courseName: "Capstone" })
+      .returning({ id: programs.id });
+    await db.insert(projectBids).values({
+      projectId: await makeProject(bystander.id),
+      studentId: target.id,
+      programId: program.id,
+      motivation: "Interested",
+      rank: 1,
+    });
+
+    const result = await purgeUser(pool, target.email);
+
+    expect(result.deleted).toBe(false);
+    expect(result.blockers.map((b) => b.relation)).toContain("project_bids");
+  });
+
+  it("refuses when they assigned someone to a project", async () => {
+    const target = await makeUser();
+    const student = await makeUser();
+    await db.insert(projectAssignments).values({
+      projectId: await makeProject(null),
+      studentId: student.id,
+      assignedBy: target.id,
+    });
+
+    const result = await purgeUser(pool, target.email);
+
+    expect(result.deleted).toBe(false);
+    expect(result.blockers.map((b) => b.relation)).toContain(
+      "project_assignments"
     );
   });
 

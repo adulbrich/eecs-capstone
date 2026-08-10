@@ -66,11 +66,31 @@ const BLOCKERS = [
   {
     // Inventory items are shared and never user-owned, so every row here is an
     // action on someone else's record. No ownership test to apply.
+    //
+    // All three references, not just changed_by. holder_id is ON DELETE SET
+    // NULL and request_item_id nulls when this account's request lines go, so
+    // those two would silently strip a real item's history rather than
+    // erroring. A SET NULL edge is the one that needs an explicit guard.
     relation: "inventory_item_status_history",
-    reason: "inventory item status changes",
+    reason: "inventory item history naming them",
     sql: `SELECT count(*)::int AS count
-            FROM inventory_item_status_history
-           WHERE changed_by = $1`,
+            FROM inventory_item_status_history h
+            LEFT JOIN inventory_request_items ri ON ri.id = h.request_item_id
+            LEFT JOIN inventory_requests r ON r.id = ri.request_id
+           WHERE h.changed_by = $1
+              OR h.holder_id = $1
+              OR r.user_id = $1`,
+  },
+  {
+    // Also SET NULL, also silent. Their own request lines go with the request,
+    // so only lines on someone else's request count.
+    relation: "inventory_request_items",
+    reason: "inventory requests they reviewed or closed",
+    sql: `SELECT count(*)::int AS count
+            FROM inventory_request_items ri
+            JOIN inventory_requests r ON r.id = ri.request_id
+           WHERE (ri.reviewed_by = $1 OR ri.closed_by = $1)
+             AND r.user_id IS DISTINCT FROM $1`,
   },
   {
     relation: "inventory_item_edit_log",
