@@ -1338,12 +1338,23 @@ export async function collectedByForRequestItems(
     if (!r.requestItemId) {
       continue;
     }
-    // Same rule as holderEmailOf and holderNameOf: the account wins, the
-    // stored values cover a collector who had no account.
+    // The account wins over the stored values, which cover a collector who
+    // had no account. Same reconciliation as every other joined read, so it
+    // comes from the Hold module rather than being restated here.
+    const hold = holdFromJoinedRow(
+      {
+        currentHolderId: r.holderId,
+        currentHolderEmail: r.holderEmail,
+        currentHolderLabel: null,
+        currentHolderName: r.holderName,
+        currentHolderProgram: null,
+      },
+      { accountEmail: r.accountEmail, accountName: r.accountName }
+    );
     map.set(r.requestItemId, {
       id: r.holderId,
-      email: r.accountEmail ?? r.holderEmail,
-      name: r.accountName ?? r.holderName,
+      email: holdEmail(hold),
+      name: holdName(hold),
     });
   }
   return map;

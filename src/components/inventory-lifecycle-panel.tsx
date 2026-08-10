@@ -1,6 +1,10 @@
 import { useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { formatHoldDetailed, holdFromStoredRow } from "#/lib/hold";
+import {
+  formatHoldDetailed,
+  formatHoldShort,
+  holdFromStoredRow,
+} from "#/lib/hold";
 import {
   hardDeleteInventoryItem,
   transitionInventoryItem,
@@ -192,6 +196,21 @@ function formatHolderDisplay(item: Props["item"]): string | null {
   );
 }
 
+/**
+ * A history row records the same hold under its own column names. Mapping it
+ * back onto the Hold shape is what lets this list share the precedence order
+ * with the item panel instead of restating it.
+ */
+function holdOfHistoryRow(h: HistoryRow) {
+  return holdFromStoredRow({
+    currentHolderId: h.holderId,
+    currentHolderEmail: h.holderEmail,
+    currentHolderLabel: h.holderLabel,
+    currentHolderName: h.holderName,
+    currentHolderProgram: h.holderProgram,
+  });
+}
+
 const HISTORY_PAGE_SIZE = 10;
 
 function StatusHistorySection({ history }: { history: HistoryRow[] }) {
@@ -227,7 +246,11 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
                 </div>
                 {(h.holderEmail || h.holderLabel) && (
                   <p className="mt-1 text-muted-foreground text-xs">
-                    Holder: {h.holderName ?? h.holderEmail ?? h.holderLabel}
+                    {/* The precedence comes from the Hold module; the two
+                        suffixes are this list's own format, and a history row
+                        shows a program even beside a label, which the item
+                        panel above does not. */}
+                    Holder: {formatHoldShort(holdOfHistoryRow(h))}
                     {h.holderName && h.holderEmail ? ` (${h.holderEmail})` : ""}
                     {h.holderProgram ? ` · ${h.holderProgram}` : ""}
                   </p>

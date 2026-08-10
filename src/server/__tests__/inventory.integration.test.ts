@@ -3024,6 +3024,30 @@ describe("transitionItem authority and line outcome", () => {
     expect(closed.status).toBe("returned");
   });
 
+  it("refuses a self-service transition that names another holder", async () => {
+    // resolveHold reads holderEmail before holderId, so guarding only the id
+    // would leave the field the resolver actually prefers unchecked.
+    const { student, item, line } = await reserveToStudent();
+    await expect(
+      transitionItem(student, {
+        itemId: item.id,
+        nextStatus: "requested",
+        requestItemId: line.id,
+        holderId: "some-other-account",
+        authority: "self_request",
+      })
+    ).rejects.toThrow(/only act on its own viewer/);
+    await expect(
+      transitionItem(student, {
+        itemId: item.id,
+        nextStatus: "requested",
+        requestItemId: line.id,
+        holderEmail: "victim@oregonstate.edu",
+        authority: "self_request",
+      })
+    ).rejects.toThrow(/may not name a holder address/);
+  });
+
   it("refuses a self_cancel that is not a release", async () => {
     const { student, item } = await reserveToStudent();
     await expect(

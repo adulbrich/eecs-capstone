@@ -131,8 +131,19 @@ function assertAuthorized(viewer: Viewer, input: TransitionInput) {
   // this, self_request would let a caller place a request hold on somebody
   // else's account, which is the first thing a self-service authority that
   // reaches a holder-writing arm could be abused for.
+  //
+  // Both identity fields are covered, not just the id. `resolveHold` reads
+  // `holderEmail` FIRST and derives the account from it, so guarding only the
+  // id would leave the field the resolver actually prefers wide open. No
+  // self-service caller supplies an address (submitCartAs passes its own id,
+  // cancel passes neither), so refusing it outright costs nothing.
   if (input.holderId && input.holderId !== viewer.id) {
     throw new Error("A self-service transition may only act on its own viewer");
+  }
+  if (input.holderEmail) {
+    throw new Error(
+      "A self-service transition may not name a holder address; the viewer is the holder"
+    );
   }
 }
 

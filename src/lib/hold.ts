@@ -143,10 +143,13 @@ export function holdFromInput(
   input: HoldInput,
   account: ResolvedAccount
 ): Hold {
+  // `||`, not `??`, on all four: an empty string is not a value. See the
+  // empty-string note in the module docblock, whose worked example is
+  // precisely an empty `current_holder_name` blanking the admin Holder cell.
   const email = input.email || null;
   const label = input.label || null;
-  const name = input.name ?? null;
-  const program = input.program ?? null;
+  const name = input.name || null;
+  const program = input.program || null;
 
   if ((email || account.accountId) && label) {
     throw new Error(
@@ -310,7 +313,11 @@ export function holdName(hold: Hold): string | null {
 export function formatHoldShort(hold: Hold): string | null {
   switch (hold.kind) {
     case "thing":
-      return hold.label;
+      // A name beats the label here, unlike in the detailed format. The staff
+      // search filter ORs over current_holder_name specifically because this
+      // column renders it: staff must be able to read a name off the table
+      // and find the row by typing it back in.
+      return hold.name ?? hold.label;
     case "account":
       return hold.name ?? hold.email;
     case "walk_in":

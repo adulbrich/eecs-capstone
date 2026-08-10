@@ -114,6 +114,21 @@ describe("holdFromInput", () => {
     });
   });
 
+  it("treats an empty name or program as absent, not as a value", () => {
+    // An empty string is not a value. `??` does not treat "" as absent, so an
+    // empty current_holder_name would stop the admin Holder column's
+    // name-then-address-then-label chain from falling through and render a
+    // blank cell for an item that does have a holder.
+    expect(
+      holdFromInput({ email: "w@in.test", name: "", program: "" }, NO_ACCOUNT)
+    ).toEqual({
+      kind: "walk_in",
+      email: "w@in.test",
+      name: null,
+      program: null,
+    });
+  });
+
   it("does not trim a whitespace-only address into no hold at all", () => {
     expect(holdFromInput({ email: "   " }, NO_ACCOUNT)).toEqual({
       kind: "walk_in",
@@ -365,6 +380,22 @@ describe("formatHoldShort", () => {
         program: "ECE",
       })
     ).toBe("Wanda");
+  });
+
+  it("prefers a thing's stored name over its label", () => {
+    // The admin Holder column renders this, and listAdminInventoryAs ORs
+    // over current_holder_name specifically so a staff member can read a
+    // name off the table and find the row by typing it back in. Returning
+    // the label here would break that pairing. Note this deliberately
+    // differs from formatHoldDetailed, which renders a thing as its label.
+    expect(
+      formatHoldShort({
+        kind: "thing",
+        label: "Lab 204",
+        name: "Robotics club",
+        program: "CS 461",
+      })
+    ).toBe("Robotics club");
   });
 });
 
