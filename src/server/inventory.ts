@@ -238,7 +238,16 @@ export const listInventoryRequests = createServerFn({ method: "GET" })
     return listInventoryRequestsForCurrentUser(data);
   });
 
-const transitionSchema = z.object({
+/**
+ * Exported so `src/test/inventory-schemas.test.ts` can prove it strips
+ * `authority`. That is not a style preference: `transitionInventoryItem`
+ * carries only `requireUser()`, so `assertStaff` inside `transitionItem` is
+ * the entire staff gate for this endpoint, and `authority` is the only way
+ * past it. Adding `.passthrough()` or `.catchall()` here, or declaring the
+ * field, would let any signed-in user retire any item. The test is what makes
+ * that fail loudly instead of silently.
+ */
+export const transitionSchema = z.object({
   itemId: z.string().uuid(),
   nextStatus: z.enum([
     "available",
