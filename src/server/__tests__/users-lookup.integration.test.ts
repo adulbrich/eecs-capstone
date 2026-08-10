@@ -42,7 +42,7 @@ describe("lookupUserByEmail", () => {
 
   it("matches regardless of the case typed", async () => {
     // Scoped to this endpoint, which answers "does an account exist". The
-    // write path's own resolution in resolveHolder still compares the
+    // write path's own resolution in resolveHold still compares the
     // address exactly, so a differently-cased address that reads as matched
     // here is stored without an account id.
     const stamp = Date.now();

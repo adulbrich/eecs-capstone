@@ -238,7 +238,16 @@ export const listInventoryRequests = createServerFn({ method: "GET" })
     return listInventoryRequestsForCurrentUser(data);
   });
 
-const transitionSchema = z.object({
+/**
+ * Exported so `src/test/inventory-schemas.test.ts` can prove it strips
+ * `authority`. That is not a style preference: `transitionInventoryItem`
+ * carries only `requireUser()`, so `assertStaff` inside `transitionItem` is
+ * the entire staff gate for this endpoint, and `authority` is the only way
+ * past it. Adding `.passthrough()` or `.catchall()` here, or declaring the
+ * field, would let any signed-in user retire any item. The test is what makes
+ * that fail loudly instead of silently.
+ */
+export const transitionSchema = z.object({
   itemId: z.string().uuid(),
   nextStatus: z.enum([
     "available",
@@ -250,10 +259,9 @@ const transitionSchema = z.object({
   ]),
   requestItemId: z.string().uuid().nullable().default(null),
   // No holderId. Staff assign a hold by address or by label; the account is
-  // resolved from the address server-side. The one caller that passes an
-  // account id to transitionItem, approveRequestItemAs, calls it directly and
-  // never goes through this schema. submitCartAs does not reach transitionItem
-  // at all: it performs its requested transition inline instead.
+  // resolved from the address server-side. The two callers that pass an
+  // account id to transitionItem, approveRequestItemAs and submitCartAs, call
+  // it directly and never go through this schema.
   holderEmail: z
     .union([z.string().email("Must be a valid email").max(200), z.null()])
     .default(null),

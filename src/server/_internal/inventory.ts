@@ -27,6 +27,14 @@ import {
   user,
 } from "#/db/schema";
 import { readSession, requireUser } from "#/lib/_internal/auth-guards";
+import {
+  type Hold,
+  type HoldColumns,
+  holdEmail,
+  holdFromJoinedRow,
+  holdFromStoredRow,
+  holdName,
+} from "#/lib/hold";
 import { setInventoryItemCategoriesAs } from "./categories";
 import type { Tx } from "./inventory-transitions";
 
@@ -77,16 +85,6 @@ export type InventoryItemStaff = InventoryItemPublic & {
   updatedAt: Date;
 };
 
-/**
- * Who a hold is on, after the item's own columns and the joined account have
- * been reconciled. Passed into fullForStaff rather than derived inside it,
- * because the reconciliation needs a join the item row alone cannot supply.
- */
-export interface HolderIdentity {
-  email: string | null;
-  name: string | null;
-}
-
 function isStaff(viewer: Viewer): boolean {
   return viewer?.role === "admin" || viewer?.role === "instructor";
 }
@@ -112,7 +110,7 @@ function stripForPublic(
 function fullForStaff(
   row: typeof inventoryItems.$inferSelect,
   categories: ItemCategory[],
-  holder: HolderIdentity
+  hold: Hold
 ): InventoryItemStaff {
   return {
     ...stripForPublic(row, categories),
@@ -126,8 +124,12 @@ function fullForStaff(
     // caller, while name was bolted on by those callers alone. Two attributes
     // of one person travelling by two mechanisms is what let the release
     // paths fall out of sync when a third attribute was added.
-    currentHolderEmail: holder.email,
-    currentHolderName: holder.name,
+    //
+    // Only these two come from the hold, because only these two are
+    // reconciled against a joined account. The other three are the row's own
+    // columns and are passed straight through, as they always were.
+    currentHolderEmail: holdEmail(hold),
+    currentHolderName: holdName(hold),
     currentHolderId: row.currentHolderId,
     currentHolderLabel: row.currentHolderLabel,
     currentHolderProgram: row.currentHolderProgram,
@@ -137,50 +139,31 @@ function fullForStaff(
 }
 
 /**
- * The joined account's address wins over the one stored on the hold: someone
- * who changed their email is still the same holder. The stored address is
- * authoritative only when the hold matched no account.
+ * The hold on a read that joined the account. The precedence rules (the
+ * joined account's address and name win, because someone who changed their
+ * email or renamed their account is still the same holder) live in
+ * `src/lib/hold.ts` and are unit tested there.
  */
-function holderEmailOf(row: {
+function joinedHold(row: {
   holderEmail: string | null;
-  item: { currentHolderEmail: string | null };
-}): string | null {
-  return row.holderEmail ?? row.item.currentHolderEmail;
+  holderName: string | null;
+  item: HoldColumns;
+}): Hold {
+  return holdFromJoinedRow(row.item, {
+    accountEmail: row.holderEmail,
+    accountName: row.holderName,
+  });
 }
 
 /**
- * Mirrors holderEmailOf. The joined account's name wins, because someone who
- * renamed their account is still the same holder; the stored name is
- * authoritative only for a hold that matched no account.
- */
-function holderNameOf(row: {
-  holderName: string | null;
-  item: { currentHolderName: string | null };
-}): string | null {
-  return row.holderName ?? row.item.currentHolderName;
-}
-
-/** The reconciled identity for a read path, which has the account joined. */
-function joinedHolderIdentity(row: {
-  holderEmail: string | null;
-  holderName: string | null;
-  item: { currentHolderEmail: string | null; currentHolderName: string | null };
-}): HolderIdentity {
-  return { email: holderEmailOf(row), name: holderNameOf(row) };
-}
-
-/**
- * The identity a write path can see: the stored columns as they stand, with
- * no account joined. Named rather than inlined so the difference from
- * joinedHolderIdentity is visible at the call site. Create and update return
- * their item only so the caller can read back an id, and neither renders the
+ * The hold a write path can see: the stored columns as they stand, with no
+ * account joined. Named rather than inlined so the difference from
+ * `joinedHold` is visible at the call site. Create and update return their
+ * item only so the caller can read back an id, and neither renders the
  * holder, so the unreconciled name costs nothing there.
  */
-function storedHolderIdentity(row: {
-  currentHolderEmail: string | null;
-  currentHolderName: string | null;
-}): HolderIdentity {
-  return { email: row.currentHolderEmail, name: row.currentHolderName };
+function storedHold(row: HoldColumns): Hold {
+  return holdFromStoredRow(row);
 }
 
 /**
@@ -267,7 +250,7 @@ export async function listInventoryAs(
 
   const mapped = rows.map((r) => {
     if (isStaff(viewer)) {
-      return fullForStaff(r.item, r.categories, joinedHolderIdentity(r));
+      return fullForStaff(r.item, r.categories, joinedHold(r));
     }
     return stripForPublic(r.item, r.categories);
   });
@@ -317,7 +300,7 @@ async function loadInventoryItemRowFor(
 }
 
 function toStaffDetail(row: InventoryItemJoinedRow): InventoryItemStaff {
-  return fullForStaff(row.item, row.categories, joinedHolderIdentity(row));
+  return fullForStaff(row.item, row.categories, joinedHold(row));
 }
 
 function toPublicDetail(row: InventoryItemJoinedRow): InventoryItemPublic {
@@ -398,9 +381,7 @@ export async function listAdminInventoryAs(
     .orderBy(desc(inventoryItems.updatedAt));
 
   return {
-    rows: rows.map((r) =>
-      fullForStaff(r.item, r.categories, joinedHolderIdentity(r))
-    ),
+    rows: rows.map((r) => fullForStaff(r.item, r.categories, joinedHold(r))),
   };
 }
 
@@ -515,11 +496,7 @@ export async function createInventoryItemAs(
       { itemId: row.id, categoryIds: data.categoryIds },
       tx
     );
-    return fullForStaff(
-      row,
-      await categoriesFor(row.id, tx),
-      storedHolderIdentity(row)
-    );
+    return fullForStaff(row, await categoriesFor(row.id, tx), storedHold(row));
   });
 }
 
@@ -596,11 +573,7 @@ export async function updateInventoryItemAs(
     }
 
     if (changed.length === 0) {
-      return fullForStaff(
-        before,
-        beforeCategories,
-        storedHolderIdentity(before)
-      );
+      return fullForStaff(before, beforeCategories, storedHold(before));
     }
 
     await tx
@@ -640,7 +613,7 @@ export async function updateInventoryItemAs(
       .select()
       .from(inventoryItems)
       .where(eq(inventoryItems.id, data.id));
-    return fullForStaff(after, afterCategories, storedHolderIdentity(after));
+    return fullForStaff(after, afterCategories, storedHold(after));
   });
 }
 
@@ -787,10 +760,7 @@ export async function submitCartAs(
     // below would otherwise silently overwrite that other party's hold.
     // Mirrors the overwrite guard in transitionItem.
     const skipped: { itemId: string; reason: "no_longer_available" }[] = [];
-    const survivors: {
-      itemId: string;
-      oldStatus: (typeof inventoryItems.$inferSelect)["status"];
-    }[] = [];
+    const survivors: { itemId: string }[] = [];
     for (const row of cartRows) {
       const [locked] = await tx
         .select()
@@ -801,7 +771,10 @@ export async function submitCartAs(
         skipped.push({ itemId: row.itemId, reason: "no_longer_available" });
         continue;
       }
-      survivors.push({ itemId: row.itemId, oldStatus: locked.status });
+      // Only the id survives. The previous status was carried for the inline
+      // history insert that used to live below; transitionItem reads it from
+      // the row it locks itself.
+      survivors.push({ itemId: row.itemId });
     }
 
     // Cart is always cleared once we have processed it.
@@ -813,18 +786,15 @@ export async function submitCartAs(
       return { requestId: null, submitted: [], skipped };
     }
 
-    // The invariant applies to every person hold, including one a student
-    // created for themselves. Fetched once here rather than as a correlated
-    // subselect inside each item update below.
+    // A guard, not a lookup. transitionItem derives the address from the
+    // holder id itself, so this query's email is unused; what it buys is the
+    // throw below.
     //
-    // This is the one holder write that never reaches validateInvariants: it
-    // runs as the student, and transitionItem asserts staff, so the requested
-    // transition is performed inline. Throwing rather than falling back to
-    // null is what makes "a person hold always carries an address" true by
-    // construction here rather than merely true in practice. No current route
-    // can reach the throw, because a live session implies the row it points
-    // at, but a silent null would leave a hold with neither an address nor a
-    // label, which is precisely the state the invariant forbids.
+    // Without it, a submission by an account that no longer exists would
+    // produce an account hold whose address resolved to null, which is the
+    // one shape "a person hold always carries an address" forbids. No current
+    // route reaches the throw, because a live session implies the row it
+    // points at. Do not delete this as a redundant read.
     const [requester] = await tx
       .select({ email: user.email })
       .from(user)
@@ -853,38 +823,27 @@ export async function submitCartAs(
       )
       .returning();
 
-    // transitionItem requires staff; do the requested transition inline here
-    // (we are inside the same transaction and the survivor rows are already
-    // locked, so atomicity and the overwrite guard hold).
-    // No notification is emitted: self-submit does not need one (matches the
-    // requested-transition arm of transitionItem.maybeNotify).
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const survivor = survivors[i];
-      await tx
-        .update(inventoryItems)
-        .set({
-          status: "requested",
-          currentHolderId: viewer.id,
-          currentHolderEmail: requester.email,
-          currentHolderLabel: null,
-          currentHolderName: null,
-          currentHolderProgram: null,
-          currentPickupBy: null,
-          currentDueAt: null,
-          currentRequestItemId: line.id,
-          updatedAt: new Date(),
-        })
-        .where(eq(inventoryItems.id, line.itemId));
-      await tx.insert(inventoryItemStatusHistory).values({
-        itemId: line.itemId,
-        oldStatus: survivor.oldStatus,
-        newStatus: "requested",
-        changedBy: viewer.id,
-        requestItemId: line.id,
-        holderId: viewer.id,
-        holderEmail: requester.email,
-      });
+    // Each requested transition goes through the one writer, under the
+    // self_request authority (the student is not staff) and on the open
+    // transaction, so the locks taken above still hold. Re-locking a row this
+    // transaction already owns is free, which is why sharing the writer costs
+    // nothing here.
+    //
+    // No notification is emitted: the requested arm of maybeNotify has no
+    // case, so self-submit stays silent as it always has.
+    const { transitionItem } = await import("./inventory-transitions");
+    for (const line of lines) {
+      await transitionItem(
+        viewer,
+        {
+          itemId: line.itemId,
+          nextStatus: "requested",
+          requestItemId: line.id,
+          holderId: viewer.id,
+          authority: "self_request",
+        },
+        tx
+      );
     }
 
     return {
@@ -992,20 +951,17 @@ export async function rejectRequestItemAs(
     throw new Error("Reject reason required");
   }
   return await db.transaction(async (tx) => {
-    // Join requester id into the initial line read so we do not need a
-    // second SELECT just to find the notification recipient.
+    // Locks the line and reads the item it belongs to. The requester is not
+    // read here any more: transitionItem looks it up when it closes the line,
+    // so that the denial reaches whoever asked even on a path that did not
+    // come through this function.
     const [line] = await tx
       .select({
         id: inventoryRequestItems.id,
         itemId: inventoryRequestItems.itemId,
         status: inventoryRequestItems.status,
-        requesterId: inventoryRequests.userId,
       })
       .from(inventoryRequestItems)
-      .innerJoin(
-        inventoryRequests,
-        eq(inventoryRequestItems.requestId, inventoryRequests.id)
-      )
       .where(eq(inventoryRequestItems.id, data.requestItemId))
       .for("update");
     if (!line) {
@@ -1014,54 +970,20 @@ export async function rejectRequestItemAs(
     if (line.status !== "pending") {
       throw new Error("Only pending lines can be rejected");
     }
-    const [item] = await tx
-      .select()
-      .from(inventoryItems)
-      .where(eq(inventoryItems.id, line.itemId))
-      .for("update");
-    await tx
-      .update(inventoryRequestItems)
-      .set({
-        status: "rejected",
-        reviewedBy: viewer.id,
-        reviewedAt: new Date(),
-        reviewComment: data.reviewComment,
-        closedAt: new Date(),
-        closedBy: viewer.id,
-        closedReason: data.reviewComment,
-        updatedAt: new Date(),
-      })
-      .where(eq(inventoryRequestItems.id, data.requestItemId));
-    await tx
-      .update(inventoryItems)
-      .set({
-        status: "available",
-        currentHolderId: null,
-        currentHolderEmail: null,
-        currentHolderLabel: null,
-        currentHolderName: null,
-        currentHolderProgram: null,
-        currentPickupBy: null,
-        currentDueAt: null,
-        currentRequestItemId: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(inventoryItems.id, line.itemId));
-    await tx.insert(inventoryItemStatusHistory).values({
-      itemId: line.itemId,
-      oldStatus: item.status,
-      newStatus: "available",
-      changedBy: viewer.id,
-      comment: data.reviewComment,
-      requestItemId: line.id,
-    });
-    await tx.insert(notifications).values({
-      userId: line.requesterId,
-      type: "inventory_request_rejected",
-      title: `Request denied: ${item.name}`,
-      message: data.reviewComment,
-      link: "/my/items?tab=history",
-    });
+    // The release, the line close, the history row and the denial notice all
+    // happen inside transitionItem now. This function keeps only what is its
+    // own: who may reject, and which line is eligible.
+    const { transitionItem } = await import("./inventory-transitions");
+    await transitionItem(
+      viewer,
+      {
+        itemId: line.itemId,
+        nextStatus: "available",
+        comment: data.reviewComment,
+        lineDecision: { outcome: "rejected", requestItemId: line.id },
+      },
+      tx
+    );
     return { ok: true as const };
   });
 }
@@ -1105,39 +1027,21 @@ export async function cancelRequestItemAs(
     if (item.status === "checked_out") {
       throw new Error("Cannot cancel after checkout");
     }
-    await tx
-      .update(inventoryRequestItems)
-      .set({
-        status: "cancelled",
-        closedAt: new Date(),
-        closedBy: viewer.id,
-        closedReason: data.note,
-        updatedAt: new Date(),
-      })
-      .where(eq(inventoryRequestItems.id, line.id));
-    await tx
-      .update(inventoryItems)
-      .set({
-        status: "available",
-        currentHolderId: null,
-        currentHolderEmail: null,
-        currentHolderLabel: null,
-        currentHolderName: null,
-        currentHolderProgram: null,
-        currentPickupBy: null,
-        currentDueAt: null,
-        currentRequestItemId: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(inventoryItems.id, line.itemId));
-    await tx.insert(inventoryItemStatusHistory).values({
-      itemId: line.itemId,
-      oldStatus: item.status,
-      newStatus: "available",
-      changedBy: viewer.id,
-      comment: data.note,
-      requestItemId: line.id,
-    });
+    // self_cancel is what lets a requester past the staff gate, and it is the
+    // reason no notification is emitted: the only person to tell is the one
+    // who just clicked the button.
+    const { transitionItem } = await import("./inventory-transitions");
+    await transitionItem(
+      viewer,
+      {
+        itemId: line.itemId,
+        nextStatus: "available",
+        comment: data.note,
+        authority: "self_cancel",
+        lineDecision: { outcome: "cancelled", requestItemId: line.id },
+      },
+      tx
+    );
     return { ok: true as const };
   });
 }
@@ -1434,12 +1338,23 @@ export async function collectedByForRequestItems(
     if (!r.requestItemId) {
       continue;
     }
-    // Same rule as holderEmailOf and holderNameOf: the account wins, the
-    // stored values cover a collector who had no account.
+    // The account wins over the stored values, which cover a collector who
+    // had no account. Same reconciliation as every other joined read, so it
+    // comes from the Hold module rather than being restated here.
+    const hold = holdFromJoinedRow(
+      {
+        currentHolderId: r.holderId,
+        currentHolderEmail: r.holderEmail,
+        currentHolderLabel: null,
+        currentHolderName: r.holderName,
+        currentHolderProgram: null,
+      },
+      { accountEmail: r.accountEmail, accountName: r.accountName }
+    );
     map.set(r.requestItemId, {
       id: r.holderId,
-      email: r.accountEmail ?? r.holderEmail,
-      name: r.accountName ?? r.holderName,
+      email: holdEmail(hold),
+      name: holdName(hold),
     });
   }
   return map;

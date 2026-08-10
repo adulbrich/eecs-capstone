@@ -15,7 +15,31 @@ None.
 
 ## Known issues
 
-None.
+- **The holder assign dialog can silently drop a typed name and program.**
+  `HolderField` looks an address up on a 250ms debounce, and `holderFields` in
+  `src/components/inventory-lifecycle-panel.tsx` only sends the Name and Program
+  fields when the lookup has answered `unmatched`. Editing the address puts
+  `accountStatus` back to `unknown`, so staff who fill in a walk-in's name and
+  program, then correct a typo in the address and press Assign inside that
+  window, submit both fields as null. The hold is recorded with an address and
+  no name, the Holder column shows the bare address, and nothing warns them.
+  The submit guard only requires an address or a label, so it does not catch
+  this. Predates the Hold refactor, which left the expression untouched. The fix
+  is either to disable Assign while `accountStatus` is `unknown`, or to keep the
+  typed values across the lookup and let the server drop them if an account
+  resolves, which it already does.
+- **`recommended-sort.integration.test.ts` is flaky in a full integration run.** The
+  case "orders by cosine distance from the viewer's interest vector" failed 2 of 6
+  full-suite runs and passed every time in isolation, where it takes 1.2s against
+  roughly 11s on the runs that fail. The duration is the clue: that is something
+  waiting, not an assertion being wrong. `publishWithVector` transitions a project
+  all the way to `published` and only then writes the test's embedding, so any
+  asynchronous embedding refresh triggered by publishing would race that write and
+  overwrite the vector the assertion depends on. Not yet diagnosed. It matters more
+  than a flake usually would, because the integration suite is the only executable
+  specification of this behavior and it does not run in CI, so nobody is watching it
+  go red.
+- No proper end-to-end (e2e) tests but for accessibility. All features in PRD should be e2e tested. In addition, we should have smoke tests for the most important flows and run the smoke test in CI.
 
 ## Roadmap (not yet implemented)
 

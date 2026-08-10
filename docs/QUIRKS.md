@@ -560,6 +560,32 @@ Both listings filter categories as all-match, not any-match: every selected cate
 
 Inventory full-text search no longer matches category names. Before this feature, `inventory_items.search_vector` weighted a `category` text column into the vector (`drizzle/0003_last_invaders.sql:61`, weight `'C'`). That column is gone; categories now live in the `categories` table, reached through the `inventory_item_categories` junction table. `search_vector` is a `GENERATED ALWAYS AS (...) STORED` column (see the tsvector quirk above), and a generated column can only read other columns on the same row, so it cannot follow that join to pull category names back in. The rebuilt column (`drizzle/0010_category_domains.sql`) simply drops the category term rather than trying to fake it. This is treated as an accepted gap, not a bug to fix: searching "electronics" no longer also surfaces every item merely tagged with a category named "electronics," but the all-match category filter documented above already covers that use case directly, and correctly, for a caller who wants it.
 
+### A Hold is a union, and `src/lib/hold.ts` owns it
+
+**Hold** is the domain term for who is holding an item. A hold is on a person or on a thing, never both and never neither, and `src/lib/hold.ts` is the one place that rule lives. It is a pure, client-safe module in the same shape as `src/lib/project-visibility.ts`, unit tested in `npm test` with no docker.
+
+Four cases, of which the first two are both person holds:
+
+| Case | Columns written | Notes |
+| --- | --- | --- |
+| `account` | `current_holder_id`, `current_holder_email` | Carries no `program`, and its `name` comes from the account |
+| `walk_in` | `current_holder_email`, `current_holder_name`, `current_holder_program` | An address that matched no account |
+| `thing` | `current_holder_label`, and a name and program if given | A label, e.g. "Lab 204" |
+| `none` | all five null | An available, maintenance or retired item |
+
+Two rules are structural rather than checked. **An account beats a typed name**: the `account` case has nowhere to put a name or program, so a name typed for an address that turns out to have an account is dropped by the shape rather than by a ternary, and `holdToColumns` writes `null` to `current_holder_name` because a second copy of the account's name is what lets the two drift. **A walk-in is identified by its address**, so that case requires an `email`.
+
+What the union does **not** guarantee, and this matters before you delete anything that looks redundant:
+
+- **"Never neither" is status-dependent and cannot be enforced here.** `{ kind: "none" }` is legal and necessary. Only `validateInvariants` knows a `reserved` or `checked_out` transition may not have it, which is why its `reserved`/`checked_out` arm stays. That arm also catches `holderId` together with `holderLabel`, which the `holderId` resolution path never routes through the constructor, and `inventory.integration.test.ts` asserts its exact wording.
+- **Not every hold is built through `holdFromInput`.** Read paths construct cases directly from stored columns. A union constrains only what passes through its constructor.
+
+Whitespace is not trimmed here, deliberately: `validateInvariants` decides person-versus-thing on raw truthiness and `transitionItemInTx` stores the raw strings, so the constructor matches both and an input cannot pass one guard then be re-judged by a stricter one. Trimming is the input layer's job. An empty string **is** normalized to null, which is a change from the old inline writes and a fix rather than a regression: `??` does not treat `""` as absent, so an empty `current_holder_name` stopped the admin table's `name ?? email ?? label` chain from falling through and rendered a blank cell for an item that did have a holder.
+
+The precedence order (name, then address, then label) has two renderings, and the module owns the order rather than collapsing the formats: `formatHoldDetailed` gives the lifecycle panel `Name (address) · Program`, `formatHoldShort` gives the admin table a bare one-liner. A TanStack Table `accessorFn` paired with `sortUndefined: "last"` must map the module's `null` to `undefined`, because `sortUndefined` does not special-case `null`.
+
+`holderFields` in `src/components/inventory-lifecycle-panel.tsx` deliberately does **not** call `holdFromInput`. The constructor asks "is there an account?"; the dialog asks "do I know there is no account?", and `AccountStatus` has a third state, `unknown`, because the lookup is debounced. Expressing "an account exists but I do not know which" would need a fabricated account id. The client refusing to compose an illegal payload and the server defining what is illegal are two different jobs, and the server re-derives independently either way.
+
 ### Lazy deadlines, no scheduler
 
 `pickup_by` / `due_at` on `inventory_request_items` and `current_pickup_by` / `current_due_at` on `inventory_items` are informational only. There is no cron. The "past pickup window" / "overdue" badges are computed at query time. Lazy idempotent notifications are inserted on read via `recordOverdueNotificationsAs`, which runs two scans: request lines with `status = 'approved'` (scoped to the viewer's own requests), and staff holds (`current_holder_id IS NOT NULL`, `status IN ('reserved', 'checked_out')`), both folded into one `values` array for a single insert. The two scans deliberately overlap. A request line and a hold can describe two different people, because a teammate can collect an item someone else requested: the requester is accountable for the request and the picker is holding the thing, so both are notified. `notifications_overdue_unique_idx` on `(user_id, type, link)` does not collapse that case, and must not, because the user ids differ. The far more common case, where requester and picker are the same person, has both scans return the same row twice in one batch. `onConflictDoNothing` already collapses intra-batch duplicates on its own (it is `DO UPDATE` that errors with "cannot affect row a second time"), so the database would handle that case either way. The candidates are also deduped in JS on `(userId, type, link)` before the insert, which keeps the statement smaller and puts the intent where a reader will look for it, not because the index is unable to. That same index, a partial unique index for the two overdue types keyed on `/inventory/${itemId}` rather than the request line, lets `onConflictDoNothing` collapse re-reads (the same scan producing the same row again on a later call) into the same key space. The target + where are declared explicitly so future unique indexes on `notifications` cannot silently swallow unrelated conflicts.
@@ -572,7 +598,24 @@ The hold scan additionally requires `current_holder_id IS NOT NULL`, narrower th
 
 ### `transitionItem` is the only writer
 
-Every status change to an inventory item must go through `src/server/_internal/inventory-transitions.ts::transitionItem`. It is the only place that writes `inventory_item_status_history` rows and the only place that syncs `current_holder_*` columns with the item status. Approve always delegates to it via `transitionItem(viewer, input, tx)` from inside the approve transaction (the new optional `externalTx` argument). Reject and cancel bypass it intentionally because they emit custom notifications and need different transaction shapes; both are documented in their impls.
+Every status change to an inventory item goes through `src/server/_internal/inventory-transitions.ts::transitionItem`. It is the only place that writes `inventory_item_status_history` rows and the only place that syncs `current_holder_*` columns with the item status. This is now literally true, and checkable: `grep -rn '\.update(inventoryItems)\|insert(inventoryItemStatusHistory)' src --include='*.ts' | grep -v __tests__` returns four hits, two in `inventory-transitions.ts` and two in `inventory.ts` that touch attribute columns only (`updateInventoryItemAs` and `uploadInventoryImageAs`, neither of which writes status or holder).
+
+An earlier version of this entry granted reject and cancel a standing exemption "because they emit custom notifications and need different transaction shapes". Both were routed through `transitionItem`, along with `submitCartAs`, which had been writing inline without the entry mentioning it at all. The exemption had already cost one bug: `4c22016 fix(inventory): clear the walk-in name and program on reject and cancel` is what happens when two new hold columns are added and only two of four writers learn about them.
+
+The four callers each keep what is genuinely theirs (who may act, and which line is eligible) and pass the rest:
+
+- **Approve** delegates via `transitionItem(viewer, input, tx)` from inside the approve transaction, using the optional `externalTx` argument.
+- **Reject** passes `lineDecision: { outcome: "rejected", requestItemId }` plus the review comment.
+- **Cancel** passes `authority: "self_cancel"` and `lineDecision: { outcome: "cancelled", ... }`.
+- **submitCart** passes `authority: "self_request"`, once per surviving cart line, on its open transaction. Re-locking a row the transaction already holds is free, which is why it shares the writer rather than a private helper.
+
+Two fields carry the variation, and both default to the previous behavior when absent:
+
+**`authority`** is the only way past `assertStaff`, and it is default-deny. `AUTHORITY_TARGET` is the single source of truth for which values exist and which status each may reach (`self_cancel` releases, `self_request` requests); an unrecognized value is rejected rather than ignored, and a self-service transition may not name a `holderId` other than its own viewer. **`transitionSchema` in `src/server/inventory.ts` must never declare this field.** `transitionInventoryItem` carries only `requireUser()`, so `assertStaff` inside `transitionItem` is that endpoint's entire staff gate, and `z.object().parse` stripping the unknown key is what keeps it shut. `src/test/inventory-schemas.test.ts` asserts the stripping, including through `__proto__`; adding `.passthrough()` or `.catchall()` there would let any signed-in user retire any item.
+
+**`lineDecision`** overrides what a released item's request line becomes, and carries the id of the line it was decided about. The two travel together on purpose: a release cannot carry `requestItemId` (`validateInvariants` forbids it on those statuses), so an outcome alone would land on whatever line the item points at, which need not be the line the caller locked. A mismatch throws. A `rejected` outcome additionally requires the line to still be `pending` and the comment to be non-empty, matching the guards `rejectRequestItemAs` has always had.
+
+The denial notification goes to the **requester**, read from the line by `closeRequestItemOnRelease`, not to the item's current holder. Those are usually the same person and are not always: staff can take a still-pending item straight to `checked_out` for a teammate (`syncRequestItem`'s `checked_out` arm writes only `dueAt`, leaving the line pending), and a denial belongs to whoever asked.
 
 ### Deferred FK
 
