@@ -2914,7 +2914,7 @@ describe("transitionItem authority and line outcome", () => {
         nextStatus: "retired",
         authority: "self_cancel",
       })
-    ).rejects.toThrow(/may only release an item to available/);
+    ).rejects.toThrow(/self_cancel may only move an item to available/);
   });
 
   it("refuses a line decision on a transition that is not a release", async () => {

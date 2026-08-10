@@ -853,38 +853,27 @@ export async function submitCartAs(
       )
       .returning();
 
-    // transitionItem requires staff; do the requested transition inline here
-    // (we are inside the same transaction and the survivor rows are already
-    // locked, so atomicity and the overwrite guard hold).
-    // No notification is emitted: self-submit does not need one (matches the
-    // requested-transition arm of transitionItem.maybeNotify).
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const survivor = survivors[i];
-      await tx
-        .update(inventoryItems)
-        .set({
-          status: "requested",
-          currentHolderId: viewer.id,
-          currentHolderEmail: requester.email,
-          currentHolderLabel: null,
-          currentHolderName: null,
-          currentHolderProgram: null,
-          currentPickupBy: null,
-          currentDueAt: null,
-          currentRequestItemId: line.id,
-          updatedAt: new Date(),
-        })
-        .where(eq(inventoryItems.id, line.itemId));
-      await tx.insert(inventoryItemStatusHistory).values({
-        itemId: line.itemId,
-        oldStatus: survivor.oldStatus,
-        newStatus: "requested",
-        changedBy: viewer.id,
-        requestItemId: line.id,
-        holderId: viewer.id,
-        holderEmail: requester.email,
-      });
+    // Each requested transition goes through the one writer, under the
+    // self_request authority (the student is not staff) and on the open
+    // transaction, so the locks taken above still hold. Re-locking a row this
+    // transaction already owns is free, which is why sharing the writer costs
+    // nothing here.
+    //
+    // No notification is emitted: the requested arm of maybeNotify has no
+    // case, so self-submit stays silent as it always has.
+    const { transitionItem } = await import("./inventory-transitions");
+    for (const line of lines) {
+      await transitionItem(
+        viewer,
+        {
+          itemId: line.itemId,
+          nextStatus: "requested",
+          requestItemId: line.id,
+          holderId: viewer.id,
+          authority: "self_request",
+        },
+        tx
+      );
     }
 
     return {
@@ -1014,54 +1003,20 @@ export async function rejectRequestItemAs(
     if (line.status !== "pending") {
       throw new Error("Only pending lines can be rejected");
     }
-    const [item] = await tx
-      .select()
-      .from(inventoryItems)
-      .where(eq(inventoryItems.id, line.itemId))
-      .for("update");
-    await tx
-      .update(inventoryRequestItems)
-      .set({
-        status: "rejected",
-        reviewedBy: viewer.id,
-        reviewedAt: new Date(),
-        reviewComment: data.reviewComment,
-        closedAt: new Date(),
-        closedBy: viewer.id,
-        closedReason: data.reviewComment,
-        updatedAt: new Date(),
-      })
-      .where(eq(inventoryRequestItems.id, data.requestItemId));
-    await tx
-      .update(inventoryItems)
-      .set({
-        status: "available",
-        currentHolderId: null,
-        currentHolderEmail: null,
-        currentHolderLabel: null,
-        currentHolderName: null,
-        currentHolderProgram: null,
-        currentPickupBy: null,
-        currentDueAt: null,
-        currentRequestItemId: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(inventoryItems.id, line.itemId));
-    await tx.insert(inventoryItemStatusHistory).values({
-      itemId: line.itemId,
-      oldStatus: item.status,
-      newStatus: "available",
-      changedBy: viewer.id,
-      comment: data.reviewComment,
-      requestItemId: line.id,
-    });
-    await tx.insert(notifications).values({
-      userId: line.requesterId,
-      type: "inventory_request_rejected",
-      title: `Request denied: ${item.name}`,
-      message: data.reviewComment,
-      link: "/my/items?tab=history",
-    });
+    // The release, the line close, the history row and the denial notice all
+    // happen inside transitionItem now. This function keeps only what is its
+    // own: who may reject, and which line is eligible.
+    const { transitionItem } = await import("./inventory-transitions");
+    await transitionItem(
+      viewer,
+      {
+        itemId: line.itemId,
+        nextStatus: "available",
+        comment: data.reviewComment,
+        lineDecision: { outcome: "rejected", requestItemId: line.id },
+      },
+      tx
+    );
     return { ok: true as const };
   });
 }
@@ -1105,39 +1060,21 @@ export async function cancelRequestItemAs(
     if (item.status === "checked_out") {
       throw new Error("Cannot cancel after checkout");
     }
-    await tx
-      .update(inventoryRequestItems)
-      .set({
-        status: "cancelled",
-        closedAt: new Date(),
-        closedBy: viewer.id,
-        closedReason: data.note,
-        updatedAt: new Date(),
-      })
-      .where(eq(inventoryRequestItems.id, line.id));
-    await tx
-      .update(inventoryItems)
-      .set({
-        status: "available",
-        currentHolderId: null,
-        currentHolderEmail: null,
-        currentHolderLabel: null,
-        currentHolderName: null,
-        currentHolderProgram: null,
-        currentPickupBy: null,
-        currentDueAt: null,
-        currentRequestItemId: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(inventoryItems.id, line.itemId));
-    await tx.insert(inventoryItemStatusHistory).values({
-      itemId: line.itemId,
-      oldStatus: item.status,
-      newStatus: "available",
-      changedBy: viewer.id,
-      comment: data.note,
-      requestItemId: line.id,
-    });
+    // self_cancel is what lets a requester past the staff gate, and it is the
+    // reason no notification is emitted: the only person to tell is the one
+    // who just clicked the button.
+    const { transitionItem } = await import("./inventory-transitions");
+    await transitionItem(
+      viewer,
+      {
+        itemId: line.itemId,
+        nextStatus: "available",
+        comment: data.note,
+        authority: "self_cancel",
+        lineDecision: { outcome: "cancelled", requestItemId: line.id },
+      },
+      tx
+    );
     return { ok: true as const };
   });
 }

@@ -35,7 +35,7 @@ export type ItemStatus =
  * schema: it is the whole staff gate for `transitionInventoryItem`, which
  * carries only `requireUser()` of its own.
  */
-export type TransitionAuthority = "self_cancel";
+export type TransitionAuthority = "self_cancel" | "self_request";
 
 /**
  * What a request line becomes when the item is released out from under it.
@@ -72,11 +72,10 @@ export interface TransitionInput {
   holderEmail?: string | null;
   /**
    * An already-resolved account, supplied only by an internal caller that
-   * already has one. Today that means approveRequestItemAs, passing the
-   * requester's id. submitCartAs performs its requested transition inline and
-   * never reaches here at all. Staff cannot assign a hold this way, because
-   * transitionSchema does not accept a holder id. The address is derived from
-   * the id, so the column invariant holds on this path too.
+   * already has one: approveRequestItemAs passing the requester's id, and
+   * submitCartAs passing the submitting student's. Staff cannot assign a hold
+   * this way, because transitionSchema does not accept a holder id. The
+   * address is derived from the id, so the column invariant holds here too.
    */
   holderId?: string | null;
   holderLabel?: string | null;
@@ -103,7 +102,14 @@ function assertStaff(viewer: Viewer) {
 
 const SELF_SERVICE_AUTHORITIES: readonly TransitionAuthority[] = [
   "self_cancel",
+  "self_request",
 ];
+
+/** The one status each self-service authority is allowed to reach. */
+const AUTHORITY_TARGET: Record<TransitionAuthority, ItemStatus> = {
+  self_cancel: "available",
+  self_request: "requested",
+};
 
 /**
  * Default deny. No authority means staff, which is every caller that existed
@@ -136,11 +142,17 @@ function isReleaseStatus(status: ItemStatus): boolean {
  * not also get to decide what that authority is allowed to do.
  */
 function validateSelfServiceAndDecision(input: TransitionInput) {
-  // A self-service caller releases an item. It does not retire one, send one
-  // to maintenance, or check one out to itself with a deadline of its
-  // choosing. Without this the authority is a hole the size of every status.
-  if (input.authority === "self_cancel" && input.nextStatus !== "available") {
-    throw new Error("self_cancel may only release an item to available");
+  // Each authority reaches exactly one status. A self-service caller releases
+  // an item or requests one; it does not retire one, send one to maintenance,
+  // or check one out to itself with a deadline of its choosing. Without this
+  // an authority is a hole the size of every status.
+  if (input.authority) {
+    const allowed = AUTHORITY_TARGET[input.authority];
+    if (input.nextStatus !== allowed) {
+      throw new Error(
+        `${input.authority} may only move an item to ${allowed}, not ${input.nextStatus}`
+      );
+    }
   }
   const decision = input.lineDecision;
   if (!decision) {
@@ -197,11 +209,10 @@ function validateInvariants(input: TransitionInput) {
     case "requested":
       // A requested row always comes from an account (the requester), so it
       // has both an id and an address; it never carries a label, because a
-      // request is always on a person, never on a thing. No current caller
-      // reaches this arm: submitCartAs writes the requested transition
-      // inline rather than calling transitionItem, and the lifecycle panel
-      // refuses to offer "requested" as a direct target. Kept correct anyway,
-      // as the shape a requested row would actually have.
+      // request is always on a person, never on a thing. submitCartAs is the
+      // one caller that reaches this arm, under the self_request authority,
+      // once per surviving cart line. The lifecycle panel does not offer
+      // "requested" as a direct target, so staff never land here.
       if (!(requestItemId && (holderId || holderEmail)) || holderLabel) {
         throw new Error(
           "requested status requires requestItemId and a holder account or address, no label"
@@ -420,7 +431,12 @@ async function transitionItemInTx(
     newStatus: input.nextStatus,
     changedBy: viewer.id,
     comment: input.comment ?? null,
-    requestItemId: input.requestItemId ?? null,
+    // A release cannot carry requestItemId, but a decision names the line it
+    // closed, and the audit row should say which line this transition was
+    // about. Falling back to it keeps the link the reject and cancel paths
+    // wrote before they came through here.
+    requestItemId:
+      input.requestItemId ?? input.lineDecision?.requestItemId ?? null,
     // The history row records the same five values under its own column
     // names, so it is fed from the same flattened hold rather than from a
     // second reading of the input. Two attributes of one person travelling by
