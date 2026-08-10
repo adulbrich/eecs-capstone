@@ -112,11 +112,15 @@ const STATUS_ORDER: Record<string, number> = {
 const DEFAULT_SORT: SortState = { desc: true, id: "updatedAt" };
 
 /**
- * The holder in one line. The row's columns arrive already reconciled against
- * the joined account, so this only has to read the hold off them and let the
- * Hold module apply the precedence.
+ * Who the item is associated with, in one line. The row's columns arrive
+ * already reconciled against the joined account, so this only has to read the
+ * hold off them and let the Hold module apply the precedence.
+ *
+ * Which column shows it is a separate question, below: the same five columns
+ * describe both possession and a claim, and only the item's status tells the
+ * two apart.
  */
-function holderOf(row: Row): string | null {
+function holdOf(row: Row): string | null {
   return formatHoldShort(
     holdFromStoredRow({
       currentHolderId: row.currentHolderId,
@@ -126,6 +130,29 @@ function holderOf(row: Row): string | null {
       currentHolderProgram: row.currentHolderProgram,
     })
   );
+}
+
+/**
+ * Who physically has the item. Only a checkout puts it in someone's hands, so
+ * a reserved item has no holder however firmly it is spoken for.
+ */
+function heldBy(row: Row): string | null {
+  return row.status === "checked_out" ? holdOf(row) : null;
+}
+
+/**
+ * Who the item is waiting on. Covers both halves of how that happens: a
+ * request the student submitted, and a reservation staff assigned directly to
+ * an address or a label. The second has no request line at all, which is why
+ * this reads the hold rather than the requester.
+ *
+ * `requested` and `reserved` share the column. The Status column already says
+ * which of the two it is, and the name is equally useful either way.
+ */
+function reservedFor(row: Row): string | null {
+  return row.status === "requested" || row.status === "reserved"
+    ? holdOf(row)
+    : null;
 }
 
 const COLUMNS: AdminColumn<Row>[] = [
@@ -181,11 +208,39 @@ const COLUMNS: AdminColumn<Row>[] = [
     // formatHoldShort returns null for an unheld item and this needs
     // undefined: sortUndefined only special-cases undefined, and a null would
     // sort into the middle of the column instead of the bottom.
-    accessorFn: (row) => holderOf(row) ?? undefined,
-    cell: ({ row }) => holderOf(row.original) ?? "-",
+    accessorFn: (row) => heldBy(row) ?? undefined,
+    cell: ({ row }) => heldBy(row.original) ?? "-",
     header: "Holder",
+    // Keeps the id it has always had, so column-visibility state already saved
+    // in a URL or in localStorage still refers to this column.
     id: "holder",
     sortUndefined: "last",
+  },
+  {
+    accessorFn: (row) => reservedFor(row) ?? undefined,
+    cell: ({ row }) => reservedFor(row.original) ?? "-",
+    header: "Reserved for",
+    id: "reservedFor",
+    sortUndefined: "last",
+  },
+  {
+    cell: ({ row }) =>
+      row.original.currentRequestItemId ? (
+        <Link
+          className="underline underline-offset-2"
+          search={{ line: row.original.currentRequestItemId, tab: "all" }}
+          to="/admin/inventory/requests"
+        >
+          View request
+        </Link>
+      ) : (
+        "-"
+      ),
+    // Nothing to order by: the cell is a link, and the id behind it is a uuid
+    // that means nothing in sorted order.
+    enableSorting: false,
+    header: "Request",
+    id: "request",
   },
   {
     accessorFn: (row) => row.location ?? undefined,
