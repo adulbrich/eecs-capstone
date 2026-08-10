@@ -257,13 +257,23 @@ The cast is the documented Drizzle idiom to avoid a circular initialization erro
 
 ### FK rules in this project
 
-| Rule | Where it lives |
-| --- | --- |
-| `CASCADE` | Pure junction tables (`program_instructors`, `project_collaborators`, `project_bookmarks`, `project_categories`), `session`, `account`, `notifications`. |
-| `RESTRICT` | Content authorship (`project_comments.author_id`, `project_bids.student_id`, `project_status_history.changed_by`, `project_assignments.assigned_by`). A user with this content cannot be hard-deleted. |
-| `SET NULL` | `inventory_requests.reviewed_by`, `projects.program_id` (from Spec 3), `projects.proposer_id`. Review attribution and program assignment can be lost without losing the record. A deleted proposer's `proposer_id` nulls out while `proposer_email` retains the link for re-linking (see "Projects" below). |
-
 Cascade rules are encoded in the schema, not in application code. Never recompute them at runtime.
+
+**Into `user.id`.** These are the ones that decide whether an account can be deleted, so they are listed in full.
+
+| Rule | Columns |
+| --- | --- |
+| `CASCADE` | `session.user_id`, `account.user_id`, `notifications.user_id`, `user_interests.user_id`, `program_instructors.user_id`, `project_collaborators.user_id`, `project_bookmarks.user_id`, `inventory_cart_items.user_id`. Sessions, credentials, and things the account merely marked. |
+| `RESTRICT` | `project_comments.author_id`, `project_status_history.changed_by`, `project_edit_log.editor_id`, `inventory_item_status_history.changed_by`, `inventory_item_edit_log.editor_id`, `inventory_requests.user_id`, `project_bids.student_id`, `project_assignments.student_id`, `project_assignments.assigned_by`, `projects.program_manager_id`. Authorship and audit trail: history has to outlive the person, so an account with any of this cannot be hard-deleted. |
+| `SET NULL` | `projects.proposer_id`, `inventory_items.current_holder_id`, `inventory_request_items.reviewed_by`, `inventory_request_items.closed_by`, `inventory_item_status_history.holder_id`. Attribution that can be lost without losing the record. A deleted proposer's `proposer_id` nulls out while `proposer_email` retains the link for re-linking (see "Projects" below). |
+
+Note `inventory_items.current_holder_id`: nulling it does **not** change `status`, so deleting a user who holds an item strands it in `checked_out` with no holder and no way to return it. Return the item first.
+
+**Everywhere else.** `CASCADE` on junction tables and on anything scoped to a parent row (`project_categories`, `inventory_item_categories`, and the comment, history, and edit-log tables against their project or item). `SET NULL` on `projects.program_id`, `inventory_item_status_history.request_item_id`, and `inventory_items.current_request_item_id`. `RESTRICT` on `inventory_request_items.item_id`, so an item with request lines cannot be deleted.
+
+`project_bids.project_id`, `project_bids.program_id`, and `project_assignments.project_id` declare no rule at all and so are `NO ACTION`. Those two tables have no UI yet; if they ever get one, give them explicit rules first.
+
+Deleting an account outright is an operator task, not a feature: `scripts/delete-user.mjs` purges a test account and its own content and refuses when it acted on anything else. See "Delete a test account" in `DEPLOYMENT.md`.
 
 ### Timestamps always `withTimezone: true`
 
