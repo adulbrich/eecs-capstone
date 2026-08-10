@@ -57,11 +57,14 @@ both and never neither. Six places re-derive some part of it:
 | `inventory.ts:144` `holderEmailOf` / `holderNameOf` | a joined account beats the stored columns |
 | `inventory.ts:179` `storedHolderIdentity` | stored columns, unreconciled |
 | `inventory-lifecycle-panel.tsx:100` `holderFields` | which fields the payload may carry |
-| `inventory-lifecycle-panel.tsx:159` `formatHolderDisplay` | name, then address, then label |
-| `admin/inventory/index.tsx:161` | name, then address, then label |
+| `inventory-lifecycle-panel.tsx:159` `formatHolderDisplay` | name, then address, then label, rendered rich |
+| `admin/inventory/index.tsx:161` | name, then address, then label, rendered plain |
 
-The last two are the same precedence expression written twice. No module owns
-"who is holding this item."
+The last two share a precedence order but not a format: the panel renders
+`Name (address) · Program` and the admin table renders a bare
+`name ?? address ?? label`. They are two renderings of one rule, not one rule
+written twice, so the module owns the order and exposes both formats rather
+than collapsing them into one. No module owns "who is holding this item."
 
 ### Three facts that shape the design
 
@@ -196,9 +199,11 @@ names as CSV export keys by string, so changing the shape would change the
 headers of downloaded files for no architectural gain. The union is internal;
 read paths use the Hold module to compute the flat columns they already return.
 
-What does change is that the two duplicated precedence expressions
-(`formatHolderDisplay` and the admin table's Holder column) both call the Hold
-module instead of re-deriving.
+What does change is that both renderings of the precedence order
+(`formatHolderDisplay` and the admin table's Holder column) derive from the
+Hold union instead of re-deriving the order from raw columns. The module
+exposes a short format and a detailed format so neither call site changes what
+it puts on screen.
 
 ### The client keeps normalizing, and the server stops trusting it
 
