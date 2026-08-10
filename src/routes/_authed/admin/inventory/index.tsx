@@ -35,6 +35,7 @@ import {
 } from "#/components/ui/select";
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, orderBySortedIds, toCsv } from "#/lib/csv";
+import { formatHoldShort, holdFromStoredRow } from "#/lib/hold";
 import { pageTitle } from "#/lib/page-title";
 import { getPublicUrl } from "#/lib/storage";
 import {
@@ -110,6 +111,23 @@ const STATUS_ORDER: Record<string, number> = {
 
 const DEFAULT_SORT: SortState = { desc: true, id: "updatedAt" };
 
+/**
+ * The holder in one line. The row's columns arrive already reconciled against
+ * the joined account, so this only has to read the hold off them and let the
+ * Hold module apply the precedence.
+ */
+function holderOf(row: Row): string | null {
+  return formatHoldShort(
+    holdFromStoredRow({
+      currentHolderId: row.currentHolderId,
+      currentHolderEmail: row.currentHolderEmail,
+      currentHolderLabel: row.currentHolderLabel,
+      currentHolderName: row.currentHolderName,
+      currentHolderProgram: row.currentHolderProgram,
+    })
+  );
+}
+
 const COLUMNS: AdminColumn<Row>[] = [
   {
     accessorFn: (row) => row.name,
@@ -157,16 +175,14 @@ const COLUMNS: AdminColumn<Row>[] = [
   {
     // Email before label: a hold assigned to a bare address has no account to
     // name it, and the address is the only thing that identifies the holder.
-    accessorFn: (row) =>
-      row.currentHolderName ??
-      row.currentHolderEmail ??
-      row.currentHolderLabel ??
-      undefined,
-    cell: ({ row }) =>
-      row.original.currentHolderName ??
-      row.original.currentHolderEmail ??
-      row.original.currentHolderLabel ??
-      "-",
+    // That order lives in src/lib/hold.ts, so this column renders a hold
+    // rather than re-deriving the precedence from raw columns.
+    //
+    // formatHoldShort returns null for an unheld item and this needs
+    // undefined: sortUndefined only special-cases undefined, and a null would
+    // sort into the middle of the column instead of the bottom.
+    accessorFn: (row) => holderOf(row) ?? undefined,
+    cell: ({ row }) => holderOf(row.original) ?? "-",
     header: "Holder",
     id: "holder",
     sortUndefined: "last",

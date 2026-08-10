@@ -3,9 +3,11 @@ import {
   formatHoldDetailed,
   formatHoldShort,
   type Hold,
+  holdEmail,
   holdFromInput,
   holdFromJoinedRow,
   holdFromStoredRow,
+  holdName,
   holdToColumns,
 } from "../hold";
 
@@ -291,6 +293,37 @@ describe("holdFromStoredRow", () => {
         currentHolderProgram: null,
       })
     ).toEqual({ kind: "none" });
+  });
+});
+
+describe("holdEmail and holdName", () => {
+  it("read a person's address and name", () => {
+    const hold: Hold = {
+      kind: "walk_in",
+      email: "w@in.test",
+      name: "Wanda",
+      program: "ECE",
+    };
+    expect(holdEmail(hold)).toBe("w@in.test");
+    expect(holdName(hold)).toBe("Wanda");
+  });
+
+  it("give a thing a name but never an address", () => {
+    // The columns behind a label hold still accept a name, and the write
+    // path stores it, so a read must report it.
+    const hold: Hold = {
+      kind: "thing",
+      label: "Lab 204",
+      name: "Robotics club",
+      program: "CS 461",
+    };
+    expect(holdEmail(hold)).toBeNull();
+    expect(holdName(hold)).toBe("Robotics club");
+  });
+
+  it("give no hold neither", () => {
+    expect(holdEmail({ kind: "none" })).toBeNull();
+    expect(holdName({ kind: "none" })).toBeNull();
   });
 });
 

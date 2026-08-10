@@ -1,5 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
+import { formatHoldDetailed, holdFromStoredRow } from "#/lib/hold";
 import {
   hardDeleteInventoryItem,
   transitionInventoryItem,
@@ -62,7 +63,6 @@ export interface HistoryRow {
 
 interface Props {
   history: HistoryRow[];
-  holderName?: string | null;
   item: {
     id: string;
     name: string;
@@ -116,13 +116,27 @@ function holderFields({
   holderProgram: string | null;
 } {
   const trimmedEmail = email.trim();
-  // Name and program are only meaningful for an address with no account, so
-  // both conditions gate them: a blank address (label mode) never sends
-  // leftover text typed while the address field held something else, and an
-  // address that has an account defers to the account's own name. Requiring
-  // "unmatched" rather than "not matched" also covers the moment before the
-  // lookup answers, when the inputs are not on screen and anything still in
-  // them would belong to a previous address.
+  // This deliberately does NOT call holdFromInput, and the reason is the
+  // third state. The constructor asks "is there an account?", a boolean it
+  // answers from a resolved id. This asks "do I know there is no account?",
+  // and `unknown` is a real answer: the lookup is debounced, so every address
+  // spends a moment where neither is established. Those two questions agree
+  // on `matched` and `unmatched` and disagree on `unknown`, where the inputs
+  // are not on screen and anything still in them belongs to a previous
+  // address. Routing this through the constructor would need a fabricated
+  // account id to express "an account exists but I do not know which", which
+  // is a lie the type should not have to carry.
+  //
+  // The rule this shares with the constructor is that an account beats a
+  // typed name; the server re-derives it from the resolved account and is
+  // sound on its own. This is the input layer refusing to compose an illegal
+  // payload, not the definition of what is illegal.
+  //
+  // Trimming also happens here, because the constructor matches the server's
+  // raw-truthiness guard so a payload cannot pass one rule and be re-judged
+  // by a stricter one. The address wins over a leftover label for the same
+  // reason: the constructor rejects both together, and staff who typed a
+  // label, backed out, then entered an address should not see an error.
   const carriesNameAndProgram =
     Boolean(trimmedEmail) && accountStatus === "unmatched";
   return {
@@ -156,24 +170,26 @@ function recommendedNext(status: Status): {
   }
 }
 
-function formatHolderDisplay(
-  item: Props["item"],
-  holderName?: string | null
-): string | null {
-  const name = holderName ?? item.currentHolderName;
-  if (item.currentHolderEmail) {
-    // Program is an attribute of the address, not the label (see
-    // holderFields above), so it is only ever appended on this branch.
-    const suffix = item.currentHolderProgram
-      ? ` · ${item.currentHolderProgram}`
-      : "";
-    return (
-      (name
-        ? `${name} (${item.currentHolderEmail})`
-        : item.currentHolderEmail) + suffix
-    );
-  }
-  return item.currentHolderLabel ?? null;
+/**
+ * The precedence (name, then address, then label) and the rule that a program
+ * belongs to a person rather than to a label both live in `src/lib/hold.ts`.
+ * This reads the hold off the item's columns and asks the module to render it,
+ * rather than re-deriving either rule here.
+ *
+ * The columns arrive already reconciled against the joined account, because
+ * `fullForStaff` builds them from `joinedHold`. There is nothing left for the
+ * client to reconcile, which is why this takes no separate account name.
+ */
+function formatHolderDisplay(item: Props["item"]): string | null {
+  return formatHoldDetailed(
+    holdFromStoredRow({
+      currentHolderId: item.currentHolderId,
+      currentHolderEmail: item.currentHolderEmail ?? null,
+      currentHolderLabel: item.currentHolderLabel ?? null,
+      currentHolderName: item.currentHolderName ?? null,
+      currentHolderProgram: item.currentHolderProgram ?? null,
+    })
+  );
 }
 
 const HISTORY_PAGE_SIZE = 10;
@@ -251,7 +267,7 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
   );
 }
 
-export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
+export function InventoryLifecyclePanel({ item, history }: Props) {
   const router = useRouter();
   const status = item.status as Status;
   const rec = recommendedNext(status);
@@ -452,7 +468,7 @@ export function InventoryLifecyclePanel({ item, holderName, history }: Props) {
   }
 
   const canHardDelete = status === "available" || status === "retired";
-  const holderDisplay = formatHolderDisplay(item, holderName);
+  const holderDisplay = formatHolderDisplay(item);
 
   return (
     <>

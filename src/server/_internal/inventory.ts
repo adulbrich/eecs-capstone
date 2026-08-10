@@ -27,6 +27,14 @@ import {
   user,
 } from "#/db/schema";
 import { readSession, requireUser } from "#/lib/_internal/auth-guards";
+import {
+  type Hold,
+  type HoldColumns,
+  holdEmail,
+  holdFromJoinedRow,
+  holdFromStoredRow,
+  holdName,
+} from "#/lib/hold";
 import { setInventoryItemCategoriesAs } from "./categories";
 import type { Tx } from "./inventory-transitions";
 
@@ -77,16 +85,6 @@ export type InventoryItemStaff = InventoryItemPublic & {
   updatedAt: Date;
 };
 
-/**
- * Who a hold is on, after the item's own columns and the joined account have
- * been reconciled. Passed into fullForStaff rather than derived inside it,
- * because the reconciliation needs a join the item row alone cannot supply.
- */
-export interface HolderIdentity {
-  email: string | null;
-  name: string | null;
-}
-
 function isStaff(viewer: Viewer): boolean {
   return viewer?.role === "admin" || viewer?.role === "instructor";
 }
@@ -112,7 +110,7 @@ function stripForPublic(
 function fullForStaff(
   row: typeof inventoryItems.$inferSelect,
   categories: ItemCategory[],
-  holder: HolderIdentity
+  hold: Hold
 ): InventoryItemStaff {
   return {
     ...stripForPublic(row, categories),
@@ -126,8 +124,12 @@ function fullForStaff(
     // caller, while name was bolted on by those callers alone. Two attributes
     // of one person travelling by two mechanisms is what let the release
     // paths fall out of sync when a third attribute was added.
-    currentHolderEmail: holder.email,
-    currentHolderName: holder.name,
+    //
+    // Only these two come from the hold, because only these two are
+    // reconciled against a joined account. The other three are the row's own
+    // columns and are passed straight through, as they always were.
+    currentHolderEmail: holdEmail(hold),
+    currentHolderName: holdName(hold),
     currentHolderId: row.currentHolderId,
     currentHolderLabel: row.currentHolderLabel,
     currentHolderProgram: row.currentHolderProgram,
@@ -137,50 +139,31 @@ function fullForStaff(
 }
 
 /**
- * The joined account's address wins over the one stored on the hold: someone
- * who changed their email is still the same holder. The stored address is
- * authoritative only when the hold matched no account.
+ * The hold on a read that joined the account. The precedence rules (the
+ * joined account's address and name win, because someone who changed their
+ * email or renamed their account is still the same holder) live in
+ * `src/lib/hold.ts` and are unit tested there.
  */
-function holderEmailOf(row: {
+function joinedHold(row: {
   holderEmail: string | null;
-  item: { currentHolderEmail: string | null };
-}): string | null {
-  return row.holderEmail ?? row.item.currentHolderEmail;
+  holderName: string | null;
+  item: HoldColumns;
+}): Hold {
+  return holdFromJoinedRow(row.item, {
+    accountEmail: row.holderEmail,
+    accountName: row.holderName,
+  });
 }
 
 /**
- * Mirrors holderEmailOf. The joined account's name wins, because someone who
- * renamed their account is still the same holder; the stored name is
- * authoritative only for a hold that matched no account.
- */
-function holderNameOf(row: {
-  holderName: string | null;
-  item: { currentHolderName: string | null };
-}): string | null {
-  return row.holderName ?? row.item.currentHolderName;
-}
-
-/** The reconciled identity for a read path, which has the account joined. */
-function joinedHolderIdentity(row: {
-  holderEmail: string | null;
-  holderName: string | null;
-  item: { currentHolderEmail: string | null; currentHolderName: string | null };
-}): HolderIdentity {
-  return { email: holderEmailOf(row), name: holderNameOf(row) };
-}
-
-/**
- * The identity a write path can see: the stored columns as they stand, with
- * no account joined. Named rather than inlined so the difference from
- * joinedHolderIdentity is visible at the call site. Create and update return
- * their item only so the caller can read back an id, and neither renders the
+ * The hold a write path can see: the stored columns as they stand, with no
+ * account joined. Named rather than inlined so the difference from
+ * `joinedHold` is visible at the call site. Create and update return their
+ * item only so the caller can read back an id, and neither renders the
  * holder, so the unreconciled name costs nothing there.
  */
-function storedHolderIdentity(row: {
-  currentHolderEmail: string | null;
-  currentHolderName: string | null;
-}): HolderIdentity {
-  return { email: row.currentHolderEmail, name: row.currentHolderName };
+function storedHold(row: HoldColumns): Hold {
+  return holdFromStoredRow(row);
 }
 
 /**
@@ -267,7 +250,7 @@ export async function listInventoryAs(
 
   const mapped = rows.map((r) => {
     if (isStaff(viewer)) {
-      return fullForStaff(r.item, r.categories, joinedHolderIdentity(r));
+      return fullForStaff(r.item, r.categories, joinedHold(r));
     }
     return stripForPublic(r.item, r.categories);
   });
@@ -317,7 +300,7 @@ async function loadInventoryItemRowFor(
 }
 
 function toStaffDetail(row: InventoryItemJoinedRow): InventoryItemStaff {
-  return fullForStaff(row.item, row.categories, joinedHolderIdentity(row));
+  return fullForStaff(row.item, row.categories, joinedHold(row));
 }
 
 function toPublicDetail(row: InventoryItemJoinedRow): InventoryItemPublic {
@@ -398,9 +381,7 @@ export async function listAdminInventoryAs(
     .orderBy(desc(inventoryItems.updatedAt));
 
   return {
-    rows: rows.map((r) =>
-      fullForStaff(r.item, r.categories, joinedHolderIdentity(r))
-    ),
+    rows: rows.map((r) => fullForStaff(r.item, r.categories, joinedHold(r))),
   };
 }
 
@@ -515,11 +496,7 @@ export async function createInventoryItemAs(
       { itemId: row.id, categoryIds: data.categoryIds },
       tx
     );
-    return fullForStaff(
-      row,
-      await categoriesFor(row.id, tx),
-      storedHolderIdentity(row)
-    );
+    return fullForStaff(row, await categoriesFor(row.id, tx), storedHold(row));
   });
 }
 
@@ -596,11 +573,7 @@ export async function updateInventoryItemAs(
     }
 
     if (changed.length === 0) {
-      return fullForStaff(
-        before,
-        beforeCategories,
-        storedHolderIdentity(before)
-      );
+      return fullForStaff(before, beforeCategories, storedHold(before));
     }
 
     await tx
@@ -640,7 +613,7 @@ export async function updateInventoryItemAs(
       .select()
       .from(inventoryItems)
       .where(eq(inventoryItems.id, data.id));
-    return fullForStaff(after, afterCategories, storedHolderIdentity(after));
+    return fullForStaff(after, afterCategories, storedHold(after));
   });
 }
 

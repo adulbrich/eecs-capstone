@@ -267,6 +267,38 @@ export function holdFromJoinedRow(
 }
 
 /**
+ * The holder's address, or null when the hold is on a thing or on nobody.
+ * A thing has a label, never an address.
+ */
+export function holdEmail(hold: Hold): string | null {
+  switch (hold.kind) {
+    case "account":
+      return hold.email;
+    case "walk_in":
+      return hold.email;
+    default:
+      return null;
+  }
+}
+
+/**
+ * The holder's name. A thing can carry one, because the columns behind a
+ * label hold still accept a name and the write path stores it.
+ */
+export function holdName(hold: Hold): string | null {
+  switch (hold.kind) {
+    case "account":
+      return hold.name;
+    case "walk_in":
+      return hold.name;
+    case "thing":
+      return hold.name;
+    default:
+      return null;
+  }
+}
+
+/**
  * The holder in as few characters as possible: name, then address, then label.
  * Used where a column has one line to spend.
  *
