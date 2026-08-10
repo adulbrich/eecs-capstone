@@ -2732,6 +2732,21 @@ describe("transitionItem authority and line outcome", () => {
     return { admin, student, item, line };
   }
 
+  /** An item in requested, pointing at a still-pending line. */
+  async function requestFromStudent() {
+    const admin = await makeUser(`ap-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`sp-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    const { line } = await makeRequestLine(student.id, item.id);
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "requested",
+      requestItemId: line.id,
+      holderId: student.id,
+    });
+    return { admin, student, item, line };
+  }
+
   it("still refuses a non-staff viewer who names no authority", async () => {
     const { student, item } = await reserveToStudent();
     await expect(
@@ -2740,12 +2755,12 @@ describe("transitionItem authority and line outcome", () => {
   });
 
   it("lets a named authority past the staff gate", async () => {
-    const { student, item } = await reserveToStudent();
+    const { student, item, line } = await reserveToStudent();
     await transitionItem(student, {
       itemId: item.id,
       nextStatus: "available",
       authority: "self_cancel",
-      lineOutcome: "cancelled",
+      lineDecision: { outcome: "cancelled", requestItemId: line.id },
     });
     const [after] = await db
       .select()
@@ -2767,13 +2782,13 @@ describe("transitionItem authority and line outcome", () => {
   });
 
   it("tells nobody when the requester cancels their own line", async () => {
-    const { student, item } = await reserveToStudent();
+    const { student, item, line } = await reserveToStudent();
     await db.delete(notifications).where(eq(notifications.userId, student.id));
     await transitionItem(student, {
       itemId: item.id,
       nextStatus: "available",
       authority: "self_cancel",
-      lineOutcome: "cancelled",
+      lineDecision: { outcome: "cancelled", requestItemId: line.id },
     });
     const rows = await db
       .select()
@@ -2801,12 +2816,14 @@ describe("transitionItem authority and line outcome", () => {
   });
 
   it("writes the review columns and the denial notice for a rejection", async () => {
-    const { admin, student, item, line } = await reserveToStudent();
+    // A rejection acts on a pending line, so this cannot reuse
+    // reserveToStudent, which leaves the line approved.
+    const { admin, student, item, line } = await requestFromStudent();
     await db.delete(notifications).where(eq(notifications.userId, student.id));
     await transitionItem(admin, {
       itemId: item.id,
       nextStatus: "available",
-      lineOutcome: "rejected",
+      lineDecision: { outcome: "rejected", requestItemId: line.id },
       comment: "Out of scope for this term",
     });
 
@@ -2842,5 +2859,120 @@ describe("transitionItem authority and line outcome", () => {
     expect(closed.status).toBe("cancelled");
     expect(closed.reviewedBy).toBeNull();
     expect(closed.reviewComment).toBeNull();
+  });
+
+  it("overrides a derivation that would have disagreed", async () => {
+    // From checked_out the derivation yields "returned". Asking for
+    // "cancelled" here is the only shape that can tell the override from its
+    // absence: a reserved item derives "cancelled" either way, so a test
+    // built on one would stay green with the whole feature deleted.
+    const { admin, student, item, line } = await reserveToStudent();
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderId: student.id,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "available",
+      lineDecision: { outcome: "cancelled", requestItemId: line.id },
+    });
+    const [closed] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.id, line.id));
+    expect(closed.status).toBe("cancelled");
+  });
+
+  it("derives returned from a checkout when no decision is named", async () => {
+    // The companion to the test above: same setup, no decision, and the
+    // derivation must produce the value the override was overriding.
+    const { admin, student, item, line } = await reserveToStudent();
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderId: student.id,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+    await transitionItem(admin, { itemId: item.id, nextStatus: "available" });
+    const [closed] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.id, line.id));
+    expect(closed.status).toBe("returned");
+  });
+
+  it("refuses a self_cancel that is not a release", async () => {
+    const { student, item } = await reserveToStudent();
+    await expect(
+      transitionItem(student, {
+        itemId: item.id,
+        nextStatus: "retired",
+        authority: "self_cancel",
+      })
+    ).rejects.toThrow(/may only release an item to available/);
+  });
+
+  it("refuses a line decision on a transition that is not a release", async () => {
+    const { admin, item, line } = await reserveToStudent();
+    await expect(
+      transitionItem(admin, {
+        itemId: item.id,
+        nextStatus: "checked_out",
+        requestItemId: line.id,
+        holderId: admin.id,
+        dueAt: new Date(Date.now() + 86_400_000),
+        lineDecision: { outcome: "cancelled", requestItemId: line.id },
+      })
+    ).rejects.toThrow(/only meaningful on a release/);
+  });
+
+  it("refuses a rejection with no reason", async () => {
+    const { admin, item, line } = await requestFromStudent();
+    await expect(
+      transitionItem(admin, {
+        itemId: item.id,
+        nextStatus: "available",
+        lineDecision: { outcome: "rejected", requestItemId: line.id },
+        comment: "   ",
+      })
+    ).rejects.toThrow(/Reject reason required/);
+  });
+
+  it("refuses a rejection of a line that is no longer pending", async () => {
+    // The line is approved here, so rejecting it would overwrite the
+    // approver's own review columns with a denial.
+    const { admin, item, line } = await reserveToStudent();
+    await expect(
+      transitionItem(admin, {
+        itemId: item.id,
+        nextStatus: "available",
+        lineDecision: { outcome: "rejected", requestItemId: line.id },
+        comment: "Changed my mind",
+      })
+    ).rejects.toThrow(/Only pending lines can be rejected/);
+  });
+
+  it("refuses a decision naming a line the item is not holding", async () => {
+    const { admin, item } = await reserveToStudent();
+    const other = await requestFromStudent();
+    await expect(
+      transitionItem(admin, {
+        itemId: item.id,
+        nextStatus: "available",
+        lineDecision: { outcome: "cancelled", requestItemId: other.line.id },
+      })
+    ).rejects.toThrow(/not the one the item is holding/);
+    // The stranger's line is untouched.
+    const [untouched] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.id, other.line.id));
+    expect(untouched.status).toBe("pending");
+    expect(untouched.closedAt).toBeNull();
   });
 });

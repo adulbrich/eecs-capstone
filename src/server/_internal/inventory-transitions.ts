@@ -35,7 +35,7 @@ export type ItemStatus =
  * schema: it is the whole staff gate for `transitionInventoryItem`, which
  * carries only `requireUser()` of its own.
  */
-export type TransitionAuthority = "self_cancel" | "self_request";
+export type TransitionAuthority = "self_cancel";
 
 /**
  * What a request line becomes when the item is released out from under it.
@@ -46,6 +46,23 @@ export type TransitionAuthority = "self_cancel" | "self_request";
  * comment, and nothing in the transition itself distinguishes them.
  */
 export type RequestLineOutcome = "cancelled" | "rejected" | "returned";
+
+/**
+ * A decision about one specific request line.
+ *
+ * The line id travels with the outcome rather than beside it, and that is the
+ * point. A release transition cannot carry `requestItemId` (validateInvariants
+ * forbids it on the statuses a release targets), so without this the outcome
+ * would land on whatever line the item happens to point at when the write
+ * runs, which is not necessarily the line the caller locked and decided
+ * about. Naming an outcome without naming its line is now unrepresentable,
+ * and `transitionItemInTx` refuses a mismatch rather than writing to the
+ * wrong student's record.
+ */
+export interface RequestLineDecision {
+  outcome: RequestLineOutcome;
+  requestItemId: string;
+}
 
 export interface TransitionInput {
   authority?: TransitionAuthority | null;
@@ -67,7 +84,7 @@ export interface TransitionInput {
   holderName?: string | null;
   holderProgram?: string | null;
   itemId: string;
-  lineOutcome?: RequestLineOutcome | null;
+  lineDecision?: RequestLineDecision | null;
   nextStatus: ItemStatus;
   pickupBy?: Date | null;
   requestItemId?: string | null;
@@ -86,7 +103,6 @@ function assertStaff(viewer: Viewer) {
 
 const SELF_SERVICE_AUTHORITIES: readonly TransitionAuthority[] = [
   "self_cancel",
-  "self_request",
 ];
 
 /**
@@ -106,7 +122,44 @@ function assertAuthorized(viewer: Viewer, input: TransitionInput) {
   }
 }
 
+/** The statuses that release an item, and so can close the line it held. */
+function isReleaseStatus(status: ItemStatus): boolean {
+  return (
+    status === "available" || status === "maintenance" || status === "retired"
+  );
+}
+
+/**
+ * The rules for the two fields that let a caller act outside the staff path.
+ * They live here, beside every other cross-field rule in this module, rather
+ * than in the callers that pass them. A caller naming its own authority must
+ * not also get to decide what that authority is allowed to do.
+ */
+function validateSelfServiceAndDecision(input: TransitionInput) {
+  // A self-service caller releases an item. It does not retire one, send one
+  // to maintenance, or check one out to itself with a deadline of its
+  // choosing. Without this the authority is a hole the size of every status.
+  if (input.authority === "self_cancel" && input.nextStatus !== "available") {
+    throw new Error("self_cancel may only release an item to available");
+  }
+  const decision = input.lineDecision;
+  if (!decision) {
+    return;
+  }
+  if (!isReleaseStatus(input.nextStatus)) {
+    throw new Error(
+      `A request line outcome is only meaningful on a release, not on a transition to ${input.nextStatus}`
+    );
+  }
+  // Matches the guard rejectRequestItemAs has always had. A denial the
+  // student cannot read a reason for is the thing that guard exists to stop.
+  if (decision.outcome === "rejected" && !input.comment?.trim()) {
+    throw new Error("Reject reason required");
+  }
+}
+
 function validateInvariants(input: TransitionInput) {
+  validateSelfServiceAndDecision(input);
   const {
     nextStatus,
     holderId,
@@ -379,21 +432,35 @@ async function transitionItemInTx(
     holderProgram: holderColumns.currentHolderProgram,
   });
 
+  // A decision names the line it was made about. If the item has since moved
+  // on to someone else's line, the caller decided about a line this item no
+  // longer holds, and writing the outcome anyway would close a stranger's
+  // request with another student's review text.
+  if (
+    input.lineDecision &&
+    input.lineDecision.requestItemId !== current.currentRequestItemId
+  ) {
+    throw new Error(
+      "The request line this decision names is not the one the item is holding"
+    );
+  }
+
+  let closedAs: RequestLineOutcome | null = null;
   if (input.requestItemId) {
     await syncRequestItem(tx, input);
   } else if (current.currentRequestItemId) {
     // Item is leaving a hold context; close the line.
-    await closeRequestItemOnRelease(
+    closedAs = await closeRequestItemOnRelease(
       tx,
       current.currentRequestItemId,
       viewer.id,
       current.status,
       input.comment ?? null,
-      input.lineOutcome
+      input.lineDecision
     );
   }
 
-  await maybeNotify(tx, current, input, holdAccountId(hold));
+  await maybeNotify(tx, current, input, holdAccountId(hold), closedAs);
 }
 
 async function syncRequestItem(tx: Tx, input: TransitionInput) {
@@ -424,21 +491,45 @@ async function syncRequestItem(tx: Tx, input: TransitionInput) {
   }
 }
 
+/**
+ * Closes the line an item was holding, and reports what it wrote so the
+ * notification arm does not have to guess.
+ */
 async function closeRequestItemOnRelease(
   tx: Tx,
   requestItemId: string,
   actorId: string,
   prevStatus: ItemStatus,
   comment: string | null,
-  outcome: RequestLineOutcome | null | undefined
-) {
+  decision: RequestLineDecision | null | undefined
+): Promise<RequestLineOutcome> {
   // Fulfillment ended in the user's hands then came back: returned.
   // Otherwise (reserved abandoned, sent to maintenance/retired before pickup): cancelled.
   // A caller that knows better says so: only it can tell a staff refusal from
   // a staff release, since both end at available with a comment.
   const lineStatus =
-    outcome ?? (prevStatus === "checked_out" ? "returned" : "cancelled");
+    decision?.outcome ??
+    (prevStatus === "checked_out" ? "returned" : "cancelled");
   const now = new Date();
+
+  if (lineStatus === "rejected") {
+    // The same precondition rejectRequestItemAs has always enforced. Without
+    // it a release could stamp "rejected" over an approved or returned line
+    // and overwrite the approver's own review columns, erasing the decision
+    // that actually happened.
+    const [line] = await tx
+      .select({ status: inventoryRequestItems.status })
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.id, requestItemId))
+      .for("update");
+    if (!line) {
+      throw new Error("Request line not found");
+    }
+    if (line.status !== "pending") {
+      throw new Error("Only pending lines can be rejected");
+    }
+  }
+
   await tx
     .update(inventoryRequestItems)
     .set({
@@ -455,6 +546,7 @@ async function closeRequestItemOnRelease(
         : {}),
     })
     .where(eq(inventoryRequestItems.id, requestItemId));
+  return lineStatus;
 }
 
 async function maybeNotify(
@@ -467,7 +559,8 @@ async function maybeNotify(
     currentRequestItemId: string | null;
   },
   input: TransitionInput,
-  holderId: string | null
+  holderId: string | null,
+  closedAs: RequestLineOutcome | null
 ) {
   // Identify a "release-from-hold" path: no new request context provided AND
   // the item was held by someone. The original holder is then the recipient.
@@ -489,20 +582,6 @@ async function maybeNotify(
   // can assign a hold to their own address, and that case is also
   // actor-equals-recipient but does want its pickup deadline in the bell.
   if (input.authority === "self_cancel") {
-    return;
-  }
-
-  // A refusal reads differently from a release, so it gets its own type and
-  // wording even though both end at available. notifications.type is text(),
-  // not a Postgres enum, so a new value costs no migration.
-  if (input.lineOutcome === "rejected") {
-    await tx.insert(notifications).values({
-      userId: recipientId,
-      type: "inventory_request_rejected",
-      title: `Request denied: ${prev.name}`,
-      message: input.comment ?? `Your request for ${prev.name} was denied.`,
-      link: "/my/items?tab=history",
-    });
     return;
   }
 
@@ -534,6 +613,21 @@ async function maybeNotify(
     case "maintenance":
     case "retired": {
       if (!isReleaseFromHold) {
+        return;
+      }
+      // Keyed on what was actually written to the line, not on what the
+      // caller asked for. A refusal reads differently from a release, so it
+      // gets its own type and wording even though both end at available.
+      // notifications.type is text(), not a Postgres enum, so a new value
+      // costs no migration.
+      if (closedAs === "rejected") {
+        await tx.insert(notifications).values({
+          userId: recipientId,
+          type: "inventory_request_rejected",
+          title: `Request denied: ${prev.name}`,
+          message: input.comment ?? `Your request for ${prev.name} was denied.`,
+          link: "/my/items?tab=history",
+        });
         return;
       }
       if (prev.status === "checked_out" && input.nextStatus === "available") {
