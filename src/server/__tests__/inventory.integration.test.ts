@@ -1265,6 +1265,49 @@ describe("request lifecycle", () => {
     expect(afterLine.reviewComment).toBe("Reserved for class");
   });
 
+  it("reject tells the requester, and cancel tells nobody", async () => {
+    // Neither notification was asserted anywhere before, so routing both
+    // paths through transitionItem could have dropped the denial notice or
+    // started emitting one for a self-cancel without the suite noticing.
+    const admin = await makeUser(`an-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`sn-${Date.now()}@x.com`, "user");
+    const rejected = await makeItem();
+    const cancelled = await makeItem();
+    await addToCartAs(student, { itemId: rejected.id });
+    await addToCartAs(student, { itemId: cancelled.id });
+    await submitCartAs(student, { note: null });
+    const lines = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(
+        inArray(inventoryRequestItems.itemId, [rejected.id, cancelled.id])
+      );
+    const rejectedLine = lines.find((l) => l.itemId === rejected.id);
+    const cancelledLine = lines.find((l) => l.itemId === cancelled.id);
+    if (!(rejectedLine && cancelledLine)) {
+      throw new Error("submitCart did not produce a line for both items");
+    }
+
+    await db.delete(notifications).where(eq(notifications.userId, student.id));
+    await rejectRequestItemAs(admin, {
+      requestItemId: rejectedLine.id,
+      reviewComment: "Reserved for class",
+    });
+    await cancelRequestItemAs(student, {
+      requestItemId: cancelledLine.id,
+      note: "Changed my mind",
+    });
+
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, student.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].type).toBe("inventory_request_rejected");
+    expect(rows[0].message).toBe("Reserved for class");
+    expect(rows[0].link).toBe("/my/items?tab=history");
+  });
+
   it("cancel works while pending or reserved, blocked after checkout", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");
