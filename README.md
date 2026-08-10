@@ -15,6 +15,19 @@ None.
 
 ## Known issues
 
+- **The holder assign dialog can silently drop a typed name and program.**
+  `HolderField` looks an address up on a 250ms debounce, and `holderFields` in
+  `src/components/inventory-lifecycle-panel.tsx` only sends the Name and Program
+  fields when the lookup has answered `unmatched`. Editing the address puts
+  `accountStatus` back to `unknown`, so staff who fill in a walk-in's name and
+  program, then correct a typo in the address and press Assign inside that
+  window, submit both fields as null. The hold is recorded with an address and
+  no name, the Holder column shows the bare address, and nothing warns them.
+  The submit guard only requires an address or a label, so it does not catch
+  this. Predates the Hold refactor, which left the expression untouched. The fix
+  is either to disable Assign while `accountStatus` is `unknown`, or to keep the
+  typed values across the lookup and let the server drop them if an account
+  resolves, which it already does.
 - **`recommended-sort.integration.test.ts` is flaky in a full integration run.** The
   case "orders by cosine distance from the viewer's interest vector" failed 2 of 6
   full-suite runs and passed every time in isolation, where it takes 1.2s against
