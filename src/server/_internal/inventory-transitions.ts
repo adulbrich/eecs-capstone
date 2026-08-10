@@ -8,6 +8,7 @@ import {
   notifications,
   user,
 } from "#/db/schema";
+import { type Hold, holdFromInput, holdToColumns } from "#/lib/hold";
 
 export type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
 
@@ -109,6 +110,16 @@ function validateInvariants(input: TransitionInput) {
       // An id and an address both identify the same person, so they count as
       // one; name and program are attributes of that person, not a third
       // identity, and are excluded from the test entirely.
+      //
+      // This arm looks redundant now that `holdFromInput` builds a union in
+      // which "both" is unrepresentable. It is not, and deleting it ships a
+      // silent bug. Two reasons:
+      //
+      // 1. "Never neither" is status-dependent, and the Hold constructor never
+      //    sees a status. `{ kind: "none" }` is a legal hold for an available
+      //    item. Only this arm knows that it is not a legal one for a
+      //    checkout, so without it a checkout with no holder saves silently.
+      // 2. `inventory.integration.test.ts:140-157` asserts this exact wording.
       const onAPerson = Boolean(holderId || holderEmail);
       const onAThing = Boolean(holderLabel);
       if (onAPerson === onAThing) {
@@ -168,40 +179,57 @@ async function lockAttachableRequestLine(
   }
 }
 
-interface ResolvedHolder {
-  email: string | null;
-  id: string | null;
-}
-
 /**
  * Completes the (account, address) pair from whichever half the caller had,
- * the same way a project's proposerEmail resolves to a proposerId.
+ * the same way a project's proposerEmail resolves to a proposerId, and hands
+ * the completed pair to the Hold constructor.
  *
  * An address supplied by the caller always wins over a supplied id, because
  * it is the address the hold was actually assigned to. Deriving the address
  * in the id-only direction is what keeps current_holder_email populated for
  * callers that never had one to give (approveRequestItemAs), which is what
  * makes "a person hold always has an address" true on every write path.
+ *
+ * Every branch goes through `holdFromInput`, so the rules about which fields
+ * survive live in one place (`src/lib/hold.ts`) rather than being reapplied
+ * here. In particular, dropping a typed name and program once an account
+ * resolves is structural in the union rather than a pair of ternaries.
  */
-async function resolveHolder(
-  tx: Tx,
-  input: TransitionInput
-): Promise<ResolvedHolder> {
+async function resolveHold(tx: Tx, input: TransitionInput): Promise<Hold> {
+  const loose = {
+    label: input.holderLabel,
+    name: input.holderName,
+    program: input.holderProgram,
+  };
   if (input.holderEmail) {
     const [match] = await tx
-      .select({ id: user.id })
+      .select({ id: user.id, name: user.name })
       .from(user)
       .where(eq(user.email, input.holderEmail));
-    return { email: input.holderEmail, id: match?.id ?? null };
+    return holdFromInput(
+      { ...loose, email: input.holderEmail },
+      { accountId: match?.id ?? null, accountName: match?.name ?? null }
+    );
   }
   if (input.holderId) {
+    // The id may name an account row that no longer exists, in which case the
+    // address comes back null and the hold is still an account hold. The Hold
+    // constructor checks the account before the address for exactly this case.
     const [account] = await tx
-      .select({ email: user.email })
+      .select({ email: user.email, name: user.name })
       .from(user)
       .where(eq(user.id, input.holderId));
-    return { email: account?.email ?? null, id: input.holderId };
+    return holdFromInput(
+      { ...loose, email: account?.email ?? null },
+      { accountId: input.holderId, accountName: account?.name ?? null }
+    );
   }
-  return { email: null, id: null };
+  return holdFromInput(loose, { accountId: null, accountName: null });
+}
+
+/** The account behind a hold, when there is one. Notifications need an id. */
+function holdAccountId(hold: Hold): string | null {
+  return hold.kind === "account" ? hold.accountId : null;
 }
 
 /**
@@ -242,11 +270,12 @@ async function transitionItemInTx(
     await lockAttachableRequestLine(tx, input.requestItemId, input.itemId);
   }
 
-  const holder = await resolveHolder(tx, input);
+  const hold = await resolveHold(tx, input);
   // The account is authoritative for anyone who has one, so a typed name or
   // program is dropped rather than stored alongside it and left to drift.
-  const holderName = holder.id ? null : (input.holderName ?? null);
-  const holderProgram = holder.id ? null : (input.holderProgram ?? null);
+  // That rule now lives in the Hold union: the account case has nowhere to
+  // put them.
+  const holderColumns = holdToColumns(hold);
 
   const [current] = await tx
     .select()
@@ -271,11 +300,7 @@ async function transitionItemInTx(
     .update(inventoryItems)
     .set({
       status: input.nextStatus,
-      currentHolderId: holder.id,
-      currentHolderEmail: holder.email,
-      currentHolderLabel: input.holderLabel ?? null,
-      currentHolderName: holderName,
-      currentHolderProgram: holderProgram,
+      ...holderColumns,
       // Writing the hold's dates here on every transition means releasing an
       // item clears them for free, with no separate reset path.
       currentPickupBy: input.pickupBy ?? null,
@@ -292,11 +317,15 @@ async function transitionItemInTx(
     changedBy: viewer.id,
     comment: input.comment ?? null,
     requestItemId: input.requestItemId ?? null,
-    holderId: holder.id,
-    holderEmail: holder.email,
-    holderLabel: input.holderLabel ?? null,
-    holderName,
-    holderProgram,
+    // The history row records the same five values under its own column
+    // names, so it is fed from the same flattened hold rather than from a
+    // second reading of the input. Two attributes of one person travelling by
+    // two mechanisms is what let these fall out of sync before.
+    holderId: holderColumns.currentHolderId,
+    holderEmail: holderColumns.currentHolderEmail,
+    holderLabel: holderColumns.currentHolderLabel,
+    holderName: holderColumns.currentHolderName,
+    holderProgram: holderColumns.currentHolderProgram,
   });
 
   if (input.requestItemId) {
@@ -312,7 +341,7 @@ async function transitionItemInTx(
     );
   }
 
-  await maybeNotify(tx, current, input, holder.id);
+  await maybeNotify(tx, current, input, holdAccountId(hold));
 }
 
 async function syncRequestItem(tx: Tx, input: TransitionInput) {
