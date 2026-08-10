@@ -1329,7 +1329,7 @@ describe("request lifecycle", () => {
 
     // Staff reserves the request to a walk-in address with no matching
     // account, typing a name and program. The address must not resolve to
-    // any account created in this file, or resolveHolder would clear the
+    // any account created in this file, or resolveHold would clear the
     // name/program at write time and the test would prove nothing.
     await transitionItem(admin, {
       itemId: item.id,
@@ -1764,7 +1764,7 @@ describe("staff-assigned holds in my items", () => {
     const admin = await makeUser(`h4-admin-${stamp}@x.com`, "admin");
     const item = await makeItem({ name: "Drill" });
 
-    // Assign to an address with no account yet, so resolveHolderId finds
+    // Assign to an address with no account yet, so resolveHold finds
     // nothing and current_holder_id stays null.
     await transitionItem(admin, {
       itemId: item.id,
@@ -2178,7 +2178,7 @@ describe("overdue notifications for staff holds", () => {
     const holderEmail = `o4-walkin-${stamp}@x.com`;
     const item = await makeItem({ name: "Grinder" });
 
-    // Assign to an address with no account yet, so resolveHolderId finds
+    // Assign to an address with no account yet, so resolveHold finds
     // nothing and current_holder_id stays null: this hold is discoverable
     // only through listMyItemsAs's verified-email match, which the
     // notification write path deliberately does not repeat.
@@ -2442,7 +2442,7 @@ describe("holder resolution", () => {
 
     // submitCartAs now writes the requester's address, so clear it first.
     // The point of the assertions below is that approveRequestItemAs passes
-    // only an account id, and resolveHolder derives the address from it. With
+    // only an account id, and resolveHold derives the address from it. With
     // the address left in place, they would pass on leftover state even if
     // the derivation were broken.
     await db
@@ -2468,7 +2468,7 @@ describe("holder resolution", () => {
       .from(inventoryItems)
       .where(eq(inventoryItems.id, item.id));
     // The address was cleared above, so this can only pass if
-    // approveRequestItemAs's holderId re-derived it via resolveHolder.
+    // approveRequestItemAs's holderId re-derived it via resolveHold.
     expect(held.currentHolderId).toBe(student.id);
     expect(held.currentHolderEmail).toBe("approve-student@x.com");
     expect(held.currentHolderLabel).toBeNull();

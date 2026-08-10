@@ -34,18 +34,28 @@
  * - **A walk-in is identified by its address.** The `walk_in` case requires an
  *   `email`, because nothing else identifies that person.
  *
- * ## Whitespace is not trimmed here
+ * ## Whitespace is not trimmed, but an empty string is not a value
  *
  * `validateInvariants` decides person-versus-thing on raw truthiness, and
- * `transitionItemInTx` stores the raw strings. This module matches both
- * exactly, so a caller cannot pass a guard on one rule and then be re-judged
- * by a stricter one. Trimming is the input layer's job, and
+ * `transitionItemInTx` stores the raw strings. This module matches both on
+ * whitespace, so a caller cannot pass a guard on one rule and then be
+ * re-judged by a stricter one. Trimming is the input layer's job, and
  * `holderFields` in the lifecycle panel already does it before submitting.
+ *
+ * An empty string is different, and is deliberately normalized to null. The
+ * previous write path stored `""` verbatim, which is not a value any reader
+ * wants: `??` does not treat `""` as absent, so an empty `current_holder_name`
+ * would stop the admin table's Holder column
+ * (`name ?? email ?? label ?? undefined`) from falling through, and render a
+ * blank cell for an item that does have a holder. `transitionSchema` accepts
+ * `""` for label, name and program (`z.string().max(200)`, no `.min(1)`), so
+ * that state was reachable. Normalizing here is a deliberate, tiny departure
+ * from byte-identical preservation, and it fixes that rather than causing it.
  *
  * ## The two account lookups
  *
  * `HolderField` asks `lookupUserByEmail` on a debounce to decide whether to
- * show its Name and Program inputs. `resolveHolder` asks the same question
+ * show its Name and Program inputs. `resolveHold` asks the same question
  * again inside the transaction. They can disagree, when an account is created
  * between the two calls.
  *
