@@ -1,16 +1,15 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { AddToCartButton } from "#/components/add-to-cart-button";
 import { CategoryChip } from "#/components/category-chip";
 import { InventoryPrivatePanel } from "#/components/inventory-private-panel";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { StaffInventoryPanel } from "#/components/staff-inventory-panel";
-import { Button } from "#/components/ui/button";
 import { authClient } from "#/lib/auth-client";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
 import { getPublicUrl } from "#/lib/storage";
 import { useHasMounted } from "#/lib/use-has-mounted";
-import { addToCart, getInventoryItemDetail } from "#/server/inventory";
+import { getInventoryItemDetail } from "#/server/inventory";
 
 export const Route = createFileRoute("/inventory/$itemId")({
   head: () => ({ meta: [{ title: pageTitle("Inventory Item") }] }),
@@ -36,7 +35,6 @@ export const Route = createFileRoute("/inventory/$itemId")({
 function ItemDetail() {
   const detail = Route.useLoaderData();
   const { item } = detail;
-  const qc = useQueryClient();
   // The server has no session, so it always renders the signed-out branch.
   // Gating on mount rather than on the session's `isPending` makes the first
   // client render match it unconditionally: a cached session resolves
@@ -93,7 +91,6 @@ function ItemDetail() {
               <CartAction
                 canAdd={canAdd}
                 itemId={item.id}
-                onAdded={() => qc.invalidateQueries()}
                 signedIn={!!session?.user}
                 status={item.status}
               />
@@ -117,27 +114,16 @@ function ItemDetail() {
 function CartAction({
   canAdd,
   itemId,
-  onAdded,
   signedIn,
   status,
 }: {
   canAdd: boolean;
   itemId: string;
-  onAdded: () => Promise<unknown>;
   signedIn: boolean;
   status: string;
 }) {
   if (canAdd) {
-    return (
-      <Button
-        onClick={async () => {
-          await addToCart({ data: { itemId } });
-          await onAdded();
-        }}
-      >
-        Add to cart
-      </Button>
-    );
+    return <AddToCartButton itemId={itemId} size="default" variant="default" />;
   }
   if (!signedIn) {
     return (
