@@ -15,7 +15,17 @@ None.
 
 ## Known issues
 
-None.
+- **`recommended-sort.integration.test.ts` is flaky in a full integration run.** The
+  case "orders by cosine distance from the viewer's interest vector" failed 2 of 6
+  full-suite runs and passed every time in isolation, where it takes 1.2s against
+  roughly 11s on the runs that fail. The duration is the clue: that is something
+  waiting, not an assertion being wrong. `publishWithVector` transitions a project
+  all the way to `published` and only then writes the test's embedding, so any
+  asynchronous embedding refresh triggered by publishing would race that write and
+  overwrite the vector the assertion depends on. Not yet diagnosed. It matters more
+  than a flake usually would, because the integration suite is the only executable
+  specification of this behavior and it does not run in CI, so nobody is watching it
+  go red.
 
 ## Roadmap (not yet implemented)
 
