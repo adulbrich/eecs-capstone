@@ -20,7 +20,35 @@ export type ItemStatus =
   | "maintenance"
   | "retired";
 
+/**
+ * The non-staff authority a caller has already verified for itself.
+ *
+ * Absent means staff, and `assertStaff` runs exactly as it always has. These
+ * two values are the only way past it, they are only reachable from an
+ * internal caller, and each names the check its caller performed:
+ * `self_cancel` means the caller confirmed the viewer owns the request line,
+ * `self_request` means the viewer is submitting their own cart.
+ *
+ * `transitionSchema` in `src/server/inventory.ts` does not declare this field,
+ * and `z.object().parse` strips unknown keys, so a client that posts
+ * `authority` has it removed before it reaches here. Do not add it to that
+ * schema: it is the whole staff gate for `transitionInventoryItem`, which
+ * carries only `requireUser()` of its own.
+ */
+export type TransitionAuthority = "self_cancel" | "self_request";
+
+/**
+ * What a request line becomes when the item is released out from under it.
+ *
+ * Absent keeps the existing derivation, `returned` from a checkout and
+ * `cancelled` otherwise. It is passed rather than derived because rejecting a
+ * pending line and releasing a reserved item both end at `available` with a
+ * comment, and nothing in the transition itself distinguishes them.
+ */
+export type RequestLineOutcome = "cancelled" | "rejected" | "returned";
+
 export interface TransitionInput {
+  authority?: TransitionAuthority | null;
   comment?: string | null;
   dueAt?: Date | null;
   /** Assigns the hold to an address, with or without a matching account. */
@@ -39,6 +67,7 @@ export interface TransitionInput {
   holderName?: string | null;
   holderProgram?: string | null;
   itemId: string;
+  lineOutcome?: RequestLineOutcome | null;
   nextStatus: ItemStatus;
   pickupBy?: Date | null;
   requestItemId?: string | null;
@@ -51,6 +80,28 @@ interface Viewer {
 
 function assertStaff(viewer: Viewer) {
   if (viewer.role !== "admin" && viewer.role !== "instructor") {
+    throw new Error("Forbidden");
+  }
+}
+
+const SELF_SERVICE_AUTHORITIES: readonly TransitionAuthority[] = [
+  "self_cancel",
+  "self_request",
+];
+
+/**
+ * Default deny. No authority means staff, which is every caller that existed
+ * before self-service paths were routed through here, so their behavior is
+ * unchanged. A named authority is accepted only if it is one this module
+ * knows; an unrecognized string is rejected rather than waved through, so a
+ * future typo fails closed.
+ */
+function assertAuthorized(viewer: Viewer, input: TransitionInput) {
+  if (!input.authority) {
+    assertStaff(viewer);
+    return;
+  }
+  if (!SELF_SERVICE_AUTHORITIES.includes(input.authority)) {
     throw new Error("Forbidden");
   }
 }
@@ -246,7 +297,7 @@ export async function transitionItem(
   input: TransitionInput,
   externalTx?: Tx
 ) {
-  assertStaff(viewer);
+  assertAuthorized(viewer, input);
   validateInvariants(input);
 
   // If the caller already has an open transaction (e.g. approveRequestItemAs
@@ -337,7 +388,8 @@ async function transitionItemInTx(
       current.currentRequestItemId,
       viewer.id,
       current.status,
-      input.comment ?? null
+      input.comment ?? null,
+      input.lineOutcome
     );
   }
 
@@ -377,19 +429,30 @@ async function closeRequestItemOnRelease(
   requestItemId: string,
   actorId: string,
   prevStatus: ItemStatus,
-  comment: string | null
+  comment: string | null,
+  outcome: RequestLineOutcome | null | undefined
 ) {
   // Fulfillment ended in the user's hands then came back: returned.
   // Otherwise (reserved abandoned, sent to maintenance/retired before pickup): cancelled.
-  const lineStatus = prevStatus === "checked_out" ? "returned" : "cancelled";
+  // A caller that knows better says so: only it can tell a staff refusal from
+  // a staff release, since both end at available with a comment.
+  const lineStatus =
+    outcome ?? (prevStatus === "checked_out" ? "returned" : "cancelled");
+  const now = new Date();
   await tx
     .update(inventoryRequestItems)
     .set({
       status: lineStatus,
-      closedAt: new Date(),
+      closedAt: now,
       closedBy: actorId,
       closedReason: comment,
-      updatedAt: new Date(),
+      updatedAt: now,
+      // A rejection is a review decision, so it also fills the review columns.
+      // The comment does double duty as the reason and the review note,
+      // matching what the reject path wrote before it came through here.
+      ...(lineStatus === "rejected"
+        ? { reviewedAt: now, reviewedBy: actorId, reviewComment: comment }
+        : {}),
     })
     .where(eq(inventoryRequestItems.id, requestItemId));
 }
@@ -417,6 +480,29 @@ async function maybeNotify(
   const recipientId =
     holderId ?? (isReleaseFromHold ? prev.currentHolderId : null);
   if (!recipientId) {
+    return;
+  }
+
+  // A requester cancelling their own line is told nothing, because the only
+  // person to tell is the one who just clicked the button. Keyed on the
+  // authority rather than on a general "actor equals recipient" rule: staff
+  // can assign a hold to their own address, and that case is also
+  // actor-equals-recipient but does want its pickup deadline in the bell.
+  if (input.authority === "self_cancel") {
+    return;
+  }
+
+  // A refusal reads differently from a release, so it gets its own type and
+  // wording even though both end at available. notifications.type is text(),
+  // not a Postgres enum, so a new value costs no migration.
+  if (input.lineOutcome === "rejected") {
+    await tx.insert(notifications).values({
+      userId: recipientId,
+      type: "inventory_request_rejected",
+      title: `Request denied: ${prev.name}`,
+      message: input.comment ?? `Your request for ${prev.name} was denied.`,
+      link: "/my/items?tab=history",
+    });
     return;
   }
 

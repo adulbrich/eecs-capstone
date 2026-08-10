@@ -2714,3 +2714,133 @@ describe("listMyItemsAs collectedBy gate", () => {
     }
   });
 });
+
+describe("transitionItem authority and line outcome", () => {
+  /** An item reserved to the student, with an open line the item points at. */
+  async function reserveToStudent() {
+    const admin = await makeUser(`aa-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`ss-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    const { line } = await makeRequestLine(student.id, item.id);
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "reserved",
+      requestItemId: line.id,
+      holderId: student.id,
+      pickupBy: new Date(Date.now() + 86_400_000),
+    });
+    return { admin, student, item, line };
+  }
+
+  it("still refuses a non-staff viewer who names no authority", async () => {
+    const { student, item } = await reserveToStudent();
+    await expect(
+      transitionItem(student, { itemId: item.id, nextStatus: "available" })
+    ).rejects.toThrow(/Forbidden/);
+  });
+
+  it("lets a named authority past the staff gate", async () => {
+    const { student, item } = await reserveToStudent();
+    await transitionItem(student, {
+      itemId: item.id,
+      nextStatus: "available",
+      authority: "self_cancel",
+      lineOutcome: "cancelled",
+    });
+    const [after] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(after.status).toBe("available");
+  });
+
+  it("refuses an authority it does not recognize", async () => {
+    const { student, item } = await reserveToStudent();
+    await expect(
+      transitionItem(student, {
+        itemId: item.id,
+        nextStatus: "available",
+        // A value outside the union, as a JS caller could supply.
+        authority: "self_anything" as "self_cancel",
+      })
+    ).rejects.toThrow(/Forbidden/);
+  });
+
+  it("tells nobody when the requester cancels their own line", async () => {
+    const { student, item } = await reserveToStudent();
+    await db.delete(notifications).where(eq(notifications.userId, student.id));
+    await transitionItem(student, {
+      itemId: item.id,
+      nextStatus: "available",
+      authority: "self_cancel",
+      lineOutcome: "cancelled",
+    });
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, student.id));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("still tells the holder when staff release the item", async () => {
+    // The self_cancel suppression must not leak into the staff path, which is
+    // the same transition by a different actor.
+    const { admin, student, item } = await reserveToStudent();
+    await db.delete(notifications).where(eq(notifications.userId, student.id));
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "available",
+      comment: "Reclaimed for a class",
+    });
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, student.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].type).toBe("inventory_request_closed");
+  });
+
+  it("writes the review columns and the denial notice for a rejection", async () => {
+    const { admin, student, item, line } = await reserveToStudent();
+    await db.delete(notifications).where(eq(notifications.userId, student.id));
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "available",
+      lineOutcome: "rejected",
+      comment: "Out of scope for this term",
+    });
+
+    const [closed] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.id, line.id));
+    expect(closed.status).toBe("rejected");
+    expect(closed.reviewComment).toBe("Out of scope for this term");
+    expect(closed.reviewedBy).toBe(admin.id);
+    expect(closed.reviewedAt).not.toBeNull();
+    expect(closed.closedReason).toBe("Out of scope for this term");
+
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, student.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].type).toBe("inventory_request_rejected");
+    expect(rows[0].title).toMatch(/Request denied/);
+    expect(rows[0].message).toBe("Out of scope for this term");
+  });
+
+  it("derives the line outcome when the caller names none", async () => {
+    const { admin, item, line } = await reserveToStudent();
+    await transitionItem(admin, { itemId: item.id, nextStatus: "available" });
+    const [closed] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.id, line.id));
+    // Reserved, never picked up, so cancelled rather than returned. The
+    // review columns stay empty: this was a release, not a decision.
+    expect(closed.status).toBe("cancelled");
+    expect(closed.reviewedBy).toBeNull();
+    expect(closed.reviewComment).toBeNull();
+  });
+});
