@@ -403,6 +403,34 @@ Migrations run during deploy. To run them out of band, use the same
 `run-task` pattern as section 6 with command
 `["node","scripts/migrate.mjs"]` and no extra environment.
 
+### Delete a test account
+
+`scripts/delete-user.mjs` removes an account together with the projects and
+inventory requests it made. It is for test accounts that reached production,
+not for real users: it refuses whenever the account acted on records it does
+not own (commented on someone else's project, changed a project's status,
+touched an inventory item, still holds one), because that means the account
+touched real data. Ban a real user instead.
+
+Run it exactly like the `promote-admin` task in section 6, with
+`["node","scripts/delete-user.mjs"]` and:
+
+```json
+"environment":[{"name":"TARGET_EMAIL","value":"test1@example.edu,test2@example.edu"}]
+```
+
+`TARGET_EMAIL` takes one address or a comma-separated list. **The first run is
+a dry run**: it writes nothing and reports, per account, what would be deleted
+or what blocks it. Read the report in CloudWatch, then run the task again with
+`CONFIRM=DELETE` added to the environment to act on it.
+
+Two more things it will refuse. An account whose role is `admin` needs
+`ALLOW_ADMIN=1`, so a mistyped address cannot take out a real admin. An account
+holding an inventory item has to have it returned through the app first,
+otherwise the item is left checked out to nobody.
+
+The task exits non-zero if any address was blocked or matched no account.
+
 ---
 
 ## 9. Adding real email delivery
