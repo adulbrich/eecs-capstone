@@ -1,15 +1,10 @@
 /**
  * Purge a test account and its content from production.
  *
- * This is an operator tool, not the admin delete-user feature on the README
- * roadmap. That one has to anonymize: nine of the ten ON DELETE RESTRICT edges
- * into `user.id` are authorship or audit records, and they are RESTRICT
- * because project history must outlive the person. This script does the
- * opposite, because a test account's content is garbage and the point is to
- * make it go away.
- *
- * It refuses whenever the account acted on records it does not own. That case
- * means the "test" account touched real data, and a purge is the wrong tool.
+ * Deletes the account along with the projects and inventory requests it made.
+ * It refuses whenever the account acted on records it does not own, because
+ * that means the "test" account touched real data and a purge is the wrong
+ * tool for it.
  *
  * A run without CONFIRM=DELETE reports and writes nothing. Run it once to read
  * the report, then again to act on it.
@@ -108,9 +103,9 @@ const BLOCKERS = [
              AND proposer_id IS DISTINCT FROM $1`,
   },
   {
-    // project_bids and project_assignments have no UI (see the README
-    // roadmap), so there is no way to clean these up short of SQL. Refuse
-    // rather than delete rows the operator cannot see.
+    // project_bids and project_assignments have no UI, so there is no way to
+    // clean these up short of SQL. Refuse rather than delete rows the operator
+    // cannot see.
     relation: "project_bids",
     reason: "project bids",
     sql: `SELECT count(*)::int AS count
