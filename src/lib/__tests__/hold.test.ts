@@ -40,10 +40,41 @@ describe("holdFromInput", () => {
     expect(hold).not.toHaveProperty("program");
   });
 
+  it("keeps an account resolved without an address, rather than dropping it", () => {
+    // approveRequestItemAs passes a requester id and no address, and that id
+    // can name an account row that no longer exists. Returning "none" here
+    // would write an item into reserved with no holder at all.
+    expect(holdFromInput({}, { accountId: "u-1", accountName: null })).toEqual({
+      kind: "account",
+      accountId: "u-1",
+      email: null,
+      name: null,
+    });
+  });
+
   it("builds a thing hold from a label alone", () => {
     expect(holdFromInput({ label: "Cart 3" }, NO_ACCOUNT)).toEqual({
       kind: "thing",
       label: "Cart 3",
+      name: null,
+      program: null,
+    });
+  });
+
+  it("keeps a name and program supplied beside a label", () => {
+    // transitionItemInTx stores both on this path today, and staff search
+    // filters on those columns, so dropping them would lose data and make the
+    // row unfindable by holder.
+    expect(
+      holdFromInput(
+        { label: "Lab 204", name: "Robotics club", program: "CS 461" },
+        NO_ACCOUNT
+      )
+    ).toEqual({
+      kind: "thing",
+      label: "Lab 204",
+      name: "Robotics club",
+      program: "CS 461",
     });
   });
 
@@ -51,27 +82,42 @@ describe("holdFromInput", () => {
     expect(holdFromInput({}, NO_ACCOUNT)).toEqual({ kind: "none" });
   });
 
-  it("throws when a hold is on a person and a thing at once", () => {
+  it("throws when a hold is on an address and a thing at once", () => {
     expect(() =>
       holdFromInput({ email: "a@b.test", label: "Cart 3" }, NO_ACCOUNT)
     ).toThrow(/not both/i);
   });
 
-  it("ignores a name or program supplied without an address", () => {
-    expect(
+  it("throws when a hold is on an account and a thing at once", () => {
+    // validateInvariants counts an id and an address as one person, so the
+    // constructor has to as well, or an input passes one guard and fails the
+    // other.
+    expect(() =>
       holdFromInput(
-        { label: "Cart 3", name: "Wanda", program: "ECE" },
-        NO_ACCOUNT
+        { label: "Cart 3" },
+        { accountId: "u-1", accountName: null }
       )
-    ).toEqual({ kind: "thing", label: "Cart 3" });
+    ).toThrow(/not both/i);
   });
 
-  it("treats a blank address as absent", () => {
-    expect(
-      holdFromInput({ email: "   ", label: "Cart 3" }, NO_ACCOUNT)
-    ).toEqual({
+  it("does not trim a whitespace-only label into no hold at all", () => {
+    // validateInvariants accepts this on raw truthiness, so trimming it away
+    // here would let a reserved item through with all five columns null and
+    // nobody to chase for it.
+    expect(holdFromInput({ label: "   " }, NO_ACCOUNT)).toEqual({
       kind: "thing",
-      label: "Cart 3",
+      label: "   ",
+      name: null,
+      program: null,
+    });
+  });
+
+  it("does not trim a whitespace-only address into no hold at all", () => {
+    expect(holdFromInput({ email: "   " }, NO_ACCOUNT)).toEqual({
+      kind: "walk_in",
+      email: "   ",
+      name: null,
+      program: null,
     });
   });
 });
@@ -94,6 +140,23 @@ describe("holdToColumns", () => {
     });
   });
 
+  it("writes a thing's name and program alongside its label", () => {
+    expect(
+      holdToColumns({
+        kind: "thing",
+        label: "Lab 204",
+        name: "Robotics club",
+        program: "CS 461",
+      })
+    ).toEqual({
+      currentHolderId: null,
+      currentHolderEmail: null,
+      currentHolderLabel: "Lab 204",
+      currentHolderName: "Robotics club",
+      currentHolderProgram: "CS 461",
+    });
+  });
+
   it("never stores an account's name, because the account is authoritative", () => {
     expect(
       holdToColumns({
@@ -111,6 +174,17 @@ describe("holdToColumns", () => {
     });
   });
 
+  it("keeps an account id whose address never loaded", () => {
+    expect(
+      holdToColumns({
+        kind: "account",
+        accountId: "u-1",
+        email: null,
+        name: null,
+      })
+    ).toMatchObject({ currentHolderId: "u-1", currentHolderEmail: null });
+  });
+
   it("clears every column for no hold", () => {
     expect(holdToColumns({ kind: "none" })).toEqual({
       currentHolderId: null,
@@ -122,23 +196,38 @@ describe("holdToColumns", () => {
   });
 
   it("round-trips a thing hold", () => {
-    const hold: Hold = { kind: "thing", label: "Cart 3" };
+    const hold: Hold = {
+      kind: "thing",
+      label: "Cart 3",
+      name: null,
+      program: null,
+    };
+    expect(holdFromStoredRow(holdToColumns(hold))).toEqual(hold);
+  });
+
+  it("round-trips a walk-in hold", () => {
+    const hold: Hold = {
+      kind: "walk_in",
+      email: "w@in.test",
+      name: "Wanda",
+      program: "ECE",
+    };
     expect(holdFromStoredRow(holdToColumns(hold))).toEqual(hold);
   });
 });
 
 describe("holdFromJoinedRow", () => {
-  const stored = {
+  const accountRow = {
     currentHolderId: "u-1",
     currentHolderEmail: "old@address.test",
     currentHolderLabel: null,
-    currentHolderName: null,
+    currentHolderName: "Old Name",
     currentHolderProgram: null,
   };
 
-  it("the joined account's address wins over the stored one", () => {
+  it("the joined account's address and name win over the stored ones", () => {
     expect(
-      holdFromJoinedRow(stored, {
+      holdFromJoinedRow(accountRow, {
         accountEmail: "new@address.test",
         accountName: "Renamed",
       })
@@ -150,37 +239,58 @@ describe("holdFromJoinedRow", () => {
     });
   });
 
-  it("falls back to the stored address when no account joined", () => {
+  it("falls back to the stored columns when the account did not join", () => {
+    // The id is still set here, so this exercises the account branch's two
+    // fallbacks. A version of this test that nulls the id never reaches them.
     expect(
-      holdFromJoinedRow(
-        { ...stored, currentHolderId: null, currentHolderName: "Wanda" },
-        { accountEmail: null, accountName: null }
-      )
+      holdFromJoinedRow(accountRow, { accountEmail: null, accountName: null })
     ).toEqual({
-      kind: "walk_in",
+      kind: "account",
+      accountId: "u-1",
       email: "old@address.test",
-      name: "Wanda",
-      program: null,
+      name: "Old Name",
     });
+  });
+
+  it("reads an unlinked row exactly as the stored reader does", () => {
+    const walkInRow = { ...accountRow, currentHolderId: null };
+    expect(
+      holdFromJoinedRow(walkInRow, { accountEmail: null, accountName: null })
+    ).toEqual(holdFromStoredRow(walkInRow));
   });
 });
 
 describe("holdFromStoredRow", () => {
-  it("does not invent an account name it was never given", () => {
+  it("reports the stored name rather than nulling it", () => {
+    // storedHolderIdentity, the reader this replaces, returns
+    // currentHolderName with no regard for currentHolderId. An unjoined read
+    // should report what is there.
     expect(
       holdFromStoredRow({
         currentHolderId: "u-1",
         currentHolderEmail: "has@account.test",
         currentHolderLabel: null,
-        currentHolderName: null,
+        currentHolderName: "Stored Name",
         currentHolderProgram: null,
       })
     ).toEqual({
       kind: "account",
       accountId: "u-1",
       email: "has@account.test",
-      name: null,
+      name: "Stored Name",
     });
+  });
+
+  it("reads no hold from five null columns", () => {
+    expect(
+      holdFromStoredRow({
+        currentHolderId: null,
+        currentHolderEmail: null,
+        currentHolderLabel: null,
+        currentHolderName: null,
+        currentHolderProgram: null,
+      })
+    ).toEqual({ kind: "none" });
   });
 });
 
@@ -202,7 +312,14 @@ describe("formatHoldShort", () => {
         name: null,
       })
     ).toBe("a@b.test");
-    expect(formatHoldShort({ kind: "thing", label: "Cart 3" })).toBe("Cart 3");
+    expect(
+      formatHoldShort({
+        kind: "thing",
+        label: "Cart 3",
+        name: null,
+        program: null,
+      })
+    ).toBe("Cart 3");
     expect(formatHoldShort({ kind: "none" })).toBeNull();
   });
 
@@ -253,9 +370,14 @@ describe("formatHoldDetailed", () => {
   });
 
   it("renders a thing as its label, with no program suffix", () => {
-    expect(formatHoldDetailed({ kind: "thing", label: "Cart 3" })).toBe(
-      "Cart 3"
-    );
+    expect(
+      formatHoldDetailed({
+        kind: "thing",
+        label: "Cart 3",
+        name: null,
+        program: "CS 461",
+      })
+    ).toBe("Cart 3");
   });
 
   it("renders no hold as null", () => {
