@@ -5,6 +5,7 @@ import {
   inventoryItemStatusHistory,
   inventoryItems,
   inventoryRequestItems,
+  inventoryRequests,
   notifications,
   user,
 } from "#/db/schema";
@@ -100,12 +101,12 @@ function assertStaff(viewer: Viewer) {
   }
 }
 
-const SELF_SERVICE_AUTHORITIES: readonly TransitionAuthority[] = [
-  "self_cancel",
-  "self_request",
-];
-
-/** The one status each self-service authority is allowed to reach. */
+/**
+ * The one status each self-service authority is allowed to reach. This Record
+ * is the single source of truth: adding an authority to the union forces an
+ * entry here, and the recognized-authority check reads its keys rather than a
+ * parallel list that could drift out of step with it.
+ */
 const AUTHORITY_TARGET: Record<TransitionAuthority, ItemStatus> = {
   self_cancel: "available",
   self_request: "requested",
@@ -123,8 +124,15 @@ function assertAuthorized(viewer: Viewer, input: TransitionInput) {
     assertStaff(viewer);
     return;
   }
-  if (!SELF_SERVICE_AUTHORITIES.includes(input.authority)) {
+  if (!Object.hasOwn(AUTHORITY_TARGET, input.authority)) {
     throw new Error("Forbidden");
+  }
+  // "Self" is the whole claim, so it is checked rather than trusted. Without
+  // this, self_request would let a caller place a request hold on somebody
+  // else's account, which is the first thing a self-service authority that
+  // reaches a holder-writing arm could be abused for.
+  if (input.holderId && input.holderId !== viewer.id) {
+    throw new Error("A self-service transition may only act on its own viewer");
   }
 }
 
@@ -461,12 +469,12 @@ async function transitionItemInTx(
     );
   }
 
-  let closedAs: RequestLineOutcome | null = null;
+  let closed: ClosedLine | null = null;
   if (input.requestItemId) {
     await syncRequestItem(tx, input);
   } else if (current.currentRequestItemId) {
     // Item is leaving a hold context; close the line.
-    closedAs = await closeRequestItemOnRelease(
+    closed = await closeRequestItemOnRelease(
       tx,
       current.currentRequestItemId,
       viewer.id,
@@ -476,7 +484,7 @@ async function transitionItemInTx(
     );
   }
 
-  await maybeNotify(tx, current, input, holdAccountId(hold), closedAs);
+  await maybeNotify(tx, current, input, holdAccountId(hold), closed);
 }
 
 async function syncRequestItem(tx: Tx, input: TransitionInput) {
@@ -507,6 +515,13 @@ async function syncRequestItem(tx: Tx, input: TransitionInput) {
   }
 }
 
+/** What was written to the line, and who asked for it in the first place. */
+interface ClosedLine {
+  outcome: RequestLineOutcome;
+  /** The account that submitted the request, when one was looked up. */
+  requesterId: string | null;
+}
+
 /**
  * Closes the line an item was holding, and reports what it wrote so the
  * notification arm does not have to guess.
@@ -518,7 +533,7 @@ async function closeRequestItemOnRelease(
   prevStatus: ItemStatus,
   comment: string | null,
   decision: RequestLineDecision | null | undefined
-): Promise<RequestLineOutcome> {
+): Promise<ClosedLine> {
   // Fulfillment ended in the user's hands then came back: returned.
   // Otherwise (reserved abandoned, sent to maintenance/retired before pickup): cancelled.
   // A caller that knows better says so: only it can tell a staff refusal from
@@ -528,14 +543,28 @@ async function closeRequestItemOnRelease(
     (prevStatus === "checked_out" ? "returned" : "cancelled");
   const now = new Date();
 
+  let requesterId: string | null = null;
   if (lineStatus === "rejected") {
     // The same precondition rejectRequestItemAs has always enforced. Without
     // it a release could stamp "rejected" over an approved or returned line
     // and overwrite the approver's own review columns, erasing the decision
     // that actually happened.
+    //
+    // The requester is read here too, and not left to the notification arm to
+    // infer. A denial belongs to whoever asked, which is a fact of the request
+    // line; the item's current holder is a different question and can be a
+    // different person, because staff can hand a still-pending item to a
+    // teammate.
     const [line] = await tx
-      .select({ status: inventoryRequestItems.status })
+      .select({
+        status: inventoryRequestItems.status,
+        requesterId: inventoryRequests.userId,
+      })
       .from(inventoryRequestItems)
+      .innerJoin(
+        inventoryRequests,
+        eq(inventoryRequestItems.requestId, inventoryRequests.id)
+      )
       .where(eq(inventoryRequestItems.id, requestItemId))
       .for("update");
     if (!line) {
@@ -544,6 +573,7 @@ async function closeRequestItemOnRelease(
     if (line.status !== "pending") {
       throw new Error("Only pending lines can be rejected");
     }
+    requesterId = line.requesterId;
   }
 
   await tx
@@ -562,7 +592,7 @@ async function closeRequestItemOnRelease(
         : {}),
     })
     .where(eq(inventoryRequestItems.id, requestItemId));
-  return lineStatus;
+  return { outcome: lineStatus, requesterId };
 }
 
 async function maybeNotify(
@@ -576,8 +606,29 @@ async function maybeNotify(
   },
   input: TransitionInput,
   holderId: string | null,
-  closedAs: RequestLineOutcome | null
+  closed: ClosedLine | null
 ) {
+  // A denial is answered first, and to the requester, because it is the one
+  // notice whose recipient is not "whoever holds the item". `closed` is only
+  // set on the release path and a rejection is only legal there, so reaching
+  // this means a line really was closed as rejected.
+  //
+  // It sits above the recipient guard below on purpose: that guard asks who
+  // holds the item, and a hold on a bare label answers nobody, which would
+  // silently swallow the denial owed to the person who asked.
+  if (closed?.outcome === "rejected") {
+    if (closed.requesterId) {
+      await tx.insert(notifications).values({
+        userId: closed.requesterId,
+        type: "inventory_request_rejected",
+        title: `Request denied: ${prev.name}`,
+        message: input.comment ?? `Your request for ${prev.name} was denied.`,
+        link: "/my/items?tab=history",
+      });
+    }
+    return;
+  }
+
   // Identify a "release-from-hold" path: no new request context provided AND
   // the item was held by someone. The original holder is then the recipient.
   // A walk-in hold has no request line, so testing only for one would silently
@@ -629,21 +680,6 @@ async function maybeNotify(
     case "maintenance":
     case "retired": {
       if (!isReleaseFromHold) {
-        return;
-      }
-      // Keyed on what was actually written to the line, not on what the
-      // caller asked for. A refusal reads differently from a release, so it
-      // gets its own type and wording even though both end at available.
-      // notifications.type is text(), not a Postgres enum, so a new value
-      // costs no migration.
-      if (closedAs === "rejected") {
-        await tx.insert(notifications).values({
-          userId: recipientId,
-          type: "inventory_request_rejected",
-          title: `Request denied: ${prev.name}`,
-          message: input.comment ?? `Your request for ${prev.name} was denied.`,
-          link: "/my/items?tab=history",
-        });
         return;
       }
       if (prev.status === "checked_out" && input.nextStatus === "available") {

@@ -787,10 +787,7 @@ export async function submitCartAs(
     // below would otherwise silently overwrite that other party's hold.
     // Mirrors the overwrite guard in transitionItem.
     const skipped: { itemId: string; reason: "no_longer_available" }[] = [];
-    const survivors: {
-      itemId: string;
-      oldStatus: (typeof inventoryItems.$inferSelect)["status"];
-    }[] = [];
+    const survivors: { itemId: string }[] = [];
     for (const row of cartRows) {
       const [locked] = await tx
         .select()
@@ -801,7 +798,10 @@ export async function submitCartAs(
         skipped.push({ itemId: row.itemId, reason: "no_longer_available" });
         continue;
       }
-      survivors.push({ itemId: row.itemId, oldStatus: locked.status });
+      // Only the id survives. The previous status was carried for the inline
+      // history insert that used to live below; transitionItem reads it from
+      // the row it locks itself.
+      survivors.push({ itemId: row.itemId });
     }
 
     // Cart is always cleared once we have processed it.
@@ -813,18 +813,15 @@ export async function submitCartAs(
       return { requestId: null, submitted: [], skipped };
     }
 
-    // The invariant applies to every person hold, including one a student
-    // created for themselves. Fetched once here rather than as a correlated
-    // subselect inside each item update below.
+    // A guard, not a lookup. transitionItem derives the address from the
+    // holder id itself, so this query's email is unused; what it buys is the
+    // throw below.
     //
-    // This is the one holder write that never reaches validateInvariants: it
-    // runs as the student, and transitionItem asserts staff, so the requested
-    // transition is performed inline. Throwing rather than falling back to
-    // null is what makes "a person hold always carries an address" true by
-    // construction here rather than merely true in practice. No current route
-    // can reach the throw, because a live session implies the row it points
-    // at, but a silent null would leave a hold with neither an address nor a
-    // label, which is precisely the state the invariant forbids.
+    // Without it, a submission by an account that no longer exists would
+    // produce an account hold whose address resolved to null, which is the
+    // one shape "a person hold always carries an address" forbids. No current
+    // route reaches the throw, because a live session implies the row it
+    // points at. Do not delete this as a redundant read.
     const [requester] = await tx
       .select({ email: user.email })
       .from(user)
@@ -981,20 +978,17 @@ export async function rejectRequestItemAs(
     throw new Error("Reject reason required");
   }
   return await db.transaction(async (tx) => {
-    // Join requester id into the initial line read so we do not need a
-    // second SELECT just to find the notification recipient.
+    // Locks the line and reads the item it belongs to. The requester is not
+    // read here any more: transitionItem looks it up when it closes the line,
+    // so that the denial reaches whoever asked even on a path that did not
+    // come through this function.
     const [line] = await tx
       .select({
         id: inventoryRequestItems.id,
         itemId: inventoryRequestItems.itemId,
         status: inventoryRequestItems.status,
-        requesterId: inventoryRequests.userId,
       })
       .from(inventoryRequestItems)
-      .innerJoin(
-        inventoryRequests,
-        eq(inventoryRequestItems.requestId, inventoryRequests.id)
-      )
       .where(eq(inventoryRequestItems.id, data.requestItemId))
       .for("update");
     if (!line) {

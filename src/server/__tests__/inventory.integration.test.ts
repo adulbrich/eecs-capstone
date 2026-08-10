@@ -1308,6 +1308,81 @@ describe("request lifecycle", () => {
     expect(rows[0].link).toBe("/my/items?tab=history");
   });
 
+  it("denies the requester even when a teammate is holding the item", async () => {
+    // Staff can take a still-pending item straight to checked_out for a
+    // teammate: the override select has no gate on current status, and
+    // syncRequestItem's checked_out arm writes only dueAt, so the line stays
+    // pending while current_holder_id moves. A denial belongs to whoever
+    // asked, so it must not follow the hold.
+    const teammateEmail = `team-${Date.now()}@x.com`;
+    const admin = await makeUser(`at-${Date.now()}@x.com`, "admin");
+    const asker = await makeUser(`ask-${Date.now()}@x.com`, "user");
+    const teammate = await makeUser(teammateEmail, "user");
+    const item = await makeItem();
+    await addToCartAs(asker, { itemId: item.id });
+    await submitCartAs(asker, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      requestItemId: line.id,
+      holderEmail: teammateEmail,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const [held] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(held.currentHolderId).toBe(teammate.id);
+    const [stillPending] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.id, line.id));
+    expect(stillPending.status).toBe("pending");
+
+    await db.delete(notifications);
+    await rejectRequestItemAs(admin, {
+      requestItemId: line.id,
+      reviewComment: "Needed for a class",
+    });
+
+    const denials = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.type, "inventory_request_rejected"));
+    expect(denials).toHaveLength(1);
+    expect(denials[0].userId).toBe(asker.id);
+  });
+
+  it("keeps the history link to the line reject and cancel closed", async () => {
+    const admin = await makeUser(`ah-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`sh-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    await addToCartAs(student, { itemId: item.id });
+    await submitCartAs(student, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+    await rejectRequestItemAs(admin, {
+      requestItemId: line.id,
+      reviewComment: "No",
+    });
+    const history = await db
+      .select()
+      .from(inventoryItemStatusHistory)
+      .where(eq(inventoryItemStatusHistory.itemId, item.id));
+    const release = history.find((h) => h.newStatus === "available");
+    // A release cannot carry requestItemId, so this link survives only
+    // because transitionItem falls back to the decision's line id.
+    expect(release?.requestItemId).toBe(line.id);
+  });
+
   it("cancel works while pending or reserved, blocked after checkout", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const student = await makeUser(`s-${Date.now()}@x.com`, "user");
