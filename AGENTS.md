@@ -80,8 +80,9 @@ Read the matching doc before you start; each one is the source of truth for its 
   radius, mobile-first breakpoints and page padding, the `Sheet` mobile nav, and
   `AdminDataTable` for responsive admin tables.
 
-- **[`README.md`](./README.md)** covers install, docker compose, seeding, running the
-  dev server, and the current known issues and roadmap.
+- **[`README.md`](./README.md)** covers install, docker compose, seeding, and
+  running the dev server. Known issues and the roadmap are GitHub Issues, not a
+  section in that file; check there before assuming something is unreported.
 
 - **[`PRD.md`](./PRD.md)** is the exhaustive feature list, built and planned. Check it
   before assuming a feature is missing.
