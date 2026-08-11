@@ -7,6 +7,12 @@ import { canEditProject } from "#/lib/project-visibility";
 
 interface AuthUser {
   id: string;
+  /**
+   * The viewer's current avatar key. Only the avatar paths read it, to delete
+   * the object the new one replaces, and it is optional because
+   * uploadProjectImageAs has no use for it.
+   */
+  image?: string | null | undefined;
   role?: string | null | undefined;
 }
 
@@ -90,8 +96,7 @@ export async function uploadProjectImageForCurrentUser(form: FormData) {
   return uploadProjectImageAs(viewer, form);
 }
 
-export async function uploadAvatarForCurrentUser(form: FormData) {
-  const viewer = await requireUser();
+export async function uploadAvatarAs(viewer: AuthUser, form: FormData) {
   const file = form.get("file");
   assertImageFile(file);
 
@@ -126,8 +131,7 @@ export async function uploadAvatarForCurrentUser(form: FormData) {
   return { key };
 }
 
-export async function clearAvatarForCurrentUser() {
-  const viewer = await requireUser();
+export async function clearAvatarAs(viewer: AuthUser) {
   const previousImage = viewer.image;
   await db
     .update(user)
@@ -146,4 +150,14 @@ export async function clearAvatarForCurrentUser() {
       });
   }
   return { ok: true as const };
+}
+
+export async function uploadAvatarForCurrentUser(form: FormData) {
+  const viewer = await requireUser();
+  return uploadAvatarAs(viewer, form);
+}
+
+export async function clearAvatarForCurrentUser() {
+  const viewer = await requireUser();
+  return clearAvatarAs(viewer);
 }
