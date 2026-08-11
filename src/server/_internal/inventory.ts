@@ -38,9 +38,14 @@ import {
 import { compareByDeadline, overdueFlags } from "#/lib/inventory-deadlines";
 import {
   canReadInventoryItem,
+  type HoldItemView,
+  holdItemView,
   type InventoryItemPublic,
   type InventoryItemStaff,
   type ItemCategory,
+  type ItemStatus,
+  type MyRequestLineView,
+  myRequestLineView,
   publicItemView,
   staffItemView,
   visibleStatuses,
@@ -1007,18 +1012,32 @@ export async function cancelRequestItemForCurrentUser(data: {
 }
 
 /**
- * An entry in the Active tab. Holds have no request line by definition, so
- * this is a union rather than a line with optional fields.
+ * An entry in the Active tab.
+ *
+ * Only a hold carries the item as its subject, because only a hold has no
+ * request line. A request carries its line plus the item's name and status: a
+ * request's deadlines live on the line, and letting it carry the item's too
+ * would put two different `pickupBy` values on one object.
  */
 export type ActiveEntry =
   | {
-      kind: "request";
       collectedBy: CollectedBy | null;
-      line: typeof inventoryRequestItems.$inferSelect;
-      item: typeof inventoryItems.$inferSelect;
-      request: typeof inventoryRequests.$inferSelect;
+      itemName: string;
+      itemStatus: ItemStatus;
+      kind: "request";
+      line: MyRequestLineView;
     }
-  | { kind: "hold"; item: typeof inventoryItems.$inferSelect };
+  | { item: HoldItemView; kind: "hold" };
+
+/**
+ * A closed line. The item's current status and dates describe whoever has it
+ * now, which is not this record, so only the name comes along.
+ */
+export interface HistoryEntry {
+  collectedBy: CollectedBy | null;
+  itemName: string;
+  line: MyRequestLineView;
+}
 
 export async function listMyItemsAs(viewer: Viewer) {
   if (!viewer) {
@@ -1175,19 +1194,26 @@ export async function listMyItemsAs(viewer: Viewer) {
       (row): ActiveEntry => ({
         kind: "request",
         collectedBy: collectedByForViewer(row.line.id),
-        ...row,
+        itemName: row.item.name,
+        itemStatus: row.item.status,
+        line: myRequestLineView(row.line),
       })
     ),
-    ...holds.map((row): ActiveEntry => ({ kind: "hold", item: row.item })),
+    ...holds.map(
+      (row): ActiveEntry => ({ kind: "hold", item: holdItemView(row.item) })
+    ),
   ].sort(compareByDeadline);
 
   return {
     cart,
     active,
-    history: history.map((row) => ({
-      ...row,
-      collectedBy: collectedByForViewer(row.line.id),
-    })),
+    history: history.map(
+      (row): HistoryEntry => ({
+        itemName: row.item.name,
+        line: myRequestLineView(row.line),
+        collectedBy: collectedByForViewer(row.line.id),
+      })
+    ),
   };
 }
 

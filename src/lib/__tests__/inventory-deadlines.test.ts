@@ -78,8 +78,8 @@ const hold = (over: Partial<{ status: string }> = {}): DeadlineEntry => ({
   kind: "hold",
   item: {
     status: "checked_out",
-    currentPickupBy: new Date("2026-08-01"),
-    currentDueAt: new Date("2026-08-05"),
+    pickupBy: new Date("2026-08-01"),
+    dueAt: new Date("2026-08-05"),
     updatedAt: new Date("2026-07-01"),
     ...over,
   },
@@ -87,7 +87,7 @@ const hold = (over: Partial<{ status: string }> = {}): DeadlineEntry => ({
 
 const request = (): DeadlineEntry => ({
   kind: "request",
-  item: { status: "reserved" },
+  itemStatus: "reserved",
   line: {
     pickupBy: new Date("2026-08-02"),
     dueAt: null,
@@ -126,7 +126,7 @@ describe("deadlineOf", () => {
 
   it("is null when neither is set", () => {
     expect(
-      deadlineOf(hold({ currentPickupBy: null, currentDueAt: null } as never))
+      deadlineOf(hold({ pickupBy: null, dueAt: null } as never))
     ).toBeNull();
   });
 });
@@ -136,8 +136,8 @@ describe("compareByDeadline", () => {
     kind: "hold",
     item: {
       status: "checked_out",
-      currentPickupBy: null,
-      currentDueAt: new Date(due),
+      pickupBy: null,
+      dueAt: new Date(due),
       updatedAt: new Date(updated),
     },
   });
@@ -145,8 +145,8 @@ describe("compareByDeadline", () => {
     kind: "hold",
     item: {
       status: "reserved",
-      currentPickupBy: null,
-      currentDueAt: null,
+      pickupBy: null,
+      dueAt: null,
       updatedAt: new Date(updated),
     },
   });

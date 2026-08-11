@@ -61,21 +61,22 @@ export function overdueFlags(
  *
  * A hold has no request line by definition, so this is a union rather than a
  * line with optional fields, and the two arms store the same pair in different
- * columns. Typed structurally rather than importing the server's `ActiveEntry`,
- * which carries Drizzle row types and would not cross to the client.
+ * places. Typed structurally rather than importing the server's `ActiveEntry`:
+ * this module needs four fields and says so, which keeps it usable by anything
+ * that has them.
  */
 export type DeadlineEntry =
   | {
       item: {
-        currentDueAt: Date | null;
-        currentPickupBy: Date | null;
+        dueAt: Date | null;
+        pickupBy: Date | null;
         status: string;
         updatedAt: Date;
       };
       kind: "hold";
     }
   | {
-      item: { status: string };
+      itemStatus: string;
       kind: "request";
       line: { createdAt: Date; dueAt: Date | null; pickupBy: Date | null };
     };
@@ -91,12 +92,12 @@ export function deadlinePairOf(entry: DeadlineEntry): DeadlinePair {
   if (entry.kind === "hold") {
     return {
       status: entry.item.status,
-      pickupBy: entry.item.currentPickupBy,
-      dueAt: entry.item.currentDueAt,
+      pickupBy: entry.item.pickupBy,
+      dueAt: entry.item.dueAt,
     };
   }
   return {
-    status: entry.item.status,
+    status: entry.itemStatus,
     pickupBy: entry.line.pickupBy,
     dueAt: entry.line.dueAt,
   };
