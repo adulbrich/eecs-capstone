@@ -9,6 +9,7 @@ import { z } from "zod";
 import { EmptyState } from "#/components/empty-state";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { LocalTime } from "#/components/local-time";
+import { OverdueBadge } from "#/components/overdue-badge";
 import { Button } from "#/components/ui/button";
 import { Textarea } from "#/components/ui/textarea";
 import {
@@ -146,6 +147,7 @@ function MyItems() {
                     <InventoryStatusBadge
                       status={entry.item.status as "available"}
                     />
+                    <OverdueBadge entry={entry} />
                     {entry.item.currentPickupBy && (
                       <p className="text-muted-foreground text-xs">
                         Pick up by{" "}
@@ -181,6 +183,7 @@ function MyItems() {
                 <div>
                   <p className="font-medium">{item.name}</p>
                   <InventoryStatusBadge status={item.status as "available"} />
+                  <OverdueBadge entry={entry} />
                   {line.pickupBy && (
                     <p className="text-muted-foreground text-xs">
                       Pick up by <LocalTime dateOnly value={line.pickupBy} />
