@@ -47,6 +47,11 @@ export const listInventory = createServerFn({ method: "GET" })
 const listAdminInventorySchema = z.object({
   categories: z.array(z.string().uuid()).max(20).default([]),
   q: z.string().default(""),
+  // Staff only, and deliberately absent from listInventorySchema. Retired
+  // items are the archive; this is the only way to list them. `visibleStatuses`
+  // also ignores the flag for a viewer who may not see retired, so a request
+  // has to defeat two independent things to reach a retired row.
+  retiredOnly: z.boolean().default(false),
   status: itemStatusEnum.nullable().default(null),
 });
 

@@ -13,6 +13,7 @@ import {
 import { CategoryChip } from "#/components/category-chip";
 import { CategoryFilterCombobox } from "#/components/category-filter-combobox";
 import { ExportCsvButton } from "#/components/export-csv-button";
+import { FilterSwitch } from "#/components/filter-switch";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { LocalTime } from "#/components/local-time";
 import {
@@ -66,6 +67,9 @@ const searchSchema = z.object({
   cols: z.string().optional(),
   dir: z.enum(["asc", "desc"]).optional(),
   q: z.string().default(""),
+  // Staff only. Retired items are the archive: excluded from every listing by
+  // default, and reachable only through this switch.
+  retiredOnly: z.boolean().default(false),
   sort: z.string().optional(),
   status: z.enum(STATUSES).nullable().default(null),
 });
@@ -87,6 +91,7 @@ export const Route = createFileRoute("/_authed/admin/inventory/")({
   loaderDeps: ({ search }) => ({
     categories: search.categories,
     q: search.q,
+    retiredOnly: search.retiredOnly,
     status: search.status,
   }),
   loader: async ({ deps }) => {
@@ -405,7 +410,7 @@ function AdminInventory() {
   const { categories, rows } = Route.useLoaderData();
   // The whole search object goes to the hook, which reads cols/dir/sort.
   const search = Route.useSearch();
-  const { categories: selectedCategories, q, status } = search;
+  const { categories: selectedCategories, q, retiredOnly, status } = search;
   const [qDraft, setQDraft] = useState(q);
   // Populated by AdminDataTable's onSortedIdsChange every time the table's
   // own sorted row order changes. A ref, not state: the export only reads it
@@ -518,7 +523,12 @@ function AdminInventory() {
             </div>
             <div>
               <Label htmlFor="inv-status">Status</Label>
+              {/* Disabled while retired-only is on. Retired cannot co-occur
+                  with any status this offers, so leaving it live would let
+                  staff set a filter that is silently ignored, or express an
+                  intersection that was never going to match. */}
               <Select
+                disabled={retiredOnly}
                 onValueChange={(v) =>
                   void navigate({
                     search: (prev) => ({
@@ -542,6 +552,23 @@ function AdminInventory() {
                 </SelectContent>
               </Select>
             </div>
+            <FilterSwitch
+              checked={retiredOnly}
+              id="inv-retired-only"
+              label="Show only retired"
+              onCheckedChange={(next) =>
+                void navigate({
+                  search: (prev) => ({
+                    ...prev,
+                    // Clearing the status keeps the URL honest about what is
+                    // actually filtering, rather than carrying a value the
+                    // disabled control no longer applies.
+                    retiredOnly: next,
+                    status: next ? null : prev.status,
+                  }),
+                })
+              }
+            />
             <div>
               <Label htmlFor="inv-category">
                 Categories (matches all selected)

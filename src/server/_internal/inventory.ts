@@ -262,6 +262,8 @@ export async function listInventoryForCurrentUser(data: ListInventoryInput) {
 export interface ListAdminInventoryInput {
   categories: string[];
   q: string;
+  /** Optional so existing callers compile; the wire schema always sends it. */
+  retiredOnly?: boolean;
   status: ListInventoryInput["status"];
 }
 
