@@ -35,6 +35,7 @@ import {
   holdFromStoredRow,
   holdName,
 } from "#/lib/hold";
+import { compareByDeadline, overdueFlags } from "#/lib/inventory-deadlines";
 import {
   canReadInventoryItem,
   type InventoryItemPublic,
@@ -1019,54 +1020,24 @@ export type ActiveEntry =
     }
   | { kind: "hold"; item: typeof inventoryItems.$inferSelect };
 
-function deadlineOf(entry: ActiveEntry): Date | null {
-  if (entry.kind === "hold") {
-    return entry.item.currentDueAt ?? entry.item.currentPickupBy;
-  }
-  return entry.line.dueAt ?? entry.line.pickupBy;
-}
-
-// A hold has no request line, so its "created" moment is when the item row
-// was last written; a pending request line hasn't been touched since it was
-// created, so createdAt and updatedAt agree for it anyway.
-function recencyOf(entry: ActiveEntry): Date {
-  return entry.kind === "hold" ? entry.item.updatedAt : entry.line.createdAt;
-}
-
-/**
- * Soonest deadline first, entries without one last, newest first within a
- * tie (including the common case of two entries that both have no
- * deadline, e.g. two pending requests). This is the created_at DESC order
- * the active list used before holds existed, kept as the fallback so it
- * still applies to everything a deadline can't order.
- */
-function byDeadline(a: ActiveEntry, b: ActiveEntry): number {
-  const left = deadlineOf(a);
-  const right = deadlineOf(b);
-  if (left && right) {
-    return (
-      left.getTime() - right.getTime() ||
-      recencyOf(b).getTime() - recencyOf(a).getTime()
-    );
-  }
-  if (left) {
-    return -1;
-  }
-  if (right) {
-    return 1;
-  }
-  return recencyOf(b).getTime() - recencyOf(a).getTime();
-}
-
 export async function listMyItemsAs(viewer: Viewer) {
   if (!viewer) {
     throw new Error("Sign in required");
   }
-  // Notifications are a side-effect; never let them block the read.
+  // Notifications are a side-effect; never let them block the read. There is
+  // no cron (see QUIRKS), so this read is genuinely the trigger, and a failure
+  // here must not 500 the page.
+  //
+  // It is reported rather than discarded. A bare `catch {}` here meant that if
+  // this stopped working, every overdue notification stopped with it and
+  // nobody found out, because the page carried on looking fine.
   try {
     await recordOverdueNotificationsAs(viewer, { ownerId: viewer.id });
-  } catch {
-    // swallow; degraded notification recording must not 500 the page.
+  } catch (error) {
+    console.error(
+      `Overdue notification recording failed for user ${viewer.id}`,
+      error
+    );
   }
   // Only a verified address may claim a hold: otherwise anyone could take
   // someone else's item by editing their own email in the profile form.
@@ -1208,7 +1179,7 @@ export async function listMyItemsAs(viewer: Viewer) {
       })
     ),
     ...holds.map((row): ActiveEntry => ({ kind: "hold", item: row.item })),
-  ].sort(byDeadline);
+  ].sort(compareByDeadline);
 
   return {
     cart,
@@ -1458,28 +1429,6 @@ export async function getInventoryItemDetailForCurrentUser(data: {
 }
 
 /**
- * Derive the two deadline flags for a row. `status` is the item-level
- * status, not the request line's: when a line is `approved` the item is
- * either `reserved` (pre-pickup) or `checked_out` (post-pickup), and we
- * key off that distinction to decide which deadline applies.
- */
-export function deriveDeadlineFlags(row: {
-  status: string;
-  pickupBy: Date | null;
-  dueAt: Date | null;
-}) {
-  const now = Date.now();
-  return {
-    pickupOverdue:
-      row.status === "reserved" &&
-      !!row.pickupBy &&
-      row.pickupBy.getTime() < now,
-    checkoutOverdue:
-      row.status === "checked_out" && !!row.dueAt && row.dueAt.getTime() < now,
-  };
-}
-
-/**
  * Lazy idempotent insert of overdue notifications. Scoped to a single owner
  * when {ownerId} is provided so the my-items read path does not scan every
  * approved line in the system.
@@ -1665,7 +1614,7 @@ export async function recordOverdueNotificationsAs(
   };
 
   for (const r of candidates) {
-    const { pickupOverdue, checkoutOverdue } = deriveDeadlineFlags(r);
+    const { pickupOverdue, checkoutOverdue } = overdueFlags(r);
     if (pickupOverdue) {
       push({
         userId: r.userId,
