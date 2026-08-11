@@ -15,6 +15,16 @@ None.
 
 ## Known issues
 
+- **Correction, now fixed:** the holder dialog issue previously listed here was
+  misdiagnosed. It described staff correcting a typo in the address and losing
+  the name they had typed. Editing the address does clear those fields, but
+  that is `onHolderEmailChange` doing it on purpose, because a name typed for
+  one address must not be submitted under another. The real defect was worse
+  and did not involve editing anything: re-saving an item that already had a
+  recorded walk-in name **erased it**, because the dialog opens with the name
+  prefilled while the lookup starts at `unknown`, and a Confirm inside the next
+  250ms sent null. Reproduced in the browser and verified by restoring the old
+  gate and watching a recorded name vanish.
 - **`recommended-sort.integration.test.ts` was flaky in a full integration run,
   and is not currently reproducible.** The case "orders by cosine distance from
   the viewer's interest vector" failed 2 of 6 full-suite runs, and passed every

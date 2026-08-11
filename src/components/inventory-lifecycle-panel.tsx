@@ -97,9 +97,16 @@ function toDateInput(value: Date | string | null | undefined): string {
  *
  * This deliberately does **not** consult the account lookup. It used to send
  * the name and program only once the debounced lookup had answered
- * `unmatched`, which meant staff who filled them in and then corrected a typo
- * in the address submitted both as null inside the 250ms window, with no
- * warning and no way to tell afterwards.
+ * `unmatched`, and the worst case was not the one first reported. Re-saving an
+ * item that already had a recorded walk-in name **erased it**: the dialog
+ * opens with the name prefilled, the lookup starts at `unknown`, and a Confirm
+ * inside the next 250ms sent both fields as null without the address being
+ * touched at all. Reproduced in the browser, and confirmed by putting the old
+ * gate back and watching a recorded name disappear.
+ *
+ * Note that editing the address is a different mechanism and still clears
+ * these: `onHolderEmailChange` drops them on purpose, because a name typed for
+ * one address must not be submitted under another.
  *
  * Deciding here was never necessary, because the server does not trust this
  * anyway: `holdFromInput` resolves the address and the `account` case of the
