@@ -685,6 +685,25 @@ Inventory answers this differently, and the difference is worth knowing before y
 
 **An earlier version of this entry said inventory "does not have this hazard", full stop, and that was false for as long as it stood.** A projection function guarantees only what passes through it, and there are three non-staff read paths for `inventory_items`, not two: `listMyItemsAs` called neither view. It selected whole table objects and spread the joined rows, so `/my/items` shipped `serial`, `notes`, `label` and `location` off the item, and `reviewedBy`, `reviewedAt`, `reviewComment`, `closedBy` and `closedAt` off the request line, to the student the row belonged to. The blast radius was the viewer's own items rather than anyone else's, which is why it read as a docs contradiction rather than an exposure, and it is also why nobody found it: this paragraph told them not to look. All three paths now go through the module, and `inventory.integration.test.ts` asserts the exact key set of both `/my/items` arms, because the type system cannot say "every read path must project" and the thing that broke was the `db.select()` above the projection, not the projection.
 
+### `commitTransition` is the only writer of `project_status_history`
+
+`performTransitionAs` and `forceTransitionAs` (`src/server/_internal/projects.ts`) keep only their gates: who may act, and which target is reachable. Everything after that is `commitTransition`, which owns the transaction (status update, history row, notifications), then the embedding refresh, then the email. Checkable:
+
+```bash
+# one hit, in commitTransition
+grep -rn 'insert(projectStatusHistory)' src --include='*.ts' | grep -v __tests__
+```
+
+**Read the claim narrowly, because the wider one is false.** This says one writer of the *history table*, not one writer of `projects.status`. `update(projects)` has six legitimate non-status writers (`uploads.ts`, `claim-projects.ts`, `project-embeddings.ts`, `softDeleteProjectAs`, `restoreProjectAs`, `updateProjectAs`), so a grep on that proves nothing. `softDeleteProjectAs` and `restoreProjectAs` write `deleted_at` and send their own notifications without writing history, and they are outside this rule on purpose: neither is a transition. This is deliberately narrower than inventory's "`transitionItem` is the only writer", which can make the broader claim because `update(inventoryItems)` has only four hits in total.
+
+Three ordering rules live in `commitTransition` rather than in a comment a caller has to obey:
+
+- **Notifications go inside the transaction.** Enforced by the type: `recordStatusChangeNotifications` takes a `Tx` as its first parameter.
+- **`refreshProjectEmbedding` goes strictly after commit.** Enforced by nothing, and this is the trap: it takes no `tx`, uses the module `db`, re-reads the row, and returns `"skipped"` unless the status is already `published`. Called inside the transaction it does not throw. It silently does nothing, and you get a project that publishes and never embeds.
+- **The email goes strictly after commit**, so a failed send cannot undo an approval. `notifyTransitionByEmail` swallows its own errors, so this one fails mildly.
+
+Before this, the two functions shared 56 byte-identical lines including both of those comments, and `forceTransitionAs` had **no** test asserting it wrote a history row, a notification, or an embedding. The equivalence of the two copies was a review question rather than a checked one for as long as they existed. The characterization tests added alongside this change (`projects.integration.test.ts`, `project-embeddings.integration.test.ts`) were written against the old code first, precisely so they could prove the extraction preserved behaviour rather than merely agreeing with the new code.
+
 ### Proposer linking is by email; `proposer_id` is canonical
 
 A project's proposer is either linked to an account (`proposer_id`, a nullable FK) or pending (`proposer_email` set with no account yet). Email is the link key; `proposer_id` is the source of truth once an account exists. Staff set it through the proposer field on the project form (`ProposerPicker`, see below); the server resolves the email to an account id on every write via `resolveProposerId` (`src/server/_internal/projects.ts`), and a non-staff request carrying `proposer_email` is ignored, not honored. `proposer_id` is never accepted from the client.
