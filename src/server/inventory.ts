@@ -68,15 +68,6 @@ export const listInventoryCategories = createServerFn({
 
 const idOnlySchema = z.object({ id: z.string().uuid() });
 
-// Re-exported so callers can narrow `getInventoryItem`'s result to the staff
-// shape with a real type guard instead of casting through `unknown`. A
-// type-only export; `verbatimModuleSyntax` erases it entirely, so it does not
-// pull `_internal/inventory`'s runtime code into any bundle.
-export type {
-  InventoryItemPublic,
-  InventoryItemStaff,
-} from "./_internal/inventory";
-
 export const getInventoryItem = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => idOnlySchema.parse(d))
   .handler(async ({ data }) => {

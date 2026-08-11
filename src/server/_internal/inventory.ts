@@ -35,16 +35,20 @@ import {
   holdFromStoredRow,
   holdName,
 } from "#/lib/hold";
+import {
+  canReadInventoryItem,
+  type InventoryItemPublic,
+  type InventoryItemStaff,
+  type ItemCategory,
+  publicItemView,
+  staffItemView,
+  visibleStatuses,
+} from "#/lib/inventory-visibility";
 import { assertStaff, isStaff } from "#/lib/viewer";
 import { setInventoryItemCategoriesAs } from "./categories";
 import type { Tx } from "./inventory-transitions";
 
 type Viewer = { id: string; role?: string | null | undefined } | null;
-
-export interface ItemCategory {
-  id: string;
-  name: string;
-}
 
 export interface ListInventoryInput {
   categories: string[];
@@ -58,81 +62,6 @@ export interface ListInventoryInput {
     | "checked_out"
     | "maintenance"
     | null;
-}
-
-export interface InventoryItemPublic {
-  categories: ItemCategory[];
-  description: string | null;
-  dueAt: Date | null;
-  id: string;
-  imageUrl: string | null;
-  name: string;
-  pickupBy: Date | null;
-  status: string;
-}
-
-export type InventoryItemStaff = InventoryItemPublic & {
-  createdAt: Date;
-  currentHolderEmail: string | null;
-  currentHolderId: string | null;
-  currentHolderLabel: string | null;
-  currentHolderName: string | null;
-  currentHolderProgram: string | null;
-  currentRequestItemId: string | null;
-  label: string | null;
-  location: string | null;
-  notes: string | null;
-  serial: string | null;
-  updatedAt: Date;
-};
-
-function stripForPublic(
-  row: typeof inventoryItems.$inferSelect,
-  categories: ItemCategory[]
-): InventoryItemPublic {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    categories,
-    imageUrl: row.imageUrl,
-    status: row.status,
-    // The hold's dates live on the item itself, so they are the same whether
-    // the hold came from a cart request or from staff assigning it directly.
-    pickupBy: row.currentPickupBy,
-    dueAt: row.currentDueAt,
-  };
-}
-
-function fullForStaff(
-  row: typeof inventoryItems.$inferSelect,
-  categories: ItemCategory[],
-  hold: Hold
-): InventoryItemStaff {
-  return {
-    ...stripForPublic(row, categories),
-    createdAt: row.createdAt,
-    serial: row.serial,
-    label: row.label,
-    location: row.location,
-    notes: row.notes,
-    // Both halves of the holder's identity arrive the same way. They used to
-    // differ: email came from the row here and was then overwritten by each
-    // caller, while name was bolted on by those callers alone. Two attributes
-    // of one person travelling by two mechanisms is what let the release
-    // paths fall out of sync when a third attribute was added.
-    //
-    // Only these two come from the hold, because only these two are
-    // reconciled against a joined account. The other three are the row's own
-    // columns and are passed straight through, as they always were.
-    currentHolderEmail: holdEmail(hold),
-    currentHolderName: holdName(hold),
-    currentHolderId: row.currentHolderId,
-    currentHolderLabel: row.currentHolderLabel,
-    currentHolderProgram: row.currentHolderProgram,
-    currentRequestItemId: row.currentRequestItemId,
-    updatedAt: row.updatedAt,
-  };
 }
 
 /**
@@ -169,11 +98,24 @@ function storedHold(row: HoldColumns): Hold {
  * the staff predicate also reaches serial, label, location and holder, and
  * those must never become publicly searchable.
  */
-function buildInventoryScope(data: {
-  categories: string[];
-  status: ListInventoryInput["status"];
-}): SQL[] {
-  const conditions: SQL[] = [ne(inventoryItems.status, "retired")];
+function buildInventoryScope(
+  viewer: Viewer,
+  data: {
+    categories: string[];
+    retiredOnly?: boolean;
+    status: ListInventoryInput["status"];
+  }
+): SQL[] {
+  // Derived from the module rather than hard-coding `ne(status, "retired")`.
+  // That literal was the half of the retired rule that disagreed with the
+  // single-row gate: it hid retired from staff too, so staff could read a
+  // retired item by URL and had no way to find one.
+  const conditions: SQL[] = [
+    inArray(
+      inventoryItems.status,
+      visibleStatuses(viewer, { retiredOnly: data.retiredOnly })
+    ),
+  ];
   if (data.status) {
     conditions.push(eq(inventoryItems.status, data.status));
   }
@@ -213,7 +155,7 @@ export async function listInventoryAs(
   viewer: Viewer,
   data: ListInventoryInput
 ) {
-  const conditions = buildInventoryScope(data);
+  const conditions = buildInventoryScope(viewer, data);
   if (data.q) {
     const q = or(
       sql`${inventoryItems.searchVector} @@ websearch_to_tsquery('english', ${data.q})`,
@@ -247,9 +189,9 @@ export async function listInventoryAs(
 
   const mapped = rows.map((r) => {
     if (isStaff(viewer)) {
-      return fullForStaff(r.item, r.categories, joinedHold(r));
+      return staffItemView(r.item, r.categories, joinedHold(r));
     }
-    return stripForPublic(r.item, r.categories);
+    return publicItemView(r.item, r.categories);
   });
 
   return {
@@ -290,18 +232,18 @@ async function loadInventoryItemRowFor(
   if (!row) {
     return null;
   }
-  if (row.item.status === "retired" && !isStaff(viewer)) {
+  if (!canReadInventoryItem(row.item, viewer)) {
     return null;
   }
   return row;
 }
 
 function toStaffDetail(row: InventoryItemJoinedRow): InventoryItemStaff {
-  return fullForStaff(row.item, row.categories, joinedHold(row));
+  return staffItemView(row.item, row.categories, joinedHold(row));
 }
 
 function toPublicDetail(row: InventoryItemJoinedRow): InventoryItemPublic {
-  return stripForPublic(row.item, row.categories);
+  return publicItemView(row.item, row.categories);
 }
 
 export async function getInventoryItemAs(viewer: Viewer, data: { id: string }) {
@@ -336,7 +278,7 @@ export async function listAdminInventoryAs(
   data: ListAdminInventoryInput
 ) {
   assertStaff(viewer);
-  const conditions = buildInventoryScope(data);
+  const conditions = buildInventoryScope(viewer, data);
   const trimmed = data.q.trim();
   if (trimmed) {
     const like = `%${trimmed}%`;
@@ -378,7 +320,7 @@ export async function listAdminInventoryAs(
     .orderBy(desc(inventoryItems.updatedAt));
 
   return {
-    rows: rows.map((r) => fullForStaff(r.item, r.categories, joinedHold(r))),
+    rows: rows.map((r) => staffItemView(r.item, r.categories, joinedHold(r))),
   };
 }
 
@@ -487,7 +429,7 @@ export async function createInventoryItemAs(
       { itemId: row.id, categoryIds: data.categoryIds },
       tx
     );
-    return fullForStaff(row, await categoriesFor(row.id, tx), storedHold(row));
+    return staffItemView(row, await categoriesFor(row.id, tx), storedHold(row));
   });
 }
 
@@ -564,7 +506,7 @@ export async function updateInventoryItemAs(
     }
 
     if (changed.length === 0) {
-      return fullForStaff(before, beforeCategories, storedHold(before));
+      return staffItemView(before, beforeCategories, storedHold(before));
     }
 
     await tx
@@ -604,7 +546,7 @@ export async function updateInventoryItemAs(
       .select()
       .from(inventoryItems)
       .where(eq(inventoryItems.id, data.id));
-    return fullForStaff(after, afterCategories, storedHold(after));
+    return staffItemView(after, afterCategories, storedHold(after));
   });
 }
 
