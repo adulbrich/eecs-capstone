@@ -270,6 +270,49 @@ describe("transitions on an unlinked (null proposer) project", () => {
 // in the UI: a non-staff (or anonymous) caller hitting the server functions
 // directly must never receive staff-only fields or succeed at staff-only writes.
 describe("staff-only data and actions are inaccessible to non-staff", () => {
+  it("names every field it returns, for an anonymous reader and for staff", async () => {
+    // /projects/$id is public, so this payload reaches anonymous viewers. The
+    // projection cannot widen on its own; what this catches is a future caller
+    // reintroducing a whole-row select above it.
+    const PUBLIC_KEYS = [
+      "contactEmail",
+      "contactName",
+      "deletedAt",
+      "description",
+      "id",
+      "imageUrl",
+      "licenseRestrictions",
+      "minQualifications",
+      "notes",
+      "objectives",
+      "prefQualifications",
+      "problemStatement",
+      "programId",
+      "status",
+      "teamsSupported",
+      "title",
+      "url",
+    ];
+    const admin = await makeUser(`keys-a-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(admin, {
+      ...baseProject(),
+      notes: "internal staff note",
+    });
+    await forceTransitionAs(admin, id, "published", undefined, {
+      sendEmail: false,
+    });
+
+    const { project: forAnon } = await getProjectAs(null, { id });
+    expect(Object.keys(forAnon ?? {}).sort()).toEqual(PUBLIC_KEYS);
+    expect(forAnon?.notes).toBeNull();
+
+    const { project: forAdmin } = await getProjectAs(admin, { id });
+    // Same key set for both. Only the value of `notes` differs, which is the
+    // design: one shape, one viewer-dependent field.
+    expect(Object.keys(forAdmin ?? {}).sort()).toEqual(PUBLIC_KEYS);
+    expect(forAdmin?.notes).toBe("internal staff note");
+  });
+
   it("getProjectAs strips notes and proposerEmail for anonymous and non-staff viewers", async () => {
     const admin = await makeUser(`sec-a-${Date.now()}@x.com`, "admin");
     const other = await makeUser(`sec-o-${Date.now()}@x.com`, "user");
@@ -281,17 +324,13 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
     await forceTransitionAs(admin, id, "published");
 
     const asStaff = await getProjectAs(admin, { id });
-    expect((asStaff.project as { notes: unknown }).notes).toBe(
-      "internal staff note"
-    );
+    expect(asStaff.project?.notes).toBe("internal staff note");
 
     for (const viewer of [null, { id: other.id, role: other.role }]) {
       const seen = await getProjectAs(viewer, { id });
       expect(seen.project).not.toBeNull();
-      expect((seen.project as { notes: unknown }).notes).toBeNull();
-      expect(
-        (seen.project as { proposerEmail: unknown }).proposerEmail
-      ).toBeNull();
+      expect(seen.project?.notes).toBeNull();
+      expect(seen.project).not.toHaveProperty("proposerEmail");
       expect(seen.viewerIsStaff).toBe(false);
     }
   });
@@ -476,7 +515,10 @@ describe("private notes", () => {
     expect(log[0].editorId).toBe(owner.id);
   });
 
-  it("keeps proposerEmail staff-only even though notes are not", async () => {
+  it("never returns proposerEmail to anyone, staff included", async () => {
+    // It is the private link key. It used to ride the payload for every viewer
+    // and be nulled for the wrong ones; now it is not on the wire at all. The
+    // staff panel reads it through getProposerForEditAs, which is staff-gated.
     const owner = await makeUser(`pn-o6-${Date.now()}@x.com`, "user");
     const admin = await makeUser(`pn-a6-${Date.now()}@x.com`, "admin");
     const { id } = await createProjectAs(admin, {
@@ -487,9 +529,9 @@ describe("private notes", () => {
 
     const ownerView = await getProjectAs(owner, { id });
     expect(ownerView.project?.notes).toBe("n");
-    expect(ownerView.project?.proposerEmail).toBeNull();
-    expect((await getProjectAs(admin, { id })).project?.proposerEmail).toBe(
-      owner.email
+    expect(ownerView.project).not.toHaveProperty("proposerEmail");
+    expect((await getProjectAs(admin, { id })).project).not.toHaveProperty(
+      "proposerEmail"
     );
   });
 });

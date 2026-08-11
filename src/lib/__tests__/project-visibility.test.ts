@@ -6,7 +6,8 @@ import {
   canSeeStatusHistory,
   canWritePrivateNotes,
   filterCommentsForViewer,
-  stripPrivateFields,
+  type ProjectRow,
+  projectDetailView,
   type VisibleProject,
 } from "../project-visibility";
 import { isStaff, type Viewer } from "../viewer";
@@ -145,38 +146,96 @@ describe("canWritePrivateNotes", () => {
   });
 });
 
-describe("stripPrivateFields", () => {
-  it("removes notes for an unrelated user", () => {
-    const result = stripPrivateFields(p({ notes: "secret" }), other);
-    expect(result.notes).toBeNull();
+const DETAIL_KEYS = [
+  "contactEmail",
+  "contactName",
+  "deletedAt",
+  "description",
+  "id",
+  "imageUrl",
+  "licenseRestrictions",
+  "minQualifications",
+  "notes",
+  "objectives",
+  "prefQualifications",
+  "problemStatement",
+  "programId",
+  "status",
+  "teamsSupported",
+  "title",
+  "url",
+];
+
+function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
+  return {
+    ...p({}),
+    title: "A project",
+    description: "d",
+    problemStatement: "ps",
+    objectives: "o",
+    minQualifications: "min",
+    prefQualifications: "pref",
+    url: "https://x.test",
+    contactEmail: "contact@x.test",
+    contactName: "Contact",
+    imageUrl: "projects/x.webp",
+    licenseRestrictions: "none",
+    teamsSupported: 2,
+    programId: "prog-1",
+    ...overrides,
+  } as ProjectRow;
+}
+
+describe("projectDetailView", () => {
+  const withPrivate = row({
+    notes: "secret",
+    proposerEmail: "who@x.com",
+    status: "published",
   });
 
-  it("removes notes for anonymous viewers", () => {
-    const result = stripPrivateFields(p({ notes: "secret" }), anon);
-    expect(result.notes).toBeNull();
+  it("carries notes for staff and for the proposer", () => {
+    expect(projectDetailView(withPrivate, admin).notes).toBe("secret");
+    expect(projectDetailView(withPrivate, owner).notes).toBe("secret");
   });
 
-  it("keeps notes for staff", () => {
-    const result = stripPrivateFields(p({ notes: "secret" }), admin);
-    expect(result.notes).toBe("secret");
+  it("nulls notes for anyone else", () => {
+    expect(projectDetailView(withPrivate, other).notes).toBeNull();
+    expect(projectDetailView(withPrivate, anon).notes).toBeNull();
   });
 
-  it("keeps notes for the proposer", () => {
-    const result = stripPrivateFields(p({ notes: "secret" }), owner);
-    expect(result.notes).toBe("secret");
-  });
-
-  it("keeps proposerEmail staff-only, even from the proposer", () => {
-    const withEmail = p({ notes: "secret", proposerEmail: "who@x.com" });
-    expect(stripPrivateFields(withEmail, owner).proposerEmail).toBeNull();
-    expect(stripPrivateFields(withEmail, admin).proposerEmail).toBe(
-      "who@x.com"
+  it("names every field it returns", () => {
+    // Built field by field rather than by nulling a copy of the row, which is
+    // why a new column on projects cannot ride the public payload.
+    expect(Object.keys(projectDetailView(withPrivate, admin)).sort()).toEqual(
+      DETAIL_KEYS
+    );
+    expect(Object.keys(projectDetailView(withPrivate, anon)).sort()).toEqual(
+      DETAIL_KEYS
     );
   });
 
+  it("omits the private link key and the machine columns, staff included", () => {
+    const view = projectDetailView(withPrivate, admin);
+    for (const key of [
+      "proposerEmail",
+      "proposerId",
+      "programManagerId",
+      "publishedAt",
+      "archivedAt",
+      "searchVector",
+      "embedding",
+      "embeddingSourceHash",
+      "embeddingUpdatedAt",
+      "createdAt",
+      "updatedAt",
+    ]) {
+      expect(view).not.toHaveProperty(key);
+    }
+  });
+
   it("does not mutate the row it was handed", () => {
-    const original = p({ notes: "secret" });
-    stripPrivateFields(original, other);
+    const original = row({ notes: "secret" });
+    projectDetailView(original, other);
     expect(original.notes).toBe("secret");
   });
 });
