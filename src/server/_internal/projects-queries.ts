@@ -24,10 +24,9 @@ import {
   canSeeProject,
   canSeeStatusHistory,
   filterCommentsForViewer,
-  isStaff,
   stripPrivateFields,
-  type Viewer,
 } from "#/lib/project-visibility";
+import { isStaff, type Viewer } from "#/lib/viewer";
 import {
   adminProjectSummarySelect,
   projectSummarySelect,

@@ -6,11 +6,10 @@ import {
   canSeeStatusHistory,
   canWritePrivateNotes,
   filterCommentsForViewer,
-  isStaff,
   stripPrivateFields,
-  type Viewer,
   type VisibleProject,
 } from "../project-visibility";
+import { isStaff, type Viewer } from "../viewer";
 
 const anon: Viewer = null;
 const other: Viewer = { id: "u-other", role: "user" };

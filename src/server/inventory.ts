@@ -47,6 +47,11 @@ export const listInventory = createServerFn({ method: "GET" })
 const listAdminInventorySchema = z.object({
   categories: z.array(z.string().uuid()).max(20).default([]),
   q: z.string().default(""),
+  // Staff only, and deliberately absent from listInventorySchema. Retired
+  // items are the archive; this is the only way to list them. `visibleStatuses`
+  // also ignores the flag for a viewer who may not see retired, so a request
+  // has to defeat two independent things to reach a retired row.
+  retiredOnly: z.boolean().default(false),
   status: itemStatusEnum.nullable().default(null),
 });
 
@@ -67,15 +72,6 @@ export const listInventoryCategories = createServerFn({
 });
 
 const idOnlySchema = z.object({ id: z.string().uuid() });
-
-// Re-exported so callers can narrow `getInventoryItem`'s result to the staff
-// shape with a real type guard instead of casting through `unknown`. A
-// type-only export; `verbatimModuleSyntax` erases it entirely, so it does not
-// pull `_internal/inventory`'s runtime code into any bundle.
-export type {
-  InventoryItemPublic,
-  InventoryItemStaff,
-} from "./_internal/inventory";
 
 export const getInventoryItem = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => idOnlySchema.parse(d))

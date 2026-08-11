@@ -560,6 +560,16 @@ Both listings filter categories as all-match, not any-match: every selected cate
 
 Inventory full-text search no longer matches category names. Before this feature, `inventory_items.search_vector` weighted a `category` text column into the vector (`drizzle/0003_last_invaders.sql:61`, weight `'C'`). That column is gone; categories now live in the `categories` table, reached through the `inventory_item_categories` junction table. `search_vector` is a `GENERATED ALWAYS AS (...) STORED` column (see the tsvector quirk above), and a generated column can only read other columns on the same row, so it cannot follow that join to pull category names back in. The rebuilt column (`drizzle/0010_category_domains.sql`) simply drops the category term rather than trying to fake it. This is treated as an accepted gap, not a bug to fix: searching "electronics" no longer also surfaces every item merely tagged with a category named "electronics," but the all-match category filter documented above already covers that use case directly, and correctly, for a caller who wants it.
 
+### One staff predicate, in `src/lib/viewer.ts`
+
+`isStaff` and `assertStaff` live in `src/lib/viewer.ts` and nowhere else. Do not add a local copy.
+
+Before this there were two `isStaff` and **five** `assertStaff`, and `isStaff` was exported from `src/lib/project-visibility.ts`, which ten files across seven non-project domains imported. That is what made the module's name wrong: a domain module owned something that is not domain-specific. Consumers import from `viewer.ts` directly rather than through a re-export, because Biome's `noBarrelFile` rejects the re-export and this project's no-shims rule would too.
+
+The four `AuthUser` interfaces in `_internal/` are structurally identical to `Viewer`, so no adapter is needed at a call site; collapsing them is a loose end, not a blocker.
+
+`assertStaff` carries `asserts viewer is NonNullable<Viewer>`, and the narrowing is load-bearing: call sites read `viewer.id` immediately afterwards with no second null check.
+
 ### A Hold is a union, and `src/lib/hold.ts` owns it
 
 **Hold** is the domain term for who is holding an item. A hold is on a person or on a thing, never both and never neither, and `src/lib/hold.ts` is the one place that rule lives. It is a pure, client-safe module in the same shape as `src/lib/project-visibility.ts`, unit tested in `npm test` with no docker.
@@ -591,6 +601,19 @@ The precedence order (name, then address, then label) has two renderings, and th
 `pickup_by` / `due_at` on `inventory_request_items` and `current_pickup_by` / `current_due_at` on `inventory_items` are informational only. There is no cron. The "past pickup window" / "overdue" badges are computed at query time. Lazy idempotent notifications are inserted on read via `recordOverdueNotificationsAs`, which runs two scans: request lines with `status = 'approved'` (scoped to the viewer's own requests), and staff holds (`current_holder_id IS NOT NULL`, `status IN ('reserved', 'checked_out')`), both folded into one `values` array for a single insert. The two scans deliberately overlap. A request line and a hold can describe two different people, because a teammate can collect an item someone else requested: the requester is accountable for the request and the picker is holding the thing, so both are notified. `notifications_overdue_unique_idx` on `(user_id, type, link)` does not collapse that case, and must not, because the user ids differ. The far more common case, where requester and picker are the same person, has both scans return the same row twice in one batch. `onConflictDoNothing` already collapses intra-batch duplicates on its own (it is `DO UPDATE` that errors with "cannot affect row a second time"), so the database would handle that case either way. The candidates are also deduped in JS on `(userId, type, link)` before the insert, which keeps the statement smaller and puts the intent where a reader will look for it, not because the index is unable to. That same index, a partial unique index for the two overdue types keyed on `/inventory/${itemId}` rather than the request line, lets `onConflictDoNothing` collapse re-reads (the same scan producing the same row again on a later call) into the same key space. The target + where are declared explicitly so future unique indexes on `notifications` cannot silently swallow unrelated conflicts.
 
 The hold scan additionally requires `current_holder_id IS NOT NULL`, narrower than the `/my/items` read path (`listMyItemsAs`), which also matches an unlinked hold by verified email. `notifications.user_id` is a foreign key to an account; an email-matched hold with no resolved account has no id to attribute a message to, and resolving the email here would reintroduce, on a write path, the impersonation risk the read path guards against. Net effect: a walk-in hold assigned by email shows in `/my/items` once the address matches a verified account, but does not notify until staff link it to an account. That linking happens automatically on the next transition that resolves the holder's email to an account and keeps the hold (e.g. reserved to checked_out); a transition that releases the item to `available` instead clears `current_holder_email` outright, so if the item is released before that resolution happens there is no longer a hold to notify about.
+
+### Retired is the archive, and staff-only
+
+Retired items are excluded from every listing by default, staff included, and reachable only through the "Show only retired" switch on `/admin/inventory`. That switch is the only way to list them, which matters because hard delete permits only `available` or `retired` and this file tells you to retire anything that has been requested.
+
+One rule, `canSeeRetired` in `src/lib/inventory-visibility.ts`, and two things derive from it:
+
+- `visibleStatuses(viewer, { retiredOnly })` returns the statuses a listing may show. It is **data, not a predicate**, because it has to cross into SQL: `buildInventoryScope` builds its `inArray` from it. Do not reintroduce a literal `ne(status, "retired")` in the query.
+- `canReadInventoryItem(item, viewer)` answers the single-row question in `loadInventoryItemRowFor`.
+
+Those two are different questions, not a contradiction: a listing decides what to show by default, the gate decides whether this person may read this row, and staff opening a retired item by URL is correct. Before the module they were two hand-written rules that **disagreed**: the SQL hid retired from staff as well, so staff could read a retired item by URL and had no way to find one.
+
+`retiredOnly` is on `listAdminInventorySchema` only. It is deliberately absent from `listInventorySchema`, and `visibleStatuses` ignores it for a viewer who may not see retired, so a request has to defeat two independent things to reach a retired row.
 
 ### Hard delete is narrow
 
@@ -627,9 +650,11 @@ The denial notification goes to the **requester**, read from the line by `closeR
 
 ## Projects
 
-### Staff-only columns leak unless stripped in `stripStaffOnlyFields`
+### Staff-only columns leak unless stripped in `stripPrivateFields`
 
-`getProjectImpl` (`src/server/_internal/projects-queries.ts`) returns the WHOLE project row through `stripStaffOnlyFields(project, viewer)`, and that object is serialized into the public SSR loader payload of `/projects/$id` for any viewer, including anonymous ones. A new staff-only column does NOT stay private just because no component renders it: it rides the payload unless you null it for non-staff inside `stripStaffOnlyFields` (`src/lib/project-visibility.ts`). Today `notes` and `proposer_email` are stripped there. Add any future sensitive column to that function and verify with a non-staff read before shipping.
+`getProjectImpl` (`src/server/_internal/projects-queries.ts`) returns the WHOLE project row through `stripPrivateFields(project, viewer)`, and that object is serialized into the public SSR loader payload of `/projects/$id` for any viewer, including anonymous ones. A new staff-only column does NOT stay private just because no component renders it: it rides the payload unless you null it for non-staff inside `stripPrivateFields` (`src/lib/project-visibility.ts`). Today `notes` and `proposer_email` are stripped there. Add any future sensitive column to that function and verify with a non-staff read before shipping.
+
+Inventory does **not** have this hazard, and the difference is worth knowing before you copy either pattern. `publicItemView` (`src/lib/inventory-visibility.ts`) names every field it returns, so a new column on `inventory_items` cannot ride the public payload by default. Projects returning the whole row and nulling fields is the reason this entry has to exist at all. Moving projects to the explicit shape is recorded in the README as a follow-up; it changes the public projects payload, so it is not a free refactor.
 
 ### Proposer linking is by email; `proposer_id` is canonical
 

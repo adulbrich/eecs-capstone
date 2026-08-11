@@ -8,7 +8,7 @@ import {
   user,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import { isStaff } from "#/lib/project-visibility";
+import { assertStaff } from "#/lib/viewer";
 import type { BanUserInput, ListUsersInput, SetUserRoleInput } from "../users";
 
 interface AuthUser {
@@ -25,12 +25,6 @@ function assertAdmin(viewer: AuthUser) {
 function assertNotSelf(viewer: AuthUser, targetId: string, action: string) {
   if (viewer.id === targetId) {
     throw new Error(`Cannot ${action} yourself`);
-  }
-}
-
-function assertStaff(viewer: AuthUser) {
-  if (!isStaff({ id: viewer.id, role: viewer.role ?? null })) {
-    throw new Error("Forbidden");
   }
 }
 

@@ -6,13 +6,13 @@ import {
 } from "@tanstack/react-router";
 import { InventoryForm } from "#/components/inventory-form";
 import { getSession } from "#/lib/auth-guards";
+import type {
+  InventoryItemPublic,
+  InventoryItemStaff,
+} from "#/lib/inventory-visibility";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
-import {
-  getInventoryItem,
-  type InventoryItemPublic,
-  type InventoryItemStaff,
-} from "#/server/inventory";
+import { getInventoryItem } from "#/server/inventory";
 
 /**
  * `getInventoryItem` returns a plain union (not a discriminated one): a

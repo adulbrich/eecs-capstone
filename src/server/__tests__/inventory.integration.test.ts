@@ -3118,3 +3118,60 @@ describe("transitionItem authority and line outcome", () => {
     expect(untouched.closedAt).toBeNull();
   });
 });
+
+describe("retired visibility", () => {
+  async function retiredAndActiveItems() {
+    const admin = await makeUser(`ar-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`sr-${Date.now()}@x.com`, "user");
+    const retired = await makeItem({ name: `Retired-${Date.now()}` });
+    const active = await makeItem({ name: `Active-${Date.now()}` });
+    await transitionItem(admin, { itemId: retired.id, nextStatus: "retired" });
+    return { admin, student, retired, active };
+  }
+
+  const LIST_DEFAULTS = () => ({
+    categories: [] as string[],
+    q: "",
+    status: null,
+  });
+
+  it("keeps retired out of the admin listing by default", async () => {
+    const { admin, retired, active } = await retiredAndActiveItems();
+    const { rows } = await listAdminInventoryAs(admin, LIST_DEFAULTS());
+    const ids = rows.map((r) => r.id);
+    expect(ids).toContain(active.id);
+    expect(ids).not.toContain(retired.id);
+  });
+
+  it("shows staff only the retired items when they ask", async () => {
+    const { admin, retired, active } = await retiredAndActiveItems();
+    const { rows } = await listAdminInventoryAs(admin, {
+      ...LIST_DEFAULTS(),
+      retiredOnly: true,
+    });
+    const ids = rows.map((r) => r.id);
+    expect(ids).toContain(retired.id);
+    expect(ids).not.toContain(active.id);
+  });
+
+  it("never shows a non-staff viewer a retired item, even asking for it", async () => {
+    // retiredOnly is not on the public wire schema at all; this covers the
+    // second, independent guard, so both would have to fail for a leak.
+    const { student, retired, active } = await retiredAndActiveItems();
+    const { rows } = await listInventoryAs(student, {
+      ...LIST_DEFAULTS(),
+      page: 1,
+      pageSize: 50,
+      retiredOnly: true,
+    } as Parameters<typeof listInventoryAs>[1]);
+    const ids = rows.map((r) => r.id);
+    expect(ids).toContain(active.id);
+    expect(ids).not.toContain(retired.id);
+  });
+
+  it("lets staff open a retired item and refuses everyone else", async () => {
+    const { admin, student, retired } = await retiredAndActiveItems();
+    expect(await getInventoryItemAs(admin, { id: retired.id })).not.toBeNull();
+    expect(await getInventoryItemAs(student, { id: retired.id })).toBeNull();
+  });
+});

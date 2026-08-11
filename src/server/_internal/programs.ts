@@ -2,18 +2,12 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { programInstructors, programs, projects, user } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import { isStaff } from "#/lib/project-visibility";
+import { assertStaff } from "#/lib/viewer";
 import type { ProgramInput, ProgramUpdateInput } from "../programs";
 
 interface AuthUser {
   id: string;
   role?: string | null | undefined;
-}
-
-function assertStaff(viewer: AuthUser) {
-  if (!isStaff({ id: viewer.id, role: viewer.role ?? null })) {
-    throw new Error("Forbidden");
-  }
 }
 
 export async function listProgramsImpl() {

@@ -10,6 +10,7 @@ import {
   user,
 } from "#/db/schema";
 import { type Hold, holdFromInput, holdToColumns } from "#/lib/hold";
+import { assertStaff } from "#/lib/viewer";
 
 export type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
 
@@ -93,12 +94,6 @@ export interface TransitionInput {
 interface Viewer {
   id: string;
   role?: string | null | undefined;
-}
-
-function assertStaff(viewer: Viewer) {
-  if (viewer.role !== "admin" && viewer.role !== "instructor") {
-    throw new Error("Forbidden");
-  }
 }
 
 /**
