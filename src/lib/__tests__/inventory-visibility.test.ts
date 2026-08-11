@@ -3,6 +3,8 @@ import {
   ACTIVE_STATUSES,
   canReadInventoryItem,
   canSeeRetired,
+  holdItemView,
+  myRequestLineView,
   publicItemView,
   staffItemView,
   visibleStatuses,
@@ -73,7 +75,7 @@ const row = {
   name: "Raspberry Pi 5",
   description: "An SBC.",
   imageUrl: "inventory/pi.webp",
-  status: "checked_out",
+  status: "checked_out" as const,
   createdAt: new Date("2026-01-01"),
   updatedAt: new Date("2026-02-01"),
   currentPickupBy: null,
@@ -92,6 +94,22 @@ const row = {
   notes: "Staff only note",
 };
 const categories = [{ id: "c-1", name: "Single-Board Computer" }];
+const lineRow = {
+  id: "line-1",
+  requestId: "req-1",
+  itemId: "i-1",
+  status: "approved",
+  reviewedBy: "u-staff",
+  reviewedAt: new Date("2026-02-02"),
+  reviewComment: "Approved for CS 461",
+  pickupBy: new Date("2026-02-10"),
+  dueAt: new Date("2026-03-01"),
+  closedAt: null,
+  closedBy: null,
+  closedReason: null,
+  createdAt: new Date("2026-02-01"),
+  updatedAt: new Date("2026-02-02"),
+};
 const hold = {
   kind: "account" as const,
   accountId: "u-holder",
@@ -130,6 +148,73 @@ describe("publicItemView", () => {
       "currentHolderProgram",
       "currentRequestItemId",
       "createdAt",
+      "updatedAt",
+    ]) {
+      expect(view).not.toHaveProperty(key);
+    }
+  });
+});
+
+describe("holdItemView", () => {
+  const view = holdItemView(row);
+
+  it("carries only what a holder's own page reads", () => {
+    expect(view).toEqual({
+      id: "i-1",
+      name: "Raspberry Pi 5",
+      status: "checked_out",
+      pickupBy: null,
+      dueAt: new Date("2026-03-01"),
+      updatedAt: new Date("2026-02-01"),
+    });
+  });
+
+  it("omits every staff-only field", () => {
+    for (const key of [
+      "serial",
+      "label",
+      "location",
+      "notes",
+      "currentHolderId",
+      "currentHolderEmail",
+      "currentHolderName",
+      "currentHolderLabel",
+      "currentHolderProgram",
+      "currentRequestItemId",
+      "description",
+      "imageUrl",
+      "createdAt",
+    ]) {
+      expect(view).not.toHaveProperty(key);
+    }
+  });
+});
+
+describe("myRequestLineView", () => {
+  const view = myRequestLineView(lineRow);
+
+  it("carries only what a requester's own page reads", () => {
+    expect(view).toEqual({
+      id: "line-1",
+      status: "approved",
+      pickupBy: new Date("2026-02-10"),
+      dueAt: new Date("2026-03-01"),
+      createdAt: new Date("2026-02-01"),
+      closedReason: null,
+    });
+  });
+
+  it("omits the staff review columns", () => {
+    // reviewComment is the same string as closedReason, which the page does
+    // render, so dropping it costs the requester nothing.
+    for (const key of [
+      "reviewedBy",
+      "reviewedAt",
+      "reviewComment",
+      "closedBy",
+      "closedAt",
+      "requestId",
+      "itemId",
       "updatedAt",
     ]) {
       expect(view).not.toHaveProperty(key);
