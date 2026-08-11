@@ -3,102 +3,19 @@
 The Oregon State University EECS Capstone application: browse and propose capstone
 projects, run them through a review workflow, and manage shared inventory.
 
-This README covers how to run and develop the app, plus the known issues in what
-is built and the roadmap of what is not. For the full, exhaustive feature list
-(built and planned), see [`PRD.md`](./PRD.md). For implementation quirks and
-gotchas, see [`docs/QUIRKS.md`](./docs/QUIRKS.md). For agent/contributor
-conventions, see [`AGENTS.md`](./AGENTS.md).
+This README covers how to run and develop the app. Known issues and the roadmap
+live in [GitHub Issues](https://github.com/adulbrich/eecs-capstone/issues). For
+the full, exhaustive feature list, see [`PRD.md`](./PRD.md). For implementation
+quirks and gotchas, see [`docs/QUIRKS.md`](./docs/QUIRKS.md). For
+agent/contributor conventions, see [`AGENTS.md`](./AGENTS.md).
 
-## Pending
+## Known issues and roadmap
 
-None.
+Both live in [GitHub Issues](https://github.com/adulbrich/eecs-capstone/issues)
+rather than in this file, so that what is outstanding has one home that can be
+assigned, closed and linked from a PR.
 
-## Known issues
-
-- **Correction, now fixed:** the holder dialog issue previously listed here was
-  misdiagnosed. It described staff correcting a typo in the address and losing
-  the name they had typed. Editing the address does clear those fields, but
-  that is `onHolderEmailChange` doing it on purpose, because a name typed for
-  one address must not be submitted under another. The real defect was worse
-  and did not involve editing anything: re-saving an item that already had a
-  recorded walk-in name **erased it**, because the dialog opens with the name
-  prefilled while the lookup starts at `unknown`, and a Confirm inside the next
-  250ms sent null. Reproduced in the browser and verified by restoring the old
-  gate and watching a recorded name vanish.
-- **`recommended-sort.integration.test.ts` was flaky in a full integration run,
-  and is not currently reproducible.** The case "orders by cosine distance from
-  the viewer's interest vector" failed 2 of 6 full-suite runs, and passed every
-  time in isolation, taking 1.2s there against roughly 11s on the runs that
-  failed. Eight consecutive full-suite runs have since passed, which at the
-  observed rate is not evidence it is gone.
-
-  The duration is the clue: 11 seconds is something waiting, not an assertion
-  being wrong. An earlier guess, that publishing races the test's embedding
-  write, is **wrong**: `refreshProjectEmbedding` is awaited inside the
-  transition, so it completes before the test writes its vector.
-
-  What the investigation did find is that `BEDROCK_EMBEDDINGS_ENABLED` was
-  captured once at import as a module-level `const`, so the kill switch could
-  fail open through import order or through a test replacing `process.env`. A
-  failed-open call reaches the AWS SDK, which walks the credential chain and
-  pays an IMDS probe with retries: seconds per call rather than a clean error,
-  which fits the timing. It now reads the env on every call. **That connection
-  is a hypothesis and was never confirmed**, so this stays open rather than
-  being claimed as fixed. The suite now runs in CI, so the next occurrence will
-  be observed rather than guessed at.
-- No proper end-to-end (e2e) tests but for accessibility. All features in PRD should be e2e tested, and there should be a smoke suite over the most important flows. The integration suite now runs in CI, which covers the server behavior; what is missing is the browser-level coverage of whole flows (request an item, review a project, upload an image). That needs its own spec naming the flows before it is worth building, or it becomes a suite that passes without asserting much.
-
-## Roadmap (not yet implemented)
-
-These are the features still on the table. Everything already built is documented
-in [`PRD.md`](./PRD.md).
-
-- Have a proper /admin/inventory/requests page with a table with requests, a search field, and filter by status (default pending).
-- Preview deployment on AWS: a "Deploy (Preview)" workflow that runs any branch on the same stack as production, with a reset and dev-seeded database, a banner on every page, and labelled email. Specced and ready to build, including per-PR previews as a second phase, in [`docs/superpowers/specs/2026-08-10-preview-deployment-design.md`](./docs/superpowers/specs/2026-08-10-preview-deployment-design.md).
-- Move the projects read path to an explicit public projection, the way inventory now does. `getProjectImpl` returns the whole project row and nulls the private fields in `stripPrivateFields`, which is why `docs/QUIRKS.md` needs an entry warning that a new staff-only column leaks unless someone remembers to strip it. `publicItemView` in [`src/lib/inventory-visibility.ts`](./src/lib/inventory-visibility.ts) names every field it returns, so the same mistake is not available there. This is not a free refactor: it changes what the public `/projects/$id` SSR payload contains, so it needs a pass over every consumer of that shape.
-- Check all the nice shadcn/ui components and see if we use them everywhere we can. Audit where we could update the app accordingly. The most important things are that the UI is consistent across the app + accessibility.
-- Review the "Improve with AI" feature at the project level (model, prompt, etc.)
-- Ability to delete users, admins only (not instructors), behind a confirmation modal. **Delete here means anonymize, not remove.** Nine of the ten `ON DELETE RESTRICT` edges into `user.id` are authorship or audit records (see the FK table in [`docs/QUIRKS.md`](./docs/QUIRKS.md)), so a real `DELETE` fails for anyone who has ever submitted or edited a project. Instead: replace name and email with an id-derived placeholder, drop sessions and linked sign-in accounts, and set a new `deleted_at` on `user`, which has to be added to both `src/db/auth-schema.ts` and `user.additionalFields` in `src/lib/auth.ts`. Authored records stay, attributed to "Deleted user". Linked records need no decision because the schema already made it: proposed projects are unlinked but kept, and bookmarks, cart, collaborator, and program-instructor rows cascade. The modal has to say all of that before it acts, the way the program delete already reports how many projects it will unlink. Two things still open: whether `proposer_email` is scrubbed too, since `claimProjectsForVerifiedUser` re-links projects by address if the person signs up again; and whether anonymized accounts drop out of `/admin/users` by default. Purging a test account outright is a different operation and already built, see "Delete a test account" in [`DEPLOYMENT.md`](./DEPLOYMENT.md).
-
-### Authentication
-
-- Additional SSO providers beyond GitHub: Oregon State University ONID. Nothing
-  is built yet and the next step is a request to OSU, not code: what to ask for,
-  the paste-able ticket, and what each answer costs to implement are in
-  [`docs/ONID-SSO.md`](./docs/ONID-SSO.md).
-
-### Discovery & taxonomy
-
-- Gen-AI category suggestion: auto-suggest the best categories for a project from
-  its content.
-- Per-type faceted category filtering on the public listing. Category filtering
-  exists, but the category types (project type, technology stack, industry,
-  field) are not yet broken out into separate, individually filterable facets.
-
-### Project bidding & assignment (stretch)
-
-The `project_bids` and `project_assignments` tables exist, but there is no UI or
-server logic yet.
-
-- Students bid on preferred projects (top 5) at the start of the year for a
-  specific program, with motivation and qualifications. Bids visible to admins
-  and project proposers, not to other students.
-- Admins assign students to projects from bids and preferences (automatic or
-  manual).
-
-We might need to scrap that because different sections handle project assignment differently. Users can already bookmark favorite projects.
-
-### Analytics dashboard (stretch)
-
-- Charts for project trends and user engagement (projects published per academic
-  year, projects submitted per period).
-- Customizable date ranges, since "academic year" varies and recruitment starts
-  before the academic year does.
-
-### Handbook integration
-
-- The handbook is currently a separate Astro site. Integrate it into this app as
-  a set of static pages, linked from the landing page.
+For the exhaustive list of what is already **built**, see [`PRD.md`](./PRD.md).
 
 ## Getting Started
 
