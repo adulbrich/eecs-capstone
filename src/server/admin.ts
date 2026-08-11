@@ -3,7 +3,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { inventoryRequestItems, projects, user } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import { isStaff } from "#/lib/project-visibility";
+import { isStaff } from "#/lib/viewer";
 
 function count() {
   return sql<number>`count(*)::int`;

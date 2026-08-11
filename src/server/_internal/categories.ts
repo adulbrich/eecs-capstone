@@ -8,7 +8,8 @@ import {
   projects,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import { canSeeProject, isStaff } from "#/lib/project-visibility";
+import { canSeeProject } from "#/lib/project-visibility";
+import { assertStaff } from "#/lib/viewer";
 import type {
   CategoryInput,
   CategoryUpdateInput,
@@ -25,12 +26,6 @@ interface AuthUser {
 
 function viewerToVisibility(viewer: AuthUser) {
   return { id: viewer.id, role: viewer.role ?? null };
-}
-
-function assertStaff(viewer: AuthUser) {
-  if (!isStaff(viewerToVisibility(viewer))) {
-    throw new Error("Forbidden");
-  }
 }
 
 export async function listCategoriesImpl(data: {

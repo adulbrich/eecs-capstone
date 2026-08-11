@@ -8,17 +8,13 @@ import {
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
-import {
-  canEditProject,
-  canWritePrivateNotes,
-  isStaff,
-  type Viewer,
-} from "#/lib/project-visibility";
+import { canEditProject, canWritePrivateNotes } from "#/lib/project-visibility";
 import {
   type ActorRole,
   assertTransitionAllowed,
   type Status,
 } from "#/lib/project-workflow";
+import { isStaff, type Viewer } from "#/lib/viewer";
 import type { ProjectInput, UpdateProjectInput } from "../projects";
 import {
   recordSoftDeleteNotification,

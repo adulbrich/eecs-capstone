@@ -1,7 +1,11 @@
-export type Viewer =
-  | { id: string; role: string | null | undefined }
-  | null
-  | undefined;
+// `isStaff` and `Viewer` live in `src/lib/viewer.ts`. They answer questions
+// about a viewer's role, not about a project, and seven non-project domains
+// were importing them through this module. Consumers import them from there
+// directly rather than through a re-export here, which Biome forbids as a
+// barrel and which the project's no-shims rule would reject anyway.
+
+import type { Viewer } from "./viewer";
+import { isStaff } from "./viewer";
 
 export type VisibleProject = {
   id: string;
@@ -14,13 +18,6 @@ export type VisibleProject = {
 export type VisibleComment = {
   isInternal: boolean | null;
 } & Record<string, unknown>;
-
-export function isStaff(viewer: Viewer): boolean {
-  if (!viewer) {
-    return false;
-  }
-  return viewer.role === "admin" || viewer.role === "instructor";
-}
 
 function isOwner(project: VisibleProject, viewer: Viewer): boolean {
   return !!viewer && project.proposerId === viewer.id;

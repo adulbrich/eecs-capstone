@@ -35,6 +35,7 @@ import {
   holdFromStoredRow,
   holdName,
 } from "#/lib/hold";
+import { assertStaff, isStaff } from "#/lib/viewer";
 import { setInventoryItemCategoriesAs } from "./categories";
 import type { Tx } from "./inventory-transitions";
 
@@ -84,10 +85,6 @@ export type InventoryItemStaff = InventoryItemPublic & {
   serial: string | null;
   updatedAt: Date;
 };
-
-function isStaff(viewer: Viewer): boolean {
-  return viewer?.role === "admin" || viewer?.role === "instructor";
-}
 
 function stripForPublic(
   row: typeof inventoryItems.$inferSelect,
@@ -437,12 +434,6 @@ export interface CreateInventoryItemInput {
   name: string;
   notes: string | null;
   serial: string | null;
-}
-
-function assertStaff(viewer: Viewer): asserts viewer is NonNullable<Viewer> {
-  if (!isStaff(viewer)) {
-    throw new Error("Forbidden");
-  }
 }
 
 /**
