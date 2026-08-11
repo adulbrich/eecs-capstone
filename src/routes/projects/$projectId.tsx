@@ -160,14 +160,8 @@ function ProjectDetail() {
         />
       </div>
 
-      <Section
-        body={project.description}
-        label="Description"
-      />
-      <Section
-        body={project.problemStatement}
-        label="Problem statement"
-      />
+      <Section body={project.description} label="Description" />
+      <Section body={project.problemStatement} label="Problem statement" />
       <Section body={project.objectives} label="Objectives" />
       <Section
         body={project.minQualifications}
@@ -177,14 +171,8 @@ function ProjectDetail() {
         body={project.prefQualifications}
         label="Preferred qualifications"
       />
-      <ContactSection
-        email={project.contactEmail}
-        name={project.contactName}
-      />
-      <Section
-        body={project.licenseRestrictions}
-        label="License / IP"
-      />
+      <ContactSection email={project.contactEmail} name={project.contactName} />
+      <Section body={project.licenseRestrictions} label="License / IP" />
       <UrlSection url={project.url} />
 
       {(viewerIsStaff || viewerIsOwner) && (

@@ -19,6 +19,7 @@ import { Panel, PanelHeader, PanelNote } from "./panel";
 import { ProgramSelect } from "./program-select";
 import { ProjectImageUploader } from "./project-image-uploader";
 import { ProposerPicker } from "./proposer-picker";
+import { ProposerSummary } from "./proposer-summary";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -419,6 +420,11 @@ export function ProjectForm({
           <PanelHeader title="Staff panel" />
           <PanelNote>{STAFF_FIELDS_PROJECT_HINT}</PanelNote>
           <div className="mt-4 space-y-4">
+            {showProposer && proposer && (
+              // The same block the detail page's staff panel shows, so the two
+              // cannot disagree about whether this proposer has an account.
+              <ProposerSummary proposer={proposer} />
+            )}
             {showProposer && (
               <form.Field name="proposerEmail">
                 {(field: AnyForm) => (
