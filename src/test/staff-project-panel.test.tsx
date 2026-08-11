@@ -102,6 +102,34 @@ function renderPanel(status: string) {
   );
 }
 
+describe("StaffProjectPanel proposer block", () => {
+  it("renders the proposer's link state in the panel body", async () => {
+    // ProposerSummary is unit tested on its own; this asserts the panel
+    // actually renders it, which is the half a component test cannot cover.
+    renderPanel("submitted");
+
+    await waitFor(() =>
+      expect(screen.getByText("Account linked")).toBeTruthy()
+    );
+    expect(screen.getAllByText("proposer@example.com").length).toBeGreaterThan(
+      0
+    );
+  });
+
+  it("says no account yet when the address has not been claimed", async () => {
+    getProposerForEdit.mockResolvedValue({
+      accountLinked: false,
+      accountName: null,
+      email: "external@x.com",
+    });
+    renderPanel("submitted");
+
+    await waitFor(() =>
+      expect(screen.getByText("No account yet")).toBeTruthy()
+    );
+  });
+});
+
 describe("StaffProjectPanel review-email control", () => {
   it("shows the checkbox checked and names the address for the Approved dialog", async () => {
     renderPanel("submitted");
