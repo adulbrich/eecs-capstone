@@ -46,6 +46,7 @@ None.
 These are the features still on the table. Everything already built is documented
 in [`PRD.md`](./PRD.md).
 
+- Have a proper /admin/inventory/requests page with a table with requests, a search field, and filter by status (default pending).
 - Preview deployment on AWS: a "Deploy (Preview)" workflow that runs any branch on the same stack as production, with a reset and dev-seeded database, a banner on every page, and labelled email. Specced and ready to build, including per-PR previews as a second phase, in [`docs/superpowers/specs/2026-08-10-preview-deployment-design.md`](./docs/superpowers/specs/2026-08-10-preview-deployment-design.md).
 - Check all the nice shadcn/ui components and see if we use them everywhere we can. Audit where we could update the app accordingly. The most important things are that the UI is consistent across the app + accessibility.
 - Review the "Improve with AI" feature at the project level (model, prompt, etc.)
