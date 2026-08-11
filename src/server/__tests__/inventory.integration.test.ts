@@ -1984,6 +1984,72 @@ describe("staff-assigned holds in my items", () => {
   });
 });
 
+describe("my items payload names every field it returns", () => {
+  it("carries no column a consumer does not read, on either arm", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`shape-admin-${stamp}@x.com`, "admin");
+    const viewer = await makeUser(`shape-viewer-${stamp}@x.com`, "user");
+    const held = await makeItem({ name: "Held", notes: "Staff only note" });
+    const requested = await makeItem({ name: "Requested" });
+
+    await transitionItem(admin, {
+      itemId: held.id,
+      nextStatus: "checked_out",
+      holderId: viewer.id,
+      dueAt: new Date("2026-09-01T00:00:00.000Z"),
+    });
+    await addToCartAs(viewer, { itemId: requested.id });
+    await submitCartAs(viewer, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, requested.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+
+    const { active } = await listMyItemsAs(viewer);
+
+    // The projections cannot widen on their own, because they name their
+    // fields. What broke before was a db.select() above them handing whole
+    // rows straight to the client, and an exact key set is what catches a
+    // fourth read path written the same way.
+    const hold = active.find((e) => e.kind === "hold");
+    expect(hold).toBeDefined();
+    if (hold?.kind === "hold") {
+      expect(Object.keys(hold.item).sort()).toEqual([
+        "dueAt",
+        "id",
+        "name",
+        "pickupBy",
+        "status",
+        "updatedAt",
+      ]);
+    }
+
+    const request = active.find((e) => e.kind === "request");
+    expect(request).toBeDefined();
+    if (request?.kind === "request") {
+      expect(Object.keys(request).sort()).toEqual([
+        "collectedBy",
+        "itemName",
+        "itemStatus",
+        "kind",
+        "line",
+      ]);
+      expect(Object.keys(request.line).sort()).toEqual([
+        "closedReason",
+        "createdAt",
+        "dueAt",
+        "id",
+        "pickupBy",
+        "status",
+      ]);
+    }
+  });
+});
+
 describe("active tab ordering (byDeadline)", () => {
   it("sorts by soonest deadline, then newest first when there is no deadline", async () => {
     const stamp = Date.now();
