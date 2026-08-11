@@ -52,9 +52,10 @@ cross-account exposure, and it is still the whole reason the seam was built.
 | `inventory_request_items` | `reviewedBy`, `reviewedAt`, `reviewComment`, `closedBy`, `closedAt`, `requestId`, `itemId`, `updatedAt` |
 | `inventory_requests` | the entire row, on every entry, in both halves |
 
-`searchVector` is declared on the table, so it is part of `$inferSelect` and is
-selected by `item: inventoryItems`. Both existing views drop it by naming their
-fields. Confirm its presence on the wire during implementation; it is a payload
+`searchVector` rides the payload too, which was checked rather than assumed:
+being `generatedAlwaysAs` does not exclude it, and `db.select({ item:
+inventoryItems })` emits `"search_vector"` in the column list and returns it as
+a key. Both existing views drop it by naming their fields. It is a payload
 concern rather than a privacy one.
 
 The staff review columns are the part the original review missed. `reviewedBy`

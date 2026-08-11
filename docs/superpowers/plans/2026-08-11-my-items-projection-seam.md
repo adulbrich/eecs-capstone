@@ -463,5 +463,5 @@ git commit -m "docs(quirks): correct the inventory payload claim"
 | The `DeadlineEntry` reshape ripples further than the four listed files | Phase 2 Step 11 runs typecheck across the repo; anything missed is a compile error, not a silent bug |
 | An integration assertion reaches `.item` on a request entry and was missed in Step 10 | Same: it is a typecheck failure. Step 11 says to fix and note rather than work around |
 | The key-set assertion passes vacuously | Phase 3 Step 2 makes it fail on purpose before trusting it |
-| `searchVector` turns out not to be on the payload, making the spec's table wrong | The spec already hedges this. Confirm during Phase 2 and correct the spec if so; it changes nothing about the design |
+| `searchVector` turns out not to be on the payload, making the spec's table wrong | Checked and confirmed: the emitted SQL names `"search_vector"` and the row carries it, `generatedAlwaysAs` notwithstanding. The spec's hedge is now a statement |
 | Sorting after projecting changes the order | `compareByDeadline` reads the same four values before and after, only under new names. The existing ordering tests at `inventory.integration.test.ts:1981-2092` cover it |
