@@ -438,7 +438,18 @@ turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
 
 - **Brainstorm before writing code** for any new feature. The brainstorming skill is the entry point. Output is a spec doc.
 - **Spec then plan then implement.** The plan is the bite-sized task list. The implementation is dispatched per phase via subagent-driven-development.
-- **`*As` first, `*ForCurrentUser` second.** Always design the impl helper to accept an explicit viewer so integration tests can call it directly. The wrapper that resolves the viewer is layered on top.
+- **`*As` first, `*ForCurrentUser` second.** Always design the impl helper to accept an explicit viewer so integration tests can call it directly. The wrapper that resolves the viewer is layered on top. An implementation that needs no viewer at all takes the `*Impl` name instead (`getProjectImpl`, `searchProjectsImpl`, `listUsersImpl`), with the authorization done in the wrapper above it.
+
+  All 57 wrappers now have a seam under them, one of those two shapes, so this audit returning anything means you have found a bug rather than a style difference:
+
+  ```bash
+  # every *ForCurrentUser should have an *As or *Impl beside it
+  grep -rhoE 'export (async )?function \w+ForCurrentUser' src/server/_internal/*.ts
+  ```
+
+  **Collapsing the wrappers into one generic adapter was considered and rejected.** Fifty of them are two lines (`const viewer = await requireUser(); return xAs(viewer, data);`) and an architecture review proposed replacing them with a single `withCurrentUser()`. They stay, for two reasons. One named function per action is 57 grep targets and a generic adapter is none, and grep-ability beats line count in this codebase. And the wrapper is not the interesting part: the `*As` seam below it is what tests cross, so collapsing the layer above would save nothing a reader is confused by while touching eleven files.
+
+  What that review actually found, once the 57 were looked at individually, was six functions with **no** `*As` twin: all four in `bookmarks.ts`, plus `uploadAvatarForCurrentUser` and `clearAvatarForCurrentUser`. The cost was exactly what this convention predicts. `bookmarks.integration.test.ts` could not reach the code, so its two cases inserted rows directly and one re-implemented the join it asserted on; the `canSeeProject` check on the bookmark path had no coverage at all. The avatar tests were `describe.skip` with a comment explaining that `requireUser()` needed a request context the harness does not provide. Both are fixed. If you are tempted to skip the seam, that is what skipping it looks like a few months later.
 - **One server-fn per workflow action.** Never collapse multiple actions into one mega-mutation. Grep-ability matters more than line count.
 - **Single canonical URL per resource.** Render staff sections conditionally on the same URL rather than maintaining a separate admin detail.
 

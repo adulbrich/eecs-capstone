@@ -7,7 +7,11 @@ import { db } from "#/db";
 import { projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { createProjectAs } from "#/server/_internal/projects";
-import { uploadProjectImageAs } from "#/server/_internal/uploads";
+import {
+  clearAvatarAs,
+  uploadAvatarAs,
+  uploadProjectImageAs,
+} from "#/server/_internal/uploads";
 
 const fixture = readFileSync(
   path.join(
@@ -98,11 +102,70 @@ describe("uploadProjectImageAs", () => {
   });
 });
 
-describe.skip("uploadAvatarForCurrentUser", () => {
-  // requireUser() inside the impl needs a request context that the test
-  // harness does not provide. The project-image test above exercises the
-  // same upload pipeline (Sharp -> bucket -> row update); the avatar path
-  // is structurally identical and shares the storage and Sharp code, so a
-  // manual smoke (Section 13 in spec) covers it.
-  it("placeholder", () => {});
+describe("uploadAvatarAs", () => {
+  // This block was `describe.skip` with a placeholder, because requireUser()
+  // inside the implementation needed a request context the harness does not
+  // provide. Splitting out the *As seam is what makes it runnable, which is
+  // the whole reason the convention exists.
+  it("writes to the bucket and updates the user row", async () => {
+    const u = await makeUser(`av-${Date.now()}@x.com`, "user");
+    const viewer = { id: u.id, role: u.role, image: null };
+
+    const form = new FormData();
+    form.append("file", fakeFile("sample.jpg", fixture));
+
+    const result = await uploadAvatarAs(viewer, form);
+    expect(result.key).toMatch(new RegExp(`^avatars/${u.id}/.+\\.webp$`));
+
+    const client = s3Client();
+    const head = await client.send(
+      new HeadObjectCommand({
+        Bucket: process.env.S3_BUCKET ?? "cs-capstone",
+        Key: result.key,
+      })
+    );
+    expect(head.ContentType).toBe("image/webp");
+
+    const [row] = await db.select().from(user).where(eq(user.id, u.id));
+    expect(row.image).toBe(result.key);
+  });
+
+  it("refuses a file that is not an allowed image", async () => {
+    const u = await makeUser(`ax-${Date.now()}@x.com`, "user");
+    const form = new FormData();
+    form.append(
+      "file",
+      new File([Buffer.from("not an image")], "x.txt", { type: "text/plain" })
+    );
+    await expect(
+      uploadAvatarAs({ id: u.id, role: u.role, image: null }, form)
+    ).rejects.toThrow(/Unsupported image type/);
+  });
+});
+
+describe("clearAvatarAs", () => {
+  it("nulls the column", async () => {
+    const u = await makeUser(`ac-${Date.now()}@x.com`, "user");
+    await db
+      .update(user)
+      .set({ image: "avatars/whatever.webp" })
+      .where(eq(user.id, u.id));
+
+    await clearAvatarAs({
+      id: u.id,
+      role: u.role,
+      image: "avatars/whatever.webp",
+    });
+
+    const [row] = await db.select().from(user).where(eq(user.id, u.id));
+    expect(row.image).toBeNull();
+  });
+
+  it("is a no-op for a viewer who has no avatar", async () => {
+    // The storage delete is skipped entirely rather than called with null.
+    const u = await makeUser(`ad-${Date.now()}@x.com`, "user");
+    await expect(
+      clearAvatarAs({ id: u.id, role: u.role, image: null })
+    ).resolves.toEqual({ ok: true });
+  });
 });
