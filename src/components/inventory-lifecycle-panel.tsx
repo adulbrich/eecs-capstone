@@ -9,7 +9,7 @@ import {
   hardDeleteInventoryItem,
   transitionInventoryItem,
 } from "#/server/inventory";
-import { type AccountStatus, HolderField } from "./holder-field";
+import { HolderField } from "./holder-field";
 import { InventoryStatusBadge } from "./inventory-status-badge";
 import { LocalTime } from "./local-time";
 import { PanelSection } from "./panel";
@@ -92,23 +92,30 @@ function toDateInput(value: Date | string | null | undefined): string {
 }
 
 /**
- * An address means the hold is on a person and carries a name/program; a
- * blank address means it is on a thing and carries a label instead. Name and
- * program are dropped once the address matches an account: the field that
- * collects them is already hidden at that point, and sending them anyway
- * would make the payload's correctness depend on `transitionItemInTx`
- * discarding them on the server, elsewhere, rather than on this file. Building
- * this in one place keeps the dialog from ever sending a combination the
- * server's invariant would reject.
+ * An address means the hold is on a person and carries a name and program; a
+ * blank address means it is on a thing and carries a label instead.
+ *
+ * This deliberately does **not** consult the account lookup. It used to send
+ * the name and program only once the debounced lookup had answered
+ * `unmatched`, which meant staff who filled them in and then corrected a typo
+ * in the address submitted both as null inside the 250ms window, with no
+ * warning and no way to tell afterwards.
+ *
+ * Deciding here was never necessary, because the server does not trust this
+ * anyway: `holdFromInput` resolves the address and the `account` case of the
+ * `Hold` union has nowhere to put a typed name, so one is dropped structurally
+ * rather than by anyone remembering to. Sending them always and letting the
+ * server decide is both simpler and the only version without a race.
+ *
+ * The lookup still drives whether the Name and Program inputs are on screen.
+ * That is a presentation question and a stale answer there costs nothing.
  */
 function holderFields({
-  accountStatus,
   email,
   label,
   name,
   program,
 }: {
-  accountStatus: AccountStatus;
   email: string;
   label: string;
   name: string;
@@ -120,34 +127,11 @@ function holderFields({
   holderProgram: string | null;
 } {
   const trimmedEmail = email.trim();
-  // This deliberately does NOT call holdFromInput, and the reason is the
-  // third state. The constructor asks "is there an account?", a boolean it
-  // answers from a resolved id. This asks "do I know there is no account?",
-  // and `unknown` is a real answer: the lookup is debounced, so every address
-  // spends a moment where neither is established. Those two questions agree
-  // on `matched` and `unmatched` and disagree on `unknown`, where the inputs
-  // are not on screen and anything still in them belongs to a previous
-  // address. Routing this through the constructor would need a fabricated
-  // account id to express "an account exists but I do not know which", which
-  // is a lie the type should not have to carry.
-  //
-  // The rule this shares with the constructor is that an account beats a
-  // typed name; the server re-derives it from the resolved account and is
-  // sound on its own. This is the input layer refusing to compose an illegal
-  // payload, not the definition of what is illegal.
-  //
-  // Trimming also happens here, because the constructor matches the server's
-  // raw-truthiness guard so a payload cannot pass one rule and be re-judged
-  // by a stricter one. The address wins over a leftover label for the same
-  // reason: the constructor rejects both together, and staff who typed a
-  // label, backed out, then entered an address should not see an error.
-  const carriesNameAndProgram =
-    Boolean(trimmedEmail) && accountStatus === "unmatched";
   return {
     holderEmail: trimmedEmail || null,
     holderLabel: trimmedEmail ? null : label.trim() || null,
-    holderName: carriesNameAndProgram ? name.trim() || null : null,
-    holderProgram: carriesNameAndProgram ? program.trim() || null : null,
+    holderName: trimmedEmail ? name.trim() || null : null,
+    holderProgram: trimmedEmail ? program.trim() || null : null,
   };
 }
 
@@ -305,12 +289,6 @@ export function InventoryLifecyclePanel({ item, history }: Props) {
   const [assignName, setAssignName] = useState("");
   const [assignProgram, setAssignProgram] = useState("");
   const [assignLabel, setAssignLabel] = useState("");
-  // Whether the typed or picked address matches an existing account, reported
-  // by HolderField from its own debounced lookup. The payload needs this too:
-  // an account's name is authoritative, so a matched address must never carry
-  // the name/program fields, and that decision should not depend on the
-  // server independently re-deriving and discarding them.
-  const [accountStatus, setAccountStatus] = useState<AccountStatus>("unknown");
   // The address the name and program on screen were entered for. Name and
   // program describe one particular person, so they cannot outlive the
   // address they belong to: staff who open a request prefilled with the
@@ -379,7 +357,6 @@ export function InventoryLifecyclePanel({ item, history }: Props) {
     holderDetailsAddress.current = (item.currentHolderEmail ?? "").trim();
     // HolderField's own lookup recomputes this from the prefilled address; it
     // just should not carry the previous dialog's result into a new one.
-    setAccountStatus("unknown");
     setDueDate(toDateInput(item.dueAt));
     setPickupDate(toDateInput(item.pickupBy));
     setDlgComment("");
@@ -408,7 +385,6 @@ export function InventoryLifecyclePanel({ item, history }: Props) {
     const needsHolder =
       dlgTargetStatus === "reserved" || dlgTargetStatus === "checked_out";
     const holder = holderFields({
-      accountStatus,
       email: assignEmail,
       label: assignLabel,
       name: assignName,
@@ -587,7 +563,6 @@ export function InventoryLifecyclePanel({ item, history }: Props) {
               email={assignEmail}
               label={assignLabel}
               name={assignName}
-              onAccountStatusChange={setAccountStatus}
               onEmailChange={onHolderEmailChange}
               onLabelChange={setAssignLabel}
               onNameChange={setAssignName}

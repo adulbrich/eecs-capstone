@@ -28,9 +28,17 @@ export const EMBEDDING_DIMENSIONS = Number(
  *
  * It doubles as an operational switch for disabling embeddings in production
  * without a redeploy of application code.
+ *
+ * Read on every call, not captured once at import. As a module-level `const`
+ * this depended on import order and on nothing replacing `process.env`, and a
+ * kill switch that can fail open by accident is not a kill switch. When it
+ * does fail open under test there is no fast error: the call reaches the AWS
+ * SDK, which walks the credential chain and pays an IMDS probe with retries,
+ * which is seconds per call rather than a clean failure.
  */
-export const EMBEDDINGS_ENABLED =
-  process.env.BEDROCK_EMBEDDINGS_ENABLED !== "false";
+export function embeddingsEnabled(): boolean {
+  return process.env.BEDROCK_EMBEDDINGS_ENABLED !== "false";
+}
 
 export function buildEmbedRequestBody(text: string): string {
   return JSON.stringify({
@@ -51,7 +59,7 @@ export function parseEmbedResponse(payload: Uint8Array): number[] {
 }
 
 export const bedrockEmbed: EmbedFn = async (text) => {
-  if (!EMBEDDINGS_ENABLED) {
+  if (!embeddingsEnabled()) {
     throw new Error("Embeddings are disabled (BEDROCK_EMBEDDINGS_ENABLED)");
   }
   const response = await getBedrockClient().send(

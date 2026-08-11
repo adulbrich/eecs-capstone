@@ -15,31 +15,28 @@ None.
 
 ## Known issues
 
-- **The holder assign dialog can silently drop a typed name and program.**
-  `HolderField` looks an address up on a 250ms debounce, and `holderFields` in
-  `src/components/inventory-lifecycle-panel.tsx` only sends the Name and Program
-  fields when the lookup has answered `unmatched`. Editing the address puts
-  `accountStatus` back to `unknown`, so staff who fill in a walk-in's name and
-  program, then correct a typo in the address and press Assign inside that
-  window, submit both fields as null. The hold is recorded with an address and
-  no name, the Holder column shows the bare address, and nothing warns them.
-  The submit guard only requires an address or a label, so it does not catch
-  this. Predates the Hold refactor, which left the expression untouched. The fix
-  is either to disable Assign while `accountStatus` is `unknown`, or to keep the
-  typed values across the lookup and let the server drop them if an account
-  resolves, which it already does.
-- **`recommended-sort.integration.test.ts` is flaky in a full integration run.** The
-  case "orders by cosine distance from the viewer's interest vector" failed 2 of 6
-  full-suite runs and passed every time in isolation, where it takes 1.2s against
-  roughly 11s on the runs that fail. The duration is the clue: that is something
-  waiting, not an assertion being wrong. `publishWithVector` transitions a project
-  all the way to `published` and only then writes the test's embedding, so any
-  asynchronous embedding refresh triggered by publishing would race that write and
-  overwrite the vector the assertion depends on. Not yet diagnosed. It matters more
-  than a flake usually would, because the integration suite is the only executable
-  specification of this behavior and it does not run in CI, so nobody is watching it
-  go red.
-- No proper end-to-end (e2e) tests but for accessibility. All features in PRD should be e2e tested. In addition, we should have smoke tests for the most important flows and run the smoke test in CI.
+- **`recommended-sort.integration.test.ts` was flaky in a full integration run,
+  and is not currently reproducible.** The case "orders by cosine distance from
+  the viewer's interest vector" failed 2 of 6 full-suite runs, and passed every
+  time in isolation, taking 1.2s there against roughly 11s on the runs that
+  failed. Eight consecutive full-suite runs have since passed, which at the
+  observed rate is not evidence it is gone.
+
+  The duration is the clue: 11 seconds is something waiting, not an assertion
+  being wrong. An earlier guess, that publishing races the test's embedding
+  write, is **wrong**: `refreshProjectEmbedding` is awaited inside the
+  transition, so it completes before the test writes its vector.
+
+  What the investigation did find is that `BEDROCK_EMBEDDINGS_ENABLED` was
+  captured once at import as a module-level `const`, so the kill switch could
+  fail open through import order or through a test replacing `process.env`. A
+  failed-open call reaches the AWS SDK, which walks the credential chain and
+  pays an IMDS probe with retries: seconds per call rather than a clean error,
+  which fits the timing. It now reads the env on every call. **That connection
+  is a hypothesis and was never confirmed**, so this stays open rather than
+  being claimed as fixed. The suite now runs in CI, so the next occurrence will
+  be observed rather than guessed at.
+- No proper end-to-end (e2e) tests but for accessibility. All features in PRD should be e2e tested, and there should be a smoke suite over the most important flows. The integration suite now runs in CI, which covers the server behavior; what is missing is the browser-level coverage of whole flows (request an item, review a project, upload an image). That needs its own spec naming the flows before it is worth building, or it becomes a suite that passes without asserting much.
 
 ## Roadmap (not yet implemented)
 

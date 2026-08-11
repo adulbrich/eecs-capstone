@@ -39,7 +39,6 @@ interface Props {
   email: string;
   label: string;
   name: string;
-  onAccountStatusChange: (status: AccountStatus) => void;
   onEmailChange: (value: string) => void;
   onLabelChange: (value: string) => void;
   onNameChange: (value: string) => void;
@@ -134,7 +133,6 @@ export function HolderField({
   email,
   label,
   name,
-  onAccountStatusChange,
   onEmailChange,
   onLabelChange,
   onNameChange,
@@ -151,7 +149,6 @@ export function HolderField({
     // lookup has actually said so.
     setAccount(null);
     setStatus("unknown");
-    onAccountStatusChange("unknown");
     if (!trimmed) {
       return;
     }
@@ -160,9 +157,7 @@ export function HolderField({
       void (async () => {
         const settle = (match: Account | null) => {
           setAccount(match);
-          const next: AccountStatus = match ? "matched" : "unmatched";
-          setStatus(next);
-          onAccountStatusChange(next);
+          setStatus(match ? "matched" : "unmatched");
         };
         try {
           // An exact-address lookup, not the search endpoint: search caps
@@ -191,7 +186,7 @@ export function HolderField({
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [trimmed, onAccountStatusChange]);
+  }, [trimmed]);
 
   return (
     <div className="space-y-3">

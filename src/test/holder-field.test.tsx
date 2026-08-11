@@ -36,7 +36,6 @@ function renderField(overrides: Partial<Parameters<typeof HolderField>[0]>) {
       email=""
       label=""
       name=""
-      onAccountStatusChange={noop}
       onEmailChange={noop}
       onLabelChange={noop}
       onNameChange={noop}
@@ -96,26 +95,23 @@ describe("HolderField", () => {
     mockedSearch.mockResolvedValue([] as never);
     resolvesTo({ email: "ada@x.test", id: "u1", name: "Ada Lovelace" });
 
-    const onAccountStatusChange = vi.fn();
-    renderField({ email: "ada@x.test", onAccountStatusChange });
+    renderField({ email: "ada@x.test" });
 
     expect(
       await screen.findByText(/Matches account: Ada Lovelace/)
     ).toBeTruthy();
     expect(screen.queryByLabelText(/^name$/i)).toBeNull();
     expect(screen.queryByLabelText(/program/i)).toBeNull();
-    expect(onAccountStatusChange).toHaveBeenCalledWith("matched");
   });
 
-  it("reports unknown synchronously and settles to the resolved answer", async () => {
+  it("keeps the inputs closed until the lookup answers, then opens them", async () => {
+    // The status is local now, so this asserts what a user sees rather than a
+    // callback: nothing flashes open during the debounce window, and the
+    // walk-in fields appear once the address is known to have no account.
     resolvesTo(null);
-    const onAccountStatusChange = vi.fn();
-    renderField({ email: "someone@nowhere.test", onAccountStatusChange });
-    // Synchronous first report, so a confirm during the debounce window can
-    // never be treated as "this address has no account".
-    expect(onAccountStatusChange).toHaveBeenCalledWith("unknown");
-    await waitFor(() =>
-      expect(onAccountStatusChange).toHaveBeenCalledWith("unmatched")
-    );
+    renderField({ email: "someone@nowhere.test" });
+    expect(screen.queryByLabelText(/^name$/i)).toBeNull();
+    await waitFor(() => expect(screen.getByLabelText(/^name$/i)).toBeTruthy());
+    expect(screen.getByLabelText(/program/i)).toBeTruthy();
   });
 });
