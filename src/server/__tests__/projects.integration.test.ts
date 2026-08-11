@@ -93,6 +93,63 @@ describe("project workflow", () => {
     await expect(performTransitionAs(owner, id, "published")).rejects.toThrow();
   });
 
+  it("force writes the same history row and notification as a normal transition", async () => {
+    // forceTransitionAs has never been asserted to do either. It shares a body
+    // with performTransitionAs by copy, so this is what makes the equivalence
+    // checkable rather than reviewable.
+    const owner = await makeUser(`fo-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`fa-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+
+    await forceTransitionAs(admin, id, "changes_requested", "force note", {
+      sendEmail: false,
+    });
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.status).toBe("changes_requested");
+
+    const history = await db
+      .select()
+      .from(projectStatusHistory)
+      .where(eq(projectStatusHistory.projectId, id));
+    expect(history).toHaveLength(1);
+    expect(history[0].oldStatus).toBe("draft");
+    expect(history[0].newStatus).toBe("changes_requested");
+    expect(history[0].changedBy).toBe(admin.id);
+    expect(history[0].comment).toBe("force note");
+
+    const ownerNotifs = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, owner.id));
+    expect(ownerNotifs).toHaveLength(1);
+  });
+
+  it("force sets publishedAt and archivedAt the same way", async () => {
+    const owner = await makeUser(`fp-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`fpa-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+
+    await forceTransitionAs(admin, id, "published", undefined, {
+      embed: vi.fn().mockResolvedValue(new Array(1024).fill(0.1)),
+      sendEmail: false,
+    });
+    const [published] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, id));
+    expect(published.publishedAt).not.toBeNull();
+
+    await forceTransitionAs(admin, id, "archived", undefined, {
+      sendEmail: false,
+    });
+    const [archived] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, id));
+    expect(archived.archivedAt).not.toBeNull();
+  });
+
   it("updateProject writes one edit-log row capturing only changed fields", async () => {
     const owner = await makeUser(`o3-${Date.now()}@x.com`, "user");
     const { id } = await createProjectAs(owner, {

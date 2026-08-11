@@ -6,6 +6,7 @@ import { auth } from "#/lib/auth";
 import { refreshProjectEmbedding } from "#/server/_internal/project-embeddings";
 import {
   createProjectAs,
+  forceTransitionAs,
   performTransitionAs,
   updateProjectAs,
 } from "#/server/_internal/projects";
@@ -143,6 +144,20 @@ describe("embedding triggers", () => {
 
     await performTransitionAs(admin, id, "approved", undefined, { embed });
     await performTransitionAs(admin, id, "published", undefined, { embed });
+
+    expect(embed).toHaveBeenCalledTimes(1);
+    expect((await readRow(id)).embedding?.length).toBe(1024);
+  });
+
+  it("embeds when the force path publishes", async () => {
+    const admin = await makeAdmin(`fg-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Forced"));
+    const embed = vi.fn().mockResolvedValue(VECTOR);
+
+    await forceTransitionAs(admin, id, "published", undefined, {
+      embed,
+      sendEmail: false,
+    });
 
     expect(embed).toHaveBeenCalledTimes(1);
     expect((await readRow(id)).embedding?.length).toBe(1024);
