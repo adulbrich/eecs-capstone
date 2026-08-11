@@ -11,15 +11,15 @@ const FUTURE = new Date(Date.now() + 86_400_000);
 
 function hold(
   status: string,
-  currentPickupBy: Date | null,
-  currentDueAt: Date | null
+  pickupBy: Date | null,
+  dueAt: Date | null
 ): DeadlineEntry {
   return {
     kind: "hold",
     item: {
       status,
-      currentPickupBy,
-      currentDueAt,
+      pickupBy,
+      dueAt,
       updatedAt: new Date(),
     },
   };
@@ -58,7 +58,7 @@ describe("OverdueBadge", () => {
   it("reads a request entry's dates off the line", () => {
     const entry: DeadlineEntry = {
       kind: "request",
-      item: { status: "checked_out" },
+      itemStatus: "checked_out",
       line: { pickupBy: null, dueAt: PAST, createdAt: new Date() },
     };
     expect(

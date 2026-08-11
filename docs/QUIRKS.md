@@ -628,6 +628,20 @@ Those two are different questions, not a contradiction: a listing decides what t
 
 `retiredOnly` is on `listAdminInventorySchema` only. It is deliberately absent from `listInventorySchema`, and `visibleStatuses` ignores it for a viewer who may not see retired, so a request has to defeat two independent things to reach a retired row.
 
+### `/my/items` has its own two projections
+
+`holdItemView` and `myRequestLineView` (`src/lib/inventory-visibility.ts`) are the third audience for `inventory_items`, beside `publicItemView` and `staffItemView`. They exist rather than reusing `publicItemView` because that one takes a `categories` argument fed by the correlated subquery in `buildInventoryScope`, which this path does not run, and `/my/items` renders neither categories nor a description.
+
+Three shapes, and the asymmetry is the point:
+
+- A **hold** carries `item: HoldItemView`, because only a hold has no request line and the item is genuinely the subject.
+- A **request** carries `itemName` and `itemStatus` flat, plus `line: MyRequestLineView`. It must not carry an item view: `publicItemView` renamed `current_pickup_by` to `pickupBy`, so an entry holding both the item's and the line's would carry two different `pickupBy` values under one name. A request's deadlines live on its line. `itemStatus` is still needed, and not only for the overdue badge: `/my/items` gates the Cancel button on it, which is what stops a requester cancelling an item a teammate has already collected.
+- **History** carries `itemName` only. The item's current status and dates describe whoever holds it now, which is not a closed line, so a returned item would otherwise render "Due tomorrow" against someone else's hold.
+
+Requester and holder are both listed when they differ, so a request entry is exactly what the requester sees while a teammate carries the thing. Both views type `status` as `ItemStatus` rather than `string`; `InventoryItemPublic` still says `string`, so `/inventory` and `/admin/inventory` still cast. Narrowing those is a loose end, along with `InventoryStatusBadge` declaring its own copy of the same six-string union.
+
+`reviewComment` is deliberately not on the line view. `closeRequestItemOnRelease` writes it and `closed_reason` from the same string ("the comment does double duty"), and `closed_reason` is the one the page renders, so the requester already sees the rejection reason.
+
 ### Hard delete is narrow
 
 `inventory_items.id` is referenced by `inventory_request_items` with `ON DELETE RESTRICT`. Hard delete works only when no historical request lines reference the item. `hardDeleteInventoryItemAs` pre-checks this and throws a friendly error instead of letting Postgres surface `23503`. Use retire for anything that has been requested.
@@ -667,7 +681,9 @@ The denial notification goes to the **requester**, read from the line by `closeR
 
 `getProjectImpl` (`src/server/_internal/projects-queries.ts`) returns the WHOLE project row through `stripPrivateFields(project, viewer)`, and that object is serialized into the public SSR loader payload of `/projects/$id` for any viewer, including anonymous ones. A new staff-only column does NOT stay private just because no component renders it: it rides the payload unless you null it for non-staff inside `stripPrivateFields` (`src/lib/project-visibility.ts`). Today `notes` and `proposer_email` are stripped there. Add any future sensitive column to that function and verify with a non-staff read before shipping.
 
-Inventory does **not** have this hazard, and the difference is worth knowing before you copy either pattern. `publicItemView` (`src/lib/inventory-visibility.ts`) names every field it returns, so a new column on `inventory_items` cannot ride the public payload by default. Projects returning the whole row and nulling fields is the reason this entry has to exist at all. Moving projects to the explicit shape is recorded in the README as a follow-up; it changes the public projects payload, so it is not a free refactor.
+Inventory answers this differently, and the difference is worth knowing before you copy either pattern. Its views name every field they return, so a new column on `inventory_items` cannot ride a payload by default. Projects returning the whole row and nulling fields is the reason this entry has to exist at all. Moving projects to the explicit shape is recorded in the README as a follow-up; it changes the public projects payload, so it is not a free refactor.
+
+**An earlier version of this entry said inventory "does not have this hazard", full stop, and that was false for as long as it stood.** A projection function guarantees only what passes through it, and there are three non-staff read paths for `inventory_items`, not two: `listMyItemsAs` called neither view. It selected whole table objects and spread the joined rows, so `/my/items` shipped `serial`, `notes`, `label` and `location` off the item, and `reviewedBy`, `reviewedAt`, `reviewComment`, `closedBy` and `closedAt` off the request line, to the student the row belonged to. The blast radius was the viewer's own items rather than anyone else's, which is why it read as a docs contradiction rather than an exposure, and it is also why nobody found it: this paragraph told them not to look. All three paths now go through the module, and `inventory.integration.test.ts` asserts the exact key set of both `/my/items` arms, because the type system cannot say "every read path must project" and the thing that broke was the `db.select()` above the projection, not the projection.
 
 ### Proposer linking is by email; `proposer_id` is canonical
 

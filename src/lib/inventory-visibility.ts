@@ -146,6 +146,57 @@ export type InventoryItemStaff = InventoryItemPublic & {
 };
 
 /**
+ * The `/my/items` views.
+ *
+ * A third read path for the same table. These exist rather than reusing
+ * `publicItemView` because that one requires a categories argument fed by a
+ * correlated subquery this path does not run, and `/my/items` renders neither
+ * categories nor a description.
+ *
+ * `status` is the enum here rather than `string`, so the page does not have to
+ * cast it back to a union it already had.
+ */
+export type HoldItemRow = Omit<InventoryItemRow, "status"> & {
+  status: ItemStatus;
+};
+
+export interface HoldItemView {
+  dueAt: Date | null;
+  id: string;
+  name: string;
+  pickupBy: Date | null;
+  status: ItemStatus;
+  updatedAt: Date;
+}
+
+/** Every column on a request line, so the narrowing below is visible. */
+export interface RequestLineRow {
+  closedAt: Date | null;
+  closedBy: string | null;
+  closedReason: string | null;
+  createdAt: Date;
+  dueAt: Date | null;
+  id: string;
+  itemId: string;
+  pickupBy: Date | null;
+  requestId: string;
+  reviewComment: string | null;
+  reviewedAt: Date | null;
+  reviewedBy: string | null;
+  status: string;
+  updatedAt: Date;
+}
+
+export interface MyRequestLineView {
+  closedReason: string | null;
+  createdAt: Date;
+  dueAt: Date | null;
+  id: string;
+  pickupBy: Date | null;
+  status: string;
+}
+
+/**
  * What anyone may see. Every field is named here, which is the property worth
  * keeping: adding a column to `inventory_items` cannot leak through this
  * payload, because nothing copies the row wholesale.
@@ -194,5 +245,40 @@ export function staffItemView(
     currentHolderProgram: row.currentHolderProgram,
     currentRequestItemId: row.currentRequestItemId,
     updatedAt: row.updatedAt,
+  };
+}
+
+/**
+ * What someone holding an item may see about it on their own page.
+ *
+ * `updatedAt` is here because it is the tie-break in `compareByDeadline`, not
+ * because the page renders it.
+ */
+export function holdItemView(row: HoldItemRow): HoldItemView {
+  return {
+    id: row.id,
+    name: row.name,
+    status: row.status,
+    pickupBy: row.currentPickupBy,
+    dueAt: row.currentDueAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/**
+ * What the requester may see about their own request line.
+ *
+ * The review columns stay behind. `reviewedBy` names the staff member who
+ * decided, and `reviewComment` is the same string as `closedReason`, which is
+ * the one the page renders.
+ */
+export function myRequestLineView(row: RequestLineRow): MyRequestLineView {
+  return {
+    id: row.id,
+    status: row.status,
+    pickupBy: row.pickupBy,
+    dueAt: row.dueAt,
+    createdAt: row.createdAt,
+    closedReason: row.closedReason,
   };
 }

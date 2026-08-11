@@ -1823,8 +1823,11 @@ describe("staff-assigned holds in my items", () => {
     const { active } = await listMyItemsAs(holder);
 
     expect(active).toHaveLength(1);
-    expect(active[0].kind).toBe("hold");
-    expect(active[0].item.id).toBe(item.id);
+    const only = active[0];
+    expect(only.kind).toBe("hold");
+    if (only.kind === "hold") {
+      expect(only.item.id).toBe(item.id);
+    }
   });
 
   it("does not leak another user's hold", async () => {
@@ -1947,8 +1950,11 @@ describe("staff-assigned holds in my items", () => {
     const { active } = await listMyItemsAs(holder);
 
     expect(active).toHaveLength(1);
-    expect(active[0].kind).toBe("hold");
-    expect(active[0].item.id).toBe(item.id);
+    const only = active[0];
+    expect(only.kind).toBe("hold");
+    if (only.kind === "hold") {
+      expect(only.item.id).toBe(item.id);
+    }
   });
 
   it("does not let a stale holder email override an explicit account assignment", async () => {
@@ -1975,6 +1981,72 @@ describe("staff-assigned holds in my items", () => {
 
     const { active } = await listMyItemsAs(holderB);
     expect(active).toHaveLength(0);
+  });
+});
+
+describe("my items payload names every field it returns", () => {
+  it("carries no column a consumer does not read, on either arm", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`shape-admin-${stamp}@x.com`, "admin");
+    const viewer = await makeUser(`shape-viewer-${stamp}@x.com`, "user");
+    const held = await makeItem({ name: "Held", notes: "Staff only note" });
+    const requested = await makeItem({ name: "Requested" });
+
+    await transitionItem(admin, {
+      itemId: held.id,
+      nextStatus: "checked_out",
+      holderId: viewer.id,
+      dueAt: new Date("2026-09-01T00:00:00.000Z"),
+    });
+    await addToCartAs(viewer, { itemId: requested.id });
+    await submitCartAs(viewer, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, requested.id));
+    await approveRequestItemAs(admin, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+
+    const { active } = await listMyItemsAs(viewer);
+
+    // The projections cannot widen on their own, because they name their
+    // fields. What broke before was a db.select() above them handing whole
+    // rows straight to the client, and an exact key set is what catches a
+    // fourth read path written the same way.
+    const hold = active.find((e) => e.kind === "hold");
+    expect(hold).toBeDefined();
+    if (hold?.kind === "hold") {
+      expect(Object.keys(hold.item).sort()).toEqual([
+        "dueAt",
+        "id",
+        "name",
+        "pickupBy",
+        "status",
+        "updatedAt",
+      ]);
+    }
+
+    const request = active.find((e) => e.kind === "request");
+    expect(request).toBeDefined();
+    if (request?.kind === "request") {
+      expect(Object.keys(request).sort()).toEqual([
+        "collectedBy",
+        "itemName",
+        "itemStatus",
+        "kind",
+        "line",
+      ]);
+      expect(Object.keys(request.line).sort()).toEqual([
+        "closedReason",
+        "createdAt",
+        "dueAt",
+        "id",
+        "pickupBy",
+        "status",
+      ]);
+    }
   });
 });
 
@@ -2036,12 +2108,11 @@ describe("active tab ordering (byDeadline)", () => {
     // first: the created_at DESC order the active list used before holds
     // existed. Under the old name tiebreak this would come back
     // alphabetically ("Apple Pending" before "Zebra Pending") instead.
-    expect(active.map((entry) => entry.item.name)).toEqual([
-      "Soon Hold",
-      "Later Request",
-      "Zebra Pending",
-      "Apple Pending",
-    ]);
+    expect(
+      active.map((entry) =>
+        entry.kind === "hold" ? entry.item.name : entry.itemName
+      )
+    ).toEqual(["Soon Hold", "Later Request", "Zebra Pending", "Apple Pending"]);
   });
 
   it("falls back to newest first when two entries share the same deadline", async () => {
@@ -2085,10 +2156,11 @@ describe("active tab ordering (byDeadline)", () => {
     // Equal deadlines: falls back to recency, newest first. Under the old
     // name tiebreak this would come back alphabetically ("Ant Match" before
     // "Yak Match") instead.
-    expect(active.map((entry) => entry.item.name)).toEqual([
-      "Yak Match",
-      "Ant Match",
-    ]);
+    expect(
+      active.map((entry) =>
+        entry.kind === "hold" ? entry.item.name : entry.itemName
+      )
+    ).toEqual(["Yak Match", "Ant Match"]);
   });
 });
 
@@ -2165,15 +2237,13 @@ describe("a teammate collects a requested item", () => {
 
     const requesterView = await listMyItemsAs(requester);
     const requesterEntries = requesterView.active.filter(
-      (e) => e.item.id === item.id
+      (e) => e.kind === "request"
     );
     expect(requesterEntries).toHaveLength(1);
     expect(requesterEntries[0].kind).toBe("request");
 
     const pickerView = await listMyItemsAs(picker);
-    const pickerEntries = pickerView.active.filter(
-      (e) => e.item.id === item.id
-    );
+    const pickerEntries = pickerView.active.filter((e) => e.kind === "hold");
     expect(pickerEntries).toHaveLength(1);
     expect(pickerEntries[0].kind).toBe("hold");
   });
@@ -2793,7 +2863,7 @@ describe("listMyItemsAs collectedBy gate", () => {
     });
 
     const { active } = await listMyItemsAs(requester);
-    const entry = active.find((e) => e.item.id === item.id);
+    const entry = active.find((e) => e.kind === "request");
     expect(entry?.kind).toBe("request");
     if (entry?.kind === "request") {
       expect(entry.collectedBy).toBeNull();
@@ -2825,7 +2895,7 @@ describe("listMyItemsAs collectedBy gate", () => {
     });
 
     const { active } = await listMyItemsAs(requester);
-    const entry = active.find((e) => e.item.id === item.id);
+    const entry = active.find((e) => e.kind === "request");
     expect(entry?.kind).toBe("request");
     if (entry?.kind === "request") {
       expect(entry.collectedBy?.email).toBe("gate-picker-2@x.com");

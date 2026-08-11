@@ -144,23 +144,17 @@ function MyItems() {
                 >
                   <div>
                     <p className="font-medium">{entry.item.name}</p>
-                    <InventoryStatusBadge
-                      status={entry.item.status as "available"}
-                    />
+                    <InventoryStatusBadge status={entry.item.status} />
                     <OverdueBadge entry={entry} />
-                    {entry.item.currentPickupBy && (
+                    {entry.item.pickupBy && (
                       <p className="text-muted-foreground text-xs">
                         Pick up by{" "}
-                        <LocalTime
-                          dateOnly
-                          value={entry.item.currentPickupBy}
-                        />
+                        <LocalTime dateOnly value={entry.item.pickupBy} />
                       </p>
                     )}
-                    {entry.item.currentDueAt && (
+                    {entry.item.dueAt && (
                       <p className="text-muted-foreground text-xs">
-                        Due{" "}
-                        <LocalTime dateOnly value={entry.item.currentDueAt} />
+                        Due <LocalTime dateOnly value={entry.item.dueAt} />
                       </p>
                     )}
                     <p className="text-muted-foreground text-xs">
@@ -171,18 +165,18 @@ function MyItems() {
               );
             }
 
-            const { line, item } = entry;
+            const { line, itemName, itemStatus } = entry;
             const canCancel =
               (line.status === "pending" || line.status === "approved") &&
-              item.status !== "checked_out";
+              itemStatus !== "checked_out";
             return (
               <div
                 className="flex items-center justify-between rounded-md border border-border bg-card p-3"
                 key={line.id}
               >
                 <div>
-                  <p className="font-medium">{item.name}</p>
-                  <InventoryStatusBadge status={item.status as "available"} />
+                  <p className="font-medium">{itemName}</p>
+                  <InventoryStatusBadge status={itemStatus} />
                   <OverdueBadge entry={entry} />
                   {line.pickupBy && (
                     <p className="text-muted-foreground text-xs">
@@ -226,12 +220,12 @@ function MyItems() {
           {data.history.length === 0 && (
             <EmptyState>No history yet.</EmptyState>
           )}
-          {data.history.map(({ line, item, collectedBy }) => (
+          {data.history.map(({ line, itemName, collectedBy }) => (
             <div
               className="rounded-md border border-border bg-card p-3"
               key={line.id}
             >
-              <p className="font-medium">{item.name}</p>
+              <p className="font-medium">{itemName}</p>
               <p className="text-muted-foreground text-xs">
                 Status: {line.status}
               </p>
