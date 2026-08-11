@@ -207,13 +207,95 @@ export async function updateProjectAs(
 
 function assertChangesRequestedHasComment(
   target: Status,
-  comment?: string
+  comment: string | null
 ): void {
   if (target === "changes_requested" && !comment?.trim()) {
     throw new Error(
       "A comment describing the requested changes is required so the proposer knows what to change."
     );
   }
+}
+
+/**
+ * Everything a status transition does once someone is allowed to make it.
+ *
+ * The two public transitions differ only in who may act and which targets are
+ * reachable. Both gates sit above this and neither is repeated here.
+ *
+ * The ordering below is why this is a function rather than a comment:
+ * notifications belong to the transaction, and the two remote calls must not
+ * be in it.
+ *
+ * Takes `actorId` rather than a viewer on purpose. Authorization is settled
+ * before this runs, so there is no role left for it to consult.
+ */
+async function commitTransition(
+  actorId: string,
+  project: typeof projects.$inferSelect,
+  target: Status,
+  comment: string | null,
+  opts?: TransitionOptions
+): Promise<{ id: string; status: Status }> {
+  assertChangesRequestedHasComment(target, comment);
+
+  await db.transaction(async (tx) => {
+    const updates: Record<string, unknown> = {
+      status: target,
+      updatedAt: new Date(),
+    };
+    if (target === "published" && !project.publishedAt) {
+      updates.publishedAt = new Date();
+    }
+    if (target === "archived") {
+      updates.archivedAt = new Date();
+    }
+    await tx.update(projects).set(updates).where(eq(projects.id, project.id));
+
+    await tx.insert(projectStatusHistory).values({
+      projectId: project.id,
+      oldStatus: project.status,
+      newStatus: target,
+      changedBy: actorId,
+      comment,
+    });
+
+    await recordStatusChangeNotifications(
+      tx,
+      { id: project.id, title: project.title, proposerId: project.proposerId },
+      target,
+      actorId,
+      comment
+    );
+  });
+
+  // After the transaction, never inside it: a Bedrock call must not hold a
+  // database transaction open, and its failure must not roll back the publish.
+  //
+  // Inside the transaction this would not even fail loudly.
+  // refreshProjectEmbedding re-reads the row and returns "skipped" unless the
+  // status is already published, so getting the order wrong gives you a
+  // project that publishes and never embeds.
+  if (target === "published") {
+    await refreshProjectEmbedding(project.id, opts?.embed);
+  }
+
+  // Same reasoning, and it matters more here: a failed email must not undo an
+  // approval. notifyTransitionByEmail swallows its own errors.
+  await notifyTransitionByEmail(
+    {
+      description: project.description,
+      id: project.id,
+      proposerEmail: project.proposerEmail,
+      proposerId: project.proposerId,
+      title: project.title,
+    },
+    target,
+    comment,
+    opts?.sendEmail ?? true,
+    opts?.send
+  );
+
+  return { id: project.id, status: target };
 }
 
 export async function performTransitionAs(
@@ -230,61 +312,7 @@ export async function performTransitionAs(
   }
   const role: ActorRole = isStaff(visibility) ? "staff" : "owner";
   assertTransitionAllowed(project.status as Status, target, role);
-  assertChangesRequestedHasComment(target, comment);
-
-  await db.transaction(async (tx) => {
-    const updates: Record<string, unknown> = {
-      status: target,
-      updatedAt: new Date(),
-    };
-    if (target === "published" && !project.publishedAt) {
-      updates.publishedAt = new Date();
-    }
-    if (target === "archived") {
-      updates.archivedAt = new Date();
-    }
-    await tx.update(projects).set(updates).where(eq(projects.id, id));
-
-    await tx.insert(projectStatusHistory).values({
-      projectId: id,
-      oldStatus: project.status,
-      newStatus: target,
-      changedBy: viewer.id,
-      comment: comment ?? null,
-    });
-
-    await recordStatusChangeNotifications(
-      tx,
-      { id: project.id, title: project.title, proposerId: project.proposerId },
-      target,
-      viewer.id,
-      comment
-    );
-  });
-
-  // After the transaction, never inside it: a Bedrock call must not hold a
-  // database transaction open, and its failure must not roll back the publish.
-  if (target === "published") {
-    await refreshProjectEmbedding(id, opts?.embed);
-  }
-
-  // Same reasoning, and it matters more here: a failed email must not undo an
-  // approval. notifyTransitionByEmail swallows its own errors.
-  await notifyTransitionByEmail(
-    {
-      description: project.description,
-      id: project.id,
-      proposerEmail: project.proposerEmail,
-      proposerId: project.proposerId,
-      title: project.title,
-    },
-    target,
-    comment ?? null,
-    opts?.sendEmail ?? true,
-    opts?.send
-  );
-
-  return { id, status: target };
+  return commitTransition(viewer.id, project, target, comment ?? null, opts);
 }
 
 export async function softDeleteProjectAs(
@@ -376,61 +404,7 @@ export async function forceTransitionAs(
   if (project.status === target) {
     throw new Error("Project is already in that status.");
   }
-  assertChangesRequestedHasComment(target, comment);
-
-  await db.transaction(async (tx) => {
-    const updates: Record<string, unknown> = {
-      status: target,
-      updatedAt: new Date(),
-    };
-    if (target === "published" && !project.publishedAt) {
-      updates.publishedAt = new Date();
-    }
-    if (target === "archived") {
-      updates.archivedAt = new Date();
-    }
-    await tx.update(projects).set(updates).where(eq(projects.id, id));
-
-    await tx.insert(projectStatusHistory).values({
-      projectId: id,
-      oldStatus: project.status,
-      newStatus: target,
-      changedBy: viewer.id,
-      comment: comment ?? null,
-    });
-
-    await recordStatusChangeNotifications(
-      tx,
-      { id: project.id, title: project.title, proposerId: project.proposerId },
-      target,
-      viewer.id,
-      comment
-    );
-  });
-
-  // After the transaction, never inside it: a Bedrock call must not hold a
-  // database transaction open, and its failure must not roll back the publish.
-  if (target === "published") {
-    await refreshProjectEmbedding(id, opts?.embed);
-  }
-
-  // Same reasoning, and it matters more here: a failed email must not undo an
-  // approval. notifyTransitionByEmail swallows its own errors.
-  await notifyTransitionByEmail(
-    {
-      description: project.description,
-      id: project.id,
-      proposerEmail: project.proposerEmail,
-      proposerId: project.proposerId,
-      title: project.title,
-    },
-    target,
-    comment ?? null,
-    opts?.sendEmail ?? true,
-    opts?.send
-  );
-
-  return { id, status: target };
+  return commitTransition(viewer.id, project, target, comment ?? null, opts);
 }
 
 // Convenience wrappers that resolve the current user from the request
