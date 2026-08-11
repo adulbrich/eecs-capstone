@@ -53,7 +53,7 @@ function EditProject() {
   if (!project) {
     return null;
   }
-  const projectId = project.id as string;
+  const projectId = project.id;
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
       <h1 className="font-semibold text-2xl">Edit project</h1>
@@ -61,21 +61,21 @@ function EditProject() {
         <ProjectForm
           enableAiReview
           initial={{
-            title: project.title as string,
-            description: (project.description as string) ?? "",
-            problemStatement: (project.problemStatement as string) ?? "",
-            objectives: (project.objectives as string) ?? "",
-            minQualifications: (project.minQualifications as string) ?? "",
-            prefQualifications: (project.prefQualifications as string) ?? "",
-            url: (project.url as string) ?? "",
-            contactEmail: (project.contactEmail as string) ?? "",
-            contactName: (project.contactName as string) ?? "",
-            imageUrl: (project.imageUrl as string) ?? "",
-            licenseRestrictions: (project.licenseRestrictions as string) ?? "",
-            programId: (project.programId as string) ?? "",
-            notes: (project.notes as string) ?? "",
+            title: project.title,
+            description: project.description ?? "",
+            problemStatement: project.problemStatement ?? "",
+            objectives: project.objectives ?? "",
+            minQualifications: project.minQualifications ?? "",
+            prefQualifications: project.prefQualifications ?? "",
+            url: project.url ?? "",
+            contactEmail: project.contactEmail ?? "",
+            contactName: project.contactName ?? "",
+            imageUrl: project.imageUrl ?? "",
+            licenseRestrictions: project.licenseRestrictions ?? "",
+            programId: project.programId ?? "",
+            notes: project.notes ?? "",
             proposerEmail: proposer.email,
-            teamsSupported: (project.teamsSupported as number) ?? 1,
+            teamsSupported: project.teamsSupported ?? 1,
           }}
           initialCategoryIds={categoryIds}
           onSubmit={async (values, nextCategoryIds, pendingImage) => {

@@ -115,15 +115,15 @@ function ProjectDetail() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 md:p-8">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="font-semibold text-2xl">{project.title as string}</h1>
-        <StatusBadge status={project.status as string} />
+        <h1 className="font-semibold text-2xl">{project.title}</h1>
+        <StatusBadge status={project.status} />
       </div>
       <div className="mt-3 flex items-center gap-2">
-        <BookmarkButton projectId={project.id as string} />
+        <BookmarkButton projectId={project.id} />
         {canEdit && (
           <Button asChild size="sm" variant="outline">
             <Link
-              params={{ projectId: project.id as string }}
+              params={{ projectId: project.id }}
               to="/projects/$projectId/edit"
             >
               Edit
@@ -138,8 +138,8 @@ function ProjectDetail() {
             void router.invalidate();
           }}
           project={{
-            id: project.id as string,
-            status: project.status as string,
+            id: project.id,
+            status: project.status,
           }}
         />
       )}
@@ -156,49 +156,49 @@ function ProjectDetail() {
         <img
           alt=""
           className="aspect-[16/9] w-full object-cover"
-          src={projectImageSrc(project.imageUrl as string | null)}
+          src={projectImageSrc(project.imageUrl)}
         />
       </div>
 
       <Section
-        body={project.description as string | null}
+        body={project.description}
         label="Description"
       />
       <Section
-        body={project.problemStatement as string | null}
+        body={project.problemStatement}
         label="Problem statement"
       />
-      <Section body={project.objectives as string | null} label="Objectives" />
+      <Section body={project.objectives} label="Objectives" />
       <Section
-        body={project.minQualifications as string | null}
+        body={project.minQualifications}
         label="Minimum qualifications"
       />
       <Section
-        body={project.prefQualifications as string | null}
+        body={project.prefQualifications}
         label="Preferred qualifications"
       />
       <ContactSection
-        email={project.contactEmail as string | null}
-        name={project.contactName as string | null}
+        email={project.contactEmail}
+        name={project.contactName}
       />
       <Section
-        body={project.licenseRestrictions as string | null}
+        body={project.licenseRestrictions}
         label="License / IP"
       />
-      <UrlSection url={project.url as string | null} />
+      <UrlSection url={project.url} />
 
       {(viewerIsStaff || viewerIsOwner) && (
         <ProjectPrivatePanel
           canEdit={canEdit}
           comments={comments}
           history={history}
-          notes={(project.notes as string | null) ?? null}
+          notes={project.notes}
           onCommentsChanged={() => {
             void refreshComments();
             void router.invalidate();
           }}
-          projectId={project.id as string}
-          teamsSupported={(project.teamsSupported as number) ?? 1}
+          projectId={project.id}
+          teamsSupported={project.teamsSupported}
           viewerIsStaff={viewerIsStaff}
         />
       )}
@@ -209,9 +209,9 @@ function ProjectDetail() {
             void router.invalidate();
           }}
           project={{
-            id: project.id as string,
-            status: project.status as string,
-            deletedAt: (project.deletedAt as Date | null) ?? null,
+            id: project.id,
+            status: project.status,
+            deletedAt: project.deletedAt,
           }}
         />
       )}
