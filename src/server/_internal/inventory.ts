@@ -1024,11 +1024,20 @@ export async function listMyItemsAs(viewer: Viewer) {
   if (!viewer) {
     throw new Error("Sign in required");
   }
-  // Notifications are a side-effect; never let them block the read.
+  // Notifications are a side-effect; never let them block the read. There is
+  // no cron (see QUIRKS), so this read is genuinely the trigger, and a failure
+  // here must not 500 the page.
+  //
+  // It is reported rather than discarded. A bare `catch {}` here meant that if
+  // this stopped working, every overdue notification stopped with it and
+  // nobody found out, because the page carried on looking fine.
   try {
     await recordOverdueNotificationsAs(viewer, { ownerId: viewer.id });
-  } catch {
-    // swallow; degraded notification recording must not 500 the page.
+  } catch (error) {
+    console.error(
+      `Overdue notification recording failed for user ${viewer.id}`,
+      error
+    );
   }
   // Only a verified address may claim a hold: otherwise anyone could take
   // someone else's item by editing their own email in the profile form.
