@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { z } from "zod";
@@ -10,11 +9,7 @@ import { authClient } from "#/lib/auth-client";
 import { useHasMounted } from "#/lib/use-has-mounted";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
 import type { ViewMode } from "#/lib/view-preference";
-import {
-  addToCart,
-  listInventory,
-  listInventoryCategories,
-} from "#/server/inventory";
+import { listInventory, listInventoryCategories } from "#/server/inventory";
 
 type PublicStatus =
   | "available"
@@ -71,7 +66,6 @@ function InventoryIndex() {
     [navigate]
   );
   useSeedViewFromStorage(search.view, seedView);
-  const qc = useQueryClient();
   const { data: session } = authClient.useSession();
   const hasMounted = useHasMounted();
   const data = Route.useLoaderData();
@@ -80,11 +74,6 @@ function InventoryIndex() {
   // Gated on mount so the server's signed-out render and the client's first
   // render agree; see useHasMounted.
   const signedIn = hasMounted && !!session?.user;
-  async function addItem(itemId: string) {
-    await addToCart({ data: { itemId } });
-    await qc.invalidateQueries();
-  }
-
   return (
     <div className="px-4 py-6 md:p-8">
       <div className="mx-auto max-w-4xl">
@@ -122,7 +111,6 @@ function InventoryIndex() {
                 <InventoryRow
                   item={{ ...it, status: it.status as PublicStatus }}
                   key={it.id}
-                  onAddToCart={addItem}
                   signedIn={signedIn}
                 />
               ))}
@@ -135,7 +123,6 @@ function InventoryIndex() {
               <InventoryCard
                 item={{ ...it, status: it.status as PublicStatus }}
                 key={it.id}
-                onAddToCart={addItem}
                 signedIn={signedIn}
               />
             ))}

@@ -675,7 +675,7 @@ async function main() {
         "https://images.unsplash.com/photo-1622979135225-d2ba269cf1ac?auto=format&fit=crop&w=1200&q=60",
       status: "checked_out",
       currentHolderId: u.student.id,
-      currentHolderLabel: "Dev User (CS 462 — VR Safety team)",
+      currentHolderEmail: u.student.email,
     },
     {
       name: "HTC Vive Pro 2 Kit",
@@ -732,7 +732,7 @@ async function main() {
         "https://images.unsplash.com/photo-1527430253228-e93688616381?auto=format&fit=crop&w=1200&q=60",
       status: "reserved",
       currentHolderId: u.studentJordan.id,
-      currentHolderLabel: "Jordan Lee (CS 461 — AMR Fleet team)",
+      currentHolderEmail: u.studentJordan.email,
     },
     {
       name: "Google Coral USB Accelerator",
@@ -775,7 +775,7 @@ async function main() {
         "https://images.unsplash.com/photo-1587826080692-f439cd0b70da?auto=format&fit=crop&w=1200&q=60",
       status: "checked_out",
       currentHolderId: u.studentSam.id,
-      currentHolderLabel: "Sam Rivera (CS 462 — Wildlife Classifier team)",
+      currentHolderEmail: u.studentSam.email,
     },
   ];
 

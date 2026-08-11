@@ -516,9 +516,15 @@ export function InventoryLifecyclePanel({ item, history }: Props) {
           )}
           <div>
             <Label htmlFor="override-status">Change status to...</Label>
+            {/* `overrideStatus` straight through, never `|| undefined`.
+                Radix's shouldShowPlaceholder is `value === "" || value ===
+                undefined`, so the empty string still shows "Pick a status"
+                while keeping the Select controlled for its whole lifetime.
+                Passing undefined made it uncontrolled until the first pick,
+                which React warns about on every status change. */}
             <Select
               onValueChange={(v) => void onOverrideChange(v)}
-              value={overrideStatus || undefined}
+              value={overrideStatus}
             >
               <SelectTrigger
                 className="mt-1 w-48"

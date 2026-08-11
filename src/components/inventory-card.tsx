@@ -1,9 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { getPublicUrl } from "#/lib/storage";
+import { AddToCartButton } from "./add-to-cart-button";
 import { CategoryChip } from "./category-chip";
 import { ImageOrFallback } from "./image-or-fallback";
 import { InventoryStatusBadge } from "./inventory-status-badge";
-import { Button } from "./ui/button";
 
 interface Props {
   item: {
@@ -19,13 +19,12 @@ interface Props {
       | "checked_out"
       | "maintenance";
   };
-  onAddToCart?: (itemId: string) => void;
   signedIn: boolean;
 }
 
-export function InventoryCard({ item, signedIn, onAddToCart }: Props) {
+export function InventoryCard({ item, signedIn }: Props) {
   const src = getPublicUrl(item.imageUrl);
-  const canAdd = signedIn && item.status === "available" && !!onAddToCart;
+  const canAdd = signedIn && item.status === "available";
   return (
     <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary">
       <Link
@@ -57,14 +56,7 @@ export function InventoryCard({ item, signedIn, onAddToCart }: Props) {
       </Link>
       {canAdd && (
         <div className="p-4 pt-0">
-          <Button
-            className="w-full"
-            onClick={() => onAddToCart?.(item.id)}
-            size="sm"
-            variant="outline"
-          >
-            Add to cart
-          </Button>
+          <AddToCartButton className="w-full" itemId={item.id} />
         </div>
       )}
     </div>

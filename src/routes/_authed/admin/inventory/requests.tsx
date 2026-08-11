@@ -1,4 +1,5 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 import { z } from "zod";
 import { AdminRequestQueueRow } from "#/components/admin-request-queue-row";
 import { EmptyState } from "#/components/empty-state";
@@ -16,6 +17,15 @@ import { pageTitle } from "#/lib/page-title";
 import { listInventoryRequests } from "#/server/inventory";
 
 const searchSchema = z.object({
+  /**
+   * A request line to bring into view, linked from the Request column on
+   * `/admin/inventory`. Not in `loaderDeps`: it changes which line is
+   * highlighted, never which rows are fetched, so it must not refetch.
+   *
+   * `.catch(null)` so a stale link to a line that no longer exists degrades to
+   * the plain queue rather than a 500.
+   */
+  line: z.string().uuid().nullable().catch(null).default(null),
   tab: z.enum(["pending", "all"]).default("pending"),
 });
 
@@ -39,7 +49,15 @@ export const Route = createFileRoute("/_authed/admin/inventory/requests")({
 
 function AdminRequestQueue() {
   const batches = Route.useLoaderData();
-  const { tab } = Route.useSearch();
+  const { line, tab } = Route.useSearch();
+  const highlighted = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // Scrolls once the linked line has rendered. A queue can run to many
+    // batches, so landing on the page without this leaves staff hunting for
+    // the very row the link named.
+    highlighted.current?.scrollIntoView({ block: "center" });
+  }, []);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
@@ -108,19 +126,32 @@ function AdminRequestQueue() {
               )}
             </header>
             <div className="space-y-2">
-              {batch.lines.map((row) => (
-                <AdminRequestQueueRow
-                  collectedBy={row.collectedBy}
-                  item={{
-                    id: row.item.id,
-                    name: row.item.name,
-                    status: row.item.status,
-                  }}
-                  key={row.line.id}
-                  line={{ id: row.line.id, status: row.line.status }}
-                  requesterEmail={batch.requester.email}
-                />
-              ))}
+              {batch.lines.map((row) => {
+                const isLinked = row.line.id === line;
+                return (
+                  <div
+                    // The documented highlight token, not a colour of its own.
+                    className={
+                      isLinked
+                        ? "rounded-md bg-[var(--brand-primary-tint)] p-2"
+                        : undefined
+                    }
+                    key={row.line.id}
+                    ref={isLinked ? highlighted : undefined}
+                  >
+                    <AdminRequestQueueRow
+                      collectedBy={row.collectedBy}
+                      item={{
+                        id: row.item.id,
+                        name: row.item.name,
+                        status: row.item.status,
+                      }}
+                      line={{ id: row.line.id, status: row.line.status }}
+                      requesterEmail={batch.requester.email}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </section>
         ))}
