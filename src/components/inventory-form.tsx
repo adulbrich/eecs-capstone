@@ -152,6 +152,7 @@ export function InventoryForm({
               onChange={(ids) => field.handleChange(ids)}
               value={field.state.value as string[]}
             />
+            <FieldErrors errors={field.state.meta.errors} />
           </div>
         )}
       </form.Field>
@@ -174,6 +175,7 @@ export function InventoryForm({
               Cropped to 1:1 and resized to max 1200x1200. Saved when you submit
               the form.
             </p>
+            <FieldErrors errors={field.state.meta.errors} />
           </div>
         )}
       </form.Field>

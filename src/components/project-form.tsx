@@ -345,6 +345,7 @@ export function ProjectForm({
               Cropped to 16:9 and resized to max 1600x900. Saved when you submit
               the form.
             </p>
+            <FieldErrors errors={field.state.meta.errors} />
           </div>
         )}
       </form.Field>
@@ -366,6 +367,7 @@ export function ProjectForm({
               onChange={(v) => field.handleChange(v)}
               value={field.state.value as string}
             />
+            <FieldErrors errors={field.state.meta.errors} />
           </div>
         )}
       </form.Field>
@@ -392,6 +394,7 @@ export function ProjectForm({
               type="number"
               value={field.state.value as number}
             />
+            <FieldErrors errors={field.state.meta.errors} />
           </div>
         )}
       </form.Field>
@@ -426,12 +429,15 @@ export function ProjectForm({
             {showProposer && (
               <form.Field name="proposerEmail">
                 {(field: AnyForm) => (
-                  <ProposerPicker
-                    accountLinked={proposer?.accountLinked ?? false}
-                    accountName={proposer?.accountName ?? null}
-                    onChange={(email) => field.handleChange(email)}
-                    value={field.state.value as string}
-                  />
+                  <div>
+                    <ProposerPicker
+                      accountLinked={proposer?.accountLinked ?? false}
+                      accountName={proposer?.accountName ?? null}
+                      onChange={(email) => field.handleChange(email)}
+                      value={field.state.value as string}
+                    />
+                    <FieldErrors errors={field.state.meta.errors} />
+                  </div>
                 )}
               </form.Field>
             )}
