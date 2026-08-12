@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { z } from "zod";
 import {
   type AdminColumn,
@@ -31,6 +31,7 @@ import {
   type SortState,
   useAdminTableState,
 } from "#/lib/table-state";
+import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import {
   exportMentors,
   listMentors,
@@ -191,7 +192,6 @@ function MentorsAdmin() {
   const search = Route.useSearch();
   const { q } = search;
   const navigate = useNavigate({ from: "/admin/mentors/" });
-  const [qDraft, setQDraft] = useState(q);
   // Populated by AdminDataTable's onSortedIdsChange every time the table's
   // own sorted row order changes. A ref, not state: the export only reads it
   // at click time, so there is no reason to re-render this component (or
@@ -201,16 +201,13 @@ function MentorsAdmin() {
     sortedIdsRef.current = ids;
   }, []);
 
-  useEffect(() => setQDraft(q), [q]);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (qDraft !== q) {
-        void navigate({ search: (prev) => ({ ...prev, q: qDraft }) });
-      }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [qDraft, q, navigate]);
+  const commitQuery = useCallback(
+    (next: string) => {
+      void navigate({ search: (prev) => ({ ...prev, q: next }) });
+    },
+    [navigate]
+  );
+  const [qDraft, setQDraft] = useDebouncedDraft(q, commitQuery);
 
   const setSearch = useCallback(
     (patch: AdminTableSearch) =>

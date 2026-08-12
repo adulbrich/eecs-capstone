@@ -42,6 +42,7 @@ import {
   type SortState,
   useAdminTableState,
 } from "#/lib/table-state";
+import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import { listPrograms } from "#/server/programs";
 import {
   exportAdminProjects,
@@ -383,16 +384,13 @@ function AdminProjects() {
   // Debounced URL sync, matching the public listing's filter bar: the input is
   // local so typing stays responsive, and the URL (and therefore the loader)
   // catches up once the user pauses.
-  const [queryDraft, setQueryDraft] = useState(q);
-  useEffect(() => setQueryDraft(q), [q]);
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (queryDraft !== q) {
-        void navigate({ search: (prev) => ({ ...prev, q: queryDraft }) });
-      }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [queryDraft, q, navigate]);
+  const commitQuery = useCallback(
+    (next: string) => {
+      void navigate({ search: (prev) => ({ ...prev, q: next }) });
+    },
+    [navigate]
+  );
+  const [queryDraft, setQueryDraft] = useDebouncedDraft(q, commitQuery);
 
   const setSearch = useCallback(
     (patch: AdminTableSearch) =>
