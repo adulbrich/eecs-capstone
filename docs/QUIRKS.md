@@ -126,24 +126,26 @@ Convention adopted in Spec 2: each project has ONE URL (`/projects/$id`), and st
 
 ## TanStack Form
 
-### Zod adapter does not accept schemas directly in `validators.onSubmit`
-
-In the installed version, passing a Zod schema directly to `validators.onSubmit` fails type-checking. The workaround:
+### Pass the schema to `validators.onSubmit` directly; `.default()` is what breaks it
 
 ```ts
 validators: {
-  onSubmit: ({ value }) => {
-    const result = projectFormSchema.safeParse(value);
-    if (result.success) return undefined;
-    const fields: Record<string, string> = {};
-    for (const issue of result.error.issues) {
-      const key = issue.path.join(".");
-      if (key && !fields[key]) fields[key] = issue.message;
-    }
-    return { fields };
-  },
+  onSubmit: projectFormSchema,
 },
 ```
+
+`@tanstack/react-form` types the validator as `FormValidateFn<T> | StandardSchemaV1<T, unknown>`, and Zod 4 schemas declare `"~standard"`, so they are Standard Schemas. `@tanstack/zod-form-adapter` is not installed and is not the mechanism.
+
+**When this fails to type-check, the cause is almost certainly `.default()`, not the adapter.** `FormValidateOrFn<TFormData>` requires `StandardSchemaV1<TFormData, unknown>`, so the schema's INPUT type must equal the form's data type. A `.default("")` makes that field optional on input and never on output, so input stops matching and the assignment fails. The compiler names the offending field:
+
+```
+The types of 'input.description' are incompatible between these types.
+  Type 'string | undefined' is not assignable to type 'string'.
+```
+
+Neither form schema carries defaults now, and neither needs them: `defaultValues` supplies every field (`initial?.x ?? ""`) and is annotated `satisfies XFormValues`. `z.infer` reads the OUTPUT type, so removing them changed `ProjectFormValues` and `InventoryFormValues` not at all.
+
+**This entry used to say the opposite**, and it was true when written: passing a schema directly did fail, and the entry told you to hand-roll a `safeParse` loop. Both forms carried that loop, sixteen identical lines each, until an architecture review proposed extracting it into a shared helper and checking found the constraint had gone. If you hit a typing error here, check your input type before you write the loop again.
 
 ### `useForm` generics are unstable; we use a localized `any` for the `Field` helper
 
@@ -151,18 +153,13 @@ validators: {
 
 ### `field.state.meta.errors` is a heterogeneous array
 
-Entries can be strings or `{ message }` objects depending on which validator produced them. Render them with a small coercer:
+Entries can be strings or `{ message }` objects depending on which validator produced them, and since the forms pass a Standard Schema the object shape is now the common path rather than the unusual one. `FieldErrors` (`src/components/field-errors.tsx`) is the one place that knows this; render field errors through it rather than inline:
 
 ```tsx
-{field.state.meta.errors.length > 0 && (
-  <p>{field.state.meta.errors
-    .map((e: unknown) =>
-      typeof e === "string" ? e : (e as { message?: string })?.message ?? String(e),
-    )
-    .join(", ")}
-  </p>
-)}
+<FieldErrors errors={field.state.meta.errors} />
 ```
+
+**Every `form.Field` render prop needs this, and six of them did not have it.** The coercer used to be inline inside each form's shared `Field` helper, so any field rendered through a raw `form.Field` (`imageUrl`, `programId`, `teamsSupported`, `proposerEmail`, `categoryIds`) displayed nothing at all. What that cost: type a malformed address into the proposer field, click Save, and validation failed, `canSubmit` flipped false so the button greyed out, and no message appeared anywhere, because `formError` only ever carries server errors. A disabled button and silence.
 
 ### Server errors via `applyServerErrors`
 
