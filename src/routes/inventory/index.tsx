@@ -66,6 +66,15 @@ function InventoryIndex() {
     [navigate]
   );
   useSeedViewFromStorage(search.view, seedView);
+  // Stable, because useDebouncedDraft inside the filter bar keys its timer on
+  // this callback: an inline arrow would re-arm the debounce on every render
+  // of this page rather than on every keystroke.
+  const onQChange = useCallback(
+    (q: string) => {
+      navigate({ search: (s) => ({ ...s, q, page: 1 }) });
+    },
+    [navigate]
+  );
   const { data: session } = authClient.useSession();
   const hasMounted = useHasMounted();
   const data = Route.useLoaderData();
@@ -84,9 +93,7 @@ function InventoryIndex() {
             onCategoriesChange={(categories) =>
               navigate({ search: (s) => ({ ...s, categories, page: 1 }) })
             }
-            onQChange={(q) =>
-              navigate({ search: (s) => ({ ...s, q, page: 1 }) })
-            }
+            onQChange={onQChange}
             onStatusChange={(status) =>
               navigate({ search: (s) => ({ ...s, status, page: 1 }) })
             }
