@@ -14,6 +14,7 @@ import type {
 import { reviewProject } from "#/server/project-review";
 import type { ProposerForEdit } from "#/server/projects-queries";
 import { CategoryMultiSelect } from "./category-multi-select";
+import { FieldErrors } from "./field-errors";
 import { MarkdownField } from "./markdown-field";
 import { Panel, PanelHeader, PanelNote } from "./panel";
 import { ProgramSelect } from "./program-select";
@@ -25,34 +26,41 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
-const optionalUrl = z
-  .union([z.literal(""), z.string().url("Must be a valid URL").max(500)])
-  .default("");
+const optionalUrl = z.union([
+  z.literal(""),
+  z.string().url("Must be a valid URL").max(500),
+]);
 
-const optionalEmail = z
-  .union([z.literal(""), z.string().email("Must be a valid email").max(200)])
-  .default("");
+const optionalEmail = z.union([
+  z.literal(""),
+  z.string().email("Must be a valid email").max(200),
+]);
 
-const optionalUuid = z
-  .union([z.literal(""), z.string().uuid("Must be a UUID")])
-  .default("");
+const optionalUuid = z.union([
+  z.literal(""),
+  z.string().uuid("Must be a UUID"),
+]);
 
+// No `.default()` anywhere on purpose. A default makes that field optional on
+// the schema's INPUT type, and `validators.onSubmit` requires a Standard Schema
+// whose input equals the form's data type, so one default blocks passing the
+// schema directly. `defaultValues` below supplies every field regardless.
 export const projectFormSchema = z.object({
   title: z.string().min(1, "Title is required").max(200),
-  description: z.string().max(5000).default(""),
-  problemStatement: z.string().max(5000).default(""),
-  objectives: z.string().max(5000).default(""),
-  minQualifications: z.string().max(2000).default(""),
-  prefQualifications: z.string().max(2000).default(""),
+  description: z.string().max(5000),
+  problemStatement: z.string().max(5000),
+  objectives: z.string().max(5000),
+  minQualifications: z.string().max(2000),
+  prefQualifications: z.string().max(2000),
   url: optionalUrl,
   contactEmail: optionalEmail,
-  contactName: z.string().max(200).default(""),
-  imageUrl: z.union([z.literal(""), z.string().max(500)]).default(""),
-  licenseRestrictions: z.string().max(1000).default(""),
+  contactName: z.string().max(200),
+  imageUrl: z.union([z.literal(""), z.string().max(500)]),
+  licenseRestrictions: z.string().max(1000),
   programId: optionalUuid,
-  notes: z.string().max(5000).default(""),
+  notes: z.string().max(5000),
   proposerEmail: optionalEmail,
-  teamsSupported: z.number().int().min(1).max(5).default(1),
+  teamsSupported: z.number().int().min(1).max(5),
 });
 
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
@@ -123,20 +131,10 @@ export function ProjectForm({
       teamsSupported: initial?.teamsSupported ?? 1,
     } satisfies ProjectFormValues,
     validators: {
-      onSubmit: ({ value }) => {
-        const result = projectFormSchema.safeParse(value);
-        if (result.success) {
-          return;
-        }
-        const fields: Record<string, string> = {};
-        for (const issue of result.error.issues) {
-          const key = issue.path.join(".");
-          if (key && !fields[key]) {
-            fields[key] = issue.message;
-          }
-        }
-        return { fields };
-      },
+      // The schema itself. react-form takes a Standard Schema and Zod 4
+      // schemas are ones; this was a hand-rolled safeParse loop for a typing
+      // limitation that no longer exists. See QUIRKS.
+      onSubmit: projectFormSchema,
     },
     onSubmit: async ({ value }) => {
       setFormError(null);
@@ -347,6 +345,7 @@ export function ProjectForm({
               Cropped to 16:9 and resized to max 1600x900. Saved when you submit
               the form.
             </p>
+            <FieldErrors errors={field.state.meta.errors} />
           </div>
         )}
       </form.Field>
@@ -368,6 +367,7 @@ export function ProjectForm({
               onChange={(v) => field.handleChange(v)}
               value={field.state.value as string}
             />
+            <FieldErrors errors={field.state.meta.errors} />
           </div>
         )}
       </form.Field>
@@ -394,6 +394,7 @@ export function ProjectForm({
               type="number"
               value={field.state.value as number}
             />
+            <FieldErrors errors={field.state.meta.errors} />
           </div>
         )}
       </form.Field>
@@ -428,12 +429,15 @@ export function ProjectForm({
             {showProposer && (
               <form.Field name="proposerEmail">
                 {(field: AnyForm) => (
-                  <ProposerPicker
-                    accountLinked={proposer?.accountLinked ?? false}
-                    accountName={proposer?.accountName ?? null}
-                    onChange={(email) => field.handleChange(email)}
-                    value={field.state.value as string}
-                  />
+                  <div>
+                    <ProposerPicker
+                      accountLinked={proposer?.accountLinked ?? false}
+                      accountName={proposer?.accountName ?? null}
+                      onChange={(email) => field.handleChange(email)}
+                      value={field.state.value as string}
+                    />
+                    <FieldErrors errors={field.state.meta.errors} />
+                  </div>
                 )}
               </form.Field>
             )}
@@ -579,17 +583,7 @@ function Field({
             rows={rows}
             textarea={textarea}
           />
-          {field.state.meta.errors.length > 0 && (
-            <p className="mt-1 text-destructive text-sm">
-              {field.state.meta.errors
-                .map((e: unknown) =>
-                  typeof e === "string"
-                    ? e
-                    : ((e as { message?: string })?.message ?? String(e))
-                )
-                .join(", ")}
-            </p>
-          )}
+          <FieldErrors errors={field.state.meta.errors} />
           {suggestion && (
             <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-2">
               <p className="font-medium text-primary text-xs">
