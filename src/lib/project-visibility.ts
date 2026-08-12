@@ -4,6 +4,7 @@
 // directly rather than through a re-export here, which Biome forbids as a
 // barrel and which the project's no-shims rule would reject anyway.
 
+import type { Status } from "./project-workflow";
 import type { Viewer } from "./viewer";
 import { isStaff } from "./viewer";
 
@@ -98,23 +99,83 @@ export function canWritePrivateNotes(
   return canSeePrivateNotes(project, viewer);
 }
 
+/** The columns the projection reads, named structurally rather than by import. */
+export interface ProjectRow extends VisibleProject {
+  contactEmail: string | null;
+  contactName: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  licenseRestrictions: string | null;
+  minQualifications: string | null;
+  objectives: string | null;
+  prefQualifications: string | null;
+  problemStatement: string | null;
+  programId: string | null;
+  teamsSupported: number;
+  title: string;
+  url: string | null;
+}
+
+export interface ProjectDetailView {
+  contactEmail: string | null;
+  contactName: string | null;
+  deletedAt: Date | null;
+  description: string | null;
+  id: string;
+  imageUrl: string | null;
+  licenseRestrictions: string | null;
+  minQualifications: string | null;
+  notes: string | null;
+  objectives: string | null;
+  prefQualifications: string | null;
+  problemStatement: string | null;
+  programId: string | null;
+  status: Status;
+  teamsSupported: number;
+  title: string;
+  url: string | null;
+}
+
 /**
- * Removes fields the viewer may not read. `notes` is private to staff and the
- * proposer; `proposerEmail` stays staff-only, because it identifies a third
- * party rather than describing the project.
+ * What the project detail and edit pages may read.
+ *
+ * `/projects/$id` is public, so this payload reaches anonymous viewers. Every
+ * field is named here, which is the property worth keeping: adding a column to
+ * `projects` cannot leak through it, because nothing copies the row wholesale.
+ *
+ * Before this the rule lived in two places. `stripPrivateFields` nulled two
+ * columns and the caller patched three more inline, which is what a fix looks
+ * like when someone finds a leak at the call site instead of in the module.
+ *
+ * `proposerEmail` is absent rather than nulled. Nothing reads it here, and the
+ * staff panel gets the proposer through `getProposerForEditAs`, which is
+ * staff-gated at the server rather than made safe by an assignment.
  */
-export function stripPrivateFields<T extends VisibleProject>(
-  project: T,
+export function projectDetailView(
+  project: ProjectRow,
   viewer: Viewer
-): T {
-  const next = { ...project };
-  if (!canSeePrivateNotes(project, viewer)) {
-    next.notes = null;
-  }
-  if (!isStaff(viewer)) {
-    (next as VisibleProject).proposerEmail = null;
-  }
-  return next;
+): ProjectDetailView {
+  return {
+    id: project.id,
+    title: project.title,
+    description: project.description,
+    problemStatement: project.problemStatement,
+    objectives: project.objectives,
+    minQualifications: project.minQualifications,
+    prefQualifications: project.prefQualifications,
+    url: project.url,
+    contactEmail: project.contactEmail,
+    contactName: project.contactName,
+    imageUrl: project.imageUrl,
+    licenseRestrictions: project.licenseRestrictions,
+    teamsSupported: project.teamsSupported,
+    programId: project.programId,
+    status: project.status as Status,
+    deletedAt: project.deletedAt,
+    // The one viewer-dependent field, and the reason this cannot be a SQL
+    // column map: the rule is which columns for THIS viewer, not which columns.
+    notes: canSeePrivateNotes(project, viewer) ? project.notes : null,
+  };
 }
 
 /**

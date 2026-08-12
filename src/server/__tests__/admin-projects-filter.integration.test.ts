@@ -192,9 +192,11 @@ describe("getProjectAs", () => {
 
     const { project } = await getProjectAs(admin, { id });
     expect(project).not.toBeNull();
-    expect(project?.embedding).toBeFalsy();
-    expect(project?.embeddingSourceHash).toBeFalsy();
-    expect(project?.embeddingUpdatedAt).toBeFalsy();
+    // Absent rather than nulled: projectDetailView never names them, so the
+    // caller no longer has to remember to patch them out.
+    expect(project).not.toHaveProperty("embedding");
+    expect(project).not.toHaveProperty("embeddingSourceHash");
+    expect(project).not.toHaveProperty("embeddingUpdatedAt");
   });
 });
 

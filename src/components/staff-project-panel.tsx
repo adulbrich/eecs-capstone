@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { STAFF_PANEL_AUDIENCE_HINT } from "#/lib/private-notes";
 import { canTransition, type Status } from "#/lib/project-workflow";
+import type { ProposerForEdit } from "#/server/_internal/projects-queries";
 import {
   forceSetProjectStatus,
   hardDeleteProject,
@@ -15,6 +16,7 @@ import {
 } from "#/server/projects-queries";
 import { LocalTime } from "./local-time";
 import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
+import { ProposerSummary } from "./proposer-summary";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import {
@@ -77,7 +79,14 @@ export function StaffProjectPanel({
   const [busy, setBusy] = useState(false);
   const [editLog, setEditLog] = useState<EditLogRow[]>([]);
   const [sendEmail, setSendEmail] = useState(true);
-  const [proposerAddress, setProposerAddress] = useState<string | null>(null);
+  const [proposer, setProposer] = useState<ProposerForEdit>({
+    accountLinked: false,
+    accountName: null,
+    email: "",
+  });
+  // The dialog's checkbox has always keyed off "is there an address at all",
+  // so it keeps reading exactly that rather than the whole record.
+  const proposerAddress = proposer.email || null;
 
   useEffect(() => {
     void (async () => {
@@ -95,10 +104,9 @@ export function StaffProjectPanel({
   useEffect(() => {
     void (async () => {
       try {
-        const { email } = await getProposerForEdit({
-          data: { projectId: project.id },
-        });
-        setProposerAddress(email || null);
+        setProposer(
+          await getProposerForEdit({ data: { projectId: project.id } })
+        );
       } catch {
         // Staff-only endpoint; on failure the dialog degrades to "no address
         // on file" and sends nothing, which is the safe direction.
@@ -195,6 +203,10 @@ export function StaffProjectPanel({
         title="Staff panel"
       />
       <PanelNote>{STAFF_PANEL_AUDIENCE_HINT}</PanelNote>
+
+      <PanelSection title="Proposer">
+        <ProposerSummary proposer={proposer} />
+      </PanelSection>
 
       <PanelSection title="Status">
         {/* Status stepper — vertical on mobile, horizontal on md+ */}

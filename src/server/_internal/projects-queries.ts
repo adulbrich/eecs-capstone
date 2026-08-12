@@ -24,7 +24,7 @@ import {
   canSeeProject,
   canSeeStatusHistory,
   filterCommentsForViewer,
-  stripPrivateFields,
+  projectDetailView,
 } from "#/lib/project-visibility";
 import { isStaff, type Viewer } from "#/lib/viewer";
 import {
@@ -278,15 +278,12 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
     };
   }
 
-  // The embedding vector is never returned to any client, staff included:
-  // no UI reads it, and shipping ~8KB of floats on every project-detail load
-  // is pure payload bloat.
-  const stripped = {
-    ...stripPrivateFields(project, viewer),
-    embedding: null,
-    embeddingSourceHash: null,
-    embeddingUpdatedAt: null,
-  };
+  // Named field by field, so a new column on `projects` cannot ride this
+  // payload. It matters here more than anywhere: this page is public, so the
+  // object below is serialized into the SSR payload for anonymous viewers.
+  // The embedding vector and search_vector are among the columns that simply
+  // are not named, rather than being nulled after the fact.
+  const detail = projectDetailView(project, viewer);
   // The status timeline (and its comments) is private to staff and the
   // proposer. Everyone else gets an empty history, so the field is not just
   // hidden in the UI but never leaves the server.
@@ -314,7 +311,7 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
     project.status !== "archived";
 
   return {
-    project: stripped,
+    project: detail,
     history,
     canEdit,
     viewerIsStaff,
