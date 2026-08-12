@@ -35,7 +35,8 @@ import {
   holdFromStoredRow,
   holdName,
 } from "#/lib/hold";
-import { compareByDeadline, overdueFlags } from "#/lib/inventory-deadlines";
+import { compareByDeadline } from "#/lib/inventory-deadlines";
+import { overdueNotifications } from "#/lib/inventory-notifications";
 import {
   canReadInventoryItem,
   type HoldItemView,
@@ -1624,42 +1625,10 @@ export async function recordOverdueNotificationsAs(
     (r): r is OverdueCandidate & { userId: string } => r.userId !== null
   );
 
-  const values: (typeof notifications.$inferInsert)[] = [];
-  const seen = new Set<string>();
-  const push = (row: typeof notifications.$inferInsert) => {
-    // Requester and picker are the same person on most checkouts, so the two
-    // scans return the same row twice. onConflictDoNothing would collapse
-    // those intra-batch duplicates anyway; deduping here keeps the statement
-    // smaller and makes the intent explicit rather than implicit in an index.
-    const key = `${row.userId}|${row.type}|${row.link}`;
-    if (seen.has(key)) {
-      return;
-    }
-    seen.add(key);
-    values.push(row);
-  };
-
-  for (const r of candidates) {
-    const { pickupOverdue, checkoutOverdue } = overdueFlags(r);
-    if (pickupOverdue) {
-      push({
-        userId: r.userId,
-        type: "inventory_pickup_overdue",
-        title: `Pickup window passed: ${r.itemName}`,
-        message: "Your reserved item is past its pickup window.",
-        link: `/inventory/${r.itemId}`,
-      });
-    }
-    if (checkoutOverdue) {
-      push({
-        userId: r.userId,
-        type: "inventory_checkout_overdue",
-        title: `Overdue: ${r.itemName}`,
-        message: "Your checked-out item is past its due date.",
-        link: `/inventory/${r.itemId}`,
-      });
-    }
-  }
+  // The rows these candidates are owed, including the dedupe: two scans that
+  // deliberately overlap, so the same person can appear twice. The rule lives
+  // in `src/lib/inventory-notifications.ts` and is unit tested there.
+  const values = overdueNotifications(candidates);
 
   if (values.length === 0) {
     return;
