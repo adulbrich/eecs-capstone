@@ -8,6 +8,7 @@ import {
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
+import { diffProjectFields } from "#/lib/project-edit-diff";
 import { canEditProject, canWritePrivateNotes } from "#/lib/project-visibility";
 import {
   type ActorRole,
@@ -34,25 +35,6 @@ export interface TransitionOptions {
   send?: SendEmailFn;
   sendEmail?: boolean;
 }
-
-const PROJECT_EDITABLE_FIELDS = [
-  "title",
-  "description",
-  "problemStatement",
-  "objectives",
-  "minQualifications",
-  "prefQualifications",
-  "url",
-  "contactEmail",
-  "contactName",
-  "imageUrl",
-  "licenseRestrictions",
-  "programId",
-  "notes",
-  "proposerEmail",
-  "proposerId",
-  "teamsSupported",
-] as const;
 
 function viewerToVisibility(viewer: AuthUser): Viewer {
   return { id: viewer.id, role: viewer.role ?? null };
@@ -122,19 +104,19 @@ export async function createProjectAs(
   return { id: created.id };
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: TODO large update path, decompose field-diffing in a follow-up
-export async function updateProjectAs(
-  viewer: AuthUser,
+/**
+ * What this edit writes, given who is making it.
+ *
+ * Server-side rather than in `src/lib/` beside the diff: the staff branch
+ * resolves a proposer address to an account id, which is a database read. It
+ * exists to keep `updateProjectAs` to four steps, not to be tested alone; the
+ * integration suite already covers both branches.
+ */
+async function buildProjectValues(
   data: UpdateProjectInput,
-  embed?: EmbedFn
-): Promise<{ id: string; updated: boolean }> {
-  const visibility = viewerToVisibility(viewer);
-  const existing = await loadProjectOr404(data.id);
-  if (!canEditProject(existing, visibility)) {
-    throw new Error("Forbidden");
-  }
-  const staff = isStaff(visibility);
-
+  existing: Awaited<ReturnType<typeof loadProjectOr404>>,
+  visibility: Viewer
+): Promise<Record<string, unknown>> {
   const newValues: Record<string, unknown> = {
     title: data.title,
     description: data.description ?? null,
@@ -153,32 +135,32 @@ export async function updateProjectAs(
   if (canWritePrivateNotes(existing, visibility)) {
     newValues.notes = data.notes ?? null;
   }
-  if (staff) {
+  if (isStaff(visibility)) {
     const proposerEmail = data.proposerEmail || null;
     newValues.proposerEmail = proposerEmail;
     newValues.proposerId = proposerEmail
       ? await resolveProposerId(proposerEmail)
       : null;
   }
+  return newValues;
+}
 
-  const oldDiff: Record<string, unknown> = {};
-  const newDiff: Record<string, unknown> = {};
-  const changedFields: string[] = [];
-  for (const field of PROJECT_EDITABLE_FIELDS) {
-    // A field the viewer was not allowed to write never made it into
-    // `newValues`, and `.set()` leaves it alone. Diffing it anyway would log a
-    // phantom "changed to null" edit for a value that is still in the row.
-    if (!(field in newValues)) {
-      continue;
-    }
-    const oldVal = (existing as Record<string, unknown>)[field] ?? null;
-    const newVal = newValues[field] ?? null;
-    if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
-      oldDiff[field] = oldVal;
-      newDiff[field] = newVal;
-      changedFields.push(field);
-    }
+export async function updateProjectAs(
+  viewer: AuthUser,
+  data: UpdateProjectInput,
+  embed?: EmbedFn
+): Promise<{ id: string; updated: boolean }> {
+  const visibility = viewerToVisibility(viewer);
+  const existing = await loadProjectOr404(data.id);
+  if (!canEditProject(existing, visibility)) {
+    throw new Error("Forbidden");
   }
+  const newValues = await buildProjectValues(data, existing, visibility);
+
+  const { changedFields, newDiff, oldDiff } = diffProjectFields(
+    existing as unknown as Record<string, unknown>,
+    newValues
+  );
 
   if (changedFields.length === 0) {
     return { id: existing.id, updated: false };
