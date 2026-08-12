@@ -10,6 +10,7 @@ import {
   user,
 } from "#/db/schema";
 import { type Hold, holdFromInput, holdToColumns } from "#/lib/hold";
+import { notificationFor } from "#/lib/inventory-notifications";
 import { assertStaff } from "#/lib/viewer";
 
 export type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
@@ -490,7 +491,10 @@ async function transitionItemInTx(
     );
   }
 
-  await maybeNotify(tx, current, input, holdAccountId(hold), closed);
+  const notice = notificationFor(current, input, holdAccountId(hold), closed);
+  if (notice) {
+    await tx.insert(notifications).values(notice);
+  }
 }
 
 async function syncRequestItem(tx: Tx, input: TransitionInput) {
@@ -599,128 +603,4 @@ async function closeRequestItemOnRelease(
     })
     .where(eq(inventoryRequestItems.id, requestItemId));
   return { outcome: lineStatus, requesterId };
-}
-
-async function maybeNotify(
-  tx: Tx,
-  prev: {
-    id: string;
-    name: string;
-    status: ItemStatus;
-    currentHolderId: string | null;
-    currentRequestItemId: string | null;
-  },
-  input: TransitionInput,
-  holderId: string | null,
-  closed: ClosedLine | null
-) {
-  // A denial is answered first, and to the requester, because it is the one
-  // notice whose recipient is not "whoever holds the item". `closed` is only
-  // set on the release path and a rejection is only legal there, so reaching
-  // this means a line really was closed as rejected.
-  //
-  // It sits above the recipient guard below on purpose: that guard asks who
-  // holds the item, and a hold on a bare label answers nobody, which would
-  // silently swallow the denial owed to the person who asked.
-  if (closed?.outcome === "rejected") {
-    if (closed.requesterId) {
-      await tx.insert(notifications).values({
-        userId: closed.requesterId,
-        type: "inventory_request_rejected",
-        title: `Request denied: ${prev.name}`,
-        message: input.comment ?? `Your request for ${prev.name} was denied.`,
-        link: "/my/items?tab=history",
-      });
-    }
-    return;
-  }
-
-  // Identify a "release-from-hold" path: no new request context provided AND
-  // the item was held by someone. The original holder is then the recipient.
-  // A walk-in hold has no request line, so testing only for one would silently
-  // drop the return notification for every staff-assigned checkout.
-  const isReleaseFromHold =
-    !input.requestItemId &&
-    (!!prev.currentRequestItemId || !!prev.currentHolderId);
-
-  const recipientId =
-    holderId ?? (isReleaseFromHold ? prev.currentHolderId : null);
-  if (!recipientId) {
-    return;
-  }
-
-  // A requester cancelling their own line is told nothing, because the only
-  // person to tell is the one who just clicked the button. Keyed on the
-  // authority rather than on a general "actor equals recipient" rule: staff
-  // can assign a hold to their own address, and that case is also
-  // actor-equals-recipient but does want its pickup deadline in the bell.
-  if (input.authority === "self_cancel") {
-    return;
-  }
-
-  switch (input.nextStatus) {
-    case "reserved": {
-      const title = input.pickupBy
-        ? `Reserved: ${prev.name}. Pick up by ${formatDate(input.pickupBy)}.`
-        : `Reserved: ${prev.name}.`;
-      await tx.insert(notifications).values({
-        userId: recipientId,
-        type: "inventory_request_approved",
-        title,
-        message: `Your request for ${prev.name} was approved.`,
-        link: "/my/items?tab=active",
-      });
-      return;
-    }
-    case "checked_out": {
-      await tx.insert(notifications).values({
-        userId: recipientId,
-        type: "inventory_item_checked_out",
-        title: `Checked out: ${prev.name}. Due ${formatDate(input.dueAt)}.`,
-        message: `${prev.name} is now in your hands.`,
-        link: "/my/items?tab=active",
-      });
-      return;
-    }
-    case "available":
-    case "maintenance":
-    case "retired": {
-      if (!isReleaseFromHold) {
-        return;
-      }
-      if (prev.status === "checked_out" && input.nextStatus === "available") {
-        await tx.insert(notifications).values({
-          userId: recipientId,
-          type: "inventory_item_returned",
-          title: `Returned: ${prev.name}`,
-          message: `Thanks for returning ${prev.name}.`,
-          link: `/inventory/${prev.id}`,
-        });
-      } else {
-        await tx.insert(notifications).values({
-          userId: recipientId,
-          type: "inventory_request_closed",
-          title: `Request closed: ${prev.name}`,
-          message:
-            input.comment ??
-            `Your request for ${prev.name} was closed by staff.`,
-          link: "/my/items?tab=history",
-        });
-      }
-      return;
-    }
-    default:
-      return;
-  }
-}
-
-function formatDate(d: Date | null | undefined): string {
-  if (!d) {
-    return "soon";
-  }
-  return new Date(d).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }

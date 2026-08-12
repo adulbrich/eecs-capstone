@@ -3,12 +3,14 @@
 //
 // Idempotent: re-running upserts users, programs, and categories, and skips
 // projects/inventory items that already exist (matched by title / serial).
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "../src/db";
 import {
   categories,
   inventoryItemCategories,
   inventoryItems,
+  inventoryRequestItems,
+  inventoryRequests,
   programInstructors,
   programs,
   projectCategories,
@@ -16,6 +18,14 @@ import {
   user,
 } from "../src/db/schema";
 import { auth } from "../src/lib/auth";
+import {
+  addToCartAs,
+  approveRequestItemAs,
+  cancelRequestItemAs,
+  rejectRequestItemAs,
+  submitCartAs,
+} from "../src/server/_internal/inventory";
+import { transitionItem } from "../src/server/_internal/inventory-transitions";
 
 const PASSWORD = "password";
 
@@ -673,9 +683,12 @@ async function main() {
         "Wipe guest data and sanitize the facial interface before returning.",
       imageUrl:
         "https://images.unsplash.com/photo-1622979135225-d2ba269cf1ac?auto=format&fit=crop&w=1200&q=60",
-      status: "checked_out",
-      currentHolderId: u.student.id,
-      currentHolderEmail: u.student.email,
+      // Held state is produced by the lifecycle section below, through
+      // transitionItem, which is the only writer of status history and the
+      // only thing that syncs the holder columns with the status.
+      status: "available",
+      currentHolderId: null,
+      currentHolderLabel: null,
     },
     {
       name: "HTC Vive Pro 2 Kit",
@@ -730,9 +743,9 @@ async function main() {
       notes: "Reserved for the warehouse robot fleet team's perception work.",
       imageUrl:
         "https://images.unsplash.com/photo-1527430253228-e93688616381?auto=format&fit=crop&w=1200&q=60",
-      status: "reserved",
-      currentHolderId: u.studentJordan.id,
-      currentHolderEmail: u.studentJordan.email,
+      status: "available",
+      currentHolderId: null,
+      currentHolderLabel: null,
     },
     {
       name: "Google Coral USB Accelerator",
@@ -773,9 +786,9 @@ async function main() {
       notes: "Checked out for the camera-trap classifier team's demo rig.",
       imageUrl:
         "https://images.unsplash.com/photo-1587826080692-f439cd0b70da?auto=format&fit=crop&w=1200&q=60",
-      status: "checked_out",
-      currentHolderId: u.studentSam.id,
-      currentHolderEmail: u.studentSam.email,
+      status: "available",
+      currentHolderId: null,
+      currentHolderLabel: null,
     },
   ];
 
@@ -853,6 +866,184 @@ async function main() {
   }
   console.log(
     `inventory: ${itemsCreated} created, ${itemsRepaired} repaired, ${ITEMS.length} total defined`
+  );
+
+  await seedInventoryFlows(u);
+}
+
+// ---------------------------------------------------------------------------
+// Inventory flows
+// ---------------------------------------------------------------------------
+
+/** Days from now, for deadlines that must stay meaningful as time passes. */
+function daysFromNow(n: number): Date {
+  return new Date(Date.now() + n * 86_400_000);
+}
+
+/**
+ * The states you cannot reach by hand.
+ *
+ * Everything here goes through the real write helpers rather than writing rows
+ * directly. `transitionItem` is the only writer of `inventory_item_status_history`
+ * and the only thing that syncs the holder columns with the status, so a seed
+ * that set `status` and `current_holder_id` itself was a second writer: that is
+ * why seeded holds used to have a holder and no history, no deadlines and no
+ * request line. Driving the helpers produces all four, and the notifications,
+ * by construction.
+ *
+ * Deadlines are relative to run time. Fixed dates drift into being hundreds of
+ * days overdue, which reads as broken data rather than a deliberate case.
+ */
+async function seedInventoryFlows(
+  u: Record<keyof typeof USERS, Awaited<ReturnType<typeof ensureUser>>>
+) {
+  const staff = { id: u.admin.id, role: "admin" as const };
+
+  const [alreadySeeded] = await db
+    .select({ id: inventoryRequests.id })
+    .from(inventoryRequests)
+    .where(eq(inventoryRequests.userId, u.studentSam.id))
+    .limit(1);
+  if (alreadySeeded) {
+    console.log("inventory flows: already seeded, skipped");
+    return;
+  }
+
+  const itemBySerial = async (serial: string) => {
+    const [row] = await db
+      .select({ id: inventoryItems.id })
+      .from(inventoryItems)
+      .where(eq(inventoryItems.serial, serial));
+    if (!row) {
+      throw new Error(`inventory flows: no item with serial ${serial}`);
+    }
+    return row.id;
+  };
+
+  const lineFor = async (itemId: string) => {
+    const [line] = await db
+      .select({ id: inventoryRequestItems.id })
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, itemId))
+      .orderBy(desc(inventoryRequestItems.createdAt))
+      .limit(1);
+    if (!line) {
+      throw new Error(`inventory flows: no request line for item ${itemId}`);
+    }
+    return line.id;
+  };
+
+  const request = async (
+    viewer: { id: string; role: string },
+    itemId: string,
+    note: string
+  ) => {
+    await addToCartAs(viewer, { itemId });
+    await submitCartAs(viewer, { note });
+    return lineFor(itemId);
+  };
+
+  const student = { id: u.student.id, role: "user" as const };
+  const jordan = { id: u.studentJordan.id, role: "user" as const };
+  const sam = { id: u.studentSam.id, role: "user" as const };
+
+  // 1. Overdue checkout. Nine days past due, so /my/items shows "Overdue" and
+  //    the lazy scan writes an inventory_checkout_overdue notice on first read.
+  const quest = await itemBySerial("QUEST3-128-0007");
+  await transitionItem(staff, {
+    itemId: quest,
+    nextStatus: "checked_out",
+    holderId: u.student.id,
+    dueAt: daysFromNow(-9),
+  });
+
+  // 2. Overdue pickup. A different rule and a different notice: the item is
+  //    reserved and was never collected.
+  const realsense = await itemBySerial("RS-D435I-0005");
+  await transitionItem(staff, {
+    itemId: realsense,
+    nextStatus: "reserved",
+    holderId: u.student.id,
+    pickupBy: daysFromNow(-3),
+  });
+
+  // 3. A healthy hold, so the overdue cases are legible as the exception.
+  const brio = await itemBySerial("BRIO-4K-0021");
+  await transitionItem(staff, {
+    itemId: brio,
+    nextStatus: "checked_out",
+    holderId: u.studentJordan.id,
+    dueAt: daysFromNow(10),
+  });
+
+  // 4. A pending request, sitting in the staff queue awaiting a decision.
+  const arduino = await itemBySerial("ARD-UNOR4W-0014");
+  await request(sam, arduino, "For the embedded systems capstone demo.");
+
+  // 5. An approved request: line approved, item reserved, pickup ahead.
+  const coral = await itemBySerial("CORAL-USB-0009");
+  const coralLine = await request(sam, coral, "Edge inference benchmarking.");
+  await approveRequestItemAs(staff, {
+    requestItemId: coralLine,
+    pickupBy: daysFromNow(5),
+  });
+
+  // 6. Requester is not the holder. Sam asked, Jordan collected, so both see
+  //    the item: Sam as a request, Jordan as a hold. Impossible to reach in
+  //    the app by hand, and the case the hardest test in the suite covers.
+  const tello = await itemBySerial("TELLO-EDU-0003");
+  const telloLine = await request(sam, tello, "Swarm flight demo for CS 462.");
+  await approveRequestItemAs(staff, {
+    requestItemId: telloLine,
+    pickupBy: daysFromNow(2),
+  });
+  await transitionItem(staff, {
+    itemId: tello,
+    nextStatus: "checked_out",
+    requestItemId: telloLine,
+    holderEmail: u.studentJordan.email,
+    dueAt: daysFromNow(7),
+  });
+
+  // 7 to 9. History: one returned, one rejected, one cancelled by its owner.
+  const returned = await itemBySerial("RPI5-8G-0001");
+  const returnedLine = await request(student, returned, "Sensor logging rig.");
+  await approveRequestItemAs(staff, {
+    requestItemId: returnedLine,
+    pickupBy: daysFromNow(-14),
+  });
+  await transitionItem(staff, {
+    itemId: returned,
+    nextStatus: "checked_out",
+    requestItemId: returnedLine,
+    holderId: u.student.id,
+    dueAt: daysFromNow(-7),
+  });
+  await transitionItem(staff, { itemId: returned, nextStatus: "available" });
+
+  const rejected = await itemBySerial("JETSON-ORIN-N-0001");
+  const rejectedLine = await request(sam, rejected, "Vision model training.");
+  await rejectRequestItemAs(staff, {
+    requestItemId: rejectedLine,
+    reviewComment: "Reserved for the senior design cohort this term.",
+  });
+
+  const cancelled = await itemBySerial("ESP32S3-DK-0031");
+  const cancelledLine = await request(jordan, cancelled, "Wi-Fi mesh prototype.");
+  await cancelRequestItemAs(jordan, {
+    requestItemId: cancelledLine,
+    note: null,
+  });
+
+  console.log("inventory flows: 9 seeded");
+  console.log(
+    "  sign in as user@example.com (password) and open /my/items: two overdue"
+  );
+  console.log(
+    "  badges, one healthy hold, and a populated History tab. The bell fills on"
+  );
+  console.log(
+    "  that first read, because the overdue scan is lazy and there is no cron."
   );
 }
 

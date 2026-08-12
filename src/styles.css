@@ -126,7 +126,11 @@
   --status-success-bg:    rgba(102, 187, 106, 0.12);
   --status-warning:       #FFA726;
   --status-warning-bg:    rgba(255, 167, 38, 0.12);
-  --status-error:         #EF5350;
+  /* Red 200, not 400 like its siblings: a badge draws this over its own 12%
+     tint, and red 400 (#EF5350) lands at 4.26:1 against that blend, under AA
+     for the 12px text badges use. The other four clear 5.2 to 7.0 on the same
+     math; this brings error to 6.09. */
+  --status-error:         #FF8A80;
   --status-error-bg:      rgba(239, 83, 80, 0.12);
   --status-info:          #42A5F5;
   --status-info-bg:       rgba(66, 165, 245, 0.12);
