@@ -56,11 +56,16 @@ required", and the message is absent before the click, so the check was not
 vacuous. Standard Schema produces `{ message }` issues, which the existing
 coercer already handles.
 
-## Five fields silently swallow their errors
+## Six fields silently swallow their errors
 
 The coercer appears exactly once per file. Every field rendered through a raw
-`form.Field` render prop displays nothing: `proposerEmail`, `categoryIds`,
-`imageUrl`, `programId`, `teamsSupported`.
+`form.Field` render prop displays nothing. Six sites, five distinct fields,
+since `imageUrl` appears in both forms:
+
+| File | Fields with no error rendering |
+| --- | --- |
+| `project-form.tsx` | `imageUrl` (:331), `programId` (:362), `teamsSupported` (:374), `proposerEmail` (:429) |
+| `inventory-form.tsx` | `categoryIds` (:151), `imageUrl` (:163) |
 
 `proposerEmail` is reachable in practice. `optionalEmail` requires a valid
 address, and `ProposerPicker` lets staff type freely whenever no account is
@@ -93,10 +98,10 @@ export function FieldErrors({ errors }: { errors: readonly unknown[] }) {
 }
 ```
 
-It replaces the two existing copies, and it is what the five bare fields use.
+It replaces the two existing copies, and it is what the six bare render props use.
 
 **3. Render the errors that are currently dropped.** Add `<FieldErrors />` to
-the five raw `form.Field` render props.
+the six raw `form.Field` render props.
 
 ### What is deliberately not shared
 
@@ -106,7 +111,7 @@ panel; inventory inlines a two-way Input/Textarea switch. A single shared
 `Field` carrying `markdown`, `suggestion` and `onApply` would be a wide
 interface over a thin implementation, which is the shape this review keeps
 arguing against. `FieldErrors` is the piece that earns extraction, because it
-has two existing callers **and** five more that need it.
+has two existing callers **and** six more that need it.
 
 The `descriptionId` and description-paragraph block are also duplicated, about
 eight lines. They stay: a component that renders one `<p>` when a string is
@@ -116,11 +121,25 @@ rather than concentrate.
 ### The `applyServerErrors` call site
 
 Duplicated verbatim in both forms, cast included:
-`form as unknown as Parameters<typeof applyServerErrors>[0]`. The cast exists
-because `AnyForm` is `any`. Folded into this change **only if deleting the
-hand-rolled validator makes the cast unnecessary**; if the generics are still
-unstable, the call sites are left alone and the spec is wrong about it, which is
-worth saying rather than forcing.
+`form as unknown as Parameters<typeof applyServerErrors>[0]`.
+
+**Tried, and it stays.** The guess in an earlier draft of this spec was that the
+cast existed because `AnyForm` is `any`, so deleting the hand-rolled validator
+might make it unnecessary. That was wrong, and the compiler says why:
+
+```
+Type '<TField extends "name" | "description" | ... >(field: TField, ...) => void'
+  is not assignable to type '(field: string, ...) => void'.
+    Type 'string' is not assignable to type '"name" | "description" | ...'
+```
+
+`FormLike` in `src/lib/apply-server-errors.ts` declares `setFieldMeta(field:
+string, ...)`, while the real form types that parameter as a union of its own
+field names. Parameter contravariance makes the narrower form unassignable to
+the wider interface, and that has nothing to do with the validator or with
+`AnyForm`. Removing it would mean generifying `FormLike` over the field-name
+union, which is a change to a shared helper with its own reasoning. The call
+sites are left alone.
 
 ## Tests
 
@@ -144,7 +163,7 @@ exercises the AI-review path.
 - **No wire-format change, no migration.** The server's own Zod schemas in
   `src/server/*.ts` are untouched; these two are client-side form schemas with
   no other consumer.
-- **Rendering the five dropped errors is a behaviour change**, in its own commit
+- **Rendering the dropped errors is a behaviour change**, in its own commit
   with its own test.
 - **Stage files by name. Never commit to `main`.** Branch
   `refactor/form-schema-validators`, cut from `main` after PR #41 merged.
@@ -181,5 +200,5 @@ rather than the unusual one, and `FieldErrors` is where it lives.
 - **32 lines of workaround deleted**, not relocated.
 - **A `QUIRKS.md` entry stops instructing people to write code they no longer
   need.**
-- **Five fields gain error rendering**, and one component owns it.
+- **Six render props gain error rendering**, and one component owns it.
 - **First test coverage** for validation on either form.
