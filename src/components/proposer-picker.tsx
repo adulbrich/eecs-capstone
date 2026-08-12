@@ -42,17 +42,30 @@ function AccountSearch({ onPick }: { onPick: (email: string) => void }) {
       setMatches([]);
       return;
     }
+    // The timer alone is not enough: clearing it stops a query that has not
+    // fired, but a request already in flight still resolves and would apply a
+    // superseded result. Same guard holder-field.tsx uses on both its lookups.
+    let cancelled = false;
     const handle = setTimeout(() => {
       void (async () => {
         try {
           const rows = (await searchUsers({ data: { q: query } })) as Match[];
+          if (cancelled) {
+            return;
+          }
           setMatches(rows);
         } catch {
+          if (cancelled) {
+            return;
+          }
           setMatches([]);
         }
       })();
     }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [query]);
 
   return (

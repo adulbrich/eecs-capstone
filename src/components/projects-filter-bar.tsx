@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { z } from "zod";
+import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import { listCategories, type listSchema } from "#/server/categories";
 import { getMyInterests } from "#/server/interests";
 import { listPrograms } from "#/server/programs";
@@ -48,7 +49,6 @@ export function ProjectsFilterBar({
   const navigate = useNavigate({ from: "/projects/" });
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [allPrograms, setAllPrograms] = useState<Program[]>([]);
-  const [queryDraft, setQueryDraft] = useState(q);
   const [canRecommend, setCanRecommend] = useState(false);
 
   useEffect(() => {
@@ -75,18 +75,15 @@ export function ProjectsFilterBar({
     })();
   }, []);
 
-  useEffect(() => setQueryDraft(q), [q]);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (queryDraft !== q) {
-        void navigate({
-          search: (prev) => ({ ...prev, q: queryDraft, page: 1 }),
-        });
-      }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [queryDraft, q, navigate]);
+  const commitQuery = useCallback(
+    (next: string) => {
+      void navigate({
+        search: (prev) => ({ ...prev, q: next, page: 1 }),
+      });
+    },
+    [navigate]
+  );
+  const [queryDraft, setQueryDraft] = useDebouncedDraft(q, commitQuery);
 
   function toggleCategory(id: string) {
     const next = categories.includes(id)

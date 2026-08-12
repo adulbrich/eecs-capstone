@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -40,15 +40,7 @@ const STATUS_OPTIONS: { value: NonNullable<StatusFilter>; label: string }[] = [
 ];
 
 export function InventoryFilterBar(props: Props) {
-  const [localQ, setLocalQ] = useState(props.q);
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (localQ !== props.q) {
-        props.onQChange(localQ);
-      }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [localQ, props]);
+  const [localQ, setLocalQ] = useDebouncedDraft(props.q, props.onQChange);
 
   function toggleCategory(id: string) {
     const next = props.selectedCategories.includes(id)

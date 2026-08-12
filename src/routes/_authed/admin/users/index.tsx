@@ -4,7 +4,7 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { z } from "zod";
 import {
   type AdminColumn,
@@ -38,6 +38,7 @@ import {
   type SortState,
   useAdminTableState,
 } from "#/lib/table-state";
+import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import { exportUsers, listUsers } from "#/server/users";
 
 const ROLES = ["user", "instructor", "admin"] as const;
@@ -192,20 +193,15 @@ function UsersAdmin() {
   // The whole search object goes to the hook, which reads cols/dir/sort.
   const search = Route.useSearch();
   const { includeBanned, q, role } = search;
-  const [qDraft, setQDraft] = useState(q);
-
-  useEffect(() => setQDraft(q), [q]);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (qDraft !== q) {
-        void navigate({
-          search: (prev) => ({ ...prev, page: 1, q: qDraft }),
-        });
-      }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [qDraft, q, navigate]);
+  const commitQuery = useCallback(
+    (next: string) => {
+      void navigate({
+        search: (prev) => ({ ...prev, page: 1, q: next }),
+      });
+    },
+    [navigate]
+  );
+  const [qDraft, setQDraft] = useDebouncedDraft(q, commitQuery);
 
   const setSearch = useCallback(
     (patch: AdminTableSearch) =>

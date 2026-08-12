@@ -41,6 +41,47 @@ describe("InventoryFilterBar", () => {
     vi.useRealTimers();
   });
 
+  it("does not write a stale draft back when q changes underneath", async () => {
+    // Browser Back. The URL's q changes, and the draft holding what the user
+    // typed must not be committed over the top of it 300ms later. This bar was
+    // the only one of six with no sync-back, so Back undid itself.
+    vi.useFakeTimers();
+    const onQChange = vi.fn();
+    const { getByPlaceholderText, rerender } = renderBar({
+      onQChange,
+      q: "old",
+    });
+    fireEvent.change(getByPlaceholderText("Search inventory"), {
+      target: { value: "typed" },
+    });
+
+    rerender(
+      <InventoryFilterBar
+        categories={[]}
+        onCategoriesChange={() => {
+          // no-op
+        }}
+        onQChange={onQChange}
+        onStatusChange={() => {
+          // no-op
+        }}
+        onViewChange={() => {
+          // no-op
+        }}
+        q="fromBack"
+        selectedCategories={[]}
+        status={null}
+        view="card"
+      />
+    );
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(onQChange).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
   it("renders the status dropdown and the view toggle", () => {
     const { getByLabelText } = renderBar();
     // Select triggers are labelled via their associated <Label htmlFor>.
