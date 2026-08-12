@@ -21,15 +21,19 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
+// No `.default()` anywhere on purpose. A default makes that field optional on
+// the schema's INPUT type, and `validators.onSubmit` requires a Standard Schema
+// whose input equals the form's data type, so one default blocks passing the
+// schema directly. `defaultValues` below supplies every field regardless.
 export const inventoryFormSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
-  description: z.string().max(5000).default(""),
-  categoryIds: z.array(z.string().uuid()).max(20).default([]),
-  serial: z.string().max(120).default(""),
-  label: z.string().max(120).default(""),
-  location: z.string().max(200).default(""),
-  notes: z.string().max(5000).default(""),
-  imageUrl: z.union([z.literal(""), z.string().max(500)]).default(""),
+  description: z.string().max(5000),
+  categoryIds: z.array(z.string().uuid()).max(20),
+  serial: z.string().max(120),
+  label: z.string().max(120),
+  location: z.string().max(200),
+  notes: z.string().max(5000),
+  imageUrl: z.union([z.literal(""), z.string().max(500)]),
 });
 
 export type InventoryFormValues = z.infer<typeof inventoryFormSchema>;
@@ -66,20 +70,10 @@ export function InventoryForm({
       imageUrl: initial?.imageUrl ?? "",
     } satisfies InventoryFormValues,
     validators: {
-      onSubmit: ({ value }) => {
-        const result = inventoryFormSchema.safeParse(value);
-        if (result.success) {
-          return;
-        }
-        const fields: Record<string, string> = {};
-        for (const issue of result.error.issues) {
-          const key = issue.path.join(".");
-          if (key && !fields[key]) {
-            fields[key] = issue.message;
-          }
-        }
-        return { fields };
-      },
+      // The schema itself. react-form takes a Standard Schema and Zod 4
+      // schemas are ones; this was a hand-rolled safeParse loop for a typing
+      // limitation that no longer exists. See QUIRKS.
+      onSubmit: inventoryFormSchema,
     },
     onSubmit: async ({ value }) => {
       setFormError(null);
