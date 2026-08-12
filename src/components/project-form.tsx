@@ -14,6 +14,7 @@ import type {
 import { reviewProject } from "#/server/project-review";
 import type { ProposerForEdit } from "#/server/projects-queries";
 import { CategoryMultiSelect } from "./category-multi-select";
+import { FieldErrors } from "./field-errors";
 import { MarkdownField } from "./markdown-field";
 import { Panel, PanelHeader, PanelNote } from "./panel";
 import { ProgramSelect } from "./program-select";
@@ -579,17 +580,7 @@ function Field({
             rows={rows}
             textarea={textarea}
           />
-          {field.state.meta.errors.length > 0 && (
-            <p className="mt-1 text-destructive text-sm">
-              {field.state.meta.errors
-                .map((e: unknown) =>
-                  typeof e === "string"
-                    ? e
-                    : ((e as { message?: string })?.message ?? String(e))
-                )
-                .join(", ")}
-            </p>
-          )}
+          <FieldErrors errors={field.state.meta.errors} />
           {suggestion && (
             <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-2">
               <p className="font-medium text-primary text-xs">

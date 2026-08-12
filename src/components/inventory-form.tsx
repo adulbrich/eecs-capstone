@@ -14,6 +14,7 @@ import {
   uploadInventoryImage,
 } from "#/server/inventory";
 import { CategoryMultiSelect } from "./category-multi-select";
+import { FieldErrors } from "./field-errors";
 import { InventoryImageUploader } from "./inventory-image-uploader";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -295,17 +296,7 @@ function Field({
               value={field.state.value as string}
             />
           )}
-          {field.state.meta.errors.length > 0 && (
-            <p className="mt-1 text-destructive text-sm">
-              {field.state.meta.errors
-                .map((e: unknown) =>
-                  typeof e === "string"
-                    ? e
-                    : ((e as { message?: string })?.message ?? String(e))
-                )
-                .join(", ")}
-            </p>
-          )}
+          <FieldErrors errors={field.state.meta.errors} />
         </div>
       )}
     </form.Field>
