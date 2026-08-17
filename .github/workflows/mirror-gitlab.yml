@@ -53,7 +53,8 @@ jobs:
         run: |
           git fetch --prune --tags origin "+refs/heads/*:refs/remotes/origin/*"
           # refs/remotes/origin/HEAD would map to a branch literally named HEAD.
-          git symbolic-ref --quiet --delete refs/remotes/origin/HEAD || true
+          # It is usually absent, and git says so on stderr, so keep it quiet.
+          git symbolic-ref --delete refs/remotes/origin/HEAD 2>/dev/null || true
           git branch -r
 
       - name: Push to GitLab
