@@ -1,0 +1,71 @@
+name: Mirror to GitLab
+
+# One-way mirror: GitHub is the source of truth, GitLab is a copy. Every branch
+# and tag here is pushed there, and anything on GitLab that no longer exists
+# here is deleted (--prune). Never commit directly to the GitLab side; the next
+# run will overwrite it.
+#
+# Requires two repository secrets and one repository variable:
+#   GITLAB_TOKEN     - GitLab personal or project access token with
+#                      write_repository scope, owned by a user with at least
+#                      Maintainer on the target project.
+#   GITLAB_USERNAME  - the username that token belongs to (use
+#                      "oauth2" for a project access token).
+#   GITLAB_REPO_URL  - host and path with no scheme, for example
+#                      gitlab.com/some-group/eecs-capstone.git
+#
+# The GitLab project must be empty when this first runs. If it was created with
+# a README, its default branch has a commit that is not an ancestor of ours, so
+# the first push is a non-fast-forward against a protected branch and GitLab
+# rejects it with an error that reads like bad credentials.
+on:
+  push:
+    branches: ["**"]
+    tags: ["**"]
+  # A branch deletion propagates only through --prune on a later run, so sweep
+  # nightly to keep GitLab from accumulating dead branches.
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: mirror-gitlab
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    # A branch deletion fires a push event whose ref is already gone, and
+    # checkout fails on it. The scheduled run prunes it instead.
+    if: ${{ github.event_name != 'push' || !github.event.deleted }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      # checkout with fetch-depth 0 already fetches every branch and tag, but
+      # this repeats it with --prune so a run triggered by one branch cannot
+      # push stale remote-tracking refs for branches deleted since.
+      - name: Fetch every branch and tag
+        run: |
+          git fetch --prune --tags origin "+refs/heads/*:refs/remotes/origin/*"
+          # refs/remotes/origin/HEAD would map to a branch literally named HEAD.
+          # It is usually absent, and git says so on stderr, so keep it quiet.
+          git symbolic-ref --delete refs/remotes/origin/HEAD 2>/dev/null || true
+          git branch -r
+
+      - name: Push to GitLab
+        env:
+          GITLAB_USERNAME: ${{ secrets.GITLAB_USERNAME }}
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_REPO_URL: ${{ vars.GITLAB_REPO_URL }}
+        run: |
+          # The credentials stay in the environment rather than the command
+          # line so they never reach the log through a trace or an error.
+          git push --prune \
+            "https://${GITLAB_USERNAME}:${GITLAB_TOKEN}@${GITLAB_REPO_URL}" \
+            "+refs/remotes/origin/*:refs/heads/*" \
+            "+refs/tags/*:refs/tags/*"
