@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { z } from "zod";
 import {
   type AdminColumn,
@@ -138,6 +138,9 @@ function buildColumns(onDone: () => void): AdminColumn<Row>[] {
       cell: (ctx) => <LocalTime value={ctx.row.original.requestedAt} />,
       header: "Requested",
       id: "requestedAt",
+      // Dates, so not the default comparator: it compares String() forms,
+      // which start with the weekday name and sort Friday before Monday.
+      sortingFn: "datetime",
     },
     {
       accessorFn: (row) => row.note ?? "",
@@ -182,7 +185,7 @@ function AdminRequestQueue() {
   const onDone = useCallback(() => {
     void router.invalidate();
   }, [router]);
-  const columns = buildColumns(onDone);
+  const columns = useMemo(() => buildColumns(onDone), [onDone]);
 
   const commitQuery = useCallback(
     (next: string) => {
