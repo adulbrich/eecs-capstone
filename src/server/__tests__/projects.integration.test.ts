@@ -712,3 +712,28 @@ describe("getProposerForEditImpl", () => {
     ).rejects.toThrow("Forbidden");
   });
 });
+
+describe("canEdit on an archived project", () => {
+  it("matches canEditProject: staff may edit, the owner may not", async () => {
+    const owner = await makeUser(`ae-o-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`ae-a-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+
+    await forceTransitionAs(admin, id, "published", undefined, {
+      embed: vi.fn().mockResolvedValue(new Array(1024).fill(0.1)),
+      sendEmail: false,
+    });
+    await forceTransitionAs(admin, id, "archived", undefined, {
+      sendEmail: false,
+    });
+
+    // getProjectAs used to reimplement the rule inline and deny staff here,
+    // while updateProjectAs, image upload and AI review all call the predicate
+    // and would have accepted the write.
+    expect((await getProjectAs(admin, { id })).canEdit).toBe(true);
+    expect(
+      (await getProjectAs({ id: owner.id, role: owner.role }, { id })).canEdit
+    ).toBe(false);
+    expect((await getProjectAs(null, { id })).canEdit).toBe(false);
+  });
+});
