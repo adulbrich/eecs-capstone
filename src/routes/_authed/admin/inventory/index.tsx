@@ -234,7 +234,7 @@ const COLUMNS: AdminColumn<Row>[] = [
       row.original.currentRequestItemId ? (
         <Link
           className="underline underline-offset-2"
-          search={{ line: row.original.currentRequestItemId, tab: "all" }}
+          search={{ line: row.original.currentRequestItemId, status: "all" }}
           to="/admin/inventory/requests"
         >
           View request

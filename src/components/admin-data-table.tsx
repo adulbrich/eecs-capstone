@@ -10,7 +10,7 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table";
 import { ChevronDown, ChevronsUpDown, ChevronUp, Columns3 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { EmptyState } from "#/components/empty-state";
 import { Button } from "#/components/ui/button";
 import {
@@ -101,6 +101,13 @@ export interface AdminDataTableProps<T> {
   emptyMessage: string;
   getRowId: (row: T) => string;
   hidden: string[];
+  /**
+   * A row to mark and scroll to, matched against `getRowId`. Used by links
+   * that name one record, so the reader lands on it rather than hunting for
+   * it. An id matching no row degrades to the plain table: a link can outlive
+   * the row it named.
+   */
+  highlightedRowId?: string | null;
   onHiddenChange: (cols: string | undefined) => void;
   onSortChange: (sort: SortState) => void;
   /**
@@ -167,6 +174,7 @@ export function AdminDataTable<T>({
   emptyMessage,
   getRowId,
   hidden,
+  highlightedRowId,
   onHiddenChange,
   onSortChange,
   onSortedIdsChange,
@@ -189,6 +197,13 @@ export function AdminDataTable<T>({
       ),
     [columns]
   );
+  const highlighted = useRef<HTMLTableRowElement | null>(null);
+  // Scrolls once the highlighted row has rendered. Deliberately runs on mount
+  // only: re-sorting or re-filtering should not yank the viewport back.
+  useEffect(() => {
+    highlighted.current?.scrollIntoView({ block: "center" });
+  }, []);
+
   const defaultHidden = useMemo(
     () =>
       columns
@@ -408,32 +423,44 @@ export function AdminDataTable<T>({
             ))}
           </TableHeader>
           <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => {
-                  // A card-header cell carries no data-label on purpose: the
-                  // mobile field name is drawn from that attribute, and this
-                  // cell is the card's title rather than one of its fields.
-                  const isCardHeader = cardHeaderIds.has(cell.column.id);
-                  return (
-                    <TableCell
-                      data-card-header={isCardHeader ? "" : undefined}
-                      data-label={
-                        isCardHeader
-                          ? undefined
-                          : (labels.get(cell.column.id) ?? "")
-                      }
-                      key={cell.id}
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  );
-                })}
-              </TableRow>
-            ))}
+            {rows.map((row) => {
+              const isHighlighted =
+                !!highlightedRowId && row.id === highlightedRowId;
+              return (
+                <TableRow
+                  // The documented highlight token, not a colour of its own.
+                  className={
+                    isHighlighted ? "bg-[var(--brand-primary-tint)]" : undefined
+                  }
+                  data-highlighted={isHighlighted ? "" : undefined}
+                  key={row.id}
+                  ref={isHighlighted ? highlighted : undefined}
+                >
+                  {row.getVisibleCells().map((cell) => {
+                    // A card-header cell carries no data-label on purpose: the
+                    // mobile field name is drawn from that attribute, and this
+                    // cell is the card's title rather than one of its fields.
+                    const isCardHeader = cardHeaderIds.has(cell.column.id);
+                    return (
+                      <TableCell
+                        data-card-header={isCardHeader ? "" : undefined}
+                        data-label={
+                          isCardHeader
+                            ? undefined
+                            : (labels.get(cell.column.id) ?? "")
+                        }
+                        key={cell.id}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       )}

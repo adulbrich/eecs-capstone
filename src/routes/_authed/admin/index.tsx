@@ -154,7 +154,7 @@ function AdminHome() {
           {pendingRequests > 0 ? (
             <Link
               className={ALERT_CARD_CLASS}
-              search={{ tab: "pending" }}
+              search={{ status: "pending" }}
               style={ALERT_CARD_STYLE}
               to="/admin/inventory/requests"
             >
