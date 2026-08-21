@@ -32,7 +32,7 @@ export function AdminRequestActions({ lineId, onDone, status }: Props) {
   // Approving or rejecting is a one-way door, so a decided line offers
   // nothing rather than a disabled control.
   if (status !== "pending") {
-    return <span className="text-muted-foreground">&mdash;</span>;
+    return <span className="text-muted-foreground">-</span>;
   }
 
   function close() {
