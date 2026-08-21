@@ -31,6 +31,7 @@ import {
   listAdminInventoryAs,
   listInventoryAs,
   listInventoryCategoriesImpl,
+  listInventoryRequestsAs,
   listMyItemsAs,
   recordOverdueNotificationsAs,
   rejectRequestItemAs,
@@ -3243,5 +3244,134 @@ describe("retired visibility", () => {
     const { admin, student, retired } = await retiredAndActiveItems();
     expect(await getInventoryItemAs(admin, { id: retired.id })).not.toBeNull();
     expect(await getInventoryItemAs(student, { id: retired.id })).toBeNull();
+  });
+});
+
+describe("listInventoryRequestsAs", () => {
+  it("returns one row per request line, not one per batch", async () => {
+    const admin = await makeUser(`lir-a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`lir-s-${Date.now()}@x.com`, "user");
+    const scope = await makeItem({ name: "Oscilloscope" });
+    const iron = await makeItem({ name: "Soldering iron" });
+
+    await addToCartAs(student, { itemId: scope.id });
+    await addToCartAs(student, { itemId: iron.id });
+    // One batch, two lines. The card layout rendered this as a single record;
+    // the table has to see two.
+    await submitCartAs(student, { note: "for demo" });
+
+    const rows = await listInventoryRequestsAs(admin, {
+      status: "pending",
+      q: "",
+    });
+
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.item.name).sort()).toEqual([
+      "Oscilloscope",
+      "Soldering iron",
+    ]);
+  });
+
+  it("filters to a single status", async () => {
+    const admin = await makeUser(`lir-b-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`lir-c-${Date.now()}@x.com`, "user");
+    const stays = await makeItem({ name: "Stays pending" });
+    const moves = await makeItem({ name: "Gets approved" });
+
+    await addToCartAs(student, { itemId: stays.id });
+    await addToCartAs(student, { itemId: moves.id });
+    await submitCartAs(student, { note: null });
+
+    const pending = await listInventoryRequestsAs(admin, {
+      status: "pending",
+      q: "",
+    });
+    const target = pending.find((r) => r.item.id === moves.id);
+    await approveRequestItemAs(admin, {
+      requestItemId: target?.line.id ?? "",
+      pickupBy: null,
+    });
+
+    expect(
+      (await listInventoryRequestsAs(admin, { status: "pending", q: "" })).map(
+        (r) => r.item.id
+      )
+    ).toEqual([stays.id]);
+    expect(
+      (await listInventoryRequestsAs(admin, { status: "approved", q: "" })).map(
+        (r) => r.item.id
+      )
+    ).toEqual([moves.id]);
+  });
+
+  it("returns every status when status is all", async () => {
+    const admin = await makeUser(`lir-d-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`lir-e-${Date.now()}@x.com`, "user");
+    const kept = await makeItem({ name: "Kept pending" });
+    const refused = await makeItem({ name: "Turned down" });
+
+    await addToCartAs(student, { itemId: kept.id });
+    await addToCartAs(student, { itemId: refused.id });
+    await submitCartAs(student, { note: null });
+
+    const pending = await listInventoryRequestsAs(admin, {
+      status: "pending",
+      q: "",
+    });
+    const target = pending.find((r) => r.item.id === refused.id);
+    await rejectRequestItemAs(admin, {
+      requestItemId: target?.line.id ?? "",
+      reviewComment: "out of stock",
+    });
+
+    const all = await listInventoryRequestsAs(admin, { status: "all", q: "" });
+    expect(all.map((r) => r.line.status).sort()).toEqual([
+      "pending",
+      "rejected",
+    ]);
+  });
+
+  // Pins existing behavior rather than driving new: assertStaff was already
+  // here, and this function had no coverage at all before this change.
+  it("refuses a non-staff viewer", async () => {
+    const student = await makeUser(`lir-g-${Date.now()}@x.com`, "user");
+    await expect(
+      listInventoryRequestsAs(student, { status: "pending", q: "" })
+    ).rejects.toThrow();
+    await expect(
+      listInventoryRequestsAs(null, { status: "pending", q: "" })
+    ).rejects.toThrow();
+  });
+
+  it("searches item name, requester name and requester email", async () => {
+    const admin = await makeUser(`lir-f-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`grendel-${Date.now()}@x.com`, "user");
+    await db
+      .update(user)
+      .set({ name: "Beatrix Kiddo" })
+      .where(eq(user.id, student.id));
+    const wanted = await makeItem({ name: "Thermal camera" });
+    const other = await makeItem({ name: "Bench vise" });
+
+    await addToCartAs(student, { itemId: wanted.id });
+    await addToCartAs(student, { itemId: other.id });
+    await submitCartAs(student, { note: null });
+
+    const byItem = await listInventoryRequestsAs(admin, {
+      status: "pending",
+      q: "thermal",
+    });
+    expect(byItem.map((r) => r.item.id)).toEqual([wanted.id]);
+
+    // Requester name and email both match, so both lines come back.
+    expect(
+      await listInventoryRequestsAs(admin, { status: "pending", q: "beatrix" })
+    ).toHaveLength(2);
+    expect(
+      await listInventoryRequestsAs(admin, { status: "pending", q: "grendel" })
+    ).toHaveLength(2);
+    expect(
+      await listInventoryRequestsAs(admin, { status: "pending", q: "zzzz" })
+    ).toHaveLength(0);
   });
 });
