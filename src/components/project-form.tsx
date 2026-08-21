@@ -409,8 +409,8 @@ export function ProjectForm({
               </Label>
             </div>
             <p className="mt-1 text-muted-foreground text-xs">
-              Students see this before they bid. Unchecking it clears the
-              restrictions below.
+              Students see this before they bid. Unchecking it clears
+              Licensing/IP/NDA notes below.
             </p>
             {/*
               Rendered from this field rather than a form.Subscribe: the
@@ -422,7 +422,7 @@ export function ProjectForm({
               <div className="mt-3">
                 <Field
                   form={form}
-                  label="License / IP restrictions"
+                  label="Licensing / IP / NDA notes"
                   markdown
                   name="licenseRestrictions"
                   onApply={() => applyField("licenseRestrictions")}
@@ -459,7 +459,15 @@ export function ProjectForm({
         {(field: AnyForm) => (
           <div>
             <Label htmlFor="programId">Program</Label>
+            <p
+              className="mt-0.5 text-muted-foreground text-xs"
+              id="programId-description"
+            >
+              The course this project would run in. Staff can set or change it
+              during review.
+            </p>
             <ProgramSelect
+              describedBy="programId-description"
               id="programId"
               onChange={(v) => field.handleChange(v)}
               value={field.state.value as string}
@@ -471,10 +479,16 @@ export function ProjectForm({
       <form.Field name="teamsSupported">
         {(field: AnyForm) => (
           <div>
-            <Label htmlFor="teamsSupported">
-              Teams this project can support
-            </Label>
+            <Label htmlFor="teamsSupported">Teams</Label>
+            <p
+              className="mt-0.5 text-muted-foreground text-xs"
+              id="teamsSupported-description"
+            >
+              How many separate teams could run this project at the same time.
+              Most projects support one.
+            </p>
             <Input
+              aria-describedby="teamsSupported-description"
               className="mt-1 w-24"
               id="teamsSupported"
               max={5}

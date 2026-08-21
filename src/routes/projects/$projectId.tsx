@@ -242,7 +242,7 @@ function AgreementSection({
   }
   return (
     <section className="mt-8">
-      <SectionHeading>License / IP</SectionHeading>
+      <SectionHeading>Licensing / IP / NDA</SectionHeading>
       <p className="mt-2">This project requires an NDA or IP agreement.</p>
       {body && (
         <div className="mt-2">
