@@ -287,6 +287,7 @@ export function ProjectForm({
         </div>
       )}
       <Field
+        description="A short, specific name. This is the first thing students see in the catalog."
         form={form}
         label="Title"
         name="title"
@@ -294,6 +295,7 @@ export function ProjectForm({
         suggestion={suggestions.title}
       />
       <Field
+        description="A paragraph or two on what the project is and why it matters."
         form={form}
         label="Description"
         markdown
@@ -303,6 +305,7 @@ export function ProjectForm({
         suggestion={suggestions.description}
       />
       <Field
+        description="The problem the team is solving, and who has it today."
         form={form}
         label="Problem statement"
         markdown
@@ -312,6 +315,7 @@ export function ProjectForm({
         suggestion={suggestions.problemStatement}
       />
       <Field
+        description="What the team should have built or handed over by the end."
         form={form}
         label="Objectives / deliverables"
         markdown
@@ -321,6 +325,7 @@ export function ProjectForm({
         suggestion={suggestions.objectives}
       />
       <Field
+        description="What a student must already know to take this on."
         form={form}
         label="Minimum qualifications"
         markdown
@@ -330,6 +335,7 @@ export function ProjectForm({
         suggestion={suggestions.minQualifications}
       />
       <Field
+        description="Helpful to have, but something a team could pick up along the way."
         form={form}
         label="Preferred qualifications"
         markdown
@@ -338,13 +344,21 @@ export function ProjectForm({
         rows={2}
         suggestion={suggestions.prefQualifications}
       />
-      <Field form={form} label="URL" name="url" placeholder="https://..." />
-      <p className="text-muted-foreground text-xs">
-        Contact details below are shown publicly on the project page. Leave them
-        blank to keep them private.
-      </p>
-      <Field form={form} label="Contact name" name="contactName" />
       <Field
+        description="A link to your organization, or to background reading. Optional."
+        form={form}
+        label="URL"
+        name="url"
+        placeholder="https://..."
+      />
+      <Field
+        description="Contact name is shown publicly. Leave blank to keep private."
+        form={form}
+        label="Contact name"
+        name="contactName"
+      />
+      <Field
+        description="Contact email is shown publicly. Leave blank to keep private."
         form={form}
         label="Contact email"
         name="contactEmail"
