@@ -209,6 +209,33 @@ markup, and nothing to add by hand.
 A hand-rolled `<table>` in an admin route collapses to an unreadable horizontal
 scroll on a phone, which is the whole reason this component exists.
 
+### A column that is not text sets its own `sortingFn`
+
+`AdminDataTable` defaults every column without one to a locale-aware **string**
+comparator, so whatever the `accessorFn` returns is sorted through `String(value)`.
+That is correct for text and wrong for everything else:
+
+| Column value | `sortingFn` | What the default does instead |
+| --- | --- | --- |
+| `Date` | `"datetime"` | `String(date)` starts with the weekday name, so ascending reads Fri, Fri, Mon, Wed. |
+| number | `"basic"` | `"10"` sorts before `"2"`. |
+
+```tsx
+{
+  accessorFn: (row) => row.createdAt,
+  cell: ({ row }) => <LocalTime dateOnly value={row.original.createdAt} />,
+  header: "Created",
+  id: "createdAt",
+  sortingFn: "datetime",
+}
+```
+
+Both are easy to ship and hard to notice. Seeded rows written in one run share a
+timestamp, and the numeric cases are ordinals that stay single-digit for a long
+time, so the column looks sorted until real data arrives. Every non-text column
+under `src/routes/_authed/admin/` sets this, so a new one that forgets is the
+outlier rather than the pattern.
+
 ---
 
 ## Component patterns
