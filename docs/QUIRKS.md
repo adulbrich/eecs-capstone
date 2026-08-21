@@ -377,6 +377,24 @@ Linting and formatting run through **Ultracite** (a strict Biome preset). `biome
 - Everything is checked except generated / tool-managed paths excluded in `biome.json`: `src/routeTree.gen.ts`, `src/styles.css`, `scripts/`, and `drizzle/`. (Biome respects `.gitignore` via `vcs.useIgnoreFile`, so `playwright-report/` etc. are skipped too.)
 - `npm run check` must be clean before committing. Run `npm run format` (or `npx ultracite fix`) to auto-fix.
 
+### The pre-commit hook
+
+`lefthook.yml` runs `npx ultracite check` on the staged files at pre-commit, so the
+rule above is enforced rather than remembered. `npm install` installs the hook via
+the `prepare` script; nobody runs anything by hand.
+
+- **`prepare` is `lefthook install || true`, and the guard is load-bearing.**
+  `.dockerignore` excludes `.git`, and the Dockerfile's runtime stage runs
+  `npm ci --omit=dev`, so `lefthook install` fails in both image stages. Without
+  the guard, the image build fails with it.
+- **A missing `node_modules` does not block commits.** The generated
+  `.git/hooks/pre-commit` falls through to `echo "Can't find lefthook in PATH"`
+  and exits 0, so committing before `npm install` warns instead of failing.
+- **To skip it:** `LEFTHOOK=0 git commit ...`, or `git commit --no-verify`.
+
+The hook covers Biome only. `npm run typecheck` and `npm test` are still on you,
+and CI still enforces all three.
+
 ### Rules deliberately relaxed or deferred
 
 Tuned in `biome.json` rather than fought file-by-file:
