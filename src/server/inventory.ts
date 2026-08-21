@@ -222,7 +222,12 @@ export const listMyItems = createServerFn({ method: "GET" }).handler(
 );
 
 const requestQueueSchema = z.object({
-  tab: z.enum(["pending", "all"]).default("pending"),
+  // "all" is a view, never combinable with a specific status, so it is one of
+  // the exclusive options rather than a separate flag.
+  status: z
+    .enum(["pending", "approved", "rejected", "cancelled", "returned", "all"])
+    .default("pending"),
+  q: z.string().default(""),
 });
 
 export const listInventoryRequests = createServerFn({ method: "GET" })

@@ -478,3 +478,38 @@ describe("AdminDataTable", () => {
     expect(inputs.at(-1)?.value).toBe("4");
   });
 });
+
+describe("highlightedRowId", () => {
+  function highlightedRows() {
+    return screen
+      .getAllByRole("row")
+      .filter((row) => row.hasAttribute("data-highlighted"));
+  }
+
+  it("marks the named row and no other", () => {
+    renderTable({ highlightedRowId: "3" });
+
+    const marked = highlightedRows();
+    expect(marked).toHaveLength(1);
+    expect(within(marked[0]).getByText("gamma")).toBeTruthy();
+  });
+
+  it("marks nothing when the id matches no row", () => {
+    // A stale ?line= link naming a row that no longer exists must degrade to
+    // the plain table rather than throwing or marking an arbitrary row.
+    renderTable({ highlightedRowId: "no-such-row" });
+
+    expect(highlightedRows()).toHaveLength(0);
+  });
+
+  it("scrolls the highlighted row into view", () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+
+    renderTable({ highlightedRowId: "3" });
+
+    // A queue can run to many rows, so landing on the page without this leaves
+    // staff hunting for the very row the link named.
+    expect(scrollIntoView).toHaveBeenCalled();
+  });
+});

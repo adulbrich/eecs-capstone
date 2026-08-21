@@ -1293,18 +1293,40 @@ export async function collectedByForRequestItems(
   return map;
 }
 
+export interface InventoryRequestQueueFilter {
+  q: string;
+  status:
+    | "all"
+    | "approved"
+    | "cancelled"
+    | "pending"
+    | "rejected"
+    | "returned";
+}
+
 export async function listInventoryRequestsAs(
   viewer: Viewer,
-  data: { tab: "pending" | "all" }
+  data: InventoryRequestQueueFilter
 ) {
   assertStaff(viewer);
   // No lazy overdue trigger here: notifications are for the requester, not
   // staff, and a global scan on every queue read is wasteful. The notification
   // fires when the requester reads /my/items.
   const statusFilter =
-    data.tab === "pending"
-      ? eq(inventoryRequestItems.status, "pending")
-      : undefined;
+    data.status === "all"
+      ? undefined
+      : eq(inventoryRequestItems.status, data.status);
+  // Free-text search spans what a staff member has in front of them when they
+  // go looking: the thing requested, and who asked for it.
+  const q = data.q.trim();
+  const searchFilter = q
+    ? or(
+        ilike(inventoryItems.name, `%${q}%`),
+        ilike(user.name, `%${q}%`),
+        ilike(user.email, `%${q}%`)
+      )
+    : undefined;
+  const conditions = [statusFilter, searchFilter].filter(Boolean);
   const rows = await db
     .select({
       line: inventoryRequestItems,
@@ -1323,7 +1345,7 @@ export async function listInventoryRequestsAs(
       eq(inventoryRequestItems.itemId, inventoryItems.id)
     )
     .innerJoin(user, eq(inventoryRequests.userId, user.id))
-    .where(statusFilter)
+    .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(inventoryRequests.createdAt));
 
   const collected = await collectedByForRequestItems(
@@ -1334,37 +1356,22 @@ export async function listInventoryRequestsAs(
     collectedBy: collected.get(r.line.id) ?? null,
   }));
 
-  // Group by requestId so the admin queue can render one card per batch.
-  const byRequest = new Map<
-    string,
-    {
-      requestId: string;
-      requester: { id: string; email: string; name: string | null };
-      createdAt: Date;
-      note: string | null;
-      lines: typeof enriched;
-    }
-  >();
-  for (const r of enriched) {
-    const id = r.request.id;
-    const existing = byRequest.get(id);
-    if (existing) {
-      existing.lines.push(r);
-    } else {
-      byRequest.set(id, {
-        requestId: id,
-        requester: {
-          id: r.request.userId,
-          email: r.requesterEmail,
-          name: r.requesterName,
-        },
-        createdAt: r.request.createdAt,
-        note: r.request.note,
-        lines: [r],
-      });
-    }
-  }
-  return Array.from(byRequest.values());
+  // One row per request line. The queue used to group these into one card per
+  // batch; the table needs the flat shape, and the batch fields ride along on
+  // every line so a row can still say who asked and why.
+  return enriched.map((r) => ({
+    line: r.line,
+    item: r.item,
+    requestId: r.request.id,
+    requester: {
+      id: r.request.userId,
+      email: r.requesterEmail,
+      name: r.requesterName,
+    },
+    requestedAt: r.request.createdAt,
+    note: r.request.note,
+    collectedBy: r.collectedBy,
+  }));
 }
 
 export async function listMyItemsForCurrentUser() {
@@ -1372,9 +1379,9 @@ export async function listMyItemsForCurrentUser() {
   return listMyItemsAs(viewer);
 }
 
-export async function listInventoryRequestsForCurrentUser(data: {
-  tab: "pending" | "all";
-}) {
+export async function listInventoryRequestsForCurrentUser(
+  data: InventoryRequestQueueFilter
+) {
   const viewer = await requireUser();
   return listInventoryRequestsAs(viewer, data);
 }

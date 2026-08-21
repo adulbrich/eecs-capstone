@@ -1,8 +1,18 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import {
+  createFileRoute,
+  Link,
+  redirect,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
+import { useCallback } from "react";
 import { z } from "zod";
-import { AdminRequestQueueRow } from "#/components/admin-request-queue-row";
-import { EmptyState } from "#/components/empty-state";
+import {
+  type AdminColumn,
+  AdminDataTable,
+} from "#/components/admin-data-table";
+import { AdminRequestActions } from "#/components/admin-request-actions";
+import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { LocalTime } from "#/components/local-time";
 import {
   Breadcrumb,
@@ -12,11 +22,37 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
+import { Input } from "#/components/ui/input";
+import { Label } from "#/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "#/components/ui/select";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import {
+  type AdminTableSearch,
+  type SortState,
+  useAdminTableState,
+} from "#/lib/table-state";
+import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import { listInventoryRequests } from "#/server/inventory";
 
+const STATUSES = [
+  "pending",
+  "approved",
+  "rejected",
+  "cancelled",
+  "returned",
+  "all",
+] as const;
+
 const searchSchema = z.object({
+  cols: z.string().optional(),
+  dir: z.enum(["asc", "desc"]).optional(),
   /**
    * A request line to bring into view, linked from the Request column on
    * `/admin/inventory`. Not in `loaderDeps`: it changes which line is
@@ -26,7 +62,9 @@ const searchSchema = z.object({
    * the plain queue rather than a 500.
    */
   line: z.string().uuid().nullable().catch(null).default(null),
-  tab: z.enum(["pending", "all"]).default("pending"),
+  q: z.string().default(""),
+  sort: z.string().optional(),
+  status: z.enum(STATUSES).default("pending"),
 });
 
 export const Route = createFileRoute("/_authed/admin/inventory/requests")({
@@ -41,26 +79,144 @@ export const Route = createFileRoute("/_authed/admin/inventory/requests")({
       throw redirect({ to: "/" });
     }
   },
-  loaderDeps: ({ search }) => ({ tab: search.tab }),
-  loader: async ({ deps }) =>
-    await listInventoryRequests({ data: { tab: deps.tab } }),
+  // Only the filter fields: sort and column visibility are client state and
+  // must not re-run the loader.
+  loaderDeps: ({ search }) => ({ q: search.q, status: search.status }),
+  loader: async ({ deps }) => await listInventoryRequests({ data: deps }),
   component: AdminRequestQueue,
 });
 
-function AdminRequestQueue() {
-  const batches = Route.useLoaderData();
-  const { line, tab } = Route.useSearch();
-  const highlighted = useRef<HTMLDivElement | null>(null);
+type Row = Awaited<ReturnType<typeof listInventoryRequests>>[number];
 
-  useEffect(() => {
-    // Scrolls once the linked line has rendered. A queue can run to many
-    // batches, so landing on the page without this leaves staff hunting for
-    // the very row the link named.
-    highlighted.current?.scrollIntoView({ block: "center" });
-  }, []);
+const DEFAULT_SORT: SortState = { desc: true, id: "requestedAt" };
+
+function statusLabel(status: string) {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function buildColumns(onDone: () => void): AdminColumn<Row>[] {
+  return [
+    {
+      accessorFn: (row) => row.item.name,
+      cardHeader: true,
+      cell: (ctx) => (
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{ctx.row.original.item.name}</span>
+          <InventoryStatusBadge
+            status={ctx.row.original.item.status as "available"}
+          />
+        </div>
+      ),
+      enableHiding: false,
+      header: "Item",
+      id: "item",
+    },
+    {
+      accessorFn: (row) => row.requester.name ?? row.requester.email,
+      cell: (ctx) => (
+        <div className="min-w-0">
+          <p className="truncate">
+            {ctx.row.original.requester.name ??
+              ctx.row.original.requester.email}
+          </p>
+          <p className="truncate text-muted-foreground text-xs">
+            {ctx.row.original.requester.email}
+          </p>
+        </div>
+      ),
+      header: "Requester",
+      id: "requester",
+    },
+    {
+      accessorFn: (row) => row.line.status,
+      cell: (ctx) => statusLabel(ctx.row.original.line.status),
+      header: "Status",
+      id: "status",
+    },
+    {
+      accessorFn: (row) => row.requestedAt,
+      cell: (ctx) => <LocalTime value={ctx.row.original.requestedAt} />,
+      header: "Requested",
+      id: "requestedAt",
+    },
+    {
+      accessorFn: (row) => row.note ?? "",
+      cell: (ctx) => (
+        <span className="whitespace-pre-wrap">{ctx.row.original.note}</span>
+      ),
+      // Batch-level context. Every line of a batch repeats it, so it is off by
+      // default and there when a row needs explaining.
+      defaultHidden: true,
+      header: "Note",
+      id: "note",
+    },
+    {
+      accessorFn: (row) =>
+        row.collectedBy?.name ?? row.collectedBy?.email ?? "",
+      header: "Collected by",
+      defaultHidden: true,
+      id: "collectedBy",
+    },
+    {
+      cell: (ctx) => (
+        <AdminRequestActions
+          lineId={ctx.row.original.line.id}
+          onDone={onDone}
+          status={ctx.row.original.line.status}
+        />
+      ),
+      enableSorting: false,
+      header: "Actions",
+      id: "actions",
+    },
+  ];
+}
+
+function AdminRequestQueue() {
+  const rows = Route.useLoaderData();
+  const router = useRouter();
+  const search = Route.useSearch();
+  const { line, q, status } = search;
+  const navigate = useNavigate({ from: "/admin/inventory/requests" });
+
+  const onDone = useCallback(() => {
+    void router.invalidate();
+  }, [router]);
+  const columns = buildColumns(onDone);
+
+  const commitQuery = useCallback(
+    (next: string) => {
+      void navigate({ search: (prev) => ({ ...prev, q: next }) });
+    },
+    [navigate]
+  );
+  const [qDraft, setQDraft] = useDebouncedDraft(q, commitQuery);
+
+  const setSearch = useCallback(
+    (patch: AdminTableSearch) =>
+      void navigate({ search: (prev) => ({ ...prev, ...patch }) }),
+    [navigate]
+  );
+  const replaceSearch = useCallback(
+    (patch: AdminTableSearch) =>
+      void navigate({
+        replace: true,
+        search: (prev) => ({ ...prev, ...patch }),
+      }),
+    [navigate]
+  );
+
+  const { hidden, onHiddenChange, onSortChange, sort } = useAdminTableState({
+    columns,
+    defaultSort: DEFAULT_SORT,
+    replaceSearch,
+    search,
+    setSearch,
+    storageKey: "inventory-requests",
+  });
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
+    <div className="px-4 py-6 md:px-8">
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -82,80 +238,60 @@ function AdminRequestQueue() {
       </Breadcrumb>
       <h1 className="mt-2 font-semibold text-2xl">Inventory requests</h1>
 
-      <div className="mt-4 flex gap-4 border-border border-b">
-        {(["pending", "all"] as const).map((t) => (
-          <Link
-            className={
-              t === tab
-                ? "border-b-2 px-2 py-1 font-medium"
-                : "px-2 py-1 text-muted-foreground hover:text-foreground"
-            }
-            key={t}
-            search={{ tab: t }}
-            style={
-              t === tab
-                ? { borderBottomColor: "var(--brand-primary)" }
-                : undefined
-            }
-            to="/admin/inventory/requests"
-          >
-            {t === "pending" ? "Pending" : "All"}
-          </Link>
-        ))}
-      </div>
-
-      <div className="mt-4 space-y-4">
-        {batches.length === 0 && (
-          <EmptyState>No requests in this view.</EmptyState>
-        )}
-        {batches.map((batch) => (
-          <section
-            className="rounded-md border border-border bg-card p-4"
-            key={batch.requestId}
-          >
-            <header className="mb-3">
-              <p className="font-medium">
-                {batch.requester.name ?? batch.requester.email}
-              </p>
-              <p className="text-muted-foreground text-xs">
-                {batch.requester.email} {" · "}
-                <LocalTime value={batch.createdAt} />
-              </p>
-              {batch.note && (
-                <p className="mt-2 whitespace-pre-wrap text-sm">{batch.note}</p>
-              )}
-            </header>
-            <div className="space-y-2">
-              {batch.lines.map((row) => {
-                const isLinked = row.line.id === line;
-                return (
-                  <div
-                    // The documented highlight token, not a colour of its own.
-                    className={
-                      isLinked
-                        ? "rounded-md bg-[var(--brand-primary-tint)] p-2"
-                        : undefined
-                    }
-                    key={row.line.id}
-                    ref={isLinked ? highlighted : undefined}
-                  >
-                    <AdminRequestQueueRow
-                      collectedBy={row.collectedBy}
-                      item={{
-                        id: row.item.id,
-                        name: row.item.name,
-                        status: row.item.status,
-                      }}
-                      line={{ id: row.line.id, status: row.line.status }}
-                      requesterEmail={batch.requester.email}
-                    />
-                  </div>
-                );
-              })}
+      <AdminDataTable
+        caption="Inventory requests"
+        columns={columns}
+        data={rows}
+        defaultSort={DEFAULT_SORT}
+        emptyMessage="No requests in this view."
+        getRowId={(row) => row.line.id}
+        hidden={hidden}
+        highlightedRowId={line}
+        onHiddenChange={onHiddenChange}
+        onSortChange={onSortChange}
+        sort={sort}
+        storageKey="inventory-requests"
+        toolbar={
+          <>
+            <div>
+              <Label htmlFor="request-search">Search</Label>
+              <Input
+                className="mt-1 w-64"
+                id="request-search"
+                onChange={(e) => setQDraft(e.target.value)}
+                placeholder="Item, requester name, or email"
+                type="search"
+                value={qDraft}
+              />
             </div>
-          </section>
-        ))}
-      </div>
+            <div>
+              <Label htmlFor="request-filter-status">Status</Label>
+              <Select
+                onValueChange={(s) =>
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      status: s as (typeof STATUSES)[number],
+                    }),
+                  })
+                }
+                value={status}
+              >
+                <SelectTrigger className="mt-1 w-48" id="request-filter-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s === "all" ? "All statuses" : statusLabel(s)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        }
+      />
     </div>
   );
 }
