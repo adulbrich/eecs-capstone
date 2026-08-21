@@ -172,7 +172,10 @@ function ProjectDetail() {
         label="Preferred qualifications"
       />
       <ContactSection email={project.contactEmail} name={project.contactName} />
-      <Section body={project.licenseRestrictions} label="License / IP" />
+      <AgreementSection
+        body={project.licenseRestrictions}
+        required={project.requiresNdaIp}
+      />
       <UrlSection url={project.url} />
 
       {(viewerIsStaff || viewerIsOwner) && (
@@ -217,6 +220,35 @@ function Section({ label, body }: { label: string; body: string | null }) {
       <div className="mt-2">
         <Markdown>{body}</Markdown>
       </div>
+    </section>
+  );
+}
+
+/**
+ * The flag renders, not just the prose. `requiresNdaIp` is the source of
+ * truth and the restrictions text is optional, so keying this off the text
+ * alone would leave a student reading nothing on a project that does require
+ * an agreement.
+ */
+function AgreementSection({
+  body,
+  required,
+}: {
+  body: string | null;
+  required: boolean;
+}) {
+  if (!required) {
+    return null;
+  }
+  return (
+    <section className="mt-8">
+      <SectionHeading>License / IP</SectionHeading>
+      <p className="mt-2">This project requires an NDA or IP agreement.</p>
+      {body && (
+        <div className="mt-2">
+          <Markdown>{body}</Markdown>
+        </div>
+      )}
     </section>
   );
 }

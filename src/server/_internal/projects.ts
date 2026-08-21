@@ -61,6 +61,26 @@ async function resolveProposerId(
   return match?.id ?? null;
 }
 
+/**
+ * The NDA/IP pair, kept consistent in one place because create and update
+ * both write it. `requiresNdaIp` is the source of truth: the form hides the
+ * restrictions textarea behind the checkbox, so text surviving an unchecked
+ * box would be prose nothing renders, and would break the rule that an empty
+ * restrictions field means no agreement is required.
+ */
+function ndaFields(data: {
+  licenseRestrictions?: string | null;
+  requiresNdaIp?: boolean;
+}): { licenseRestrictions: string | null; requiresNdaIp: boolean } {
+  const requiresNdaIp = data.requiresNdaIp ?? false;
+  return {
+    licenseRestrictions: requiresNdaIp
+      ? (data.licenseRestrictions ?? null)
+      : null,
+    requiresNdaIp,
+  };
+}
+
 export async function createProjectAs(
   viewer: AuthUser,
   data: ProjectInput
@@ -92,7 +112,8 @@ export async function createProjectAs(
       contactEmail: (data.contactEmail || null) as string | null,
       contactName: data.contactName ?? null,
       imageUrl: (data.imageUrl || null) as string | null,
-      licenseRestrictions: data.licenseRestrictions ?? null,
+      ...ndaFields(data),
+      isSponsored: data.isSponsored ?? false,
       programId: data.programId ?? null,
       notes: allowedNotes,
       proposerId,
@@ -128,7 +149,8 @@ async function buildProjectValues(
     contactEmail: data.contactEmail || null,
     contactName: data.contactName ?? null,
     imageUrl: data.imageUrl || null,
-    licenseRestrictions: data.licenseRestrictions ?? null,
+    ...ndaFields(data),
+    isSponsored: data.isSponsored ?? false,
     programId: data.programId ?? null,
     teamsSupported: data.teamsSupported ?? 1,
   };

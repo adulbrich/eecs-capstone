@@ -72,6 +72,10 @@ function EditProject() {
             contactName: project.contactName ?? "",
             imageUrl: project.imageUrl ?? "",
             licenseRestrictions: project.licenseRestrictions ?? "",
+            requiresNdaIp: project.requiresNdaIp,
+            // Absent for a viewer who may not see it, but only staff and the
+            // proposer reach this page, and both of those get the field.
+            isSponsored: project.isSponsored ?? false,
             programId: project.programId ?? "",
             notes: project.notes ?? "",
             proposerEmail: proposer.email,

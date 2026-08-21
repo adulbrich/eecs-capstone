@@ -281,6 +281,7 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
       "description",
       "id",
       "imageUrl",
+      "isSponsored",
       "licenseRestrictions",
       "minQualifications",
       "notes",
@@ -288,6 +289,7 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
       "prefQualifications",
       "problemStatement",
       "programId",
+      "requiresNdaIp",
       "status",
       "teamsSupported",
       "title",
@@ -735,5 +737,110 @@ describe("canEdit on an archived project", () => {
       (await getProjectAs({ id: owner.id, role: owner.role }, { id })).canEdit
     ).toBe(false);
     expect((await getProjectAs(null, { id })).canEdit).toBe(false);
+  });
+});
+
+describe("NDA/IP agreement flag", () => {
+  it("clears the restrictions text when no agreement is required", async () => {
+    const owner = await makeUser(`nda-a-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      licenseRestrictions: "Signed NDA required before kickoff",
+      requiresNdaIp: false,
+    });
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    // The checkbox is the source of truth. Text left behind an unchecked box
+    // is prose nothing renders, and it breaks the rule that an empty
+    // restrictions field means no agreement is required.
+    expect(row.requiresNdaIp).toBe(false);
+    expect(row.licenseRestrictions).toBeNull();
+  });
+
+  it("keeps the restrictions text when an agreement is required", async () => {
+    const owner = await makeUser(`nda-b-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      licenseRestrictions: "Signed NDA required before kickoff",
+      requiresNdaIp: true,
+    });
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.requiresNdaIp).toBe(true);
+    expect(row.licenseRestrictions).toBe("Signed NDA required before kickoff");
+  });
+
+  it("clears the text when an edit unchecks the flag", async () => {
+    const owner = await makeUser(`nda-c-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      licenseRestrictions: "Signed NDA required before kickoff",
+      requiresNdaIp: true,
+    });
+
+    await updateProjectAs(owner, {
+      ...baseProject(),
+      id,
+      licenseRestrictions: "Signed NDA required before kickoff",
+      requiresNdaIp: false,
+    });
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.requiresNdaIp).toBe(false);
+    expect(row.licenseRestrictions).toBeNull();
+  });
+});
+
+describe("sponsorship flag", () => {
+  it("is visible to staff and the proposer, and to nobody else", async () => {
+    const owner = await makeUser(`spon-o-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`spon-a-${Date.now()}@x.com`, "admin");
+    const other = await makeUser(`spon-x-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      isSponsored: true,
+    });
+    await performTransitionAs(owner, id, "submitted");
+    await forceTransitionAs(admin, id, "published", undefined, {
+      embed: vi.fn().mockResolvedValue(new Array(1024).fill(0.1)),
+      sendEmail: false,
+    });
+
+    expect((await getProjectAs(admin, { id })).project?.isSponsored).toBe(true);
+    // The proposer declares sponsorship on the form, so they have to be able
+    // to read it back. Hiding it from them would make an edit round-trip
+    // silently reset the flag.
+    expect(
+      (await getProjectAs({ id: owner.id, role: owner.role }, { id })).project
+        ?.isSponsored
+    ).toBe(true);
+
+    // Sponsorship is closer to a funding conversation than a project
+    // attribute, so it never reaches the public payload. Null rather than
+    // absent, matching how notes are withheld.
+    expect(
+      (await getProjectAs({ id: other.id, role: other.role }, { id })).project
+        ?.isSponsored
+    ).toBeNull();
+    expect((await getProjectAs(null, { id })).project?.isSponsored).toBeNull();
+  });
+
+  it("publishes the NDA/IP flag to anonymous viewers", async () => {
+    const owner = await makeUser(`spon-p-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`spon-q-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      licenseRestrictions: "NDA required",
+      requiresNdaIp: true,
+    });
+    await performTransitionAs(owner, id, "submitted");
+    await forceTransitionAs(admin, id, "published", undefined, {
+      embed: vi.fn().mockResolvedValue(new Array(1024).fill(0.1)),
+      sendEmail: false,
+    });
+
+    // A student needs this before bidding, so it is public by design.
+    const anonView = await getProjectAs(null, { id });
+    expect(anonView.project?.requiresNdaIp).toBe(true);
   });
 });

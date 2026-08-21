@@ -22,6 +22,7 @@ import { ProjectImageUploader } from "./project-image-uploader";
 import { ProposerPicker } from "./proposer-picker";
 import { ProposerSummary } from "./proposer-summary";
 import { Button } from "./ui/button";
+import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
@@ -57,6 +58,8 @@ export const projectFormSchema = z.object({
   contactName: z.string().max(200),
   imageUrl: z.union([z.literal(""), z.string().max(500)]),
   licenseRestrictions: z.string().max(1000),
+  requiresNdaIp: z.boolean(),
+  isSponsored: z.boolean(),
   programId: optionalUuid,
   notes: z.string().max(5000),
   proposerEmail: optionalEmail,
@@ -125,6 +128,8 @@ export function ProjectForm({
       contactName: initial?.contactName ?? "",
       imageUrl: initial?.imageUrl ?? "",
       licenseRestrictions: initial?.licenseRestrictions ?? "",
+      requiresNdaIp: initial?.requiresNdaIp ?? false,
+      isSponsored: initial?.isSponsored ?? false,
       programId: initial?.programId ?? "",
       notes: initial?.notes ?? "",
       proposerEmail: initial?.proposerEmail ?? "",
@@ -225,6 +230,25 @@ export function ProjectForm({
         void form.handleSubmit();
       }}
     >
+      {/*
+        The commitment the program actually requires of a proposer, stated
+        where the proposal is written. Both cases are named because role
+        cannot tell them apart: a student and an industry partner are both
+        role "user", and a student cannot mentor their own team.
+      */}
+      <div className="rounded-md border border-border bg-muted/40 p-3 text-sm">
+        <p className="font-medium">Before you propose</p>
+        <p className="mt-1 text-muted-foreground">
+          A team expects about one hour a week from a project partner or mentor
+          once the project is accepted. If you are a student proposing a
+          project, line up a mentor who can give that hour, because you cannot
+          mentor your own team.
+        </p>
+        <p className="mt-2 text-muted-foreground">
+          Scope the work at roughly what you would hand a single summer intern,
+          and keep it off your critical path.
+        </p>
+      </div>
       {enableAiReview && (
         <div className="rounded-md border p-3">
           <div className="flex items-center justify-between gap-3">
@@ -349,15 +373,74 @@ export function ProjectForm({
           </div>
         )}
       </form.Field>
-      <Field
-        form={form}
-        label="License / IP restrictions"
-        markdown
-        name="licenseRestrictions"
-        onApply={() => applyField("licenseRestrictions")}
-        rows={2}
-        suggestion={suggestions.licenseRestrictions}
-      />
+      <form.Field name="requiresNdaIp">
+        {(field: AnyForm) => (
+          <div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={field.state.value as boolean}
+                id="requiresNdaIp"
+                onCheckedChange={(next) => {
+                  const on = next === true;
+                  field.handleChange(on);
+                  // Keep the form in the same shape the server enforces:
+                  // unchecking drops the prose rather than hiding it.
+                  if (!on) {
+                    form.setFieldValue("licenseRestrictions", "");
+                  }
+                }}
+              />
+              <Label className="font-normal" htmlFor="requiresNdaIp">
+                This project requires an NDA or IP agreement
+              </Label>
+            </div>
+            <p className="mt-1 text-muted-foreground text-xs">
+              Students see this before they bid. Unchecking it clears the
+              restrictions below.
+            </p>
+            {/*
+              Rendered from this field rather than a form.Subscribe: the
+              selector generics on Subscribe do not narrow to a single value
+              (see the useForm note in docs/QUIRKS.md), and the textarea only
+              ever depends on this one checkbox.
+            */}
+            {(field.state.value as boolean) && (
+              <div className="mt-3">
+                <Field
+                  form={form}
+                  label="License / IP restrictions"
+                  markdown
+                  name="licenseRestrictions"
+                  onApply={() => applyField("licenseRestrictions")}
+                  rows={2}
+                  suggestion={suggestions.licenseRestrictions}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </form.Field>
+      <form.Field name="isSponsored">
+        {(field: AnyForm) => (
+          <div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={field.state.value as boolean}
+                id="isSponsored"
+                onCheckedChange={(next) => field.handleChange(next === true)}
+              />
+              <Label className="font-normal" htmlFor="isSponsored">
+                This is a sponsored project
+              </Label>
+            </div>
+            <p className="mt-1 text-muted-foreground text-xs">
+              Organizations with more than 500 employees are asked to consider a
+              $2,000 contribution, and smaller ones $500. Sponsorship is not
+              required to propose a project.
+            </p>
+          </div>
+        )}
+      </form.Field>
       <form.Field name="programId">
         {(field: AnyForm) => (
           <div>

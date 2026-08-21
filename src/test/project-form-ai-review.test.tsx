@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 // Stub the heavy child components and the server function.
 vi.mock("#/components/program-select", () => ({
@@ -18,8 +18,11 @@ vi.mock("#/server/project-review", () => ({
 
 import { ProjectForm } from "#/components/project-form";
 import { reviewProject } from "#/server/project-review";
+import { installResizeObserver } from "./radix-jsdom";
 
 const mockedReview = vi.mocked(reviewProject);
+
+beforeAll(installResizeObserver);
 
 afterEach(() => {
   cleanup();

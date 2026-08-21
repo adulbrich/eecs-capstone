@@ -6,7 +6,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("#/components/program-select", () => ({
   ProgramSelect: () => null,
@@ -25,6 +25,9 @@ vi.mock("#/server/users", () => ({
 }));
 
 import { ProjectForm } from "#/components/project-form";
+import { installResizeObserver } from "./radix-jsdom";
+
+beforeAll(installResizeObserver);
 
 afterEach(cleanup);
 
