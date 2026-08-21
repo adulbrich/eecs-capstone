@@ -410,7 +410,7 @@ export function ProjectForm({
             </div>
             <p className="mt-1 text-muted-foreground text-xs">
               Students see this before they bid. Unchecking it clears
-              Licensing/IP/NDA notes below.
+              Licensing/IP/NDA notes.
             </p>
             {/*
               Rendered from this field rather than a form.Subscribe: the
@@ -421,6 +421,7 @@ export function ProjectForm({
             {(field.state.value as boolean) && (
               <div className="mt-3">
                 <Field
+                  description="Briefly explain the restrictions a team would be agreeing to."
                   form={form}
                   label="Licensing / IP / NDA notes"
                   markdown
@@ -484,8 +485,10 @@ export function ProjectForm({
               className="mt-0.5 text-muted-foreground text-xs"
               id="teamsSupported-description"
             >
-              How many separate teams could run this project at the same time.
-              Most projects support one.
+              How many separate teams could work on this project at the same
+              time. They might take different parts, try different solutions, or
+              compete for the best one. More teams means a larger time
+              commitment.
             </p>
             <Input
               aria-describedby="teamsSupported-description"

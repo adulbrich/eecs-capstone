@@ -48,8 +48,10 @@ describe("ProjectForm NDA/IP agreement", () => {
     // The hint names the field it clears, rather than "the restrictions
     // below", which matched no label on the page.
     expect(
-      screen.getByText(/Unchecking it clears Licensing\/IP\/NDA notes below\./)
+      screen.getByText(/Unchecking it clears Licensing\/IP\/NDA notes\./)
     ).toBeTruthy();
+    // The revealed field says what to put in it, like every other field.
+    expect(screen.getByText(/Briefly explain the restrictions/i)).toBeTruthy();
 
     expect(screen.getByLabelText("Licensing / IP / NDA notes")).toBeTruthy();
   });
