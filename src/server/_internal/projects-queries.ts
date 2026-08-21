@@ -21,6 +21,7 @@ import {
 } from "#/db/schema";
 import { readSession } from "#/lib/_internal/auth-guards";
 import {
+  canEditProject,
   canSeeProject,
   canSeeStatusHistory,
   filterCommentsForViewer,
@@ -304,11 +305,11 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
 
   const viewerIsStaff = isStaff(viewer);
   const viewerIsOwner = !!viewer && project.proposerId === viewer.id;
-  const canEdit =
-    !!viewer &&
-    !project.deletedAt &&
-    (viewerIsStaff || viewerIsOwner) &&
-    project.status !== "archived";
+  // The predicate, not a copy of it. An inline reimplementation here used to
+  // deny staff on an archived project while the write paths that call
+  // canEditProject allowed it, so the page hid an edit button for a write the
+  // server would have accepted.
+  const canEdit = canEditProject(project, viewer);
 
   return {
     project: detail,
