@@ -20,7 +20,7 @@ export const FIELD_LABELS: Record<ImprovableField, string> = {
   objectives: "Objectives / deliverables",
   minQualifications: "Minimum qualifications",
   prefQualifications: "Preferred qualifications",
-  licenseRestrictions: "License / IP restrictions",
+  licenseRestrictions: "Licensing / IP / NDA notes",
 };
 
 export interface FieldSuggestion {

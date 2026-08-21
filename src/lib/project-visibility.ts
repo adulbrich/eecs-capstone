@@ -105,12 +105,14 @@ export interface ProjectRow extends VisibleProject {
   contactName: string | null;
   description: string | null;
   imageUrl: string | null;
+  isSponsored: boolean;
   licenseRestrictions: string | null;
   minQualifications: string | null;
   objectives: string | null;
   prefQualifications: string | null;
   problemStatement: string | null;
   programId: string | null;
+  requiresNdaIp: boolean;
   teamsSupported: number;
   title: string;
   url: string | null;
@@ -123,6 +125,8 @@ export interface ProjectDetailView {
   description: string | null;
   id: string;
   imageUrl: string | null;
+  /** Staff and the proposer see the value; everyone else sees null. */
+  isSponsored: boolean | null;
   licenseRestrictions: string | null;
   minQualifications: string | null;
   notes: string | null;
@@ -130,6 +134,7 @@ export interface ProjectDetailView {
   prefQualifications: string | null;
   problemStatement: string | null;
   programId: string | null;
+  requiresNdaIp: boolean;
   status: Status;
   teamsSupported: number;
   title: string;
@@ -168,6 +173,9 @@ export function projectDetailView(
     contactName: project.contactName,
     imageUrl: project.imageUrl,
     licenseRestrictions: project.licenseRestrictions,
+    // Public by design: a student needs to know an agreement is involved
+    // before bidding, and this is what a catalog filter would key on.
+    requiresNdaIp: project.requiresNdaIp,
     teamsSupported: project.teamsSupported,
     programId: project.programId,
     status: project.status as Status,
@@ -175,6 +183,16 @@ export function projectDetailView(
     // The one viewer-dependent field, and the reason this cannot be a SQL
     // column map: the rule is which columns for THIS viewer, not which columns.
     notes: canSeePrivateNotes(project, viewer) ? project.notes : null,
+    // Same audience as the private notes: staff and the proposer. Sponsorship
+    // is closer to a funding conversation than a project attribute, so it
+    // does not reach the public payload. Nulled rather than omitted, because
+    // this projection returns one fixed key set for every viewer and
+    // project-visibility.test.ts pins that. The proposer is included because
+    // they declare it on the form: hide it from them and an edit round-trip
+    // would silently reset the flag.
+    isSponsored: canSeePrivateNotes(project, viewer)
+      ? project.isSponsored
+      : null,
   };
 }
 

@@ -103,6 +103,14 @@ export const projects = pgTable(
     contactName: text("contact_name"),
     imageUrl: text("image_url"),
     licenseRestrictions: text("license_restrictions"),
+    // The checkbox that gates licenseRestrictions in the form, and the column
+    // the public catalog can filter on. The invariant the write path keeps:
+    // false means licenseRestrictions is null, so an empty restrictions field
+    // and "no agreement required" can never disagree.
+    requiresNdaIp: boolean("requires_nda_ip").notNull().default(false),
+    // Staff-only. OSU asks a submitter to say whether the project is
+    // sponsored; the amount is a conversation, not a column.
+    isSponsored: boolean("is_sponsored").notNull().default(false),
     teamsSupported: integer("teams_supported").notNull().default(1),
     /** Staff-visible only; never returned in public queries. */
     notes: text("notes"),
