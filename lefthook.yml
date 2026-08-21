@@ -1,0 +1,9 @@
+# Biome, via ultracite, on every commit. Same check CI runs (`npm run check`),
+# narrowed to the staged files. Run `npm run format` to auto-fix what it reports.
+#
+# Set LEFTHOOK=0 to skip, or `git commit --no-verify`.
+pre-commit:
+  commands:
+    biome:
+      glob: "*.{js,jsx,mjs,ts,tsx,json,jsonc,css}"
+      run: npx ultracite check {staged_files}
