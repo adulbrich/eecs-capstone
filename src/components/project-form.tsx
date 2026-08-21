@@ -352,13 +352,13 @@ export function ProjectForm({
         placeholder="https://..."
       />
       <Field
-        description="Contact name is shown publicly. Leave blank to keep private."
+        description="Optional. Leave blank to keep private."
         form={form}
         label="Contact name"
         name="contactName"
       />
       <Field
-        description="Contact email is shown publicly. Leave blank to keep private."
+        description="Optional. Leave blank to keep private."
         form={form}
         label="Contact email"
         name="contactEmail"

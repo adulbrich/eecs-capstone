@@ -73,10 +73,10 @@ describe("ProjectForm field guidance", () => {
       screen.queryByText(/Contact details below are shown publicly/)
     ).toBeNull();
     expect(describedText("Contact name")).toBe(
-      "Contact name is shown publicly. Leave blank to keep private."
+      "Optional. Leave blank to keep private."
     );
     expect(describedText("Contact email")).toBe(
-      "Contact email is shown publicly. Leave blank to keep private."
+      "Optional. Leave blank to keep private."
     );
   });
 
