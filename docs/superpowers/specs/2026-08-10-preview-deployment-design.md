@@ -5,6 +5,13 @@ dev data, banner-marked as preview, and safe to send email from. Phase 1 is one
 shared preview environment dispatched at a branch. Phase 2, outlined but not
 specced to implementation depth, turns that into one preview per pull request.
 
+Re-checked against the tree on 2026-08-21 and still buildable. Every `infra/*.tf`
+claim and line reference in here still resolves; `infra/`, `Dockerfile` and
+`.github/workflows/deploy.yml` have not changed since it was written. What did
+move is recorded inline: the seed bundle's size and externals, four line
+references in `src/lib/auth.ts` and `scripts/seed-dev.ts`, and two pointers at a
+`README.md` roadmap that has since become GitHub Issues.
+
 ## Goal
 
 1. Deploy any branch to a running AWS environment that uses the same stack as
@@ -249,7 +256,7 @@ hostname.
 | Variable | Value | Why |
 |---|---|---|
 | `BETTER_AUTH_URL` | the preview distribution's `https://d***.cloudfront.net` | Better Auth reads it before `x-forwarded-host`, so a mismatch fails every request with `INVALID_ORIGIN` (`infra/ecs.tf:86-90`). |
-| `EMAIL_SUBJECT_PREFIX` | `[PREVIEW]` | The label the README asks for. |
+| `EMAIL_SUBJECT_PREFIX` | `[PREVIEW]` | The label issue #25 asks for. |
 | `EMAIL_SIMULATOR_DOMAINS` | `example.com` | Recipients in these domains are rewritten to the SES mailbox simulator. |
 | `EMAIL_REVIEW_INBOX` | `review@example.com` | Must not be the live staff inbox. It is subject to the simulator rewrite like any other recipient; config is not exempt. |
 | `EMAIL_REPLY_TO` | empty | No human should reply to preview mail. |
@@ -288,12 +295,12 @@ are `@oregonstate.edu`, and three sit on registrable company domains. Local dev
 benefits from the same change.
 
 No other change is needed. The seed calls `auth.api.signUpEmail` and then sets
-`emailVerified: true` directly (`scripts/seed-dev.ts:114-117` and `133-136`),
+`emailVerified: true` directly (`scripts/seed-dev.ts:123-131` and `135-150`),
 so seeded accounts can sign in under `requireEmailVerification: true`
-(`src/lib/auth.ts:39`).
+(`src/lib/auth.ts:40`).
 
 Worth stating because it sizes the blast radius: `sendOnSignUp: true`
-(`src/lib/auth.ts:44`) means the seed emits one verification email per seeded
+(`src/lib/auth.ts:46`) means the seed emits one verification email per seeded
 user, so every preview deploy sends ten. They all land on the simulator under
 this design. If that mapping ever regresses, the seed is the amplifier that
 turns one mistake into ten hard bounces against the shared account.
@@ -334,11 +341,20 @@ same user, so no additional grants are needed.
 bundles `scripts/seed-dev.ts` with esbuild to `dist-ops/seed-dev.mjs`:
 `--bundle --platform=node --format=esm --packages=external`.
 
-Verified by probe: the bundle is 61 KB and its only bare imports are
-`better-auth`, `better-auth/adapters/drizzle`, `better-auth/plugins`,
-`better-auth/tanstack-start`, `drizzle-orm`, `drizzle-orm/node-postgres`,
-`drizzle-orm/pg-core`, and `@aws-sdk/client-sesv2`. All are in `dependencies`,
-so `npm ci --omit=dev` leaves them present.
+Verified by probe, re-run 2026-08-21: the bundle is 91 KB and its only bare
+imports are `better-auth`, `better-auth/adapters/drizzle`,
+`better-auth/plugins`, `better-auth/tanstack-start`, `drizzle-orm`,
+`drizzle-orm/node-postgres`, `drizzle-orm/pg-core`, `@aws-sdk/client-sesv2`,
+`@tanstack/react-router`, and `@tanstack/react-start/server`. All resolve to
+packages in `dependencies`, so `npm ci --omit=dev` leaves them present.
+
+The last two arrived with commit `756bd93`, which made the seed produce its
+inventory flows through `src/server/_internal/inventory.ts` and
+`inventory-transitions.ts` instead of inserting rows directly. They are also why
+the assertion below has to resolve a subpath import back to its package:
+`@tanstack/react-start/server` is satisfied by `@tanstack/react-start`, and
+looking up the whole specifier in `dependencies` would fail the build over a
+dependency that is present.
 
 `--packages=external` marks every bare import external, including one that would
 resolve only through a devDependency, so the bundle succeeding does not prove
@@ -360,7 +376,7 @@ bundle is inert unless invoked.
 
 Full width, non-dismissible, rendered above `SiteHeader` in
 `src/routes/__root.tsx`. Reads the flag from `import.meta.env.VITE_PREVIEW_BANNER`,
-matching how `src/lib/storage.ts:11-16` reads its own build-time value.
+matching how `src/lib/storage.ts:12-16` reads its own build-time value.
 
 New `--preview-bg` and `--preview-fg` tokens in `src/styles.css`, in both the
 `:root` block and the dark block, because `docs/UI-CONVENTIONS.md` forbids hex in
@@ -602,8 +618,9 @@ OAuth app, a verification email arrives in the SES sending statistics with a
   dropping the branch ref.
 - `.env.example` gains `EMAIL_SUBJECT_PREFIX` and `EMAIL_SIMULATOR_DOMAINS`,
   both blank, with a note that they are preview-only.
-- The `README.md` roadmap bullet is rewritten to record the decision, following
-  the pattern set by commit `eae6c7b`.
+- Issue #25 is closed by the pull request. Commit `da5145c` moved the roadmap
+  out of `README.md` and into GitHub Issues the day after this spec was
+  written, so the bullet this once asked to rewrite no longer exists.
 
 ## Risks
 
