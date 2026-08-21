@@ -16,6 +16,8 @@ interface Program {
 
 interface Props {
   allowEmpty?: boolean;
+  /** Id of the helper text describing this control, for aria-describedby. */
+  describedBy?: string;
   id?: string;
   onChange: (value: string) => void;
   value: string;
@@ -29,6 +31,7 @@ export function ProgramSelect({
   value,
   onChange,
   allowEmpty = true,
+  describedBy,
   id,
 }: Props) {
   const [programs, setPrograms] = useState<Program[]>([]);
@@ -49,7 +52,12 @@ export function ProgramSelect({
       onValueChange={(v) => onChange(v === NONE ? "" : v)}
       value={value === "" ? NONE : value}
     >
-      <SelectTrigger aria-label="Program" className="mt-1 w-full" id={id}>
+      <SelectTrigger
+        aria-describedby={describedBy}
+        aria-label="Program"
+        className="mt-1 w-full"
+        id={id}
+      >
         <SelectValue placeholder="Select a program" />
       </SelectTrigger>
       <SelectContent>

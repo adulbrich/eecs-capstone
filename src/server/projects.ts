@@ -29,6 +29,8 @@ const projectInputSchema = z.object({
   contactName: z.string().max(200).nullable().optional(),
   imageUrl: z.string().max(500).nullable().optional().or(z.literal("")),
   licenseRestrictions: z.string().max(1000).nullable().optional(),
+  requiresNdaIp: z.boolean().optional(),
+  isSponsored: z.boolean().optional(),
   programId: z.string().uuid().nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
   proposerEmail: z
