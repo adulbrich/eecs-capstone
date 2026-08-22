@@ -118,15 +118,12 @@ export function CategoryMultiSelect({ domain, value, onChange }: Props) {
     <div className="space-y-3">
       {loadError && <p className="text-destructive text-sm">{loadError}</p>}
       {!loadError && categories.length === 0 && (
-        <p className="text-neutral-500 text-sm">No categories yet.</p>
+        <p className="text-muted-foreground text-sm">No categories yet.</p>
       )}
       {domain === "project" &&
         [...grouped.entries()].map(([type, items]) => (
-          <fieldset
-            className="border border-neutral-200 p-2 dark:border-neutral-800"
-            key={type}
-          >
-            <legend className="px-1 font-medium text-neutral-500 text-xs">
+          <fieldset className="border border-border p-2" key={type}>
+            <legend className="px-1 font-medium text-muted-foreground text-xs">
               {type}
             </legend>
             <div className="flex flex-wrap gap-2">

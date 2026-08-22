@@ -4,9 +4,7 @@ export default function BetterAuthHeader() {
   const { data: session, isPending } = authClient.useSession();
 
   if (isPending) {
-    return (
-      <div className="h-8 w-8 animate-pulse bg-neutral-100 dark:bg-neutral-800" />
-    );
+    return <div className="h-8 w-8 animate-pulse bg-secondary" />;
   }
 
   if (session?.user) {
@@ -15,14 +13,14 @@ export default function BetterAuthHeader() {
         {session.user.image ? (
           <img alt="" className="h-8 w-8" src={session.user.image} />
         ) : (
-          <div className="flex h-8 w-8 items-center justify-center bg-neutral-100 dark:bg-neutral-800">
-            <span className="font-medium text-neutral-600 text-xs dark:text-neutral-400">
+          <div className="flex h-8 w-8 items-center justify-center bg-secondary">
+            <span className="font-medium text-muted-foreground text-xs">
               {session.user.name?.charAt(0).toUpperCase() || "U"}
             </span>
           </div>
         )}
         <button
-          className="h-9 flex-1 border border-neutral-300 bg-white px-4 font-medium text-neutral-900 text-sm transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-50 dark:hover:bg-neutral-800"
+          className="h-9 flex-1 border border-border bg-card px-4 font-medium text-card-foreground text-sm transition-colors hover:bg-secondary"
           onClick={() => {
             void authClient.signOut();
           }}

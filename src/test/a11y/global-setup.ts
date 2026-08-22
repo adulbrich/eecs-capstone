@@ -67,7 +67,7 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
       "instructor@example.com not found in database. Run: npm run db:seed:dev"
     );
   }
-  // instructor is only used as a program_instructors DB fixture — no auth session needed.
+  // instructor is only used as a program_instructors DB fixture: no auth session needed.
 
   const [adminUser] = await db
     .select()
@@ -129,7 +129,7 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   // duplicate rows since these tables have no UNIQUE constraint on their sentinel
   // values. Acceptable for single-worker CI; revisit if workers > 1.
 
-  // Category (no unique constraint on name — select-first pattern)
+  // Category (no unique constraint on name, hence the select-first pattern)
   let [category] = await db
     .select()
     .from(schema.categories)
@@ -145,7 +145,7 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
       .returning();
   }
 
-  // Program (no unique constraint on courseId — select-first pattern)
+  // Program (no unique constraint on courseId, hence the select-first pattern)
   let [program] = await db
     .select()
     .from(schema.programs)
@@ -160,13 +160,13 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
       .returning();
   }
 
-  // Program instructor join (has composite PK — safe to use onConflictDoNothing)
+  // Program instructor join (has composite PK, so onConflictDoNothing is safe)
   await db
     .insert(schema.programInstructors)
     .values({ programId: program.id, userId: instructor.id })
     .onConflictDoNothing();
 
-  // Project (no unique constraint on title — select-first pattern)
+  // Project (no unique constraint on title, hence the select-first pattern)
   let [project] = await db
     .select()
     .from(schema.projects)
@@ -218,7 +218,7 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
       .returning();
   }
 
-  // Inventory item (no unique constraint on name — select-first pattern)
+  // Inventory item (no unique constraint on name, hence the select-first pattern)
   let [item] = await db
     .select()
     .from(schema.inventoryItems)

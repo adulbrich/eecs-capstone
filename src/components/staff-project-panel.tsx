@@ -213,7 +213,7 @@ export function StaffProjectPanel({
       </PanelSection>
 
       <PanelSection title="Status">
-        {/* Status stepper — vertical on mobile, horizontal on md+ */}
+        {/* Status stepper: vertical on mobile, horizontal on md+ */}
         <div className="md:overflow-x-auto md:pb-1">
           <div className="flex flex-col md:min-w-max md:flex-row md:items-center">
             {WORKFLOW.map((s, i) => {
