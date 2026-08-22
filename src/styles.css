@@ -7,7 +7,7 @@
 @custom-variant dark (@media (prefers-color-scheme: dark));
 
 :root {
-  /* Brand defaults — must match brand.ts values exactly.
+  /* Brand defaults, which must match brand.ts values exactly.
      BrandProvider overwrites these at runtime; the values here serve as
      SSR fallbacks and are identical to brand.ts so there is no FOUC. */
   --brand-primary:        #D73F09;
@@ -92,7 +92,7 @@
 
 @media (prefers-color-scheme: dark) {
 :root {
-  /* Brand — primary kept at vivid orange for decorative uses; brand-primary-dark
+  /* Brand: primary kept at vivid orange for decorative uses; brand-primary-dark
      bumped to #FF8C5A so link text clears WCAG AA (7:1 on #1C1C1C).
      --primary overrides the var(--brand-primary) reference for buttons so
      white button text meets 4.5:1 before BrandProvider hydrates. */
@@ -100,12 +100,12 @@
   --brand-primary-dark:   #FF8C5A;
   --brand-primary-tint:   rgba(239, 87, 19, 0.12);
 
-  /* Surfaces — deeper base gives more range for the gradient */
+  /* Surfaces: deeper base gives more range for the gradient */
   --surface-base:         #111111;
   --surface-raised:       #1C1C1C;
   --surface-sunken:       #242424;
 
-  /* Text — secondary/tertiary lightened to clear WCAG AA on all surfaces:
+  /* Text: secondary/tertiary lightened to clear WCAG AA on all surfaces:
      #ADA8A4 → 7:1, #908B87 → 4.8:1 on #1C1C1C */
   --text-primary:         #EDE9E5;
   --text-secondary:       #ADA8A4;
@@ -121,7 +121,7 @@
   --hero-a:               rgba(239, 87, 19, 0.10);
   --hero-b:               rgba(0, 0, 0, 0.55);
 
-  /* Status — all override `:root` values that fail on dark surfaces */
+  /* Status: all override `:root` values that fail on dark surfaces */
   --status-success:       #66BB6A;
   --status-success-bg:    rgba(102, 187, 106, 0.12);
   --status-warning:       #FFA726;
@@ -176,7 +176,7 @@ body {
     linear-gradient(160deg, #090909 0%, #171717 55%, #111111 100%);
 }
 
-/* Tone down the light blobs — they're distracting on dark */
+/* Tone down the light blobs, which are distracting on dark */
 body::before {
   opacity: 0.12;
   background:
@@ -185,7 +185,7 @@ body::before {
     radial-gradient(circle at 42% 82%, rgba(0, 0, 0, 0.20), transparent 36%);
 }
 
-/* Subtle grid — opacity pulled back so it doesn't compete with content */
+/* Subtle grid: opacity pulled back so it does not compete with content */
 body::after {
   opacity: 0.05;
 }
@@ -204,7 +204,7 @@ body::after {
   --font-mono: ui-monospace, "JetBrains Mono", "Fira Code", "Cascadia Code",
                Menlo, Consolas, monospace;
 
-  /* Brand Tailwind color aliases — bg-brand, text-brand, border-brand, etc. */
+  /* Brand Tailwind color aliases: bg-brand, text-brand, border-brand, etc. */
   --color-brand:          var(--brand-primary);
   --color-brand-dark:     var(--brand-primary-dark);
   --color-brand-light:    var(--brand-primary-light);
