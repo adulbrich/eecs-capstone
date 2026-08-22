@@ -1,6 +1,7 @@
 import { useForm, useStore } from "@tanstack/react-form";
 import { useState } from "react";
 import { z } from "zod";
+import { FieldError } from "#/components/ui/field";
 import { applyServerErrors } from "#/lib/apply-server-errors";
 import {
   PRIVATE_NOTES_LABEL,
@@ -16,7 +17,6 @@ import {
 import { reviewProject } from "#/server/project-review";
 import type { ProposerForEdit } from "#/server/projects-queries";
 import { CategoryMultiSelect } from "./category-multi-select";
-import { FieldErrors } from "./field-errors";
 import { MarkdownField } from "./markdown-field";
 import { Panel, PanelHeader, PanelNote } from "./panel";
 import { ProgramSelect } from "./program-select";
@@ -399,7 +399,7 @@ export function ProjectForm({
               Cropped to 16:9 and resized to max 1600x900. Saved when you submit
               the form.
             </p>
-            <FieldErrors errors={field.state.meta.errors} />
+            <FieldError errors={field.state.meta.errors} />
           </div>
         )}
       </form.Field>
@@ -489,7 +489,7 @@ export function ProjectForm({
               onChange={(v) => field.handleChange(v)}
               value={field.state.value as string}
             />
-            <FieldErrors errors={field.state.meta.errors} />
+            <FieldError errors={field.state.meta.errors} />
           </div>
         )}
       </form.Field>
@@ -524,7 +524,7 @@ export function ProjectForm({
               type="number"
               value={field.state.value as number}
             />
-            <FieldErrors errors={field.state.meta.errors} />
+            <FieldError errors={field.state.meta.errors} />
           </div>
         )}
       </form.Field>
@@ -566,7 +566,7 @@ export function ProjectForm({
                       onChange={(email) => field.handleChange(email)}
                       value={field.state.value as string}
                     />
-                    <FieldErrors errors={field.state.meta.errors} />
+                    <FieldError errors={field.state.meta.errors} />
                   </div>
                 )}
               </form.Field>
@@ -713,7 +713,7 @@ function Field({
             rows={rows}
             textarea={textarea}
           />
-          <FieldErrors errors={field.state.meta.errors} />
+          <FieldError errors={field.state.meta.errors} />
           {suggestion && (
             <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-2">
               <p className="font-medium text-primary text-xs">

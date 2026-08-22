@@ -641,6 +641,7 @@ export function InventoryLifecyclePanel({ item, history }: Props) {
               Item name: <span className="font-mono">{item.name}</span>
             </p>
             <Input
+              aria-label="Confirm item name"
               onChange={(e) => setDelConfirm(e.target.value)}
               placeholder="Type item name to confirm"
               value={delConfirm}

@@ -100,6 +100,7 @@ function MyItems() {
             {data.cart.length > 0 && (
               <div className="space-y-2 rounded-md border border-border bg-card p-3">
                 <Textarea
+                  aria-label="Note for staff"
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="Optional note for staff"
                   value={note}

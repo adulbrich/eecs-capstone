@@ -54,6 +54,7 @@ export function InventoryFilterBar(props: Props) {
     <Card className="bg-transparent p-4">
       <div className="flex items-center gap-3">
         <Input
+          aria-label="Search inventory"
           className="flex-1"
           onChange={(e) => setLocalQ(e.target.value)}
           placeholder="Search inventory"

@@ -143,6 +143,7 @@ export function ProjectsFilterBar({
     <Card className="bg-transparent p-4">
       <div className="flex items-center gap-3">
         <Input
+          aria-label="Search projects"
           className="flex-1"
           onChange={(e) => setQueryDraft(e.target.value)}
           placeholder='Search projects (try "phrase" or -word to exclude)'

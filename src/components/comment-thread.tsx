@@ -183,6 +183,7 @@ function NewCommentForm({
   return (
     <form className="mt-4 space-y-2" onSubmit={onSubmit}>
       <Textarea
+        aria-label="Comment"
         onChange={(e) => setContent(e.target.value)}
         placeholder="Add a comment"
         required
@@ -262,6 +263,7 @@ function ReplyForm({
   return (
     <form className="mt-2 space-y-2 pl-4" onSubmit={onSubmit}>
       <Textarea
+        aria-label="Reply"
         onChange={(e) => setContent(e.target.value)}
         placeholder="Reply"
         required
