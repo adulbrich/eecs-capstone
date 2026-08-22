@@ -1,3 +1,5 @@
+import { Badge } from "./ui/badge";
+
 type Status =
   | "available"
   | "requested"
@@ -27,12 +29,9 @@ export function InventoryStatusBadge({
   }
   const style = STYLES[status];
   return (
-    <span
-      className="inline-flex items-center rounded px-2 py-0.5 font-medium text-xs"
-      style={style}
-    >
+    <Badge style={style} variant="status">
       {LABEL[status]}
-    </span>
+    </Badge>
   );
 }
 

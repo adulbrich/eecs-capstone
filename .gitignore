@@ -19,3 +19,6 @@ src/test/a11y/.fixtures.json
 playwright-report/
 test-results/
 .playwright-mcp/
+
+# Subagent-driven-development scratch: ledgers, briefs, review packages.
+.superpowers/

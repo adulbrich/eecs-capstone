@@ -5,8 +5,8 @@ import { cn } from "#/lib/utils.ts";
 /**
  * The shared vocabulary for the audience-gated panels on the project and
  * inventory detail pages. Before this existed the four panels had four
- * different heading treatments — `island-kicker`, `h2.font-medium.text-sm`,
- * `h3.font-medium.text-sm` and `p.uppercase.text-xs` — and two different ways
+ * different heading treatments (`island-kicker`, `h2.font-medium.text-sm`,
+ * `h3.font-medium.text-sm` and `p.uppercase.text-xs`) and two different ways
  * of separating their sections. Routing every panel through these primitives
  * is what keeps a fifth from appearing.
  *

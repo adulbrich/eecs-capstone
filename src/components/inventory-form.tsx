@@ -1,6 +1,7 @@
 import { useForm } from "@tanstack/react-form";
 import { useState } from "react";
 import { z } from "zod";
+import { FieldError } from "#/components/ui/field";
 import { applyServerErrors } from "#/lib/apply-server-errors";
 import {
   PRIVATE_NOTES_INVENTORY_HINT,
@@ -14,7 +15,6 @@ import {
   uploadInventoryImage,
 } from "#/server/inventory";
 import { CategoryMultiSelect } from "./category-multi-select";
-import { FieldErrors } from "./field-errors";
 import { InventoryImageUploader } from "./inventory-image-uploader";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -152,7 +152,7 @@ export function InventoryForm({
               onChange={(ids) => field.handleChange(ids)}
               value={field.state.value as string[]}
             />
-            <FieldErrors errors={field.state.meta.errors} />
+            <FieldError errors={field.state.meta.errors} />
           </div>
         )}
       </form.Field>
@@ -175,7 +175,7 @@ export function InventoryForm({
               Cropped to 1:1 and resized to max 1200x1200. Saved when you submit
               the form.
             </p>
-            <FieldErrors errors={field.state.meta.errors} />
+            <FieldError errors={field.state.meta.errors} />
           </div>
         )}
       </form.Field>
@@ -292,7 +292,7 @@ function Field({
               value={field.state.value as string}
             />
           )}
-          <FieldErrors errors={field.state.meta.errors} />
+          <FieldError errors={field.state.meta.errors} />
         </div>
       )}
     </form.Field>

@@ -8,6 +8,7 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { BrandProvider } from "../components/brand-provider";
 import { SiteHeader } from "../components/site-header";
+import { Toaster } from "../components/ui/sonner";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { brand } from "../lib/brand";
 import appCss from "../styles.css?url";
@@ -50,6 +51,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <BrandProvider>
           <SiteHeader />
           {children}
+          <Toaster />
           <TanStackDevtools
             config={{
               position: "bottom-right",

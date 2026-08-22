@@ -1,7 +1,7 @@
 /**
  * Route params arrive as arbitrary strings. The server functions validate ids
  * with Zod's `.uuid()`, which throws on a malformed value and surfaces as a
- * 500 — but a URL that cannot name a record is a 404, not a server fault. Route
+ * 500, but a URL that cannot name a record is a 404, not a server fault. Route
  * loaders call this first so the status code reflects the actual situation.
  *
  * Accepts the RFC 4122 forms Postgres `uuid` columns round-trip, case

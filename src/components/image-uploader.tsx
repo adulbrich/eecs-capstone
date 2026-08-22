@@ -159,7 +159,7 @@ export function ImageUploader({
               {busy ? "Processing..." : "Use image"}
             </button>
             <button
-              className="border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100"
+              className="border border-border px-3 py-1.5 text-sm hover:bg-secondary"
               disabled={busy}
               onClick={onCancelCrop}
               type="button"
@@ -167,22 +167,22 @@ export function ImageUploader({
               Cancel
             </button>
           </div>
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+          {error && <p className="text-destructive text-sm">{error}</p>}
         </div>
       ) : (
         <div className="space-y-2">
           {displayUrl ? (
             <img
               alt="Current"
-              className="max-h-48 border border-neutral-200 object-contain dark:border-neutral-800"
+              className="max-h-48 border border-border object-contain"
               src={displayUrl}
             />
           ) : (
-            <p className="text-neutral-500 text-sm">No image set.</p>
+            <p className="text-muted-foreground text-sm">No image set.</p>
           )}
           <div className="flex gap-2">
             <button
-              className="border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700/50"
+              className="border border-border px-3 py-1.5 text-sm hover:bg-secondary"
               onClick={() => fileInputRef.current?.click()}
               type="button"
             >
@@ -190,7 +190,7 @@ export function ImageUploader({
             </button>
             {hasContent && (
               <button
-                className="inline-flex items-center gap-1 border border-red-300 px-3 py-1.5 text-red-700 text-sm hover:bg-red-50 dark:hover:bg-red-950"
+                className="inline-flex items-center gap-1 border border-destructive/30 px-3 py-1.5 text-destructive text-sm hover:bg-[var(--status-error-bg)]"
                 onClick={onRemove}
                 type="button"
               >
@@ -205,7 +205,7 @@ export function ImageUploader({
             ref={fileInputRef}
             type="file"
           />
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+          {error && <p className="text-destructive text-sm">{error}</p>}
         </div>
       )}
     </div>

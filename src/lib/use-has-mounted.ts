@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
  * False during SSR and on the client's first render, true thereafter.
  *
  * Use it to gate anything whose output depends on state the server cannot
- * know — most often the signed-in session, which Better Auth can resolve
+ * know: most often the signed-in session, which Better Auth can resolve
  * synchronously on the client from a cached cookie. Without a gate the server
  * renders the signed-out branch, the client's very first render produces the
  * signed-in one, and React reports a hydration mismatch and throws the tree

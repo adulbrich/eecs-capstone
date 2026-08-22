@@ -10,13 +10,10 @@ function NotFound() {
   return (
     <div className="mx-auto max-w-md p-8">
       <h1 className="font-semibold text-2xl">Not found</h1>
-      <p className="mt-3 text-neutral-600 text-sm">
+      <p className="mt-3 text-muted-foreground text-sm">
         We could not find the page you were looking for.
       </p>
-      <Link
-        className="mt-4 inline-block text-blue-700 text-sm hover:underline"
-        to="/"
-      >
+      <Link className="mt-4 inline-block text-sm hover:underline" to="/">
         Go home
       </Link>
     </div>

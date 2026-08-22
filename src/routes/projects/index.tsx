@@ -4,6 +4,11 @@ import { z } from "zod";
 import { EmptyState } from "#/components/empty-state";
 import { ProjectListItem } from "#/components/project-list-item";
 import { ProjectsFilterBar } from "#/components/projects-filter-bar";
+import {
+  Pagination,
+  PaginationLink,
+  PaginationStatus,
+} from "#/components/ui/pagination";
 import { pageTitle } from "#/lib/page-title";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
 import type { ViewMode } from "#/lib/view-preference";
@@ -82,35 +87,35 @@ function ProjectsList() {
           ))}
         </div>
       )}
-      <div className="mx-auto mt-6 flex max-w-4xl items-center justify-between text-sm">
-        <Link
-          className={
-            page <= 1
-              ? "pointer-events-none text-muted-foreground/40"
-              : "hover:underline"
-          }
-          from="/projects/"
-          search={(prev) => ({ ...prev, page: Math.max(1, page - 1) })}
-          to="/projects"
-        >
-          Previous
-        </Link>
-        <span className="text-muted-foreground">
-          Page {page} of {totalPages}
-        </span>
-        <Link
-          className={
-            page >= totalPages
-              ? "pointer-events-none text-muted-foreground/40"
-              : "hover:underline"
-          }
-          from="/projects/"
-          search={(prev) => ({ ...prev, page: Math.min(totalPages, page + 1) })}
-          to="/projects"
-        >
-          Next
-        </Link>
-      </div>
+      <Pagination className="mx-auto max-w-4xl">
+        {page <= 1 ? (
+          <PaginationLink disabled>Previous</PaginationLink>
+        ) : (
+          <PaginationLink asChild>
+            <Link
+              from="/projects/"
+              search={(prev) => ({ ...prev, page: page - 1 })}
+              to="/projects"
+            >
+              Previous
+            </Link>
+          </PaginationLink>
+        )}
+        <PaginationStatus page={page} totalPages={totalPages} />
+        {page >= totalPages ? (
+          <PaginationLink disabled>Next</PaginationLink>
+        ) : (
+          <PaginationLink asChild>
+            <Link
+              from="/projects/"
+              search={(prev) => ({ ...prev, page: page + 1 })}
+              to="/projects"
+            >
+              Next
+            </Link>
+          </PaginationLink>
+        )}
+      </Pagination>
     </div>
   );
 }

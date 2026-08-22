@@ -16,7 +16,7 @@ export const brand = {
   supportEmail: "capstone@oregonstate.edu",
   institutionUrl: "https://oregonstate.edu",
 
-  // Color tokens — must match the :root defaults in styles.css exactly.
+  // Color tokens: must match the :root defaults in styles.css exactly.
   // BrandProvider writes these to :root at runtime via element.style.setProperty().
   colorPrimary: "#D73F09", // Beaver Orange
   colorPrimaryDark: "#B83207", // hover / pressed

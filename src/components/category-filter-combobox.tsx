@@ -43,7 +43,7 @@ function triggerLabel(
  * uses, adapted so selecting an item toggles membership in `value` instead
  * of replacing it and closing the popover. Selection is all-match: the
  * caller (a listing query) treats every selected id as required, not "any
- * of these" — hence the trigger stays open across selections so a user can
+ * of these"; hence the trigger stays open across selections so a user can
  * pick several without reopening it each time.
  */
 export function CategoryFilterCombobox({

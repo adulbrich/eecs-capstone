@@ -131,7 +131,7 @@ function buildInventoryScope(
     // (src/server/_internal/search.ts:40-46). A subquery grouped by itemId
     // with count = the number of requested categories is the only shape
     // that discriminates "has every selected category" from "has at least
-    // one of them" — a plain inArray on the join table would give the
+    // one of them"; a plain inArray on the join table would give the
     // any-match semantics this task explicitly rejects.
     const matching = db
       .select({ itemId: inventoryItemCategories.itemId })

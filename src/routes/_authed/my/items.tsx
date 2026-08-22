@@ -5,12 +5,14 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 import { EmptyState } from "#/components/empty-state";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { LocalTime } from "#/components/local-time";
 import { OverdueBadge } from "#/components/overdue-badge";
 import { Button } from "#/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import { Textarea } from "#/components/ui/textarea";
 import {
   cancelRequestItem,
@@ -47,200 +49,196 @@ function MyItems() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
       <h1 className="font-semibold text-2xl">My Items</h1>
-      <div className="mt-4 flex gap-4 border-border border-b">
-        {(["cart", "active", "history"] as const).map((t) => (
-          <button
-            className={
-              t === tab
-                ? "border-b-2 px-2 py-1 font-medium"
-                : "px-2 py-1 text-muted-foreground hover:text-foreground"
-            }
-            key={t}
-            onClick={() => navigate({ search: () => ({ tab: t }) })}
-            style={
-              t === tab
-                ? { borderBottomColor: "var(--brand-primary)" }
-                : undefined
-            }
-            type="button"
-          >
-            {(() => {
-              if (t === "cart") {
-                return `Cart (${data.cart.length})`;
-              }
-              if (t === "active") {
-                return `Active (${data.active.length})`;
-              }
-              return "History";
-            })()}
-          </button>
-        ))}
-      </div>
+      {/* Manual activation: selecting a tab pushes a navigation and rewrites
+          the URL, so arrowing must only move focus. Under automatic mode,
+          arrowing across the strip fires onValueChange (and a navigation) on
+          every keypress. */}
+      <Tabs
+        activationMode="manual"
+        className="mt-4"
+        onValueChange={(next) =>
+          navigate({
+            search: () => ({ tab: next as "active" | "cart" | "history" }),
+          })
+        }
+        value={tab}
+      >
+        <TabsList>
+          <TabsTrigger value="cart">Cart ({data.cart.length})</TabsTrigger>
+          <TabsTrigger value="active">
+            Active ({data.active.length})
+          </TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
+        </TabsList>
 
-      {tab === "cart" && (
-        <div className="mt-4 space-y-2">
-          {data.cart.length === 0 && (
-            <EmptyState>Your cart is empty.</EmptyState>
-          )}
-          {data.cart.map((row) => (
-            <div
-              className="flex items-center justify-between rounded-md border border-border bg-card p-3"
-              key={row.itemId}
-            >
-              <div>
-                <p className="font-medium">{row.name}</p>
-                <InventoryStatusBadge status={row.status as "available"} />
+        <TabsContent value="cart">
+          <div className="space-y-2">
+            {data.cart.length === 0 && (
+              <EmptyState>Your cart is empty.</EmptyState>
+            )}
+            {data.cart.map((row) => (
+              <div
+                className="flex items-center justify-between rounded-md border border-border bg-card p-3"
+                key={row.itemId}
+              >
+                <div>
+                  <p className="font-medium">{row.name}</p>
+                  <InventoryStatusBadge status={row.status as "available"} />
+                </div>
+                <Button
+                  onClick={async () => {
+                    await removeFromCart({ data: { itemId: row.itemId } });
+                    await refresh();
+                  }}
+                  size="sm"
+                  variant="outline"
+                >
+                  Remove
+                </Button>
               </div>
-              <Button
-                onClick={async () => {
-                  await removeFromCart({ data: { itemId: row.itemId } });
-                  await refresh();
-                }}
-                size="sm"
-                variant="outline"
-              >
-                Remove
-              </Button>
-            </div>
-          ))}
-          {data.cart.length > 0 && (
-            <div className="space-y-2 rounded-md border border-border bg-card p-3">
-              <Textarea
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Optional note for staff"
-                value={note}
-              />
-              <Button
-                onClick={async () => {
-                  const result = await submitCart({
-                    data: { note: note || null },
-                  });
-                  setNote("");
-                  await refresh();
-                  if (result.skipped.length > 0) {
-                    alert(
-                      `Submitted ${result.submitted.length}; skipped ${result.skipped.length} (no longer available).`
-                    );
-                  }
-                  navigate({ search: () => ({ tab: "active" }) });
-                }}
-              >
-                Submit request
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
+            ))}
+            {data.cart.length > 0 && (
+              <div className="space-y-2 rounded-md border border-border bg-card p-3">
+                <Textarea
+                  aria-label="Note for staff"
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Optional note for staff"
+                  value={note}
+                />
+                <Button
+                  onClick={async () => {
+                    const result = await submitCart({
+                      data: { note: note || null },
+                    });
+                    setNote("");
+                    await refresh();
+                    if (result.skipped.length > 0) {
+                      toast.warning(
+                        `Submitted ${result.submitted.length}, skipped ${result.skipped.length} (no longer available).`
+                      );
+                    }
+                    navigate({ search: () => ({ tab: "active" }) });
+                  }}
+                >
+                  Submit request
+                </Button>
+              </div>
+            )}
+          </div>
+        </TabsContent>
 
-      {tab === "active" && (
-        <div className="mt-4 space-y-2">
-          {data.active.length === 0 && <EmptyState>Nothing active.</EmptyState>}
-          {data.active.map((entry) => {
-            if (entry.kind === "hold") {
+        <TabsContent value="active">
+          <div className="space-y-2">
+            {data.active.length === 0 && (
+              <EmptyState>Nothing active.</EmptyState>
+            )}
+            {data.active.map((entry) => {
+              if (entry.kind === "hold") {
+                return (
+                  <div
+                    className="flex items-center justify-between rounded-md border border-border bg-card p-3"
+                    key={entry.item.id}
+                  >
+                    <div>
+                      <p className="font-medium">{entry.item.name}</p>
+                      <InventoryStatusBadge status={entry.item.status} />
+                      <OverdueBadge entry={entry} />
+                      {entry.item.pickupBy && (
+                        <p className="text-muted-foreground text-xs">
+                          Pick up by{" "}
+                          <LocalTime dateOnly value={entry.item.pickupBy} />
+                        </p>
+                      )}
+                      {entry.item.dueAt && (
+                        <p className="text-muted-foreground text-xs">
+                          Due <LocalTime dateOnly value={entry.item.dueAt} />
+                        </p>
+                      )}
+                      <p className="text-muted-foreground text-xs">
+                        Assigned by staff
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
+              const { line, itemName, itemStatus } = entry;
+              const canCancel =
+                (line.status === "pending" || line.status === "approved") &&
+                itemStatus !== "checked_out";
               return (
                 <div
                   className="flex items-center justify-between rounded-md border border-border bg-card p-3"
-                  key={entry.item.id}
+                  key={line.id}
                 >
                   <div>
-                    <p className="font-medium">{entry.item.name}</p>
-                    <InventoryStatusBadge status={entry.item.status} />
+                    <p className="font-medium">{itemName}</p>
+                    <InventoryStatusBadge status={itemStatus} />
                     <OverdueBadge entry={entry} />
-                    {entry.item.pickupBy && (
+                    {line.pickupBy && (
                       <p className="text-muted-foreground text-xs">
-                        Pick up by{" "}
-                        <LocalTime dateOnly value={entry.item.pickupBy} />
+                        Pick up by <LocalTime dateOnly value={line.pickupBy} />
                       </p>
                     )}
-                    {entry.item.dueAt && (
+                    {line.dueAt && (
                       <p className="text-muted-foreground text-xs">
-                        Due <LocalTime dateOnly value={entry.item.dueAt} />
+                        Due <LocalTime dateOnly value={line.dueAt} />
                       </p>
                     )}
-                    <p className="text-muted-foreground text-xs">
-                      Assigned by staff
-                    </p>
+                    {entry.collectedBy && (
+                      <p className="text-muted-foreground text-xs">
+                        Collected by{" "}
+                        {entry.collectedBy.name ?? entry.collectedBy.email}
+                      </p>
+                    )}
                   </div>
+                  {canCancel && (
+                    <Button
+                      onClick={async () => {
+                        await cancelRequestItem({
+                          data: { requestItemId: line.id, note: null },
+                        });
+                        await refresh();
+                      }}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Cancel
+                    </Button>
+                  )}
                 </div>
               );
-            }
+            })}
+          </div>
+        </TabsContent>
 
-            const { line, itemName, itemStatus } = entry;
-            const canCancel =
-              (line.status === "pending" || line.status === "approved") &&
-              itemStatus !== "checked_out";
-            return (
+        <TabsContent value="history">
+          <div className="space-y-2">
+            {data.history.length === 0 && (
+              <EmptyState>No history yet.</EmptyState>
+            )}
+            {data.history.map(({ line, itemName, collectedBy }) => (
               <div
-                className="flex items-center justify-between rounded-md border border-border bg-card p-3"
+                className="rounded-md border border-border bg-card p-3"
                 key={line.id}
               >
-                <div>
-                  <p className="font-medium">{itemName}</p>
-                  <InventoryStatusBadge status={itemStatus} />
-                  <OverdueBadge entry={entry} />
-                  {line.pickupBy && (
-                    <p className="text-muted-foreground text-xs">
-                      Pick up by <LocalTime dateOnly value={line.pickupBy} />
-                    </p>
-                  )}
-                  {line.dueAt && (
-                    <p className="text-muted-foreground text-xs">
-                      Due <LocalTime dateOnly value={line.dueAt} />
-                    </p>
-                  )}
-                  {entry.collectedBy && (
-                    <p className="text-muted-foreground text-xs">
-                      Collected by{" "}
-                      {entry.collectedBy.name ?? entry.collectedBy.email}
-                    </p>
-                  )}
-                </div>
-                {canCancel && (
-                  <Button
-                    onClick={async () => {
-                      await cancelRequestItem({
-                        data: { requestItemId: line.id, note: null },
-                      });
-                      await refresh();
-                    }}
-                    size="sm"
-                    variant="outline"
-                  >
-                    Cancel
-                  </Button>
+                <p className="font-medium">{itemName}</p>
+                <p className="text-muted-foreground text-xs">
+                  Status: {line.status}
+                </p>
+                {collectedBy && (
+                  <p className="text-muted-foreground text-xs">
+                    Collected by {collectedBy.name ?? collectedBy.email}
+                  </p>
+                )}
+                {line.closedReason && (
+                  <p className="mt-1 text-sm">{line.closedReason}</p>
                 )}
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {tab === "history" && (
-        <div className="mt-4 space-y-2">
-          {data.history.length === 0 && (
-            <EmptyState>No history yet.</EmptyState>
-          )}
-          {data.history.map(({ line, itemName, collectedBy }) => (
-            <div
-              className="rounded-md border border-border bg-card p-3"
-              key={line.id}
-            >
-              <p className="font-medium">{itemName}</p>
-              <p className="text-muted-foreground text-xs">
-                Status: {line.status}
-              </p>
-              {collectedBy && (
-                <p className="text-muted-foreground text-xs">
-                  Collected by {collectedBy.name ?? collectedBy.email}
-                </p>
-              )}
-              {line.closedReason && (
-                <p className="mt-1 text-sm">{line.closedReason}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

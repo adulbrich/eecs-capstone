@@ -1,3 +1,5 @@
+import { Badge } from "./ui/badge";
+
 const STATUS_STYLES: Record<string, { fg: string; bg: string }> = {
   draft: { fg: "var(--status-neutral)", bg: "var(--status-neutral-bg)" },
   submitted: { fg: "var(--status-info)", bg: "var(--status-info-bg)" },
@@ -22,11 +24,8 @@ const FALLBACK = {
 export function StatusBadge({ status }: { status: string }) {
   const { fg, bg } = STATUS_STYLES[status] ?? FALLBACK;
   return (
-    <span
-      className="inline-block rounded px-2 py-0.5 font-medium text-xs"
-      style={{ color: fg, backgroundColor: bg }}
-    >
+    <Badge style={{ backgroundColor: bg, color: fg }} variant="status">
       {status.replace(/_/g, " ")}
-    </span>
+    </Badge>
   );
 }

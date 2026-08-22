@@ -43,8 +43,10 @@ export function AvatarUploader({ currentKey, onChanged }: Props) {
         maxWidth={512}
         onChange={(f) => void handleChange(f)}
       />
-      {busy && <p className="text-neutral-500 text-sm">Saving avatar...</p>}
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {busy && (
+        <p className="text-muted-foreground text-sm">Saving avatar...</p>
+      )}
+      {error && <p className="text-destructive text-sm">{error}</p>}
     </div>
   );
 }
