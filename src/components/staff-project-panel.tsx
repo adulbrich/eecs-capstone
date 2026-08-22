@@ -414,14 +414,16 @@ export function StaffProjectPanel({
       <PanelSection title="Danger zone" tone="danger">
         <div className="flex flex-wrap gap-2">
           {!project.deletedAt && project.status !== "draft" && (
-            <Button
-              onClick={() => void runDelete("softDelete")}
-              size="sm"
-              type="button"
-              variant="outline"
+            <ConfirmDialog
+              confirmLabel="Soft delete"
+              description="The project is hidden from listings. Staff can restore it from this panel afterwards."
+              onConfirm={() => runDelete("softDelete")}
+              title="Soft delete this project?"
             >
-              Soft delete
-            </Button>
+              <Button size="sm" variant="outline">
+                Soft delete
+              </Button>
+            </ConfirmDialog>
           )}
           {project.deletedAt && (
             <Button
