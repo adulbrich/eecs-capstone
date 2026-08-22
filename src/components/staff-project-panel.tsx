@@ -237,7 +237,7 @@ export function StaffProjectPanel({
                 pillTitle = `Override: force to ${STATUS_LABEL[s]}`;
               }
               const pillClass = [
-                "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                "rounded-full px-3 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                 pillState,
               ].join(" ");
 
@@ -414,14 +414,16 @@ export function StaffProjectPanel({
       <PanelSection title="Danger zone" tone="danger">
         <div className="flex flex-wrap gap-2">
           {!project.deletedAt && project.status !== "draft" && (
-            <Button
-              onClick={() => void runDelete("softDelete")}
-              size="sm"
-              type="button"
-              variant="outline"
+            <ConfirmDialog
+              confirmLabel="Soft delete"
+              description="The project is hidden from listings. Staff can restore it from this panel afterwards."
+              onConfirm={() => runDelete("softDelete")}
+              title="Soft delete this project?"
             >
-              Soft delete
-            </Button>
+              <Button size="sm" variant="outline">
+                Soft delete
+              </Button>
+            </ConfirmDialog>
           )}
           {project.deletedAt && (
             <Button

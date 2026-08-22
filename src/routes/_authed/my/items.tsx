@@ -21,8 +21,11 @@ import {
   submitCart,
 } from "#/server/inventory";
 
+// `tab` is optional rather than defaulted, so "the user asked for Active" and
+// "the URL said nothing" stay distinguishable. With a default they collapse
+// into the same value, which is what made Active unreachable below.
 const searchSchema = z.object({
-  tab: z.enum(["cart", "active", "history"]).default("active"),
+  tab: z.enum(["cart", "active", "history"]).optional(),
 });
 
 export const Route = createFileRoute("/_authed/my/items")({
@@ -43,8 +46,12 @@ function MyItems() {
     await Promise.all([qc.invalidateQueries(), router.invalidate()]);
   }
 
-  const tab =
-    data.cart.length > 0 && search.tab === "active" ? "cart" : search.tab;
+  // A bare /my/items opens on the cart when there is something in it, which is
+  // the common case right after adding items. An explicit `?tab=` always wins,
+  // so Active stays reachable: the previous derivation re-applied the cart pin
+  // on every render, so selecting Active snapped straight back to Cart and the
+  // user menu's own "Active" link could never land.
+  const tab = search.tab ?? (data.cart.length > 0 ? "cart" : "active");
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">

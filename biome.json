@@ -23,7 +23,7 @@
         "useImageSize": "off"
       },
       "suspicious": {
-        "noAlert": "off"
+        "noAlert": "on"
       }
     }
   },
