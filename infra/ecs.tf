@@ -93,6 +93,7 @@ resource "aws_ecs_task_definition" "app" {
         { name = "S3_REGION", value = var.region },
         { name = "BEDROCK_REGION", value = var.bedrock_region },
         { name = "BEDROCK_MODEL_ID", value = var.bedrock_model_id },
+        { name = "BEDROCK_REASONING_EFFORT", value = var.bedrock_reasoning_effort },
         { name = "BEDROCK_EMBEDDING_MODEL_ID", value = var.bedrock_embedding_model_id },
         { name = "BEDROCK_EMBEDDING_DIMENSIONS", value = var.bedrock_embedding_dimensions },
         # Real outbound mail through SES. Both preconditions are met: the

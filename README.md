@@ -217,7 +217,12 @@ AWS, or run with `S3_ENDPOINT` set to your CDN base. Set
 
 The project form can request per-field improvement suggestions, backed by AWS
 Bedrock. Set `BEDROCK_MODEL_ID` (and the relevant AWS credentials) to configure
-the model.
+the model; the default is OpenAI GPT-5.6 Luna.
+
+The call goes to the OpenAI-compatible Responses API on the `bedrock-mantle`
+endpoint, signed with SigV4 from the ambient AWS credentials, so no separate
+Bedrock API key is needed. `BEDROCK_REASONING_EFFORT` tunes how much the model
+thinks before answering. Embeddings still use `bedrock-runtime`.
 
 ## Testing
 

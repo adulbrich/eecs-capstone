@@ -1,5 +1,5 @@
-import type { ConverseCommandOutput } from "@aws-sdk/client-bedrock-runtime";
 import { describe, expect, it, vi } from "vitest";
+import type { MantleResponse } from "#/lib/_internal/bedrock-mantle";
 import {
   buildUserMessage,
   parseReviewResponse,
@@ -8,16 +8,17 @@ import {
   TOOL_NAME,
 } from "../_internal/project-review-core";
 
-function toolResponse(input: unknown): ConverseCommandOutput {
+function toolResponse(input: unknown): MantleResponse {
   return {
-    output: {
-      message: {
-        role: "assistant",
-        content: [{ toolUse: { name: TOOL_NAME, toolUseId: "t1", input } }],
+    status: "completed",
+    output: [
+      {
+        type: "function_call",
+        name: TOOL_NAME,
+        arguments: JSON.stringify(input),
       },
-    },
-    stopReason: "tool_use",
-  } as unknown as ConverseCommandOutput;
+    ],
+  };
 }
 
 describe("buildUserMessage", () => {
@@ -41,7 +42,7 @@ describe("buildUserMessage", () => {
 });
 
 describe("parseReviewResponse", () => {
-  it("maps a tool_use response into ReviewResult with only suggested fields", () => {
+  it("maps a function call into ReviewResult with only suggested fields", () => {
     const result = parseReviewResponse(
       toolResponse({
         description: { suggestion: "Better desc.", rationale: "clearer" },
@@ -56,6 +57,29 @@ describe("parseReviewResponse", () => {
       rationale: "clearer",
     });
     expect(result.suggestions.title).toBeUndefined();
+  });
+
+  it("finds a function call nested inside an output item's content", () => {
+    const nested: MantleResponse = {
+      status: "completed",
+      output: [
+        {
+          type: "message",
+          content: [
+            {
+              type: "function_call",
+              name: TOOL_NAME,
+              arguments: JSON.stringify({
+                title: { suggestion: "Sharper", rationale: "punchier" },
+              }),
+            },
+          ],
+        },
+      ],
+    };
+    expect(parseReviewResponse(nested, "m").suggestions.title?.suggestion).toBe(
+      "Sharper"
+    );
   });
 
   it("drops unknown keys the model might emit", () => {
@@ -73,11 +97,19 @@ describe("parseReviewResponse", () => {
   });
 
   it("throws when the model returns no tool call", () => {
-    const noTool = {
-      output: { message: { role: "assistant", content: [{ text: "hi" }] } },
-      stopReason: "end_turn",
-    } as unknown as ConverseCommandOutput;
+    const noTool: MantleResponse = {
+      status: "completed",
+      output: [{ type: "message", content: [{ type: "output_text" }] }],
+    };
     expect(() => parseReviewResponse(noTool, "m")).toThrow();
+  });
+
+  it("throws when the arguments are not valid JSON", () => {
+    const badJson: MantleResponse = {
+      status: "completed",
+      output: [{ type: "function_call", name: TOOL_NAME, arguments: "{oops" }],
+    };
+    expect(() => parseReviewResponse(badJson, "m")).toThrow();
   });
 
   it("throws when tool input fails schema validation", () => {
@@ -88,10 +120,21 @@ describe("parseReviewResponse", () => {
       )
     ).toThrow();
   });
+
+  it("names truncation separately from a missing tool call", () => {
+    const truncated: MantleResponse = {
+      status: "incomplete",
+      incomplete_details: { reason: "max_output_tokens" },
+      output: [],
+    };
+    expect(() => parseReviewResponse(truncated, "m")).toThrow(
+      /ran out of room/
+    );
+  });
 });
 
 describe("runProjectReview", () => {
-  it("invokes the model with the tool config and returns parsed suggestions", async () => {
+  it("invokes the model with the tool declared and returns parsed suggestions", async () => {
     const invoke = vi.fn().mockResolvedValue(
       toolResponse({
         title: { suggestion: "Sharper Title", rationale: "punchier" },
@@ -100,9 +143,33 @@ describe("runProjectReview", () => {
     const result = await runProjectReview({ title: "old title" }, invoke);
     expect(invoke).toHaveBeenCalledTimes(1);
     const call = invoke.mock.calls[0][0];
-    expect(call.toolConfig.tools[0].toolSpec.name).toBe(TOOL_NAME);
-    expect(call.messages[0].content[0].text).toContain("old title");
+    expect(call.tools[0].name).toBe(TOOL_NAME);
+    expect(call.tools[0].type).toBe("function");
+    expect(call.instructions).toBe(SYSTEM_PROMPT);
+    expect(call.input[0].content).toContain("old title");
     expect(result.suggestions.title?.suggestion).toBe("Sharper Title");
+  });
+
+  it("opts out of the 30 day response retention the API defaults to", async () => {
+    const invoke = vi
+      .fn()
+      .mockResolvedValue(
+        toolResponse({ title: { suggestion: "s", rationale: "r" } })
+      );
+    await runProjectReview({ title: "old title" }, invoke);
+    expect(invoke.mock.calls[0][0].store).toBe(false);
+  });
+
+  it("sends no sampling parameters, which reasoning mode rejects", async () => {
+    const invoke = vi
+      .fn()
+      .mockResolvedValue(
+        toolResponse({ title: { suggestion: "s", rationale: "r" } })
+      );
+    await runProjectReview({ title: "old title" }, invoke);
+    const call = invoke.mock.calls[0][0];
+    expect(call.temperature).toBeUndefined();
+    expect(call.top_p).toBeUndefined();
   });
 
   it("returns an empty result without calling the model when there is nothing to review", async () => {

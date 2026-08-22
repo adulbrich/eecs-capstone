@@ -11,7 +11,7 @@ const DEFAULT_REGION = "us-east-1";
 
 /**
  * Sends a `SendEmailCommand` to SES. Injected into `SesEmailSender` so the
- * sender can be unit-tested without touching AWS (mirrors `ConverseFn` in
+ * sender can be unit-tested without touching AWS (mirrors `ResponsesFn` in
  * the Bedrock client).
  */
 export type SesSendFn = (

@@ -123,9 +123,15 @@ variable "bedrock_region" {
 }
 
 variable "bedrock_model_id" {
-  description = "Bedrock model ID for AI project review."
+  description = "Bedrock model ID for AI project review, as named on the bedrock-mantle endpoint (no us./global. prefix)."
   type        = string
-  default     = "minimax.minimax-m2.5"
+  default     = "openai.gpt-5.6-luna"
+}
+
+variable "bedrock_reasoning_effort" {
+  description = "Reasoning budget for AI project review: none, low, medium, high, xhigh, or max."
+  type        = string
+  default     = "low"
 }
 
 variable "bedrock_embedding_model_id" {
