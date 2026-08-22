@@ -54,9 +54,18 @@ data "aws_iam_policy_document" "task" {
     resources = ["${aws_s3_bucket.assets.arn}/*"]
   }
 
+  # Embeddings, on the bedrock-runtime endpoint.
   statement {
     sid       = "Bedrock"
     actions   = ["bedrock:InvokeModel"]
+    resources = ["*"]
+  }
+
+  # AI project review, on the bedrock-mantle endpoint. Its actions live in
+  # their own namespace, so bedrock:InvokeModel above does not reach it.
+  statement {
+    sid       = "BedrockMantle"
+    actions   = ["bedrock-mantle:CreateInference"]
     resources = ["*"]
   }
 

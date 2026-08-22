@@ -156,6 +156,12 @@ commercial regions the first time you invoke them in your account, so no manual
 model-access grant is required. The ECS task role already carries the
 `bedrock:InvokeModel` permission it needs.
 
+AI project review is the other Bedrock caller, and it does not share this path:
+it calls the `bedrock-mantle` endpoint, which authorizes
+`bedrock-mantle:CreateInference` rather than `bedrock:InvokeModel`, and which is
+offered in fewer regions. Both statements are on the task role in
+`infra/iam.tf`.
+
 1. The migration creates the `vector` extension. RDS PostgreSQL 18 ships
    pgvector 0.8.1, and the master user has the privileges to create it.
    Before relying on this, confirm the instance is actually on 18 in your
@@ -759,7 +765,8 @@ this config; delete it manually if you are done with the project.
 **Runtime environment (set in the task definition, `infra/ecs.tf`):**
 
 `NODE_ENV`, `PORT`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `S3_BUCKET`,
-`S3_REGION`, `BEDROCK_REGION`, `BEDROCK_MODEL_ID`, `EMAIL_TRANSPORT=console`,
+`S3_REGION`, `BEDROCK_REGION`, `BEDROCK_MODEL_ID`, `BEDROCK_REASONING_EFFORT`,
+`EMAIL_TRANSPORT=console`,
 `EMAIL_FROM`, `EMAIL_REPLY_TO` (blank), `SES_REGION`, plus secrets
 `DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`. In production, S3
 and Bedrock use the task role (no access keys). The three email variables are

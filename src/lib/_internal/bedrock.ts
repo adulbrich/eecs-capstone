@@ -1,14 +1,15 @@
 import {
   BedrockRuntimeClient,
   type BedrockRuntimeClientConfig,
-  ConverseCommand,
-  type ConverseCommandInput,
-  type ConverseCommandOutput,
 } from "@aws-sdk/client-bedrock-runtime";
 
 const DEFAULT_REGION = "us-east-1";
 
 /**
+ * Client for the bedrock-runtime endpoint, which serves embeddings. The AI
+ * project review talks to bedrock-mantle instead and signs its own requests;
+ * see bedrock-mantle.ts.
+ *
  * Builds the Bedrock client config from the environment.
  *
  * In production no static keys are set, so we omit `credentials` and let
@@ -37,10 +38,3 @@ export function getBedrockClient(): BedrockRuntimeClient {
   _client = new BedrockRuntimeClient(buildBedrockConfig());
   return _client;
 }
-
-export type ConverseFn = (
-  input: ConverseCommandInput
-) => Promise<ConverseCommandOutput>;
-
-export const bedrockConverse: ConverseFn = (input) =>
-  getBedrockClient().send(new ConverseCommand(input));
