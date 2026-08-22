@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { limitVerdict, reviewLimits } from "../ai-review-usage";
+import { limitVerdict, reviewLimits } from "#/lib/ai-review-limits";
 
 const LIMITS = { perHour: 10, perDay: 40 };
 

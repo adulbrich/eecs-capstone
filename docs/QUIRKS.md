@@ -330,6 +330,25 @@ loadDotenv({ path: [".env.local", ".env"] });
 export default defineConfig({ /* ... */ });
 ```
 
+### A unit test that transitively imports `#/db` passes locally and fails in CI
+
+Same root cause from the other direction. `src/db/index.ts` throws at import
+time when `DATABASE_URL` is unset, and the unit suite has no dotenv loading of
+its own: locally the value is present because the app's Vite config picks up
+`.env`, and CI has no `.env` at all. So a unit test importing any module that
+imports `#/db`, even for a pure function that never touches the database,
+passes on your machine and fails on the PR.
+
+Keep pure logic in a module that imports nothing, and let the query layer
+import it rather than the reverse. `src/lib/ai-review-limits.ts` holds the rate
+limit decision for exactly this reason, while
+`server/_internal/ai-review-usage.ts` holds the queries around it.
+
+To reproduce a CI run locally, blank the variable rather than trusting a clean
+pass: `DATABASE_URL= npm test`. The check is falsy, so an empty value fails the
+same way an absent one does, and dotenv will not overwrite a variable that is
+already set.
+
 ### Vitest 4 `poolOptions` moved
 
 Older docs show `test.poolOptions.forks.singleFork: true`. Vitest 4 removed that path. Use top-level `test.fileParallelism: false` instead.

@@ -5,6 +5,7 @@ import {
   mantleResponses,
   type ResponsesFn,
 } from "#/lib/_internal/bedrock-mantle";
+import type { ReviewOutcome } from "#/lib/ai-review-limits";
 import {
   FIELD_LABELS,
   FIELD_MAX_LENGTHS,
@@ -188,8 +189,6 @@ export function parseReviewResponse(
   }
   return { suggestions, model, reviewedFields };
 }
-
-export type ReviewOutcome = "ok" | "truncated" | "failed";
 
 /**
  * What one review attempt did, as opposed to what the user gets back. The
