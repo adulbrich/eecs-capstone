@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { MantleResponse } from "#/lib/_internal/bedrock-mantle";
-import { FIELD_MAX_LENGTHS } from "#/lib/project-review-fields";
+import {
+  FIELD_MAX_LENGTHS,
+  IMPROVABLE_FIELDS,
+} from "#/lib/project-review-fields";
 import { PROPOSAL_SCOPE_RULE } from "#/lib/proposal-guidance";
 import {
   buildUserMessage,
@@ -250,6 +253,18 @@ describe("reviewToolSpec", () => {
     >;
     for (const [field, max] of Object.entries(FIELD_MAX_LENGTHS)) {
       expect(props[field].properties.suggestion.maxLength).toBe(max);
+    }
+  });
+
+  // The prompt names each field and the tool schema declares it, and the model
+  // has to pick the same identifier for its tool call. If the two ever drift,
+  // the model returns a key Zod drops and the suggestion vanishes into "no
+  // improvements suggested" rather than failing loudly.
+  it("declares exactly the fields the prompt names, by the same identifier", () => {
+    const keys = Object.keys(reviewToolSpec.parameters.properties);
+    expect(keys.sort()).toEqual([...IMPROVABLE_FIELDS].sort());
+    for (const field of IMPROVABLE_FIELDS) {
+      expect(SYSTEM_PROMPT).toContain(`- ${field} (`);
     }
   });
 

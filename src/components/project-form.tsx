@@ -62,6 +62,8 @@ export const projectFormSchema = z.object({
   requiresNdaIp: z.boolean(),
   isSponsored: z.boolean(),
   programId: optionalUuid,
+  // Not in FIELD_MAX_LENGTHS on purpose: notes are staff-private and never sent
+  // to the model, so they do not belong in a map the review reads.
   notes: z.string().max(5000),
   proposerEmail: optionalEmail,
   teamsSupported: z.number().int().min(1).max(5),
