@@ -67,13 +67,18 @@ export type ResponsesFn = (
 
 let _signer: SignatureV4 | null = null;
 
-function getSigner(region: string): SignatureV4 {
+/**
+ * Takes no region: a signer binds the region into its credential scope at
+ * construction, so a cached one cannot honour a different region later. It
+ * reads the same env the host does, which keeps the two from drifting.
+ */
+function getSigner(): SignatureV4 {
   if (_signer) {
     return _signer;
   }
   _signer = new SignatureV4({
     credentials: credentialProvider(),
-    region,
+    region: mantleRegion(),
     service: SIGNING_SERVICE,
     sha256: Sha256,
   });
@@ -92,7 +97,7 @@ export const mantleResponses: ResponsesFn = async (body) => {
   const region = mantleRegion();
   const hostname = mantleHost(region);
   const payload = JSON.stringify(body);
-  const signed = await getSigner(region).sign({
+  const signed = await getSigner().sign({
     body: payload,
     headers: { "content-type": "application/json", host: hostname },
     hostname,
