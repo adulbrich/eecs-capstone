@@ -41,7 +41,7 @@ describe("native browser modals", () => {
         }
         // Match a bare call, not `.confirm(` on some object, and not the word
         // inside a longer identifier such as `confirmPassword(`.
-        if (/(^|[^.\w])confirm\s*\(/.test(line)) {
+        if (/(^|[^.\w])(confirm|alert)\s*\(/.test(line)) {
           offenders.push(`${file}:${i + 1}: ${line.trim()}`);
         }
       });

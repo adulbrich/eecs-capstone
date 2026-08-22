@@ -5,6 +5,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 import { EmptyState } from "#/components/empty-state";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
@@ -118,8 +119,8 @@ function MyItems() {
                   setNote("");
                   await refresh();
                   if (result.skipped.length > 0) {
-                    alert(
-                      `Submitted ${result.submitted.length}; skipped ${result.skipped.length} (no longer available).`
+                    toast.warning(
+                      `Submitted ${result.submitted.length}, skipped ${result.skipped.length} (no longer available).`
                     );
                   }
                   navigate({ search: () => ({ tab: "active" }) });
