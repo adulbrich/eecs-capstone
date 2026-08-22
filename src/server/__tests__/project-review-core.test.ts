@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { MantleResponse } from "#/lib/_internal/bedrock-mantle";
+import { FIELD_MAX_LENGTHS } from "#/lib/project-review-fields";
+import { PROPOSAL_SCOPE_RULE } from "#/lib/proposal-guidance";
 import {
   buildUserMessage,
   parseReviewResponse,
+  reviewToolSpec,
   runProjectReview,
   SYSTEM_PROMPT,
   TOOL_NAME,
@@ -121,6 +124,36 @@ describe("parseReviewResponse", () => {
     ).toThrow();
   });
 
+  it("drops an over-long suggestion and keeps the rest of the review", () => {
+    const result = parseReviewResponse(
+      toolResponse({
+        title: {
+          suggestion: "x".repeat(FIELD_MAX_LENGTHS.title + 1),
+          rationale: "too long",
+        },
+        description: { suggestion: "Fits fine.", rationale: "clearer" },
+      }),
+      "m"
+    );
+    // Applying an over-long suggestion would fail validation on submit with an
+    // error the user did not cause, so it must not reach the form at all.
+    expect(result.suggestions.title).toBeUndefined();
+    expect(result.reviewedFields).toEqual(["description"]);
+  });
+
+  it("keeps a suggestion that is exactly at the limit", () => {
+    const result = parseReviewResponse(
+      toolResponse({
+        title: {
+          suggestion: "x".repeat(FIELD_MAX_LENGTHS.title),
+          rationale: "at the edge",
+        },
+      }),
+      "m"
+    );
+    expect(result.reviewedFields).toEqual(["title"]);
+  });
+
   it("names truncation separately from a missing tool call", () => {
     const truncated: MantleResponse = {
       status: "incomplete",
@@ -188,5 +221,43 @@ describe("SYSTEM_PROMPT", () => {
 
   it("tells the model to return markdown and preserve structure", () => {
     expect(SYSTEM_PROMPT).toContain("Return each suggestion as Markdown");
+  });
+
+  it("states every field's character limit", () => {
+    for (const [field, max] of Object.entries(FIELD_MAX_LENGTHS)) {
+      expect(SYSTEM_PROMPT).toContain(`${field} (${max})`);
+    }
+  });
+
+  it("names the reader the proposal is edited for", () => {
+    expect(SYSTEM_PROMPT).toContain("undergraduate students");
+  });
+
+  it("carries the same scope bar the form states to the proposer", () => {
+    expect(SYSTEM_PROMPT).toContain(PROPOSAL_SCOPE_RULE);
+  });
+
+  it("rules out cosmetic-only suggestions", () => {
+    expect(SYSTEM_PROMPT).toContain("cosmetic change alone");
+  });
+});
+
+describe("reviewToolSpec", () => {
+  it("caps each suggestion at its field's limit", () => {
+    const props = reviewToolSpec.parameters.properties as Record<
+      string,
+      { properties: { suggestion: { maxLength: number } } }
+    >;
+    for (const [field, max] of Object.entries(FIELD_MAX_LENGTHS)) {
+      expect(props[field].properties.suggestion.maxLength).toBe(max);
+    }
+  });
+
+  it("caps the rationale so it stays on one line", () => {
+    const props = reviewToolSpec.parameters.properties as Record<
+      string,
+      { properties: { rationale: { maxLength: number } } }
+    >;
+    expect(props.title.properties.rationale.maxLength).toBeLessThanOrEqual(120);
   });
 });

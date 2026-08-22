@@ -7,9 +7,10 @@ import {
   PRIVATE_NOTES_PROJECT_HINT,
   STAFF_FIELDS_PROJECT_HINT,
 } from "#/lib/private-notes";
-import type {
-  FieldSuggestion,
-  ImprovableField,
+import {
+  FIELD_MAX_LENGTHS,
+  type FieldSuggestion,
+  type ImprovableField,
 } from "#/lib/project-review-fields";
 import { reviewProject } from "#/server/project-review";
 import type { ProposerForEdit } from "#/server/projects-queries";
@@ -47,17 +48,17 @@ const optionalUuid = z.union([
 // whose input equals the form's data type, so one default blocks passing the
 // schema directly. `defaultValues` below supplies every field regardless.
 export const projectFormSchema = z.object({
-  title: z.string().min(1, "Title is required").max(200),
-  description: z.string().max(5000),
-  problemStatement: z.string().max(5000),
-  objectives: z.string().max(5000),
-  minQualifications: z.string().max(2000),
-  prefQualifications: z.string().max(2000),
+  title: z.string().min(1, "Title is required").max(FIELD_MAX_LENGTHS.title),
+  description: z.string().max(FIELD_MAX_LENGTHS.description),
+  problemStatement: z.string().max(FIELD_MAX_LENGTHS.problemStatement),
+  objectives: z.string().max(FIELD_MAX_LENGTHS.objectives),
+  minQualifications: z.string().max(FIELD_MAX_LENGTHS.minQualifications),
+  prefQualifications: z.string().max(FIELD_MAX_LENGTHS.prefQualifications),
   url: optionalUrl,
   contactEmail: optionalEmail,
   contactName: z.string().max(200),
   imageUrl: z.union([z.literal(""), z.string().max(500)]),
-  licenseRestrictions: z.string().max(1000),
+  licenseRestrictions: z.string().max(FIELD_MAX_LENGTHS.licenseRestrictions),
   requiresNdaIp: z.boolean(),
   isSponsored: z.boolean(),
   programId: optionalUuid,
@@ -244,6 +245,11 @@ export function ProjectForm({
           project, line up a mentor who can give that hour, because you cannot
           mentor your own team.
         </p>
+        {/*
+          The same scope bar is stated to the model as PROPOSAL_SCOPE_RULE in
+          lib/proposal-guidance.ts, in neutral voice. Change one and change the
+          other, or the page and the AI review start giving different advice.
+        */}
         <p className="mt-2 text-muted-foreground">
           Scope the work at roughly what you would hand a single summer intern,
           and keep it off your critical path.
