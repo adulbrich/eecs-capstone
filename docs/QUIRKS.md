@@ -18,6 +18,7 @@ The stack is fast-moving: **TanStack Start** is pre-v1 as of 2026, **Better Auth
 10. [When you add a quirk](#when-you-add-a-quirk)
 11. [Inventory](#inventory)
 12. [Projects](#projects)
+13. [Amazon Bedrock](#amazon-bedrock)
 
 ---
 
@@ -779,3 +780,61 @@ Note that one address with both a password account and GitHub ends up as a
 single user row with two `account` rows: Better Auth links them implicitly, and
 only when the local row is already verified. So no third hook is needed, and the
 `proposer_id is null` guard makes the claim idempotent anyway.
+
+---
+
+## Amazon Bedrock
+
+This app talks to two different Bedrock endpoints, and almost nothing is shared
+between them. Embeddings use `bedrock-runtime` through the AWS SDK
+(`src/lib/_internal/bedrock.ts`). AI project review uses `bedrock-mantle`
+through a hand-signed `fetch` (`src/lib/_internal/bedrock-mantle.ts`). Treat a
+fact about one as saying nothing about the other.
+
+### The SigV4 service name is `bedrock-mantle`, not `bedrock`
+
+Signing a Mantle request as `bedrock` produces a well-formed signature that the
+endpoint rejects, and the rejection reads as an IAM misconfiguration rather
+than a signing bug. The IAM actions are namespaced the same way: Mantle
+authorizes `bedrock-mantle:CreateInference`, which `bedrock:InvokeModel` does
+not cover. Both statements are on the task role in `infra/iam.tf`.
+
+There is no AWS SDK client for this endpoint. The alternative to signing by
+hand is the OpenAI SDK with a long-lived Bedrock API key, which would put a
+model credential in the task definition; SigV4 keeps production on the task
+role instead.
+
+### Model ids are not portable between the two endpoints
+
+On `bedrock-mantle` the id is bare: `openai.gpt-5.6-luna`. On `bedrock-runtime`
+the same model must be named through a cross-region inference profile
+(`us.openai.gpt-5.6-luna` or `global.`), because in-region inference is not
+offered there for it. Each form is rejected by the other endpoint. `BEDROCK_MODEL_ID`
+holds the Mantle form.
+
+The GPT models are also served under `/openai/v1` on Mantle rather than the
+endpoint's default `/v1`, so the path is not interchangeable between models
+either.
+
+### The Responses API retains inputs and outputs unless you opt out
+
+`store` defaults to `true`, which keeps the request and the response for 30
+days. Proposals carry unpublished IP and NDA notes, so `runProjectReview` sends
+`store: false` on every call. The Converse path this replaced retained nothing,
+so this is a default to hold down, not a feature to enable.
+
+### Reasoning models reject sampling parameters and spend the output budget
+
+`temperature` and `top_p` are incompatible with reasoning mode, so the review
+sends neither. Reasoning tokens also burn down `max_output_tokens` before any
+visible output appears, which means a ceiling sized only for the answer can be
+consumed before the model emits its tool call. That failure arrives as
+`status: "incomplete"`, which `parseReviewResponse` reports as its own error
+rather than folding into the generic one, because the fix is different.
+
+### Function call arguments arrive as a JSON string
+
+A `function_call` item's `arguments` is a string, not an object: parse it
+before handing it to Zod. Where the item sits is less certain. The Responses
+API spec puts it at the top level of `output`, while the Bedrock tool-use guide
+reads it out of an item's `content`, so `findToolCall` looks in both.

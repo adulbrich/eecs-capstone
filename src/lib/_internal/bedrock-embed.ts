@@ -5,8 +5,8 @@ import { getBedrockClient } from "./bedrock";
  * Embedding adapter for Amazon Titan Text Embeddings V2.
  *
  * `EmbedFn` is the injection seam: every caller takes it as a trailing default
- * parameter so tests pass a fake and never reach AWS, mirroring `ConverseFn`
- * in project-review-core.ts.
+ * parameter so tests pass a fake and never reach AWS, mirroring `ResponsesFn`
+ * in bedrock-mantle.ts.
  */
 export type EmbedFn = (text: string) => Promise<number[]>;
 
