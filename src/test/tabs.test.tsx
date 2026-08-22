@@ -42,6 +42,16 @@ describe("Tabs", () => {
     expect(screen.getByRole("tab", { name: "Cart (2)" })).toHaveFocus();
     await userEvent.keyboard("{ArrowRight}");
     expect(screen.getByRole("tab", { name: "Active (1)" })).toHaveFocus();
+    // A second Tab leaves the trigger group entirely and lands on the
+    // panel content, proving there is one tab stop for the whole strip
+    // rather than one per trigger: three plain tabindex=0 buttons would
+    // each keep their own stop, so a second Tab would still land on a
+    // trigger ("History"), not skip past all of them.
+    await userEvent.tab();
+    for (const t of screen.getAllByRole("tab")) {
+      expect(t).not.toHaveFocus();
+    }
+    expect(screen.getByRole("tabpanel")).toHaveFocus();
   });
 
   it("shows only the selected panel", async () => {

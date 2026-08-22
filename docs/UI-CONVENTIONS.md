@@ -249,10 +249,18 @@ Radix's `Tabs`, so it gives the tablist real semantics for free: `role="tablist"
 triggers. A hand-rolled button row has none of that: a screen reader announces
 unrelated buttons, and a keyboard user has to tab through every tab individually.
 
-The tab state usually lives in a URL search param, so `Tabs` is controlled:
+The tab state usually lives in a URL search param, so `Tabs` is controlled. Pass
+`activationMode="manual"` whenever activating a tab has a side effect beyond
+showing its panel, such as a navigation: activating pushes a URL change, and the
+ARIA authoring practices recommend manual activation whenever activation carries
+a side effect. Under the default `automatic` mode, arrowing across a three-tab
+strip fires that side effect on every keypress; under `manual`, arrows only move
+focus, and Enter or Space activates.
 
 ```tsx
 <Tabs
+  activationMode="manual"
+  className="mt-4"
   onValueChange={(next) => navigate({ search: { tab: next as MyTabUnion } })}
   value={tab}
 >
@@ -266,7 +274,10 @@ The tab state usually lives in a URL search param, so `Tabs` is controlled:
 ```
 
 `onValueChange` hands back a plain `string`; cast it at the `navigate` boundary
-when the search schema wants a narrower union. The active trigger still gets the
+when the search schema wants a narrower union. `TabsList` carries no margin of
+its own, so give `Tabs` a `className="mt-4"` for the gap above the strip;
+`TabsContent` already ships `mt-4` for the gap below it, so do not add another
+`mt-4` to the panel body or the two will stack. The active trigger still gets the
 brand-colored bottom border and the rest go muted, but that styling lives inside
 `tabs.tsx` now, keyed off Radix's `data-[state=active]`, rather than being
 hand-written at every call site.

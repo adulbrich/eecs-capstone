@@ -49,7 +49,12 @@ function MyItems() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
       <h1 className="font-semibold text-2xl">My Items</h1>
+      {/* Manual activation: selecting a tab pushes a navigation and rewrites
+          the URL, so arrowing must only move focus. Under automatic mode,
+          arrowing across the strip fires onValueChange (and a navigation) on
+          every keypress. */}
       <Tabs
+        activationMode="manual"
         className="mt-4"
         onValueChange={(next) =>
           navigate({

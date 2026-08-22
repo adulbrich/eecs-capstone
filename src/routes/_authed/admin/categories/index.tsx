@@ -321,7 +321,12 @@ function CategoriesAdmin() {
         </Dialog>
       </div>
 
+      {/* Manual activation: selecting a tab pushes a navigation and rewrites
+          the URL, so arrowing must only move focus. Under automatic mode,
+          arrowing across the strip fires onValueChange (and a navigation) on
+          every keypress. */}
       <Tabs
+        activationMode="manual"
         className="mt-4"
         onValueChange={(next) =>
           navigate({ search: { tab: next as "inventory" | "project" } })
