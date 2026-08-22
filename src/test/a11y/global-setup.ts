@@ -233,11 +233,37 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
       .returning();
   }
 
+  // Draft project owned by the fixture user (no unique constraint on title,
+  // select-first pattern). user.a11y.test.ts needs a draft it can sign in as
+  // user@example.com and see a delete trigger on: the dev seed's only draft
+  // (71203d97-6bfe-4580-a318-594522c1ef8e) is proposed by
+  // riveras@oregonstate.edu, not the fixture owner, so OwnerProjectActions
+  // never renders the delete confirmation dialog for that user.
+  let [draftProject] = await db
+    .select()
+    .from(schema.projects)
+    .where(eq(schema.projects.title, "A11Y Test Draft Project"));
+  if (!draftProject) {
+    [draftProject] = await db
+      .insert(schema.projects)
+      .values({
+        title: "A11Y Test Draft Project",
+        description:
+          "A draft project owned by the fixture user, used to " +
+          "scan the delete confirmation dialog in its open and closed states.",
+        status: "draft",
+        proposerId: owner.id,
+        proposerEmail: owner.email,
+      })
+      .returning();
+  }
+
   writeFileSync(
     join(__dirname, ".fixtures.json"),
     JSON.stringify(
       {
         projectId: project.id,
+        draftProjectId: draftProject.id,
         itemId: item.id,
         categoryId: category.id,
         programId: program.id,
