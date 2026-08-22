@@ -99,10 +99,18 @@ Schema (what both forms in this app pass) produces `{ message }` issues, while a
 hand-written validator or a server error can produce a bare string. `FieldError`
 renders both so no call site has to know which it has.
 
-`inventory-form.tsx` and `project-form.tsx` each already have their own local
-`Field`, a TanStack Form binding wrapper (it renders `<form.Field>` and wires
-`handleChange`/`handleBlur`), not a layout primitive; a future task could factor
-those two into one shared primitive.
+`inventory-form.tsx` and `project-form.tsx` each have their own local `Field`, a
+TanStack Form binding wrapper (it renders `<form.Field>` and wires
+`handleChange`/`handleBlur`), not a layout primitive. They share about 31
+identical lines. Consolidating them was considered in 2026-08 and declined: the
+options were a layout-only shell (which leaves the `aria-describedby` wiring
+duplicated, so it removes the lines without removing the risk), a shared binding
+with a control slot (a render prop inside TanStack's own render prop, across 17
+call sites), or one component carrying every prop both forms need (which puts
+the AI review suggestion UI inside a component `inventory-form` also renders).
+None was worth the churn against two wrappers that are currently in sync. Keep
+them separate, and if you change the label, description or error handling in one,
+change it in the other.
 
 **A placeholder is not a label.** Every `Input` and `Textarea` needs an `id`
 matched by a `Label`'s `htmlFor`, or an `aria-label` when there is no visible
