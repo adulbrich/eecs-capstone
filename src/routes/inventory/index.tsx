@@ -5,6 +5,11 @@ import { EmptyState } from "#/components/empty-state";
 import { InventoryCard } from "#/components/inventory-card";
 import { InventoryFilterBar } from "#/components/inventory-filter-bar";
 import { InventoryRow } from "#/components/inventory-row";
+import {
+  Pagination,
+  PaginationButton,
+  PaginationStatus,
+} from "#/components/ui/pagination";
 import { authClient } from "#/lib/auth-client";
 import { useHasMounted } from "#/lib/use-has-mounted";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
@@ -136,43 +141,25 @@ function InventoryIndex() {
           </div>
         );
       })()}
-      <div className="mx-auto mt-6 flex max-w-4xl items-center justify-between text-sm">
-        <button
-          className={
-            data.page <= 1
-              ? "pointer-events-none text-muted-foreground/40"
-              : "hover:underline"
-          }
+      <Pagination className="mx-auto max-w-4xl">
+        <PaginationButton
           disabled={data.page <= 1}
           onClick={() =>
-            navigate({
-              search: (s) => ({ ...s, page: Math.max(1, s.page - 1) }),
-            })
+            navigate({ search: (s) => ({ ...s, page: s.page - 1 }) })
           }
-          type="button"
         >
           Previous
-        </button>
-        <span className="text-muted-foreground">
-          Page {data.page} of {totalPages}
-        </span>
-        <button
-          className={
-            data.page >= totalPages
-              ? "pointer-events-none text-muted-foreground/40"
-              : "hover:underline"
-          }
+        </PaginationButton>
+        <PaginationStatus page={data.page} totalPages={totalPages} />
+        <PaginationButton
           disabled={data.page >= totalPages}
           onClick={() =>
-            navigate({
-              search: (s) => ({ ...s, page: Math.min(totalPages, s.page + 1) }),
-            })
+            navigate({ search: (s) => ({ ...s, page: s.page + 1 }) })
           }
-          type="button"
         >
           Next
-        </button>
-      </div>
+        </PaginationButton>
+      </Pagination>
     </div>
   );
 }

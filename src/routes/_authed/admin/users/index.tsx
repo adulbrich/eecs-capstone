@@ -24,6 +24,11 @@ import {
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import {
+  Pagination,
+  PaginationLink,
+  PaginationStatus,
+} from "#/components/ui/pagination";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -350,38 +355,35 @@ function UsersAdmin() {
         }
       />
 
-      <div className="mt-6 flex items-center justify-between text-sm">
-        <Link
-          className={
-            page <= 1
-              ? "pointer-events-none text-muted-foreground/40"
-              : "hover:underline"
-          }
-          from="/admin/users/"
-          search={(prev) => ({ ...prev, page: Math.max(1, page - 1) })}
-          to="/admin/users"
-        >
-          Previous
-        </Link>
-        <span className="text-muted-foreground">
-          Page {page} of {totalPages}
-        </span>
-        <Link
-          className={
-            page >= totalPages
-              ? "pointer-events-none text-muted-foreground/40"
-              : "hover:underline"
-          }
-          from="/admin/users/"
-          search={(prev) => ({
-            ...prev,
-            page: Math.min(totalPages, page + 1),
-          })}
-          to="/admin/users"
-        >
-          Next
-        </Link>
-      </div>
+      <Pagination>
+        {page <= 1 ? (
+          <PaginationLink disabled>Previous</PaginationLink>
+        ) : (
+          <PaginationLink asChild>
+            <Link
+              from="/admin/users/"
+              search={(prev) => ({ ...prev, page: page - 1 })}
+              to="/admin/users"
+            >
+              Previous
+            </Link>
+          </PaginationLink>
+        )}
+        <PaginationStatus page={page} totalPages={totalPages} />
+        {page >= totalPages ? (
+          <PaginationLink disabled>Next</PaginationLink>
+        ) : (
+          <PaginationLink asChild>
+            <Link
+              from="/admin/users/"
+              search={(prev) => ({ ...prev, page: page + 1 })}
+              to="/admin/users"
+            >
+              Next
+            </Link>
+          </PaginationLink>
+        )}
+      </Pagination>
     </div>
   );
 }
