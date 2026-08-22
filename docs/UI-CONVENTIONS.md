@@ -242,16 +242,34 @@ outlier rather than the pattern.
 
 ### Status tabs
 
-The active tab gets a brand-colored bottom border:
+Use `Tabs`, `TabsList`, `TabsTrigger`, and `TabsContent` from
+`#/components/ui/tabs`, not a row of `<button>` elements. The primitive wraps
+Radix's `Tabs`, so it gives the tablist real semantics for free: `role="tablist"`,
+`aria-selected`, one tab stop for the whole strip, and arrow-key movement between
+triggers. A hand-rolled button row has none of that: a screen reader announces
+unrelated buttons, and a keyboard user has to tab through every tab individually.
+
+The tab state usually lives in a URL search param, so `Tabs` is controlled:
 
 ```tsx
-className={
-  s === status
-    ? "border-b-2 px-2 py-1 font-medium"
-    : "px-2 py-1 text-muted-foreground hover:text-foreground"
-}
-style={s === status ? { borderBottomColor: "var(--brand-primary)" } : undefined}
+<Tabs
+  onValueChange={(next) => navigate({ search: { tab: next as MyTabUnion } })}
+  value={tab}
+>
+  <TabsList>
+    <TabsTrigger value="active">Active</TabsTrigger>
+    <TabsTrigger value="history">History</TabsTrigger>
+  </TabsList>
+  <TabsContent value="active">{/* active panel */}</TabsContent>
+  <TabsContent value="history">{/* history panel */}</TabsContent>
+</Tabs>
 ```
+
+`onValueChange` hands back a plain `string`; cast it at the `navigate` boundary
+when the search schema wants a narrower union. The active trigger still gets the
+brand-colored bottom border and the rest go muted, but that styling lives inside
+`tabs.tsx` now, keyed off Radix's `data-[state=active]`, rather than being
+hand-written at every call site.
 
 ### Disabled pagination
 

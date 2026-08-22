@@ -34,6 +34,7 @@ import {
 } from "#/components/ui/dialog";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, orderBySortedIds, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
@@ -320,71 +321,64 @@ function CategoriesAdmin() {
         </Dialog>
       </div>
 
-      <div className="mt-4 flex gap-4 border-border border-b">
-        {TABS.map((t) => (
-          <button
-            className={
-              t.value === tab
-                ? "border-b-2 px-2 py-1 font-medium"
-                : "px-2 py-1 text-muted-foreground hover:text-foreground"
-            }
-            key={t.value}
-            onClick={() => navigate({ search: { tab: t.value } })}
-            style={
-              t.value === tab
-                ? { borderBottomColor: "var(--brand-primary)" }
-                : undefined
-            }
-            type="button"
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-4">
-        <AdminDataTable
-          actions={
-            <ExportCsvButton
-              filename={
-                tab === "project"
-                  ? "project-categories"
-                  : "inventory-categories"
-              }
-              load={() =>
-                Promise.resolve(
-                  toCsv(
-                    EXPORT_COLUMNS,
-                    orderBySortedIds(
-                      rows,
-                      sortedIdsRef.current,
-                      (row) => row.id
+      <Tabs
+        className="mt-4"
+        onValueChange={(next) =>
+          navigate({ search: { tab: next as "inventory" | "project" } })
+        }
+        value={tab}
+      >
+        <TabsList>
+          {TABS.map((t) => (
+            <TabsTrigger key={t.value} value={t.value}>
+              {t.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <TabsContent value={tab}>
+          <AdminDataTable
+            actions={
+              <ExportCsvButton
+                filename={
+                  tab === "project"
+                    ? "project-categories"
+                    : "inventory-categories"
+                }
+                load={() =>
+                  Promise.resolve(
+                    toCsv(
+                      EXPORT_COLUMNS,
+                      orderBySortedIds(
+                        rows,
+                        sortedIdsRef.current,
+                        (row) => row.id
+                      )
                     )
                   )
-                )
-              }
-            />
-          }
-          caption={
-            tab === "project" ? "Project categories" : "Inventory categories"
-          }
-          columns={columns}
-          data={rows}
-          defaultSort={defaultSort}
-          emptyMessage={
-            tab === "project"
-              ? "No project categories yet."
-              : "No inventory categories yet."
-          }
-          getRowId={(row) => row.id}
-          hidden={hidden}
-          onHiddenChange={onHiddenChange}
-          onSortChange={onSortChange}
-          onSortedIdsChange={onSortedIdsChange}
-          sort={sort}
-          storageKey={storageKey}
-        />
-      </div>
+                }
+              />
+            }
+            caption={
+              tab === "project" ? "Project categories" : "Inventory categories"
+            }
+            columns={columns}
+            data={rows}
+            defaultSort={defaultSort}
+            emptyMessage={
+              tab === "project"
+                ? "No project categories yet."
+                : "No inventory categories yet."
+            }
+            getRowId={(row) => row.id}
+            hidden={hidden}
+            onHiddenChange={onHiddenChange}
+            onSortChange={onSortChange}
+            onSortedIdsChange={onSortedIdsChange}
+            sort={sort}
+            storageKey={storageKey}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
