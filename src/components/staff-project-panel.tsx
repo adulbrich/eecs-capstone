@@ -237,7 +237,7 @@ export function StaffProjectPanel({
                 pillTitle = `Override: force to ${STATUS_LABEL[s]}`;
               }
               const pillClass = [
-                "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                "rounded-full px-3 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                 pillState,
               ].join(" ");
 

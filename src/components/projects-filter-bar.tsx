@@ -248,7 +248,7 @@ export function ProjectsFilterBar({
 
       {hasAnyFilter && (
         <button
-          className="mt-3 text-brand text-sm hover:underline"
+          className="mt-3 text-brand text-sm outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
           onClick={clearAll}
           type="button"
         >

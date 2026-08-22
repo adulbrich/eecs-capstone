@@ -117,7 +117,7 @@ export function NotificationBell() {
                 key={n.id}
               >
                 <button
-                  className="block w-full p-2 text-left text-sm hover:bg-secondary"
+                  className="block w-full p-2 text-left text-sm outline-none hover:bg-secondary focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   onClick={() => void onClickNotification(n)}
                   type="button"
                 >
@@ -132,7 +132,7 @@ export function NotificationBell() {
         )}
         {rows.length > 0 && (
           <button
-            className="block w-full border-border border-t p-2 text-center text-xs hover:bg-secondary"
+            className="block w-full border-border border-t p-2 text-center text-xs outline-none hover:bg-secondary focus-visible:ring-[3px] focus-visible:ring-ring/50"
             onClick={() => void onMarkAllRead()}
             type="button"
           >

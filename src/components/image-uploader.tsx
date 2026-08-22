@@ -6,6 +6,7 @@ import ReactCrop, {
   makeAspectCrop,
 } from "react-image-crop";
 import { getPublicUrl } from "#/lib/storage";
+import { Button } from "./ui/button";
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Image processing failed.";
@@ -150,22 +151,21 @@ export function ImageUploader({
             />
           </ReactCrop>
           <div className="flex gap-2">
-            <button
-              className="bg-brand px-3 py-1.5 text-sm text-white disabled:opacity-50"
+            <Button
               disabled={busy || !crop}
               onClick={() => void onConfirmCrop()}
-              type="button"
+              size="sm"
             >
               {busy ? "Processing..." : "Use image"}
-            </button>
-            <button
-              className="border border-border px-3 py-1.5 text-sm hover:bg-secondary"
+            </Button>
+            <Button
               disabled={busy}
               onClick={onCancelCrop}
-              type="button"
+              size="sm"
+              variant="outline"
             >
               Cancel
-            </button>
+            </Button>
           </div>
           {error && <p className="text-destructive text-sm">{error}</p>}
         </div>
@@ -181,21 +181,22 @@ export function ImageUploader({
             <p className="text-muted-foreground text-sm">No image set.</p>
           )}
           <div className="flex gap-2">
-            <button
-              className="border border-border px-3 py-1.5 text-sm hover:bg-secondary"
+            <Button
               onClick={() => fileInputRef.current?.click()}
-              type="button"
+              size="sm"
+              variant="outline"
             >
               {hasContent ? "Replace image" : "Upload image"}
-            </button>
+            </Button>
             {hasContent && (
-              <button
-                className="inline-flex items-center gap-1 border border-destructive/30 px-3 py-1.5 text-destructive text-sm hover:bg-[var(--status-error-bg)]"
+              <Button
+                className="border-destructive/30 text-destructive hover:bg-[var(--status-error-bg)] hover:text-destructive"
                 onClick={onRemove}
-                type="button"
+                size="sm"
+                variant="outline"
               >
                 <Trash2 className="h-4 w-4" /> Remove
-              </button>
+              </Button>
             )}
           </div>
           <input
