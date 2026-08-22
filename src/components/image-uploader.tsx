@@ -190,7 +190,7 @@ export function ImageUploader({
             </button>
             {hasContent && (
               <button
-                className="inline-flex items-center gap-1 border border-red-300 px-3 py-1.5 text-destructive text-sm hover:bg-red-50 dark:hover:bg-red-950"
+                className="inline-flex items-center gap-1 border border-destructive/30 px-3 py-1.5 text-destructive text-sm hover:bg-[var(--status-error-bg)]"
                 onClick={onRemove}
                 type="button"
               >

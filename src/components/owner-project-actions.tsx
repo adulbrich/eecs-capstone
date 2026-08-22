@@ -109,7 +109,7 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
               onConfirm={runDelete}
               title="Permanently delete this draft?"
             >
-              <Button disabled={busy} variant="destructive">
+              <Button disabled={busy} size="sm" variant="destructive">
                 Delete draft
               </Button>
             </ConfirmDialog>

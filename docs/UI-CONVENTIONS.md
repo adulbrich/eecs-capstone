@@ -81,16 +81,16 @@ Header nav items (Projects, My projects, Admin) use the `.nav-link` class from
 Use `<Input>`, `<Textarea>`, and `<Label>` from `#/components/ui/`. They carry the
 `h-9` sizing, the focus ring, and the `aria-invalid` styling that raw elements lack.
 
-Wrap the label/input/error triple in `<Field>` from `#/components/ui/field`, which
-carries the `space-y-1.5` rhythm and pairs with `FieldLabel` and `FieldError`. Give
-every input an `id` that its `FieldLabel htmlFor` matches:
+Wrap the label/input/error triple in a `space-y-1.5` div, written by hand. Give
+every input an `id` that the `Label`'s `htmlFor` matches, and render errors with
+`FieldError` from `#/components/ui/field`:
 
 ```tsx
-<Field>
-  <FieldLabel htmlFor="email">Email</FieldLabel>
+<div className="space-y-1.5">
+  <Label htmlFor="email">Email</Label>
   <Input id="email" name="email" type="email" required />
   <FieldError errors={field.state.meta.errors} />
-</Field>
+</div>
 ```
 
 `FieldError` takes `errors: readonly unknown[]` because a validation error can
@@ -99,8 +99,13 @@ Schema (what both forms in this app pass) produces `{ message }` issues, while a
 hand-written validator or a server error can produce a bare string. `FieldError`
 renders both so no call site has to know which it has.
 
+`inventory-form.tsx` and `project-form.tsx` each already have their own local
+`Field`, a TanStack Form binding wrapper (it renders `<form.Field>` and wires
+`handleChange`/`handleBlur`), not a layout primitive; a future task could factor
+those two into one shared primitive.
+
 **A placeholder is not a label.** Every `Input` and `Textarea` needs an `id`
-matched by a `FieldLabel htmlFor`, or an `aria-label` when there is no visible
+matched by a `Label`'s `htmlFor`, or an `aria-label` when there is no visible
 label. A placeholder disappears the moment the user types, and axe will not
 report its absence, because `placeholder` is a fallback in the accessible-name
 computation, so the name reads as non-empty. Six controls shipped this way.

@@ -435,6 +435,7 @@ export function StaffProjectPanel({
           )}
           {project.status === "draft" && !project.deletedAt && (
             <ConfirmDialog
+              confirmLabel="Hard delete"
               description="This cannot be undone."
               onConfirm={runHardDelete}
               title="Permanently delete this draft?"

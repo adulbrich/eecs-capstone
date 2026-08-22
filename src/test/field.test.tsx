@@ -3,23 +3,11 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { Field, FieldError, FieldLabel } from "#/components/ui/field";
-import { Input } from "#/components/ui/input";
+import { FieldError } from "#/components/ui/field";
 
 afterEach(cleanup);
 
-describe("Field", () => {
-  it("associates the label with the input", () => {
-    render(
-      <Field>
-        <FieldLabel htmlFor="email">Email</FieldLabel>
-        <Input id="email" name="email" />
-      </Field>
-    );
-    // The pairing the 6 placeholder-only inputs are missing.
-    expect(screen.getByLabelText("Email")).toBeTruthy();
-  });
-
+describe("FieldError", () => {
   it("renders nothing when there are no errors", () => {
     const { container } = render(<FieldError errors={[]} />);
     expect(container.textContent).toBe("");
@@ -79,7 +67,7 @@ describe("every Input and Textarea", () => {
     expect(
       offenders,
       "A placeholder is not a label: it disappears when the user types, and axe\n" +
-        "will not report it. Give the control an id paired with a FieldLabel, or\n" +
+        "will not report it. Give the control an id paired with a Label, or\n" +
         "an aria-label when there is no visible label.\n\n" +
         offenders.join("\n")
     ).toEqual([]);
