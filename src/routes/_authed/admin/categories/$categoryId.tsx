@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { useState } from "react";
 import { CategoryTypeCombobox } from "#/components/category-type-combobox";
+import { ConfirmDialog } from "#/components/confirm-dialog";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -75,13 +76,6 @@ function CategoryEdit() {
   }
 
   async function onDelete() {
-    if (
-      !confirm(
-        `Delete category "${category.name}"? It will be removed from any projects and inventory items that use it; those projects and items are unaffected otherwise.`
-      )
-    ) {
-      return;
-    }
     setError(null);
     try {
       await deleteCategory({ data: { id: category.id } });
@@ -138,14 +132,15 @@ function CategoryEdit() {
           <Button size="sm" type="submit">
             Save
           </Button>
-          <Button
-            onClick={() => void onDelete()}
-            size="sm"
-            type="button"
-            variant="destructive"
+          <ConfirmDialog
+            description="It will be removed from any projects and inventory items that use it. Those projects and items are unaffected otherwise."
+            onConfirm={onDelete}
+            title={`Delete category "${category.name}"?`}
           >
-            Delete
-          </Button>
+            <Button size="sm" variant="destructive">
+              Delete
+            </Button>
+          </ConfirmDialog>
         </div>
         {error && <p className="text-destructive text-sm">{error}</p>}
       </form>

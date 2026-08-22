@@ -4,6 +4,7 @@ import {
   returnToDraft,
   submitProject,
 } from "#/server/projects";
+import { ConfirmDialog } from "./confirm-dialog";
 import { SectionHeading } from "./section-heading";
 import { Button } from "./ui/button";
 
@@ -21,7 +22,7 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function run(action: "submit" | "withdraw" | "delete") {
+  async function run(action: "submit" | "withdraw") {
     setError(null);
     setBusy(true);
     try {
@@ -32,16 +33,6 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
         case "withdraw":
           await returnToDraft({ data: { id: project.id } });
           break;
-        case "delete":
-          if (
-            !confirm("Permanently delete this draft? This cannot be undone.")
-          ) {
-            setBusy(false);
-            return;
-          }
-          await hardDeleteProject({ data: { id: project.id } });
-          window.location.href = "/my/projects";
-          return;
         default:
           break;
       }
@@ -53,8 +44,20 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
     }
   }
 
+  async function runDelete() {
+    setError(null);
+    setBusy(true);
+    try {
+      await hardDeleteProject({ data: { id: project.id } });
+      window.location.href = "/my/projects";
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  }
+
   const buttons: Array<{
-    id: "submit" | "withdraw" | "delete";
+    id: "submit" | "withdraw";
     label: string;
     show: boolean;
     variant?: "default" | "outline" | "destructive";
@@ -74,12 +77,6 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
       label: "Withdraw to draft",
       show: project.status === "submitted",
       variant: "outline",
-    },
-    {
-      id: "delete",
-      label: "Delete draft",
-      show: project.status === "draft",
-      variant: "destructive",
     },
   ];
 
@@ -104,6 +101,17 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
             {b.label}
           </Button>
         ))}
+        {project.status === "draft" && (
+          <ConfirmDialog
+            description="This cannot be undone."
+            onConfirm={runDelete}
+            title="Permanently delete this draft?"
+          >
+            <Button disabled={busy} variant="destructive">
+              Delete draft
+            </Button>
+          </ConfirmDialog>
+        )}
       </div>
       {error && <p className="mt-3 text-destructive text-sm">{error}</p>}
     </section>

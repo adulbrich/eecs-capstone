@@ -6,6 +6,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useState } from "react";
+import { ConfirmDialog } from "#/components/confirm-dialog";
 import { InstructorManager } from "#/components/instructor-manager";
 import {
   Breadcrumb,
@@ -66,13 +67,6 @@ function ProgramEdit() {
   }
 
   async function onDelete() {
-    const msg =
-      projectCount > 0
-        ? `Delete program "${program.courseName}"? ${projectCount} project(s) will be unlinked but kept.`
-        : `Delete program "${program.courseName}"?`;
-    if (!confirm(msg)) {
-      return;
-    }
     setError(null);
     try {
       await deleteProgram({ data: { id: program.id } });
@@ -81,6 +75,11 @@ function ProgramEdit() {
       setError((err as Error).message);
     }
   }
+
+  const deleteDescription =
+    projectCount > 0
+      ? `${projectCount} project(s) will be unlinked but kept.`
+      : "This cannot be undone.";
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
@@ -140,14 +139,15 @@ function ProgramEdit() {
           <Button size="sm" type="submit">
             Save
           </Button>
-          <Button
-            onClick={() => void onDelete()}
-            size="sm"
-            type="button"
-            variant="destructive"
+          <ConfirmDialog
+            description={deleteDescription}
+            onConfirm={onDelete}
+            title={`Delete program "${program.courseName}"?`}
           >
-            Delete
-          </Button>
+            <Button size="sm" variant="destructive">
+              Delete
+            </Button>
+          </ConfirmDialog>
         </div>
         {error && <p className="text-destructive text-sm">{error}</p>}
       </form>

@@ -14,6 +14,7 @@ import {
   getProposerForEdit,
   listProjectEditLog,
 } from "#/server/projects-queries";
+import { ConfirmDialog } from "./confirm-dialog";
 import { LocalTime } from "./local-time";
 import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { ProposerSummary } from "./proposer-summary";
@@ -161,22 +162,25 @@ export function StaffProjectPanel({
     }
   }
 
-  async function runDelete(action: "softDelete" | "restore" | "hardDelete") {
+  async function runDelete(action: "softDelete" | "restore") {
     setError(null);
     try {
       if (action === "softDelete") {
         await softDeleteProject({ data: { id: project.id } });
-      } else if (action === "restore") {
-        await restoreProject({ data: { id: project.id } });
       } else {
-        if (!confirm("Permanently delete this draft? This cannot be undone.")) {
-          return;
-        }
-        await hardDeleteProject({ data: { id: project.id } });
-        window.location.href = "/admin/projects";
-        return;
+        await restoreProject({ data: { id: project.id } });
       }
       onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function runHardDelete() {
+    setError(null);
+    try {
+      await hardDeleteProject({ data: { id: project.id } });
+      window.location.href = "/admin/projects";
     } catch (err) {
       setError((err as Error).message);
     }
@@ -430,14 +434,15 @@ export function StaffProjectPanel({
             </Button>
           )}
           {project.status === "draft" && !project.deletedAt && (
-            <Button
-              onClick={() => void runDelete("hardDelete")}
-              size="sm"
-              type="button"
-              variant="destructive"
+            <ConfirmDialog
+              description="This cannot be undone."
+              onConfirm={runHardDelete}
+              title="Permanently delete this draft?"
             >
-              Hard delete
-            </Button>
+              <Button size="sm" variant="destructive">
+                Hard delete
+              </Button>
+            </ConfirmDialog>
           )}
         </div>
       </PanelSection>
