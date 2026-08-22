@@ -1,16 +1,29 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { FIELD_MAX_LENGTHS } from "#/lib/project-review-fields";
 
 const reviewInputSchema = z.object({
   projectId: z.string().uuid(),
   fields: z.object({
-    title: z.string().max(200).optional(),
-    description: z.string().max(5000).optional(),
-    problemStatement: z.string().max(5000).optional(),
-    objectives: z.string().max(5000).optional(),
-    minQualifications: z.string().max(2000).optional(),
-    prefQualifications: z.string().max(2000).optional(),
-    licenseRestrictions: z.string().max(1000).optional(),
+    title: z.string().max(FIELD_MAX_LENGTHS.title).optional(),
+    description: z.string().max(FIELD_MAX_LENGTHS.description).optional(),
+    problemStatement: z
+      .string()
+      .max(FIELD_MAX_LENGTHS.problemStatement)
+      .optional(),
+    objectives: z.string().max(FIELD_MAX_LENGTHS.objectives).optional(),
+    minQualifications: z
+      .string()
+      .max(FIELD_MAX_LENGTHS.minQualifications)
+      .optional(),
+    prefQualifications: z
+      .string()
+      .max(FIELD_MAX_LENGTHS.prefQualifications)
+      .optional(),
+    licenseRestrictions: z
+      .string()
+      .max(FIELD_MAX_LENGTHS.licenseRestrictions)
+      .optional(),
   }),
 });
 

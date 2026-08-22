@@ -832,6 +832,20 @@ consumed before the model emits its tool call. That failure arrives as
 `status: "incomplete"`, which `parseReviewResponse` reports as its own error
 rather than folding into the generic one, because the fix is different.
 
+### Field length ceilings have one home, and the review enforces them twice
+
+`FIELD_MAX_LENGTHS` in `src/lib/project-review-fields.ts` is the only place the
+per-field character caps are written down. `projectFormSchema`, the review server
+function's input schema, and the tool schema handed to the model all read from
+it. They used to be three independent copies of the same numbers, which is how
+the model came to be told nothing about a limit its output had to satisfy.
+
+The prompt states each limit and the tool schema carries `maxLength`, and neither
+binds the model. So `parseReviewResponse` drops any suggestion over its field's
+cap and keeps the rest of the review. Failing the whole review would throw away
+six good suggestions over one long one, and applying it would write text into the
+form that fails validation on submit with an error the user did not cause.
+
 ### Function call arguments arrive as a JSON string
 
 A `function_call` item's `arguments` is a string, not an object: parse it

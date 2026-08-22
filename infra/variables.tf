@@ -131,7 +131,7 @@ variable "bedrock_model_id" {
 variable "bedrock_reasoning_effort" {
   description = "Reasoning budget for AI project review: none, low, medium, high, xhigh, or max."
   type        = string
-  default     = "low"
+  default     = "medium"
 }
 
 variable "bedrock_embedding_model_id" {
