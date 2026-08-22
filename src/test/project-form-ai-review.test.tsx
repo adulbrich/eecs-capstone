@@ -118,3 +118,64 @@ describe("ProjectForm AI review", () => {
     );
   });
 });
+
+describe("ProjectForm AI review without a project", () => {
+  function renderNewProjectForm(initial?: Record<string, string>) {
+    return render(
+      <ProjectForm
+        enableAiReview
+        {...(initial ? { initial } : {})}
+        onSubmit={vi.fn()}
+        showCategories={false}
+        showNotes={false}
+        submitLabel="Create draft"
+      />
+    );
+  }
+
+  it("offers the review on the submission page, where there is no projectId", () => {
+    const { getByText } = renderNewProjectForm({ title: "Something" });
+    expect(getByText("Improve with AI")).toBeTruthy();
+  });
+
+  it("omits projectId from the request when the project does not exist yet", async () => {
+    mockedReview.mockResolvedValue({
+      suggestions: { title: { suggestion: "Sharper", rationale: "punchier" } },
+      model: "m",
+      reviewedFields: ["title"],
+    });
+    const { getByRole } = renderNewProjectForm({ title: "Something" });
+
+    fireEvent.click(getByRole("button", { name: "Review with AI" }));
+
+    await waitFor(() => expect(mockedReview).toHaveBeenCalled());
+    const sent = mockedReview.mock.calls[0][0] as {
+      data: { projectId?: string };
+    };
+    // Sending an undefined projectId would fail the uuid validator; the key
+    // has to be absent, not empty.
+    expect("projectId" in sent.data).toBe(false);
+  });
+
+  it("disables the button on an empty form, since a blank review is free but useless", () => {
+    const { getByRole } = renderNewProjectForm();
+    expect(
+      (getByRole("button", { name: "Review with AI" }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+  });
+
+  it("enables the button once a reviewable field has content", async () => {
+    const { getByRole, getByLabelText } = renderNewProjectForm();
+    const button = getByRole("button", {
+      name: "Review with AI",
+    }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+
+    fireEvent.change(getByLabelText(/Title/), {
+      target: { value: "A real title" },
+    });
+
+    await waitFor(() => expect(button.disabled).toBe(false));
+  });
+});

@@ -586,3 +586,41 @@ export const projectEditLog = pgTable(
   },
   (t) => [index("project_edit_log_project_idx").on(t.projectId, t.createdAt)]
 );
+
+/**
+ * One row per AI review that reached Bedrock. It is both the rate limiter's
+ * counter and the usage log: without the token columns there is no way to
+ * answer what a reasoning-effort change costs.
+ *
+ * `project_id` is nullable because a review from the submission page has no
+ * project yet, which is the whole point of allowing one.
+ *
+ * FK rules: `user_id` cascades because this is metering scoped to an account,
+ * not authorship, and restricting it would block deleting a user over a rate
+ * limit counter. `project_id` nulls out because deleting a project should not
+ * erase the record that money was spent.
+ */
+export const aiReviewUsage = pgTable(
+  "ai_review_usage",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .references(() => user.id, { onDelete: "cascade" })
+      .notNull(),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    model: text("model").notNull(),
+    reasoningEffort: text("reasoning_effort").notNull(),
+    inputTokens: integer("input_tokens"),
+    reasoningTokens: integer("reasoning_tokens"),
+    outputTokens: integer("output_tokens"),
+    reviewedFieldCount: integer("reviewed_field_count"),
+    outcome: text("outcome").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  // The only shape the limiter queries: this user, within a time window.
+  (t) => [index("ai_review_usage_user_idx").on(t.userId, t.createdAt)]
+);

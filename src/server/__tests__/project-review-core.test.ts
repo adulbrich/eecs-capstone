@@ -176,14 +176,16 @@ describe("runProjectReview", () => {
         title: { suggestion: "Sharper Title", rationale: "punchier" },
       })
     );
-    const result = await runProjectReview({ title: "old title" }, invoke);
+    const run = await runProjectReview({ title: "old title" }, invoke);
     expect(invoke).toHaveBeenCalledTimes(1);
     const call = invoke.mock.calls[0][0];
     expect(call.tools[0].name).toBe(TOOL_NAME);
     expect(call.tools[0].type).toBe("function");
     expect(call.instructions).toBe(SYSTEM_PROMPT);
     expect(call.input[0].content).toContain("old title");
-    expect(result.suggestions.title?.suggestion).toBe("Sharper Title");
+    expect(run.result.suggestions.title?.suggestion).toBe("Sharper Title");
+    expect(run.called).toBe(true);
+    expect(run.outcome).toBe("ok");
   });
 
   it("opts out of the 30 day response retention the API defaults to", async () => {
@@ -210,10 +212,66 @@ describe("runProjectReview", () => {
 
   it("returns an empty result without calling the model when there is nothing to review", async () => {
     const invoke = vi.fn();
-    const result = await runProjectReview({ description: "   " }, invoke);
+    const run = await runProjectReview({ description: "   " }, invoke);
     expect(invoke).not.toHaveBeenCalled();
-    expect(result.reviewedFields).toEqual([]);
-    expect(result.suggestions).toEqual({});
+    expect(run.result.reviewedFields).toEqual([]);
+    expect(run.result.suggestions).toEqual({});
+    // Nothing was spent, so nothing is metered.
+    expect(run.called).toBe(false);
+  });
+
+  it("reports a truncated response without throwing, so it can be metered", async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      status: "incomplete",
+      incomplete_details: { reason: "max_output_tokens" },
+      output: [],
+      usage: {
+        input_tokens: 900,
+        output_tokens: 16_384,
+        output_tokens_details: { reasoning_tokens: 16_000 },
+      },
+    });
+    const run = await runProjectReview({ title: "old title" }, invoke);
+    expect(run.outcome).toBe("truncated");
+    expect(run.called).toBe(true);
+    expect(run.error).toMatch(/ran out of room/);
+    // The counts are the whole point: a truncated run is what says the
+    // reasoning budget is crowding out the answer.
+    expect(run.usage?.reasoningTokens).toBe(16_000);
+  });
+
+  it("reports a transport failure as called, since the call was attempted", async () => {
+    const invoke = vi.fn().mockRejectedValue(new Error("Bedrock Mantle 503"));
+    const run = await runProjectReview({ title: "old title" }, invoke);
+    expect(run.called).toBe(true);
+    expect(run.outcome).toBe("failed");
+    expect(run.error).toBe("Bedrock Mantle 503");
+  });
+
+  it("carries the token counts through on success", async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      status: "completed",
+      output: [
+        {
+          type: "function_call",
+          name: TOOL_NAME,
+          arguments: JSON.stringify({
+            title: { suggestion: "s", rationale: "r" },
+          }),
+        },
+      ],
+      usage: {
+        input_tokens: 100,
+        output_tokens: 200,
+        output_tokens_details: { reasoning_tokens: 50 },
+      },
+    });
+    const run = await runProjectReview({ title: "old title" }, invoke);
+    expect(run.usage).toEqual({
+      inputTokens: 100,
+      outputTokens: 200,
+      reasoningTokens: 50,
+    });
   });
 });
 

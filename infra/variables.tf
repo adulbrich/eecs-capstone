@@ -134,6 +134,18 @@ variable "bedrock_reasoning_effort" {
   default     = "medium"
 }
 
+variable "ai_review_limit_per_hour" {
+  description = "Per-user hourly ceiling on AI project reviews."
+  type        = string
+  default     = "10"
+}
+
+variable "ai_review_limit_per_day" {
+  description = "Per-user daily ceiling on AI project reviews."
+  type        = string
+  default     = "40"
+}
+
 variable "bedrock_embedding_model_id" {
   description = "Bedrock model id used for project and interest embeddings"
   type        = string

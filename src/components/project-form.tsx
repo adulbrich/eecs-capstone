@@ -1,4 +1,4 @@
-import { useForm } from "@tanstack/react-form";
+import { useForm, useStore } from "@tanstack/react-form";
 import { useState } from "react";
 import { z } from "zod";
 import { applyServerErrors } from "#/lib/apply-server-errors";
@@ -10,6 +10,7 @@ import {
 import {
   FIELD_MAX_LENGTHS,
   type FieldSuggestion,
+  IMPROVABLE_FIELDS,
   type ImprovableField,
 } from "#/lib/project-review-fields";
 import { reviewProject } from "#/server/project-review";
@@ -160,12 +161,17 @@ export function ProjectForm({
     },
   });
 
+  // An entirely blank form short-circuits server-side and comes back with
+  // "No improvements suggested", which reads as a bug rather than as an
+  // instruction. Subscribe to the store rather than to field change handlers:
+  // applyField writes through setFieldValue, which bypasses those.
+  const hasReviewableContent = useStore(form.store, (state) =>
+    IMPROVABLE_FIELDS.some((field) =>
+      String((state.values as Record<string, unknown>)[field] ?? "").trim()
+    )
+  );
+
   async function handleReview() {
-    // The edit route always supplies projectId; guard for the future
-    // new-project path where the button could appear before a project exists.
-    if (!projectId) {
-      return;
-    }
     setReviewError(null);
     setReviewState("loading");
     // Clear any prior suggestions so a fresh review never shows stale ones.
@@ -174,7 +180,9 @@ export function ProjectForm({
       const v = form.state.values;
       const result = await reviewProject({
         data: {
-          projectId,
+          // Omitted on the submission page, where no row exists yet. The
+          // server authorizes a projectless review on the session alone.
+          ...(projectId ? { projectId } : {}),
           fields: {
             title: v.title,
             description: v.description,
@@ -274,7 +282,7 @@ export function ProjectForm({
                 </Button>
               )}
               <Button
-                disabled={reviewState === "loading"}
+                disabled={reviewState === "loading" || !hasReviewableContent}
                 onClick={handleReview}
                 type="button"
               >

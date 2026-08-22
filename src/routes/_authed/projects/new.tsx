@@ -22,6 +22,7 @@ function NewProject() {
       <h1 className="font-semibold text-2xl">New project</h1>
       <div className="mt-6">
         <ProjectForm
+          enableAiReview
           onSubmit={async (values, categoryIds, pendingImage) => {
             const { id } = await createProject({
               data: {

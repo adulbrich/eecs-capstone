@@ -2,6 +2,9 @@ import { sql } from "drizzle-orm";
 import { db } from "#/db";
 
 const TABLES = [
+  // Rate-limit counters leak across tests otherwise: a limiter test would see
+  // rows from the test before it and block a call it expected to allow.
+  "ai_review_usage",
   "notifications",
   "inventory_requests",
   "inventory_items",
