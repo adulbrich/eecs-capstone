@@ -40,7 +40,11 @@ function PaginationStatus({
   totalPages: number;
 }) {
   return (
-    <span aria-live="polite" className="text-muted-foreground">
+    <span
+      aria-live="polite"
+      className="text-muted-foreground"
+      data-slot="pagination-status"
+    >
       Page {page} of {totalPages}
     </span>
   );
