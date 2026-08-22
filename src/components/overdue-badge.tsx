@@ -4,6 +4,7 @@ import {
   deadlinePairOf,
   overdueFlags,
 } from "#/lib/inventory-deadlines";
+import { Badge } from "./ui/badge";
 
 /**
  * Says an item has missed a deadline, beside the status badge where a reader
@@ -23,15 +24,15 @@ export function OverdueBadge({ entry }: { entry: DeadlineEntry }) {
   );
 
   if (checkoutOverdue) {
-    return <Badge style={ERROR}>Overdue</Badge>;
+    return <BadgeBox style={ERROR}>Overdue</BadgeBox>;
   }
   if (pickupOverdue) {
-    return <Badge style={WARNING}>Pickup overdue</Badge>;
+    return <BadgeBox style={WARNING}>Pickup overdue</BadgeBox>;
   }
   return null;
 }
 
-function Badge({
+function BadgeBox({
   children,
   style,
 }: {
@@ -39,12 +40,9 @@ function Badge({
   style: React.CSSProperties;
 }) {
   return (
-    <span
-      className="inline-flex items-center rounded px-2 py-0.5 font-medium text-xs"
-      style={style}
-    >
+    <Badge style={style} variant="status">
       {children}
-    </span>
+    </Badge>
   );
 }
 

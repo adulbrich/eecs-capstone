@@ -1,3 +1,5 @@
+import { Badge } from "./ui/badge";
+
 interface Category {
   id: string;
   name: string;
@@ -6,17 +8,17 @@ interface Category {
 
 export function CategoryChip({ category }: { category: Category }) {
   return (
-    <span
-      className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs"
+    <Badge
       style={{
         background: "var(--chip-bg)",
         border: "1px solid var(--chip-line)",
       }}
+      variant="status"
     >
       {category.type && (
         <span style={{ color: "var(--text-secondary)" }}>{category.type}</span>
       )}
       <span style={{ color: "var(--text-primary)" }}>{category.name}</span>
-    </span>
+    </Badge>
   );
 }
