@@ -40,8 +40,16 @@ describe("native browser modals", () => {
           return;
         }
         // Match a bare call, not `.confirm(` on some object, and not the word
-        // inside a longer identifier such as `confirmPassword(`.
-        if (/(^|[^.\w])(confirm|alert)\s*\(/.test(line)) {
+        // inside a longer identifier such as `confirmPassword(`. `window.` and
+        // `globalThis.` are matched explicitly and on purpose: they are the
+        // same global call as the bare form, just spelled with its receiver,
+        // so the `[^.\w]` guard that excludes `someApi.confirm(` must not
+        // also exclude these two.
+        if (
+          /(^|[^.\w])(?:(?:window|globalThis)\.)?(?:confirm|alert)\s*\(/.test(
+            line
+          )
+        ) {
           offenders.push(`${file}:${i + 1}: ${line.trim()}`);
         }
       });
