@@ -339,6 +339,30 @@ Tests closed successfully but something prevents Vite server from exiting
 The test results above those lines are still authoritative. The exit code is
 still correct.
 
+### The accessibility suite retries in CI, and only in CI
+
+`playwright.a11y.config.ts` sets `retries: process.env.CI ? 2 : 0`. Locally you
+get none, so a flake stays visible to whoever is writing the test. CI gets two,
+because the suite drives a real dev server and a real browser on a shared
+runner.
+
+The failure that prompted this is worth recognising, because it does not look
+like what it is:
+
+```
+- <vite-error-overlay></vite-error-overlay> intercepts pointer events
+```
+
+That is not an accessibility violation and axe never ran. The dev server hit a
+transient `[vite] Internal server error: socket hang up`, Vite painted its error
+overlay over the page, and the overlay then swallowed the click the test was
+waiting on, which failed 30 seconds later as a locator timeout. If you see a
+Playwright timeout on a click that works locally, search the job log for
+`vite-error-overlay` before suspecting the element.
+
+Retried tests are reported as flaky rather than silently swallowed, so a genuine
+intermittent bug still surfaces in the log.
+
 ### Integration tests need DATABASE_URL at config-load time
 
 `src/db/index.ts` reads `DATABASE_URL` at module-import time and throws if missing. Vitest setup files (`setupFiles`) run AFTER the test files start importing. So loading dotenv from `setup.integration.ts` is too late. Load it from `vitest.integration.config.ts` itself:
@@ -441,7 +465,8 @@ Tuned in `biome.json` rather than fought file-by-file:
 
 - **Disabled (idiom / framework conflict):** `noVoid` (intentional fire-and-forget `void promise()`), `useFilenamingConvention` under `src/routes/**` (TanStack `$param` / `__root` files), plus inline ignores for `noNamespaceImport` (drizzle `import * as schema`, shadcn) and `noBarrelFile` (the schema re-export).
 - **Relaxed in tests** (`*.test.ts(x)`, `__tests__/`, `src/test/`): `useTopLevelRegex`, `noEmptyBlockStatements`, `useAwait`, `noNonNullAssertion`.
-- **Deferred (need real a11y/UX work, tracked as findings):** `useImageSize` (add intrinsic image dimensions) and `noAlert` (replace `alert()`/`confirm()` with proper UI). Re-enable when addressed.
+- **Deferred (needs real a11y/UX work, tracked as a finding):** `useImageSize` (add intrinsic image dimensions). Re-enable when addressed.
+- **Re-enabled 2026-08-22:** `noAlert`. It was off while the app still used native `alert()`/`confirm()`; those are now `ConfirmDialog` and `sonner` toasts, so the rule passes and catches a regression at edit time. `src/test/no-native-modals.test.ts` guards the same thing at test time, including the `window.`-prefixed forms the linter also sees.
 
 ### Do not run `biome check --write --unsafe` blindly
 
