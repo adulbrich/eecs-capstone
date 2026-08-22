@@ -319,6 +319,26 @@ Pattern that works: pass `--env-file=.env.local` to `tsx` at the command line.
 
 The seed scripts themselves should not import dotenv. A comment at the top of each script explains the invocation pattern.
 
+### Vitest needs the agent tool sandbox disabled
+
+Running Vitest inside a sandboxed tool call dies with `EMFILE: too many open
+files`, and raising the limit does not help: it still fails with
+`ulimit -n 8192`. Vite's watcher opens more descriptors than the sandbox
+allows, and the failure looks like a broken test rather than a broken
+environment, so it costs time to place. Run the suites with the sandbox off.
+
+Two harmless things it prints on every run in this repo, which are not signs
+of a problem and are worth recognising so you stop chasing them:
+
+```
+module is not defined
+close timed out after 10000ms
+Tests closed successfully but something prevents Vite server from exiting
+```
+
+The test results above those lines are still authoritative. The exit code is
+still correct.
+
 ### Integration tests need DATABASE_URL at config-load time
 
 `src/db/index.ts` reads `DATABASE_URL` at module-import time and throws if missing. Vitest setup files (`setupFiles`) run AFTER the test files start importing. So loading dotenv from `setup.integration.ts` is too late. Load it from `vitest.integration.config.ts` itself:
