@@ -18,6 +18,7 @@ Companion docs: [`QUIRKS.md`](./QUIRKS.md) for framework gotchas and code style,
 7. [Mobile navigation](#mobile-navigation)
 8. [Admin tables](#admin-tables)
 9. [Component patterns](#component-patterns)
+10. [Destructive actions](#destructive-actions)
 
 ---
 
@@ -80,15 +81,37 @@ Header nav items (Projects, My projects, Admin) use the `.nav-link` class from
 Use `<Input>`, `<Textarea>`, and `<Label>` from `#/components/ui/`. They carry the
 `h-9` sizing, the focus ring, and the `aria-invalid` styling that raw elements lack.
 
-Wrap each label/input pair in `space-y-1.5` for consistent vertical rhythm, and give
-every input an `id` that its `<Label htmlFor>` matches:
+Wrap the label/input/error triple in `<Field>` from `#/components/ui/field`, which
+carries the `space-y-1.5` rhythm and pairs with `FieldLabel` and `FieldError`. Give
+every input an `id` that its `FieldLabel htmlFor` matches:
 
 ```tsx
-<div className="space-y-1.5">
-  <Label htmlFor="email">Email</Label>
+<Field>
+  <FieldLabel htmlFor="email">Email</FieldLabel>
   <Input id="email" name="email" type="email" required />
-</div>
+  <FieldError errors={field.state.meta.errors} />
+</Field>
 ```
+
+`FieldError` takes `errors: readonly unknown[]` because a validation error can
+arrive as either shape depending on which validator produced it: a Standard
+Schema (what both forms in this app pass) produces `{ message }` issues, while a
+hand-written validator or a server error can produce a bare string. `FieldError`
+renders both so no call site has to know which it has.
+
+**A placeholder is not a label.** Every `Input` and `Textarea` needs an `id`
+matched by a `FieldLabel htmlFor`, or an `aria-label` when there is no visible
+label. A placeholder disappears the moment the user types, and axe will not
+report its absence, because `placeholder` is a fallback in the accessible-name
+computation, so the name reads as non-empty. Six controls shipped this way.
+`src/test/field.test.tsx` enforces it.
+
+### Why not shadcn `form`
+
+The upstream `form` component declares `react-hook-form` and `@hookform/resolvers`
+as dependencies. This project uses TanStack Form, so adopting `form` would put a
+second form library in the tree. `field` is the form-library-agnostic half of that
+family and declares no dependencies at all. Do not re-propose `form`.
 
 ---
 
@@ -134,9 +157,21 @@ Write the small-screen styles first, then add `md:` (768px and up) overrides. Th
 a deliberate two-tier system, mobile and desktop, so `sm:`, `lg:`, and `xl:` overrides
 are reserved for the rare case that genuinely needs a third tier.
 
+The one sanctioned exception is the responsive card grid, which needs more tiers
+because column count should track available width continuously. All three card
+grids in the app use the same ladder, and a new one must match it rather than
+invent a variant:
+
+```tsx
+<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+```
+
+Everything else stays two-tier.
+
 ### Page wrapper padding
 
-Every route page root:
+Every route page root other than the auth cards (see [Auth pages](#auth-pages))
+carries this padding signature, with `max-w-*` chosen per page (see below):
 
 ```tsx
 <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
@@ -145,8 +180,22 @@ Every route page root:
 `px-4 py-6` gives comfortable touch margins; `md:p-8` expands to the desktop-standard
 32px. A bare `p-8` wrapper wastes a third of the width on a phone.
 
-`max-w-4xl` is the standard page width. The 2026-06 list-presentation work
-deliberately kept it rather than widening to `max-w-7xl`.
+Page width is chosen by content, not fixed. Counting the 17 route roots that carry
+this `px-4 py-6 md:p-8` signature: `max-w-2xl` on the 7 form and dashboard pages
+(`projects/new`, `projects/$projectId/edit`, `admin/index`, `admin/programs/$programId`,
+`admin/users/$userId`, `inventory/new`, `inventory/$itemId/edit`), `max-w-4xl` on 6
+pages that hold a list or a two-column detail layout, `max-w-3xl` on the one
+long-form page (`projects/$projectId.tsx`), and `max-w-md` on two narrow-content
+pages (`profile.tsx`, `admin/categories/$categoryId.tsx`) plus `max-w-sm` on
+`verify-email.tsx`. Of the six `max-w-4xl` pages, three hold the card grid
+(`projects/index.tsx`, `inventory/index.tsx`, `my/bookmarks.tsx`); the other three
+(`my/projects.tsx`, `my/items.tsx`, `inventory/$itemId.tsx`) hold a row list or a
+two-column detail layout instead. The sign-in/sign-up/forgot/reset-password cards
+are narrower still but live inside the separate `island-shell` container below, not
+this padding pattern.
+
+Pick the narrowest that fits the content; a form at `max-w-4xl` has an
+uncomfortably long measure.
 
 ### Interactive element height
 
@@ -282,10 +331,69 @@ brand-colored bottom border and the rest go muted, but that styling lives inside
 `tabs.tsx` now, keyed off Radix's `data-[state=active]`, rather than being
 hand-written at every call site.
 
-### Disabled pagination
+### Pagination
 
-Use `pointer-events-none text-muted-foreground/40`, which stays legible in dark mode
-where `text-neutral-300` does not.
+Use `<Pagination>` from `#/components/ui/pagination`, with `PaginationLink` for
+route links and `PaginationButton` for in-place navigation.
+
+Never disable a pagination control with `pointer-events-none` alone. That
+suppresses mouse events and nothing else: the anchor stays in the tab order, is
+still announced as a link, and Enter still activates it, so a keyboard user on
+page 1 could focus a control that looks disabled and activate it to no effect.
+Two of the three pagers in this app shipped that way, and no axe rule reports
+it. `PaginationLink` drops `href` and sets `aria-disabled` and `tabIndex={-1}`
+when disabled, which is what actually removes it from the tab order.
+
+```tsx
+<Pagination>
+  {page <= 1 ? (
+    <PaginationLink disabled>Previous</PaginationLink>
+  ) : (
+    <PaginationLink asChild>
+      <Link search={(prev) => ({ ...prev, page: page - 1 })} to="/projects">
+        Previous
+      </Link>
+    </PaginationLink>
+  )}
+  <PaginationStatus page={page} totalPages={totalPages} />
+  ...
+</Pagination>
+```
+
+### Badges
+
+Every badge renders through `<Badge>` from `#/components/ui/badge`. A badge that
+carries a domain status uses `variant="status"` and supplies its own
+`--status-*` foreground and background through `style`, because the upstream
+variants (`default`, `secondary`, `outline`) paint a fixed color and cannot
+express a status mapping. Four components wrote this box independently before
+this rule existed, and two had already drifted apart on details like
+`inline-flex` versus `inline-block`.
+
+### Surfaces are not all cards
+
+`<Card>` is the repeated `rounded-lg border border-border bg-card` surface used
+by list items, filter bars, and admin tiles. Three other surfaces are
+deliberately separate and must not be folded into it:
+
+- `panel.tsx` for the audience-gated panels, which carry their own tone variants
+- `.island-shell` for the auth cards
+- `.feature-card` for the landing page tiles
+
+`Card` also takes an `asChild` prop. `project-card.tsx`, `project-row.tsx`, and
+admin's `NavCard` (in `admin/index.tsx`) each have a `<Link>` as their root
+element; wrapping one of those in a plain `<Card>` would nest a `<div>` around
+the `<a>` instead of merging onto it, which silently breaks the click target.
+Reach for `asChild` any time the thing a card wraps is itself the navigable
+element:
+
+```tsx
+<Card asChild className="flex flex-col overflow-hidden" interactive>
+  <Link to="/projects/$projectId" params={{ projectId: project.id }}>
+    ...
+  </Link>
+</Card>
+```
 
 ### Select with an "All" option
 
@@ -322,3 +430,39 @@ Sign-in, sign-up, forgot-password, and reset-password share an `island-shell` ca
 ```
 
 `3.5rem` is the `h-14` header, so the card centers in the space below it.
+
+---
+
+## Destructive actions
+
+Most destructive actions confirm through `<ConfirmDialog>` from
+`#/components/confirm-dialog`. Pass the question as `title` and the consequence
+as `description`; the title is what gives the dialog its accessible name.
+
+```tsx
+<ConfirmDialog
+  description="This cannot be undone."
+  onConfirm={runDelete}
+  title="Permanently delete this draft?"
+>
+  <Button variant="destructive">Delete draft</Button>
+</ConfirmDialog>
+```
+
+The one exception is the hard delete in `inventory-lifecycle-panel.tsx`. It
+uses a shadcn `Dialog` directly rather than `ConfirmDialog`, and adds a step
+`ConfirmDialog` does not have: the user must type the item's name into an
+`Input` before the destructive `Button` un-disables
+(`disabled={busy || delConfirm !== item.name}`). A single confirm click is an
+easy reflex to fire without reading; typing the exact name is a deliberate
+extra brake. Reach for this shape only when a single confirmation is not
+enough friction for the action at hand, not as the default: the project hard
+delete in `staff-project-panel.tsx` is equally permanent and still confirms
+through plain `ConfirmDialog`.
+
+Results that need no acknowledgement use a toast: `import { toast } from "sonner"`.
+
+**Native `confirm()` and `alert()` are banned.** They are unstyled, ignore the
+brand and the dark palette, block the main thread, and cannot be scanned by the
+accessibility suite, because axe cannot reach a page whose script is parked on a
+modal browser prompt. `src/test/no-native-modals.test.ts` enforces this.
