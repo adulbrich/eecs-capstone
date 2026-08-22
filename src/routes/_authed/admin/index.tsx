@@ -8,6 +8,7 @@ import {
   Tag,
   Users,
 } from "lucide-react";
+import { Card } from "#/components/ui/card";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { getAdminStats } from "#/server/admin";
@@ -38,11 +39,11 @@ function StatCard({
   value: number;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
+    <Card className="p-4">
       <p className="text-muted-foreground text-sm">{label}</p>
       <p className="mt-1 font-semibold text-2xl tabular-nums">{value}</p>
       {hint && <p className="mt-0.5 text-muted-foreground text-xs">{hint}</p>}
-    </div>
+    </Card>
   );
 }
 
@@ -84,16 +85,18 @@ interface NavCard {
 
 function NavCard({ to, icon: Icon, label, description }: NavCard) {
   return (
-    <Link
-      className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-secondary"
-      to={to}
+    <Card
+      asChild
+      className="flex items-start gap-3 p-4 transition-colors hover:bg-secondary"
     >
-      <Icon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
-      <div>
-        <p className="font-medium text-sm">{label}</p>
-        <p className="mt-0.5 text-muted-foreground text-xs">{description}</p>
-      </div>
-    </Link>
+      <Link to={to}>
+        <Icon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+        <div>
+          <p className="font-medium text-sm">{label}</p>
+          <p className="mt-0.5 text-muted-foreground text-xs">{description}</p>
+        </div>
+      </Link>
+    </Card>
   );
 }
 

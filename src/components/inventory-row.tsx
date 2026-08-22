@@ -4,6 +4,7 @@ import { AddToCartButton } from "./add-to-cart-button";
 import { CategoryChip } from "./category-chip";
 import { ImageOrFallback } from "./image-or-fallback";
 import { InventoryStatusBadge } from "./inventory-status-badge";
+import { Card } from "./ui/card";
 
 interface Props {
   item: {
@@ -26,7 +27,7 @@ export function InventoryRow({ item, signedIn }: Props) {
   const src = getPublicUrl(item.imageUrl);
   const canAdd = signedIn && item.status === "available";
   return (
-    <div className="flex items-stretch gap-3 overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary">
+    <Card className="flex items-stretch gap-3 overflow-hidden" interactive>
       <Link
         className="flex min-w-0 flex-1 items-stretch gap-3"
         params={{ itemId: item.id }}
@@ -61,6 +62,6 @@ export function InventoryRow({ item, signedIn }: Props) {
           <AddToCartButton itemId={item.id} />
         </div>
       )}
-    </div>
+    </Card>
   );
 }

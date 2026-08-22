@@ -7,6 +7,7 @@ import {
 import { ConfirmDialog } from "./confirm-dialog";
 import { SectionHeading } from "./section-heading";
 import { Button } from "./ui/button";
+import { Card } from "./ui/card";
 
 interface Project {
   id: string;
@@ -86,34 +87,36 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
   }
 
   return (
-    <section className="mt-6 rounded-lg border border-border bg-secondary p-4">
-      <SectionHeading>Your actions</SectionHeading>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {visible.map((b) => (
-          <Button
-            disabled={busy}
-            key={b.id}
-            onClick={() => void run(b.id)}
-            size="sm"
-            type="button"
-            variant={b.variant ?? "outline"}
-          >
-            {b.label}
-          </Button>
-        ))}
-        {project.status === "draft" && (
-          <ConfirmDialog
-            description="This cannot be undone."
-            onConfirm={runDelete}
-            title="Permanently delete this draft?"
-          >
-            <Button disabled={busy} variant="destructive">
-              Delete draft
+    <Card asChild className="mt-6 bg-secondary p-4">
+      <section>
+        <SectionHeading>Your actions</SectionHeading>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {visible.map((b) => (
+            <Button
+              disabled={busy}
+              key={b.id}
+              onClick={() => void run(b.id)}
+              size="sm"
+              type="button"
+              variant={b.variant ?? "outline"}
+            >
+              {b.label}
             </Button>
-          </ConfirmDialog>
-        )}
-      </div>
-      {error && <p className="mt-3 text-destructive text-sm">{error}</p>}
-    </section>
+          ))}
+          {project.status === "draft" && (
+            <ConfirmDialog
+              description="This cannot be undone."
+              onConfirm={runDelete}
+              title="Permanently delete this draft?"
+            >
+              <Button disabled={busy} variant="destructive">
+                Delete draft
+              </Button>
+            </ConfirmDialog>
+          )}
+        </div>
+        {error && <p className="mt-3 text-destructive text-sm">{error}</p>}
+      </section>
+    </Card>
   );
 }

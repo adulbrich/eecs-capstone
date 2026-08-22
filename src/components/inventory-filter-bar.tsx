@@ -1,4 +1,5 @@
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import { Card } from "./ui/card";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -50,7 +51,7 @@ export function InventoryFilterBar(props: Props) {
   }
 
   return (
-    <div className="rounded-lg border border-border p-4">
+    <Card className="bg-transparent p-4">
       <div className="flex items-center gap-3">
         <Input
           className="flex-1"
@@ -103,6 +104,6 @@ export function InventoryFilterBar(props: Props) {
           </div>
         </fieldset>
       )}
-    </div>
+    </Card>
   );
 }

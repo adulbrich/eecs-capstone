@@ -6,6 +6,7 @@ import { listCategories, type listSchema } from "#/server/categories";
 import { getMyInterests } from "#/server/interests";
 import { listPrograms } from "#/server/programs";
 import { FilterSwitch } from "./filter-switch";
+import { Card } from "./ui/card";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -139,7 +140,7 @@ export function ProjectsFilterBar({
     sort !== "relevance";
 
   return (
-    <div className="rounded-lg border border-border p-4">
+    <Card className="bg-transparent p-4">
       <div className="flex items-center gap-3">
         <Input
           className="flex-1"
@@ -253,6 +254,6 @@ export function ProjectsFilterBar({
           Clear all
         </button>
       )}
-    </div>
+    </Card>
   );
 }

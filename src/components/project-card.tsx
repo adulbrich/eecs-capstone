@@ -4,6 +4,7 @@ import { stripMarkdown } from "#/lib/strip-markdown";
 import { ImageOrFallback } from "./image-or-fallback";
 import { LocalTime } from "./local-time";
 import { StatusBadge } from "./status-badge";
+import { Card } from "./ui/card";
 
 interface ProjectSummary {
   contactName?: string | null;
@@ -45,30 +46,28 @@ function ProjectMeta({ project }: { project: ProjectSummary }) {
 export function ProjectCard({ project }: { project: ProjectSummary }) {
   const src = projectImageSrc(project.imageUrl);
   return (
-    <Link
-      className="flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary"
-      params={{ projectId: project.id }}
-      to="/projects/$projectId"
-    >
-      <ImageOrFallback
-        className="aspect-[16/9] w-full object-cover"
-        src={src}
-      />
-      <div className="flex flex-1 flex-col p-4">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-semibold leading-tight">{project.title}</h3>
-          {project.status !== "published" && (
-            <StatusBadge status={project.status} />
+    <Card asChild className="flex flex-col overflow-hidden" interactive>
+      <Link params={{ projectId: project.id }} to="/projects/$projectId">
+        <ImageOrFallback
+          className="aspect-[16/9] w-full object-cover"
+          src={src}
+        />
+        <div className="flex flex-1 flex-col p-4">
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="font-semibold leading-tight">{project.title}</h3>
+            {project.status !== "published" && (
+              <StatusBadge status={project.status} />
+            )}
+          </div>
+          {project.description && (
+            <p className="mt-2 line-clamp-3 text-muted-foreground text-sm">
+              {stripMarkdown(project.description)}
+            </p>
           )}
+          <ProjectMeta project={project} />
         </div>
-        {project.description && (
-          <p className="mt-2 line-clamp-3 text-muted-foreground text-sm">
-            {stripMarkdown(project.description)}
-          </p>
-        )}
-        <ProjectMeta project={project} />
-      </div>
-    </Link>
+      </Link>
+    </Card>
   );
 }
 
