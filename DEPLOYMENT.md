@@ -766,7 +766,7 @@ this config; delete it manually if you are done with the project.
 
 `NODE_ENV`, `PORT`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `S3_BUCKET`,
 `S3_REGION`, `BEDROCK_REGION`, `BEDROCK_MODEL_ID`, `BEDROCK_REASONING_EFFORT`,
-`EMAIL_TRANSPORT=console`,
+`AI_REVIEW_LIMIT_PER_HOUR`, `AI_REVIEW_LIMIT_PER_DAY`, `EMAIL_TRANSPORT=console`,
 `EMAIL_FROM`, `EMAIL_REPLY_TO` (blank), `SES_REGION`, plus secrets
 `DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`. In production, S3
 and Bedrock use the task role (no access keys). The three email variables are

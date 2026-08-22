@@ -5,6 +5,7 @@ import {
   mantleResponses,
   type ResponsesFn,
 } from "#/lib/_internal/bedrock-mantle";
+import type { ReviewOutcome } from "#/lib/ai-review-limits";
 import {
   FIELD_LABELS,
   FIELD_MAX_LENGTHS,
@@ -189,27 +190,97 @@ export function parseReviewResponse(
   return { suggestions, model, reviewedFields };
 }
 
+/**
+ * What one review attempt did, as opposed to what the user gets back. The
+ * caller needs the token counts and the outcome to meter the call, and needs
+ * to know whether a paid call happened at all, none of which belongs in the
+ * client-facing `ReviewResult`.
+ *
+ * A failed review is reported here rather than thrown, because the failure
+ * still has to be recorded before it reaches the user. The caller throws.
+ */
+export interface ReviewRun {
+  called: boolean;
+  error?: string;
+  model: string;
+  outcome: ReviewOutcome;
+  reasoningEffort: string;
+  result: ReviewResult;
+  usage?: {
+    inputTokens?: number | undefined;
+    outputTokens?: number | undefined;
+    reasoningTokens?: number | undefined;
+  };
+}
+
+function emptyRun(): ReviewRun {
+  return {
+    called: false,
+    model: MODEL_ID,
+    outcome: "ok",
+    reasoningEffort: REASONING_EFFORT,
+    result: { suggestions: {}, model: MODEL_ID, reviewedFields: [] },
+  };
+}
+
 export async function runProjectReview(
   fields: Partial<Record<ImprovableField, string>>,
   invoke: ResponsesFn = mantleResponses
-): Promise<ReviewResult> {
+): Promise<ReviewRun> {
   const userMessage = buildUserMessage(fields);
   // Nothing to review: skip the (paid) Bedrock call, which also rejects empty
-  // input with a validation error.
+  // input with a validation error. Nothing was spent, so nothing is metered.
   if (!userMessage) {
-    return { suggestions: {}, model: MODEL_ID, reviewedFields: [] };
+    return emptyRun();
   }
-  const response = await invoke({
+  let response: MantleResponse;
+  try {
+    response = await invoke({
+      model: MODEL_ID,
+      instructions: SYSTEM_PROMPT,
+      input: [{ role: "user", content: userMessage }],
+      tools: [reviewToolSpec],
+      reasoning: { effort: REASONING_EFFORT },
+      max_output_tokens: MAX_OUTPUT_TOKENS,
+      // The Responses API defaults to store:true, which retains the input and
+      // the output for 30 days. Proposals carry unpublished IP and NDA notes,
+      // and the Converse path this replaced retained nothing, so keep it off.
+      store: false,
+    });
+  } catch (error) {
+    // The call was attempted, so it counts even though no tokens came back.
+    return {
+      ...emptyRun(),
+      called: true,
+      outcome: "failed",
+      error: (error as Error)?.message || "AI review failed",
+    };
+  }
+
+  // Read the outcome from the response rather than from the error message: a
+  // truncated run is the signal that the reasoning budget is crowding out the
+  // answer, and it has to survive a parse failure to be worth recording.
+  const truncated = response.status === "incomplete";
+  const usage = {
+    inputTokens: response.usage?.input_tokens,
+    outputTokens: response.usage?.output_tokens,
+    reasoningTokens: response.usage?.output_tokens_details?.reasoning_tokens,
+  };
+  const base = {
+    called: true,
     model: MODEL_ID,
-    instructions: SYSTEM_PROMPT,
-    input: [{ role: "user", content: userMessage }],
-    tools: [reviewToolSpec],
-    reasoning: { effort: REASONING_EFFORT },
-    max_output_tokens: MAX_OUTPUT_TOKENS,
-    // The Responses API defaults to store:true, which retains the input and
-    // the output for 30 days. Proposals carry unpublished IP and NDA notes,
-    // and the Converse path this replaced retained nothing, so keep it off.
-    store: false,
-  });
-  return parseReviewResponse(response, MODEL_ID);
+    reasoningEffort: REASONING_EFFORT,
+    usage,
+  };
+  try {
+    const result = parseReviewResponse(response, MODEL_ID);
+    return { ...base, outcome: "ok", result };
+  } catch (error) {
+    return {
+      ...base,
+      outcome: truncated ? "truncated" : "failed",
+      error: (error as Error)?.message || "AI review failed",
+      result: { suggestions: {}, model: MODEL_ID, reviewedFields: [] },
+    };
+  }
 }

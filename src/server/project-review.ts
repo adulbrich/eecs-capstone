@@ -3,7 +3,8 @@ import { z } from "zod";
 import { FIELD_MAX_LENGTHS } from "#/lib/project-review-fields";
 
 const reviewInputSchema = z.object({
-  projectId: z.string().uuid(),
+  // Optional: the submission page reviews a proposal that has no row yet.
+  projectId: z.string().uuid().optional(),
   fields: z.object({
     title: z.string().max(FIELD_MAX_LENGTHS.title).optional(),
     description: z.string().max(FIELD_MAX_LENGTHS.description).optional(),

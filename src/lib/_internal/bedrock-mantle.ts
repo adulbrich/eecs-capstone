@@ -51,10 +51,18 @@ export interface MantleOutputItem {
   type?: string;
 }
 
+/** Token counts as the Responses API reports them. */
+export interface MantleUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  output_tokens_details?: { reasoning_tokens?: number };
+}
+
 export interface MantleResponse {
   incomplete_details?: { reason?: string };
   output?: MantleOutputItem[];
   status?: string;
+  usage?: MantleUsage;
 }
 
 /**

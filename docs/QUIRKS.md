@@ -330,6 +330,25 @@ loadDotenv({ path: [".env.local", ".env"] });
 export default defineConfig({ /* ... */ });
 ```
 
+### A unit test that transitively imports `#/db` passes locally and fails in CI
+
+Same root cause from the other direction. `src/db/index.ts` throws at import
+time when `DATABASE_URL` is unset, and the unit suite has no dotenv loading of
+its own: locally the value is present because the app's Vite config picks up
+`.env`, and CI has no `.env` at all. So a unit test importing any module that
+imports `#/db`, even for a pure function that never touches the database,
+passes on your machine and fails on the PR.
+
+Keep pure logic in a module that imports nothing, and let the query layer
+import it rather than the reverse. `src/lib/ai-review-limits.ts` holds the rate
+limit decision for exactly this reason, while
+`server/_internal/ai-review-usage.ts` holds the queries around it.
+
+To reproduce a CI run locally, blank the variable rather than trusting a clean
+pass: `DATABASE_URL= npm test`. The check is falsy, so an empty value fails the
+same way an absent one does, and dotenv will not overwrite a variable that is
+already set.
+
 ### Vitest 4 `poolOptions` moved
 
 Older docs show `test.poolOptions.forks.singleFork: true`. Vitest 4 removed that path. Use top-level `test.fileParallelism: false` instead.
@@ -831,6 +850,53 @@ visible output appears, which means a ceiling sized only for the answer can be
 consumed before the model emits its tool call. That failure arrives as
 `status: "incomplete"`, which `parseReviewResponse` reports as its own error
 rather than folding into the generic one, because the fix is different.
+
+### A review without a project is authorized on the session alone
+
+`reviewProjectAs` has two authorization paths. With a `projectId` it loads the
+project and applies `canEditProject`, unchanged. Without one, the text is
+unsaved and belongs to nobody else, so ownership is the wrong question and a
+verified session is the whole gate. The submission page (`/projects/new`) takes
+the second path, because no row exists until the proposal is saved.
+
+That change removed the only thing bounding spend: you used to need to own a
+project to reach a paid endpoint. `assertReviewWithinLimit` replaces it and is
+not optional for that reason. It lives in `reviewProjectAs`, not in the
+`ForCurrentUser` wrapper, so the integration suite can reach it through the
+usual `*As` seam.
+
+The client must omit `projectId` rather than send `undefined`: the input schema
+validates it as a uuid when present.
+
+### `ai_review_usage` is both the limiter and the usage log
+
+One row per call that reached Bedrock. The token columns are not decoration:
+without them there is no way to answer what a reasoning-effort change costs,
+which is the question `BEDROCK_REASONING_EFFORT` raises every time someone
+considers turning it up.
+
+What counts, and why:
+
+- **Every attempt that reached Bedrock**, including a truncated or failed one.
+  A truncated response is billed in full, so counting only successes would let
+  a user spend without limit by repeating a call that fails.
+- **Not** a call the limiter refused, and **not** an entirely blank form, which
+  short-circuits before the request. `runProjectReview` reports this as
+  `called: false`, and metering keys off that rather than off reaching the
+  handler.
+
+`runProjectReview` returns a `ReviewRun` rather than throwing on a failed
+review, because the failure has to be recorded before it reaches the user. The
+caller records, then throws.
+
+Two concurrent requests can both pass the check and overshoot by one. That is
+bounded by concurrency and deliberately not locked: this exists to stop a loop,
+not to be exact.
+
+Any new table holding per-user counters must be added to `TABLES` in
+`src/test/db-reset.ts`. Rows left behind by one test make the next one flaky in
+the direction that is hardest to read: a limit that trips when the test expected
+room.
 
 ### Field length ceilings have one home, and the review enforces them twice
 
