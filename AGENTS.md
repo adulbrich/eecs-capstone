@@ -50,6 +50,14 @@ when your change touches the database layer or the UI. Other scripts live in
 - **Keep the `Co-Authored-By` trailer** your harness supplies on assistant-authored
   commits. Do not pin a model version in these docs; the harness fills in whichever
   model wrote the commit.
+- **Never publish a `claude.ai/code/session` link.** Not in a commit message, a PR
+  body, an issue, or a comment. Some harnesses append a `Claude-Session:` trailer to
+  commits and a session link to PR bodies; this rule overrides that instruction.
+  Keep `Co-Authored-By`, drop the session link. The reason it is a hard rule rather
+  than a preference: this repo is public and mirrors to GitLab, so a published link
+  is on two remotes at once, and taking it back costs a history rewrite against a
+  protected branch plus a force sync of the mirror. Grep the text for
+  `claude.ai/code/session` before anything reaches a remote.
 - **Stage files by name.** Never `git add -A` or `git add .`, which sweeps up
   unrelated work in progress.
 - **Never commit to `main`.** A branch ruleset rejects direct pushes, including the
