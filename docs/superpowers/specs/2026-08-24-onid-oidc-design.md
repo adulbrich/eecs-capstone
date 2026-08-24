@@ -54,7 +54,7 @@ in it. Whatever we read, we read from the ID token.
 ### The rule
 
 ```
-email    = email claim, falling back to the username claim (the UPN)
+email    = email claim, then username, preferred_username, upn (all the UPN)
 id       = sub
 name     = given_name + family_name, falling back to name, falling back to the local part of email
 emailVerified = true, always
@@ -66,6 +66,22 @@ The UPN is `onid@oregonstate.edu`. It is a real, deliverable address issued by
 the same tenant that just authenticated the user, and Oregon State owns
 `oregonstate.edu`. Synthesizing it is not inventing an address; it is reading the
 one the IdP already asserted under a different name.
+
+The chain tries three claim names because we have never seen a token from this
+tenant. `username` is what UIT named, but it is not a stock Entra v2.0 claim;
+`preferred_username` is what the tenant's discovery document advertises, and
+`upn` is the optional-claim spelling. For a work or school account all three
+carry the UPN, so trying each in turn costs one line and removes the likeliest
+way this breaks on first contact. The personal-account caveat, that
+`preferred_username` can be arbitrary, does not reach us: this registration is
+published to engineering accounts in a single tenant.
+
+What the chain cannot fix is the case where a student has a verified password
+account at their ONID email address and then signs in with ONID without an
+`email` claim. They get their UPN, a different address, and therefore a second
+account rather than a link. At Oregon State the two usually match. This is
+inherent to an IdP that does not guarantee the email claim, not something we can
+fix on our side.
 
 ### Why `emailVerified` is unconditionally true
 
@@ -239,7 +255,9 @@ covers it directly with hand-built unsigned tokens:
 
 - Both claims present: `email` wins.
 - `email` absent: falls back to the UPN in `username`.
-- Both absent: returns `null`, which Better Auth turns into
+- `email` absent and only `preferred_username` or `upn` present: each is
+  accepted in turn, and `username` wins when more than one is present.
+- All of them absent: returns `null`, which Better Auth turns into
   `user_info_is_missing` rather than creating a broken account.
 - Name assembled from `given_name` and `family_name`; falls back to `name`, then
   to the local part of the email.
@@ -257,11 +275,12 @@ which redirect URIs they registered or added a localhost one. Until all three ar
 resolved, **no part of the live flow has been exercised**: not the authorization
 redirect, not the token exchange, not the claim shape.
 
-Specifically, `username` is an unverified assumption. It is not a stock Entra
-claim, UIT named it in prose, and no ID token has been decoded. If it arrives as
-`preferred_username` or `upn` instead, the fallback silently never fires and
-users without an email claim are rejected. The unit tests prove the mapping
-logic is correct given the claim names; they cannot prove the claim names.
+Specifically, the UPN claim name is an unverified assumption. `username` is not
+a stock Entra claim, UIT named it in prose, and no ID token has been decoded.
+The mapper accepts `username`, `preferred_username` and `upn` rather than betting
+on one, which should make this a non-event; what it cannot cover is a fourth
+name nobody has guessed. The unit tests prove the mapping logic is correct given
+the claim names; they cannot prove the claim names.
 
 The first real sign-in is the test that matters, and it has not been run.
 

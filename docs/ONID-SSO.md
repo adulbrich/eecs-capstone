@@ -54,7 +54,7 @@ through `getUserInfo`.
 
 ```
 id            = sub
-email         = email claim, falling back to username (the UPN)
+email         = email, then username, preferred_username, upn (all the UPN)
 name          = given_name + family_name, then name, then the local part of email
 emailVerified = true, always
 ```
@@ -63,7 +63,9 @@ Three things about this are worth knowing before you change any of it.
 
 **There is no ONID claim.** UIT: "To my knowledge the ONID is not available via
 OIDC. The next-best record would be the UPN, passed through the username claim."
-The UPN is shaped `onid@oregonstate.edu`.
+The UPN is shaped `onid@oregonstate.edu`. The mapper tries `username`,
+`preferred_username` and `upn` in that order, because all three spell the UPN for
+a work or school account and we have never seen a token from this tenant.
 
 **The email claim is not guaranteed**, per Entra's own field documentation, and
 Better Auth requires a unique non-null email per user. So the UPN fallback is
@@ -77,6 +79,13 @@ otherwise falls through to the discovered `userinfo_endpoint`. For this tenant
 that endpoint is Microsoft Graph, whose OIDC response carries a fixed claim set
 that does not include a tenant-custom `username`. The default therefore routes
 the exact case UIT warned about to the one source that cannot answer it.
+
+One case the fallback does not solve, and cannot: a student with a verified
+password account at their ONID *email* address who then signs in with ONID and
+gets no `email` claim. The fallback hands back their *UPN*, a different address,
+so they get a second account rather than a link. At Oregon State the two usually
+match, so this should be rare. It is inherent to an IdP that does not guarantee
+the email claim, not a bug with a fix on our side.
 
 `emailVerified` is asserted rather than read. The tenant owns the domain and has
 just completed an interactive sign-in with whatever MFA the university enforces,
@@ -146,10 +155,9 @@ wrong and the unit tests cannot catch it: **`username` is not a stock Entra v2.0
 claim.** The tenant's discovery document advertises `preferred_username` and
 does not list `username` at all, so it must come from a claims-mapping
 configuration on this app registration. UIT named it in prose and no ID token
-has been decoded. If it arrives as `preferred_username` or `upn` instead, the
-UPN fallback silently never fires and users without an email claim are rejected.
-The fix would be one line in `onid-profile.ts`, but you will only find out by
-signing in.
+has been decoded. The mapper therefore accepts all three spellings rather
+than betting on one, which should make this a non-event. What it cannot cover is
+a fourth name nobody has guessed, and you will only find that out by signing in.
 
 ## What is deliberately not built
 

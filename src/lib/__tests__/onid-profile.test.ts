@@ -42,7 +42,44 @@ describe("onidProfileFromIdToken", () => {
     );
   });
 
-  it("returns null when neither email nor username is present", () => {
+  it("falls back to preferred_username, the stock Entra spelling", () => {
+    // UIT named `username`, but that is not a stock v2.0 claim and no token
+    // from this tenant has been decoded. For a work or school account
+    // preferred_username carries the same UPN.
+    const { email, username, ...withoutEither } = full;
+    expect(
+      onidProfileFromIdToken(
+        idToken({
+          ...withoutEither,
+          preferred_username: "beavers@oregonstate.edu",
+        })
+      )?.email
+    ).toBe("beavers@oregonstate.edu");
+  });
+
+  it("falls back to upn, the optional-claim spelling", () => {
+    const { email, username, ...withoutEither } = full;
+    expect(
+      onidProfileFromIdToken(
+        idToken({ ...withoutEither, upn: "beavers@oregonstate.edu" })
+      )?.email
+    ).toBe("beavers@oregonstate.edu");
+  });
+
+  it("prefers username over the other two UPN spellings", () => {
+    const { email, ...withoutEmail } = full;
+    expect(
+      onidProfileFromIdToken(
+        idToken({
+          ...withoutEmail,
+          preferred_username: "other@oregonstate.edu",
+          upn: "another@oregonstate.edu",
+        })
+      )?.email
+    ).toBe("beavers@oregonstate.edu");
+  });
+
+  it("returns null when no email and no UPN spelling is present", () => {
     // Better Auth turns null into a `user_info_is_missing` redirect. The
     // alternative, inventing an address from `sub`, would create an account
     // nobody can be contacted at and that no password reset can recover.

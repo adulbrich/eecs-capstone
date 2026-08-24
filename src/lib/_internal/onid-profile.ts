@@ -81,7 +81,21 @@ export function onidProfileFromIdToken(
   // domain this tenant owns, not a synthesized placeholder. Entra does not
   // guarantee `email`, which is why the fallback is load-bearing rather than
   // defensive: without it, those users cannot sign in at all.
-  const email = claim(claims, "email") ?? claim(claims, "username");
+  //
+  // Three names for the UPN, because we have never seen a token from this
+  // tenant. `username` is what UIT said they configured, but it is not a stock
+  // Entra v2.0 claim: the tenant's discovery document advertises
+  // `preferred_username`, and `upn` is the optional-claim spelling of the same
+  // value. For a work or school account all three carry the UPN, so trying
+  // each in turn costs one line and removes the likeliest way this breaks on
+  // first contact. The personal-account caveat about `preferred_username`
+  // being arbitrary does not reach us: this registration is published to
+  // engineering accounts in one tenant.
+  const email =
+    claim(claims, "email") ??
+    claim(claims, "username") ??
+    claim(claims, "preferred_username") ??
+    claim(claims, "upn");
   if (!email) {
     return null;
   }

@@ -103,6 +103,12 @@ function SignUp() {
           onClick={() =>
             authClient.signIn.oauth2({
               providerId: "onid",
+              // Explicit, unlike the GitHub button below. signIn.social and
+              // signIn.oauth2 are different code paths, and the oauth2 callback
+              // handler calls .toString() on whatever callbackURL the state
+              // carried, so an absent one is not obviously safe. Cheaper to
+              // pass it than to prove it.
+              callbackURL: "/",
               errorCallbackURL: "/sign-in",
             })
           }
