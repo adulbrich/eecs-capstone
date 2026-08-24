@@ -1,205 +1,166 @@
-# Adding ONID sign-in
+# ONID sign-in
 
-What to ask OSU for, and what each answer costs to build. Nothing here is
-implemented yet: `src/lib/auth.ts` currently has GitHub as its only social
-provider. This is the request stage.
+How ONID sign-in works, how to operate it, and what is still open with UIT.
 
-## The one question that decides everything
+UIT registered the app as an OpenID Connect relying party in the Oregon State
+Entra ID tenant on 2026-08-24. That settled the question this document used to
+be written around: this is OIDC, not SAML, so it is Better Auth's `genericOAuth`
+plugin and not the `@better-auth/sso` package. The design reasoning lives in
+`docs/superpowers/specs/2026-08-24-onid-oidc-design.md`.
 
-Every other detail follows from this, so ask it first and ask it plainly:
+## Registration
 
-> Can you register our web app as an **OpenID Connect relying party**, or is
-> **SAML 2.0** the only federation option for a campus-hosted application?
+| | |
+|---|---|
+| Tenant ID | `ce6d05e1-3c5e-4d62-87a8-4c4a2713c113` |
+| Client ID | `d551d87a-b608-46a6-9fc3-a8b6bd56a5df` |
+| Discovery URL | `https://login.microsoftonline.com/ce6d05e1-3c5e-4d62-87a8-4c4a2713c113/v2.0/.well-known/openid-configuration` |
+| Client secret | Azure Key Vault `kv-engr-coe-vault-caps` |
+| Scopes requested | `openid profile email` |
+| Claims released | `username`, `email`, `given_name`, `family_name` |
+| Audience | Holders of an active College of Engineering account |
 
-| Answer | What we build | Effort |
-|---|---|---|
-| OIDC | `genericOAuth` plugin, already in the `better-auth` package | Small. Config plus a secret. |
-| SAML 2.0 only | Separate `@better-auth/sso` package, SP metadata and signing certs, and an SP registration that is either local to their IdP or via InCommon | Materially larger. |
-| API-gateway OAuth | `genericOAuth` with a custom `getUserInfo` | Small, with caveats below. |
+The client ID, tenant ID and discovery URL are public values. They appear in
+`.env.example` and `infra/variables.tf` on purpose; treating them as secrets
+buys nothing and costs every new developer a round trip.
 
-Do not assert in the ticket which one OSU runs. `login.oregonstate.edu` resolves
-to `login_oregonstate_edu.alias.cirrusidentity.com`, and Cirrus Identity is a
-higher-ed vendor whose usual posture is a hosted Shibboleth IdP in InCommon.
-That is a hint, not a fact about what they will offer us, and guessing wrong in
-the ticket invites a correction round trip instead of an answer.
+## Redirect URIs
 
-## The developer portal is probably not the answer, but it is cheap to test
+```
+https://capstone.eecs.oregonstate.edu/api/auth/oauth2/callback/onid
+http://localhost:3000/api/auth/oauth2/callback/onid
+```
 
-`developer.oregonstate.edu` lets you register an app yourself, with a Callback
-URL field and three-legged OAuth, so it looks like the fast path.
+Note the `oauth2` segment. It does not match GitHub's
+`/api/auth/callback/github` sitting beside it in the same app, and that is not a
+mistake to tidy up: it is where Better Auth 1.6 mounts the generic OAuth
+callback (`signInWithOAuth2` in
+`better-auth/dist/plugins/generic-oauth/routes.mjs`).
 
-**Read this before registering anything: that portal is an API gateway, not an
-identity provider.** Every API on its list is a data API (Persons, Students,
-Directory, Terms) and none is an OIDC discovery or `userinfo` endpoint. At best
-this is OAuth-as-login rather than SSO: the user authenticates, we receive an
-access token, and we then have to call an identity API to work out who they are.
-It may not be able to log anyone in at all. Three things have to be true, and if
-any is false the route is a dead end:
+Entra matches redirect URIs exactly. A URI that is not allowlisted fails at
+sign-in, not at configuration time, which is why `package.json` pins
+`better-auth` to `~1.6.13` rather than `^1.6.13`. Version 1.7 rebuilds
+`genericOAuth` on the social-provider path, moves the callback to
+`/api/auth/callback/:id`, and removes `genericOAuthClient()`. Under a caret
+range, a routine `npm update` would break ONID sign-in with no code change and
+no failing test. **Upgrading to 1.7 requires UIT to allowlist the new URI
+first.**
 
-1. **Does three-legged OAuth authenticate the end user against ONID**, with
-   campus MFA, or does it only authorize the app? Some gateway tenants enable
-   only two-legged (`client_credentials`), which cannot log anyone in.
-2. **Can we resolve the token holder's own identity?** `Persons v3 - get by ID`
-   needs an ID we do not have yet. We need an endpoint that answers "who is this
-   token" without one. If none exists, the flow cannot identify the user.
-3. **Is a verified email address always returned?** See the account-linking note
-   below.
+## How identity maps
 
-Those are answerable by registering a throwaway app and trying it, which costs
-nothing and needs no ticket, so it is worth doing in parallel with the UIT
-request rather than instead of it. If the answers come back no, say so in the
-ticket: it usefully narrows their reply.
+Everything is read from the ID token by
+`src/lib/_internal/onid-profile.ts`, which the `genericOAuth` config calls
+through `getUserInfo`.
 
-To register, use:
+```
+id            = sub
+email         = email claim, falling back to username (the UPN)
+name          = given_name + family_name, then name, then the local part of email
+emailVerified = true, always
+```
 
-- **Callback URL**: `https://capstone.eecs.oregonstate.edu/api/auth/oauth2/callback/onid`
-  (this is the `better-auth` 1.6 path shape and it moves in 1.7, so read the pin
-  note under "Notes for whoever implements it" before you register)
-- **Internal name**: `capstone` (lowercase, numbers and underscores only)
-- **APIs**: `Identities v3 test` (or `Identities v2`), plus `Persons v3 - get by
-  ID` and `Persons v3 - emails`. Add `Directory v2` if name and affiliation turn
-  out not to be carried by those. Names are copied verbatim from the portal's
-  list; the `test` suffix on the v3 entry suggests it is not production, which
-  is itself worth asking about.
+Three things about this are worth knowing before you change any of it.
 
-## The UIT ticket
+**There is no ONID claim.** UIT: "To my knowledge the ONID is not available via
+OIDC. The next-best record would be the UPN, passed through the username claim."
+The UPN is shaped `onid@oregonstate.edu`.
 
-Paste this, filling in the contact and timeline.
+**The email claim is not guaranteed**, per Entra's own field documentation, and
+Better Auth requires a unique non-null email per user. So the UPN fallback is
+load-bearing: without it, a user with no `email` claim cannot sign in at all.
+Falling back is not inventing an address, because the UPN is deliverable on a
+domain this tenant owns.
 
----
+**We do not use the default `getUserInfo`, and cannot.** Better Auth's default
+takes its ID-token branch only when `sub` and `email` are both present, and
+otherwise falls through to the discovered `userinfo_endpoint`. For this tenant
+that endpoint is Microsoft Graph, whose OIDC response carries a fixed claim set
+that does not include a tenant-custom `username`. The default therefore routes
+the exact case UIT warned about to the one source that cannot answer it.
 
-**Subject:** OIDC (or SAML) registration for the EECS Capstone web application
+`emailVerified` is asserted rather than read. The tenant owns the domain and has
+just completed an interactive sign-in with whatever MFA the university enforces,
+which is stronger proof of address control than the verification link our own
+password path mails. It has two intended consequences: it fires the
+project-claim hook in `src/lib/auth.ts`, and it suppresses the sign-up
+verification email that a university-authenticated user must never receive.
 
-I am deploying a web application for the EECS Capstone program at
-`https://capstone.eecs.oregonstate.edu` and would like students, faculty and
-staff to sign in with their ONID account rather than maintaining a separate
-password. The app currently supports email/password and GitHub sign-in; ONID
-would become the primary path.
+## Account linking
 
-**My first question:** can you register the application as an OpenID Connect
-relying party, or is SAML 2.0 the only option for an application like this? I
-can implement either, but OIDC is substantially less work and I would prefer it
-if it is available.
+`onid` is in `account.accountLinking.trustedProviders`, so an ONID sign-in links
+to an existing account at the same address rather than forking a second one.
 
-**If OIDC, I need:**
+`requireLocalEmailVerified` stays at its default of `true`. A student who signed
+up with a password and never clicked the verification link gets `account not
+linked` on their first ONID sign-in, and `/sign-in` renders copy telling them to
+verify the password account first. That refusal is deliberate. Merging an
+authenticated ONID identity into an address nobody has proven would let whoever
+set that password inherit the real student's account.
 
-- The issuer or discovery URL (`.../.well-known/openid-configuration`)
-- A `client_id` and `client_secret`
-- Confirmation of this redirect URI, which I need allowlisted exactly:
-  `https://capstone.eecs.oregonstate.edu/api/auth/oauth2/callback/onid`
-- The scopes I should request
-- **Claim names**, specifically: which claim carries the ONID username, which
-  carries the email address, which carries given and family name, and whether
-  you release `eduPersonPrimaryAffiliation` or `eduPersonScopedAffiliation`
-- Whether the email claim is **guaranteed present and verified** for every user
+## Rotating the secret
 
-**If SAML 2.0, I need:**
+The secret does not originate in AWS. UIT issue it into the Azure Key Vault
+`kv-engr-coe-vault-caps`, and it is copied by hand into AWS Secrets Manager at
+`eecs-capstone/onid-client-secret`. There is no sync between the two clouds, and
+there should not be one for a value that changes every two years.
 
-- Your **IdP metadata URL**, or failing that the IdP entityID, SSO entry point
-  and signing certificate
-- **Registration of the application as a Service Provider.** Its values are:
-  - entityID (proposed):
-    `https://capstone.eecs.oregonstate.edu/api/auth/sso/saml2/sp/metadata`
-  - Assertion Consumer Service URL, HTTP-POST binding:
-    `https://capstone.eecs.oregonstate.edu/api/auth/sso/saml2/sp/acs/onid`
-  - SP metadata, served once I have the IdP details above:
-    `https://capstone.eecs.oregonstate.edu/api/auth/sso/saml2/sp/metadata?providerId=onid`
+```bash
+aws --profile aws-capstone1 secretsmanager put-secret-value \
+  --secret-id eecs-capstone/onid-client-secret \
+  --secret-string 'NEW_SECRET' \
+  --region us-west-2
 
-  The metadata document is not live yet, because the application will not serve
-  it until it has your entry point and certificate. The two values above are
-  what it will contain. If you have an entityID naming convention for campus
-  applications, tell me and I will adopt it instead of the proposal.
-- **Whether you register the application locally in your IdP, or whether this
-  has to go through InCommon.** I would prefer a local registration if you
-  support it. I cannot register an `oregonstate.edu` entity in InCommon myself,
-  so if that is the required path I would need you to sponsor it, and I would
-  like to know the lead time.
-- The **NameID format** you release, and whether it is persistent for a given
-  user. A transient NameID would not let the application recognize a returning
-  user.
-- The **attribute release** you can offer, specifically `eduPersonPrincipalName`,
-  `mail`, `givenName`, `sn`, `displayName`, and `eduPersonPrimaryAffiliation` or
-  `eduPersonScopedAffiliation`. As with OIDC, I need to know whether `mail` is
-  released for every user and whether anything in the assertion indicates that
-  the address is verified.
-- Whether you require **signed AuthnRequests** or **encrypted assertions**. The
-  application is a Node/TypeScript service using a standards-compliant SAML 2.0
-  SP library, which supports both, so I can supply an SP signing certificate if
-  you need one. I mention the stack only because the ACS path above will not
-  look like the Shibboleth SP or SimpleSAMLphp shapes you normally see; it is a
-  conventional SAML 2.0 SP in every other respect.
-- Whether you require **Single Logout**, and over which binding. I would rather
-  find out now than after registration.
+aws --profile aws-capstone1 ecs update-service \
+  --cluster eecs-capstone --service eecs-capstone \
+  --force-new-deployment --region us-west-2
+```
 
-**Two process questions, either way:**
+**Put the expiry date in a shared calendar the day you set it.** The secret is
+good for two years, does not auto-renew, and UIT do not track expiry dates.
+Nothing in this stack will warn you. Sign-in simply starts failing, on a date
+nobody wrote down.
 
-1. Is there a **test or staging IdP** I can integrate against, or does
-   registration go straight to production?
-2. Does attribute release require a **security review or data classification
-   form** first? If so I would like to start that now rather than after the
-   technical work.
+## Open with UIT
 
-I am requesting only identity attributes for authentication and display. I do
-not need grades, holds, financial or any other student record data.
+These went back on 2026-08-24 and are unanswered. Until the first three are
+resolved, **no part of the live flow has been exercised**: not the authorization
+redirect, not the token exchange, not the claim shape.
 
----
+1. **The client secret.** We cannot open the Key Vault link, so we do not have
+   it. Everything else is blocked behind this.
+2. **Which redirect URIs were actually registered.** The original request named
+   the production URI exactly; the reply did not confirm it.
+3. **A localhost redirect URI**, without which the flow cannot be tested outside
+   production.
+4. **Which scopes to request.** We assume `openid profile email` from the
+   tenant's `scopes_supported`. Deliberately not `offline_access`: it buys a
+   refresh token, and we call no API on the user's behalf.
+5. **The secret's calendar expiry date**, and the rotation procedure.
+6. **Who can actually sign in.** UIT say the app is published to users with an
+   active engineering account. If that is narrower than ONID, a student or staff
+   member with a valid ONID and no College of Engineering account cannot sign
+   in, and we do not yet know what they see when they try.
 
-## Notes for whoever implements it
+One assumption worth naming separately, because it is the one most likely to be
+wrong and the unit tests cannot catch it: **`username` is not a stock Entra v2.0
+claim.** The tenant's discovery document advertises `preferred_username` and
+does not list `username` at all, so it must come from a claims-mapping
+configuration on this app registration. UIT named it in prose and no ID token
+has been decoded. If it arrives as `preferred_username` or `upn` instead, the
+UPN fallback silently never fires and users without an email claim are rejected.
+The fix would be one line in `onid-profile.ts`, but you will only find out by
+signing in.
 
-- **The redirect URI shape differs from the existing GitHub one.** GitHub uses
-  `/api/auth/callback/github` (see `DEPLOYMENT.md` §11). The `genericOAuth`
-  plugin mounts a different path, `/api/auth/oauth2/callback/:providerId`. Pasting
-  the GitHub shape into the ticket costs a round trip with UIT, so send the
-  `oauth2` form above.
-- **Pin `better-auth` before sending the ticket.** That `oauth2` URL is the 1.6
-  shape. `package.json` asks for `^1.6.13`, 1.6.25 is installed and 1.6.26 is
-  the newest published release, so the URL above is correct today. But the 1.7
-  upgrade guide rebuilds `genericOAuth` on the social-provider path and moves
-  the callback to `/api/auth/callback/:id`, converging with GitHub's shape and
-  making the bullet above obsolete. A caret range accepts 1.7 the day it ships,
-  so a routine `npm update` after UIT has allowlisted the `oauth2` URL would
-  break sign-in with no code change. Pin to `~1.6` before sending, and treat the
-  upgrade as a change that needs a new URL allowlisted. The SAML ACS path is not
-  affected: 1.7 documents the same `/sso/saml2/sp/acs/:providerId` shape.
-- **The ticket names the stack in the SAML branch and deliberately not in the
-  OIDC branch.** This is not an inconsistency to tidy up. An OIDC registration
-  is library-agnostic: UIT issue a client ID and secret and allowlist a redirect
-  URI, and what consumes the token is not their concern, so naming the library
-  there only invites a question about approved software lists. SAML is different
-  because `/api/auth/sso/saml2/sp/acs/onid` matches neither the Shibboleth SP
-  shape (`/Shibboleth.sso/SAML2/POST`) nor the SimpleSAMLphp one, and an ACS URL
-  an admin does not recognize reads as a mistake. One clause naming the stack
-  buys off that round trip. Keep it capability-first for the same reason: a
-  competent SP declaring what it supports gets registered, whereas a request for
-  help with an unfamiliar library gets triaged.
-- **Single Logout is an open question, not a known capability.** `@better-auth/sso`
-  advertised SP- and IdP-initiated SLO in the 1.5 release announcement, but the
-  current SSO plugin reference documentation does not mention `enableSingleLogout`
-  or any logout endpoint. That is why the ticket asks whether UIT require SLO
-  rather than claiming support for it. If they do require it, verify against the
-  installed package before promising anything, because some campus IdPs treat
-  SLO as mandatory for registration and that would be the point at which this
-  route needs re-costing.
-- **Affiliation already has a home.** `src/lib/auth.ts` declares
-  `user.additionalFields.affiliation`, so `eduPersonPrimaryAffiliation` maps
-  straight onto an existing column rather than needing a migration. Worth naming
-  in the ticket for that reason.
-- **Email is load-bearing for account linking.** Better Auth links a social
-  identity to an existing account by email. If ONID does not release a verified
-  email, a student who already signed up with email/password gets a second,
-  disconnected account. This is why the ticket asks whether email is guaranteed.
-  On the SAML branch the NameID is the same kind of load-bearing value, for a
-  different reason: it is the stable subject identifier, and `@better-auth/sso`
-  maps it through `samlConfig.mapping.id`. A transient NameID changes on every
-  login, so each sign-in would look like a new user. That is why the ticket asks
-  for the format rather than assuming one. `mapping.emailVerified` is also a
-  real field in that config, which is what the question about a verification
-  signal in the assertion is for.
-- **`requireEmailVerification: true` needs thought.** It is set in
-  `src/lib/auth.ts` for the email/password path. An ONID user has already been
-  authenticated by the university, and must not land in an email-verification
-  loop on first sign-in. Check this behavior when the provider is wired up.
-- **The client secret goes to Secrets Manager**, alongside
-  `GITHUB_CLIENT_SECRET` in `infra/secrets.tf`, not into `infra/ecs.tf` as a
-  plain environment variable. The non-secret client ID follows
-  `GITHUB_CLIENT_ID` and can sit in the task definition.
+## What is deliberately not built
+
+- **No affiliation mapping.** UIT release neither `eduPersonPrimaryAffiliation`
+  nor `eduPersonScopedAffiliation`. `user.additionalFields.affiliation` stays a
+  user-entered mentor-profile field and ONID does not touch it.
+- **No ONID username column.** Storing the UPN separately from email would be a
+  migration for a value nothing reads. Add it when something needs to display or
+  join on an ONID.
+- **No single logout.** Not requested, and signing out of this app should not
+  sign a user out of every Microsoft property in the tenant.
+- **No removal of email/password or GitHub sign-in.** Industry partners and
+  outside faculty have no ONID, and open question 6 may narrow the ONID audience
+  further.

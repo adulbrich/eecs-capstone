@@ -29,6 +29,7 @@ data "aws_iam_policy_document" "execution_secrets" {
       aws_secretsmanager_secret.database_url.arn,
       aws_secretsmanager_secret.better_auth_secret.arn,
       aws_secretsmanager_secret.github_client_secret.arn,
+      aws_secretsmanager_secret.onid_client_secret.arn,
     ]
   }
 }

@@ -1,8 +1,9 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { admin } from "better-auth/plugins";
+import { admin, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { db } from "#/db";
+import { onidProfileFromIdToken } from "#/lib/_internal/onid-profile";
 import { getEmailSender } from "#/lib/email/sender";
 import { passwordResetEmail, verificationEmail } from "#/lib/email/templates";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
@@ -65,6 +66,8 @@ export const auth = betterAuth({
         // to GitHub's own verified flag for the chosen email (see
         // @better-auth/core/dist/social-providers/github.mjs getUserInfo), so a
         // GitHub account with a GitHub-verified email is claimed at creation.
+        // ONID sign-ups always arrive with it set, because the university has
+        // already authenticated the person; see lib/_internal/onid-profile.ts.
         //
         // One other way in: the admin plugin's create-user takes an open data
         // record, so an admin can set emailVerified directly and claim for an
@@ -84,6 +87,24 @@ export const auth = betterAuth({
       clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
     },
   },
+  account: {
+    accountLinking: {
+      // Redundant while onid-profile.ts asserts emailVerified unconditionally:
+      // the guard in better-auth/dist/oauth2/link-account.mjs is
+      // `!isTrustedProvider && !userInfo.emailVerified`, and the second half is
+      // already false. It stays because it is the documented way to say "this
+      // IdP is authoritative for its own domain", and because linking keeps
+      // working if emailVerified ever becomes conditional on the claim.
+      //
+      // It deliberately does NOT relax requireLocalEmailVerified, which
+      // defaults to true. A student who signed up with a password and never
+      // clicked the verification link gets `account not linked` on their first
+      // ONID sign-in rather than a silent merge, because merging an
+      // authenticated ONID identity into an address nobody has proven would let
+      // whoever set that password inherit the real student's account.
+      trustedProviders: ["onid"],
+    },
+  },
   user: {
     additionalFields: {
       affiliation: { type: "string", required: false },
@@ -94,6 +115,36 @@ export const auth = betterAuth({
   },
   plugins: [
     admin({ defaultRole: "user", adminRoles: ["admin"] }),
+    // ONID, via the Oregon State Entra ID tenant. UIT registered the app as an
+    // OIDC relying party rather than a SAML SP, which is why this is the
+    // genericOAuth plugin and not @better-auth/sso.
+    //
+    // Two things about this config are worth not "fixing":
+    //
+    // The callback path is /api/auth/oauth2/callback/onid, which does not match
+    // the /api/auth/callback/github shape beside it. That is the 1.6 generic
+    // OAuth path, and Entra matches redirect URIs exactly against what UIT
+    // allowlisted. better-auth 1.7 converges the two shapes, which is why
+    // package.json pins ~1.6 rather than ^1.6.
+    //
+    // offline_access is absent on purpose. It buys a refresh token, and a
+    // refresh token is only useful for calling an API as the user later. We
+    // call nothing: the session is ours, not Microsoft's, so holding one would
+    // be a stored credential with no purpose.
+    genericOAuth({
+      config: [
+        {
+          providerId: "onid",
+          discoveryUrl: process.env.ONID_DISCOVERY_URL ?? "",
+          clientId: process.env.ONID_CLIENT_ID ?? "",
+          clientSecret: process.env.ONID_CLIENT_SECRET ?? "",
+          scopes: ["openid", "profile", "email"],
+          pkce: true,
+          getUserInfo: (tokens) =>
+            Promise.resolve(onidProfileFromIdToken(tokens.idToken)),
+        },
+      ],
+    }),
     tanstackStartCookies(),
   ],
 });

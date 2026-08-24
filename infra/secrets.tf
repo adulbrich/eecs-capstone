@@ -50,6 +50,30 @@ resource "aws_secretsmanager_secret_version" "github_client_secret" {
   }
 }
 
+# ONID (Entra ID) client secret. Same placeholder-then-set-by-hand shape as the
+# GitHub secret above, for an additional reason: this value does not originate
+# in AWS at all. UIT issue it into an Azure Key Vault
+# (kv-engr-coe-vault-caps) and it is copied across by hand. There is no sync
+# and there should not be one for a value that changes every two years.
+#
+# It expires two years from issue, does not auto-renew, and UIT do not track
+# expiry dates. Whoever sets it should put the date in a shared calendar; see
+# docs/ONID-SSO.md.
+resource "aws_secretsmanager_secret" "onid_client_secret" {
+  name = "${var.project}/onid-client-secret"
+
+  tags = { Name = "${var.project}-onid-client-secret" }
+}
+
+resource "aws_secretsmanager_secret_version" "onid_client_secret" {
+  secret_id     = aws_secretsmanager_secret.onid_client_secret.id
+  secret_string = "REPLACE_ME_AFTER_APPLY"
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
 # The assets CloudFront base URL is needed at image *build* time (it is baked
 # into the client bundle via VITE_STORAGE_PUBLIC_BASE). The deploy workflow
 # reads it from here and passes it as a Docker build arg.

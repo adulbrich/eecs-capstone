@@ -89,6 +89,11 @@ resource "aws_ecs_task_definition" "app" {
         # origin fail the origin check with INVALID_ORIGIN.
         { name = "BETTER_AUTH_URL", value = "https://${var.domain_name}" },
         { name = "GITHUB_CLIENT_ID", value = var.github_client_id },
+        { name = "ONID_CLIENT_ID", value = var.onid_client_id },
+        # The tenant discovery document. An env var rather than a literal in
+        # src/lib/auth.ts so a tenant change, or a test tenant if UIT ever
+        # provide one, is a variable and not a deploy.
+        { name = "ONID_DISCOVERY_URL", value = var.onid_discovery_url },
         { name = "S3_BUCKET", value = aws_s3_bucket.assets.bucket },
         { name = "S3_REGION", value = var.region },
         { name = "BEDROCK_REGION", value = var.bedrock_region },
@@ -134,6 +139,7 @@ resource "aws_ecs_task_definition" "app" {
         { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn },
         { name = "BETTER_AUTH_SECRET", valueFrom = aws_secretsmanager_secret.better_auth_secret.arn },
         { name = "GITHUB_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.github_client_secret.arn },
+        { name = "ONID_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.onid_client_secret.arn },
       ]
 
       logConfiguration = {

@@ -100,6 +100,18 @@ function SignUp() {
         </form>
         <Button
           className="mt-3 w-full"
+          onClick={() =>
+            authClient.signIn.oauth2({
+              providerId: "onid",
+              errorCallbackURL: "/sign-in",
+            })
+          }
+          type="button"
+        >
+          Continue with ONID
+        </Button>
+        <Button
+          className="mt-3 w-full"
           onClick={() => authClient.signIn.social({ provider: "github" })}
           type="button"
           variant="outline"

@@ -14,7 +14,39 @@ import { authClient } from "#/lib/auth-client";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 
-const searchSchema = z.object({ redirect: z.string().optional() });
+const searchSchema = z.object({
+  redirect: z.string().optional(),
+  // Better Auth redirects a failed OAuth callback to errorCallbackURL with the
+  // reason in `error`. Without this the param is not in the route's search
+  // schema, so the page renders as if nothing went wrong.
+  error: z.string().optional(),
+});
+
+/**
+ * Copy for the OAuth failures a user can actually do something about.
+ *
+ * `account_not_linked` is the one that matters. A student who signed up with a
+ * password and never clicked the verification link hits it on their first ONID
+ * sign-in, because Better Auth will not merge an authenticated identity into an
+ * address nobody has proven. That is the correct refusal, but on its own it is
+ * a dead end, so the message says which door to go through instead.
+ */
+const OAUTH_ERRORS: Record<string, string> = {
+  account_not_linked:
+    "You already have an account with this email address that has not been verified. Sign in with your password and verify your email first, then ONID will link to it.",
+  email_is_missing:
+    "ONID did not return an email address for your account. Contact the capstone office so we can follow up with UIT.",
+  user_info_is_missing:
+    "ONID did not return enough information to sign you in. Try again, and contact the capstone office if it keeps happening.",
+  signup_disabled: "This account is not permitted to sign up.",
+};
+
+function oauthErrorMessage(code: string): string {
+  return (
+    OAUTH_ERRORS[code] ??
+    "Sign-in through ONID failed. Try again, or use your email and password."
+  );
+}
 
 export const Route = createFileRoute("/(auth)/sign-in")({
   head: () => ({ meta: [{ title: pageTitle("Sign In") }] }),
@@ -30,7 +62,9 @@ export const Route = createFileRoute("/(auth)/sign-in")({
 
 function SignIn() {
   const navigate = useNavigate();
-  const { redirect } = useSearch({ from: "/(auth)/sign-in" });
+  const { redirect, error: oauthError } = useSearch({
+    from: "/(auth)/sign-in",
+  });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -55,6 +89,14 @@ function SignIn() {
     <div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">
       <div className="island-shell w-full max-w-sm rounded-xl p-8">
         <h1 className="font-semibold text-2xl">Sign in</h1>
+        {oauthError && (
+          <p
+            className="mt-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-destructive text-sm"
+            role="alert"
+          >
+            {oauthErrorMessage(oauthError)}
+          </p>
+        )}
         <form className="mt-6 space-y-4" onSubmit={onSubmit}>
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
@@ -83,6 +125,19 @@ function SignIn() {
             {loading ? "Signing in..." : "Sign in"}
           </Button>
         </form>
+        <Button
+          className="mt-3 w-full"
+          onClick={() =>
+            authClient.signIn.oauth2({
+              providerId: "onid",
+              callbackURL: redirect ?? "/",
+              errorCallbackURL: "/sign-in",
+            })
+          }
+          type="button"
+        >
+          Continue with ONID
+        </Button>
         <Button
           className="mt-3 w-full"
           onClick={() =>

@@ -280,6 +280,32 @@ stored in GitHub.
 
 ---
 
+### 4.4 Set the ONID client secret
+
+Terraform seeds a placeholder here too. Unlike the GitHub secret, this value
+does not originate in AWS: UIT issue it into the Azure Key Vault
+`kv-engr-coe-vault-caps` and it is copied across by hand.
+
+```bash
+aws --profile aws-capstone1 secretsmanager put-secret-value \
+  --secret-id eecs-capstone/onid-client-secret \
+  --secret-string 'YOUR_REAL_ONID_CLIENT_SECRET' \
+  --region us-west-2
+```
+
+**Put the expiry in a shared calendar when you set it.** The secret is good for
+two years, does not auto-renew, and UIT do not track expiry dates on their side.
+Nothing in this stack will warn you: sign-in simply starts failing.
+
+The redirect URI UIT must have allowlisted is
+`https://capstone.eecs.oregonstate.edu/api/auth/oauth2/callback/onid`. Note the
+`oauth2` segment, which differs from GitHub's `/api/auth/callback/github` in
+section 4.2. That is the Better Auth 1.6 generic-OAuth path, Entra matches
+redirect URIs exactly, and `package.json` pins `~1.6` because 1.7 moves it. See
+`docs/ONID-SSO.md` before upgrading.
+
+---
+
 ## 5. First deploy
 
 Trigger the deploy: GitHub → Actions → **Deploy** → Run workflow (on `main`).
@@ -396,7 +422,8 @@ List revisions with
 
 ### Update a secret or config
 
-- Secrets (DATABASE_URL, BETTER_AUTH_SECRET, GITHUB_CLIENT_SECRET): update in
+- Secrets (DATABASE_URL, BETTER_AUTH_SECRET, GITHUB_CLIENT_SECRET,
+  ONID_CLIENT_SECRET): update in
   Secrets Manager, then force a new deployment so tasks pick it up:
   `aws --profile aws-capstone1 ecs update-service --cluster eecs-capstone --service eecs-capstone --force-new-deployment --region us-west-2`.
 - Non-secret env (model ID, email from, etc.): change the value in
@@ -758,17 +785,19 @@ this config; delete it manually if you are done with the project.
 - ECS cluster/service: `eecs-capstone` / `eecs-capstone`
 - ECR repo: `eecs-capstone`
 - Secrets: `eecs-capstone/database-url`, `eecs-capstone/better-auth-secret`,
-  `eecs-capstone/github-client-secret`
+  `eecs-capstone/github-client-secret`, `eecs-capstone/onid-client-secret`
 - SSM: `/eecs-capstone/ASSETS_PUBLIC_BASE`
 - Log group: `/ecs/eecs-capstone`
 
 **Runtime environment (set in the task definition, `infra/ecs.tf`):**
 
-`NODE_ENV`, `PORT`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `S3_BUCKET`,
+`NODE_ENV`, `PORT`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `ONID_CLIENT_ID`,
+`ONID_DISCOVERY_URL`, `S3_BUCKET`,
 `S3_REGION`, `BEDROCK_REGION`, `BEDROCK_MODEL_ID`, `BEDROCK_REASONING_EFFORT`,
 `AI_REVIEW_LIMIT_PER_HOUR`, `AI_REVIEW_LIMIT_PER_DAY`, `EMAIL_TRANSPORT=console`,
 `EMAIL_FROM`, `EMAIL_REPLY_TO` (blank), `SES_REGION`, plus secrets
-`DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`. In production, S3
+`DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`,
+`ONID_CLIENT_SECRET`. In production, S3
 and Bedrock use the task role (no access keys). The three email variables are
 inert until `EMAIL_TRANSPORT` flips to `ses` (section 9.5).
 

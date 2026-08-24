@@ -110,6 +110,18 @@ variable "github_client_id" {
   default     = ""
 }
 
+variable "onid_client_id" {
+  description = "ONID (Entra ID) application client ID (not secret). The client secret lives in Secrets Manager."
+  type        = string
+  default     = ""
+}
+
+variable "onid_discovery_url" {
+  description = "OIDC discovery document for the Oregon State Entra ID tenant."
+  type        = string
+  default     = "https://login.microsoftonline.com/ce6d05e1-3c5e-4d62-87a8-4c4a2713c113/v2.0/.well-known/openid-configuration"
+}
+
 variable "deploy_branch" {
   description = "Branch the Deploy workflow runs from; the OIDC role trust is scoped to this ref."
   type        = string
