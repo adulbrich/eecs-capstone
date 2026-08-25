@@ -110,6 +110,29 @@ variable "github_client_id" {
   default     = ""
 }
 
+# Defaulted here rather than left empty for terraform.tfvars to fill, unlike
+# github_client_id above. That file is gitignored, so an empty default reaches a
+# fresh checkout as an empty ONID_CLIENT_ID in the task definition, and the
+# failure surfaces as an Entra error at the token exchange rather than as
+# anything this codebase logs. The value is public and fixed for the life of the
+# registration, so it belongs in version control next to the discovery URL it
+# has to stay in step with.
+variable "onid_client_id" {
+  description = "ONID (Entra ID) application client ID (not secret). The client secret lives in Secrets Manager."
+  type        = string
+  default     = "d551d87a-b608-46a6-9fc3-a8b6bd56a5df"
+}
+
+# Must name the tenant by GUID. The app derives the expected token issuer from
+# this value and refuses any token that does not match, and Entra always issues
+# the GUID form even though it will resolve a discovery URL built on a domain
+# name. A domain-shaped value here refuses every sign-in.
+variable "onid_discovery_url" {
+  description = "OIDC discovery document for the Oregon State Entra ID tenant. Tenant must be named by GUID."
+  type        = string
+  default     = "https://login.microsoftonline.com/ce6d05e1-3c5e-4d62-87a8-4c4a2713c113/v2.0/.well-known/openid-configuration"
+}
+
 variable "deploy_branch" {
   description = "Branch the Deploy workflow runs from; the OIDC role trust is scoped to this ref."
   type        = string
