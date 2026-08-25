@@ -37,9 +37,18 @@ permissions:
 
 jobs:
   mirror:
-    # A branch deletion fires a push event whose ref is already gone, and
-    # checkout fails on it. The scheduled run prunes it instead.
-    if: ${{ github.event_name != 'push' || !github.event.deleted }}
+    # Two kinds of push cannot be mirrored as they happen:
+    #   A branch deletion fires a push event whose ref is already gone, and
+    #   checkout fails on it.
+    #   A dependabot push runs against the Dependabot secret store rather than
+    #   the Actions one, so GITLAB_USERNAME and GITLAB_TOKEN arrive empty and
+    #   GitLab rejects the push as bad credentials.
+    # Skipping both is safe because the nightly sweep pushes every ref under
+    # refs/remotes/origin/*, dependabot branches included, so the branch is
+    # late to GitLab rather than missing. Do not fix this by copying the
+    # secrets into the Dependabot store; that hands a GitLab write token to a
+    # lower-trust context and buys nothing the sweep does not already do.
+    if: ${{ github.event_name != 'push' || (!github.event.deleted && github.actor != 'dependabot[bot]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
