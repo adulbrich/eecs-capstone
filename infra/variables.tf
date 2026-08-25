@@ -110,10 +110,17 @@ variable "github_client_id" {
   default     = ""
 }
 
+# Defaulted here rather than left empty for terraform.tfvars to fill, unlike
+# github_client_id above. That file is gitignored, so an empty default reaches a
+# fresh checkout as an empty ONID_CLIENT_ID in the task definition, and the
+# failure surfaces as an Entra error at the token exchange rather than as
+# anything this codebase logs. The value is public and fixed for the life of the
+# registration, so it belongs in version control next to the discovery URL it
+# has to stay in step with.
 variable "onid_client_id" {
   description = "ONID (Entra ID) application client ID (not secret). The client secret lives in Secrets Manager."
   type        = string
-  default     = ""
+  default     = "d551d87a-b608-46a6-9fc3-a8b6bd56a5df"
 }
 
 # Must name the tenant by GUID. The app derives the expected token issuer from
