@@ -116,8 +116,12 @@ variable "onid_client_id" {
   default     = ""
 }
 
+# Must name the tenant by GUID. The app derives the expected token issuer from
+# this value and refuses any token that does not match, and Entra always issues
+# the GUID form even though it will resolve a discovery URL built on a domain
+# name. A domain-shaped value here refuses every sign-in.
 variable "onid_discovery_url" {
-  description = "OIDC discovery document for the Oregon State Entra ID tenant."
+  description = "OIDC discovery document for the Oregon State Entra ID tenant. Tenant must be named by GUID."
   type        = string
   default     = "https://login.microsoftonline.com/ce6d05e1-3c5e-4d62-87a8-4c4a2713c113/v2.0/.well-known/openid-configuration"
 }

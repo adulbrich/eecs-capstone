@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   issuerFromDiscoveryUrl,
-  onidProfileFromIdToken,
+  onidProfileOrRejection,
 } from "../_internal/onid-profile";
 
 const TENANT = "ce6d05e1-3c5e-4d62-87a8-4c4a2713c113";
@@ -20,9 +20,23 @@ function idToken(payload: Record<string, unknown>): string {
   )}.not-checked`;
 }
 
-/** Every case but the issuer tests runs against the configured tenant. */
-function profileOf(token: string | null | undefined) {
-  return onidProfileFromIdToken(token, ISSUER);
+/**
+ * Every case but the issuer tests runs against the configured tenant.
+ *
+ * These go through `onidProfileOrRejection` rather than the exported
+ * `onidProfileFromIdToken` so that the ten refusal cases below do not each
+ * print a console error. The wrapper is a `console.error` and a `return null`
+ * over this function, and `rejectionOf` covers the reasons it logs.
+ */
+function profileOf(token: string | null | undefined, issuer = ISSUER) {
+  const result = onidProfileOrRejection(token, issuer);
+  return "rejected" in result ? null : result;
+}
+
+/** The reason a token was refused, or null if it was accepted. */
+function rejectionOf(token: string | null | undefined, issuer = ISSUER) {
+  const result = onidProfileOrRejection(token, issuer);
+  return "rejected" in result ? result.rejected : null;
 }
 
 /** The claim set UIT says they configured, for a user who has an email. */
@@ -128,22 +142,54 @@ describe("onidProfileFromIdToken", () => {
       // attacker with their own tenant could set a user's mail to a real
       // student's address and be linked straight into that student's account.
       const other = "https://login.microsoftonline.com/some-other-tenant/v2.0";
-      expect(
-        onidProfileFromIdToken(idToken({ ...full, iss: other }), ISSUER)
-      ).toBeNull();
+      expect(profileOf(idToken({ ...full, iss: other }))).toBeNull();
     });
 
     it("rejects a token with no issuer claim at all", () => {
-      expect(
-        onidProfileFromIdToken(idToken({ ...full, iss: undefined }), ISSUER)
-      ).toBeNull();
+      expect(profileOf(idToken({ ...full, iss: undefined }))).toBeNull();
     });
 
     it("refuses every token when no issuer is configured", () => {
       // ONID_DISCOVERY_URL unset. Failing closed matters more than failing
       // helpfully: the alternative is accepting tokens from anywhere.
-      expect(onidProfileFromIdToken(idToken(full), "")).toBeNull();
-      expect(onidProfileFromIdToken(idToken(full), "   ")).toBeNull();
+      expect(profileOf(idToken(full), "")).toBeNull();
+      expect(profileOf(idToken(full), "   ")).toBeNull();
+    });
+  });
+
+  describe("refusal reasons", () => {
+    // Better Auth collapses every refusal into one `user_info_is_missing`
+    // redirect, so the reason exists only in the server log. These assertions
+    // are what keep the first live sign-in failure diagnosable rather than a
+    // guessing game between six identical-looking outcomes.
+    it("names the wrong tenant", () => {
+      const other = "https://login.microsoftonline.com/some-other-tenant/v2.0";
+      expect(rejectionOf(idToken({ ...full, iss: other }))).toContain("issuer");
+    });
+
+    it("names the missing configuration", () => {
+      expect(rejectionOf(idToken(full), "")).toContain("ONID_DISCOVERY_URL");
+    });
+
+    it("names the missing account id", () => {
+      const { oid, sub, ...neither } = full;
+      expect(rejectionOf(idToken(neither))).toContain("oid");
+    });
+
+    it("names every UPN spelling it looked for", () => {
+      const { email, username, ...neither } = full;
+      const reason = rejectionOf(idToken(neither)) ?? "";
+      expect(reason).toContain("preferred_username");
+      expect(reason).toContain("upn");
+    });
+
+    it("never leaks a claim value into the reason", () => {
+      // The log line goes wherever server logs go. A UPN is personal data and
+      // has no business being in it.
+      const other = "https://login.microsoftonline.com/some-other-tenant/v2.0";
+      const reason = rejectionOf(idToken({ ...full, iss: other })) ?? "";
+      expect(reason).not.toContain("beavers@oregonstate.edu");
+      expect(reason).not.toContain(full.oid);
     });
   });
 

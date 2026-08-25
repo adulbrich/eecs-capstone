@@ -28,13 +28,17 @@ export interface OnidProfile {
   name: string;
 }
 
+const DISCOVERY_SUFFIX = /\/\.well-known\/openid-configuration\/?$/;
+
 /**
  * The issuer a token must carry, derived from the discovery URL we were
  * configured with. For Entra that is `https://login.microsoftonline.com/<tenant
  * id>/v2.0`, so pinning it pins the tenant.
+ *
+ * The discovery URL must name the tenant by GUID. Entra also resolves one built
+ * on a domain name, but the `iss` claim is always the GUID form, so a
+ * domain-shaped URL would derive an issuer no token can ever match.
  */
-const DISCOVERY_SUFFIX = /\/\.well-known\/openid-configuration\/?$/;
-
 export function issuerFromDiscoveryUrl(discoveryUrl: string): string {
   return discoveryUrl.trim().replace(DISCOVERY_SUFFIX, "");
 }
@@ -70,16 +74,36 @@ function decodePayload(idToken: string): Record<string, unknown> | null {
   }
 }
 
-export function onidProfileFromIdToken(
+/** Why a token was refused. Never carries a claim value, only a reason. */
+export interface OnidRejection {
+  rejected: string;
+}
+
+/**
+ * The mapping, with the reason for a refusal instead of a bare null.
+ *
+ * Six different conditions reject a token and Better Auth collapses all of them
+ * into one `user_info_is_missing` redirect, so without a reason the first real
+ * sign-in failure is a guessing game: wrong issuer, no `oid`, or a UPN under a
+ * fourth claim name all look identical from the browser. Exported separately
+ * from the logging wrapper so tests can assert which guard fired.
+ */
+export function onidProfileOrRejection(
   idToken: string | null | undefined,
   expectedIssuer: string
-): OnidProfile | null {
-  if (!(idToken && expectedIssuer.trim())) {
-    return null;
+): OnidProfile | OnidRejection {
+  if (!idToken) {
+    return { rejected: "the token response carried no id_token" };
+  }
+  if (!expectedIssuer.trim()) {
+    return {
+      rejected:
+        "ONID_DISCOVERY_URL is unset, so there is no issuer to check against",
+    };
   }
   const claims = decodePayload(idToken);
   if (!claims) {
-    return null;
+    return { rejected: "the id_token payload did not decode to a JSON object" };
   }
 
   // Pin the tenant. Microsoft's guidance is to "use the GUID portion of the
@@ -95,8 +119,15 @@ export function onidProfileFromIdToken(
   // for authorization". Someone could stand up their own tenant, set a user's
   // mail to a real student's address, and be linked straight into that
   // student's account. Pinning the issuer is what makes that impossible.
+  //
+  // The expected issuer must be the GUID form. Entra resolves a discovery URL
+  // built on a domain name too, but the `iss` claim is always the GUID, so a
+  // domain-shaped ONID_DISCOVERY_URL derives an issuer that can never match.
   if (claim(claims, "iss") !== expectedIssuer.trim()) {
-    return null;
+    return {
+      rejected:
+        "the id_token issuer is not the configured tenant, so the token was refused",
+    };
   }
 
   // `oid` over `sub` on UIT's advice, and Microsoft's: both are immutable
@@ -106,7 +137,10 @@ export function onidProfileFromIdToken(
   // `oid` requires the `profile` scope, which we request but do not control.
   const id = claim(claims, "oid") ?? claim(claims, "sub");
   if (!id) {
-    return null;
+    return {
+      rejected:
+        "the id_token carried neither an oid nor a sub claim, so there is no account id",
+    };
   }
 
   // UIT: "To my knowledge the ONID is not available via OIDC. The next-best
@@ -133,7 +167,10 @@ export function onidProfileFromIdToken(
     claim(claims, "preferred_username") ??
     claim(claims, "upn");
   if (!email) {
-    return null;
+    return {
+      rejected:
+        "the id_token carried no email, username, preferred_username or upn claim",
+    };
   }
 
   const given = claim(claims, "given_name");
@@ -166,4 +203,25 @@ export function onidProfileFromIdToken(
     // just authenticated must never be sent.
     emailVerified: true,
   };
+}
+
+/**
+ * What `genericOAuth` calls. Logs the reason for a refusal and hands Better Auth
+ * the `null` it expects.
+ *
+ * The log is the point. Every rejection reaches the user as the same opaque
+ * message, so without this line the first failure after UIT release the client
+ * secret would be undiagnosable from the outside. The reason never includes a
+ * claim value.
+ */
+export function onidProfileFromIdToken(
+  idToken: string | null | undefined,
+  expectedIssuer: string
+): OnidProfile | null {
+  const result = onidProfileOrRejection(idToken, expectedIssuer);
+  if ("rejected" in result) {
+    console.error(`ONID sign-in refused a token: ${result.rejected}`);
+    return null;
+  }
+  return result;
 }
