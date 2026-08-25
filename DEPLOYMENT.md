@@ -293,11 +293,15 @@ aws --profile aws-capstone1 secretsmanager put-secret-value \
   --region us-west-2
 ```
 
-**Put the expiry in a shared calendar when you set it.** The secret is good for
-two years, does not auto-renew, and UIT do not track expiry dates on their side.
-Nothing in this stack will warn you: sign-in simply starts failing.
+UIT issued two secrets on the one client ID. The production one goes here; the
+development one is for localhost and stays out of AWS.
 
-The redirect URI UIT must have allowlisted is
+**The production secret expires 2028-08-24. Put that in a shared calendar when
+you set it.** It does not auto-renew, UIT do not track expiry dates on their
+side, and nothing in this stack will warn you: sign-in simply starts failing on
+that date. Renewal is a request through the UIT support portal.
+
+The redirect URI, confirmed registered by UIT, is
 `https://capstone.eecs.oregonstate.edu/api/auth/oauth2/callback/onid`. Note the
 `oauth2` segment, which differs from GitHub's `/api/auth/callback/github` in
 section 4.2. That is the Better Auth 1.6 generic-OAuth path, Entra matches

@@ -56,9 +56,12 @@ resource "aws_secretsmanager_secret_version" "github_client_secret" {
 # (kv-engr-coe-vault-caps) and it is copied across by hand. There is no sync
 # and there should not be one for a value that changes every two years.
 #
-# It expires two years from issue, does not auto-renew, and UIT do not track
-# expiry dates. Whoever sets it should put the date in a shared calendar; see
-# docs/ONID-SSO.md.
+# It expires 2028-08-24, does not auto-renew, and UIT do not track expiry dates.
+# Whoever sets it should put that date in a shared calendar; renewal is a request
+# through the UIT support portal. See docs/ONID-SSO.md.
+#
+# Use the production secret here. UIT issued a second, separate secret on the
+# same client ID for local development, and that one does not belong in AWS.
 resource "aws_secretsmanager_secret" "onid_client_secret" {
   name = "${var.project}/onid-client-secret"
 

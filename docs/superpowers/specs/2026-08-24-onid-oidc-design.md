@@ -1,6 +1,6 @@
 # ONID sign-in over OIDC
 
-Date: 2026-08-24
+Date: 2026-08-24, revised 2026-08-25 after UIT answered the follow-up.
 Status: Design settled, implemented on `feat/onid-oidc`. The live flow is
 unverified and cannot be verified yet; see "What we cannot claim".
 
@@ -54,11 +54,56 @@ in it. Whatever we read, we read from the ID token.
 ### The rule
 
 ```
+issuer   = must equal the tenant issuer, or the token is refused outright
 email    = email claim, then username, preferred_username, upn (all the UPN)
-id       = sub
+id       = oid, falling back to sub
 name     = given_name + family_name, falling back to name, falling back to the local part of email
 emailVerified = true, always
 ```
+
+### Why `oid` rather than `sub`
+
+Microsoft's claims reference says either works: "use `sub` or `oid` alone (which
+as GUIDs are unique)". UIT recommended `oid` and they are right, for a reason the
+reference states a paragraph earlier. `sub` is pairwise per application ID, so
+recreating the app registration with a new client ID hands every existing user a
+different `sub` and forks their account. `oid` is per user per tenant and
+survives it. Over an application whose client secret expires in 2028 and whose
+registration is administered by somebody else, that is not a hypothetical.
+
+`sub` remains the fallback because Entra gates `oid` behind the `profile` scope.
+We request it, but we do not control the registration, so losing `profile` should
+degrade to `sub` rather than break sign-in outright.
+
+### Why the issuer is pinned, and why we stayed single tenant
+
+UIT offered to open the registration to all Entra tenants so that industry
+partners could sign in. Declined, and the mapper now refuses any token whose
+`iss` does not equal this tenant's issuer.
+
+The vector is specific. Entra verifies the domain suffix of a UPN, so nobody can
+mint `student@oregonstate.edu` as a UPN in their own tenant. It does not verify
+the `mail` attribute behind the `email` claim, and the claims reference says
+`email` "isn't guaranteed to be correct and is mutable over time. Never use it
+for authorization or to save data for a user." Our mapper reads `email` first,
+asserts `emailVerified: true`, and trusts `onid` for account linking. Multi-tenant
+turns that composition into account takeover: register your own tenant, set a
+user's mail attribute to a real student's address, sign in, get linked into their
+account.
+
+The expected issuer is derived from `ONID_DISCOVERY_URL`, which already carries
+the tenant GUID, rather than added as a fourth environment variable that can fall
+out of step. An empty discovery URL yields an empty issuer and the mapper refuses
+everything, so an unconfigured deployment fails closed.
+
+The check does not make the email trust self-sufficient. A guest invited into the
+OSU tenant carries this tenant's `iss` with a home-tenant email and passes. What
+makes the trust sound is the conjunction of the issuer pin and UIT publishing the
+registration only to engineering-account holders. `idp` differing from `iss` is
+the discriminator for a guest if that ever stops holding.
+
+Partners do not need multi-tenant anyway: email and password with verification,
+plus GitHub, is already the path for anyone without an ONID.
 
 ### Why the fallback is safe
 
@@ -270,13 +315,16 @@ will check.
 
 ## What we cannot claim
 
-The client secret is in a Key Vault we cannot read, and UIT has not confirmed
-which redirect URIs they registered or added a localhost one. Until all three are
-resolved, **no part of the live flow has been exercised**: not the authorization
-redirect, not the token exchange, not the claim shape.
+As of 2026-08-25 one blocker remains: the client secrets are in a Key Vault we
+still cannot read. UIT report the Secrets User role was assigned at vault
+creation and suspect a tenant misconfiguration. Both redirect URIs are now
+registered and a development secret exists. Until the vault opens, **no part of
+the live flow has been exercised**: not the authorization redirect, not the token
+exchange, not the claim shape.
 
 Specifically, the UPN claim name is an unverified assumption. `username` is not
-a stock Entra claim, UIT named it in prose, and no ID token has been decoded.
+a stock Entra claim: UIT took it from a Proxmox realm configuration and agree it
+is non-standard, and no ID token has been decoded.
 The mapper accepts `username`, `preferred_username` and `upn` rather than betting
 on one, which should make this a non-event; what it cannot cover is a fourth
 name nobody has guessed. The unit tests prove the mapping logic is correct given

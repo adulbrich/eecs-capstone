@@ -3,7 +3,10 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { db } from "#/db";
-import { onidProfileFromIdToken } from "#/lib/_internal/onid-profile";
+import {
+  issuerFromDiscoveryUrl,
+  onidProfileFromIdToken,
+} from "#/lib/_internal/onid-profile";
 import { getEmailSender } from "#/lib/email/sender";
 import { passwordResetEmail, verificationEmail } from "#/lib/email/templates";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
@@ -11,6 +14,14 @@ import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects"
 const emailSender = getEmailSender();
 
 const isProduction = process.env.NODE_ENV === "production";
+
+const onidDiscoveryUrl = process.env.ONID_DISCOVERY_URL ?? "";
+// Derived rather than configured separately, because the discovery URL already
+// contains the tenant GUID and a second variable is a second thing to get out
+// of step. An empty discovery URL yields an empty issuer, and the mapper
+// refuses every token in that case: ONID sign-in fails closed when it is not
+// configured, rather than accepting tokens from anywhere.
+const onidIssuer = issuerFromDiscoveryUrl(onidDiscoveryUrl);
 
 /**
  * Claims a newly verified user's projects, swallowing any failure.
@@ -135,13 +146,16 @@ export const auth = betterAuth({
       config: [
         {
           providerId: "onid",
-          discoveryUrl: process.env.ONID_DISCOVERY_URL ?? "",
+          discoveryUrl: onidDiscoveryUrl,
           clientId: process.env.ONID_CLIENT_ID ?? "",
           clientSecret: process.env.ONID_CLIENT_SECRET ?? "",
+          // `profile` is not decoration: Entra gates the `oid` claim behind it,
+          // and `oid` is the account id. Dropping it forks every account onto
+          // the `sub` fallback.
           scopes: ["openid", "profile", "email"],
           pkce: true,
           getUserInfo: (tokens) =>
-            Promise.resolve(onidProfileFromIdToken(tokens.idToken)),
+            Promise.resolve(onidProfileFromIdToken(tokens.idToken, onidIssuer)),
         },
       ],
     }),

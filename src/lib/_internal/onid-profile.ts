@@ -28,6 +28,17 @@ export interface OnidProfile {
   name: string;
 }
 
+/**
+ * The issuer a token must carry, derived from the discovery URL we were
+ * configured with. For Entra that is `https://login.microsoftonline.com/<tenant
+ * id>/v2.0`, so pinning it pins the tenant.
+ */
+const DISCOVERY_SUFFIX = /\/\.well-known\/openid-configuration\/?$/;
+
+export function issuerFromDiscoveryUrl(discoveryUrl: string): string {
+  return discoveryUrl.trim().replace(DISCOVERY_SUFFIX, "");
+}
+
 /** Reads a claim only when it is a non-blank string. */
 function claim(claims: Record<string, unknown>, key: string): string | null {
   const value = claims[key];
@@ -60,9 +71,10 @@ function decodePayload(idToken: string): Record<string, unknown> | null {
 }
 
 export function onidProfileFromIdToken(
-  idToken: string | null | undefined
+  idToken: string | null | undefined,
+  expectedIssuer: string
 ): OnidProfile | null {
-  if (!idToken) {
+  if (!(idToken && expectedIssuer.trim())) {
     return null;
   }
   const claims = decodePayload(idToken);
@@ -70,7 +82,29 @@ export function onidProfileFromIdToken(
     return null;
   }
 
-  const id = claim(claims, "sub");
+  // Pin the tenant. Microsoft's guidance is to "use the GUID portion of the
+  // [iss] claim to restrict the set of tenants that can sign in to the app",
+  // and this application is meant for one tenant only.
+  //
+  // This is not paranoia about today's registration, which is single-tenant.
+  // It is what keeps the email trust below from becoming an account-takeover
+  // vector if the registration is ever widened. In a multi-tenant app, `email`
+  // is whatever the signing-in tenant's admin typed: Entra verifies the domain
+  // suffix of a UPN but not the `mail` attribute, and the claims reference says
+  // plainly that `email` "isn't guaranteed to be correct" and to "never use it
+  // for authorization". Someone could stand up their own tenant, set a user's
+  // mail to a real student's address, and be linked straight into that
+  // student's account. Pinning the issuer is what makes that impossible.
+  if (claim(claims, "iss") !== expectedIssuer.trim()) {
+    return null;
+  }
+
+  // `oid` over `sub` on UIT's advice, and Microsoft's: both are immutable
+  // GUIDs, but `sub` is pairwise per application ID, so a re-registered app
+  // hands every existing user a new one and forks their account. `oid` is
+  // per-user-per-tenant and survives that. `sub` remains the fallback because
+  // `oid` requires the `profile` scope, which we request but do not control.
+  const id = claim(claims, "oid") ?? claim(claims, "sub");
   if (!id) {
     return null;
   }
@@ -83,14 +117,16 @@ export function onidProfileFromIdToken(
   // defensive: without it, those users cannot sign in at all.
   //
   // Three names for the UPN, because we have never seen a token from this
-  // tenant. `username` is what UIT said they configured, but it is not a stock
-  // Entra v2.0 claim: the tenant's discovery document advertises
+  // tenant. UIT named `username`, then told us where it came from: a Proxmox
+  // realm configuration, not Entra's own reference, and they concede it is
+  // non-standard. The tenant's discovery document advertises
   // `preferred_username`, and `upn` is the optional-claim spelling of the same
-  // value. For a work or school account all three carry the UPN, so trying
-  // each in turn costs one line and removes the likeliest way this breaks on
-  // first contact. The personal-account caveat about `preferred_username`
-  // being arbitrary does not reach us: this registration is published to
-  // engineering accounts in one tenant.
+  // value. For a work or school account all three carry the UPN, so trying each
+  // in turn costs one line and removes the likeliest way this breaks on first
+  // contact. Do not narrow this back to one name until a real token says which.
+  //
+  // The personal-account caveat about `preferred_username` being arbitrary does
+  // not reach us: the issuer check above pins this to one tenant.
   const email =
     claim(claims, "email") ??
     claim(claims, "username") ??
@@ -116,6 +152,13 @@ export function onidProfileFromIdToken(
     // and has just completed an interactive sign-in with whatever MFA the
     // university enforces. That is stronger proof of address control than the
     // verification link our own password path mails out.
+    //
+    // What makes it sound is the conjunction of the issuer check above and
+    // UIT publishing this registration only to engineering-account holders,
+    // not the email claim itself, which Entra does not verify. A guest invited
+    // into the OSU tenant would pass the issuer check while carrying a
+    // home-tenant email; `idp` differing from `iss` is the discriminator if
+    // that ever stops being acceptable.
     //
     // Two things follow, both intended. It fires the project-claim hook in
     // `src/lib/auth.ts`, the same way a GitHub-verified email does. And it
