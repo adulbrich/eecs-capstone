@@ -28,10 +28,10 @@ env:
 jobs:
   deploy:
     # Native arm64 runner (free on public repos), matching the arm64 Fargate
-    # task/image — no QEMU cross-build needed.
+    # task/image, so no QEMU cross-build is needed.
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
