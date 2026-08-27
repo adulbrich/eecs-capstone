@@ -300,8 +300,14 @@ function validateInvariants(input: TransitionInput) {
  * `transitionItem` calls this before it opens a transaction, so a malformed
  * or unauthorized input never reaches Postgres at all.
  *
- * Throws on the first rule broken. The message is the contract: the admin
- * lifecycle panel renders it verbatim.
+ * Throws on the first rule broken, and authorization is checked before the
+ * invariants on purpose: an unauthorized caller learns it is unauthorized,
+ * not which fields of its rejected input were also wrong.
+ *
+ * The message is part of the contract. `inventory-lifecycle-panel.tsx` renders
+ * `(e as Error).message` verbatim, so these strings reach staff on screen. The
+ * panel pre-checks the two rules a form can catch early, in friendlier words
+ * of its own; everything else arrives from here.
  */
 export function assertTransitionAllowed(
   viewer: TransitionActor,

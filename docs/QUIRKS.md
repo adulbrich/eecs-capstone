@@ -820,9 +820,12 @@ narrowed it first.
 An integration case is warranted only when the assertion is about a row: what
 was written, what was left untouched, what a concurrent caller saw.
 
-Twelve integration cases became twenty-one unit cases when this moved. The
-ones that left asserted a thrown message and nothing else, while paying for a
-user, an item and sometimes a full reserve to get there. `transitionItem
+Twelve integration cases left when this moved. Each asserted a thrown message
+and nothing else, while paying for a user, an item and sometimes a full
+reserve to get there. The rules now have twenty-two unit cases, including
+coverage the integration suite never had: the holder fields refused on a
+release, the `requested` arm, `pickupBy` staying optional on a reservation,
+and instructor counting as staff. `transitionItem
 throws Forbidden for a non-staff viewer` under `defense in depth` is still an
 integration case on purpose: that block exists to prove the impl re-checks
 role, and a unit test of the rules module cannot show that.

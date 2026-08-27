@@ -29,6 +29,16 @@ describe("assertTransitionAllowed: the staff gate", () => {
     expect(() => assertTransitionAllowed(INSTRUCTOR, input())).not.toThrow();
   });
 
+  it("answers the staff question before the input question", () => {
+    // Authorization first is the documented order. This input breaks an
+    // invariant too (a checkout with no holder and no dueAt), and the caller
+    // must be told it is not staff rather than handed a critique of the
+    // payload it was never allowed to send.
+    expect(() =>
+      assertTransitionAllowed(STUDENT, input({ nextStatus: "checked_out" }))
+    ).toThrow(/Forbidden/);
+  });
+
   it("refuses an authority it does not recognize", () => {
     // A value outside the union, as a JS caller could supply. Default deny is
     // the point: an unrecognized authority must not fall through to the
