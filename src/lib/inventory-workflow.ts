@@ -4,10 +4,9 @@
  *
  * Pure and client-safe, like `hold.ts`, `inventory-deadlines.ts`,
  * `inventory-notifications.ts` and `inventory-visibility.ts`, and for the
- * same reason: these were the subtlest
- * rules in the domain, welded to the transaction that enforced them, so
- * exercising one meant standing up a request lifecycle against docker
- * Postgres. `inventory-notifications.ts` already did this to the question of
+ * same reason: these were the subtlest rules in the domain, welded to the
+ * transaction that enforced them, so exercising one meant standing up a
+ * request lifecycle against docker Postgres. `inventory-notifications.ts` already did this to the question of
  * who gets told. This module does it to the question of what is allowed.
  *
  * Everything here is decidable from its arguments. What stayed behind in

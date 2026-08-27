@@ -1,8 +1,9 @@
 /**
  * Who receives an inventory notification, and what it says.
  *
- * Pure and client-safe, like `hold.ts`, `inventory-deadlines.ts` and
- * `inventory-visibility.ts`, and for the same reason: these were ninety-odd
+ * Pure and client-safe, like `hold.ts`, `inventory-deadlines.ts`,
+ * `inventory-visibility.ts` and `inventory-workflow.ts`, and for the same
+ * reason: these were ninety-odd
  * lines of decision welded to five `tx.insert` calls, so the subtlest rule in
  * the domain could only be exercised through a full request lifecycle against
  * docker Postgres.

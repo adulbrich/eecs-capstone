@@ -2,8 +2,9 @@
  * Deadlines on inventory items: whether one is overdue, and how a list of
  * them is ordered.
  *
- * Pure and client-safe, like `hold.ts` and `inventory-visibility.ts`, and for
- * the same reason: the notification path and the page a student lands on have
+ * Pure and client-safe, like `hold.ts`, `inventory-notifications.ts`,
+ * `inventory-visibility.ts` and `inventory-workflow.ts`, and for the same
+ * reason: the notification path and the page a student lands on have
  * to agree about what "overdue" means, and they cannot if the rule lives
  * inside a server-only file that only one of them can import.
  *
