@@ -789,9 +789,69 @@ describe("NDA/IP agreement flag", () => {
     expect(row.requiresNdaIp).toBe(false);
     expect(row.licenseRestrictions).toBeNull();
   });
+
+  it("persists unchecking the flag when the restrictions text is already null", async () => {
+    // The case above passes for a reason that is not the flag: clearing the
+    // text is itself a change, so the write happens and the flag rides along.
+    // With no text to clear, the flag is the only thing that moved, which is
+    // what an edit diff blind to it would discard.
+    const owner = await makeUser(`nda-d-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      licenseRestrictions: null,
+      requiresNdaIp: true,
+    });
+
+    const result = await updateProjectAs(owner, {
+      ...baseProject(),
+      id,
+      licenseRestrictions: null,
+      requiresNdaIp: false,
+    });
+
+    expect(result.updated).toBe(true);
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.requiresNdaIp).toBe(false);
+  });
 });
 
 describe("sponsorship flag", () => {
+  it("persists a sponsorship toggle that is the only change", async () => {
+    const owner = await makeUser(`spon-only-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      isSponsored: false,
+    });
+
+    const result = await updateProjectAs(owner, {
+      ...baseProject(),
+      id,
+      isSponsored: true,
+    });
+
+    expect(result.updated).toBe(true);
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.isSponsored).toBe(true);
+  });
+
+  it("records the toggled flags on the edit log", async () => {
+    const owner = await makeUser(`spon-log-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      isSponsored: false,
+    });
+
+    await updateProjectAs(owner, { ...baseProject(), id, isSponsored: true });
+
+    const [entry] = await db
+      .select()
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
+    expect(entry.changedFields).toContain("isSponsored");
+    expect(entry.newValues).toMatchObject({ isSponsored: true });
+    expect(entry.oldValues).toMatchObject({ isSponsored: false });
+  });
+
   it("is visible to staff and the proposer, and to nobody else", async () => {
     const owner = await makeUser(`spon-o-${Date.now()}@x.com`, "user");
     const admin = await makeUser(`spon-a-${Date.now()}@x.com`, "admin");
