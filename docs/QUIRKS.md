@@ -838,6 +838,16 @@ Three ordering rules live in `commitTransition` rather than in a comment a calle
 
 Before this, the two functions shared 56 byte-identical lines including both of those comments, and `forceTransitionAs` had **no** test asserting it wrote a history row, a notification, or an embedding. The equivalence of the two copies was a review question rather than a checked one for as long as they existed. The characterization tests added alongside this change (`projects.integration.test.ts`, `project-embeddings.integration.test.ts`) were written against the old code first, precisely so they could prove the extraction preserved behaviour rather than merely agreeing with the new code.
 
+### `sendEmail` is decided by role in `performTransitionAs`, not by the schema
+
+Skipping a transition's mail is a staff affordance, driven by a checkbox in the staff panel. The decision is made in `performTransitionAs` from the `ActorRole` it already derives, and a non-staff caller's `sendEmail: false` is ignored rather than rejected.
+
+**The schema cannot be the gate here, which is why this differs from inventory's `authority`.** That rule works because `transitionSchema` simply never declares the field, so `z.object().parse` strips it. The same trick does not cover this one. `sendEmail` is carried by three owner-reachable endpoints, and the third is the problem: `performTransition` takes its target status from the request, so one validator serves staff and owners alike and there is no schema to split them by. Splitting `transitionInputSchema` would have fixed `submitProject` and `returnToDraft` and left the generic endpoint open.
+
+What it was protecting, before the gate existed: an owner can reach `submitted` from `draft` and from `changes_requested`, both of which mail `EMAIL_REVIEW_INBOX`, and a proposer passing `sendEmail: false` suppressed it. That notice is the **only** push telling staff a project arrived. `recordStatusChangeNotifications` can address exactly one recipient, `project.proposerId`, so no staff in-app notification exists or is meant to; the pull surface is the "Awaiting review" count on `/admin` (`routes/_authed/admin/index.tsx:152`). The email also fails quietly twice over: an unset `EMAIL_REVIEW_INBOX` only warns, and `notifyTransitionByEmail` swallows its own errors on purpose so a failed send cannot undo an approval.
+
+`forceTransitionAs` needs no equivalent; it throws for a non-staff viewer before it reaches `commitTransition`. `TransitionOptions.sendEmail` is untouched and stays available to the nine integration call sites that use it to keep mail out of the suite.
+
 ### Proposer linking is by email; `proposer_id` is canonical
 
 A project's proposer is either linked to an account (`proposer_id`, a nullable FK) or pending (`proposer_email` set with no account yet). Email is the link key; `proposer_id` is the source of truth once an account exists. Staff set it through the proposer field on the project form (`ProposerPicker`, see below); the server resolves the email to an account id on every write via `resolveProposerId` (`src/server/_internal/projects.ts`), and a non-staff request carrying `proposer_email` is ignored, not honored. `proposer_id` is never accepted from the client.

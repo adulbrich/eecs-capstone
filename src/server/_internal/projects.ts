@@ -320,7 +320,20 @@ export async function performTransitionAs(
   }
   const role: ActorRole = isStaff(visibility) ? "staff" : "owner";
   assertTransitionAllowed(project.status as Status, target, role);
-  return commitTransition(viewer.id, project, target, comment ?? null, opts);
+  // Skipping the mail is a staff affordance, so the decision is made here from
+  // the role rather than read off the request. `sendEmail` cannot be gated by
+  // the schema instead: three owner-reachable endpoints carry it, and one of
+  // them is `performTransition`, which takes its target status from the wire
+  // and so serves staff and owners through the same validator. Without this a
+  // proposer could submit and suppress the notice to EMAIL_REVIEW_INBOX, which
+  // is the only push telling staff a project arrived.
+  //
+  // Ignored rather than rejected: an unexpected `false` is a client bug or a
+  // probe, and neither should fail a student's submission.
+  return commitTransition(viewer.id, project, target, comment ?? null, {
+    ...opts,
+    sendEmail: role === "staff" ? (opts?.sendEmail ?? true) : true,
+  });
 }
 
 export async function softDeleteProjectAs(
