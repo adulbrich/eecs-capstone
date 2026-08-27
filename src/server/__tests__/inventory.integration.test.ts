@@ -97,17 +97,6 @@ async function makeRequestLine(userId: string, itemId: string) {
 }
 
 describe("transitionItem", () => {
-  it("staff-only: non-staff viewer is rejected", async () => {
-    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
-    const item = await makeItem();
-    await expect(
-      transitionItem(student, {
-        itemId: item.id,
-        nextStatus: "maintenance",
-      })
-    ).rejects.toThrow(/Forbidden/);
-  });
-
   it("available to maintenance writes history and clears holder columns", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const item = await makeItem();
@@ -131,31 +120,6 @@ describe("transitionItem", () => {
     expect(history[0].oldStatus).toBe("available");
     expect(history[0].newStatus).toBe("maintenance");
     expect(history[0].comment).toBe("needs new cable");
-  });
-
-  it("reserved transition requires exactly one holder, with or without a line", async () => {
-    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
-    const item = await makeItem();
-    // No request line is needed any more, but a holder still is: an item
-    // cannot be reserved to nobody.
-    await expect(
-      transitionItem(admin, { itemId: item.id, nextStatus: "reserved" })
-    ).rejects.toThrow(
-      /holder email or a holder label, not both and not neither/
-    );
-    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
-    const { line } = await makeRequestLine(student.id, item.id);
-    await expect(
-      transitionItem(admin, {
-        itemId: item.id,
-        nextStatus: "reserved",
-        requestItemId: line.id,
-        holderId: student.id,
-        holderLabel: "X",
-      })
-    ).rejects.toThrow(
-      /holder email or a holder label, not both and not neither/
-    );
   });
 
   it("refuses a request line that is already closed", async () => {
@@ -239,21 +203,6 @@ describe("transitionItem", () => {
     expect(notifs.some((n) => n.type === "inventory_request_approved")).toBe(
       true
     );
-  });
-
-  it("checked_out requires dueAt", async () => {
-    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
-    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
-    const item = await makeItem();
-    const { line } = await makeRequestLine(student.id, item.id);
-    await expect(
-      transitionItem(admin, {
-        itemId: item.id,
-        nextStatus: "checked_out",
-        requestItemId: line.id,
-        holderId: student.id,
-      })
-    ).rejects.toThrow(/dueAt/);
   });
 
   it("ad-hoc label: checked_out with holderLabel and no holderId", async () => {
@@ -1731,18 +1680,6 @@ describe("staff-assigned holds without a request line", () => {
     expect(notifs.some((n) => n.type === "inventory_item_returned")).toBe(true);
   });
 
-  it("still refuses a checkout with no due date", async () => {
-    const admin = await makeUser(`wi-a5-${Date.now()}@x.com`, "admin");
-    const item = await makeItem();
-    await expect(
-      transitionItem(admin, {
-        itemId: item.id,
-        nextStatus: "checked_out",
-        holderLabel: "Lab 204",
-      })
-    ).rejects.toThrow(/checked_out requires dueAt/);
-  });
-
   it("finds a request-less hold by holder email in the staff table", async () => {
     const admin = await makeUser(`wi-a6-${Date.now()}@x.com`, "admin");
     const holderEmail = `wi-find-${Date.now()}@x.com`;
@@ -2571,32 +2508,6 @@ describe("holder resolution", () => {
     expect(h.holderLabel).toBeNull();
   });
 
-  it("rejects a hold with both an address and a label", async () => {
-    const admin = await makeUser("resolve-admin-5@x.com", "admin");
-    const item = await makeItem();
-    await expect(
-      transitionItem(admin, {
-        itemId: item.id,
-        nextStatus: "checked_out",
-        holderEmail: "both@nowhere.test",
-        holderLabel: "Lab 204",
-        dueAt: new Date(Date.now() + 86_400_000),
-      })
-    ).rejects.toThrow();
-  });
-
-  it("rejects a hold with neither", async () => {
-    const admin = await makeUser("resolve-admin-6@x.com", "admin");
-    const item = await makeItem();
-    await expect(
-      transitionItem(admin, {
-        itemId: item.id,
-        nextStatus: "checked_out",
-        dueAt: new Date(Date.now() + 86_400_000),
-      })
-    ).rejects.toThrow();
-  });
-
   it("gives a self-submitted request hold an address", async () => {
     const student = await makeUser("cart-address@x.com", "user");
     const item = await makeItem();
@@ -2936,13 +2847,6 @@ describe("transitionItem authority and line outcome", () => {
     return { admin, student, item, line };
   }
 
-  it("still refuses a non-staff viewer who names no authority", async () => {
-    const { student, item } = await reserveToStudent();
-    await expect(
-      transitionItem(student, { itemId: item.id, nextStatus: "available" })
-    ).rejects.toThrow(/Forbidden/);
-  });
-
   it("lets a named authority past the staff gate", async () => {
     const { student, item, line } = await reserveToStudent();
     await transitionItem(student, {
@@ -2956,18 +2860,6 @@ describe("transitionItem authority and line outcome", () => {
       .from(inventoryItems)
       .where(eq(inventoryItems.id, item.id));
     expect(after.status).toBe("available");
-  });
-
-  it("refuses an authority it does not recognize", async () => {
-    const { student, item } = await reserveToStudent();
-    await expect(
-      transitionItem(student, {
-        itemId: item.id,
-        nextStatus: "available",
-        // A value outside the union, as a JS caller could supply.
-        authority: "self_anything" as "self_cancel",
-      })
-    ).rejects.toThrow(/Forbidden/);
   });
 
   it("tells nobody when the requester cancels their own line", async () => {
@@ -3093,67 +2985,6 @@ describe("transitionItem authority and line outcome", () => {
       .from(inventoryRequestItems)
       .where(eq(inventoryRequestItems.id, line.id));
     expect(closed.status).toBe("returned");
-  });
-
-  it("refuses a self-service transition that names another holder", async () => {
-    // resolveHold reads holderEmail before holderId, so guarding only the id
-    // would leave the field the resolver actually prefers unchecked.
-    const { student, item, line } = await reserveToStudent();
-    await expect(
-      transitionItem(student, {
-        itemId: item.id,
-        nextStatus: "requested",
-        requestItemId: line.id,
-        holderId: "some-other-account",
-        authority: "self_request",
-      })
-    ).rejects.toThrow(/only act on its own viewer/);
-    await expect(
-      transitionItem(student, {
-        itemId: item.id,
-        nextStatus: "requested",
-        requestItemId: line.id,
-        holderEmail: "victim@oregonstate.edu",
-        authority: "self_request",
-      })
-    ).rejects.toThrow(/may not name a holder address/);
-  });
-
-  it("refuses a self_cancel that is not a release", async () => {
-    const { student, item } = await reserveToStudent();
-    await expect(
-      transitionItem(student, {
-        itemId: item.id,
-        nextStatus: "retired",
-        authority: "self_cancel",
-      })
-    ).rejects.toThrow(/self_cancel may only move an item to available/);
-  });
-
-  it("refuses a line decision on a transition that is not a release", async () => {
-    const { admin, item, line } = await reserveToStudent();
-    await expect(
-      transitionItem(admin, {
-        itemId: item.id,
-        nextStatus: "checked_out",
-        requestItemId: line.id,
-        holderId: admin.id,
-        dueAt: new Date(Date.now() + 86_400_000),
-        lineDecision: { outcome: "cancelled", requestItemId: line.id },
-      })
-    ).rejects.toThrow(/only meaningful on a release/);
-  });
-
-  it("refuses a rejection with no reason", async () => {
-    const { admin, item, line } = await requestFromStudent();
-    await expect(
-      transitionItem(admin, {
-        itemId: item.id,
-        nextStatus: "available",
-        lineDecision: { outcome: "rejected", requestItemId: line.id },
-        comment: "   ",
-      })
-    ).rejects.toThrow(/Reject reason required/);
   });
 
   it("refuses a rejection of a line that is no longer pending", async () => {

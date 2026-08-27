@@ -780,9 +780,52 @@ Two fields carry the variation, and both default to the previous behavior when a
 
 **`authority`** is the only way past `assertStaff`, and it is default-deny. `AUTHORITY_TARGET` is the single source of truth for which values exist and which status each may reach (`self_cancel` releases, `self_request` requests); an unrecognized value is rejected rather than ignored, and a self-service transition may not name a `holderId` other than its own viewer. **`transitionSchema` in `src/server/inventory.ts` must never declare this field.** `transitionInventoryItem` carries only `requireUser()`, so `assertStaff` inside `transitionItem` is that endpoint's entire staff gate, and `z.object().parse` stripping the unknown key is what keeps it shut. `src/test/inventory-schemas.test.ts` asserts the stripping, including through `__proto__`; adding `.passthrough()` or `.catchall()` there would let any signed-in user retire any item.
 
-**`lineDecision`** overrides what a released item's request line becomes, and carries the id of the line it was decided about. The two travel together on purpose: a release cannot carry `requestItemId` (`validateInvariants` forbids it on those statuses), so an outcome alone would land on whatever line the item points at, which need not be the line the caller locked. A mismatch throws. A `rejected` outcome additionally requires the line to still be `pending` and the comment to be non-empty, matching the guards `rejectRequestItemAs` has always had.
+**`lineDecision`** overrides what a released item's request line becomes, and carries the id of the line it was decided about. The two travel together on purpose: a release cannot carry `requestItemId` (the invariants in `inventory-workflow.ts` forbid it on those statuses), so an outcome alone would land on whatever line the item points at, which need not be the line the caller locked. A mismatch throws. A `rejected` outcome additionally requires the line to still be `pending` and the comment to be non-empty, matching the guards `rejectRequestItemAs` has always had.
 
 The denial notification goes to the **requester**, read from the line by `closeRequestItemOnRelease`, not to the item's current holder. Those are usually the same person and are not always: staff can take a still-pending item straight to `checked_out` for a teammate (`syncRequestItem`'s `checked_out` arm writes only `dueAt`, leaving the line pending), and a denial belongs to whoever asked.
+
+### The transition rules are a module, not a preamble
+
+`src/lib/inventory-workflow.ts` owns every rule a transition can be refused
+for before a row is read: the staff gate, `AUTHORITY_TARGET` and what each
+authority may do, the per-status invariants, and `resolveLineOutcome`. It is
+pure and client-safe, beside `hold.ts`, `inventory-notifications.ts` and
+`inventory-visibility.ts`, and it is the inventory twin of
+`src/lib/project-workflow.ts`. `transitionItem` calls
+`assertTransitionAllowed(viewer, input)` once, before it opens a transaction.
+
+**The split is by whether a rule needs a locked row, not by tidiness.** These
+stayed in `inventory-transitions.ts` and should stay there: a line is still
+open, a line belongs to this item, the item is free to be requested, and the
+decision names the line the item is currently holding. Each is a rule about a
+row read under `FOR UPDATE`, and pulling it out would leave a predicate that
+means nothing without the read that feeds it.
+
+**A single `plan(viewer, input, currentRow)` covering both halves is not
+available.** It would have to read the item before the request line, and
+`lockAttachableRequestLine` takes them line-then-item to match
+`approveRequestItemAs`, which locks the line and then calls `transitionItem`.
+Inverting that deadlocks the two paths against each other.
+
+Two departures from the `inventory-notifications.ts` pattern next door, both
+deliberate. That module declares a narrow structural `TransitionNotice`
+because it reads six fields of twenty; the rules read all but `itemId`, so
+`TransitionInput` itself moved and the server file imports it back. And
+`TransitionActor` is the non-null arm of `Viewer` rather than the union,
+because the self-service path reads `viewer.id` without `assertStaff` having
+narrowed it first.
+
+**A new rule, or a new case for an existing one, belongs in
+`src/lib/__tests__/inventory-workflow.test.ts`, not the integration suite.**
+An integration case is warranted only when the assertion is about a row: what
+was written, what was left untouched, what a concurrent caller saw.
+
+Twelve integration cases became twenty-one unit cases when this moved. The
+ones that left asserted a thrown message and nothing else, while paying for a
+user, an item and sometimes a full reserve to get there. `transitionItem
+throws Forbidden for a non-staff viewer` under `defense in depth` is still an
+integration case on purpose: that block exists to prove the impl re-checks
+role, and a unit test of the rules module cannot show that.
 
 ### Deferred FK
 
