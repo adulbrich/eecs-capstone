@@ -13,9 +13,9 @@
  * - **"Never neither" is not enforced here, and cannot be.** `{ kind: "none" }`
  *   is a legal, necessary case: an available, maintenance or retired item has
  *   no holder. Whether "none" is acceptable depends on the status being moved
- *   to, and this module never sees a status. `validateInvariants` in
- *   `inventory-transitions.ts` is what rejects a `reserved` or `checked_out`
- *   transition with no holder, and it must stay.
+ *   to, and this module never sees a status. The per-status invariants in
+ *   `inventory-workflow.ts` are what reject a `reserved` or `checked_out`
+ *   transition with no holder, and they must stay.
  * - **Not every hold is built through `holdFromInput`.** Read paths construct
  *   cases directly from stored columns. A union constrains only the values
  *   that pass through its constructor.
@@ -36,7 +36,7 @@
  *
  * ## Whitespace is not trimmed, but an empty string is not a value
  *
- * `validateInvariants` decides person-versus-thing on raw truthiness, and
+ * `inventory-workflow.ts` decides person-versus-thing on raw truthiness, and
  * `transitionItemInTx` stores the raw strings. This module matches both on
  * whitespace, so a caller cannot pass a guard on one rule and then be
  * re-judged by a stricter one. Trimming is the input layer's job, and
@@ -129,7 +129,7 @@ export interface ResolvedAccount {
 /**
  * Turns loose fields into a hold.
  *
- * The person-versus-thing test mirrors `validateInvariants` exactly: an id and
+ * The person-versus-thing test mirrors `inventory-workflow.ts` exactly: an id and
  * an address both identify the same person, so they count as one, and name and
  * program are attributes rather than a third identity. Keeping the two in step
  * is what stops an input passing the wire guard and then failing here.

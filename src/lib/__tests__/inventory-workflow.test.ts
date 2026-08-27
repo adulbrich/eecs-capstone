@@ -296,6 +296,40 @@ describe("assertTransitionAllowed: invariants per status", () => {
     ).toThrow(/not both and not neither/);
   });
 
+  it("catches an id paired with a label, the pair the constructor never sees", () => {
+    // The reason QUIRKS gives for this arm surviving at all: the holderId
+    // resolution path never routes through `holdFromInput`, so this guard is
+    // the only thing standing between an id-plus-label payload and a row that
+    // holds both. Asserting the rule through holderEmail instead exercises it
+    // by a path the Hold union already makes unrepresentable.
+    for (const nextStatus of ["reserved", "checked_out"] as const) {
+      const extra = nextStatus === "checked_out" ? { dueAt: LATER } : {};
+      expect(() =>
+        assertTransitionAllowed(
+          ADMIN,
+          input({
+            ...extra,
+            holderId: "u1",
+            holderLabel: "Bench 3",
+            nextStatus,
+          })
+        )
+      ).toThrow(/not both and not neither/);
+    }
+  });
+
+  it("accepts an account id as the whole holder", () => {
+    // Every "both" case above still fails correctly if `holderId` is dropped
+    // from the person test, so only an id-alone case that must NOT throw can
+    // tell a live disjunct from a dead one.
+    expect(() =>
+      assertTransitionAllowed(
+        ADMIN,
+        input({ holderId: "u1", nextStatus: "reserved" })
+      )
+    ).not.toThrow();
+  });
+
   it("requires dueAt on a checkout", () => {
     expect(() =>
       assertTransitionAllowed(

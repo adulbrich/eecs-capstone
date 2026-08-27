@@ -690,10 +690,10 @@ Two rules are structural rather than checked. **An account beats a typed name**:
 
 What the union does **not** guarantee, and this matters before you delete anything that looks redundant:
 
-- **"Never neither" is status-dependent and cannot be enforced here.** `{ kind: "none" }` is legal and necessary. Only `validateInvariants` knows a `reserved` or `checked_out` transition may not have it, which is why its `reserved`/`checked_out` arm stays. That arm also catches `holderId` together with `holderLabel`, which the `holderId` resolution path never routes through the constructor, and `inventory.integration.test.ts` asserts its exact wording.
+- **"Never neither" is status-dependent and cannot be enforced here.** `{ kind: "none" }` is legal and necessary. Only the invariants in `src/lib/inventory-workflow.ts` know a `reserved` or `checked_out` transition may not have it, which is why its `reserved`/`checked_out` arm stays. That arm also catches `holderId` together with `holderLabel`, which the `holderId` resolution path never routes through the constructor, and `src/lib/__tests__/inventory-workflow.test.ts` asserts its exact wording and that exact pair.
 - **Not every hold is built through `holdFromInput`.** Read paths construct cases directly from stored columns. A union constrains only what passes through its constructor.
 
-Whitespace is not trimmed here, deliberately: `validateInvariants` decides person-versus-thing on raw truthiness and `transitionItemInTx` stores the raw strings, so the constructor matches both and an input cannot pass one guard then be re-judged by a stricter one. Trimming is the input layer's job. An empty string **is** normalized to null, which is a change from the old inline writes and a fix rather than a regression: `??` does not treat `""` as absent, so an empty `current_holder_name` stopped the admin table's `name ?? email ?? label` chain from falling through and rendered a blank cell for an item that did have a holder.
+Whitespace is not trimmed here, deliberately: `inventory-workflow.ts` decides person-versus-thing on raw truthiness and `transitionItemInTx` stores the raw strings, so the constructor matches both and an input cannot pass one guard then be re-judged by a stricter one. Trimming is the input layer's job. An empty string **is** normalized to null, which is a change from the old inline writes and a fix rather than a regression: `??` does not treat `""` as absent, so an empty `current_holder_name` stopped the admin table's `name ?? email ?? label` chain from falling through and rendered a blank cell for an item that did have a holder.
 
 The precedence order (name, then address, then label) has two renderings, and the module owns the order rather than collapsing the formats: `formatHoldDetailed` gives the lifecycle panel `Name (address) · Program`, `formatHoldShort` gives the admin table a bare one-liner. A TanStack Table `accessorFn` paired with `sortUndefined: "last"` must map the module's `null` to `undefined`, because `sortUndefined` does not special-case `null`.
 
@@ -820,12 +820,13 @@ narrowed it first.
 An integration case is warranted only when the assertion is about a row: what
 was written, what was left untouched, what a concurrent caller saw.
 
-Twelve integration cases left when this moved. Each asserted a thrown message
-and nothing else, while paying for a user, an item and sometimes a full
-reserve to get there. The rules now have twenty-two unit cases, including
-coverage the integration suite never had: the holder fields refused on a
-release, the `requested` arm, `pickupBy` staying optional on a reservation,
-and instructor counting as staff. `transitionItem
+Twelve integration cases left when this moved. Each asserted only that the
+call was rejected, ten of them on the message and two on the rejection alone,
+and none looked at a row afterwards, while paying for a user, an item and
+sometimes a full reserve to get there. The rules now have twenty-four unit
+cases, including coverage the integration suite never had: the holder fields
+refused on a release, the `requested` arm, `pickupBy` staying optional on a
+reservation, and instructor counting as staff. `transitionItem
 throws Forbidden for a non-staff viewer` under `defense in depth` is still an
 integration case on purpose: that block exists to prove the impl re-checks
 role, and a unit test of the rules module cannot show that.

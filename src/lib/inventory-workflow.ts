@@ -25,7 +25,7 @@
  */
 
 import type { ItemStatus } from "./inventory-visibility";
-import { assertStaff } from "./viewer";
+import { assertStaff, type Viewer } from "./viewer";
 
 /**
  * Whoever is making the transition.
@@ -36,11 +36,13 @@ import { assertStaff } from "./viewer";
  * anonymous self-service transition a type error waiting to become a
  * TypeError. Both callers that name an authority reject a null viewer before
  * they get this far; this makes that unrepresentable rather than merely true.
+ *
+ * Derived rather than restated. This was a private `interface Viewer` inside
+ * the server module, where a hand copy could only drift out of sight; it is
+ * now exported into `src/lib` beside the type it is an arm of, where a copy
+ * would drift in plain view.
  */
-export interface TransitionActor {
-  id: string;
-  role?: string | null | undefined;
-}
+export type TransitionActor = NonNullable<Viewer>;
 
 /**
  * The non-staff authority a caller has already verified for itself.

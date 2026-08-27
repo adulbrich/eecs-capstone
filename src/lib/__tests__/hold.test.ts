@@ -91,7 +91,7 @@ describe("holdFromInput", () => {
   });
 
   it("throws when a hold is on an account and a thing at once", () => {
-    // validateInvariants counts an id and an address as one person, so the
+    // inventory-workflow.ts counts an id and an address as one person, so the
     // constructor has to as well, or an input passes one guard and fails the
     // other.
     expect(() =>
@@ -103,7 +103,7 @@ describe("holdFromInput", () => {
   });
 
   it("does not trim a whitespace-only label into no hold at all", () => {
-    // validateInvariants accepts this on raw truthiness, so trimming it away
+    // inventory-workflow.ts accepts this on raw truthiness, so trimming it away
     // here would let a reserved item through with all five columns null and
     // nobody to chase for it.
     expect(holdFromInput({ label: "   " }, NO_ACCOUNT)).toEqual({
