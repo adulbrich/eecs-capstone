@@ -1,17 +1,20 @@
 /**
  * Who receives an inventory notification, and what it says.
  *
- * Pure and client-safe, like `hold.ts`, `inventory-deadlines.ts` and
- * `inventory-visibility.ts`, and for the same reason: these were ninety-odd
+ * Pure and client-safe, like `hold.ts`, `inventory-deadlines.ts`,
+ * `inventory-visibility.ts` and `inventory-workflow.ts`, and for the same
+ * reason: these were ninety-odd
  * lines of decision welded to five `tx.insert` calls, so the subtlest rule in
  * the domain could only be exercised through a full request lifecycle against
  * docker Postgres.
  *
  * The transaction's job is now the insert. This module's job is the choice.
  *
- * Input types are structural rather than the server's `TransitionInput`, which
- * carries Drizzle row types and twenty fields; six are read here, and saying so
- * is what keeps this importable from the client.
+ * Input types are structural rather than the `TransitionInput` next door in
+ * `inventory-workflow.ts`, which carries thirteen fields; six are read here,
+ * and saying so is what keeps the two modules independent. That type is
+ * Drizzle-free too, so this is a narrowing for its own sake, not the thing
+ * that makes this file client-safe.
  */
 
 import { overdueFlags } from "./inventory-deadlines";

@@ -690,10 +690,10 @@ Two rules are structural rather than checked. **An account beats a typed name**:
 
 What the union does **not** guarantee, and this matters before you delete anything that looks redundant:
 
-- **"Never neither" is status-dependent and cannot be enforced here.** `{ kind: "none" }` is legal and necessary. Only `validateInvariants` knows a `reserved` or `checked_out` transition may not have it, which is why its `reserved`/`checked_out` arm stays. That arm also catches `holderId` together with `holderLabel`, which the `holderId` resolution path never routes through the constructor, and `inventory.integration.test.ts` asserts its exact wording.
+- **"Never neither" is status-dependent and cannot be enforced here.** `{ kind: "none" }` is legal and necessary. Only the invariants in `src/lib/inventory-workflow.ts` know a `reserved` or `checked_out` transition may not have it, which is why its `reserved`/`checked_out` arm stays. That arm also catches `holderId` together with `holderLabel`, which the `holderId` resolution path never routes through the constructor, and `src/lib/__tests__/inventory-workflow.test.ts` asserts its exact wording and that exact pair.
 - **Not every hold is built through `holdFromInput`.** Read paths construct cases directly from stored columns. A union constrains only what passes through its constructor.
 
-Whitespace is not trimmed here, deliberately: `validateInvariants` decides person-versus-thing on raw truthiness and `transitionItemInTx` stores the raw strings, so the constructor matches both and an input cannot pass one guard then be re-judged by a stricter one. Trimming is the input layer's job. An empty string **is** normalized to null, which is a change from the old inline writes and a fix rather than a regression: `??` does not treat `""` as absent, so an empty `current_holder_name` stopped the admin table's `name ?? email ?? label` chain from falling through and rendered a blank cell for an item that did have a holder.
+Whitespace is not trimmed here, deliberately: `inventory-workflow.ts` decides person-versus-thing on raw truthiness and `transitionItemInTx` stores the raw strings, so the constructor matches both and an input cannot pass one guard then be re-judged by a stricter one. Trimming is the input layer's job. An empty string **is** normalized to null, which is a change from the old inline writes and a fix rather than a regression: `??` does not treat `""` as absent, so an empty `current_holder_name` stopped the admin table's `name ?? email ?? label` chain from falling through and rendered a blank cell for an item that did have a holder.
 
 The precedence order (name, then address, then label) has two renderings, and the module owns the order rather than collapsing the formats: `formatHoldDetailed` gives the lifecycle panel `Name (address) · Program`, `formatHoldShort` gives the admin table a bare one-liner. A TanStack Table `accessorFn` paired with `sortUndefined: "last"` must map the module's `null` to `undefined`, because `sortUndefined` does not special-case `null`.
 
@@ -701,7 +701,7 @@ The precedence order (name, then address, then label) has two renderings, and th
 
 ### `src/lib/inventory-notifications.ts` decides, the transaction inserts
 
-Who receives an inventory notification and what it says lives in one pure, client-safe module, beside `hold.ts`, `inventory-deadlines.ts` and `inventory-visibility.ts`. `notificationFor(prev, input, holderId, closed)` returns one row or null; `overdueNotifications(candidates, now)` returns many and owns the dedupe. `transitionItem` and `recordOverdueNotificationsAs` only insert what comes back.
+Who receives an inventory notification and what it says lives in one pure, client-safe module, beside `hold.ts`, `inventory-deadlines.ts`, `inventory-visibility.ts` and `inventory-workflow.ts`. `notificationFor(prev, input, holderId, closed)` returns one row or null; `overdueNotifications(candidates, now)` returns many and owns the dedupe. `transitionItem` and `recordOverdueNotificationsAs` only insert what comes back.
 
 Before this the decision was welded to the write: ninety-odd pure lines wrapped around five `tx.insert` calls, so the subtlest rule in the domain could only be exercised through a full request lifecycle against docker. Asserting the requester-versus-holder rule cost twenty-four lines of arrange. It is now a line.
 
@@ -780,9 +780,26 @@ Two fields carry the variation, and both default to the previous behavior when a
 
 **`authority`** is the only way past `assertStaff`, and it is default-deny. `AUTHORITY_TARGET` is the single source of truth for which values exist and which status each may reach (`self_cancel` releases, `self_request` requests); an unrecognized value is rejected rather than ignored, and a self-service transition may not name a `holderId` other than its own viewer. **`transitionSchema` in `src/server/inventory.ts` must never declare this field.** `transitionInventoryItem` carries only `requireUser()`, so `assertStaff` inside `transitionItem` is that endpoint's entire staff gate, and `z.object().parse` stripping the unknown key is what keeps it shut. `src/test/inventory-schemas.test.ts` asserts the stripping, including through `__proto__`; adding `.passthrough()` or `.catchall()` there would let any signed-in user retire any item.
 
-**`lineDecision`** overrides what a released item's request line becomes, and carries the id of the line it was decided about. The two travel together on purpose: a release cannot carry `requestItemId` (`validateInvariants` forbids it on those statuses), so an outcome alone would land on whatever line the item points at, which need not be the line the caller locked. A mismatch throws. A `rejected` outcome additionally requires the line to still be `pending` and the comment to be non-empty, matching the guards `rejectRequestItemAs` has always had.
+**`lineDecision`** overrides what a released item's request line becomes, and carries the id of the line it was decided about. The two travel together on purpose: a release cannot carry `requestItemId` (the invariants in `inventory-workflow.ts` forbid it on those statuses), so an outcome alone would land on whatever line the item points at, which need not be the line the caller locked. A mismatch throws. A `rejected` outcome additionally requires the line to still be `pending` and the comment to be non-empty, matching the guards `rejectRequestItemAs` has always had.
 
 The denial notification goes to the **requester**, read from the line by `closeRequestItemOnRelease`, not to the item's current holder. Those are usually the same person and are not always: staff can take a still-pending item straight to `checked_out` for a teammate (`syncRequestItem`'s `checked_out` arm writes only `dueAt`, leaving the line pending), and a denial belongs to whoever asked.
+
+### The transition rules are a module, not a preamble
+
+`src/lib/inventory-workflow.ts` owns every rule a transition can be refused for before a row is read: the staff gate, `AUTHORITY_TARGET` and what each authority may do, the per-status invariants, and `resolveLineOutcome`. It is pure and client-safe, beside `hold.ts`, `inventory-deadlines.ts`, `inventory-notifications.ts` and `inventory-visibility.ts`, and it is the inventory twin of `src/lib/project-workflow.ts`. `transitionItem` calls `assertTransitionAllowed(viewer, input)` once, before it opens a transaction.
+
+**The split is by whether a rule needs a locked row, not by tidiness.** These
+stayed in `inventory-transitions.ts` and should stay there: a line is still open, a line belongs to this item, the item is free to be requested, a rejection lands only on a line that is still pending, and the decision names the line the item is currently holding. Each is a rule about a row read under `FOR UPDATE`, and pulling it out would leave a predicate that means nothing without the read that feeds it.
+
+**A single `plan(viewer, input, currentRow)` covering both halves is not
+available.** It would have to read the item before the request line, and `lockAttachableRequestLine` takes them line-then-item to match `approveRequestItemAs`, which locks the line and then calls `transitionItem`. Inverting that deadlocks the two paths against each other.
+
+Two departures from the `inventory-notifications.ts` pattern next door, both deliberate. That module declares a narrow structural `TransitionNotice` because it reads six of its thirteen fields; the rules read all but `itemId`, so `TransitionInput` itself moved and the server file imports it back. And `TransitionActor` is the non-null arm of `Viewer` rather than the union, because the self-service path reads `viewer.id` without `assertStaff` having narrowed it first.
+
+**A new rule, or a new case for an existing one, belongs in
+`src/lib/__tests__/inventory-workflow.test.ts`, not the integration suite.** An integration case is warranted only when the assertion is about a row: what was written, what was left untouched, what a concurrent caller saw.
+
+Twelve integration cases left when this moved. Each asserted only that the call was rejected, ten of them on the message and two on the rejection alone, and none looked at a row afterwards, while paying for a user, an item and sometimes a full reserve to get there. The rules now have twenty-four unit cases, including coverage the integration suite never had: the holder fields refused on a release, the `requested` arm, `pickupBy` staying optional on a reservation, and instructor counting as staff. One case stayed an integration test on purpose: `transitionItem throws Forbidden for a non-staff viewer` sits under `defense in depth`, a block whose whole job is to prove the impl re-checks role on every staff write. A unit test of the rules module cannot show that.
 
 ### Deferred FK
 

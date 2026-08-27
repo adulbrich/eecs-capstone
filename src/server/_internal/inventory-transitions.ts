@@ -11,261 +11,17 @@ import {
 } from "#/db/schema";
 import { type Hold, holdFromInput, holdToColumns } from "#/lib/hold";
 import { notificationFor } from "#/lib/inventory-notifications";
-import { assertStaff } from "#/lib/viewer";
+import type { ItemStatus } from "#/lib/inventory-visibility";
+import {
+  assertTransitionAllowed,
+  type RequestLineDecision,
+  type RequestLineOutcome,
+  resolveLineOutcome,
+  type TransitionActor,
+  type TransitionInput,
+} from "#/lib/inventory-workflow";
 
 export type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
-
-export type ItemStatus =
-  | "available"
-  | "requested"
-  | "reserved"
-  | "checked_out"
-  | "maintenance"
-  | "retired";
-
-/**
- * The non-staff authority a caller has already verified for itself.
- *
- * Absent means staff, and `assertStaff` runs exactly as it always has. These
- * two values are the only way past it, they are only reachable from an
- * internal caller, and each names the check its caller performed:
- * `self_cancel` means the caller confirmed the viewer owns the request line,
- * `self_request` means the viewer is submitting their own cart.
- *
- * `transitionSchema` in `src/server/inventory.ts` does not declare this field,
- * and `z.object().parse` strips unknown keys, so a client that posts
- * `authority` has it removed before it reaches here. Do not add it to that
- * schema: it is the whole staff gate for `transitionInventoryItem`, which
- * carries only `requireUser()` of its own.
- */
-export type TransitionAuthority = "self_cancel" | "self_request";
-
-/**
- * What a request line becomes when the item is released out from under it.
- *
- * Absent keeps the existing derivation, `returned` from a checkout and
- * `cancelled` otherwise. It is passed rather than derived because rejecting a
- * pending line and releasing a reserved item both end at `available` with a
- * comment, and nothing in the transition itself distinguishes them.
- */
-export type RequestLineOutcome = "cancelled" | "rejected" | "returned";
-
-/**
- * A decision about one specific request line.
- *
- * The line id travels with the outcome rather than beside it, and that is the
- * point. A release transition cannot carry `requestItemId` (validateInvariants
- * forbids it on the statuses a release targets), so without this the outcome
- * would land on whatever line the item happens to point at when the write
- * runs, which is not necessarily the line the caller locked and decided
- * about. Naming an outcome without naming its line is now unrepresentable,
- * and `transitionItemInTx` refuses a mismatch rather than writing to the
- * wrong student's record.
- */
-export interface RequestLineDecision {
-  outcome: RequestLineOutcome;
-  requestItemId: string;
-}
-
-export interface TransitionInput {
-  authority?: TransitionAuthority | null;
-  comment?: string | null;
-  dueAt?: Date | null;
-  /** Assigns the hold to an address, with or without a matching account. */
-  holderEmail?: string | null;
-  /**
-   * An already-resolved account, supplied only by an internal caller that
-   * already has one: approveRequestItemAs passing the requester's id, and
-   * submitCartAs passing the submitting student's. Staff cannot assign a hold
-   * this way, because transitionSchema does not accept a holder id. The
-   * address is derived from the id, so the column invariant holds here too.
-   */
-  holderId?: string | null;
-  holderLabel?: string | null;
-  /** Describes a holder with no account. Discarded when one is resolved. */
-  holderName?: string | null;
-  holderProgram?: string | null;
-  itemId: string;
-  lineDecision?: RequestLineDecision | null;
-  nextStatus: ItemStatus;
-  pickupBy?: Date | null;
-  requestItemId?: string | null;
-}
-
-interface Viewer {
-  id: string;
-  role?: string | null | undefined;
-}
-
-/**
- * The one status each self-service authority is allowed to reach. This Record
- * is the single source of truth: adding an authority to the union forces an
- * entry here, and the recognized-authority check reads its keys rather than a
- * parallel list that could drift out of step with it.
- */
-const AUTHORITY_TARGET: Record<TransitionAuthority, ItemStatus> = {
-  self_cancel: "available",
-  self_request: "requested",
-};
-
-/**
- * Default deny. No authority means staff, which is every caller that existed
- * before self-service paths were routed through here, so their behavior is
- * unchanged. A named authority is accepted only if it is one this module
- * knows; an unrecognized string is rejected rather than waved through, so a
- * future typo fails closed.
- */
-function assertAuthorized(viewer: Viewer, input: TransitionInput) {
-  if (!input.authority) {
-    assertStaff(viewer);
-    return;
-  }
-  if (!Object.hasOwn(AUTHORITY_TARGET, input.authority)) {
-    throw new Error("Forbidden");
-  }
-  // "Self" is the whole claim, so it is checked rather than trusted. Without
-  // this, self_request would let a caller place a request hold on somebody
-  // else's account, which is the first thing a self-service authority that
-  // reaches a holder-writing arm could be abused for.
-  //
-  // Both identity fields are covered, not just the id. `resolveHold` reads
-  // `holderEmail` FIRST and derives the account from it, so guarding only the
-  // id would leave the field the resolver actually prefers wide open. No
-  // self-service caller supplies an address (submitCartAs passes its own id,
-  // cancel passes neither), so refusing it outright costs nothing.
-  if (input.holderId && input.holderId !== viewer.id) {
-    throw new Error("A self-service transition may only act on its own viewer");
-  }
-  if (input.holderEmail) {
-    throw new Error(
-      "A self-service transition may not name a holder address; the viewer is the holder"
-    );
-  }
-}
-
-/** The statuses that release an item, and so can close the line it held. */
-function isReleaseStatus(status: ItemStatus): boolean {
-  return (
-    status === "available" || status === "maintenance" || status === "retired"
-  );
-}
-
-/**
- * The rules for the two fields that let a caller act outside the staff path.
- * They live here, beside every other cross-field rule in this module, rather
- * than in the callers that pass them. A caller naming its own authority must
- * not also get to decide what that authority is allowed to do.
- */
-function validateSelfServiceAndDecision(input: TransitionInput) {
-  // Each authority reaches exactly one status. A self-service caller releases
-  // an item or requests one; it does not retire one, send one to maintenance,
-  // or check one out to itself with a deadline of its choosing. Without this
-  // an authority is a hole the size of every status.
-  if (input.authority) {
-    const allowed = AUTHORITY_TARGET[input.authority];
-    if (input.nextStatus !== allowed) {
-      throw new Error(
-        `${input.authority} may only move an item to ${allowed}, not ${input.nextStatus}`
-      );
-    }
-  }
-  const decision = input.lineDecision;
-  if (!decision) {
-    return;
-  }
-  if (!isReleaseStatus(input.nextStatus)) {
-    throw new Error(
-      `A request line outcome is only meaningful on a release, not on a transition to ${input.nextStatus}`
-    );
-  }
-  // Matches the guard rejectRequestItemAs has always had. A denial the
-  // student cannot read a reason for is the thing that guard exists to stop.
-  if (decision.outcome === "rejected" && !input.comment?.trim()) {
-    throw new Error("Reject reason required");
-  }
-}
-
-function validateInvariants(input: TransitionInput) {
-  validateSelfServiceAndDecision(input);
-  const {
-    nextStatus,
-    holderId,
-    holderEmail,
-    holderLabel,
-    holderName,
-    holderProgram,
-    requestItemId,
-    pickupBy,
-    dueAt,
-  } = input;
-
-  switch (nextStatus) {
-    case "available":
-    case "maintenance":
-    case "retired":
-      if (
-        holderId ||
-        holderEmail ||
-        holderLabel ||
-        holderName ||
-        holderProgram ||
-        requestItemId
-      ) {
-        throw new Error(
-          `Cannot set holder or request on transition to ${nextStatus}`
-        );
-      }
-      if (pickupBy || dueAt) {
-        throw new Error(
-          `pickupBy / dueAt not allowed on transition to ${nextStatus}`
-        );
-      }
-      return;
-    case "requested":
-      // A requested row always comes from an account (the requester), so it
-      // has both an id and an address; it never carries a label, because a
-      // request is always on a person, never on a thing. submitCartAs is the
-      // one caller that reaches this arm, under the self_request authority,
-      // once per surviving cart line. The lifecycle panel does not offer
-      // "requested" as a direct target, so staff never land here.
-      if (!(requestItemId && (holderId || holderEmail)) || holderLabel) {
-        throw new Error(
-          "requested status requires requestItemId and a holder account or address, no label"
-        );
-      }
-      return;
-    case "reserved":
-    case "checked_out": {
-      // A hold is on a person or on a thing, never both and never neither.
-      // An id and an address both identify the same person, so they count as
-      // one; name and program are attributes of that person, not a third
-      // identity, and are excluded from the test entirely.
-      //
-      // This arm looks redundant now that `holdFromInput` builds a union in
-      // which "both" is unrepresentable. It is not, and deleting it ships a
-      // silent bug. Two reasons:
-      //
-      // 1. "Never neither" is status-dependent, and the Hold constructor never
-      //    sees a status. `{ kind: "none" }` is a legal hold for an available
-      //    item. Only this arm knows that it is not a legal one for a
-      //    checkout, so without it a checkout with no holder saves silently.
-      // 2. `inventory.integration.test.ts:140-157` asserts this exact wording.
-      const onAPerson = Boolean(holderId || holderEmail);
-      const onAThing = Boolean(holderLabel);
-      if (onAPerson === onAThing) {
-        throw new Error(
-          `${nextStatus} requires either a holder email or a holder label, not both and not neither`
-        );
-      }
-      if (nextStatus === "checked_out" && !dueAt) {
-        throw new Error("checked_out requires dueAt");
-      }
-      return;
-    }
-    default:
-      return;
-  }
-}
 
 /**
  * The statuses a request line can be in while an item still points at it.
@@ -369,15 +125,18 @@ function holdAccountId(hold: Hold): string | null {
  * inventory_request_items row's lifecycle columns.
  *
  * Does NOT enforce ordering between statuses ("recommended lifecycle" is a
- * UI concern). DOES enforce role and data invariants.
+ * UI concern). DOES enforce role and data invariants, but no longer decides
+ * what they are: `assertTransitionAllowed` in `#/lib/inventory-workflow` owns
+ * every rule that can be settled without reading a row, and is called here
+ * before a transaction is opened. What is left in this file are the rules
+ * that need a locked row to mean anything.
  */
 export async function transitionItem(
-  viewer: Viewer,
+  viewer: TransitionActor,
   input: TransitionInput,
   externalTx?: Tx
 ) {
-  assertAuthorized(viewer, input);
-  validateInvariants(input);
+  assertTransitionAllowed(viewer, input);
 
   // If the caller already has an open transaction (e.g. approveRequestItemAs
   // locks the request line before calling here), reuse it instead of opening
@@ -393,7 +152,7 @@ export async function transitionItem(
 
 async function transitionItemInTx(
   tx: Tx,
-  viewer: Viewer,
+  viewer: TransitionActor,
   input: TransitionInput
 ) {
   if (input.requestItemId) {
@@ -544,13 +303,7 @@ async function closeRequestItemOnRelease(
   comment: string | null,
   decision: RequestLineDecision | null | undefined
 ): Promise<ClosedLine> {
-  // Fulfillment ended in the user's hands then came back: returned.
-  // Otherwise (reserved abandoned, sent to maintenance/retired before pickup): cancelled.
-  // A caller that knows better says so: only it can tell a staff refusal from
-  // a staff release, since both end at available with a comment.
-  const lineStatus =
-    decision?.outcome ??
-    (prevStatus === "checked_out" ? "returned" : "cancelled");
+  const lineStatus = resolveLineOutcome(decision, prevStatus);
   const now = new Date();
 
   let requesterId: string | null = null;
