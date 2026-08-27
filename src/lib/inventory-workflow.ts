@@ -2,8 +2,9 @@
  * The rules a transition must satisfy, and the outcome it writes to the line
  * it closes.
  *
- * Pure and client-safe, like `hold.ts`, `inventory-notifications.ts` and
- * `inventory-visibility.ts`, and for the same reason: these were the subtlest
+ * Pure and client-safe, like `hold.ts`, `inventory-deadlines.ts`,
+ * `inventory-notifications.ts` and `inventory-visibility.ts`, and for the
+ * same reason: these were the subtlest
  * rules in the domain, welded to the transaction that enforced them, so
  * exercising one meant standing up a request lifecycle against docker
  * Postgres. `inventory-notifications.ts` already did this to the question of
@@ -20,9 +21,8 @@
  *
  * A single `plan(viewer, input, currentRow)` covering both halves was
  * considered and is not possible: it would have to read the item before the
- * request line, and `lockAttachableRequestLine` takes them line-then-item to
- * match `approveRequestItemAs`. Inverting that deadlocks the two paths against
- * each other.
+ * request line, and `lockAttachableRequestLine` owns that lock order and says
+ * why reversing it deadlocks.
  */
 
 import type { ItemStatus } from "./inventory-visibility";
@@ -37,11 +37,6 @@ import { assertStaff, type Viewer } from "./viewer";
  * anonymous self-service transition a type error waiting to become a
  * TypeError. Both callers that name an authority reject a null viewer before
  * they get this far; this makes that unrepresentable rather than merely true.
- *
- * Derived rather than restated. This was a private `interface Viewer` inside
- * the server module, where a hand copy could only drift out of sight; it is
- * now exported into `src/lib` beside the type it is an arm of, where a copy
- * would drift in plain view.
  */
 export type TransitionActor = NonNullable<Viewer>;
 
@@ -95,9 +90,9 @@ export interface RequestLineDecision {
  * A departure from `inventory-notifications.ts`, which declares a narrow
  * structural `TransitionNotice` because it reads six of these thirteen
  * fields. The rules read all of them but `itemId`, so narrowing would restate
- * the type rather than shrink it. The type is Drizzle-free either way, which is what
- * being here requires; `Tx` was the only unclean type in the module this came
- * from, and it stayed there.
+ * the type rather than shrink it. The type is Drizzle-free either way, which
+ * is what being here requires; `Tx` was the only unclean type in the module
+ * this came from, and it stayed there.
  */
 export interface TransitionInput {
   authority?: TransitionAuthority | null;
@@ -288,8 +283,16 @@ function validateStatusInvariants(input: TransitionInput) {
       }
       return;
     }
-    default:
-      return;
+    default: {
+      // Each arm above is a decision about which fields that status may
+      // carry, and `ItemStatus` now lives a file away. Without this, a
+      // seventh member would reach a silent `return` and be written with no
+      // invariants at all; with it, adding one fails to compile here.
+      const unhandled: never = nextStatus;
+      throw new Error(
+        `No transition invariants declared for ${String(unhandled)}`
+      );
+    }
   }
 }
 
@@ -305,9 +308,9 @@ function validateStatusInvariants(input: TransitionInput) {
  * Throws on the first rule broken. The three calls are flat and their order
  * is the contract: authorization first, so an unauthorized caller learns it is
  * unauthorized rather than receiving a critique of the payload it was never
- * allowed to send. The self-service and decision rules used to run from inside
- * the status switch, where a reader of that function's name had no way to know
- * they were there.
+ * allowed to send. The self-service and decision rules used to run from the
+ * first line of the status validator, where its name gave a reader no hint
+ * they were there at all.
  *
  * The message is part of the contract. `inventory-lifecycle-panel.tsx` renders
  * `(e as Error).message` verbatim, so these strings reach staff on screen. The

@@ -701,7 +701,7 @@ The precedence order (name, then address, then label) has two renderings, and th
 
 ### `src/lib/inventory-notifications.ts` decides, the transaction inserts
 
-Who receives an inventory notification and what it says lives in one pure, client-safe module, beside `hold.ts`, `inventory-deadlines.ts` and `inventory-visibility.ts`. `notificationFor(prev, input, holderId, closed)` returns one row or null; `overdueNotifications(candidates, now)` returns many and owns the dedupe. `transitionItem` and `recordOverdueNotificationsAs` only insert what comes back.
+Who receives an inventory notification and what it says lives in one pure, client-safe module, beside `hold.ts`, `inventory-deadlines.ts`, `inventory-visibility.ts` and `inventory-workflow.ts`. `notificationFor(prev, input, holderId, closed)` returns one row or null; `overdueNotifications(candidates, now)` returns many and owns the dedupe. `transitionItem` and `recordOverdueNotificationsAs` only insert what comes back.
 
 Before this the decision was welded to the write: ninety-odd pure lines wrapped around five `tx.insert` calls, so the subtlest rule in the domain could only be exercised through a full request lifecycle against docker. Asserting the requester-versus-holder rule cost twenty-four lines of arrange. It is now a line.
 
@@ -789,8 +789,9 @@ The denial notification goes to the **requester**, read from the line by `closeR
 `src/lib/inventory-workflow.ts` owns every rule a transition can be refused
 for before a row is read: the staff gate, `AUTHORITY_TARGET` and what each
 authority may do, the per-status invariants, and `resolveLineOutcome`. It is
-pure and client-safe, beside `hold.ts`, `inventory-notifications.ts` and
-`inventory-visibility.ts`, and it is the inventory twin of
+pure and client-safe, beside `hold.ts`, `inventory-deadlines.ts`,
+`inventory-notifications.ts` and `inventory-visibility.ts`, and it is the
+inventory twin of
 `src/lib/project-workflow.ts`. `transitionItem` calls
 `assertTransitionAllowed(viewer, input)` once, before it opens a transaction.
 
@@ -811,8 +812,7 @@ Inverting that deadlocks the two paths against each other.
 Two departures from the `inventory-notifications.ts` pattern next door, both
 deliberate. That module declares a narrow structural `TransitionNotice`
 because it reads six of its thirteen fields; the rules read all but `itemId`,
-so
-`TransitionInput` itself moved and the server file imports it back. And
+so `TransitionInput` itself moved and the server file imports it back. And
 `TransitionActor` is the non-null arm of `Viewer` rather than the union,
 because the self-service path reads `viewer.id` without `assertStaff` having
 narrowed it first.
