@@ -33,11 +33,8 @@ import {
 } from "#/components/ui/select";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
-import {
-  type AdminTableSearch,
-  type SortState,
-  useAdminTableState,
-} from "#/lib/table-state";
+import type { SortState } from "#/lib/table-state";
+import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import { listInventoryRequests } from "#/server/inventory";
 
@@ -195,26 +192,13 @@ function AdminRequestQueue() {
   );
   const [qDraft, setQDraft] = useDebouncedDraft(q, commitQuery);
 
-  const setSearch = useCallback(
-    (patch: AdminTableSearch) =>
-      void navigate({ search: (prev) => ({ ...prev, ...patch }) }),
-    [navigate]
-  );
-  const replaceSearch = useCallback(
-    (patch: AdminTableSearch) =>
-      void navigate({
-        replace: true,
-        search: (prev) => ({ ...prev, ...patch }),
-      }),
-    [navigate]
-  );
-
-  const { hidden, onHiddenChange, onSortChange, sort } = useAdminTableState({
+  const { tableProps } = useAdminTable({
     columns,
+    data: rows,
     defaultSort: DEFAULT_SORT,
-    replaceSearch,
+    getRowId: (row) => row.line.id,
+    navigate,
     search,
-    setSearch,
     storageKey: "inventory-requests",
   });
 
@@ -243,17 +227,9 @@ function AdminRequestQueue() {
 
       <AdminDataTable
         caption="Inventory requests"
-        columns={columns}
-        data={rows}
-        defaultSort={DEFAULT_SORT}
         emptyMessage="No requests in this view."
-        getRowId={(row) => row.line.id}
-        hidden={hidden}
         highlightedRowId={line}
-        onHiddenChange={onHiddenChange}
-        onSortChange={onSortChange}
-        sort={sort}
-        storageKey="inventory-requests"
+        {...tableProps}
         toolbar={
           <>
             <div>

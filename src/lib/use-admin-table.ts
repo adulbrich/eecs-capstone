@@ -8,28 +8,10 @@ import {
 } from "./table-state";
 
 /**
- * Everything an admin index route needs to drive `AdminDataTable`.
- *
- * This is the router-aware half. `useAdminTableState` in `table-state.ts` is
- * the router-agnostic core and keeps its own unit tests; this only builds the
- * two navigation callbacks it wants, owns the sorted-id ref, and hands back
- * one spreadable prop bag. Splitting them this way is deliberate: the core's
- * docstring makes "router-agnostic" a stated property, and the whole job of
- * this file is to not be that.
- *
- * The prop bag exists because `columns`, `defaultSort` and `storageKey` used
- * to be passed twice, once to the core and once to the table, with nothing
- * linking them. Six routes times three values is eighteen agreements that no
- * compiler or test checked, and each one fails quietly: a mismatched
- * `storageKey` writes preferences under one key and clears them under
- * another, a mismatched `defaultSort` makes the URL and the rendered order
- * disagree. Named once here, they cannot disagree.
- */
-/**
  * The slice of the router's `navigate` this hook uses. Structural so the hook
  * never imports the router.
  */
-export type AdminNavigate = (opts: {
+type AdminNavigate = (opts: {
   replace?: boolean;
   search: (prev: Record<string, unknown>) => Record<string, unknown>;
 }) => unknown;
@@ -64,6 +46,24 @@ interface UseAdminTableOptions<TRow, TColumn extends AdminTableStateColumn> {
   storageKey: string;
 }
 
+/**
+ * Everything an admin route needs to drive `AdminDataTable`.
+ *
+ * This is the router-aware half. `useAdminTableState` in `table-state.ts` is
+ * the router-agnostic core and keeps its own unit tests; this only builds the
+ * two navigation callbacks it wants, owns the sorted-id ref, and hands back
+ * one spreadable prop bag. Splitting them this way is deliberate: the core's
+ * docstring makes "router-agnostic" a stated property, and the whole job of
+ * this file is to not be that.
+ *
+ * The prop bag exists because `columns`, `defaultSort` and `storageKey` used
+ * to be passed twice, once to the core and once to the table, with nothing
+ * linking them. Seven routes times three values is twenty-one agreements that
+ * no compiler or test checked, and each one fails quietly: a mismatched
+ * `storageKey` writes preferences under one key and clears them under
+ * another, a mismatched `defaultSort` makes the URL and the rendered order
+ * disagree. Named once here, they cannot disagree.
+ */
 export function useAdminTable<TRow, TColumn extends AdminTableStateColumn>({
   columns,
   data,

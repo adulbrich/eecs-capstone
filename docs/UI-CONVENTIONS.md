@@ -263,7 +263,7 @@ and drive it with the `useAdminTable` hook from `#/lib/use-admin-table`. The com
 handles sorting, column hiding, and the responsive card layout; the hook owns the
 URL-backed sort and visibility state.
 
-Name `columns`, `defaultSort` and `storageKey` to the hook, then spread what it gives
+Give `columns`, `defaultSort` and `storageKey` to the hook, then spread what it hands
 back. They used to be passed twice, once to the hook and once to the table, and nothing
 checked that the two agreed: a mismatched `storageKey` writes column preferences under
 one key and clears them under another, and a mismatched `defaultSort` leaves the URL and
@@ -296,8 +296,8 @@ imply paginated. `orderRows(rows, getId)` puts exported rows in the order the ta
 rendering, so a CSV matches the screen; it is a no-op under `serverSorted`.
 
 `useAdminTableState` in `#/lib/table-state` is the router-agnostic core underneath, and
-stays directly unit-testable. Reach for it only if you are building something that is
-not a route.
+stays directly unit-testable. Every admin route goes through `useAdminTable`; reach past
+it to the core only if you are driving a table from somewhere that has no `navigate`.
 
 Responsive behavior is automatic: the component applies `className="admin-table"` and
 derives each body cell's `data-label` from its column header. Below 768px the
