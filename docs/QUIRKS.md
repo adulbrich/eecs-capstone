@@ -817,7 +817,7 @@ Two consequences to respect:
 - **`next` is `Partial<typeof projects.$inferSelect>`, and `buildProjectValues` is declared to return it.** That is what makes a key which is not a column a typecheck failure rather than a runtime skip, and it is why the writer must stay typed against the table. Widening it back to `Record<string, unknown>` silently restores the old class of bug.
 - **The order of `changedFields` is the order of the literal in `buildProjectValues`**, because object key order is insertion order for string keys. It is observable: it is stored on the edit log and rendered by the staff panel at `staff-project-panel.tsx:404`. Reordering that literal changes what staff read, so `project-edit-diff.test.ts` pins the order to make the change loud.
 
-`imageUrl` is a real exception to all of this and not an oversight: `uploadProjectImageAs` (`src/server/_internal/uploads.ts`) writes the column directly on its own request, so an image change never reaches this diff or the edit log at all. See the tracking issue.
+`imageUrl` is a real exception to all of this and not an oversight: `uploadProjectImageAs` (`src/server/_internal/uploads.ts`) writes the column directly on its own request, so an image change never reaches this diff or the edit log at all. See issue #88.
 
 ### `commitTransition` is the only writer of `project_status_history`
 
