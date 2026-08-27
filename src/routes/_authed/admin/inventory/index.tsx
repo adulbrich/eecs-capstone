@@ -4,7 +4,7 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { z } from "zod";
 import {
   type AdminColumn,
@@ -35,15 +35,12 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { getSession } from "#/lib/auth-guards";
-import { defineCsvColumns, orderBySortedIds, toCsv } from "#/lib/csv";
+import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { formatHoldShort, holdFromStoredRow } from "#/lib/hold";
 import { pageTitle } from "#/lib/page-title";
 import { getPublicUrl } from "#/lib/storage";
-import {
-  type AdminTableSearch,
-  type SortState,
-  useAdminTableState,
-} from "#/lib/table-state";
+import type { SortState } from "#/lib/table-state";
+import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import {
   listAdminInventory,
@@ -412,14 +409,6 @@ function AdminInventory() {
   // The whole search object goes to the hook, which reads cols/dir/sort.
   const search = Route.useSearch();
   const { categories: selectedCategories, q, retiredOnly, status } = search;
-  // Populated by AdminDataTable's onSortedIdsChange every time the table's
-  // own sorted row order changes. A ref, not state: the export only reads it
-  // at click time, so there is no reason to re-render this component (or
-  // re-run the effect that populates it) on every sort change.
-  const sortedIdsRef = useRef<string[]>([]);
-  const onSortedIdsChange = useCallback((ids: string[]) => {
-    sortedIdsRef.current = ids;
-  }, []);
 
   const commitQuery = useCallback(
     (next: string) => {
@@ -429,26 +418,13 @@ function AdminInventory() {
   );
   const [qDraft, setQDraft] = useDebouncedDraft(q, commitQuery);
 
-  const setSearch = useCallback(
-    (patch: AdminTableSearch) =>
-      void navigate({ search: (prev) => ({ ...prev, ...patch }) }),
-    [navigate]
-  );
-  const replaceSearch = useCallback(
-    (patch: AdminTableSearch) =>
-      void navigate({
-        replace: true,
-        search: (prev) => ({ ...prev, ...patch }),
-      }),
-    [navigate]
-  );
-
-  const { hidden, onHiddenChange, onSortChange, sort } = useAdminTableState({
+  const { orderRows, tableProps } = useAdminTable({
     columns: COLUMNS,
+    data: rows,
     defaultSort: DEFAULT_SORT,
-    replaceSearch,
+    getRowId: (row) => row.id,
+    navigate,
     search,
-    setSearch,
     storageKey: "inventory",
   });
 
@@ -487,24 +463,15 @@ function AdminInventory() {
               Promise.resolve(
                 toCsv(
                   EXPORT_COLUMNS,
-                  orderBySortedIds(rows, sortedIdsRef.current, (row) => row.id)
+                  orderRows(rows, (row) => row.id)
                 )
               )
             }
           />
         }
         caption="Inventory items"
-        columns={COLUMNS}
-        data={rows}
-        defaultSort={DEFAULT_SORT}
         emptyMessage="No items in this view."
-        getRowId={(row) => row.id}
-        hidden={hidden}
-        onHiddenChange={onHiddenChange}
-        onSortChange={onSortChange}
-        onSortedIdsChange={onSortedIdsChange}
-        sort={sort}
-        storageKey="inventory"
+        {...tableProps}
         toolbar={
           <>
             <div>

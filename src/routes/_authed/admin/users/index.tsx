@@ -38,11 +38,8 @@ import {
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
-import {
-  type AdminTableSearch,
-  type SortState,
-  useAdminTableState,
-} from "#/lib/table-state";
+import type { SortState } from "#/lib/table-state";
+import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import { exportUsers, listUsers } from "#/server/users";
 
@@ -208,36 +205,20 @@ function UsersAdmin() {
   );
   const [qDraft, setQDraft] = useDebouncedDraft(q, commitQuery);
 
-  const setSearch = useCallback(
-    (patch: AdminTableSearch) =>
-      void navigate({
-        search: (prev) => ({
-          ...prev,
-          ...patch,
-          // A sort change re-queries the server for a newly ordered set, so
-          // whatever page the user was on no longer means anything; land
-          // back on page 1 rather than show an arbitrary slice of the new
-          // order.
-          ...("sort" in patch || "dir" in patch ? { page: 1 } : {}),
-        }),
-      }),
-    [navigate]
-  );
-  const replaceSearch = useCallback(
-    (patch: AdminTableSearch) =>
-      void navigate({
-        replace: true,
-        search: (prev) => ({ ...prev, ...patch }),
-      }),
-    [navigate]
-  );
-
-  const { hidden, onHiddenChange, onSortChange, sort } = useAdminTableState({
+  const { tableProps } = useAdminTable({
     columns: COLUMNS,
+    data: rows,
     defaultSort: DEFAULT_SORT,
-    replaceSearch,
+    getRowId: (row) => row.id,
+    navigate,
+    // The server paginates this table, so a sort change re-queries a newly
+    // ordered set and the page the reader was on no longer names the same
+    // rows.
+    resetPageOnSort: true,
     search,
-    setSearch,
+    // The server also orders it, so local reordering would sort the twenty
+    // rows on screen while presenting that as sorting the table.
+    serverSorted: true,
     storageKey: "users",
   });
 
@@ -279,22 +260,8 @@ function UsersAdmin() {
           />
         }
         caption="Users"
-        columns={COLUMNS}
-        data={rows}
-        defaultSort={DEFAULT_SORT}
         emptyMessage="No users in this view."
-        getRowId={(row) => row.id}
-        hidden={hidden}
-        onHiddenChange={onHiddenChange}
-        onSortChange={onSortChange}
-        // The server paginates this table, so it also has to be the one that
-        // orders it: sorting only the 20 rows on screen while presenting
-        // that as sorting the table would be wrong. serverSorted turns off
-        // AdminDataTable's own reordering while keeping header clicks and
-        // aria-sort working the same as everywhere else.
-        serverSorted
-        sort={sort}
-        storageKey="users"
+        {...tableProps}
         toolbar={
           <>
             <div>
