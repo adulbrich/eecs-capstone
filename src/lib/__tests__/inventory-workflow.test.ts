@@ -13,6 +13,15 @@ const STUDENT: TransitionActor = { id: "student-1", role: "user" };
 
 const LATER = new Date("2030-01-01T00:00:00Z");
 
+/**
+ * A checkout is refused for a missing due date before the holder rules are
+ * reachable, so a case that means to test the holder rules on both hold
+ * statuses has to supply one.
+ */
+function reachHolderRules(nextStatus: "checked_out" | "reserved") {
+  return nextStatus === "checked_out" ? { dueAt: LATER } : {};
+}
+
 function input(over: Partial<TransitionInput> = {}): TransitionInput {
   return { itemId: "item-1", nextStatus: "available", ...over };
 }
@@ -152,7 +161,7 @@ describe("assertTransitionAllowed: line decisions", () => {
     );
   });
 
-  it("refuses a rejection with no reason, including whitespace", () => {
+  it("refuses a rejection with no reason, whitespace included, and takes a real one", () => {
     const rejected: RequestLineDecision = {
       outcome: "rejected",
       requestItemId: "line-1",
@@ -253,9 +262,11 @@ describe("assertTransitionAllowed: invariants per status", () => {
     // The wording is asserted rather than a match on "requires", because the
     // admin lifecycle panel renders the message verbatim.
     for (const nextStatus of ["reserved", "checked_out"] as const) {
-      const extra = nextStatus === "checked_out" ? { dueAt: LATER } : {};
       expect(() =>
-        assertTransitionAllowed(ADMIN, input({ ...extra, nextStatus }))
+        assertTransitionAllowed(
+          ADMIN,
+          input({ ...reachHolderRules(nextStatus), nextStatus })
+        )
       ).toThrow(
         `${nextStatus} requires either a holder email or a holder label, not both and not neither`
       );
@@ -263,7 +274,7 @@ describe("assertTransitionAllowed: invariants per status", () => {
         assertTransitionAllowed(
           ADMIN,
           input({
-            ...extra,
+            ...reachHolderRules(nextStatus),
             holderEmail: "a@b.com",
             holderLabel: "Bench 3",
             nextStatus,
@@ -303,12 +314,11 @@ describe("assertTransitionAllowed: invariants per status", () => {
     // holds both. Asserting the rule through holderEmail instead exercises it
     // by a path the Hold union already makes unrepresentable.
     for (const nextStatus of ["reserved", "checked_out"] as const) {
-      const extra = nextStatus === "checked_out" ? { dueAt: LATER } : {};
       expect(() =>
         assertTransitionAllowed(
           ADMIN,
           input({
-            ...extra,
+            ...reachHolderRules(nextStatus),
             holderId: "u1",
             holderLabel: "Bench 3",
             nextStatus,

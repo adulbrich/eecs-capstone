@@ -12,8 +12,9 @@
  * Everything here is decidable from its arguments. What stayed behind in
  * `src/server/_internal/inventory-transitions.ts` is the set of rules fused to
  * a `SELECT ... FOR UPDATE`: a line is still open, a line belongs to this
- * item, the item is free to be requested, the decision names the line the item
- * is currently holding. Those are not rules about an input, they are rules
+ * item, the item is free to be requested, a rejection lands only on a line
+ * that is still pending, and the decision names the line the item is
+ * currently holding. Those are not rules about an input, they are rules
  * about a row read under a lock, and moving them here would buy a predicate
  * call at the cost of an interface twice this size.
  *
@@ -92,9 +93,9 @@ export interface RequestLineDecision {
  * Everything a caller asks for, in full.
  *
  * A departure from `inventory-notifications.ts`, which declares a narrow
- * structural `TransitionNotice` because it reads six fields of twenty. The
- * rules read all of them but `itemId`, so narrowing would restate the type
- * rather than shrink it. The type is Drizzle-free either way, which is what
+ * structural `TransitionNotice` because it reads six of these thirteen
+ * fields. The rules read all of them but `itemId`, so narrowing would restate
+ * the type rather than shrink it. The type is Drizzle-free either way, which is what
  * being here requires; `Tx` was the only unclean type in the module this came
  * from, and it stayed there.
  */
@@ -211,8 +212,7 @@ function validateSelfServiceAndDecision(input: TransitionInput) {
   }
 }
 
-function validateInvariants(input: TransitionInput) {
-  validateSelfServiceAndDecision(input);
+function validateStatusInvariants(input: TransitionInput) {
   const {
     nextStatus,
     holderId,
@@ -302,9 +302,12 @@ function validateInvariants(input: TransitionInput) {
  * `transitionItem` calls this before it opens a transaction, so a malformed
  * or unauthorized input never reaches Postgres at all.
  *
- * Throws on the first rule broken, and authorization is checked before the
- * invariants on purpose: an unauthorized caller learns it is unauthorized,
- * not which fields of its rejected input were also wrong.
+ * Throws on the first rule broken. The three calls are flat and their order
+ * is the contract: authorization first, so an unauthorized caller learns it is
+ * unauthorized rather than receiving a critique of the payload it was never
+ * allowed to send. The self-service and decision rules used to run from inside
+ * the status switch, where a reader of that function's name had no way to know
+ * they were there.
  *
  * The message is part of the contract. `inventory-lifecycle-panel.tsx` renders
  * `(e as Error).message` verbatim, so these strings reach staff on screen. The
@@ -316,7 +319,8 @@ export function assertTransitionAllowed(
   input: TransitionInput
 ) {
   assertAuthorized(viewer, input);
-  validateInvariants(input);
+  validateSelfServiceAndDecision(input);
+  validateStatusInvariants(input);
 }
 
 /**

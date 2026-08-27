@@ -796,8 +796,9 @@ pure and client-safe, beside `hold.ts`, `inventory-notifications.ts` and
 
 **The split is by whether a rule needs a locked row, not by tidiness.** These
 stayed in `inventory-transitions.ts` and should stay there: a line is still
-open, a line belongs to this item, the item is free to be requested, and the
-decision names the line the item is currently holding. Each is a rule about a
+open, a line belongs to this item, the item is free to be requested, a
+rejection lands only on a line that is still pending, and the decision names
+the line the item is currently holding. Each is a rule about a
 row read under `FOR UPDATE`, and pulling it out would leave a predicate that
 means nothing without the read that feeds it.
 
@@ -809,7 +810,8 @@ Inverting that deadlocks the two paths against each other.
 
 Two departures from the `inventory-notifications.ts` pattern next door, both
 deliberate. That module declares a narrow structural `TransitionNotice`
-because it reads six fields of twenty; the rules read all but `itemId`, so
+because it reads six of its thirteen fields; the rules read all but `itemId`,
+so
 `TransitionInput` itself moved and the server file imports it back. And
 `TransitionActor` is the non-null arm of `Viewer` rather than the union,
 because the self-service path reads `viewer.id` without `assertStaff` having
@@ -826,10 +828,11 @@ and none looked at a row afterwards, while paying for a user, an item and
 sometimes a full reserve to get there. The rules now have twenty-four unit
 cases, including coverage the integration suite never had: the holder fields
 refused on a release, the `requested` arm, `pickupBy` staying optional on a
-reservation, and instructor counting as staff. `transitionItem
-throws Forbidden for a non-staff viewer` under `defense in depth` is still an
-integration case on purpose: that block exists to prove the impl re-checks
-role, and a unit test of the rules module cannot show that.
+reservation, and instructor counting as staff.
+One case stayed an integration test on purpose:
+`transitionItem throws Forbidden for a non-staff viewer` sits under
+`defense in depth`, a block whose whole job is to prove the impl re-checks
+role on every staff write. A unit test of the rules module cannot show that.
 
 ### Deferred FK
 

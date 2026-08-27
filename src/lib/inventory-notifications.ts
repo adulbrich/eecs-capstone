@@ -9,9 +9,11 @@
  *
  * The transaction's job is now the insert. This module's job is the choice.
  *
- * Input types are structural rather than the server's `TransitionInput`, which
- * carries Drizzle row types and twenty fields; six are read here, and saying so
- * is what keeps this importable from the client.
+ * Input types are structural rather than the `TransitionInput` next door in
+ * `inventory-workflow.ts`, which carries thirteen fields; six are read here,
+ * and saying so is what keeps the two modules independent. That type is
+ * Drizzle-free too, so this is a narrowing for its own sake, not the thing
+ * that makes this file client-safe.
  */
 
 import { overdueFlags } from "./inventory-deadlines";
