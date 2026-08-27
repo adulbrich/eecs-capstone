@@ -616,6 +616,30 @@ describe("review emails", () => {
     expect(history.some((h) => h.newStatus === "approved")).toBe(true);
   });
 
+  it("ignores a proposer's attempt to skip the submission email", async () => {
+    // Skipping the mail is a staff affordance, and this notice is the only
+    // push that tells staff a project arrived: nothing writes them an in-app
+    // notification, and the admin dashboard's "Awaiting review" count has to
+    // be looked at. `sendEmail` rides on schemas that three owner-reachable
+    // endpoints share, so the gate has to be the role, not the field.
+    process.env.BETTER_AUTH_URL = "https://app";
+    process.env.EMAIL_REVIEW_INBOX = "review@oregonstate.edu";
+    const owner = await makeUser("owner-noskip@x.edu", "user");
+    const { id } = await createProjectAs(owner, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await performTransitionAs(owner, id, "submitted", undefined, {
+      send,
+      sendEmail: false,
+    });
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("review@oregonstate.edu");
+    // Ignored, not rejected: the submission itself still goes through.
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.status).toBe("submitted");
+  });
+
   it("emails a proposer who has an address but no account", async () => {
     process.env.BETTER_AUTH_URL = "https://app";
     const admin = await makeUser("admin-noacct@x.edu", "admin");
