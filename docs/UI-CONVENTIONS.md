@@ -258,9 +258,46 @@ and escape-dismissible for free. Three rules keep it correct:
 
 ## Admin tables
 
-Render admin tables with `<AdminDataTable>` from `#/components/admin-data-table`.
-It handles sorting, column hiding, and the responsive card layout, and it pairs with
-the `useAdminTableState` hook for URL-backed sort and visibility state.
+Render admin tables with `<AdminDataTable>` from `#/components/admin-data-table`,
+and drive it with the `useAdminTable` hook from `#/lib/use-admin-table`. The component
+handles sorting, column hiding, and the responsive card layout; the hook owns the
+URL-backed sort and visibility state.
+
+Name `columns`, `defaultSort` and `storageKey` to the hook, then spread what it gives
+back. They used to be passed twice, once to the hook and once to the table, and nothing
+checked that the two agreed: a mismatched `storageKey` writes column preferences under
+one key and clears them under another, and a mismatched `defaultSort` leaves the URL and
+the rendered order disagreeing. Spreading makes disagreeing impossible.
+
+```tsx
+const { orderRows, tableProps } = useAdminTable({
+  columns: COLUMNS,
+  data: rows,
+  defaultSort: DEFAULT_SORT,
+  getRowId: (row) => row.id,
+  navigate,
+  search,
+  storageKey: "programs",
+});
+
+<AdminDataTable
+  caption="Programs"
+  emptyMessage="No programs yet."
+  {...tableProps}
+/>;
+```
+
+`navigate` is the route's own `useNavigate({ from })`, passed in rather than called
+inside the hook so it typechecks against the real route path. Two options carry the
+variations: `resetPageOnSort` for a paginated listing, whose page number stops meaning
+anything once the server reorders, and `serverSorted` for a listing the server ordered,
+which turns off local reordering. They are separate because server-ordered does not
+imply paginated. `orderRows(rows, getId)` puts exported rows in the order the table is
+rendering, so a CSV matches the screen; it is a no-op under `serverSorted`.
+
+`useAdminTableState` in `#/lib/table-state` is the router-agnostic core underneath, and
+stays directly unit-testable. Reach for it only if you are building something that is
+not a route.
 
 Responsive behavior is automatic: the component applies `className="admin-table"` and
 derives each body cell's `data-label` from its column header. Below 768px the

@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { z } from "zod";
 import {
   type AdminColumn,
@@ -24,13 +24,10 @@ import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
-import { defineCsvColumns, orderBySortedIds, toCsv } from "#/lib/csv";
+import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
-import {
-  type AdminTableSearch,
-  type SortState,
-  useAdminTableState,
-} from "#/lib/table-state";
+import type { SortState } from "#/lib/table-state";
+import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import {
   exportMentors,
@@ -192,14 +189,6 @@ function MentorsAdmin() {
   const search = Route.useSearch();
   const { q } = search;
   const navigate = useNavigate({ from: "/admin/mentors/" });
-  // Populated by AdminDataTable's onSortedIdsChange every time the table's
-  // own sorted row order changes. A ref, not state: the export only reads it
-  // at click time, so there is no reason to re-render this component (or
-  // re-run the effect that populates it) on every sort change.
-  const sortedIdsRef = useRef<string[]>([]);
-  const onSortedIdsChange = useCallback((ids: string[]) => {
-    sortedIdsRef.current = ids;
-  }, []);
 
   const commitQuery = useCallback(
     (next: string) => {
@@ -209,26 +198,13 @@ function MentorsAdmin() {
   );
   const [qDraft, setQDraft] = useDebouncedDraft(q, commitQuery);
 
-  const setSearch = useCallback(
-    (patch: AdminTableSearch) =>
-      void navigate({ search: (prev) => ({ ...prev, ...patch }) }),
-    [navigate]
-  );
-  const replaceSearch = useCallback(
-    (patch: AdminTableSearch) =>
-      void navigate({
-        replace: true,
-        search: (prev) => ({ ...prev, ...patch }),
-      }),
-    [navigate]
-  );
-
-  const { hidden, onHiddenChange, onSortChange, sort } = useAdminTableState({
+  const { orderRows, tableProps } = useAdminTable({
     columns: COLUMNS,
+    data: rows,
     defaultSort: DEFAULT_SORT,
-    replaceSearch,
+    getRowId: (row) => row.id,
+    navigate,
     search,
-    setSearch,
     storageKey: "mentors",
   });
 
@@ -268,27 +244,14 @@ function MentorsAdmin() {
               // `rows`.
               return toCsv(
                 EXPORT_COLUMNS,
-                orderBySortedIds(
-                  exportRows,
-                  sortedIdsRef.current,
-                  (row) => row.id
-                )
+                orderRows(exportRows, (row) => row.id)
               );
             }}
           />
         }
         caption="Mentors"
-        columns={COLUMNS}
-        data={rows}
-        defaultSort={DEFAULT_SORT}
         emptyMessage="No mentors in this view."
-        getRowId={(row) => row.id}
-        hidden={hidden}
-        onHiddenChange={onHiddenChange}
-        onSortChange={onSortChange}
-        onSortedIdsChange={onSortedIdsChange}
-        sort={sort}
-        storageKey="mentors"
+        {...tableProps}
         toolbar={
           <div>
             <Label htmlFor="mentor-search">Search</Label>

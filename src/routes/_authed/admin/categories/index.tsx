@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { useCallback, useRef, useState } from "react";
+import { useState } from "react";
 import { z } from "zod";
 import {
   type AdminColumn,
@@ -36,13 +36,10 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import { getSession } from "#/lib/auth-guards";
-import { defineCsvColumns, orderBySortedIds, toCsv } from "#/lib/csv";
+import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
-import {
-  type AdminTableSearch,
-  type SortState,
-  useAdminTableState,
-} from "#/lib/table-state";
+import type { SortState } from "#/lib/table-state";
+import { useAdminTable } from "#/lib/use-admin-table";
 import {
   createCategory,
   listCategoriesWithUsage,
@@ -194,14 +191,6 @@ function CategoriesAdmin() {
   const [name, setName] = useState("");
   const [type, setType] = useState("");
   const [error, setError] = useState<string | null>(null);
-  // Populated by AdminDataTable's onSortedIdsChange every time the table's
-  // own sorted row order changes. A ref, not state: the export only reads it
-  // at click time, so there is no reason to re-render this component (or
-  // re-run the effect that populates it) on every sort change.
-  const sortedIdsRef = useRef<string[]>([]);
-  const onSortedIdsChange = useCallback((ids: string[]) => {
-    sortedIdsRef.current = ids;
-  }, []);
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -223,32 +212,19 @@ function CategoriesAdmin() {
     }
   }
 
-  const setSearch = useCallback(
-    (patch: AdminTableSearch) =>
-      void navigate({ search: (prev) => ({ ...prev, ...patch }) }),
-    [navigate]
-  );
-  const replaceSearch = useCallback(
-    (patch: AdminTableSearch) =>
-      void navigate({
-        replace: true,
-        search: (prev) => ({ ...prev, ...patch }),
-      }),
-    [navigate]
-  );
-
   const columns = tab === "project" ? PROJECT_COLUMNS : INVENTORY_COLUMNS;
   const defaultSort =
     tab === "project" ? PROJECT_DEFAULT_SORT : INVENTORY_DEFAULT_SORT;
   const storageKey =
     tab === "project" ? "categories-project" : "categories-inventory";
 
-  const { hidden, onHiddenChange, onSortChange, sort } = useAdminTableState({
+  const { orderRows, tableProps } = useAdminTable({
     columns,
+    data: rows,
     defaultSort,
-    replaceSearch,
+    getRowId: (row) => row.id,
+    navigate,
     search,
-    setSearch,
     storageKey,
   });
 
@@ -353,11 +329,7 @@ function CategoriesAdmin() {
                   Promise.resolve(
                     toCsv(
                       EXPORT_COLUMNS,
-                      orderBySortedIds(
-                        rows,
-                        sortedIdsRef.current,
-                        (row) => row.id
-                      )
+                      orderRows(rows, (row) => row.id)
                     )
                   )
                 }
@@ -366,21 +338,12 @@ function CategoriesAdmin() {
             caption={
               tab === "project" ? "Project categories" : "Inventory categories"
             }
-            columns={columns}
-            data={rows}
-            defaultSort={defaultSort}
             emptyMessage={
               tab === "project"
                 ? "No project categories yet."
                 : "No inventory categories yet."
             }
-            getRowId={(row) => row.id}
-            hidden={hidden}
-            onHiddenChange={onHiddenChange}
-            onSortChange={onSortChange}
-            onSortedIdsChange={onSortedIdsChange}
-            sort={sort}
-            storageKey={storageKey}
+            {...tableProps}
           />
         </TabsContent>
       </Tabs>

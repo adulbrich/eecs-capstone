@@ -38,10 +38,11 @@ export function parseSort(
  *
  * The return type spells out `dir`/`sort` as always-present keys holding
  * `undefined`, rather than making them optional. That is load-bearing, not
- * incidental: `/admin/users`'s `setSearch` resets `page` to 1 by checking
- * `"sort" in patch`, and an optional key that is simply absent when unset
- * would make that check false for a real (default-restoring) sort change,
- * silently breaking the page reset.
+ * incidental: `useAdminTable`'s `resetPageOnSort` sends a paginated listing
+ * back to page 1 by checking `"sort" in patch`, and an optional key that is
+ * simply absent when unset would make that check false for a real
+ * (default-restoring) sort change, silently breaking the page reset.
+ * `use-admin-table.test.tsx` pins that case.
  */
 export function serializeSort(
   state: SortState,
