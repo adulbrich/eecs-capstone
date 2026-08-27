@@ -806,6 +806,19 @@ Do not read `canEdit` in that return value as authoritative. `getProjectAs:310-3
 
 **Inventory got here first, and an earlier version of this entry said it "does not have this hazard", full stop, which was false for as long as it stood.** A projection function guarantees only what passes through it, and there are three non-staff read paths for `inventory_items`, not two: `listMyItemsAs` called neither view. It selected whole table objects and spread the joined rows, so `/my/items` shipped `serial`, `notes`, `label` and `location` off the item, and `reviewedBy`, `reviewedAt`, `reviewComment`, `closedBy` and `closedAt` off the request line, to the student the row belonged to. The blast radius was the viewer's own items rather than anyone else's, which is why it read as a docs contradiction rather than an exposure, and it is also why nobody found it: this paragraph told them not to look. All three paths now go through the module, and `inventory.integration.test.ts` asserts the exact key set of both `/my/items` arms, because the type system cannot say "every read path must project" and the thing that broke was the `db.select()` above the projection, not the projection.
 
+### The edit diff has no field list; it reads the writer's keys
+
+`diffProjectFields` (`src/lib/project-edit-diff.ts`) iterates the keys of the object `buildProjectValues` produced, not a list of its own. There used to be a `PROJECT_EDITABLE_FIELDS` array beside it, and it drifted: `isSponsored` and `requiresNdaIp` were written by `buildProjectValues` and never named in the list, so a diff blind to them returned no changed fields, and `updateProjectAs` took the `changedFields.length === 0` early return before the UPDATE ran. Toggling sponsorship on its own, or unchecking the NDA flag on a project whose `licenseRestrictions` was already null, reported success and saved nothing.
+
+The reason it survived a test suite that covered the flags is worth knowing before you trust a passing case here. `ndaFields` derives `licenseRestrictions` from `requiresNdaIp`, and `licenseRestrictions` *was* in the list, so unchecking the box persisted whenever there was text to clear. The existing test set the text, so it passed for the sibling field's reason and would have kept passing if the flag had stopped persisting entirely. A test that moves two fields cannot tell you which one carried the write.
+
+Two consequences to respect:
+
+- **`next` is `Partial<typeof projects.$inferSelect>`, and `buildProjectValues` is declared to return it.** That is what makes a key which is not a column a typecheck failure rather than a runtime skip, and it is why the writer must stay typed against the table. Widening it back to `Record<string, unknown>` silently restores the old class of bug.
+- **The order of `changedFields` is the order of the literal in `buildProjectValues`**, because object key order is insertion order for string keys. It is observable: it is stored on the edit log and rendered by the staff panel at `staff-project-panel.tsx:404`. Reordering that literal changes what staff read, so `project-edit-diff.test.ts` pins the order to make the change loud.
+
+`imageUrl` is a real exception to all of this and not an oversight: `uploadProjectImageAs` (`src/server/_internal/uploads.ts`) writes the column directly on its own request, so an image change never reaches this diff or the edit log at all. See the tracking issue.
+
 ### `commitTransition` is the only writer of `project_status_history`
 
 `performTransitionAs` and `forceTransitionAs` (`src/server/_internal/projects.ts`) keep only their gates: who may act, and which target is reachable. Everything after that is `commitTransition`, which owns the transaction (status update, history row, notifications), then the embedding refresh, then the email. Checkable:

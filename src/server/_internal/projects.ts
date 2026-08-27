@@ -137,8 +137,12 @@ async function buildProjectValues(
   data: UpdateProjectInput,
   existing: Awaited<ReturnType<typeof loadProjectOr404>>,
   visibility: Viewer
-): Promise<Record<string, unknown>> {
-  const newValues: Record<string, unknown> = {
+): Promise<Partial<typeof projects.$inferSelect>> {
+  // Typed against the table rather than as a loose record, because this object
+  // is the only statement of which columns an edit may touch. `diffProjectFields`
+  // reads its keys, and `.set()` writes them, so a key that is not a column has
+  // to be a typecheck failure here rather than a surprise at either end.
+  const newValues: Partial<typeof projects.$inferSelect> = {
     title: data.title,
     description: data.description ?? null,
     problemStatement: data.problemStatement ?? null,
@@ -180,7 +184,7 @@ export async function updateProjectAs(
   const newValues = await buildProjectValues(data, existing, visibility);
 
   const { changedFields, newDiff, oldDiff } = diffProjectFields(
-    existing as unknown as Record<string, unknown>,
+    existing,
     newValues
   );
 
