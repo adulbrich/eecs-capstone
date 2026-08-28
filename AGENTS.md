@@ -56,8 +56,8 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
   when the user asks for one.
 - **Commit messages use Conventional Commits with a lowercase imperative subject:**
   `fix(projects): stop the proposer field lying about pending changes`. The types in
-  use are `feat`, `fix`, `docs`, `test`, `refactor`, `style`, `perf`, `ci` and
-  `chore`. Put the affected area in parens. Bare subjects exist in the history and
+  use are `feat`, `fix`, `docs`, `test`, `refactor`, `style`, `perf`, `build`,
+  `ci` and `chore`. Put the affected area in parens. Bare subjects exist in the history and
   are not the pattern to copy, same as the long bodies below. A breaking change
   takes a `!` before the colon, as in
   `feat(inventory)!: give items many categories`. Dependabot lands `chore(deps)`
@@ -95,11 +95,14 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
   reads a branch, not your intent, and will sometimes be confidently wrong about what
   exists.
 
-  `.claude/settings.json` declares the marketplace and enables the plugin, so a fresh
-  clone can run it without installing anything by hand. Dependabot's PRs are exempt.
-  If you are an agent that cannot run a Claude Code plugin, review the diff against
-  this file and `docs/QUIRKS.md` yourself and say so in the PR: what is required is a
-  review, not a particular tool.
+  `.claude/settings.json` declares the marketplace and enables the plugin, so nobody
+  has to add either by hand. Claude Code still asks each operator once whether to
+  trust the marketplace, so a fresh clone answers a prompt, not a setup step. Every
+  PR goes through this, Dependabot's included: a bump that draws no findings clears
+  the rule in a single pass, which is cheaper than arguing about the exception. If
+  you are an agent that cannot run a Claude Code plugin, say so in the PR and review
+  the diff against this file and `docs/QUIRKS.md` yourself. That is a fallback for a
+  harness that lacks the tool, not a choice between equals.
 - **Check the docs for the fast-moving libraries with the context7 MCP server**
   rather than recalling them, for TanStack Start, TanStack Router, Better Auth and
   Drizzle above all: those four are what training data is most likely to be wrong

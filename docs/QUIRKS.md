@@ -2,7 +2,7 @@
 
 A running log of every gotcha we have hit and the conventions that grew out of them. Read this before debugging anything that "should just work."
 
-The stack is fast-moving: **TanStack Start** is pre-v1 as of 2026, **Better Auth** 1.5.x changed several method names from earlier docs, and **Drizzle 0.45** has gaps the docs do not warn about. Treat the official docs as a starting point, this file as the ground truth for THIS codebase.
+The stack is fast-moving. TanStack Start, TanStack Router, Better Auth and Drizzle all ship breaking changes faster than any model's training data tracks, and the ones here have already renamed methods and moved APIs under this project. Check them with the context7 MCP server rather than recalling them, treat the official docs as a starting point, and treat this file as the ground truth for THIS codebase. Versions live in `package.json`; do not restate them here, because a number written into prose goes stale silently.
 
 ## Table of contents
 
@@ -502,8 +502,8 @@ here.
 
 ## Project conventions
 
-The git rules (stage by name, stay on `main`, leave `AGENTS.md` unstaged) bind every
-turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
+The git rules (stage by name, never commit to `main`, no session links on a remote)
+bind every turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
 
 ### Path-by-path convention summary
 
