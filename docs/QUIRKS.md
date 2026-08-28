@@ -388,14 +388,14 @@ export default defineConfig({ /* ... */ });
 
 ### The integration suite refuses to run with embeddings enabled
 
-`vitest.integration.config.ts` sets `BEDROCK_EMBEDDINGS_ENABLED=false` in its `env` block, and `src/test/setup.integration.ts` asserts it twice: once at collection, and once after every test. If a run fails with "Embeddings are enabled during the integration run", the parenthesis says which, and they have different causes.
+`vitest.integration.config.ts` sets `BEDROCK_EMBEDDINGS_ENABLED=false` in its `env` block, and `src/test/setup.integration.ts` asserts it at collection and again after every test. The parenthesis in the failure says which.
 
-- **"at collection"** means the value never arrived, so the `env` line is missing or the variable is set to something other than `"false"`. Note that unset is on: `embeddingsEnabled()` treats anything but the exact string as enabled.
-- **"after a test mutated the environment"** means a test replaced `process.env`. The failing test is the one that did it. This is the fail-open #22 names and the one PR #21's read-per-call fix does not close, which is why it is checked after each test rather than before: a `beforeEach` blames the next test instead.
+- **"at collection"** means the value never arrived: the `env` line is gone, or the variable is set to something other than `"false"`. Unset is on, because `embeddingsEnabled()` treats anything but that exact string as enabled. Fix the config, not your environment.
+- **"left enabled by a test"** means a test replaced `process.env` and did not put it back. Narrower than it sounds: `sequence.hooks` defaults to `stack`, so a test that restores the value in its own `afterEach` is invisible here. It catches leaked state, not the transient mutation #22 describes, and nothing exercises it today. It is a regression guard, not a reproduction of the flake.
 
-It exists because a fail-open is expensive rather than merely wrong. The call reaches the AWS SDK, which walks the credential chain and pays an IMDS probe with retries, so it presents as a slow flaky test rather than a configuration error. See the `embeddingsEnabled` docblock and #22.
+A fail-open is expensive rather than merely wrong: the call reaches the AWS SDK, which walks the credential chain and pays an IMDS probe with retries, so it presents as a slow flaky test rather than a configuration error. Whether that is what #22 actually was remains unconfirmed, which is why #22 is still open.
 
-`test.env` beats the shell, so `BEDROCK_EMBEDDINGS_ENABLED=true npm run test:integration` does not override the config.
+The switch lives in `src/lib/_internal/embeddings-flag.ts` rather than beside the adapter, so reading it costs no `@aws-sdk/client-bedrock-runtime` import. `test.env` beats the shell, so `BEDROCK_EMBEDDINGS_ENABLED=true npm run test:integration` does not override the config.
 
 ### A unit test that transitively imports `#/db` passes locally and fails in CI
 

@@ -3,9 +3,9 @@ import {
   buildEmbedRequestBody,
   EMBEDDING_DIMENSIONS,
   EMBEDDING_MODEL_ID,
-  embeddingsEnabled,
   parseEmbedResponse,
 } from "#/lib/_internal/bedrock-embed";
+import { embeddingsEnabled } from "#/lib/_internal/embeddings-flag";
 
 describe("buildEmbedRequestBody", () => {
   it("asks Titan for normalized vectors at the configured size", () => {

@@ -1,24 +1,16 @@
 import { afterEach, beforeEach } from "vitest";
+import { embeddingsEnabled } from "#/lib/_internal/embeddings-flag";
 import { resetDatabase } from "./db-reset";
 
 /**
  * Fail if the embedding kill switch is open.
  *
  * `vitest.integration.config.ts` sets `BEDROCK_EMBEDDINGS_ENABLED=false`, but
- * nothing checked that it arrived. A fail-open is expensive rather than merely
- * wrong; the docblock on `embeddingsEnabled` in
- * `src/lib/_internal/bedrock-embed.ts` explains why, and #22 is the flake it
- * presented as.
+ * nothing checked that it arrived, and a fail-open is expensive rather than
+ * merely wrong. The docblock on `embeddingsEnabled` says why.
  *
- * The expression is duplicated from that module rather than imported, because
- * importing it pulls `@aws-sdk/client-bedrock-runtime` in at the top level,
- * which is 109ms every integration file would pay in its own fork to run one
- * string compare. Keep the two in step.
+ * The flag lives in its own module so this costs no AWS SDK import.
  */
-function embeddingsEnabled(): boolean {
-  return process.env.BEDROCK_EMBEDDINGS_ENABLED !== "false";
-}
-
 function assertEmbeddingsDisabled(when: string) {
   if (embeddingsEnabled()) {
     throw new Error(
@@ -27,21 +19,23 @@ function assertEmbeddingsDisabled(when: string) {
   }
 }
 
-// The config never set it, or the line was deleted. Checked here so the failure
-// arrives once per file at collection, naming the cause, rather than as N
-// identical test failures. This is a reporting choice, not extra coverage: the
-// afterEach below would catch it too.
+// The value never arrived, which is the case worth catching and the only one
+// that can affect a whole run. Checked at module scope so it reports once per
+// file at collection, naming the cause, rather than once per test.
 assertEmbeddingsDisabled("at collection");
 
 beforeEach(async () => {
   await resetDatabase();
 });
 
-// A test replaced `process.env`, which is the fail-open #22 actually names and
-// the one PR #21's read-per-call fix does not close. Checked after rather than
-// before, so the failure lands on the test that did it: a beforeEach would pass
-// the blame to the innocent next test, and would never catch the last test in a
-// file at all.
+// A test replaced `process.env` and did not put it back. This is narrower than
+// it looks and the narrowness is the point: a test that mutates and restores in
+// its own afterEach is invisible here, because vitest's `sequence.hooks`
+// defaults to "stack" and runs the file's hook before this one. So it catches
+// leaked state, not the transient mutation #22 describes, and it cannot see the
+// call that already paid the IMDS probe inside the test body. It is a
+// regression guard on a mode nothing exercises today, not a reproduction of the
+// flake.
 afterEach(() => {
-  assertEmbeddingsDisabled("after a test mutated the environment");
+  assertEmbeddingsDisabled("left enabled by a test");
 });
