@@ -41,227 +41,234 @@ interface AccessDeclaration {
 }
 
 export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
-  "admin.ts:getAdminStats": {
+  "server/admin.ts:getAdminStats": {
     level: "staff",
     note: "Gated inline in the handler, not in an _internal seam.",
   },
 
-  "bookmarks.ts:addBookmark": {
+  "server/bookmarks.ts:addBookmark": {
     level: "authenticated",
     note: "Also runs canSeeProject on the target, so a guessed draft id cannot be bookmarked.",
   },
-  "bookmarks.ts:isBookmarked": { level: "authenticated" },
-  "bookmarks.ts:listMyBookmarks": {
+  "server/bookmarks.ts:isBookmarked": { level: "authenticated" },
+  "server/bookmarks.ts:listMyBookmarks": {
     level: "authenticated",
     note: "Scoped to the viewer's own rows. Visibility is re-checked on read (#106).",
   },
-  "bookmarks.ts:removeBookmark": {
+  "server/bookmarks.ts:removeBookmark": {
     level: "authenticated",
     note: "Scoped to the viewer, so the id alone cannot remove someone else's.",
   },
 
-  "categories.ts:createCategory": { level: "staff" },
-  "categories.ts:deleteCategory": { level: "staff" },
-  "categories.ts:getCategory": {
+  "server/categories.ts:createCategory": { level: "staff" },
+  "server/categories.ts:deleteCategory": { level: "staff" },
+  "server/categories.ts:getCategory": {
     level: "public",
     note: "Public catalog. No join to user.",
   },
-  "categories.ts:listCategories": {
+  "server/categories.ts:listCategories": {
     level: "public",
     note: "Public catalog. No join to user.",
   },
-  "categories.ts:listCategoriesWithUsage": { level: "staff" },
-  "categories.ts:listCategoryTypes": {
+  "server/categories.ts:listCategoriesWithUsage": { level: "staff" },
+  "server/categories.ts:listCategoryTypes": {
     level: "public",
     note: "Public catalog. No join to user.",
   },
-  "categories.ts:listProjectCategories": {
+  "server/categories.ts:listProjectCategories": {
     level: "public",
     note: "Takes a project id and returns that project's category names without checking canSeeProject, so an unpublished draft's categories are readable by anyone holding the id. Low severity and possibly intended; #113 decides whether to gate it.",
   },
-  "categories.ts:setProjectCategories": {
+  "server/categories.ts:setProjectCategories": {
     level: "staff",
     note: "assertStaff, then canSeeProject on the target project.",
   },
-  "categories.ts:updateCategory": { level: "staff" },
+  "server/categories.ts:updateCategory": { level: "staff" },
 
-  "comments.ts:addComment": {
+  "server/comments.ts:addComment": {
     level: "owner-or-staff",
     note: "An internal comment additionally requires staff: a proposer cannot post one.",
   },
 
-  "interests.ts:getMyInterests": { level: "authenticated" },
-  "interests.ts:saveMyInterests": { level: "authenticated" },
+  "server/interests.ts:getMyInterests": { level: "authenticated" },
+  "server/interests.ts:saveMyInterests": { level: "authenticated" },
 
-  "inventory.ts:addToCart": {
+  "server/inventory.ts:addToCart": {
     level: "authenticated",
     note: "Any signed-in user may cart any available item. The catalog is public, so there is no per-item visibility rule to apply.",
   },
-  "inventory.ts:approveRequestItem": { level: "staff" },
-  "inventory.ts:cancelRequestItem": {
+  "server/inventory.ts:approveRequestItem": { level: "staff" },
+  "server/inventory.ts:cancelRequestItem": {
     level: "authenticated",
     note: "Requester only: the line's requesterId must equal the viewer. Staff cancel through transitionInventoryItem instead.",
   },
-  "inventory.ts:createInventoryItem": { level: "staff" },
-  "inventory.ts:getCart": { level: "authenticated" },
-  "inventory.ts:getInventoryItem": {
+  "server/inventory.ts:createInventoryItem": { level: "staff" },
+  "server/inventory.ts:getCart": { level: "authenticated" },
+  "server/inventory.ts:getInventoryItem": {
     level: "public",
     note: "Anonymous callers get the public projection; staff get the staff one, from the same endpoint.",
   },
-  "inventory.ts:getInventoryItemDetail": {
+  "server/inventory.ts:getInventoryItemDetail": {
     level: "public",
     note: "Anonymous callers get the public projection; staff get the staff one, from the same endpoint.",
   },
-  "inventory.ts:hardDeleteInventoryItem": { level: "staff" },
-  "inventory.ts:listAdminInventory": {
+  "server/inventory.ts:hardDeleteInventoryItem": { level: "staff" },
+  "server/inventory.ts:listAdminInventory": {
     level: "staff",
     note: "The wrapper reads the session and passes null when there is none, so assertStaff rejects anonymous callers.",
   },
-  "inventory.ts:listInventory": {
+  "server/inventory.ts:listInventory": {
     level: "public",
     note: "Anonymous callers get the public projection; staff see more, from the same endpoint.",
   },
-  "inventory.ts:listInventoryCategories": {
+  "server/inventory.ts:listInventoryCategories": {
     level: "public",
     note: "Public catalog. No join to user.",
   },
-  "inventory.ts:listInventoryRequests": { level: "staff" },
-  "inventory.ts:listMyItems": {
+  "server/inventory.ts:listInventoryRequests": { level: "staff" },
+  "server/inventory.ts:listMyItems": {
     level: "authenticated",
     note: "Scoped to the viewer. Only a verified address may claim a hold.",
   },
-  "inventory.ts:rejectRequestItem": { level: "staff" },
-  "inventory.ts:removeFromCart": { level: "authenticated" },
-  "inventory.ts:submitCart": { level: "authenticated" },
-  "inventory.ts:transitionInventoryItem": {
+  "server/inventory.ts:rejectRequestItem": { level: "staff" },
+  "server/inventory.ts:removeFromCart": { level: "authenticated" },
+  "server/inventory.ts:submitCart": { level: "authenticated" },
+  "server/inventory.ts:transitionInventoryItem": {
     level: "staff",
-    note: "The handler carries only requireUser(). assertStaff inside transitionItem is the entire staff gate, and the schema deliberately omits `authority` so a signed-in user cannot supply one. See the transitionSchema docblock.",
+    note: "The handler carries only requireUser(). The staff gate is the assertStaff in assertTransitionAllowed (src/lib/inventory-workflow.ts), reached through transitionItem, and the schema deliberately omits `authority` so a signed-in user cannot supply one. See the transitionSchema docblock.",
   },
-  "inventory.ts:updateInventoryItem": { level: "staff" },
-  "inventory.ts:uploadInventoryImage": { level: "staff" },
+  "server/inventory.ts:updateInventoryItem": { level: "staff" },
+  "server/inventory.ts:uploadInventoryImage": { level: "staff" },
 
-  "notifications.ts:listMyNotifications": { level: "authenticated" },
-  "notifications.ts:markAllRead": { level: "authenticated" },
-  "notifications.ts:markRead": { level: "authenticated" },
-  "notifications.ts:unreadCount": { level: "authenticated" },
+  "server/notifications.ts:listMyNotifications": { level: "authenticated" },
+  "server/notifications.ts:markAllRead": { level: "authenticated" },
+  "server/notifications.ts:markRead": { level: "authenticated" },
+  "server/notifications.ts:unreadCount": { level: "authenticated" },
 
-  "profile.ts:updateProfile": {
+  "server/profile.ts:updateProfile": {
     level: "authenticated",
     note: "Writes the viewer's own row only; the id comes from the session, never from the input.",
   },
 
-  "programs.ts:addProgramInstructor": { level: "staff" },
-  "programs.ts:createProgram": { level: "staff" },
-  "programs.ts:deleteProgram": { level: "staff" },
-  "programs.ts:getProgram": {
+  "server/programs.ts:addProgramInstructor": { level: "staff" },
+  "server/programs.ts:createProgram": { level: "staff" },
+  "server/programs.ts:deleteProgram": { level: "staff" },
+  "server/programs.ts:getProgram": {
     level: "staff",
     note: "Joins instructor accounts. Was unauthenticated until #103.",
   },
-  "programs.ts:listEligibleInstructors": {
+  "server/programs.ts:listEligibleInstructors": {
     level: "staff",
     note: "Returns instructor id, name, email and role. Was unauthenticated until #103.",
   },
-  "programs.ts:listPrograms": {
+  "server/programs.ts:listPrograms": {
     level: "public",
     note: "Course id, name and description only. No join to user, which is what separates it from getProgram.",
   },
-  "programs.ts:removeProgramInstructor": { level: "staff" },
-  "programs.ts:updateProgram": { level: "staff" },
+  "server/programs.ts:removeProgramInstructor": { level: "staff" },
+  "server/programs.ts:updateProgram": { level: "staff" },
 
-  "project-review.ts:reviewProject": {
-    level: "owner-or-staff",
-    note: "canEditProject. Also accepts no project id at all, for the submission page reviewing a proposal with no row yet.",
+  "server/project-review.ts:reviewProject": {
+    level: "authenticated",
+    note: "Narrows to owner-or-staff only when a project id is supplied: reviewProjectAs runs canEditProject inside `if (input.projectId)`, and the id is optional because the submission page reviews a proposal with no row yet. With no id the gate is requireUser() plus assertReviewWithinLimit, which is what bounds spend on a paid endpoint now that ownership no longer does.",
   },
 
-  "projects-queries.ts:exportAdminProjects": { level: "staff" },
-  "projects-queries.ts:getProject": {
+  "server/projects-queries.ts:exportAdminProjects": { level: "staff" },
+  "server/projects-queries.ts:getProject": {
     level: "public",
     note: "canSeeProject decides, so a draft 404s for a stranger. Status history and staff fields are withheld separately.",
   },
-  "projects-queries.ts:getProposerForEdit": { level: "staff" },
-  "projects-queries.ts:listAdminProjects": { level: "staff" },
-  "projects-queries.ts:listMyProjects": {
+  "server/projects-queries.ts:getProposerForEdit": { level: "staff" },
+  "server/projects-queries.ts:listAdminProjects": { level: "staff" },
+  "server/projects-queries.ts:listMyProjects": {
     level: "authenticated",
     note: "Scoped to the viewer's own proposals.",
   },
-  "projects-queries.ts:listProjectComments": {
+  "server/projects-queries.ts:listProjectComments": {
     level: "public",
     note: "canSeeProject gates the project, then filterCommentsForViewer withholds internal comments from the proposer and everything from a stranger.",
   },
-  "projects-queries.ts:listProjectEditLog": { level: "staff" },
+  "server/projects-queries.ts:listProjectEditLog": { level: "staff" },
 
-  "projects.ts:approveProject": {
+  "server/projects.ts:approveProject": {
     level: "staff",
     note: "The endpoint gate is owner-or-staff, but only staff may reach `approved` in the TRANSITIONS table in src/lib/project-workflow.ts, which is where this is enforced.",
   },
-  "projects.ts:archiveProject": {
+  "server/projects.ts:archiveProject": {
     level: "staff",
     note: "Enforced by TRANSITIONS in src/lib/project-workflow.ts, not by the endpoint gate.",
   },
-  "projects.ts:createProject": {
+  "server/projects.ts:createProject": {
     level: "authenticated",
     note: "Any signed-in user may propose. Staff creating one get a wider set of writable fields.",
   },
-  "projects.ts:forceSetProjectStatus": {
+  "server/projects.ts:forceSetProjectStatus": {
     level: "staff",
     note: "Bypasses the transition rules, so it is gated on staff directly rather than through the workflow table.",
   },
-  "projects.ts:hardDeleteProject": { level: "owner-or-staff" },
-  "projects.ts:performTransition": {
+  "server/projects.ts:hardDeleteProject": { level: "owner-or-staff" },
+  "server/projects.ts:performTransition": {
     level: "owner-or-staff",
     note: "The generic entry point. Which transitions each role may make is decided by TRANSITIONS in src/lib/project-workflow.ts.",
   },
-  "projects.ts:publishProject": {
+  "server/projects.ts:publishProject": {
     level: "staff",
     note: "Enforced by TRANSITIONS in src/lib/project-workflow.ts, not by the endpoint gate.",
   },
-  "projects.ts:requestChanges": {
+  "server/projects.ts:requestChanges": {
     level: "staff",
     note: "Enforced by TRANSITIONS in src/lib/project-workflow.ts, not by the endpoint gate.",
   },
-  "projects.ts:restoreArchived": {
+  "server/projects.ts:restoreArchived": {
     level: "staff",
     note: "Enforced by TRANSITIONS in src/lib/project-workflow.ts, not by the endpoint gate.",
   },
-  "projects.ts:restoreProject": { level: "staff" },
-  "projects.ts:returnToDraft": {
+  "server/projects.ts:restoreProject": { level: "staff" },
+  "server/projects.ts:returnToDraft": {
     level: "owner-or-staff",
     note: "submitted to draft is open to both roles in TRANSITIONS.",
   },
-  "projects.ts:softDeleteProject": { level: "staff" },
-  "projects.ts:submitProject": {
+  "server/projects.ts:softDeleteProject": { level: "staff" },
+  "server/projects.ts:submitProject": {
     level: "owner-or-staff",
     note: "draft or changes_requested to submitted is open to both roles in TRANSITIONS.",
   },
-  "projects.ts:updateProject": { level: "owner-or-staff" },
+  "server/projects.ts:updateProject": { level: "owner-or-staff" },
 
-  "search.ts:searchProjects": {
+  "server/search.ts:searchProjects": {
     level: "public",
     note: "The public listing. The viewer id only scopes the recommended sort, it decides nothing.",
   },
 
-  "uploads.ts:clearAvatar": { level: "authenticated" },
-  "uploads.ts:uploadAvatar": {
+  "server/uploads.ts:clearAvatar": { level: "authenticated" },
+  "server/uploads.ts:uploadAvatar": {
     level: "authenticated",
     note: "The storage key is derived from the session id, so a viewer can only overwrite their own avatar.",
   },
-  "uploads.ts:uploadProjectImage": { level: "owner-or-staff" },
+  "server/uploads.ts:uploadProjectImage": { level: "owner-or-staff" },
 
-  "users.ts:banUser": { level: "admin" },
-  "users.ts:exportMentors": { level: "staff" },
-  "users.ts:exportUsers": {
+  "server/users.ts:banUser": { level: "admin" },
+  "server/users.ts:exportMentors": { level: "staff" },
+  "server/users.ts:exportUsers": {
     level: "admin",
     note: "Every user column except authentication material: nothing from account or session is joined.",
   },
-  "users.ts:getUser": { level: "admin" },
-  "users.ts:listMentors": { level: "staff" },
-  "users.ts:listUsers": {
+  "server/users.ts:getUser": { level: "admin" },
+  "server/users.ts:listMentors": { level: "staff" },
+  "server/users.ts:listUsers": {
     level: "admin",
     note: "/admin/users requires role === admin exactly, unlike every other admin route.",
   },
-  "users.ts:lookupUserByEmail": { level: "staff" },
-  "users.ts:searchUsers": { level: "staff" },
-  "users.ts:setUserMentorStatus": { level: "staff" },
-  "users.ts:setUserRole": { level: "admin" },
-  "users.ts:unbanUser": { level: "admin" },
+  "server/users.ts:lookupUserByEmail": { level: "staff" },
+  "server/users.ts:searchUsers": { level: "staff" },
+  "server/users.ts:setUserMentorStatus": { level: "staff" },
+  "server/users.ts:setUserRole": { level: "admin" },
+  "server/users.ts:unbanUser": { level: "admin" },
+
+  // Not under src/server. It is still an independently reachable endpoint, and
+  // leaving it out is how the count came to 86 when it was 87.
+  "lib/auth-guards.ts:getSession": {
+    level: "public",
+    note: "Returns the caller's own session, or null when there is none. Public because asking who you are cannot leak someone else: the answer is derived from the request's own cookies.",
+  },
 };
