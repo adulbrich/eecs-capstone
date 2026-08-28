@@ -64,8 +64,10 @@ interface UseAdminTableOptions<TColumn extends AdminTableStateColumn> {
  * `serverSorted` is the one option this hook takes and never reads: it is
  * passed straight through to the table. It stays because it belongs to the
  * same prop bag as everything else the table needs, not because anything here
- * would break without it. A route that put it on the JSX directly would behave
- * identically.
+ * would break without it. Nothing below reads it, so a route that dropped the
+ * option and put the prop on the table directly would behave the same. Note it
+ * would have to do both: `tableProps` always carries the key, so a JSX prop
+ * written before the spread is overwritten with `undefined`.
  */
 export function useAdminTable<TColumn extends AdminTableStateColumn>({
   columns,

@@ -263,12 +263,16 @@ and drive it with the `useAdminTable` hook from `#/lib/use-admin-table`. The com
 handles sorting, column hiding, and the responsive card layout; the hook owns the
 URL-backed sort and visibility state.
 
-Give the hook only what it owns or what two places would otherwise have to agree on:
-`columns`, `defaultSort` and `storageKey`. Row data goes straight to the table. Then
-spread what the hook hands back. They used to be passed twice, once to the hook and once to the table, and nothing
-checked that the two agreed: a mismatched `storageKey` writes column preferences under
+Give the hook `columns`, `defaultSort` and `storageKey`, then spread what it hands back.
+Those three used to be passed twice, once to the hook and once to the table, with nothing
+checking that the two agreed: a mismatched `storageKey` writes column preferences under
 one key and clears them under another, and a mismatched `defaultSort` leaves the URL and
 the rendered order disagreeing. Spreading makes disagreeing impossible.
+
+Row data does not go through the hook. `data` and `getRowId` are props of the table,
+because the hook never read them and routing them through it bought nothing but a generic
+parameter (#97). The hook does take two options it only forwards, `serverSorted` and
+`resetPageOnSort`; both are described below.
 
 ```tsx
 const { orderRows, tableProps } = useAdminTable({
