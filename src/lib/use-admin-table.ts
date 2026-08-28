@@ -63,6 +63,20 @@ interface UseAdminTableOptions<TRow, TColumn extends AdminTableStateColumn> {
  * `storageKey` writes preferences under one key and clears them under
  * another, a mismatched `defaultSort` makes the URL and the rendered order
  * disagree. Named once here, they cannot disagree.
+ *
+ * `data`, `getRowId` and `serverSorted` are different: the hook reads none of
+ * them, and forwards all three into `tableProps` untouched. That is deliberate
+ * and was weighed in #97 rather than left to be re-noticed at each review.
+ *
+ * They stay because `data` is not pure forwarding. It is what fixes `TRow` so
+ * `getRowId` infers, since `orderRows` is generic over its own export row type
+ * and cannot anchor it, and dropping it means annotating the row type at all
+ * seven call sites. `getRowId` has to travel with it: it genuinely varies, and
+ * not only in the way the six `(row) => row.id` sites suggest, because
+ * `/admin/inventory/requests` keys on `row.line.id`. And a complete prop bag is
+ * what lets a route write `<AdminDataTable caption emptyMessage {...tableProps}
+ * />`; dropping two options puts two props back into seven JSX blocks, so the
+ * line count roughly cancels.
  */
 export function useAdminTable<TRow, TColumn extends AdminTableStateColumn>({
   columns,
