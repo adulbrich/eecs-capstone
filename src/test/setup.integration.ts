@@ -3,28 +3,38 @@ import { embeddingsEnabled } from "#/lib/_internal/bedrock-embed";
 import { resetDatabase } from "./db-reset";
 
 /**
- * Fail the run, not one case, if the embedding kill switch is open.
+ * Fail if the embedding kill switch is open.
  *
  * `vitest.integration.config.ts` sets `BEDROCK_EMBEDDINGS_ENABLED=false`, but
  * nothing checked that it arrived. When it fails open there is no fast error:
  * the call reaches the AWS SDK, which walks the credential chain and pays an
  * IMDS probe with retries, so a case takes seconds instead of milliseconds and
- * looks like flakiness rather than misconfiguration. That is the profile of
- * #22, which failed 2 of 6 full-suite runs at roughly 11s against 1.2s in
- * isolation.
+ * reads as flakiness rather than misconfiguration. See #22 and the docblock on
+ * `embeddingsEnabled` for why that is expensive rather than merely wrong.
  *
- * Checked here rather than trusted from the config because the config is one
- * deleted line away from silent, and because `loadDotenv` runs in that same
- * file: a `.env.local` copied from `.env.example`, which ships
- * `BEDROCK_EMBEDDINGS_ENABLED=true`, is a plausible way for the value to
- * change without anyone editing the test setup.
+ * Checked in two places because #22 names two ways it can fail open, and one
+ * check cannot see both.
  */
-if (embeddingsEnabled()) {
-  throw new Error(
-    "Embeddings are enabled during the integration run. Set BEDROCK_EMBEDDINGS_ENABLED=false; see the env block in vitest.integration.config.ts."
-  );
+function assertEmbeddingsDisabled() {
+  if (embeddingsEnabled()) {
+    throw new Error(
+      "Embeddings are enabled during the integration run. Set BEDROCK_EMBEDDINGS_ENABLED=false; see the env block in vitest.integration.config.ts."
+    );
+  }
 }
 
+// Mode one: the config never set it. Deleting that one line is enough, and the
+// variable is then unset rather than "true", which still fails open because
+// `embeddingsEnabled` treats anything but the string "false" as on. Checked at
+// module scope so this reports once per file at collection, naming the cause,
+// instead of once per test.
+assertEmbeddingsDisabled();
+
 beforeEach(async () => {
+  // Mode two: a test replaced `process.env`. PR #21 fixed the import-order
+  // half of #22 by reading the variable per call, which leaves this half: a
+  // value that was correct at collection can be wrong by the time a later case
+  // runs, and only a per-test check sees that.
+  assertEmbeddingsDisabled();
   await resetDatabase();
 });

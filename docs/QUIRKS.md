@@ -386,6 +386,14 @@ loadDotenv({ path: [".env.local", ".env"] });
 export default defineConfig({ /* ... */ });
 ```
 
+### The integration suite refuses to run with embeddings enabled
+
+`vitest.integration.config.ts` sets `BEDROCK_EMBEDDINGS_ENABLED=false` in its `env` block, and `src/test/setup.integration.ts` throws if that did not take effect. If a run dies at collection with "Embeddings are enabled during the integration run", that is this check, and the fix is the config rather than your environment.
+
+It exists because a fail-open is expensive rather than merely wrong: `embeddingsEnabled()` treats anything but the string `"false"` as on, so an unset variable is on, and the resulting call reaches the AWS SDK, which walks the credential chain and pays an IMDS probe with retries. That is seconds per call, and it presents as a flaky slow test rather than a configuration error. See #22.
+
+Note that `test.env` wins over the shell, so `BEDROCK_EMBEDDINGS_ENABLED=true npm run test:integration` does not override it. The realistic way to fail open is losing the config line.
+
 ### A unit test that transitively imports `#/db` passes locally and fails in CI
 
 Same root cause from the other direction. `src/db/index.ts` throws at import
