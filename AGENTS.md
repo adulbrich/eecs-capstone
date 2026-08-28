@@ -81,7 +81,9 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
   user's. Branch, push, open a PR, and let the `verify` check go green. GitHub asks
   for no approving review, so nothing but the rule below stops a PR merging unread.
 - **Run `mattpocock-skills:code-review` on every PR before merging, and run it again
-  after addressing what it found.** A clean first pass ends it: one pass is enough
+  after addressing what it found.** The skill comes from a plugin, so
+  `.claude/settings.json` declares the marketplace and enables it; a fresh clone gets
+  it without anyone installing anything by hand. Dependabot's PRs are exempt. A clean first pass ends it: one pass is enough
   when there is nothing to re-review. The second pass exists for the code the first
   pass caused you to write, which otherwise reaches `main` having been reviewed by
   nobody. Green CI is not a review; it says the suite still passes, which is exactly
