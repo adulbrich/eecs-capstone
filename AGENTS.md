@@ -29,13 +29,13 @@ All three must be clean, because a red local run is a red PR. The `verify` job i
 `npm run check:compression`.
 
 `npm test` excludes the integration and accessibility suites to keep the unit run
-fast. Both have their own CI jobs and run on every pull request, so "it passed
-locally" is not the question; run `npm run test:integration` (needs docker Postgres
-and RustFS up, see `docker compose`) and `npm run test:accessibility` yourself when
-your change touches the database layer or the UI, rather than finding out from CI. The
-accessibility suite needs more setup than the integration one: the same Postgres and
-RustFS, plus `npm run db:seed:dev` (its global setup signs in as the seeded users) and
-`npx playwright install chromium`. Other scripts live in `package.json`.
+fast, so a green `npm test` says nothing about either. Run `npm run test:integration`
+(needs docker Postgres and RustFS up, see `docker compose`) and
+`npm run test:accessibility` yourself when your change touches the database layer or
+the UI, rather than finding out from CI. The accessibility suite needs more setup than
+the integration one: the same Postgres and RustFS, plus `npm run db:seed:dev` (its
+global setup signs in as the seeded users) and `npx playwright install chromium`.
+Other scripts live in `package.json`.
 
 Only `verify` can block a merge today. The `integration` and `accessibility` jobs run
 on every pull request and a red one still merges, so read their results rather than
@@ -56,11 +56,12 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
   when the user asks for one.
 - **Commit messages use Conventional Commits with a lowercase imperative subject:**
   `fix(projects): stop the proposer field lying about pending changes`. The types in
-  use are `feat`, `fix`, `docs`, `test`, `refactor`, and `style`, each with the
-  affected area in parens. `perf`, `ci` and `chore` are also in use; `ci` and `chore`
-  appear with or without an area, and a breaking change takes a `!` before the
-  colon, as in `feat(inventory)!: give items many categories`. Dependabot lands
-  `chore(deps)` and `build(deps)`.
+  use are `feat`, `fix`, `docs`, `test`, `refactor`, `style`, `perf`, `ci` and
+  `chore`. The area in parens is conventional rather than required: most commits
+  carry one, every `perf` does, and bare subjects are common for `docs`, `feat` and
+  `fix`. A breaking change takes a `!` before the colon, as in
+  `feat(inventory)!: give items many categories`. Dependabot lands `chore(deps)` and
+  `build(deps)`.
 - **Keep the body short, or leave it out.** A sentence or two on why, and only when
   the subject does not already carry it. Cut anything that does not change what a
   reader will do or understand. Commits before 2026-08-09 run to several paragraphs;
@@ -103,8 +104,9 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
   rather than recalling them, for TanStack Start, TanStack Router, Better Auth and
   Drizzle above all: those four are what training data is most likely to be wrong
   about. Do not write down a version, a release cadence or a maturity level here;
-  `package.json` is the only copy of any of that which cannot go stale. Naming a
-  major line is fine where it identifies the thing, as "Tailwind v4" does.
+  `package.json` carries the versions and cannot go stale; cadence and maturity are
+  not facts this repo should be recording at all. Naming a major line is fine where it
+  identifies the thing, as "Tailwind v4" does.
   `docs/QUIRKS.md` outranks upstream docs wherever the two disagree about this
   codebase.
 - **Import `createServerFn` from `@tanstack/react-start`.** The bare
