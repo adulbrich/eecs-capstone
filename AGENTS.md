@@ -23,13 +23,21 @@ npm run typecheck  # tsc --noEmit
 npm test           # unit tests only
 ```
 
-All three must be clean. CI (`.github/workflows/ci.yml`) enforces check, typecheck,
-test, and build, so a red local run is a red PR.
+All three must be clean, because a red local run is a red PR. The `verify` job in
+`.github/workflows/ci.yml` runs those three plus `npm run build` and
+`npm run check:compression`.
 
-`npm test` deliberately excludes the integration and accessibility suites. Run
-`npm run test:integration` (needs docker Postgres up) and `npm run test:accessibility`
-when your change touches the database layer or the UI. Other scripts live in
+`npm test` excludes the integration and accessibility suites to keep the unit run fast.
+Both have their own CI jobs and run on every pull request, so "it passed locally" is not
+the question; run `npm run test:integration` (needs docker Postgres and RustFS up, see
+`docker compose`) and `npm run test:accessibility` yourself when your change touches the
+database layer or the UI, rather than finding out from CI. Other scripts live in
 `package.json`.
+
+The branch ruleset decides which of the three jobs can block a merge, and it is the
+source of truth rather than this file. Check it with
+`gh api repos/adulbrich/eecs-capstone/rulesets` before assuming a green PR was fully
+gated.
 
 ## Always
 
@@ -41,7 +49,8 @@ when your change touches the database layer or the UI. Other scripts live in
 - **Commit messages use Conventional Commits with a lowercase imperative subject:**
   `fix(projects): stop the proposer field lying about pending changes`. The types in
   use are `feat`, `fix`, `docs`, `test`, `refactor`, and `style`, each with the
-  affected area in parentheses.
+  affected area in parentheses. Dependabot also lands `chore(deps)` and `build(deps)`;
+  you should not need either.
 - **Keep the body short, or leave it out.** A sentence or two on why, and only when
   the subject does not already carry it. Cut anything that does not change what a
   reader will do or understand. Commits before 2026-08-09 run to several paragraphs;
@@ -73,9 +82,11 @@ when your change touches the database layer or the UI. Other scripts live in
   acting on it: a review agent reads a branch, not your intent, and will sometimes be
   confidently wrong about what exists.
 - **Check the docs for the fast-moving libraries with the context7 MCP server**
-  rather than recalling them. TanStack Start is pre-v1, and Better Auth and Drizzle
-  both move faster than training data. `docs/QUIRKS.md` outranks upstream docs
-  wherever the two disagree about this codebase.
+  rather than recalling them. Drizzle is still pre-1.0, and TanStack Start and Better
+  Auth both ship rapid minor releases, so all three move faster than training data.
+  Do not quote version numbers in this file; read them from `package.json`, which is
+  the only copy that cannot go stale. `docs/QUIRKS.md` outranks upstream docs wherever
+  the two disagree about this codebase.
 - **Import `createServerFn` from `@tanstack/react-start`.** The bare
   `@tanstack/start` package is not what this project uses.
 
