@@ -16,6 +16,18 @@
  *
  * Adding an endpoint means adding its line. Answer what it should allow. Do
  * not copy the level of the entry above it.
+ *
+ * Two constraints the notes carry, because they are what the levels protect
+ * rather than properties of the levels themselves:
+ *
+ * - `proposerEmail` is the private link key. It joins a project to an account
+ *   that may not exist yet, so it is an address someone was invited by rather
+ *   than one they published. Stripped from public reads; the endpoints that
+ *   return it are staff or above.
+ * - `contactEmail` is a separate, manually entered, publicly visible field.
+ *
+ * The two are easy to confuse and confusing them fails in one direction only,
+ * so the notes name which is which wherever both are in play.
  */
 
 export type AccessLevel =
@@ -135,7 +147,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/inventory.ts:submitCart": { level: "authenticated" },
   "server/inventory.ts:transitionInventoryItem": {
     level: "staff",
-    note: "The handler carries only requireUser(). The staff gate is the assertStaff in assertTransitionAllowed (src/lib/inventory-workflow.ts), reached through transitionItem, and the schema deliberately omits `authority` so a signed-in user cannot supply one. See the transitionSchema docblock.",
+    note: "The handler carries only requireUser(). The staff gate is the assertStaff in assertAuthorized (src/lib/inventory-workflow.ts), reached through transitionItem and assertTransitionAllowed, and the schema deliberately omits `authority` so a signed-in user cannot supply one. See the transitionSchema docblock.",
   },
   "server/inventory.ts:updateInventoryItem": { level: "staff" },
   "server/inventory.ts:uploadInventoryImage": { level: "staff" },
@@ -173,12 +185,18 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     note: "Narrows to owner-or-staff only when a project id is supplied: reviewProjectAs runs canEditProject inside `if (input.projectId)`, and the id is optional because the submission page reviews a proposal with no row yet. With no id the gate is requireUser() plus assertReviewWithinLimit, which is what bounds spend on a paid endpoint now that ownership no longer does.",
   },
 
-  "server/projects-queries.ts:exportAdminProjects": { level: "staff" },
+  "server/projects-queries.ts:exportAdminProjects": {
+    level: "staff",
+    note: "Widens projectSummarySelect with proposer identity and contactEmail. Staff is the level keeping proposerEmail out of a public read.",
+  },
   "server/projects-queries.ts:getProject": {
     level: "public",
-    note: "canSeeProject decides, so a draft 404s for a stranger. Status history and staff fields are withheld separately.",
+    note: "canSeeProject decides, so a draft 404s for a stranger. Status history and staff fields are withheld separately. The projection carries contactEmail, which is manually entered and publicly visible by design, and must never carry proposerEmail.",
   },
-  "server/projects-queries.ts:getProposerForEdit": { level: "staff" },
+  "server/projects-queries.ts:getProposerForEdit": {
+    level: "staff",
+    note: "The endpoint that exists to return proposerEmail, the private link key that joins a project to an account which may not exist yet. Staff only, and it must not widen: leaking it exposes the address a proposer was invited by, not one they chose to publish.",
+  },
   "server/projects-queries.ts:listAdminProjects": { level: "staff" },
   "server/projects-queries.ts:listMyProjects": {
     level: "authenticated",

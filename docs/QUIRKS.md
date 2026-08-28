@@ -507,14 +507,11 @@ turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
 
 ### Every server function declares its access level
 
-There is no global middleware. Each `createServerFn` endpoint is independently HTTP-reachable and carries its own authorization or carries none, and the gate is spelled three ways that no grep can tell apart. That is how `getProgram` and `listEligibleInstructors` returned every admin's and instructor's id, name, email and role to anonymous callers for three months, against a design doc that said staff only (#103, #108).
+There is no global middleware, and the gate is spelled three ways that no grep can tell apart. That is how two endpoints returned every admin's and instructor's email to anonymous callers for three months (#103, #108).
 
-So the level is declared, not detected. `src/server/__tests__/access-contract.ts` carries one line per endpoint and explains the reasoning; read it there rather than here, so there is one copy to keep true. `access-contract.test.ts` fails if an endpoint exists with no line, if a line names an endpoint that does not, or if the set of endpoints declared `public` changes. Adding an endpoint means adding its line: answer what it should allow rather than copying the level above it.
+So the level is declared, not detected, in `src/server/__tests__/access-contract.ts`. That file carries one line per endpoint plus the reasoning; read it there, so there is one copy to keep true. Its test fails if an endpoint exists with no line, if a line names an endpoint that does not exist, if the set declared `public` changes, or if a `createServerFn` call appears in a shape the scan cannot parse. That last one is the load-bearing check: two legal shapes, a type annotation and a line break before the initializer, were invisible until it was added.
 
-Two things worth knowing before you read the table:
-
-- **It records the effective level, not the gate's.** Five of the seven project transition endpoints pass a gate that admits the proposer and are staff-only anyway, because `TRANSITIONS` in `src/lib/project-workflow.ts` decides per role. Two separate reasons: `approved`, `published` and `archived` list no `owner` key at all, and `approve` and `requestChanges` are unreachable for an owner because the owner arms of `draft`, `submitted` and `changes_requested` do not name those targets. Only `submitProject` and `returnToDraft` are genuinely owner-reachable.
-- **It covers all of `src`, not just `src/server`.** The scan was narrower once and missed `lib/auth-guards.ts:getSession`, which is as reachable as any of the others.
+Two things the table does that are easy to misread. It records the **effective** level, so five project transition endpoints are `staff` even though their gate admits the proposer, because `TRANSITIONS` in `src/lib/project-workflow.ts` decides per role. And it covers all of `src`, not just `src/server`, because the narrow scan missed `lib/auth-guards.ts:getSession`.
 
 ### Path-by-path convention summary
 

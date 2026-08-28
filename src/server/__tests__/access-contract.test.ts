@@ -7,24 +7,28 @@ import { ACCESS_CONTRACT } from "./access-contract";
  * Holds `access-contract.ts` to the code. It infers no endpoint's access level:
  * inferring is what #108 rules out, because a grep for the guard names
  * mislabelled seven of seventeen endpoints and could not tell a correctly
- * ungated public read from a gate it failed to recognise.
+ * ungated public read from a gate it failed to recognize.
  *
- * What it enforces is that the two lists agree, so a new endpoint cannot ship
- * without someone answering what it allows, plus one assertion on the declared
- * levels themselves. See the `public` case below for why only that one.
+ * What it enforces is that the two lists name the same endpoints, so a new one
+ * cannot ship without someone answering what it allows.
  */
 
 const SRC_DIR = join(process.cwd(), "src");
 
 /**
- * `^export const <name> = createServerFn`. Anchored to the line start on
- * purpose, and safe to anchor: `docs/QUIRKS.md` records that TanStack Start's
- * bundler transform recognises `createServerFn` only as the direct initializer
- * of a top-level exported const, and ships the handler body to the browser in
- * any other shape. So the framework itself rejects the declarations this would
- * miss.
+ * `export const <name> = createServerFn`, allowing a type annotation and a line
+ * break before the initializer. Both of those shapes are legal and both were
+ * invisible to the first version of this pattern, which is why the
+ * reconciliation below exists rather than trust in this regex.
  */
-const SERVER_FN = /^export const (\w+) = createServerFn/gm;
+const ENDPOINT_DECLARATION =
+  /^export const (\w+)\s*(?::[^=\n]+)?=\s*createServerFn/gm;
+
+/** Any mention of the factory, wherever it appears. */
+const FACTORY_MENTION = /\bcreateServerFn\b/g;
+
+const IMPORT_LINE = /^\s*import\b/;
+const COMMENT_LINE = /^\s*(\/\/|\*|\/\*)/;
 
 /** Test files declare no endpoints, and `node_modules` is not ours. */
 const SKIP_DIRS = new Set(["__tests__", "node_modules"]);
@@ -44,20 +48,35 @@ function typeScriptFilesUnder(dir: string): string[] {
   return found;
 }
 
+/** Mentions that should correspond to a declaration: not imports, not prose. */
+function factoryMentions(source: string): number {
+  const code = source
+    .split("\n")
+    .filter((line) => !(IMPORT_LINE.test(line) || COMMENT_LINE.test(line)))
+    .join("\n");
+  return code.match(FACTORY_MENTION)?.length ?? 0;
+}
+
 /**
  * Every endpoint in `src`, not just `src/server`. The narrower scan missed
  * `lib/auth-guards.ts:getSession`, which is as reachable as any of the others,
  * and would have missed anything added in a subdirectory.
  */
-function liveEndpoints(): string[] {
-  const found: string[] = [];
+function scanEndpoints(): { declared: string[]; mentions: number } {
+  const declared: string[] = [];
+  let mentions = 0;
   for (const file of typeScriptFilesUnder(SRC_DIR)) {
     const source = readFileSync(file, "utf8");
-    for (const match of source.matchAll(SERVER_FN)) {
-      found.push(`${relative(SRC_DIR, file)}:${match[1]}`);
+    mentions += factoryMentions(source);
+    for (const match of source.matchAll(ENDPOINT_DECLARATION)) {
+      declared.push(`${relative(SRC_DIR, file)}:${match[1]}`);
     }
   }
-  return found.sort();
+  return { declared: declared.sort(), mentions };
+}
+
+function liveEndpoints(): string[] {
+  return scanEndpoints().declared;
 }
 
 function declaredAt(level: string): string[] {
@@ -68,6 +87,22 @@ function declaredAt(level: string): string[] {
 }
 
 describe("the server function access contract", () => {
+  it("accounts for every use of createServerFn, not just the ones it can parse", () => {
+    // The guard that makes the other assertions trustworthy, and the one this
+    // file was missing. Both of the assertions below compare the declaration
+    // list against ACCESS_CONTRACT, so an endpoint the regex cannot see is not
+    // "undeclared", it is absent from both sides and reports nothing. Two real
+    // shapes slipped through that way: a type annotation
+    // (`export const x: unknown = createServerFn(...)`) and a line break before
+    // the initializer.
+    //
+    // Counting mentions instead means any shape the pattern does not parse is a
+    // failure rather than a silence. If this goes red, widen
+    // ENDPOINT_DECLARATION; do not add the endpoint to an ignore list.
+    const { declared, mentions } = scanEndpoints();
+    expect(declared.length).toBe(mentions);
+  });
+
   it("declares a level for every endpoint that exists", () => {
     const undeclared = liveEndpoints().filter(
       (endpoint) => !(endpoint in ACCESS_CONTRACT)
@@ -76,11 +111,6 @@ describe("the server function access contract", () => {
   });
 
   it("declares no endpoint that has been removed or renamed", () => {
-    // Also the guard against a regex that stops matching: if SERVER_FN breaks,
-    // `liveEndpoints()` returns nothing and every declaration reports here as
-    // stale, which is loud and names the problem. No separate count assertion
-    // is needed, and a vague one ("more than 80 found") would pass while six
-    // endpoints went missing.
     const live = new Set(liveEndpoints());
     const stale = Object.keys(ACCESS_CONTRACT).filter(
       (endpoint) => !live.has(endpoint)
@@ -89,14 +119,14 @@ describe("the server function access contract", () => {
   });
 
   it("keeps the public surface to exactly these endpoints", () => {
-    // The one assertion that reads a declared level, and the reason the levels
-    // are not inert data. `public` is the only level where a careless
-    // declaration is itself the bug: every other value fails closed if it is
-    // too generous by one step, but a wrong `public` ships the data.
+    // A speed bump rather than a check: it compares two literals and reads no
+    // source, so it cannot tell you a level is wrong. What it does is make
+    // widening the public surface cost a second, visible edit, on the one level
+    // where a careless declaration is itself the bug. Every other value fails
+    // closed when it is too generous by a step; a wrong `public` ships the data.
     //
-    // Adding one means editing this list too, which is a line a reviewer sees.
-    // If you are here because the test failed, the question to answer is
-    // whether the new endpoint should be reachable with no session at all.
+    // If you are here because this failed, the question is whether the new
+    // endpoint should be reachable with no session at all.
     expect(declaredAt("public")).toEqual([
       "lib/auth-guards.ts:getSession",
       "server/categories.ts:getCategory",
