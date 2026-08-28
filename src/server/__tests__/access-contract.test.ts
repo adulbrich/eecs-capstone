@@ -109,31 +109,62 @@ describe("the scan the contract is checked with", () => {
     expect(unparsed).toEqual([]);
   });
 
-  it("leaves no endpoint in neither list", () => {
-    // Each of these is a use the scan does not turn into a declared endpoint.
-    // None of them may go quiet: an unrecognized use fails the first assertion
-    // in this file by name and line, which is the whole point of that guard.
-    const shapes = [
-      // Namespace import, so the call is a property access rather than a call
-      // of a bound name.
-      'import * as start from "@tanstack/react-start";\n' +
-        "export const a = start.createServerFn().handler(() => []);\n",
-      // Declared, then exported in a separate statement the scan does not walk.
-      'import { createServerFn } from "@tanstack/react-start";\n' +
-        "const a = createServerFn().handler(() => []);\nexport { a };\n",
-      // Default export, which carries no name to key a declaration on.
-      'import { createServerFn } from "@tanstack/react-start";\n' +
-        "export default createServerFn().handler(() => []);\n",
-      // Wrapped, so the exported binding is the wrapper's return value.
-      'import { createServerFn } from "@tanstack/react-start";\n' +
-        "export const a = wrap(createServerFn().handler(() => []));\n",
+  it("reports every other shape rather than passing it over", () => {
+    // Each of these is a use the scan does not turn into a declared endpoint,
+    // and none of them may go quiet: an unrecognized use fails the first
+    // assertion in this file by name and line.
+    //
+    // Asserting the exact pair, not that the two lists sum to one. A sum is
+    // satisfied by the inverse too, so widening the search to recurse into call
+    // arguments would move `wrap(...)` from reported to declared, leave the sum
+    // at one, and quietly key a contract line on an endpoint whose gate belongs
+    // to `wrap`.
+    const shapes: [string, string][] = [
+      [
+        "namespace import, so the call is a property access, not a bound name",
+        'import * as start from "@tanstack/react-start";\n' +
+          "export const a = start.createServerFn().handler(() => []);\n",
+      ],
+      [
+        "declared, then exported in a separate statement the scan does not walk",
+        'import { createServerFn } from "@tanstack/react-start";\n' +
+          "const a = createServerFn().handler(() => []);\nexport { a };\n",
+      ],
+      [
+        "default export, which carries no name to key a declaration on",
+        'import { createServerFn } from "@tanstack/react-start";\n' +
+          "export default createServerFn().handler(() => []);\n",
+      ],
+      [
+        "wrapped, so the exported binding is the wrapper's return value",
+        'import { createServerFn } from "@tanstack/react-start";\n' +
+          "export const a = wrap(createServerFn().handler(() => []));\n",
+      ],
+      [
+        "import-equals, which binds a name without being a module import",
+        'import * as start from "@tanstack/react-start";\n' +
+          "import make = start.createServerFn;\n" +
+          "export const a = make().handler(() => []);\n",
+      ],
+      [
+        "computed access, which hides the name from an identifier visitor",
+        'import * as start from "@tanstack/react-start";\n' +
+          'const make = start["createServerFn"];\n' +
+          "export const a = make().handler(() => []);\n",
+      ],
+      [
+        "imported from somewhere that is not the real module",
+        'import { createServerFn } from "./not-tanstack";\n' +
+          "export const a = createServerFn().handler(() => []);\n",
+      ],
     ];
 
-    for (const source of shapes) {
+    for (const [what, source] of shapes) {
       const { declared, unparsed } = scanOf(source);
-      expect({ source, seen: declared.length + unparsed.length }).toEqual({
-        source,
-        seen: 1,
+      expect({ declared, unparsed, what }).toEqual({
+        declared: [],
+        unparsed: [expect.any(Number)],
+        what,
       });
     }
   });

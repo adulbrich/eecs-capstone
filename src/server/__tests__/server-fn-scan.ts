@@ -30,9 +30,14 @@ const SRC_DIR = join(process.cwd(), "src");
 const FACTORY = "createServerFn";
 
 /**
- * `node_modules` is not ours, and `__tests__` holds no endpoints. `src/test/` is
- * deliberately still scanned: it is test infrastructure rather than test cases,
- * and an endpoint declared there would be as reachable as any other.
+ * `node_modules` is not ours. `__tests__` is skipped because nothing imports it
+ * into the app's module graph, so an endpoint written there is never built into
+ * the server bundle and is not reachable over HTTP. That is the reason, rather
+ * than an assumption that no such file would ever contain one.
+ *
+ * `src/test/` is deliberately still scanned: it is test infrastructure that the
+ * app can import, so an endpoint declared there would be as reachable as any
+ * other.
  */
 const SKIP_DIRS = new Set(["__tests__", "node_modules"]);
 const SOURCE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts"];
@@ -53,24 +58,36 @@ function typeScriptFilesUnder(dir: string): string[] {
 }
 
 /**
- * Every name `createServerFn` is bound to in this file. An import may rename it,
- * and an alias was the one shape that escaped both halves of this check: the
- * scan compared identifier text against `createServerFn`, so `make()` declared
- * no endpoint, and the unrecognized-use guard suppresses everything inside an
- * import declaration, so the sole occurrence of the real name raised nothing
- * either. An endpoint could ship undeclared with all four assertions green.
+ * The names this file binds `createServerFn` to, taken from its imports of
+ * `@tanstack/react-start`. An import may rename it, and an alias was the one
+ * shape that escaped both halves of this check: the scan compared identifier
+ * text against `createServerFn`, so `make()` declared no endpoint, and the
+ * unrecognized-use guard suppresses everything inside an import declaration, so
+ * the sole occurrence of the real name raised nothing either. An endpoint could
+ * ship undeclared with all four assertions green.
  *
- * `FACTORY` itself stays in the set unconditionally. A namespace import calling
- * `ns.createServerFn()`, or a local declaration of that name, is then still
- * reported as unrecognized rather than passing silently, which is what the
- * guard is for.
+ * The module is part of the test, not decoration. Without it
+ * `import { chunk as createServerFn } from "lodash"` binds the name this scan
+ * keys on to a foreign function, and every call of it would be declared an
+ * endpoint that does not exist. It is also the import `AGENTS.md` requires, so
+ * a file reaching for the deprecated `@tanstack/start` fails here rather than
+ * scanning clean.
  */
+const FACTORY_MODULE = "@tanstack/react-start";
+
 function factoryNames(sourceFile: ts.SourceFile): Set<string> {
-  const names = new Set([FACTORY]);
+  const names = new Set<string>();
   for (const statement of sourceFile.statements) {
-    const bindings = ts.isImportDeclaration(statement)
-      ? statement.importClause?.namedBindings
-      : undefined;
+    if (
+      !(
+        ts.isImportDeclaration(statement) &&
+        ts.isStringLiteral(statement.moduleSpecifier) &&
+        statement.moduleSpecifier.text === FACTORY_MODULE
+      )
+    ) {
+      continue;
+    }
+    const bindings = statement.importClause?.namedBindings;
     if (!(bindings && ts.isNamedImports(bindings))) {
       continue;
     }
@@ -120,9 +137,15 @@ function isExported(statement: ts.VariableStatement): boolean {
   );
 }
 
+/**
+ * Only an `import ... from` declaration, deliberately. `import make =
+ * ns.createServerFn` also parses as an import, and suppressing it put that
+ * binding in neither list: not declared, not reported. It is contrived, but the
+ * guard's whole claim is that nothing goes quiet.
+ */
 function withinImport(node: ts.Node): boolean {
   for (let n: ts.Node | undefined = node; n; n = n.parent) {
-    if (ts.isImportDeclaration(n) || ts.isImportEqualsDeclaration(n)) {
+    if (ts.isImportDeclaration(n)) {
       return true;
     }
   }
@@ -191,11 +214,22 @@ export function scanFile(file: string, source: string) {
 
   const unparsed: number[] = [];
   const visit = (node: ts.Node) => {
-    if (
-      ts.isIdentifier(node) &&
-      names.has(node.text) &&
-      !(withinImport(node) || accounted.has(node))
-    ) {
+    // Two ways to be unrecognized. A bound name that no exported declaration
+    // turned into an endpoint is a use this scan could not read. The literal
+    // `createServerFn` reached any other way (a namespace import calling
+    // `ns.createServerFn()`, an import from some other module, a local of that
+    // name) is not a binding at all, and is reported rather than declared: a
+    // wrong endpoint in the contract is worse than a loud one out of it.
+    const suspicious = ts.isIdentifier(node)
+      ? (names.has(node.text) || node.text === FACTORY) &&
+        !(withinImport(node) || accounted.has(node))
+      : // `ns["createServerFn"]` puts the name in a string, where an identifier
+        // visitor never sees it. Only as an element access: a plain string
+        // holding this name is prose, and this file's own tests are full of it.
+        ts.isStringLiteral(node) &&
+        node.text === FACTORY &&
+        ts.isElementAccessExpression(node.parent);
+    if (suspicious) {
       unparsed.push(
         sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
           .line + 1

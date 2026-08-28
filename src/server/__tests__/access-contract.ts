@@ -53,6 +53,14 @@ interface AccessDeclaration {
   note?: string;
 }
 
+/**
+ * Shared because two endpoints return the same projection, and this file's one
+ * proven failure mode is a note drifting from the code it describes. Two copies
+ * of a claim this specific is two chances to correct only one of them.
+ */
+const PUBLIC_ITEM_VIEW_NOTE =
+  "The projection branches on isStaff, not on having a session, so anonymous and signed-in non-staff callers get the same public view and only staff see more. publicItemView omits holder identity, serial, label, location and notes.";
+
 export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/admin.ts:getAdminStats": {
     level: "staff",
@@ -119,11 +127,11 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/inventory.ts:getCart": { level: "authenticated" },
   "server/inventory.ts:getInventoryItem": {
     level: "public",
-    note: "The projection branches on isStaff, not on having a session, so anonymous and signed-in non-staff callers get the same public view and only staff see more. publicItemView omits holder identity, serial, label, location and notes.",
+    note: PUBLIC_ITEM_VIEW_NOTE,
   },
   "server/inventory.ts:getInventoryItemDetail": {
     level: "public",
-    note: "The projection branches on isStaff, not on having a session, so anonymous and signed-in non-staff callers get the same public view and only staff see more. publicItemView omits holder identity, serial, label, location and notes.",
+    note: PUBLIC_ITEM_VIEW_NOTE,
   },
   "server/inventory.ts:hardDeleteInventoryItem": { level: "staff" },
   "server/inventory.ts:listAdminInventory": {
