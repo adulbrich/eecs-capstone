@@ -27,7 +27,11 @@ const SRC_DIR = join(process.cwd(), "src");
 
 const FACTORY = "createServerFn";
 
-/** Test files declare no endpoints, and `node_modules` is not ours. */
+/**
+ * `node_modules` is not ours, and `__tests__` holds no endpoints. `src/test/` is
+ * deliberately still scanned: it is test infrastructure rather than test cases,
+ * and an endpoint declared there would be as reachable as any other.
+ */
 const SKIP_DIRS = new Set(["__tests__", "node_modules"]);
 const SOURCE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts"];
 
@@ -48,17 +52,27 @@ function typeScriptFilesUnder(dir: string): string[] {
 
 /**
  * Walk down `createServerFn({...}).inputValidator(...).handler(...)` to the
- * identifier the chain is rooted in.
+ * identifier the chain is rooted in, and return it only if the chain actually
+ * calls it. `createServerFn.mock()` and a bare `export const x = createServerFn`
+ * both reach the identifier without calling it, and neither is an endpoint.
  */
-function chainRoot(node: ts.Node): ts.Node {
-  let current = node;
-  while (
-    ts.isCallExpression(current) ||
-    ts.isPropertyAccessExpression(current)
-  ) {
-    current = current.expression;
+function calledFactory(node: ts.Node): ts.Identifier | undefined {
+  let current: ts.Node = node;
+  while (true) {
+    if (ts.isCallExpression(current)) {
+      if (
+        ts.isIdentifier(current.expression) &&
+        current.expression.text === FACTORY
+      ) {
+        return current.expression;
+      }
+      current = current.expression;
+    } else if (ts.isPropertyAccessExpression(current)) {
+      current = current.expression;
+    } else {
+      return;
+    }
   }
-  return current;
 }
 
 function isExported(statement: ts.VariableStatement): boolean {
@@ -87,25 +101,37 @@ function scanFile(file: string, source: string) {
     file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
   );
 
+  // A file the parser could not read yields an empty tree, which every
+  // assertion below would read as "nothing here" rather than as a problem.
+  // `npm run typecheck` catches this first in CI, but a check that can quietly
+  // examine nothing is the defect this whole file exists to remove.
+  const parseErrors = (
+    sourceFile as unknown as { parseDiagnostics?: unknown[] }
+  ).parseDiagnostics;
+  if (parseErrors && parseErrors.length > 0) {
+    throw new Error(
+      `${file} did not parse, so its endpoints cannot be read. Fix the syntax error; typecheck will name it.`
+    );
+  }
+
   const declared: string[] = [];
-  const accepted: [number, number][] = [];
+  // The exact identifier nodes an endpoint declaration is built on, not their
+  // positions. A span would clear every other use inside the same statement,
+  // and `export const a = createServerFn()..., b = wrap(createServerFn()...)`
+  // then loses `b` from both the declared list and the unrecognized one.
+  const accounted = new Set<ts.Node>();
 
   for (const statement of sourceFile.statements) {
     if (!(ts.isVariableStatement(statement) && isExported(statement))) {
       continue;
     }
     for (const declaration of statement.declarationList.declarations) {
-      const root = declaration.initializer
-        ? chainRoot(declaration.initializer)
+      const factory = declaration.initializer
+        ? calledFactory(declaration.initializer)
         : undefined;
-      if (
-        root &&
-        ts.isIdentifier(root) &&
-        root.text === FACTORY &&
-        ts.isIdentifier(declaration.name)
-      ) {
+      if (factory && ts.isIdentifier(declaration.name)) {
         declared.push(declaration.name.text);
-        accepted.push([statement.getStart(sourceFile), statement.end]);
+        accounted.add(factory);
       }
     }
   }
@@ -115,10 +141,7 @@ function scanFile(file: string, source: string) {
     if (
       ts.isIdentifier(node) &&
       node.text === FACTORY &&
-      !withinImport(node) &&
-      !accepted.some(
-        ([from, to]) => node.getStart(sourceFile) >= from && node.end <= to
-      )
+      !(withinImport(node) || accounted.has(node))
     ) {
       unparsed.push(
         sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
@@ -134,7 +157,7 @@ function scanFile(file: string, source: string) {
 
 let cached: { declared: string[]; unparsed: string[] } | undefined;
 
-/** Parsing every file is ~40ms, and three assertions want the same answer. */
+/** Parsing every file costs about 250ms, and four assertions want the answer. */
 function scan() {
   if (cached) {
     return cached;
