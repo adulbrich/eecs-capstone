@@ -207,9 +207,7 @@ function UsersAdmin() {
 
   const { tableProps } = useAdminTable({
     columns: COLUMNS,
-    data: rows,
     defaultSort: DEFAULT_SORT,
-    getRowId: (row) => row.id,
     navigate,
     // The server paginates this table, so a sort change re-queries a newly
     // ordered set and the page the reader was on no longer names the same
@@ -260,7 +258,9 @@ function UsersAdmin() {
           />
         }
         caption="Users"
+        data={rows}
         emptyMessage="No users in this view."
+        getRowId={(row) => row.id}
         {...tableProps}
         toolbar={
           <>

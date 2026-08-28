@@ -16,12 +16,9 @@ type AdminNavigate = (opts: {
   search: (prev: Record<string, unknown>) => Record<string, unknown>;
 }) => unknown;
 
-interface UseAdminTableOptions<TRow, TColumn extends AdminTableStateColumn> {
+interface UseAdminTableOptions<TColumn extends AdminTableStateColumn> {
   columns: TColumn[];
-  /** The rows to render. Also what fixes `TRow` for `getRowId`. */
-  data: TRow[];
   defaultSort: SortState;
-  getRowId: (row: TRow) => string;
   /**
    * The route's own `useNavigate({ from })` result. Taken as an argument
    * rather than called here: `useNavigate` is generic over the route tree, so
@@ -63,18 +60,22 @@ interface UseAdminTableOptions<TRow, TColumn extends AdminTableStateColumn> {
  * `storageKey` writes preferences under one key and clears them under
  * another, a mismatched `defaultSort` makes the URL and the rendered order
  * disagree. Named once here, they cannot disagree.
+ *
+ * `serverSorted` is the one option this hook takes and never reads: it is
+ * passed straight through to the table. It stays because it belongs to the
+ * same prop bag as everything else the table needs, not because anything here
+ * would break without it. Contrast `resetPageOnSort`, which this hook reads and
+ * never forwards: the table has no such prop.
  */
-export function useAdminTable<TRow, TColumn extends AdminTableStateColumn>({
+export function useAdminTable<TColumn extends AdminTableStateColumn>({
   columns,
-  data,
   defaultSort,
-  getRowId,
   navigate,
   resetPageOnSort,
   search,
   serverSorted,
   storageKey,
-}: UseAdminTableOptions<TRow, TColumn>) {
+}: UseAdminTableOptions<TColumn>) {
   const setSearch = useCallback(
     (patch: AdminTableSearch) =>
       void navigate({
@@ -121,9 +122,9 @@ export function useAdminTable<TRow, TColumn extends AdminTableStateColumn>({
    * A no-op under `serverSorted`, where the rows already arrived ordered and
    * the table reports no ids.
    *
-   * Generic over its own row type rather than reusing `TRow`: an export is a
-   * wider projection of the same records under the same filters, keyed by the
-   * same id but not the same shape.
+   * Generic over its own row type rather than over the table's: an export is
+   * a wider projection of the same records under the same filters, keyed by
+   * the same id but not the same shape.
    */
   const orderRows = useCallback(
     <TExport>(rows: readonly TExport[], getId: (row: TExport) => string) =>
@@ -135,9 +136,7 @@ export function useAdminTable<TRow, TColumn extends AdminTableStateColumn>({
     orderRows,
     tableProps: {
       columns,
-      data,
       defaultSort,
-      getRowId,
       hidden,
       onHiddenChange,
       onSortChange,

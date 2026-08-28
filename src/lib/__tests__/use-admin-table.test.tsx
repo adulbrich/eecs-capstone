@@ -6,16 +6,13 @@ import { useAdminTable } from "../use-admin-table";
 
 const COLUMNS = [{ id: "name" }, { id: "createdAt" }];
 const DEFAULT_SORT: SortState = { desc: false, id: "name" };
-const ROWS = [{ id: "r1" }];
 
 function setup(extra: { resetPageOnSort?: boolean } = {}) {
   const navigate = vi.fn();
   const { result } = renderHook(() =>
     useAdminTable({
       columns: COLUMNS,
-      data: ROWS,
       defaultSort: DEFAULT_SORT,
-      getRowId: (row: { id: string }) => row.id,
       navigate,
       search: {},
       storageKey: "test-table",
@@ -95,7 +92,6 @@ describe("useAdminTable", () => {
 
     expect(result.current.tableProps).toMatchObject({
       columns: COLUMNS,
-      data: ROWS,
       defaultSort: DEFAULT_SORT,
       storageKey: "test-table",
     });
