@@ -23,8 +23,9 @@ export type ReviewOutcome = "ok" | "truncated" | "failed";
 
 /**
  * Read on every call rather than captured at import, so a test can set a low
- * limit and an operator can change one without a code change. Same reason
- * `embeddingsEnabled()` is a function.
+ * limit and an operator can change one without a code change; both variables
+ * are plumbed through `infra/ecs.tf`. `embeddingsEnabled()` is a function for
+ * the first reason only: it is not plumbed, so it is not operator-facing.
  */
 export function reviewLimits(
   env: NodeJS.ProcessEnv = process.env

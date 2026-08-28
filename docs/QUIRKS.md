@@ -405,6 +405,14 @@ pass: `DATABASE_URL= npm test`. The check is falsy, so an empty value fails the
 same way an absent one does, and dotenv will not overwrite a variable that is
 already set.
 
+### The integration suite refuses to run with embeddings enabled
+
+`vitest.integration.config.ts` sets `BEDROCK_EMBEDDINGS_ENABLED=false` in its `env` block, and `src/test/setup.integration.ts` throws at collection if that did not arrive. Unset counts as enabled, because `embeddingsEnabled()` treats anything but that exact string as on, so a deleted config line is enough to trip it. Fix the config, not your environment.
+
+It exists because a fail-open is expensive rather than merely wrong: the call reaches the AWS SDK, which walks the credential chain and pays an IMDS probe with retries, so it presents as a slow flaky test rather than a configuration error. See #22, which records that link as a hypothesis rather than a confirmed cause.
+
+The switch lives in `src/lib/_internal/embeddings-flag.ts` rather than beside the adapter, so reading it costs no `@aws-sdk/client-bedrock-runtime` import. `test.env` beats the shell, so `BEDROCK_EMBEDDINGS_ENABLED=true npm run test:integration` does not override the config.
+
 ### Vitest 4 `poolOptions` moved
 
 Older docs show `test.poolOptions.forks.singleFork: true`. Vitest 4 removed that path. Use top-level `test.fileParallelism: false` instead.
