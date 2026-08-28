@@ -437,7 +437,7 @@ Before #93 each route inlined the reducer against its own `useNavigate({ from })
 TanStack Router checked the merged object against that route's `validateSearch` output.
 The hook now types it `Record<string, unknown>` and nothing checks it.
 
-No bug today: the `resetPageOnSort` branch at `use-admin-table.ts:87` is opt-in and only
+No bug today: the `resetPageOnSort` branch at `use-admin-table.ts:85` is opt-in and only
 `/admin/users` opts in, whose schema does declare `page`. What is gone is the compiler
 stopping the next route from opting in without one.
 
