@@ -10,9 +10,10 @@
  * `listEligibleInstructors` returned every admin's and instructor's id, name,
  * email and role to anonymous callers for three months (#103, #108).
  *
- * So the level is declared here rather than detected from code shape, and
- * `access-contract.test.ts` fails if an endpoint exists with no line or a line
- * names an endpoint that does not exist.
+ * So the level is declared here rather than detected from code shape.
+ * `access-contract.test.ts` fails if a use of `createServerFn` cannot be
+ * parsed, if an endpoint exists with no line, if a line names an endpoint that
+ * does not exist, or if the set declared `public` changes.
  *
  * Adding an endpoint means adding its line. Answer what it should allow. Do
  * not copy the level of the entry above it.
@@ -197,7 +198,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "staff",
     note: "The endpoint that exists to return proposerEmail, the private link key that joins a project to an account which may not exist yet. Staff only, and it must not widen: leaking it exposes the address a proposer was invited by, not one they chose to publish.",
   },
-  "server/projects-queries.ts:listAdminProjects": { level: "staff" },
+  "server/projects-queries.ts:listAdminProjects": {
+    level: "staff",
+    note: "Reads adminProjectSummarySelect, so it carries proposerEmail and contactEmail both. Staff is what keeps the first out of a public read.",
+  },
   "server/projects-queries.ts:listMyProjects": {
     level: "authenticated",
     note: "Scoped to the viewer's own proposals.",

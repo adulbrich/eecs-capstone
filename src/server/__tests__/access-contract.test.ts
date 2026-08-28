@@ -9,29 +9,26 @@ import { ACCESS_CONTRACT } from "./access-contract";
  * mislabelled seven of seventeen endpoints and could not tell a correctly
  * ungated public read from a gate it failed to recognize.
  *
- * What it enforces is that the two lists name the same endpoints, so a new one
- * cannot ship without someone answering what it allows.
+ * What it enforces is that the two lists name the same endpoints, that no use
+ * of `createServerFn` escapes the parser, and that the public surface is
+ * exactly the one written down.
  */
 
 const SRC_DIR = join(process.cwd(), "src");
 
 /**
  * `export const <name> = createServerFn`, allowing a type annotation and a line
- * break before the initializer. Both of those shapes are legal and both were
- * invisible to the first version of this pattern, which is why the
- * reconciliation below exists rather than trust in this regex.
+ * break before the initializer. Both are legal and both were invisible to the
+ * first version of this pattern, which is why nothing here trusts it alone.
  */
 const ENDPOINT_DECLARATION =
   /^export const (\w+)\s*(?::[^=\n]+)?=\s*createServerFn/gm;
 
-/** Any mention of the factory, wherever it appears. */
-const FACTORY_MENTION = /\bcreateServerFn\b/g;
-
-const IMPORT_LINE = /^\s*import\b/;
-const COMMENT_LINE = /^\s*(\/\/|\*|\/\*)/;
+const FACTORY = /\bcreateServerFn\b/g;
 
 /** Test files declare no endpoints, and `node_modules` is not ours. */
 const SKIP_DIRS = new Set(["__tests__", "node_modules"]);
+const SOURCE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts"];
 
 function typeScriptFilesUnder(dir: string): string[] {
   const found: string[] = [];
@@ -41,42 +38,103 @@ function typeScriptFilesUnder(dir: string): string[] {
       if (!SKIP_DIRS.has(entry.name)) {
         found.push(...typeScriptFilesUnder(full));
       }
-    } else if (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) {
+    } else if (SOURCE_EXTENSIONS.some((ext) => entry.name.endsWith(ext))) {
       found.push(full);
     }
   }
   return found;
 }
 
-/** Mentions that should correspond to a declaration: not imports, not prose. */
-function factoryMentions(source: string): number {
-  const code = source
-    .split("\n")
-    .filter((line) => !(IMPORT_LINE.test(line) || COMMENT_LINE.test(line)))
-    .join("\n");
-  return code.match(FACTORY_MENTION)?.length ?? 0;
+/**
+ * Blank out comments and string literals, preserving every offset and newline
+ * so positions and line numbers still line up with the original.
+ *
+ * Line-anchored filters were tried first and were wrong three ways: a trailing
+ * comment, a string mentioning the factory, and a wrapped multi-line import all
+ * slipped through and turned the check red on correct code.
+ */
+function maskCommentsAndStrings(source: string): string {
+  const out = source.split("");
+  let i = 0;
+  const blank = (from: number, to: number) => {
+    for (let k = from; k < to && k < out.length; k++) {
+      if (out[k] !== "\n") {
+        out[k] = " ";
+      }
+    }
+  };
+  while (i < source.length) {
+    const two = source.slice(i, i + 2);
+    if (two === "//") {
+      const end = source.indexOf("\n", i);
+      const stop = end === -1 ? source.length : end;
+      blank(i, stop);
+      i = stop;
+    } else if (two === "/*") {
+      const end = source.indexOf("*/", i + 2);
+      const stop = end === -1 ? source.length : end + 2;
+      blank(i, stop);
+      i = stop;
+    } else if (source[i] === '"' || source[i] === "'" || source[i] === "`") {
+      const quote = source[i];
+      let k = i + 1;
+      while (k < source.length && source[k] !== quote) {
+        k += source[k] === "\\" ? 2 : 1;
+      }
+      blank(i, k + 1);
+      i = k + 1;
+    } else {
+      i++;
+    }
+  }
+  return out.join("");
 }
 
 /**
- * Every endpoint in `src`, not just `src/server`. The narrower scan missed
- * `lib/auth-guards.ts:getSession`, which is as reachable as any of the others,
- * and would have missed anything added in a subdirectory.
+ * Blank import statements too. Run after masking, so the module specifier is
+ * already gone and a statement is simply `import` up to its semicolon, which is
+ * what makes a wrapped multi-line import safe to match.
  */
-function scanEndpoints(): { declared: string[]; mentions: number } {
+function maskImports(masked: string): string {
+  return masked.replace(/\bimport\b[^;]*;/g, (match) =>
+    match.replace(/[^\n]/g, " ")
+  );
+}
+
+function lineOf(source: string, index: number): number {
+  return source.slice(0, index).split("\n").length;
+}
+
+function scan() {
   const declared: string[] = [];
-  let mentions = 0;
+  const unparsed: string[] = [];
+
   for (const file of typeScriptFilesUnder(SRC_DIR)) {
     const source = readFileSync(file, "utf8");
-    mentions += factoryMentions(source);
+    const code = maskImports(maskCommentsAndStrings(source));
+    const label = relative(SRC_DIR, file);
+
+    const covered: [number, number][] = [];
     for (const match of source.matchAll(ENDPOINT_DECLARATION)) {
-      declared.push(`${relative(SRC_DIR, file)}:${match[1]}`);
+      declared.push(`${label}:${match[1]}`);
+      const start = match.index ?? 0;
+      covered.push([start, start + match[0].length]);
+    }
+
+    for (const mention of code.matchAll(FACTORY)) {
+      const at = mention.index ?? 0;
+      const parsed = covered.some(([from, to]) => at >= from && at < to);
+      if (!parsed) {
+        unparsed.push(`${label}:${lineOf(source, at)}`);
+      }
     }
   }
-  return { declared: declared.sort(), mentions };
+
+  return { declared: declared.sort(), unparsed: unparsed.sort() };
 }
 
 function liveEndpoints(): string[] {
-  return scanEndpoints().declared;
+  return scan().declared;
 }
 
 function declaredAt(level: string): string[] {
@@ -87,20 +145,16 @@ function declaredAt(level: string): string[] {
 }
 
 describe("the server function access contract", () => {
-  it("accounts for every use of createServerFn, not just the ones it can parse", () => {
-    // The guard that makes the other assertions trustworthy, and the one this
-    // file was missing. Both of the assertions below compare the declaration
-    // list against ACCESS_CONTRACT, so an endpoint the regex cannot see is not
-    // "undeclared", it is absent from both sides and reports nothing. Two real
-    // shapes slipped through that way: a type annotation
-    // (`export const x: unknown = createServerFn(...)`) and a line break before
-    // the initializer.
+  it("parses every use of createServerFn", () => {
+    // The guard that makes the other assertions trustworthy. They compare the
+    // parsed list against ACCESS_CONTRACT, so an endpoint the pattern cannot
+    // read is absent from both sides and reports nothing at all rather than
+    // reporting as undeclared. Two real shapes escaped that way: a type
+    // annotation, and a line break before the initializer.
     //
-    // Counting mentions instead means any shape the pattern does not parse is a
-    // failure rather than a silence. If this goes red, widen
-    // ENDPOINT_DECLARATION; do not add the endpoint to an ignore list.
-    const { declared, mentions } = scanEndpoints();
-    expect(declared.length).toBe(mentions);
+    // If this fails it names the file and line. Widen ENDPOINT_DECLARATION to
+    // cover that shape; do not add it to an ignore list.
+    expect(scan().unparsed).toEqual([]);
   });
 
   it("declares a level for every endpoint that exists", () => {
