@@ -11,7 +11,7 @@ export const INTERESTS_MAX_LENGTH = 2000;
 const interestsTextSchema = z.string().trim().max(INTERESTS_MAX_LENGTH);
 
 /** Never returns the vector itself, only whether one exists. */
-export async function getMyInterestsAs(userId: string) {
+export async function getMyInterestsImpl(userId: string) {
   const [row] = await db
     .select({
       interestsText: userInterests.interestsText,
@@ -25,7 +25,7 @@ export async function getMyInterestsAs(userId: string) {
   };
 }
 
-export async function saveMyInterestsAs(
+export async function saveMyInterestsImpl(
   userId: string,
   interestsText: string,
   embed?: EmbedFn
@@ -49,10 +49,10 @@ export async function saveMyInterestsAs(
 
 export async function getMyInterestsForCurrentUser() {
   const viewer = await requireUser();
-  return getMyInterestsAs(viewer.id);
+  return getMyInterestsImpl(viewer.id);
 }
 
 export async function saveMyInterestsForCurrentUser(interestsText: string) {
   const viewer = await requireUser();
-  return saveMyInterestsAs(viewer.id, interestsText);
+  return saveMyInterestsImpl(viewer.id, interestsText);
 }
