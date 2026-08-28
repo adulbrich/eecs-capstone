@@ -271,8 +271,8 @@ the rendered order disagreeing. Spreading makes disagreeing impossible.
 
 Row data does not go through the hook. `data` and `getRowId` are props of the table,
 because the hook never read them and routing them through it bought nothing but a generic
-parameter (#97). The hook does take two options it only forwards, `serverSorted` and
-`resetPageOnSort`; both are described below.
+parameter (#97). The hook does take one option it only forwards, `serverSorted`; it is described
+below.
 
 ```tsx
 const { orderRows, tableProps } = useAdminTable({
