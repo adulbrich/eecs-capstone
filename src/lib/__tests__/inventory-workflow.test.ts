@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   assertTransitionAllowed,
+  needsDueAt,
+  needsHolder,
   type RequestLineDecision,
   resolveLineOutcome,
   type TransitionActor,
@@ -12,6 +14,15 @@ const INSTRUCTOR: TransitionActor = { id: "staff-2", role: "instructor" };
 const STUDENT: TransitionActor = { id: "student-1", role: "user" };
 
 const LATER = new Date("2030-01-01T00:00:00Z");
+
+const ITEM_STATUSES = [
+  "available",
+  "checked_out",
+  "maintenance",
+  "requested",
+  "reserved",
+  "retired",
+] as const;
 
 function input(over: Partial<TransitionInput> = {}): TransitionInput {
   return { itemId: "item-1", nextStatus: "available", ...over };
@@ -352,6 +363,62 @@ describe("assertTransitionAllowed: invariants per status", () => {
         input({ holderLabel: "Bench 3", nextStatus: "reserved" })
       )
     ).not.toThrow();
+  });
+});
+
+describe("the form predicates agree with the rules", () => {
+  // `needsHolder` and `needsDueAt` exist for the lifecycle panel, which spelled
+  // both rules inline until it imported them. They are a second spelling of
+  // what `validateStatusInvariants` decides in its `case` labels, and that
+  // arrangement, one rule written twice with nothing linking the copies, is
+  // what produced #87. So the agreement is derived by asking the rules rather
+  // than asserted by hand.
+  //
+  // `requested` is excluded: the panel refuses it outright and directs staff
+  // to the request queue, so it is not a status these predicates answer for.
+  const PANEL_STATUSES = ITEM_STATUSES.filter((s) => s !== "requested");
+
+  function refusal(over: Partial<TransitionInput>): string {
+    try {
+      assertTransitionAllowed(ADMIN, input(over));
+      return "allowed";
+    } catch (e) {
+      return (e as Error).message;
+    }
+  }
+
+  it("needsHolder is true exactly when a holderless transition is refused", () => {
+    for (const nextStatus of PANEL_STATUSES) {
+      const message = refusal({
+        nextStatus,
+        ...(needsDueAt(nextStatus) ? { dueAt: LATER } : {}),
+      });
+      expect(
+        /not both and not neither/.test(message),
+        `needsHolder(${nextStatus}) disagrees with the rules`
+      ).toBe(needsHolder(nextStatus));
+    }
+  });
+
+  it("needsDueAt is true exactly when a dated transition is required", () => {
+    for (const nextStatus of PANEL_STATUSES.filter(needsHolder)) {
+      const message = refusal({ holderLabel: "Bench 3", nextStatus });
+      expect(
+        /requires dueAt/.test(message),
+        `needsDueAt(${nextStatus}) disagrees with the rules`
+      ).toBe(needsDueAt(nextStatus));
+    }
+  });
+
+  it("never asks for a date on a status that forbids one", () => {
+    // The other direction: a release refuses `dueAt` outright, so a predicate
+    // that answered true there would send the panel into a guaranteed refusal.
+    for (const nextStatus of PANEL_STATUSES.filter((s) => !needsHolder(s))) {
+      expect(needsDueAt(nextStatus)).toBe(false);
+      expect(refusal({ dueAt: LATER, nextStatus })).toMatch(
+        /pickupBy \/ dueAt not allowed/
+      );
+    }
   });
 });
 

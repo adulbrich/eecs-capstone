@@ -55,6 +55,8 @@ const LINE_OUTCOMES = members<RequestLineOutcome>({
   returned: true,
 });
 
+const LATER = new Date("2030-01-01T00:00:00Z");
+
 const AUTHORITIES = members<TransitionAuthority>({
   self_cancel: true,
   self_request: true,
@@ -139,15 +141,30 @@ describe("the project transition table is total and connected", () => {
 });
 
 describe("the inventory rules are total", () => {
-  // The rules answer with a decision or a refusal, never with a crash or an
-  // empty message. The refusal text is rendered verbatim by the lifecycle
-  // panel, so a blank one is a dialog that tells staff nothing.
-  function check(input: TransitionInput) {
+  /**
+   * Runs one input and reports what the rules did with it.
+   *
+   * The thrown value's exact constructor is compared rather than
+   * `instanceof Error`, because `TypeError` and `RangeError` are Errors too.
+   * An earlier version of this helper used `instanceof` and could not tell a
+   * refusal from a crash: injecting a TypeError into `assertTransitionAllowed`
+   * left every case in this file passing.
+   *
+   * The message is checked because the lifecycle panel renders it verbatim,
+   * so a blank refusal is a dialog that tells staff nothing.
+   */
+  function outcomeOf(input: TransitionInput): string {
     try {
       assertTransitionAllowed({ id: "staff-1", role: "admin" }, input);
+      return "allowed";
     } catch (e) {
-      expect(e).toBeInstanceOf(Error);
-      expect((e as Error).message.trim().length).toBeGreaterThan(0);
+      expect(
+        e?.constructor,
+        `${input.nextStatus} threw ${String(e)} rather than refusing`
+      ).toBe(Error);
+      const { message } = e as Error;
+      expect(message.trim().length).toBeGreaterThan(0);
+      return message;
     }
   }
 
@@ -162,38 +179,45 @@ describe("the inventory rules are total", () => {
   ];
 
   it("answers every status crossed with every holder shape", () => {
-    for (const nextStatus of ITEM_STATUSES) {
-      for (const holder of HOLDER_SHAPES) {
-        check({ itemId: "item-1", nextStatus, ...holder });
-        check({
-          dueAt: new Date("2030-01-01T00:00:00Z"),
+    const outcomes = ITEM_STATUSES.flatMap((nextStatus) =>
+      HOLDER_SHAPES.flatMap((holder) => [
+        outcomeOf({ itemId: "item-1", nextStatus, ...holder }),
+        outcomeOf({
+          dueAt: LATER,
           itemId: "item-1",
           nextStatus,
           requestItemId: "line-1",
           ...holder,
-        });
-      }
-    }
+        }),
+      ])
+    );
+    // Asserted so a loop that stopped iterating fails instead of passing
+    // vacuously, which is the other half of what the old helper allowed.
+    expect(outcomes).toHaveLength(
+      ITEM_STATUSES.length * HOLDER_SHAPES.length * 2
+    );
   });
 
   it("answers every authority crossed with every status", () => {
-    for (const authority of AUTHORITIES) {
-      for (const nextStatus of ITEM_STATUSES) {
-        check({ authority, itemId: "item-1", nextStatus });
-      }
-    }
+    const outcomes = AUTHORITIES.flatMap((authority) =>
+      ITEM_STATUSES.map((nextStatus) =>
+        outcomeOf({ authority, itemId: "item-1", nextStatus })
+      )
+    );
+    expect(outcomes).toHaveLength(AUTHORITIES.length * ITEM_STATUSES.length);
   });
 
   it("answers every line outcome crossed with every status", () => {
-    for (const outcome of LINE_OUTCOMES) {
-      for (const nextStatus of ITEM_STATUSES) {
-        check({
+    const outcomes = LINE_OUTCOMES.flatMap((outcome) =>
+      ITEM_STATUSES.map((nextStatus) =>
+        outcomeOf({
           comment: "A reason",
           itemId: "item-1",
           lineDecision: { outcome, requestItemId: "line-1" },
           nextStatus,
-        });
-      }
-    }
+        })
+      )
+    );
+    expect(outcomes).toHaveLength(LINE_OUTCOMES.length * ITEM_STATUSES.length);
   });
 });
