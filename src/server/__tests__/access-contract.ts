@@ -94,7 +94,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/categories.ts:setProjectCategories": {
     level: "staff",
-    note: "assertStaff, then canSeeProject on the target project.",
+    note: "assertStaff decides. The canSeeProject call after it cannot reject, because canSeeProject returns true for staff before it looks at anything else; the live second guard is the `if (!project)` above it. Do not read this as the checked-visibility shape addBookmark uses.",
   },
   "server/categories.ts:updateCategory": { level: "staff" },
 
@@ -119,11 +119,11 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/inventory.ts:getCart": { level: "authenticated" },
   "server/inventory.ts:getInventoryItem": {
     level: "public",
-    note: "Anonymous callers get the public projection; staff get the staff one, from the same endpoint.",
+    note: "The projection branches on isStaff, not on having a session, so anonymous and signed-in non-staff callers get the same public view and only staff see more. publicItemView omits holder identity, serial, label, location and notes.",
   },
   "server/inventory.ts:getInventoryItemDetail": {
     level: "public",
-    note: "Anonymous callers get the public projection; staff get the staff one, from the same endpoint.",
+    note: "The projection branches on isStaff, not on having a session, so anonymous and signed-in non-staff callers get the same public view and only staff see more. publicItemView omits holder identity, serial, label, location and notes.",
   },
   "server/inventory.ts:hardDeleteInventoryItem": { level: "staff" },
   "server/inventory.ts:listAdminInventory": {
@@ -132,7 +132,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/inventory.ts:listInventory": {
     level: "public",
-    note: "Anonymous callers get the public projection; staff see more, from the same endpoint.",
+    note: "The projection branches on isStaff, not on having a session, so anonymous and signed-in non-staff callers get the same public view and only staff see more.",
   },
   "server/inventory.ts:listInventoryCategories": {
     level: "public",
@@ -176,7 +176,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/programs.ts:listPrograms": {
     level: "public",
-    note: "Course id, name and description only. No join to user, which is what separates it from getProgram.",
+    note: "Public because `programs` holds no personal data and this does not join `user`, which is what separates it from getProgram. Nothing projects that: listProgramsImpl is a bare select() returning all six columns, so a personal column added to the table would ride into a public read. programs.integration.test.ts pins the exact key set and is the only enforcement.",
   },
   "server/programs.ts:removeProgramInstructor": { level: "staff" },
   "server/programs.ts:updateProgram": { level: "staff" },
@@ -188,7 +188,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
 
   "server/projects-queries.ts:exportAdminProjects": {
     level: "staff",
-    note: "Widens projectSummarySelect with proposer identity and contactEmail. Staff is the level keeping proposerEmail out of a public read.",
+    note: "Reads adminProjectSummarySelect, which widens the shared projection with proposer identity, contactEmail and `notes`. `notes` is the staff-only field this gate exists for; the export includes it deliberately, see the docblock on exportAdminProjectsAs.",
   },
   "server/projects-queries.ts:getProject": {
     level: "public",
@@ -210,7 +210,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "public",
     note: "canSeeProject gates the project, then filterCommentsForViewer withholds internal comments from the proposer and everything from a stranger.",
   },
-  "server/projects-queries.ts:listProjectEditLog": { level: "staff" },
+  "server/projects-queries.ts:listProjectEditLog": {
+    level: "staff",
+    note: "Gated by an inline getViewer() plus isStaff inside listProjectEditLogImpl, which the handler calls directly. One of the seven endpoints #108 found a guard-name grep could not see.",
+  },
 
   "server/projects.ts:approveProject": {
     level: "staff",
@@ -265,7 +268,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/uploads.ts:clearAvatar": { level: "authenticated" },
   "server/uploads.ts:uploadAvatar": {
     level: "authenticated",
-    note: "The storage key is derived from the session id, so a viewer can only overwrite their own avatar.",
+    note: "The storage key puts the user id off the resolved session in the path, under avatars, so a viewer can only overwrite their own avatar. Not the session id: those are different values.",
   },
   "server/uploads.ts:uploadProjectImage": { level: "owner-or-staff" },
 
@@ -275,7 +278,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "admin",
     note: "Every user column except authentication material: nothing from account or session is joined.",
   },
-  "server/users.ts:getUser": { level: "admin" },
+  "server/users.ts:getUser": {
+    level: "admin",
+    note: "Gated in getUserForCurrentUser, not in getUserImpl, which is exported ungated and selects the whole user row rather than naming columns. That is the shape #103 shipped in, and the widest projection in this file.",
+  },
   "server/users.ts:listMentors": { level: "staff" },
   "server/users.ts:listUsers": {
     level: "admin",
