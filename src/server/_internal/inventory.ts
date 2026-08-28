@@ -27,6 +27,7 @@ import {
   user,
 } from "#/db/schema";
 import { readSession, requireUser } from "#/lib/_internal/auth-guards";
+import { diffRowFields } from "#/lib/edit-diff";
 import {
   type Hold,
   type HoldColumns,
@@ -446,23 +447,6 @@ export type UpdateInventoryItemInput = CreateInventoryItemInput & {
   id: string;
 };
 
-// `satisfies` (not a type annotation) so the array keeps its literal tuple
-// type for the loop below, while a renamed or removed column here still
-// fails the build: a drifted entry silently makes `changed` empty for an
-// edit that only touched that field, hitting the early return below and
-// discarding the whole update while the caller still sees a success.
-// Categories are not in this list: they moved off inventory_items onto the
-// join table and are diffed separately, below.
-const EDITABLE_FIELDS = [
-  "name",
-  "description",
-  "serial",
-  "label",
-  "location",
-  "notes",
-  "imageUrl",
-] as const satisfies readonly (keyof typeof inventoryItems.$inferSelect)[];
-
 export async function updateInventoryItemAs(
   viewer: Viewer,
   data: UpdateInventoryItemInput
@@ -478,26 +462,40 @@ export async function updateInventoryItemAs(
       throw new Error("Item not found");
     }
 
-    const changed: string[] = [];
-    const oldValues: Record<string, unknown> = {};
-    const newValues: Record<string, unknown> = {};
-    for (const f of EDITABLE_FIELDS) {
-      // Match projects.ts: normalize undefined to null on both sides and
-      // compare with JSON.stringify so a wrapper passing `undefined`
-      // for an unset field does not spuriously log a change. `f` is one of
-      // the literal EDITABLE_FIELDS keys (not a bare `string`), so both
-      // reads below are real, checked property accesses rather than casts.
-      const oldVal = before[f] ?? null;
-      const newVal = data[f] ?? null;
-      if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
-        changed.push(f);
-        oldValues[f] = oldVal;
-        newValues[f] = newVal;
-      }
-    }
+    // Typed against the table rather than as a loose record, because this
+    // object is the only statement of which columns an edit may touch.
+    // `diffRowFields` reads its keys and `.set()` writes them, so the two
+    // cannot fall out of step.
+    //
+    // The hand-maintained list this replaced could, and nothing would have
+    // said so: dropping any of description, serial, notes or imageUrl from
+    // it left `npm run typecheck` and the whole integration suite green
+    // while an edit touching only that field saved nothing and reported
+    // success. That is the defect `diffRowFields` was written for on the
+    // projects side.
+    //
+    // Categories are not here: they live on a join table rather than on
+    // inventory_items, and are diffed separately below.
+    const values: Partial<typeof inventoryItems.$inferSelect> = {
+      name: data.name,
+      description: data.description,
+      serial: data.serial,
+      label: data.label,
+      location: data.location,
+      notes: data.notes,
+      imageUrl: data.imageUrl,
+    };
 
-    // Categories left EDITABLE_FIELDS's loop above along with the column, so
-    // they need their own diff, computed before the early return: otherwise
+    // Named for what the edit log calls them. The differ builds all three
+    // fresh on every call, so the category arm below appends to them directly.
+    const {
+      changedFields: changed,
+      newDiff: newValues,
+      oldDiff: oldValues,
+    } = diffRowFields(before, values);
+
+    // Categories are outside that diff along with the column, so they need
+    // their own, computed before the early return: otherwise
     // a request that changes only categoryIds would compute changed.length
     // === 0 above and silently discard the category write entirely, the
     // same silent-write class the rest of this function guards against.
@@ -520,16 +518,7 @@ export async function updateInventoryItemAs(
 
     await tx
       .update(inventoryItems)
-      .set({
-        name: data.name,
-        description: data.description,
-        serial: data.serial,
-        label: data.label,
-        location: data.location,
-        notes: data.notes,
-        imageUrl: data.imageUrl,
-        updatedAt: new Date(),
-      })
+      .set({ ...values, updatedAt: new Date() })
       .where(eq(inventoryItems.id, data.id));
 
     let afterCategories = beforeCategories;

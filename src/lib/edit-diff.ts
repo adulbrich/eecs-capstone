@@ -1,5 +1,5 @@
 /**
- * What changed between two versions of a project.
+ * What changed between two versions of a row.
  *
  * Pure and client-safe so the rules below can be exercised without a database.
  * Asserting on `changedFields` used to cost a Postgres round trip and a Better
@@ -25,7 +25,7 @@
  * pinning the order is what makes it a loud one.
  */
 
-export function diffProjectFields<T extends Record<string, unknown>>(
+export function diffRowFields<T extends Record<string, unknown>>(
   existing: T,
   next: Partial<T>
 ): {

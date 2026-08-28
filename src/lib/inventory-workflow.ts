@@ -164,6 +164,30 @@ function assertAuthorized(viewer: TransitionActor, input: TransitionInput) {
   }
 }
 
+/**
+ * The statuses that put an item into somebody's keeping, and so cannot be
+ * reached without naming who.
+ *
+ * Exported for the form, not for the rules below: `validateStatusInvariants`
+ * keeps its literal `case` labels, because those are what make a seventh
+ * `ItemStatus` a compile error. This and that switch are therefore two
+ * spellings of one rule, which is the arrangement that produced #87, so
+ * `inventory-workflow.test.ts` derives their agreement from the rules
+ * themselves rather than trusting the pair to stay in step.
+ *
+ * `inventory-lifecycle-panel.tsx` used to spell it a third time, inline, and
+ * used its answer to decide both an error message and whether to send
+ * `requestItemId`.
+ */
+export function needsHolder(status: ItemStatus): boolean {
+  return status === "reserved" || status === "checked_out";
+}
+
+/** The one status that cannot be reached without saying when it comes back. */
+export function needsDueAt(status: ItemStatus): boolean {
+  return status === "checked_out";
+}
+
 /** The statuses that release an item, and so can close the line it held. */
 function isReleaseStatus(status: ItemStatus): boolean {
   return (

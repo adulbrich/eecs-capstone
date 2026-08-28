@@ -5,6 +5,7 @@ import {
   formatHoldShort,
   holdFromStoredRow,
 } from "#/lib/hold";
+import { needsDueAt, needsHolder } from "#/lib/inventory-workflow";
 import {
   hardDeleteInventoryItem,
   transitionInventoryItem,
@@ -389,21 +390,20 @@ export function InventoryLifecyclePanel({ item, history }: Props) {
   }
 
   async function onConfirmDialog() {
-    const needsHolder =
-      dlgTargetStatus === "reserved" || dlgTargetStatus === "checked_out";
+    const holderRequired = needsHolder(dlgTargetStatus);
     const holder = holderFields({
       email: assignEmail,
       label: assignLabel,
       name: assignName,
       program: assignProgram,
     });
-    if (needsHolder && !(holder.holderEmail || holder.holderLabel)) {
+    if (holderRequired && !(holder.holderEmail || holder.holderLabel)) {
       setError(
         "Enter an email address, or a label if the item is not going to a person."
       );
       return;
     }
-    if (dlgTargetStatus === "checked_out" && !dueDate) {
+    if (needsDueAt(dlgTargetStatus) && !dueDate) {
       setError("A due date is required to check out an item.");
       return;
     }
@@ -412,7 +412,7 @@ export function InventoryLifecyclePanel({ item, history }: Props) {
       // Null when the item was never requested through a cart. Staff-assigned
       // holds are first-class, so the absence of a request line is not an
       // error; the item's own columns carry the hold.
-      requestItemId: needsHolder ? item.currentRequestItemId : null,
+      requestItemId: holderRequired ? item.currentRequestItemId : null,
       ...holder,
       pickupBy:
         dlgTargetStatus === "reserved" && pickupDate
