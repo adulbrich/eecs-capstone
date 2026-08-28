@@ -66,7 +66,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/bookmarks.ts:isBookmarked": { level: "authenticated" },
   "server/bookmarks.ts:listMyBookmarks": {
     level: "authenticated",
-    note: "Scoped to the viewer's own rows. Visibility is re-checked on read (#106).",
+    note: "Scoped to the viewer's own rows, and filtered on deletedAt only. canSeeProject runs when the bookmark is added, not when the list is read, so a project bookmarked while published and later returned to draft keeps rendering for that bookmarker. #106 is open to fix that; do not read this note as if it were already done.",
   },
   "server/bookmarks.ts:removeBookmark": {
     level: "authenticated",
@@ -279,7 +279,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/users.ts:listMentors": { level: "staff" },
   "server/users.ts:listUsers": {
     level: "admin",
-    note: "/admin/users requires role === admin exactly, unlike every other admin route.",
+    note: "The /admin/users routes require role === admin exactly, where most admin routes accept staff.",
   },
   "server/users.ts:lookupUserByEmail": { level: "staff" },
   "server/users.ts:searchUsers": { level: "staff" },

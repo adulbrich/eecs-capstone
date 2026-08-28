@@ -105,10 +105,19 @@ function scanFile(file: string, source: string) {
   // assertion below would read as "nothing here" rather than as a problem.
   // `npm run typecheck` catches this first in CI, but a check that can quietly
   // examine nothing is the defect this whole file exists to remove.
+  // `parseDiagnostics` is internal, so a TypeScript release that renames it
+  // would leave this reading `undefined`. Treat absent and non-empty alike:
+  // otherwise the rename disarms the guard silently, which is the exact defect
+  // this block exists to prevent.
   const parseErrors = (
     sourceFile as unknown as { parseDiagnostics?: unknown[] }
   ).parseDiagnostics;
-  if (parseErrors && parseErrors.length > 0) {
+  if (!Array.isArray(parseErrors)) {
+    throw new Error(
+      "TypeScript no longer exposes parseDiagnostics, so a file that fails to parse would be read as empty. Replace this check with ts.transpileModule(source, { reportDiagnostics: true })."
+    );
+  }
+  if (parseErrors.length > 0) {
     throw new Error(
       `${file} did not parse, so its endpoints cannot be read. Fix the syntax error; typecheck will name it.`
     );
