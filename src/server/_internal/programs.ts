@@ -15,7 +15,17 @@ export async function listProgramsImpl() {
   return { rows };
 }
 
-export async function getProgramImpl(data: { id: string }) {
+/**
+ * A program with its instructors, for staff.
+ *
+ * Staff-gated because of the join below: it returns each instructor's address
+ * and role, which is a staff view of an account, not a property of the
+ * program. The program row itself carries no personal data and stays public
+ * through `listProgramsImpl`, which is what the project listing's program
+ * filter reads.
+ */
+export async function getProgramAs(viewer: AuthUser, data: { id: string }) {
+  assertStaff(viewer);
   const [program] = await db
     .select()
     .from(programs)
@@ -39,6 +49,11 @@ export async function getProgramImpl(data: { id: string }) {
     .from(projects)
     .where(eq(projects.programId, data.id));
   return { program, instructors, projectCount: count };
+}
+
+export async function getProgramForCurrentUser(data: { id: string }) {
+  const viewer = await requireUser();
+  return getProgramAs(viewer, data);
 }
 
 export async function createProgramAs(viewer: AuthUser, data: ProgramInput) {
@@ -149,7 +164,15 @@ export async function removeProgramInstructorForCurrentUser(data: {
   return removeProgramInstructorAs(viewer, data);
 }
 
-export async function listEligibleInstructorsImpl() {
+/**
+ * Everyone who could be added to a program as an instructor.
+ *
+ * Staff-gated: this is the whole staff roster with addresses and roles, which
+ * also answers "who are the admins" for anyone who asks. Its one consumer is
+ * `instructor-manager.tsx` on the admin program pages.
+ */
+export async function listEligibleInstructorsAs(viewer: AuthUser) {
+  assertStaff(viewer);
   const rows = await db
     .select({
       id: user.id,
@@ -161,4 +184,9 @@ export async function listEligibleInstructorsImpl() {
     .where(inArray(user.role, ["admin", "instructor"]))
     .orderBy(user.name);
   return { rows };
+}
+
+export async function listEligibleInstructorsForCurrentUser() {
+  const viewer = await requireUser();
+  return listEligibleInstructorsAs(viewer);
 }

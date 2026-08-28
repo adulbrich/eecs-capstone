@@ -7,6 +7,9 @@ import {
   addProgramInstructorAs,
   createProgramAs,
   deleteProgramAs,
+  getProgramAs,
+  listEligibleInstructorsAs,
+  listProgramsImpl,
   removeProgramInstructorAs,
   updateProgramAs,
 } from "#/server/_internal/programs";
@@ -23,6 +26,71 @@ async function makeUser(email: string, role: "user" | "admin" | "instructor") {
   const [u] = await db.select().from(user).where(eq(user.email, email));
   return { id: u.id, role: u.role };
 }
+
+describe("the instructor-bearing reads are staff-only", () => {
+  // Both were reachable without a session until 2026-08-28. See the QUIRKS
+  // entry "A read is public or staff-only per endpoint, not per domain" for
+  // why, and for the rule that replaced the classification which missed it.
+  it("refuses a program detail read to a non-staff viewer", async () => {
+    const admin = await makeUser(`gp-a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`gp-s-${Date.now()}@x.com`, "user");
+    const { id } = await createProgramAs(admin, {
+      courseId: `CS-${Date.now()}`,
+      courseName: "Capstone",
+      description: null,
+    });
+
+    // Only the staff gate is exercised here. `requireUser()` in the wrapper
+    // is what shuts the endpoint to anonymous callers, and it reads a request
+    // session, so it is not reachable from an integration test.
+    await expect(getProgramAs(student, { id })).rejects.toThrow(/Forbidden/);
+    await expect(getProgramAs(admin, { id })).resolves.toMatchObject({
+      program: { id },
+    });
+  });
+
+  it("refuses the instructor roster to a non-staff viewer", async () => {
+    const admin = await makeUser(`li-a-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`li-s-${Date.now()}@x.com`, "user");
+
+    await expect(listEligibleInstructorsAs(student)).rejects.toThrow(
+      /Forbidden/
+    );
+    const { rows } = await listEligibleInstructorsAs(admin);
+    expect(rows.some((r) => r.id === admin.id)).toBe(true);
+  });
+
+  it("keeps user columns out of the public program list", async () => {
+    // `listProgramsImpl` has no gate on purpose: the public project listing
+    // filters by program, so it has to be reachable without a session. What
+    // makes that safe is that the query never reaches `user`, and it is a
+    // bare `select()` with no projection to enforce that, so this test is the
+    // enforcement. A join added here would nest the row under table keys,
+    // `courseId` would stop resolving, and the lookup below would fail.
+    const admin = await makeUser(`lp-a-${Date.now()}@x.com`, "admin");
+    const courseId = `PUB-${Date.now()}`;
+    await createProgramAs(admin, {
+      courseId,
+      courseName: "Public",
+      description: null,
+    });
+
+    const { rows } = await listProgramsImpl();
+    const row = rows.find((r) => r.courseId === courseId);
+    expect(row).toBeDefined();
+    // Sorted, like the same assertion on the projects side: the point is the
+    // key set, and pinning Drizzle's projection order would fail on a harmless
+    // reordering of the schema.
+    expect(Object.keys(row ?? {}).sort()).toEqual([
+      "courseId",
+      "courseName",
+      "createdAt",
+      "description",
+      "id",
+      "updatedAt",
+    ]);
+  });
+});
 
 describe("programs", () => {
   it("create + update + delete; deleteProgram returns unlinkedProjectCount", async () => {

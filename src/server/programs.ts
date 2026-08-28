@@ -32,8 +32,8 @@ export const listPrograms = createServerFn({ method: "GET" }).handler(
 export const getProgram = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data }) => {
-    const { getProgramImpl } = await import("./_internal/programs");
-    return getProgramImpl(data);
+    const { getProgramForCurrentUser } = await import("./_internal/programs");
+    return getProgramForCurrentUser(data);
   });
 
 export const createProgram = createServerFn({ method: "POST" })
@@ -84,6 +84,8 @@ export const removeProgramInstructor = createServerFn({ method: "POST" })
 export const listEligibleInstructors = createServerFn({
   method: "GET",
 }).handler(async () => {
-  const { listEligibleInstructorsImpl } = await import("./_internal/programs");
-  return listEligibleInstructorsImpl();
+  const { listEligibleInstructorsForCurrentUser } = await import(
+    "./_internal/programs"
+  );
+  return listEligibleInstructorsForCurrentUser();
 });
