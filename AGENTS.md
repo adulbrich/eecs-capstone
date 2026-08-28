@@ -4,8 +4,9 @@ The Oregon State University EECS Capstone app: browse and propose capstone proje
 run them through a review workflow, and manage shared inventory.
 
 Stack: TanStack Start (React SSR) with TanStack Router, Query, Form, and Table;
-Drizzle ORM on PostgreSQL; Better Auth; shadcn/ui on Radix; Tailwind v4; S3-compatible
-object storage (RustFS locally, S3 in AWS).
+Drizzle ORM on PostgreSQL with pgvector; Better Auth; shadcn/ui on Radix; Tailwind v4;
+S3-compatible object storage (RustFS locally, S3 in AWS); Amazon Bedrock for project
+review and embeddings.
 
 This file is the entry point. It carries the rules that bind every turn and points at
 the reference docs for everything else.
@@ -31,13 +32,20 @@ All three must be clean, because a red local run is a red PR. The `verify` job i
 Both have their own CI jobs and run on every pull request, so "it passed locally" is not
 the question; run `npm run test:integration` (needs docker Postgres and RustFS up, see
 `docker compose`) and `npm run test:accessibility` yourself when your change touches the
-database layer or the UI, rather than finding out from CI. Other scripts live in
-`package.json`.
+database layer or the UI, rather than finding out from CI. The accessibility suite
+needs more setup than the integration one: the same Postgres and RustFS, plus
+`npm run db:seed:dev` (its global setup signs in as the seeded users) and
+`npx playwright install chromium`. Other scripts live in `package.json`.
 
-The branch ruleset decides which of the three jobs can block a merge, and it is the
-source of truth rather than this file. Check it with
-`gh api repos/adulbrich/eecs-capstone/rulesets` before assuming a green PR was fully
-gated.
+Only `verify` can block a merge today. The `integration` and `accessibility` jobs run
+on every pull request and a red one still merges, so read their results rather than
+trusting the merge button. The ruleset is the source of truth and the list endpoint
+does not carry the rules, so it takes two calls:
+
+```bash
+gh api repos/adulbrich/eecs-capstone/rulesets --jq '.[].id'
+gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type=="required_status_checks")'
+```
 
 ## Always
 
@@ -49,8 +57,8 @@ gated.
 - **Commit messages use Conventional Commits with a lowercase imperative subject:**
   `fix(projects): stop the proposer field lying about pending changes`. The types in
   use are `feat`, `fix`, `docs`, `test`, `refactor`, and `style`, each with the
-  affected area in parentheses. Dependabot also lands `chore(deps)` and `build(deps)`;
-  you should not need either.
+  affected area in parentheses. `chore` is also in use, with or without an area, for
+  work that changes no behavior. Dependabot lands `chore(deps)` and `build(deps)`.
 - **Keep the body short, or leave it out.** A sentence or two on why, and only when
   the subject does not already carry it. Cut anything that does not change what a
   reader will do or understand. Commits before 2026-08-09 run to several paragraphs;
@@ -84,8 +92,9 @@ gated.
 - **Check the docs for the fast-moving libraries with the context7 MCP server**
   rather than recalling them. Drizzle is still pre-1.0, and TanStack Start and Better
   Auth both ship rapid minor releases, so all three move faster than training data.
-  Do not quote version numbers in this file; read them from `package.json`, which is
-  the only copy that cannot go stale. `docs/QUIRKS.md` outranks upstream docs wherever
+  Do not describe a library's maturity or release cadence here, and do not pin a
+  version: read those from `package.json`, the only copy that cannot go stale. Naming
+  a major line is fine where it identifies the thing, as "Tailwind v4" does. `docs/QUIRKS.md` outranks upstream docs wherever
   the two disagree about this codebase.
 - **Import `createServerFn` from `@tanstack/react-start`.** The bare
   `@tanstack/start` package is not what this project uses.
@@ -118,8 +127,10 @@ Read the matching doc before you start; each one is the source of truth for its 
 - **[`DEPLOYMENT.md`](./DEPLOYMENT.md)** and **[`infra/`](./infra/)** cover the AWS
   deployment, Terraform, and environment variables.
 
-- **[`docs/ONID-SSO.md`](./docs/ONID-SSO.md)** covers the OSU SAML / ONID single
-  sign-on request, which is blocked on the university rather than on code.
+- **[`docs/ONID-SSO.md`](./docs/ONID-SSO.md)** covers ONID sign-in: how it works, how
+  to operate it, and what is still open with UIT. It is OIDC through Better Auth's
+  `genericOAuth`, not SAML, and it shipped; UIT registered the app as a relying party
+  on 2026-08-24.
 
 ## Adding to these docs
 
