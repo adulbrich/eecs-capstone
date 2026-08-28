@@ -2,8 +2,10 @@
  * The embeddings kill switch, alone in its own module.
  *
  * Set `BEDROCK_EMBEDDINGS_ENABLED=false` to make every embedding attempt fail
- * instantly without touching AWS. It doubles as an operational switch for
- * disabling embeddings in production without a redeploy.
+ * instantly without touching AWS. It is a test and local-development switch:
+ * `infra/ecs.tf` plumbs the model id and dimensions into the task definition
+ * but not this, so turning embeddings off in production is a terraform change
+ * and a new revision, not a variable flip.
  *
  * It lives here rather than beside the adapter because reading a flag should
  * not cost an SDK. `bedrock-embed.ts` imports `@aws-sdk/client-bedrock-runtime`
