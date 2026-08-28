@@ -61,11 +61,11 @@ interface UseAdminTableOptions<TColumn extends AdminTableStateColumn> {
  * another, a mismatched `defaultSort` makes the URL and the rendered order
  * disagree. Named once here, they cannot disagree.
  *
- * `serverSorted` is the one option this hook forwards without reading. It
- * belongs here anyway: `orderRows` below is a no-op when it is set, so the
- * value the table sorts by and the value that suppresses client sorting are
- * the same decision, and a route that passed them separately could disagree
- * with itself.
+ * `serverSorted` is the one option this hook takes and never reads: it is
+ * passed straight through to the table. It stays because it belongs to the
+ * same prop bag as everything else the table needs, not because anything here
+ * would break without it. A route that put it on the JSX directly would behave
+ * identically.
  */
 export function useAdminTable<TColumn extends AdminTableStateColumn>({
   columns,
@@ -122,9 +122,9 @@ export function useAdminTable<TColumn extends AdminTableStateColumn>({
    * A no-op under `serverSorted`, where the rows already arrived ordered and
    * the table reports no ids.
    *
-   * Generic over its own row type rather than reusing `TRow`: an export is a
-   * wider projection of the same records under the same filters, keyed by the
-   * same id but not the same shape.
+   * Generic over its own row type rather than over the table's: an export is
+   * a wider projection of the same records under the same filters, keyed by
+   * the same id but not the same shape.
    */
   const orderRows = useCallback(
     <TExport>(rows: readonly TExport[], getId: (row: TExport) => string) =>
