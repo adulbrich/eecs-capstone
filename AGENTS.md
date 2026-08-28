@@ -57,9 +57,9 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
 - **Commit messages use Conventional Commits with a lowercase imperative subject:**
   `fix(projects): stop the proposer field lying about pending changes`. The types in
   use are `feat`, `fix`, `docs`, `test`, `refactor`, `style`, `perf`, `build`,
-  `ci` and `chore`. Put the affected area in parens. Bare subjects exist in the history and
-  are not the pattern to copy, same as the long bodies below. A breaking change
-  takes a `!` before the colon, as in
+  `ci` and `chore`. Put the affected area in parens. Bare subjects exist in the
+  history and are not the pattern to copy, same as the long bodies below. A
+  breaking change takes a `!` before the colon, as in
   `feat(inventory)!: give items many categories`. Dependabot lands `chore(deps)`
   and `build(deps)`.
 - **Keep the body short, or leave it out.** A sentence or two on why, and only when
@@ -85,16 +85,16 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
   for no approving review, so nothing but the rule below stops a PR merging unread.
 - **Run `mattpocock-skills:code-review` on every PR before merging, then again after
   addressing what it found, until a pass raises nothing you have not already
-  answered.** That is the only stopping condition, and a PR that draws no findings
-  meets it after one pass. Answered covers both a finding you fixed and one you
-  declined in writing, so a reviewer repeating a point you argued against does not
-  restart the loop, and a pass whose findings you all declined without changing a
-  line is itself the pass that ends it. Every pass after the first exists for the code the previous pass
-  caused you to write, which otherwise reaches `main` reviewed by nobody. Green CI is
-  not a review: it says nothing broke that was already covered, and new code with no
-  new tests is the part it cannot speak to. Verify a finding before acting on it. A review agent
-  reads a branch, not your intent, and will sometimes be confidently wrong about what
-  exists.
+  answered.** A PR that draws no findings meets that after one pass. Answered
+  covers a finding you fixed and one you declined in writing alike, so a reviewer
+  repeating a point you argued against does not restart the loop, and a pass whose
+  findings you all declined without editing a line is itself the pass that ends it.
+  Every pass after the first exists for the code the previous pass caused you to
+  write, which otherwise reaches `main` reviewed by nobody. Green CI is not a
+  review: it says nothing broke that was already covered, and new code with no new
+  tests is the part it cannot speak to. Verify a finding before acting on it. A
+  review agent reads a branch, not your intent, and will sometimes be confidently
+  wrong about what exists.
 
   `.claude/settings.json` declares the marketplace and enables the plugin, so nobody
   has to add either by hand. Claude Code still asks each operator once whether to

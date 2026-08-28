@@ -511,7 +511,7 @@ bind every turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
 | --- | --- |
 | `src/lib/*.ts` | Pure modules, client-safe wrappers. |
 | `src/lib/_internal/*.ts` | Server-only helpers (auth-guards). |
-| `src/lib/__tests__/*.test.ts` | Pure-module unit tests. |
+| `src/lib/__tests__/*.test.ts` | Pure-module unit tests, plus two integration suites (`auth`, `role-gate`) that need a database. |
 | `src/server/*.ts` | createServerFn wrappers (Zod schemas + dynamic-import handlers). Client-importable. |
 | `src/server/_internal/*.ts` | Impl + `*As(viewer, ...)` + `*ForCurrentUser(...)` helpers. Server-only. |
 | `src/server/__tests__/*.integration.test.ts` | Integration tests against docker Postgres. |
@@ -557,8 +557,8 @@ resize).
 
 ### Sharp's `.withMetadata({})` does NOT strip EXIF
 
-This is the opposite of what you'd expect. In Sharp 0.34.x,
-`.withMetadata()` preserves metadata; passing an empty options object
+This is the opposite of what you'd expect. `.withMetadata()` preserves
+metadata; passing an empty options object
 does NOT mean "strip everything," it means "preserve with these
 options." To strip EXIF, GPS, and orientation, simply omit
 `.withMetadata()` entirely. Sharp's default is metadata-free output.
@@ -666,7 +666,7 @@ Inventory full-text search no longer matches category names. Before this feature
 
 Before this there were two `isStaff` and **five** `assertStaff`, and `isStaff` was exported from `src/lib/project-visibility.ts`, which ten files across seven non-project domains imported. That is what made the module's name wrong: a domain module owned something that is not domain-specific. Consumers import from `viewer.ts` directly rather than through a re-export, because Biome's `noBarrelFile` rejects the re-export and this project's no-shims rule would too.
 
-There are **seven** `AuthUser` interfaces in `_internal/` (`comments`, `uploads`, `projects`, `programs`, `users`, `categories`, `project-review`), and six are byte-identical to `NonNullable<Viewer>`, so no adapter is needed at a call site. The seventh, in `uploads.ts`, genuinely extends it with an optional `image` that only the avatar paths read. `inventory.ts:58` additionally declares its own local `Viewer` while importing `isStaff` from `#/lib/viewer` five lines above. Collapsing them is a loose end, not a blocker. This entry said "four" for several months while the count grew, so treat it as a lower bound and count before you cite it.
+There are **seven** `AuthUser` interfaces in `_internal/` (`comments`, `uploads`, `projects`, `programs`, `users`, `categories`, `project-review`), and six are byte-identical to `NonNullable<Viewer>`, so no adapter is needed at a call site. The seventh, in `uploads.ts`, genuinely extends it with an optional `image` that only the avatar paths read. `inventory.ts:59` additionally declares its own local `Viewer` while importing `isStaff` from `#/lib/viewer` five lines above. Collapsing them is a loose end, not a blocker. This entry said "four" for several months while the count grew, so treat it as a lower bound and count before you cite it.
 
 `assertStaff` carries `asserts viewer is NonNullable<Viewer>`, and the narrowing is load-bearing: call sites read `viewer.id` immediately afterwards with no second null check.
 
