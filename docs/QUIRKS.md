@@ -2,7 +2,7 @@
 
 A running log of every gotcha we have hit and the conventions that grew out of them. Read this before debugging anything that "should just work."
 
-The stack is fast-moving. TanStack Start, TanStack Router, Better Auth and Drizzle all ship breaking changes faster than any model's training data tracks, and the ones here have already renamed methods and moved APIs under this project. Check them with the context7 MCP server rather than recalling them, treat the official docs as a starting point, and treat this file as the ground truth for THIS codebase. Versions live in `package.json`; do not restate them here, because a number written into prose goes stale silently.
+The stack is fast-moving. TanStack Start, TanStack Router, Better Auth and Drizzle all ship breaking changes faster than any model's training data tracks, and the ones here have already renamed methods and moved APIs under this project. Check them with the context7 MCP server rather than recalling them, treat the official docs as a starting point, and treat this file as the ground truth for THIS codebase. Do not restate a version here to say how current the stack is; `package.json` carries that and cannot go stale. A version number that IS the gotcha stays, as with the Better Auth OAuth path change below: there the number is the fact, not decoration.
 
 ## Table of contents
 
@@ -172,7 +172,7 @@ When a server function throws a `ZodError`, the helper `src/lib/apply-server-err
 
 ### `authClient.requestPasswordReset`, not `forgetPassword`
 
-In 1.5.x the password-reset trigger method is `authClient.requestPasswordReset({ email, redirectTo })`. Older docs and some examples show `forgetPassword`, which does not exist.
+The password-reset trigger method is `authClient.requestPasswordReset({ email, redirectTo })`. Older docs and some examples show `forgetPassword`, which does not exist.
 
 ### `user.id` is `text`, not `uuid`
 

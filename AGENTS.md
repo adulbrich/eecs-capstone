@@ -88,10 +88,11 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
   answered.** That is the only stopping condition, and a PR that draws no findings
   meets it after one pass. Answered covers both a finding you fixed and one you
   declined in writing, so a reviewer repeating a point you argued against does not
-  restart the loop. Every pass after the first exists for the code the previous pass
+  restart the loop, and a pass whose findings you all declined without changing a
+  line is itself the pass that ends it. Every pass after the first exists for the code the previous pass
   caused you to write, which otherwise reaches `main` reviewed by nobody. Green CI is
-  not a review: it says the suite still passes, which is exactly what a change that
-  adds no coverage cannot fail. Verify a finding before acting on it. A review agent
+  not a review: it says nothing broke that was already covered, and new code with no
+  new tests is the part it cannot speak to. Verify a finding before acting on it. A review agent
   reads a branch, not your intent, and will sometimes be confidently wrong about what
   exists.
 
