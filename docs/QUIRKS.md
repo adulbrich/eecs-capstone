@@ -407,12 +407,9 @@ already set.
 
 ### The integration suite refuses to run with embeddings enabled
 
-`vitest.integration.config.ts` sets `BEDROCK_EMBEDDINGS_ENABLED=false` in its `env` block, and `src/test/setup.integration.ts` asserts it at collection and again after every test. The parenthesis in the failure says which.
+`vitest.integration.config.ts` sets `BEDROCK_EMBEDDINGS_ENABLED=false` in its `env` block, and `src/test/setup.integration.ts` throws at collection if that did not arrive. Unset counts as enabled, because `embeddingsEnabled()` treats anything but that exact string as on, so a deleted config line is enough to trip it. Fix the config, not your environment.
 
-- **"at collection"** means the value never arrived: the `env` line is gone, or the variable is set to something other than `"false"`. Unset is on, because `embeddingsEnabled()` treats anything but that exact string as enabled. Fix the config, not your environment.
-- **"left enabled by a test"** means a test replaced `process.env` and did not put it back. Narrower than it sounds: `sequence.hooks` defaults to `stack`, so a test that restores the value in its own `afterEach` is invisible here. It catches leaked state, not the transient mutation #22 describes, and nothing exercises it today. It is a regression guard, not a reproduction of the flake.
-
-A fail-open is expensive rather than merely wrong: the call reaches the AWS SDK, which walks the credential chain and pays an IMDS probe with retries, so it presents as a slow flaky test rather than a configuration error. Whether that is what #22 actually was remains unconfirmed, which is why #22 is still open.
+It exists because a fail-open is expensive rather than merely wrong: the call reaches the AWS SDK, which walks the credential chain and pays an IMDS probe with retries, so it presents as a slow flaky test rather than a configuration error. See #22, which records that link as a hypothesis rather than a confirmed cause.
 
 The switch lives in `src/lib/_internal/embeddings-flag.ts` rather than beside the adapter, so reading it costs no `@aws-sdk/client-bedrock-runtime` import. `test.env` beats the shell, so `BEDROCK_EMBEDDINGS_ENABLED=true npm run test:integration` does not override the config.
 
