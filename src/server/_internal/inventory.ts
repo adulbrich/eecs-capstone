@@ -486,10 +486,13 @@ export async function updateInventoryItemAs(
       imageUrl: data.imageUrl,
     };
 
-    const { changedFields, newDiff, oldDiff } = diffRowFields(before, values);
-    const changed: string[] = [...changedFields];
-    const oldValues: Record<string, unknown> = { ...oldDiff };
-    const newValues: Record<string, unknown> = { ...newDiff };
+    // Named for what the edit log calls them. The differ builds all three
+    // fresh on every call, so the category arm below appends to them directly.
+    const {
+      changedFields: changed,
+      newDiff: newValues,
+      oldDiff: oldValues,
+    } = diffRowFields(before, values);
 
     // Categories are outside that diff along with the column, so they need
     // their own, computed before the early return: otherwise

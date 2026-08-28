@@ -644,13 +644,12 @@ describe("catalog CRUD", () => {
     });
   });
 
-  // Pins the failure mode a drifted EDITABLE_FIELDS entry would cause: if the
-  // field list disagrees with what `.set()` actually writes, an edit that
-  // touches only the drifted field computes `changed.length === 0` and hits
-  // the early return, so the whole update is silently discarded while the
-  // caller still gets back a success response. A type annotation on
-  // EDITABLE_FIELDS only catches a *renamed* column; it says nothing about
-  // this early-return path staying correct, which is what this test checks
+  // Pins the early-return path the deleted EDITABLE_FIELDS list used to put
+  // at risk: an edit whose only changed field was missing from that list
+  // computed `changed.length === 0`, took the return before the UPDATE, and
+  // reported success having saved nothing. `diffRowFields` reads the writer's
+  // own keys now, so there is no list left to drift, but the early return is
+  // still there and this pins that it fires only on a genuine no-op
   // by asserting the write actually reached the row, not just the log.
   it("persists every editable field when it is the only one that changed", async () => {
     // The regression guard for the defect this replaced. `updateInventoryItemAs`
@@ -705,6 +704,43 @@ describe("catalog CRUD", () => {
       expect(logs[0].oldValues).toMatchObject({ [field]: from });
       expect(logs[0].newValues).toMatchObject({ [field]: to });
     }
+  });
+
+  it("logs changed fields in the order the writer builds them", async () => {
+    // QUIRKS calls this order observable on the projects side and pins it
+    // there. Inventory has the same dependency now that its diff reads the
+    // writer's keys, because object key order is insertion order for string
+    // keys, so reordering that literal changes what a reader of the edit log
+    // sees. Nothing renders this log yet; the point is that changing it is
+    // loud rather than silent.
+    const admin = await makeUser(`edit-order-${Date.now()}@x.com`, "admin");
+    const item = await makeItem({ name: "Before", location: "Shelf A" });
+
+    await updateInventoryItemAs(admin, {
+      categoryIds: [],
+      description: "d",
+      id: item.id,
+      imageUrl: "inventory/x.jpg",
+      label: "Bench 3",
+      location: "Shelf B",
+      name: "After",
+      notes: "n",
+      serial: "SN-1",
+    });
+
+    const logs = await db
+      .select()
+      .from(inventoryItemEditLog)
+      .where(eq(inventoryItemEditLog.itemId, item.id));
+    expect(logs[0].changedFields).toEqual([
+      "name",
+      "description",
+      "serial",
+      "label",
+      "location",
+      "notes",
+      "imageUrl",
+    ]);
   });
 
   it("a single-field update persists to the row, not just the edit log", async () => {
@@ -1028,8 +1064,8 @@ describe("inventory item categories", () => {
     );
   });
 
-  // Categories left EDITABLE_FIELDS's loop for their own diff, computed
-  // separately before the same early return. This pins that the two diffs
+  // Categories sit outside the column diff and have their own, computed
+  // before the same early return. This pins that the two diffs
   // agree on "nothing changed": a truly identical update (including
   // categoryIds) must still take the zero-log early return, not log a
   // spurious "categories" change because the two diffs disagree.

@@ -70,7 +70,7 @@ describe("the TypeScript vocabularies match the database enums", () => {
   //
   // `categories.ts` already derives its domain type from `enumValues`, which
   // is the fix rather than the test. Until the status vocabularies do the
-  // same (candidate #5), this is what holds them together.
+  // same, this is what holds them together. See issue #102.
   it("project statuses agree", () => {
     expect([...PROJECT_STATUSES].sort()).toEqual(
       [...projectStatusEnum.enumValues].sort()

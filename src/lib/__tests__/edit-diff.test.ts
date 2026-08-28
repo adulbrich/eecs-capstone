@@ -61,9 +61,11 @@ describe("diffRowFields", () => {
 
   it("ignores a column the writer did not offer", () => {
     // Replaces an older case that passed a non-column key in `next` and
-    // expected it skipped. Membership now comes from the writer, so the
-    // guarantee moved to the type: `next` is `Partial<T>` of the row, and a
-    // key that is not a column no longer typechecks.
+    // expected it skipped. Membership comes from the writer now, so what
+    // this shows is only the skip. The stronger guarantee, that a key which
+    // is not a column fails to compile, lives at the real call sites, where
+    // `T` is the Drizzle row type; here `T` is inferred from the literal
+    // above, so it cannot be demonstrated.
     const out = diffRowFields(
       { searchVector: "old", title: "A" },
       { title: "A" }
