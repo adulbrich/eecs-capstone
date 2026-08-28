@@ -279,7 +279,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/users.ts:listMentors": { level: "staff" },
   "server/users.ts:listUsers": {
     level: "admin",
-    note: "The /admin/users routes require role === admin exactly, where most admin routes accept staff.",
+    note: "Gated in listUsersForCurrentUser, not in listUsersImpl, which is exported and ungated. The /admin/users routes require role === admin exactly, where most admin routes accept staff.",
   },
   "server/users.ts:lookupUserByEmail": { level: "staff" },
   "server/users.ts:searchUsers": { level: "staff" },
