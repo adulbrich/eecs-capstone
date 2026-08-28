@@ -75,14 +75,20 @@ function typeScriptFilesUnder(dir: string): string[] {
  */
 const FACTORY_MODULE = "@tanstack/react-start";
 
-function factoryNames(sourceFile: ts.SourceFile): Set<string> {
+function factoryImports(sourceFile: ts.SourceFile) {
   const names = new Set<string>();
+  // Imports of the factory from anywhere else, by the line they sit on.
+  // `import { createServerFn as make } from "@tanstack/react-start/server"`
+  // spells the real name only inside the import, where the guard below
+  // suppresses it, and binds `make`, which is not a name from the module this
+  // keys on. It reached neither list. Reporting the import itself is what makes
+  // a near-miss specifier loud instead of silent.
+  const foreign: ts.ImportSpecifier[] = [];
   for (const statement of sourceFile.statements) {
     if (
       !(
         ts.isImportDeclaration(statement) &&
-        ts.isStringLiteral(statement.moduleSpecifier) &&
-        statement.moduleSpecifier.text === FACTORY_MODULE
+        ts.isStringLiteral(statement.moduleSpecifier)
       )
     ) {
       continue;
@@ -91,14 +97,20 @@ function factoryNames(sourceFile: ts.SourceFile): Set<string> {
     if (!(bindings && ts.isNamedImports(bindings))) {
       continue;
     }
+    const fromFactoryModule = statement.moduleSpecifier.text === FACTORY_MODULE;
     for (const element of bindings.elements) {
       // `propertyName` is set only on `{ a as b }`, where it holds `a`.
-      if ((element.propertyName ?? element.name).text === FACTORY) {
+      if ((element.propertyName ?? element.name).text !== FACTORY) {
+        continue;
+      }
+      if (fromFactoryModule) {
         names.add(element.name.text);
+      } else {
+        foreign.push(element);
       }
     }
   }
-  return names;
+  return { foreign, names };
 }
 
 /**
@@ -189,7 +201,7 @@ export function scanFile(file: string, source: string) {
     );
   }
 
-  const names = factoryNames(sourceFile);
+  const { foreign, names } = factoryImports(sourceFile);
   const declared: string[] = [];
   // The exact identifier nodes an endpoint declaration is built on, not their
   // positions. A span would clear every other use inside the same statement,
@@ -212,7 +224,11 @@ export function scanFile(file: string, source: string) {
     }
   }
 
-  const unparsed: number[] = [];
+  const unparsed: number[] = foreign.map(
+    (element) =>
+      sourceFile.getLineAndCharacterOfPosition(element.getStart(sourceFile))
+        .line + 1
+  );
   const visit = (node: ts.Node) => {
     // Two ways to be unrecognized. A bound name that no exported declaration
     // turned into an endpoint is a use this scan could not read. The literal

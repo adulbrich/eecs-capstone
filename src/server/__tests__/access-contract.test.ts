@@ -157,13 +157,21 @@ describe("the scan the contract is checked with", () => {
         'import { createServerFn } from "./not-tanstack";\n' +
           "export const a = createServerFn().handler(() => []);\n",
       ],
+      [
+        "aliased out of a near-miss specifier, so the real name is only in the import",
+        'import { createServerFn as make } from "@tanstack/react-start/server";\n' +
+          "export const a = make().handler(() => []);\n",
+      ],
     ];
 
     for (const [what, source] of shapes) {
       const { declared, unparsed } = scanOf(source);
-      expect({ declared, unparsed, what }).toEqual({
+      // Both halves matter. `declared` empty says the shape was not mistaken
+      // for an endpoint, which is what a bare sum would also allow the inverse
+      // of; a non-empty `unparsed` says it was reported instead of skipped.
+      expect({ declared, reported: unparsed.length > 0, what }).toEqual({
         declared: [],
-        unparsed: [expect.any(Number)],
+        reported: true,
         what,
       });
     }

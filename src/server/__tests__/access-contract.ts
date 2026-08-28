@@ -59,7 +59,7 @@ interface AccessDeclaration {
  * of a claim this specific is two chances to correct only one of them.
  */
 const PUBLIC_ITEM_VIEW_NOTE =
-  "The projection branches on isStaff, not on having a session, so anonymous and signed-in non-staff callers get the same public view and only staff see more. publicItemView omits holder identity, serial, label, location and notes.";
+  "The projection branches on isStaff, not on having a session, so anonymous and signed-in non-staff callers get the same public view and only staff see more. publicItemView omits holder identity, serial, label, location and notes. getInventoryItemDetail withholds one thing more: the staff branch returns the status history, joined to user.name, where the public branch returns an empty array.";
 
 export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/admin.ts:getAdminStats": {
@@ -116,7 +116,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
 
   "server/inventory.ts:addToCart": {
     level: "authenticated",
-    note: "Any signed-in user may cart any available item. The catalog is public, so there is no per-item visibility rule to apply.",
+    note: "Any signed-in user may cart any item, but addToCartAs throws unless item.status is available. That check is the per-item rule: a retired or otherwise non-available item is hidden from non-staff by canReadInventoryItem, and the status guard is what stops one being carted by id. Do not remove it as redundant with the public catalog.",
   },
   "server/inventory.ts:approveRequestItem": { level: "staff" },
   "server/inventory.ts:cancelRequestItem": {
@@ -140,7 +140,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/inventory.ts:listInventory": {
     level: "public",
-    note: "The projection branches on isStaff, not on having a session, so anonymous and signed-in non-staff callers get the same public view and only staff see more.",
+    note: PUBLIC_ITEM_VIEW_NOTE,
   },
   "server/inventory.ts:listInventoryCategories": {
     level: "public",
