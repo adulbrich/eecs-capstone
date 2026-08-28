@@ -82,28 +82,25 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
 - **Never commit to `main`.** A branch ruleset rejects direct pushes, including the
   user's. Branch, push, open a PR, and let the `verify` check go green. GitHub asks
   for no approving review, so nothing but the rule below stops a PR merging unread.
-- **Run `mattpocock-skills:code-review` on every PR before merging, and run it again
-  after addressing what it found, until a pass comes back with nothing.** A clean pass
-  ends it, so a PR that draws no findings needs exactly one. Every later pass exists
-  for the code the previous pass caused you to write, which otherwise reaches `main`
-  reviewed by nobody. A clean first pass ends it: one pass is enough when there is
-  nothing to re-review. The second pass exists for the code the first pass caused you
-  to write, which otherwise reaches `main` having been reviewed by nobody. Green CI is
-  not a review; it says the suite still passes, which is exactly what a change that
-  adds no coverage cannot fail. Report the findings you are declining and why, not
-  only the ones you acted on, and verify a finding before acting on it: a review agent
-  reads a branch, not your intent, and will sometimes be confidently wrong about what
-  exists.
+- **Run `mattpocock-skills:code-review` on every PR before merging, and again after
+  addressing what it found, until a pass raises nothing new.** A pass that finds
+  nothing ends it, so a PR nobody has notes on needs exactly one. Every later pass
+  exists for the code the previous pass caused you to write, which otherwise reaches
+  `main` reviewed by nobody. A finding you decline does not restart the loop; say in
+  the PR that you declined it and why, so the next pass raising it again is not new.
+  Green CI is not a review: it says the suite still passes, which is exactly what a
+  change that adds no coverage cannot fail. Verify a finding before acting on it, and
+  say which you declined. A review agent reads a branch, not your intent, and will
+  sometimes be confidently wrong about what exists.
 
-  `.claude/settings.json` declares the marketplace and enables the plugin, which comes
-  from `github.com/mattpocock/skills` pinned to a commit, so a fresh clone can run it
-  without installing anything by hand. Dependabot's PRs are exempt. If you are an
-  agent that cannot run a Claude Code plugin, review the diff against this file and
-  `docs/QUIRKS.md` yourself and say so in the PR: what is required is a review, not a
-  particular tool.
+  `.claude/settings.json` declares the marketplace and enables the plugin, so a fresh
+  clone can run it without installing anything by hand. Dependabot's PRs are exempt.
+  If you are an agent that cannot run a Claude Code plugin, review the diff against
+  this file and `docs/QUIRKS.md` yourself and say so in the PR: what is required is a
+  review, not a particular tool.
 - **Check the docs for the fast-moving libraries with the context7 MCP server**
-  rather than recalling them, for TanStack Start, TanStack Router, Better
-  Auth and Drizzle above all: those four move faster than training data. Do not record
+  rather than recalling them, for TanStack Start, TanStack Router, Better Auth and
+  Drizzle above all: those four move faster than training data. Do not record
   here how fast, how mature, or which version; read that from `package.json`, the only
   copy that cannot go stale. Naming a major line is fine where it identifies the
   thing, as "Tailwind v4" does. `docs/QUIRKS.md` outranks upstream docs wherever the
@@ -121,7 +118,8 @@ Read the matching doc before you start; each one is the source of truth for its 
   params, TanStack Form validators, Better Auth sessions and bans, Drizzle tsvector
   columns and FK rules, Vitest and integration-test setup, Sharp and S3 storage keys,
   which Biome rules are relaxed and why, the path-by-path layout of `src/`, the
-  spec-then-plan-then-implement workflow, and the inventory and project domain rules.
+  spec-then-plan-then-implement workflow, Amazon Bedrock, and the inventory and
+  project domain rules.
 
 - **[`docs/UI-CONVENTIONS.md`](./docs/UI-CONVENTIONS.md)** is the design system:
   brand tokens and why hex codes never go in a component, `Button` variants and
