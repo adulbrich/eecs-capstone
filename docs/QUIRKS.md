@@ -513,6 +513,12 @@ here.
 The git rules (stage by name, never commit to `main`, no session links on a remote)
 bind every turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
 
+### Every server function declares its access level
+
+There is no global middleware, and no grep can tell an ungated endpoint from a gated one, so the level is declared rather than detected. It lives in `src/server/__tests__/access-contract.ts`, one line per endpoint, with the reasoning and the incident behind it (#103, #108) written out there. Read it there: this section says where the check is, not what it concluded, so there is one copy to keep true. Its test fails if an endpoint exists with no line, if a line names an endpoint that does not exist, if the set declared `public` changes, or if any use of `createServerFn` appears in a shape the scan cannot parse. That last one is load-bearing: two legal shapes, a type annotation and a line break before the initializer, were invisible until it was added, and an endpoint the pattern cannot read reports as nothing at all rather than as undeclared. The scan itself lives in `server-fn-scan.ts` so it can be driven with sources written to break it, which is how a renamed import (`import { createServerFn as make }`) was caught escaping both the search and that guard: the only occurrence of the real name sat inside the import, where the guard suppresses it.
+
+Two things the table does that are easy to misread. It records the **effective** level, so five project transition endpoints are `staff` even though their gate admits the proposer, because `TRANSITIONS` in `src/lib/project-workflow.ts` decides per role. And it covers all of `src`, not just `src/server`, because the narrow scan missed `lib/auth-guards.ts:getSession`.
+
 ### Path-by-path convention summary
 
 | Path | What goes there |
@@ -523,6 +529,7 @@ bind every turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
 | `src/server/*.ts` | createServerFn wrappers (Zod schemas + dynamic-import handlers). Client-importable. |
 | `src/server/_internal/*.ts` | Impl + `*As(viewer, ...)` + `*ForCurrentUser(...)` helpers. Server-only. |
 | `src/server/__tests__/*.integration.test.ts` | Integration tests against docker Postgres. |
+| `src/server/__tests__/*.test.ts` | Unit tests over the server layer, including the structural ones (`seam-convention`, `access-contract`) that read source off disk and need no database. `access-contract.ts` and `server-fn-scan.ts` sit beside them and are not test files. |
 | `src/components/*.tsx` | App components built on shadcn/ui + Radix primitives (see `src/components/ui/`). |
 | `src/routes/...` | TanStack file-based routes. `_layout.tsx` are pathless. `routeTree.gen.ts` is auto-generated; do not hand-edit. |
 | `src/db/schema.ts` | Hand-written Drizzle schema for app tables. |

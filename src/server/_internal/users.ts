@@ -217,9 +217,10 @@ export async function exportUsersImpl(data: ListUsersInput) {
 }
 
 /**
- * Gated with assertAdmin, not assertStaff. /admin/users requires
- * `role === "admin"` exactly, unlike every other admin route, and a server
- * function is a public endpoint rather than a page the router can redirect.
+ * Gated with assertAdmin, not assertStaff. The /admin/users routes require
+ * `role === "admin"` exactly, where most admin routes accept staff, and a
+ * server function is a public endpoint rather than a page the router can
+ * redirect.
  *
  * Split out from the wrapper below so integration tests can exercise the gate
  * with a plain viewer, the way they do for every other *As helper.
