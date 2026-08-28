@@ -220,9 +220,7 @@ function CategoriesAdmin() {
 
   const { orderRows, tableProps } = useAdminTable({
     columns,
-    data: rows,
     defaultSort,
-    getRowId: (row) => row.id,
     navigate,
     search,
     storageKey,
@@ -338,11 +336,13 @@ function CategoriesAdmin() {
             caption={
               tab === "project" ? "Project categories" : "Inventory categories"
             }
+            data={rows}
             emptyMessage={
               tab === "project"
                 ? "No project categories yet."
                 : "No inventory categories yet."
             }
+            getRowId={(row) => row.id}
             {...tableProps}
           />
         </TabsContent>

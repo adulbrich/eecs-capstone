@@ -16,12 +16,9 @@ type AdminNavigate = (opts: {
   search: (prev: Record<string, unknown>) => Record<string, unknown>;
 }) => unknown;
 
-interface UseAdminTableOptions<TRow, TColumn extends AdminTableStateColumn> {
+interface UseAdminTableOptions<TColumn extends AdminTableStateColumn> {
   columns: TColumn[];
-  /** The rows to render. Also what fixes `TRow` for `getRowId`. */
-  data: TRow[];
   defaultSort: SortState;
-  getRowId: (row: TRow) => string;
   /**
    * The route's own `useNavigate({ from })` result. Taken as an argument
    * rather than called here: `useNavigate` is generic over the route tree, so
@@ -64,31 +61,30 @@ interface UseAdminTableOptions<TRow, TColumn extends AdminTableStateColumn> {
  * another, a mismatched `defaultSort` makes the URL and the rendered order
  * disagree. Named once here, they cannot disagree.
  *
- * `data`, `getRowId` and `serverSorted` are different: the hook reads none of
- * them, and forwards all three into `tableProps` untouched. That is deliberate
- * and was weighed in #97 rather than left to be re-noticed at each review.
+ * `data` and `getRowId` used to be options here too, forwarded into the prop
+ * bag and read by nothing. #97 asked whether that was worth it; they are gone,
+ * because it was not. The argument for keeping them was that `data` fixed
+ * `TRow` so `getRowId` could infer, and that removing it meant annotating the
+ * row type at all seven call sites. That is only true if `getRowId` stays
+ * behind: move both out and `TRow` leaves this hook entirely, `AdminDataTable`
+ * anchors the row type from its own `data` prop, and every route typechecks
+ * with no annotation at all. Each route was an exact wash, two lines out and
+ * two lines in.
  *
- * They stay because `data` is not pure forwarding. It is what fixes `TRow` so
- * `getRowId` infers, since `orderRows` is generic over its own export row type
- * and cannot anchor it, and dropping it means annotating the row type at all
- * seven call sites. `getRowId` has to travel with it: it genuinely varies, and
- * not only in the way the six `(row) => row.id` sites suggest, because
- * `/admin/inventory/requests` keys on `row.line.id`. And a complete prop bag is
- * what lets a route write `<AdminDataTable caption emptyMessage {...tableProps}
- * />`; dropping two options puts two props back into seven JSX blocks, so the
- * line count roughly cancels.
+ * `serverSorted` stays, and is genuinely forwarded rather than read: it reaches
+ * the table, and `orderRows` below explains that it makes that function a
+ * no-op. Keeping it here is what lets a route pass one prop bag instead of
+ * agreeing with itself twice.
  */
-export function useAdminTable<TRow, TColumn extends AdminTableStateColumn>({
+export function useAdminTable<TColumn extends AdminTableStateColumn>({
   columns,
-  data,
   defaultSort,
-  getRowId,
   navigate,
   resetPageOnSort,
   search,
   serverSorted,
   storageKey,
-}: UseAdminTableOptions<TRow, TColumn>) {
+}: UseAdminTableOptions<TColumn>) {
   const setSearch = useCallback(
     (patch: AdminTableSearch) =>
       void navigate({
@@ -149,9 +145,7 @@ export function useAdminTable<TRow, TColumn extends AdminTableStateColumn>({
     orderRows,
     tableProps: {
       columns,
-      data,
       defaultSort,
-      getRowId,
       hidden,
       onHiddenChange,
       onSortChange,

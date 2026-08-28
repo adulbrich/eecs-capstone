@@ -420,9 +420,7 @@ function AdminInventory() {
 
   const { orderRows, tableProps } = useAdminTable({
     columns: COLUMNS,
-    data: rows,
     defaultSort: DEFAULT_SORT,
-    getRowId: (row) => row.id,
     navigate,
     search,
     storageKey: "inventory",
@@ -470,7 +468,9 @@ function AdminInventory() {
           />
         }
         caption="Inventory items"
+        data={rows}
         emptyMessage="No items in this view."
+        getRowId={(row) => row.id}
         {...tableProps}
         toolbar={
           <>
