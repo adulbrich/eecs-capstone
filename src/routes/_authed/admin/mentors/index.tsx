@@ -200,9 +200,7 @@ function MentorsAdmin() {
 
   const { orderRows, tableProps } = useAdminTable({
     columns: COLUMNS,
-    data: rows,
     defaultSort: DEFAULT_SORT,
-    getRowId: (row) => row.id,
     navigate,
     search,
     storageKey: "mentors",
@@ -250,7 +248,9 @@ function MentorsAdmin() {
           />
         }
         caption="Mentors"
+        data={rows}
         emptyMessage="No mentors in this view."
+        getRowId={(row) => row.id}
         {...tableProps}
         toolbar={
           <div>

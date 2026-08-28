@@ -194,9 +194,7 @@ function AdminRequestQueue() {
 
   const { tableProps } = useAdminTable({
     columns,
-    data: rows,
     defaultSort: DEFAULT_SORT,
-    getRowId: (row) => row.line.id,
     navigate,
     search,
     storageKey: "inventory-requests",
@@ -227,7 +225,9 @@ function AdminRequestQueue() {
 
       <AdminDataTable
         caption="Inventory requests"
+        data={rows}
         emptyMessage="No requests in this view."
+        getRowId={(row) => row.line.id}
         highlightedRowId={line}
         {...tableProps}
         toolbar={

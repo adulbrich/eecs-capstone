@@ -22,3 +22,7 @@ test-results/
 
 # Subagent-driven-development scratch: ledgers, briefs, review packages.
 .superpowers/
+
+# Personal Claude Code overrides. `.claude/settings.json` is tracked and shared;
+# this one is not, and the directory being tracked makes it committable by accident.
+.claude/settings.local.json

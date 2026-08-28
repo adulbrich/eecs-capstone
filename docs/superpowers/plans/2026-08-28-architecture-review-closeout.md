@@ -410,40 +410,24 @@ blocked, close it. A required check nobody has seen block a merge is a setting, 
 Ordered smallest blast radius first. Each is independently revertible and none blocks
 another, so they can be reordered freely if one turns out larger than its issue suggests.
 
-### Task B1: Document useAdminTable's forwarded options (#97)
+### Task B1: Drop useAdminTable's forwarded options (#97) [done, PR #118]
 
-The issue is explicitly a judgement call filed so the question is answered once. It offers
-two resolutions and names the second as nearly free: leave the three forwarded options in
-place and add one sentence to the docblock. Take that one.
+The issue is a judgement call filed so the question is answered once. It offers two
+resolutions, drop `data` and `getRowId` back to the JSX or keep them and document why,
+and leans toward keeping them. **The opposite one shipped**, because the issue's reason
+for keeping them does not survive checking.
 
-Arguments for it, from the issue: `data` is not purely forwarded, it fixes `TRow` so
-`getRowId` infers, and removing it means annotating the row type at seven call sites; the
-complete prop bag is what lets a route write `<AdminDataTable caption emptyMessage
-{...tableProps} />`.
+That reason: `data` fixes `TRow` so `getRowId` infers, so removing it costs a row-type
+annotation at seven call sites. True only if `getRowId` stays behind. Removing both takes
+`TRow` out of the hook entirely, `AdminDataTable` anchors the row type from its own `data`
+prop, and all seven routes typecheck with no annotation. Each route is an exact wash, two
+lines out of the hook call and two into the JSX.
 
-**Files:**
-- Modify: `src/lib/use-admin-table.ts` (the docblock at `:47-53`)
+`serverSorted` stays, and is the one option the hook takes without reading. The docblock
+says so.
 
-- [ ] **Step 1: Add the sentence**
-
-```ts
- * `data`, `getRowId` and `serverSorted` are forwarded into `tableProps` for prop-bag
- * completeness rather than to fix an agreement: the hook itself never reads them. `data`
- * is not pure forwarding, though. It is what fixes `TRow` so `getRowId` infers, because
- * `orderRows` is generic over its own export row type and cannot anchor it; dropping it
- * means annotating the row type at seven call sites. See #97, which weighed removing them
- * and decided against.
-```
-
-- [ ] **Step 2: Verify and commit**
-
-```bash
-npm run check && npm run typecheck
-git add src/lib/use-admin-table.ts
-git commit -m "docs(admin): say why useAdminTable forwards three options it never reads"
-```
-
-PR closes #97. No test changes: nothing behavioral moved.
+- [x] **Done in PR #118.** Do not re-apply the docblock this task originally carried; it
+  argued for the resolution that was rejected, and named a generic that no longer exists.
 
 ---
 
@@ -453,7 +437,7 @@ Before #93 each route inlined the reducer against its own `useNavigate({ from })
 TanStack Router checked the merged object against that route's `validateSearch` output.
 The hook now types it `Record<string, unknown>` and nothing checks it.
 
-No bug today: the `resetPageOnSort` branch at `use-admin-table.ts:84` is opt-in and only
+No bug today: the `resetPageOnSort` branch at `use-admin-table.ts:85` is opt-in and only
 `/admin/users` opts in, whose schema does declare `page`. What is gone is the compiler
 stopping the next route from opting in without one.
 

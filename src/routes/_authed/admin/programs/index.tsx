@@ -172,9 +172,7 @@ function ProgramsAdmin() {
 
   const { orderRows, tableProps } = useAdminTable({
     columns: COLUMNS,
-    data: rows,
     defaultSort: DEFAULT_SORT,
-    getRowId: (row) => row.id,
     navigate,
     search,
     storageKey: "programs",
@@ -263,7 +261,9 @@ function ProgramsAdmin() {
           />
         }
         caption="Programs"
+        data={rows}
         emptyMessage="No programs yet."
+        getRowId={(row) => row.id}
         {...tableProps}
       />
     </div>

@@ -383,9 +383,7 @@ function AdminProjects() {
 
   const { orderRows, tableProps } = useAdminTable({
     columns: COLUMNS,
-    data: rows,
     defaultSort: DEFAULT_SORT,
-    getRowId: (row) => row.id,
     navigate,
     search,
     storageKey: "projects",
@@ -443,7 +441,9 @@ function AdminProjects() {
           />
         }
         caption="Projects"
+        data={rows}
         emptyMessage="No projects in this view."
+        getRowId={(row) => row.id}
         {...tableProps}
         toolbar={
           <>

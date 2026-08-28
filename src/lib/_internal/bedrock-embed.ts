@@ -1,5 +1,6 @@
 import { InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 import { getBedrockClient } from "./bedrock";
+import { embeddingsEnabled } from "./embeddings-flag";
 
 /**
  * Embedding adapter for Amazon Titan Text Embeddings V2.
@@ -16,29 +17,6 @@ export const EMBEDDING_MODEL_ID =
 export const EMBEDDING_DIMENSIONS = Number(
   process.env.BEDROCK_EMBEDDING_DIMENSIONS ?? "1024"
 );
-
-/**
- * Kill switch. Set `BEDROCK_EMBEDDINGS_ENABLED=false` to make every embedding
- * attempt fail instantly without touching AWS.
- *
- * The integration suite sets it, because `refreshProjectEmbedding` defaults to
- * the real adapter and is reached from every publish. Without this, publishing
- * a fixture project would issue a live InvokeModel, or pay the SDK credential
- * chain's IMDS probe and retries when no credentials exist.
- *
- * It doubles as an operational switch for disabling embeddings in production
- * without a redeploy of application code.
- *
- * Read on every call, not captured once at import. As a module-level `const`
- * this depended on import order and on nothing replacing `process.env`, and a
- * kill switch that can fail open by accident is not a kill switch. When it
- * does fail open under test there is no fast error: the call reaches the AWS
- * SDK, which walks the credential chain and pays an IMDS probe with retries,
- * which is seconds per call rather than a clean failure.
- */
-export function embeddingsEnabled(): boolean {
-  return process.env.BEDROCK_EMBEDDINGS_ENABLED !== "false";
-}
 
 export function buildEmbedRequestBody(text: string): string {
   return JSON.stringify({
