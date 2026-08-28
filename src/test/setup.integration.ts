@@ -1,40 +1,47 @@
-import { beforeEach } from "vitest";
-import { embeddingsEnabled } from "#/lib/_internal/bedrock-embed";
+import { afterEach, beforeEach } from "vitest";
 import { resetDatabase } from "./db-reset";
 
 /**
  * Fail if the embedding kill switch is open.
  *
  * `vitest.integration.config.ts` sets `BEDROCK_EMBEDDINGS_ENABLED=false`, but
- * nothing checked that it arrived. When it fails open there is no fast error:
- * the call reaches the AWS SDK, which walks the credential chain and pays an
- * IMDS probe with retries, so a case takes seconds instead of milliseconds and
- * reads as flakiness rather than misconfiguration. See #22 and the docblock on
- * `embeddingsEnabled` for why that is expensive rather than merely wrong.
+ * nothing checked that it arrived. A fail-open is expensive rather than merely
+ * wrong; the docblock on `embeddingsEnabled` in
+ * `src/lib/_internal/bedrock-embed.ts` explains why, and #22 is the flake it
+ * presented as.
  *
- * Checked in two places because #22 names two ways it can fail open, and one
- * check cannot see both.
+ * The expression is duplicated from that module rather than imported, because
+ * importing it pulls `@aws-sdk/client-bedrock-runtime` in at the top level,
+ * which is 109ms every integration file would pay in its own fork to run one
+ * string compare. Keep the two in step.
  */
-function assertEmbeddingsDisabled() {
+function embeddingsEnabled(): boolean {
+  return process.env.BEDROCK_EMBEDDINGS_ENABLED !== "false";
+}
+
+function assertEmbeddingsDisabled(when: string) {
   if (embeddingsEnabled()) {
     throw new Error(
-      "Embeddings are enabled during the integration run. Set BEDROCK_EMBEDDINGS_ENABLED=false; see the env block in vitest.integration.config.ts."
+      `Embeddings are enabled during the integration run (${when}). BEDROCK_EMBEDDINGS_ENABLED must be "false"; anything else, including unset, is on.`
     );
   }
 }
 
-// Mode one: the config never set it. Deleting that one line is enough, and the
-// variable is then unset rather than "true", which still fails open because
-// `embeddingsEnabled` treats anything but the string "false" as on. Checked at
-// module scope so this reports once per file at collection, naming the cause,
-// instead of once per test.
-assertEmbeddingsDisabled();
+// The config never set it, or the line was deleted. Checked here so the failure
+// arrives once per file at collection, naming the cause, rather than as N
+// identical test failures. This is a reporting choice, not extra coverage: the
+// afterEach below would catch it too.
+assertEmbeddingsDisabled("at collection");
 
 beforeEach(async () => {
-  // Mode two: a test replaced `process.env`. PR #21 fixed the import-order
-  // half of #22 by reading the variable per call, which leaves this half: a
-  // value that was correct at collection can be wrong by the time a later case
-  // runs, and only a per-test check sees that.
-  assertEmbeddingsDisabled();
   await resetDatabase();
+});
+
+// A test replaced `process.env`, which is the fail-open #22 actually names and
+// the one PR #21's read-per-call fix does not close. Checked after rather than
+// before, so the failure lands on the test that did it: a beforeEach would pass
+// the blame to the innocent next test, and would never catch the last test in a
+// file at all.
+afterEach(() => {
+  assertEmbeddingsDisabled("after a test mutated the environment");
 });
