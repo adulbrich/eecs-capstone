@@ -652,6 +652,61 @@ describe("catalog CRUD", () => {
   // EDITABLE_FIELDS only catches a *renamed* column; it says nothing about
   // this early-return path staying correct, which is what this test checks
   // by asserting the write actually reached the row, not just the log.
+  it("persists every editable field when it is the only one that changed", async () => {
+    // The regression guard for the defect this replaced. `updateInventoryItemAs`
+    // used to diff against a hand-maintained EDITABLE_FIELDS list while writing
+    // a separate object literal, and nothing held the two in step: dropping
+    // description, serial, notes or imageUrl from the list left typecheck and
+    // this whole suite green while an edit touching only that field hit the
+    // empty-diff early return, saved nothing, and reported success.
+    //
+    // Each field is edited alone, so a field that stops being diffed fails
+    // here by name rather than being covered incidentally by a multi-field
+    // edit that some other field rescued.
+    const admin = await makeUser(`edit-all-${Date.now()}@x.com`, "admin");
+    const edits = [
+      { field: "name", from: "Before", to: "After" },
+      { field: "description", from: null, to: "A description" },
+      { field: "serial", from: null, to: "SN-1" },
+      { field: "label", from: null, to: "Bench 3" },
+      { field: "location", from: "Shelf A", to: "Shelf B" },
+      { field: "notes", from: null, to: "Private note" },
+      { field: "imageUrl", from: null, to: "inventory/x.jpg" },
+    ] as const;
+
+    for (const { field, from, to } of edits) {
+      const item = await makeItem({ name: "Before", location: "Shelf A" });
+      const base = {
+        id: item.id,
+        categoryIds: [],
+        description: null,
+        imageUrl: null,
+        label: null,
+        location: "Shelf A",
+        name: "Before",
+        notes: null,
+        serial: null,
+      };
+
+      await updateInventoryItemAs(admin, { ...base, [field]: to });
+
+      const [row] = await db
+        .select()
+        .from(inventoryItems)
+        .where(eq(inventoryItems.id, item.id));
+      expect(row[field], `${field} was not written to the row`).toBe(to);
+
+      const logs = await db
+        .select()
+        .from(inventoryItemEditLog)
+        .where(eq(inventoryItemEditLog.itemId, item.id));
+      expect(logs, `${field} produced no edit-log row`).toHaveLength(1);
+      expect(logs[0].changedFields).toEqual([field]);
+      expect(logs[0].oldValues).toMatchObject({ [field]: from });
+      expect(logs[0].newValues).toMatchObject({ [field]: to });
+    }
+  });
+
   it("a single-field update persists to the row, not just the edit log", async () => {
     const admin = await makeUser(`a1-${Date.now()}@x.com`, "admin");
     const item = await makeItem({ name: "Widget", location: "Shelf A" });

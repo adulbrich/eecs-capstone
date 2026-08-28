@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { diffProjectFields } from "../project-edit-diff";
+import { diffRowFields } from "../edit-diff";
 
-describe("diffProjectFields", () => {
+describe("diffRowFields", () => {
   it("skips a field the caller never offered", () => {
     // The rule worth protecting. A viewer who may not write `notes` never
     // contributes one, and `.set()` leaves the column alone. Diffing it anyway
     // would log a phantom "changed to null" against a value still in the row.
-    const out = diffProjectFields(
+    const out = diffRowFields(
       { notes: "staff only", title: "A" },
       { title: "A" }
     );
@@ -16,7 +16,7 @@ describe("diffProjectFields", () => {
   });
 
   it("reports a field that changed, with both sides", () => {
-    const out = diffProjectFields(
+    const out = diffRowFields(
       { description: "old", title: "A" },
       { description: "new", title: "A" }
     );
@@ -26,7 +26,7 @@ describe("diffProjectFields", () => {
   });
 
   it("treats undefined and null as the same absence", () => {
-    const out = diffProjectFields(
+    const out = diffRowFields(
       { description: null, title: "A" },
       { description: undefined, title: "A" }
     );
@@ -38,7 +38,7 @@ describe("diffProjectFields", () => {
     // so its order is observable. It is the order `buildProjectValues` builds
     // its object in, which is why reordering that literal is a visible change
     // and this test fails when it happens.
-    const out = diffProjectFields(
+    const out = diffRowFields(
       { objectives: "a", title: "A", url: "u" },
       { title: "B", objectives: "b", url: "v" }
     );
@@ -50,7 +50,7 @@ describe("diffProjectFields", () => {
     // and were absent from the hand-maintained field list, so an edit that
     // moved only one of them diffed to nothing and was dropped before the
     // UPDATE ran.
-    const out = diffProjectFields(
+    const out = diffRowFields(
       { isSponsored: false, requiresNdaIp: true, title: "A" },
       { isSponsored: true, requiresNdaIp: true, title: "A" }
     );
@@ -64,7 +64,7 @@ describe("diffProjectFields", () => {
     // expected it skipped. Membership now comes from the writer, so the
     // guarantee moved to the type: `next` is `Partial<T>` of the row, and a
     // key that is not a column no longer typechecks.
-    const out = diffProjectFields(
+    const out = diffRowFields(
       { searchVector: "old", title: "A" },
       { title: "A" }
     );

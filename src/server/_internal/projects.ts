@@ -8,7 +8,7 @@ import {
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
-import { diffProjectFields } from "#/lib/project-edit-diff";
+import { diffRowFields } from "#/lib/edit-diff";
 import { canEditProject, canWritePrivateNotes } from "#/lib/project-visibility";
 import {
   type ActorRole,
@@ -139,7 +139,7 @@ async function buildProjectValues(
   visibility: Viewer
 ): Promise<Partial<typeof projects.$inferSelect>> {
   // Typed against the table rather than as a loose record, because this object
-  // is the only statement of which columns an edit may touch. `diffProjectFields`
+  // is the only statement of which columns an edit may touch. `diffRowFields`
   // reads its keys, and `.set()` writes them, so a key that is not a column has
   // to be a typecheck failure here rather than a surprise at either end.
   const newValues: Partial<typeof projects.$inferSelect> = {
@@ -183,7 +183,7 @@ export async function updateProjectAs(
   }
   const newValues = await buildProjectValues(data, existing, visibility);
 
-  const { changedFields, newDiff, oldDiff } = diffProjectFields(
+  const { changedFields, newDiff, oldDiff } = diffRowFields(
     existing,
     newValues
   );
