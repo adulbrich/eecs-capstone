@@ -61,20 +61,11 @@ interface UseAdminTableOptions<TColumn extends AdminTableStateColumn> {
  * another, a mismatched `defaultSort` makes the URL and the rendered order
  * disagree. Named once here, they cannot disagree.
  *
- * `data` and `getRowId` used to be options here too, forwarded into the prop
- * bag and read by nothing. #97 asked whether that was worth it; they are gone,
- * because it was not. The argument for keeping them was that `data` fixed
- * `TRow` so `getRowId` could infer, and that removing it meant annotating the
- * row type at all seven call sites. That is only true if `getRowId` stays
- * behind: move both out and `TRow` leaves this hook entirely, `AdminDataTable`
- * anchors the row type from its own `data` prop, and every route typechecks
- * with no annotation at all. Each route was an exact wash, two lines out and
- * two lines in.
- *
- * `serverSorted` stays, and is genuinely forwarded rather than read: it reaches
- * the table, and `orderRows` below explains that it makes that function a
- * no-op. Keeping it here is what lets a route pass one prop bag instead of
- * agreeing with itself twice.
+ * `serverSorted` is the one option this hook forwards without reading. It
+ * belongs here anyway: `orderRows` below is a no-op when it is set, so the
+ * value the table sorts by and the value that suppresses client sorting are
+ * the same decision, and a route that passed them separately could disagree
+ * with itself.
  */
 export function useAdminTable<TColumn extends AdminTableStateColumn>({
   columns,
