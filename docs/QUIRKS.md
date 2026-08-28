@@ -44,6 +44,17 @@ export const submitProject = makeTransition("submitted");
 
 Even if there are 10 near-identical server functions, write them out as 10 top-level constants. Verbose, but the only shape the framework understands.
 
+### Every server function declares its access level
+
+There is no global middleware. Each `createServerFn` endpoint is independently HTTP-reachable and carries its own authorization or carries none, and the gate is spelled three ways: `requireUser()` inside the impl, a file-local `getViewer()` or `readSession()` delegating to an `*As(viewer, ...)` that decides, or deliberately absent because the data is public catalog with no join to `user`. Those three are indistinguishable to a grep. That is how `getProgram` and `listEligibleInstructors` returned every admin's and instructor's id, name, email and role to anonymous callers for three months, against a design doc that said staff only (#103, #108).
+
+So the level is declared, not detected. `src/server/__tests__/access-contract.ts` carries one line per endpoint, and `access-contract.test.ts` fails if an endpoint exists with no line, or a line names an endpoint that does not. Adding an endpoint means adding its line: answer what it should allow rather than copying the level above it.
+
+Two things the table records that the code does not say in one place:
+
+- **The effective level, not the gate's level.** Five of the seven project transition endpoints pass a gate that admits the proposer, and are staff-only anyway, because the `TRANSITIONS` table in `src/lib/project-workflow.ts` lists no `owner` key for `approved`, `published` or `archived`. The declaration says `staff` and names where it is enforced.
+- **Deliberate public reads.** The category and program list reads are ungated on purpose. Recording that is the point: it is what stops a future reader from "fixing" them, and it is what separates them from an endpoint whose gate simply went missing.
+
 ### Server-only modules must not match `**/*.server.*`
 
 TanStack Start's `import-protection` plugin denies any client-chain import (static OR dynamic) where the resolved path matches `**/*.server.*` OR the specifier matches `@tanstack/react-start/server` (or similar denylist entries). The denial is based on static name analysis; the fact that the import lives inside a stripped `createServerFn` handler does not exempt it.
