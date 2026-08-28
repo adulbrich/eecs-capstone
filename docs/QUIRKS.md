@@ -2,7 +2,7 @@
 
 A running log of every gotcha we have hit and the conventions that grew out of them. Read this before debugging anything that "should just work."
 
-The stack is fast-moving: **TanStack Start** is pre-v1 as of 2026, **Better Auth** 1.5.x changed several method names from earlier docs, and **Drizzle 0.45** has gaps the docs do not warn about. Treat the official docs as a starting point, this file as the ground truth for THIS codebase.
+The stack is fast-moving. TanStack Start, TanStack Router, Better Auth and Drizzle all ship breaking changes faster than any model's training data tracks, and the ones here have already renamed methods and moved APIs under this project. Check them with the context7 MCP server rather than recalling them, treat the official docs as a starting point, and treat this file as the ground truth for THIS codebase. Do not restate a version here to say how current the stack is; `package.json` carries that and cannot go stale. A version number that IS the gotcha stays, as with the Better Auth OAuth path change below: there the number is the fact, not decoration.
 
 ## Table of contents
 
@@ -172,7 +172,7 @@ When a server function throws a `ZodError`, the helper `src/lib/apply-server-err
 
 ### `authClient.requestPasswordReset`, not `forgetPassword`
 
-In 1.5.x the password-reset trigger method is `authClient.requestPasswordReset({ email, redirectTo })`. Older docs and some examples show `forgetPassword`, which does not exist.
+The password-reset trigger method is `authClient.requestPasswordReset({ email, redirectTo })`. Older docs and some examples show `forgetPassword`, which does not exist.
 
 ### `user.id` is `text`, not `uuid`
 
@@ -510,8 +510,8 @@ here.
 
 ## Project conventions
 
-The git rules (stage by name, stay on `main`, leave `AGENTS.md` unstaged) bind every
-turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
+The git rules (stage by name, never commit to `main`, no session links on a remote)
+bind every turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
 
 ### Path-by-path convention summary
 
@@ -519,7 +519,7 @@ turn, so they live in [`../AGENTS.md`](../AGENTS.md) instead of here.
 | --- | --- |
 | `src/lib/*.ts` | Pure modules, client-safe wrappers. |
 | `src/lib/_internal/*.ts` | Server-only helpers (auth-guards). |
-| `src/lib/__tests__/*.test.ts` | Pure-module unit tests. |
+| `src/lib/__tests__/*.test.ts` | Pure-module unit tests, plus two integration suites (`auth`, `role-gate`) that need a database. |
 | `src/server/*.ts` | createServerFn wrappers (Zod schemas + dynamic-import handlers). Client-importable. |
 | `src/server/_internal/*.ts` | Impl + `*As(viewer, ...)` + `*ForCurrentUser(...)` helpers. Server-only. |
 | `src/server/__tests__/*.integration.test.ts` | Integration tests against docker Postgres. |
@@ -565,8 +565,8 @@ resize).
 
 ### Sharp's `.withMetadata({})` does NOT strip EXIF
 
-This is the opposite of what you'd expect. In Sharp 0.34.x,
-`.withMetadata()` preserves metadata; passing an empty options object
+This is the opposite of what you'd expect. `.withMetadata()` preserves
+metadata; passing an empty options object
 does NOT mean "strip everything," it means "preserve with these
 options." To strip EXIF, GPS, and orientation, simply omit
 `.withMetadata()` entirely. Sharp's default is metadata-free output.
@@ -674,7 +674,7 @@ Inventory full-text search no longer matches category names. Before this feature
 
 Before this there were two `isStaff` and **five** `assertStaff`, and `isStaff` was exported from `src/lib/project-visibility.ts`, which ten files across seven non-project domains imported. That is what made the module's name wrong: a domain module owned something that is not domain-specific. Consumers import from `viewer.ts` directly rather than through a re-export, because Biome's `noBarrelFile` rejects the re-export and this project's no-shims rule would too.
 
-There are **seven** `AuthUser` interfaces in `_internal/` (`comments`, `uploads`, `projects`, `programs`, `users`, `categories`, `project-review`), and six are byte-identical to `NonNullable<Viewer>`, so no adapter is needed at a call site. The seventh, in `uploads.ts`, genuinely extends it with an optional `image` that only the avatar paths read. `inventory.ts:58` additionally declares its own local `Viewer` while importing `isStaff` from `#/lib/viewer` five lines above. Collapsing them is a loose end, not a blocker. This entry said "four" for several months while the count grew, so treat it as a lower bound and count before you cite it.
+There are **seven** `AuthUser` interfaces in `_internal/` (`comments`, `uploads`, `projects`, `programs`, `users`, `categories`, `project-review`), and six are byte-identical to `NonNullable<Viewer>`, so no adapter is needed at a call site. The seventh, in `uploads.ts`, genuinely extends it with an optional `image` that only the avatar paths read. `inventory.ts:59` additionally declares its own local `Viewer` while importing `isStaff` from `#/lib/viewer` four lines above. Collapsing them is a loose end, not a blocker. This entry said "four" for several months while the count grew, so treat it as a lower bound and count before you cite it.
 
 `assertStaff` carries `asserts viewer is NonNullable<Viewer>`, and the narrowing is load-bearing: call sites read `viewer.id` immediately afterwards with no second null check.
 
