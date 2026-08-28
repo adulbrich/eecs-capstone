@@ -57,7 +57,7 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
 - **Commit messages use Conventional Commits with a lowercase imperative subject:**
   `fix(projects): stop the proposer field lying about pending changes`. The types in
   use are `feat`, `fix`, `docs`, `test`, `refactor`, and `style`, each with the
-  affected area in parentheses. `perf` and `chore` are also in use, the latter with or
+  affected area in parens. `perf`, `ci` and `chore` are also in use, the last with or
   without an area, and a breaking change takes a `!` before the colon, as in
   `feat(inventory)!: give items many categories`. Dependabot lands `chore(deps)` and
   `build(deps)`.
@@ -82,16 +82,17 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
 - **Never commit to `main`.** A branch ruleset rejects direct pushes, including the
   user's. Branch, push, open a PR, and let the `verify` check go green. GitHub asks
   for no approving review, so nothing but the rule below stops a PR merging unread.
-- **Run `mattpocock-skills:code-review` on every PR before merging, and again after
-  addressing what it found, until a pass raises nothing new.** A pass that finds
-  nothing ends it, so a PR nobody has notes on needs exactly one. Every later pass
-  exists for the code the previous pass caused you to write, which otherwise reaches
-  `main` reviewed by nobody. A finding you decline does not restart the loop; say in
-  the PR that you declined it and why, so the next pass raising it again is not new.
-  Green CI is not a review: it says the suite still passes, which is exactly what a
-  change that adds no coverage cannot fail. Verify a finding before acting on it, and
-  say which you declined. A review agent reads a branch, not your intent, and will
-  sometimes be confidently wrong about what exists.
+- **Run `mattpocock-skills:code-review` on every PR before merging, then again after
+  addressing what it found, until a pass raises nothing you have not already
+  answered.** That is the only stopping condition, and a PR that draws no findings
+  meets it after one pass. Answered covers both a finding you fixed and one you
+  declined in writing, so a reviewer repeating a point you argued against does not
+  restart the loop. Every pass after the first exists for the code the previous pass
+  caused you to write, which otherwise reaches `main` reviewed by nobody. Green CI is
+  not a review: it says the suite still passes, which is exactly what a change that
+  adds no coverage cannot fail. Verify a finding before acting on it. A review agent
+  reads a branch, not your intent, and will sometimes be confidently wrong about what
+  exists.
 
   `.claude/settings.json` declares the marketplace and enables the plugin, so a fresh
   clone can run it without installing anything by hand. Dependabot's PRs are exempt.
@@ -125,11 +126,13 @@ Read the matching doc before you start; each one is the source of truth for its 
   brand tokens and why hex codes never go in a component, `Button` variants and
   sizes, `asChild` for links, shadcn form inputs, semantic color classes, border
   radius, mobile-first breakpoints and page padding, the `Sheet` mobile nav, and
-  `AdminDataTable` for responsive admin tables.
+  `AdminDataTable` for responsive admin tables, the shared component patterns, and
+  the confirmation rules for destructive actions.
 
 - **[`README.md`](./README.md)** covers install, docker compose, seeding, and
-  running the dev server. Known issues and the roadmap are GitHub Issues, not a
-  section in that file; check there before assuming something is unreported.
+  running the dev server. Its "Known issues and roadmap" section is a pointer at
+  GitHub Issues rather than a list; check the issues before assuming something is
+  unreported.
 
 - **[`PRD.md`](./PRD.md)** is the exhaustive feature list, built and planned. Check it
   before assuming a feature is missing.
