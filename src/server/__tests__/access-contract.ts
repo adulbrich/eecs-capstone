@@ -188,7 +188,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
 
   "server/projects-queries.ts:exportAdminProjects": {
     level: "staff",
-    note: "Reads adminProjectSummarySelect, which widens the shared projection with proposer identity, contactEmail and `notes`. `notes` is the staff-only field this gate exists for; the export includes it deliberately, see the docblock on exportAdminProjectsAs.",
+    note: "Reads adminProjectSummarySelect, which carries proposer identity and contactEmail, and then adds `notes` in its own select rather than through the shared one. `notes` is the staff-only field this gate exists for, and adding it here is what keeps it out of the listing that shares the projection.",
   },
   "server/projects-queries.ts:getProject": {
     level: "public",

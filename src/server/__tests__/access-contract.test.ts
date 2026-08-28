@@ -1,187 +1,16 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
-import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { ACCESS_CONTRACT } from "./access-contract";
+import { scan, scanFile } from "./server-fn-scan";
 
 /**
- * Holds `access-contract.ts` to the code. It infers no endpoint's access level:
- * inferring is what #108 rules out, because a grep for the guard names
- * mislabelled seven of seventeen endpoints and could not tell a correctly
- * ungated public read from a gate it failed to recognize.
+ * Holds `access-contract.ts` to the code. The two lists have to name the same
+ * endpoints, no use of `createServerFn` may escape the scan, and the public
+ * surface has to be exactly the one written down.
  *
- * What it enforces is that the two lists name the same endpoints, that no use
- * of `createServerFn` escapes the scan, and that the public surface is exactly
- * the one written down.
- *
- * It reads the real TypeScript AST rather than matching text. Two hand-written
- * attempts came first and both were wrong: a line-anchored filter tripped over
- * a wrapped import, a trailing comment and a string literal, and the character
- * masker that replaced it treated `/["']/` as an unterminated string and
- * blanked the rest of the file, which silently disarmed the check for
- * everything below that line. Comments, strings, JSX text and regex literals
- * contain no identifiers, so the parser gets all four right for free.
+ * No assertion here reads an access level out of the source. #108 exists
+ * because that cannot be done reliably, so the level is declared and this only
+ * checks that something was declared for everything that exists.
  */
-
-const SRC_DIR = join(process.cwd(), "src");
-
-const FACTORY = "createServerFn";
-
-/**
- * `node_modules` is not ours, and `__tests__` holds no endpoints. `src/test/` is
- * deliberately still scanned: it is test infrastructure rather than test cases,
- * and an endpoint declared there would be as reachable as any other.
- */
-const SKIP_DIRS = new Set(["__tests__", "node_modules"]);
-const SOURCE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts"];
-
-function typeScriptFilesUnder(dir: string): string[] {
-  const found: string[] = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) {
-        found.push(...typeScriptFilesUnder(full));
-      }
-    } else if (SOURCE_EXTENSIONS.some((ext) => entry.name.endsWith(ext))) {
-      found.push(full);
-    }
-  }
-  return found;
-}
-
-/**
- * Walk down `createServerFn({...}).inputValidator(...).handler(...)` to the
- * identifier the chain is rooted in, and return it only if the chain actually
- * calls it. `createServerFn.mock()` and a bare `export const x = createServerFn`
- * both reach the identifier without calling it, and neither is an endpoint.
- */
-function calledFactory(node: ts.Node): ts.Identifier | undefined {
-  let current: ts.Node = node;
-  while (true) {
-    if (ts.isCallExpression(current)) {
-      if (
-        ts.isIdentifier(current.expression) &&
-        current.expression.text === FACTORY
-      ) {
-        return current.expression;
-      }
-      current = current.expression;
-    } else if (ts.isPropertyAccessExpression(current)) {
-      current = current.expression;
-    } else {
-      return;
-    }
-  }
-}
-
-function isExported(statement: ts.VariableStatement): boolean {
-  return (
-    statement.modifiers?.some(
-      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword
-    ) ?? false
-  );
-}
-
-function withinImport(node: ts.Node): boolean {
-  for (let n: ts.Node | undefined = node; n; n = n.parent) {
-    if (ts.isImportDeclaration(n) || ts.isImportEqualsDeclaration(n)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function scanFile(file: string, source: string) {
-  const sourceFile = ts.createSourceFile(
-    file,
-    source,
-    ts.ScriptTarget.Latest,
-    /* setParentNodes */ true,
-    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
-  );
-
-  // A file the parser could not read yields an empty tree, which every
-  // assertion below would read as "nothing here" rather than as a problem.
-  // `npm run typecheck` catches this first in CI, but a check that can quietly
-  // examine nothing is the defect this whole file exists to remove.
-  // `parseDiagnostics` is internal, so a TypeScript release that renames it
-  // would leave this reading `undefined`. Treat absent and non-empty alike:
-  // otherwise the rename disarms the guard silently, which is the exact defect
-  // this block exists to prevent.
-  const parseErrors = (
-    sourceFile as unknown as { parseDiagnostics?: unknown[] }
-  ).parseDiagnostics;
-  if (!Array.isArray(parseErrors)) {
-    throw new Error(
-      "TypeScript no longer exposes parseDiagnostics, so a file that fails to parse would be read as empty. Replace this check with ts.transpileModule(source, { reportDiagnostics: true })."
-    );
-  }
-  if (parseErrors.length > 0) {
-    throw new Error(
-      `${file} did not parse, so its endpoints cannot be read. Fix the syntax error; typecheck will name it.`
-    );
-  }
-
-  const declared: string[] = [];
-  // The exact identifier nodes an endpoint declaration is built on, not their
-  // positions. A span would clear every other use inside the same statement,
-  // and `export const a = createServerFn()..., b = wrap(createServerFn()...)`
-  // then loses `b` from both the declared list and the unrecognized one.
-  const accounted = new Set<ts.Node>();
-
-  for (const statement of sourceFile.statements) {
-    if (!(ts.isVariableStatement(statement) && isExported(statement))) {
-      continue;
-    }
-    for (const declaration of statement.declarationList.declarations) {
-      const factory = declaration.initializer
-        ? calledFactory(declaration.initializer)
-        : undefined;
-      if (factory && ts.isIdentifier(declaration.name)) {
-        declared.push(declaration.name.text);
-        accounted.add(factory);
-      }
-    }
-  }
-
-  const unparsed: number[] = [];
-  const visit = (node: ts.Node) => {
-    if (
-      ts.isIdentifier(node) &&
-      node.text === FACTORY &&
-      !(withinImport(node) || accounted.has(node))
-    ) {
-      unparsed.push(
-        sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
-          .line + 1
-      );
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-
-  return { declared, unparsed };
-}
-
-let cached: { declared: string[]; unparsed: string[] } | undefined;
-
-/** Parsing every file costs about 250ms, and four assertions want the answer. */
-function scan() {
-  if (cached) {
-    return cached;
-  }
-  const declared: string[] = [];
-  const unparsed: string[] = [];
-  for (const file of typeScriptFilesUnder(SRC_DIR)) {
-    const label = relative(SRC_DIR, file);
-    const result = scanFile(file, readFileSync(file, "utf8"));
-    declared.push(...result.declared.map((name) => `${label}:${name}`));
-    unparsed.push(...result.unparsed.map((line) => `${label}:${line}`));
-  }
-  cached = { declared: declared.sort(), unparsed: unparsed.sort() };
-  return cached;
-}
 
 function declaredAt(level: string): string[] {
   return Object.entries(ACCESS_CONTRACT)
@@ -241,5 +70,80 @@ describe("the server function access contract", () => {
       "server/projects-queries.ts:listProjectComments",
       "server/search.ts:searchProjects",
     ]);
+  });
+});
+
+describe("the scan the contract is checked with", () => {
+  /**
+   * The assertions above read `src/`, so they can only show the scan and the
+   * contract agree on the endpoints that exist today. These feed it endpoints
+   * that do not, because every defect found in this file so far has been a
+   * check that could not fail on the thing it was written to catch.
+   *
+   * The invariant is not that every shape is recognized. It is that no shape
+   * lands in neither list: an endpoint the scan cannot read has to surface as
+   * an unrecognized use, so it fails the suite instead of passing unseen.
+   */
+  const scanOf = (source: string) => scanFile("probe.ts", source);
+
+  it("reads an endpoint declared through the normal import", () => {
+    const { declared, unparsed } = scanOf(
+      'import { createServerFn } from "@tanstack/react-start";\n' +
+        "export const listThings = createServerFn().handler(() => []);\n"
+    );
+
+    expect(declared).toEqual(["listThings"]);
+    expect(unparsed).toEqual([]);
+  });
+
+  it("reads an endpoint declared through a renamed import", () => {
+    // The shape that escaped both halves of the check: the only occurrence of
+    // `createServerFn` sits inside the import, where the unrecognized-use guard
+    // suppresses it, and no call site spells the name at all.
+    const { declared, unparsed } = scanOf(
+      'import { createServerFn as make } from "@tanstack/react-start";\n' +
+        "export const listThings = make().handler(() => []);\n"
+    );
+
+    expect(declared).toEqual(["listThings"]);
+    expect(unparsed).toEqual([]);
+  });
+
+  it("leaves no endpoint in neither list", () => {
+    // Each of these is a use the scan does not turn into a declared endpoint.
+    // None of them may go quiet: an unrecognized use fails the first assertion
+    // in this file by name and line, which is the whole point of that guard.
+    const shapes = [
+      // Namespace import, so the call is a property access rather than a call
+      // of a bound name.
+      'import * as start from "@tanstack/react-start";\n' +
+        "export const a = start.createServerFn().handler(() => []);\n",
+      // Declared, then exported in a separate statement the scan does not walk.
+      'import { createServerFn } from "@tanstack/react-start";\n' +
+        "const a = createServerFn().handler(() => []);\nexport { a };\n",
+      // Default export, which carries no name to key a declaration on.
+      'import { createServerFn } from "@tanstack/react-start";\n' +
+        "export default createServerFn().handler(() => []);\n",
+      // Wrapped, so the exported binding is the wrapper's return value.
+      'import { createServerFn } from "@tanstack/react-start";\n' +
+        "export const a = wrap(createServerFn().handler(() => []));\n",
+    ];
+
+    for (const source of shapes) {
+      const { declared, unparsed } = scanOf(source);
+      expect({ source, seen: declared.length + unparsed.length }).toEqual({
+        source,
+        seen: 1,
+      });
+    }
+  });
+
+  it("refuses a file it cannot parse instead of reading it as empty", () => {
+    expect(() =>
+      scanOf(
+        'import { createServerFn } from "@tanstack/react-start";\n' +
+          "export const a = createServerFn().handler(() => {\n"
+      )
+    ).toThrow(/did not parse/);
   });
 });
