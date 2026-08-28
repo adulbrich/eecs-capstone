@@ -57,10 +57,10 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
 - **Commit messages use Conventional Commits with a lowercase imperative subject:**
   `fix(projects): stop the proposer field lying about pending changes`. The types in
   use are `feat`, `fix`, `docs`, `test`, `refactor`, and `style`, each with the
-  affected area in parens. `perf`, `ci` and `chore` are also in use, the last with or
-  without an area, and a breaking change takes a `!` before the colon, as in
-  `feat(inventory)!: give items many categories`. Dependabot lands `chore(deps)` and
-  `build(deps)`.
+  affected area in parens. `perf`, `ci` and `chore` are also in use; `ci` and `chore`
+  appear with or without an area, and a breaking change takes a `!` before the
+  colon, as in `feat(inventory)!: give items many categories`. Dependabot lands
+  `chore(deps)` and `build(deps)`.
 - **Keep the body short, or leave it out.** A sentence or two on why, and only when
   the subject does not already carry it. Cut anything that does not change what a
   reader will do or understand. Commits before 2026-08-09 run to several paragraphs;
@@ -101,11 +101,12 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
   review, not a particular tool.
 - **Check the docs for the fast-moving libraries with the context7 MCP server**
   rather than recalling them, for TanStack Start, TanStack Router, Better Auth and
-  Drizzle above all: those four move faster than training data. Do not record
-  here how fast, how mature, or which version; read that from `package.json`, the only
-  copy that cannot go stale. Naming a major line is fine where it identifies the
-  thing, as "Tailwind v4" does. `docs/QUIRKS.md` outranks upstream docs wherever the
-  two disagree about this codebase.
+  Drizzle above all: those four are what training data is most likely to be wrong
+  about. Do not write down a version, a release cadence or a maturity level here;
+  `package.json` is the only copy of any of that which cannot go stale. Naming a
+  major line is fine where it identifies the thing, as "Tailwind v4" does.
+  `docs/QUIRKS.md` outranks upstream docs wherever the two disagree about this
+  codebase.
 - **Import `createServerFn` from `@tanstack/react-start`.** The bare
   `@tanstack/start` package is not what this project uses.
 
