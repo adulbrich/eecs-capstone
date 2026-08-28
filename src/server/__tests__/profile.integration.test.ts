@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { user } from "#/db/schema";
 import { auth } from "#/lib/auth";
-import { updateProfileAs } from "#/server/_internal/profile";
+import { updateProfileImpl } from "#/server/_internal/profile";
 
 async function makeUser(email: string) {
   await auth.api.signUpEmail({
@@ -20,7 +20,7 @@ async function makeUser(email: string) {
 describe("profile", () => {
   it("persists mentor fields", async () => {
     const u = await makeUser(`m-${Date.now()}@x.com`);
-    await updateProfileAs(u.id, {
+    await updateProfileImpl(u.id, {
       affiliation: "OSU",
       linkedin: null,
       mentorTeamCount: 4,

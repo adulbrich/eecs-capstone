@@ -4,7 +4,7 @@ import { user } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { ProfileInput } from "../profile";
 
-export async function updateProfileAs(userId: string, data: ProfileInput) {
+export async function updateProfileImpl(userId: string, data: ProfileInput) {
   await db
     .update(user)
     .set({
@@ -21,5 +21,5 @@ export async function updateProfileAs(userId: string, data: ProfileInput) {
 
 export async function updateProfileForCurrentUser(data: ProfileInput) {
   const current = await requireUser();
-  return updateProfileAs(current.id, data);
+  return updateProfileImpl(current.id, data);
 }
