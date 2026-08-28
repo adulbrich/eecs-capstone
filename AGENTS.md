@@ -63,14 +63,15 @@ when your change touches the database layer or the UI. Other scripts live in
 - **Never commit to `main`.** A branch ruleset rejects direct pushes, including the
   user's. Branch, push, open a PR, and let the `verify` check go green. GitHub asks
   for no approving review, so nothing but the rule below stops a PR merging unread.
-- **Run `mattpocock-skills:code-review` on every PR, at least twice, before merging.**
-  Once against the opening diff, and again after its findings are addressed. If the
-  first pass finds nothing, run the second anyway: the two axes are sampled, not
-  exhaustive, and a clean first pass is the case where a second is most likely to
-  turn something up. Green CI is not a review. It says the suite still passes, which
-  is exactly the thing a change that adds no coverage cannot fail.
-  Report both passes' findings rather than only the ones you acted on, and say which
-  you are declining and why.
+- **Run `mattpocock-skills:code-review` on every PR before merging, and run it again
+  after addressing what it found.** A clean first pass ends it: one pass is enough
+  when there is nothing to re-review. The second pass exists for the code the first
+  pass caused you to write, which otherwise reaches `main` having been reviewed by
+  nobody. Green CI is not a review; it says the suite still passes, which is exactly
+  what a change that adds no coverage cannot fail. Report the findings you are
+  declining and why, not only the ones you acted on, and verify a finding before
+  acting on it: a review agent reads a branch, not your intent, and will sometimes be
+  confidently wrong about what exists.
 - **Check the docs for the fast-moving libraries with the context7 MCP server**
   rather than recalling them. TanStack Start is pre-v1, and Better Auth and Drizzle
   both move faster than training data. `docs/QUIRKS.md` outranks upstream docs
