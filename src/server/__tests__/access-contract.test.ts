@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { ACCESS_CONTRACT } from "./access-contract";
 
@@ -10,21 +11,21 @@ import { ACCESS_CONTRACT } from "./access-contract";
  * ungated public read from a gate it failed to recognize.
  *
  * What it enforces is that the two lists name the same endpoints, that no use
- * of `createServerFn` escapes the parser, and that the public surface is
- * exactly the one written down.
+ * of `createServerFn` escapes the scan, and that the public surface is exactly
+ * the one written down.
+ *
+ * It reads the real TypeScript AST rather than matching text. Two hand-written
+ * attempts came first and both were wrong: a line-anchored filter tripped over
+ * a wrapped import, a trailing comment and a string literal, and the character
+ * masker that replaced it treated `/["']/` as an unterminated string and
+ * blanked the rest of the file, which silently disarmed the check for
+ * everything below that line. Comments, strings, JSX text and regex literals
+ * contain no identifiers, so the parser gets all four right for free.
  */
 
 const SRC_DIR = join(process.cwd(), "src");
 
-/**
- * `export const <name> = createServerFn`, allowing a type annotation and a line
- * break before the initializer. Both are legal and both were invisible to the
- * first version of this pattern, which is why nothing here trusts it alone.
- */
-const ENDPOINT_DECLARATION =
-  /^export const (\w+)\s*(?::[^=\n]+)?=\s*createServerFn/gm;
-
-const FACTORY = /\bcreateServerFn\b/g;
+const FACTORY = "createServerFn";
 
 /** Test files declare no endpoints, and `node_modules` is not ours. */
 const SKIP_DIRS = new Set(["__tests__", "node_modules"]);
@@ -46,95 +47,108 @@ function typeScriptFilesUnder(dir: string): string[] {
 }
 
 /**
- * Blank out comments and string literals, preserving every offset and newline
- * so positions and line numbers still line up with the original.
- *
- * Line-anchored filters were tried first and were wrong three ways: a trailing
- * comment, a string mentioning the factory, and a wrapped multi-line import all
- * slipped through and turned the check red on correct code.
+ * Walk down `createServerFn({...}).inputValidator(...).handler(...)` to the
+ * identifier the chain is rooted in.
  */
-function maskCommentsAndStrings(source: string): string {
-  const out = source.split("");
-  let i = 0;
-  const blank = (from: number, to: number) => {
-    for (let k = from; k < to && k < out.length; k++) {
-      if (out[k] !== "\n") {
-        out[k] = " ";
-      }
-    }
-  };
-  while (i < source.length) {
-    const two = source.slice(i, i + 2);
-    if (two === "//") {
-      const end = source.indexOf("\n", i);
-      const stop = end === -1 ? source.length : end;
-      blank(i, stop);
-      i = stop;
-    } else if (two === "/*") {
-      const end = source.indexOf("*/", i + 2);
-      const stop = end === -1 ? source.length : end + 2;
-      blank(i, stop);
-      i = stop;
-    } else if (source[i] === '"' || source[i] === "'" || source[i] === "`") {
-      const quote = source[i];
-      let k = i + 1;
-      while (k < source.length && source[k] !== quote) {
-        k += source[k] === "\\" ? 2 : 1;
-      }
-      blank(i, k + 1);
-      i = k + 1;
-    } else {
-      i++;
-    }
+function chainRoot(node: ts.Node): ts.Node {
+  let current = node;
+  while (
+    ts.isCallExpression(current) ||
+    ts.isPropertyAccessExpression(current)
+  ) {
+    current = current.expression;
   }
-  return out.join("");
+  return current;
 }
 
-/**
- * Blank import statements too. Run after masking, so the module specifier is
- * already gone and a statement is simply `import` up to its semicolon, which is
- * what makes a wrapped multi-line import safe to match.
- */
-function maskImports(masked: string): string {
-  return masked.replace(/\bimport\b[^;]*;/g, (match) =>
-    match.replace(/[^\n]/g, " ")
+function isExported(statement: ts.VariableStatement): boolean {
+  return (
+    statement.modifiers?.some(
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword
+    ) ?? false
   );
 }
 
-function lineOf(source: string, index: number): number {
-  return source.slice(0, index).split("\n").length;
+function withinImport(node: ts.Node): boolean {
+  for (let n: ts.Node | undefined = node; n; n = n.parent) {
+    if (ts.isImportDeclaration(n) || ts.isImportEqualsDeclaration(n)) {
+      return true;
+    }
+  }
+  return false;
 }
 
-function scan() {
+function scanFile(file: string, source: string) {
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  );
+
   const declared: string[] = [];
-  const unparsed: string[] = [];
+  const accepted: [number, number][] = [];
 
-  for (const file of typeScriptFilesUnder(SRC_DIR)) {
-    const source = readFileSync(file, "utf8");
-    const code = maskImports(maskCommentsAndStrings(source));
-    const label = relative(SRC_DIR, file);
-
-    const covered: [number, number][] = [];
-    for (const match of source.matchAll(ENDPOINT_DECLARATION)) {
-      declared.push(`${label}:${match[1]}`);
-      const start = match.index ?? 0;
-      covered.push([start, start + match[0].length]);
+  for (const statement of sourceFile.statements) {
+    if (!(ts.isVariableStatement(statement) && isExported(statement))) {
+      continue;
     }
-
-    for (const mention of code.matchAll(FACTORY)) {
-      const at = mention.index ?? 0;
-      const parsed = covered.some(([from, to]) => at >= from && at < to);
-      if (!parsed) {
-        unparsed.push(`${label}:${lineOf(source, at)}`);
+    for (const declaration of statement.declarationList.declarations) {
+      const root = declaration.initializer
+        ? chainRoot(declaration.initializer)
+        : undefined;
+      if (
+        root &&
+        ts.isIdentifier(root) &&
+        root.text === FACTORY &&
+        ts.isIdentifier(declaration.name)
+      ) {
+        declared.push(declaration.name.text);
+        accepted.push([statement.getStart(sourceFile), statement.end]);
       }
     }
   }
 
-  return { declared: declared.sort(), unparsed: unparsed.sort() };
+  const unparsed: number[] = [];
+  const visit = (node: ts.Node) => {
+    if (
+      ts.isIdentifier(node) &&
+      node.text === FACTORY &&
+      !withinImport(node) &&
+      !accepted.some(
+        ([from, to]) => node.getStart(sourceFile) >= from && node.end <= to
+      )
+    ) {
+      unparsed.push(
+        sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
+          .line + 1
+      );
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+
+  return { declared, unparsed };
 }
 
-function liveEndpoints(): string[] {
-  return scan().declared;
+let cached: { declared: string[]; unparsed: string[] } | undefined;
+
+/** Parsing every file is ~40ms, and three assertions want the same answer. */
+function scan() {
+  if (cached) {
+    return cached;
+  }
+  const declared: string[] = [];
+  const unparsed: string[] = [];
+  for (const file of typeScriptFilesUnder(SRC_DIR)) {
+    const label = relative(SRC_DIR, file);
+    const result = scanFile(file, readFileSync(file, "utf8"));
+    declared.push(...result.declared.map((name) => `${label}:${name}`));
+    unparsed.push(...result.unparsed.map((line) => `${label}:${line}`));
+  }
+  cached = { declared: declared.sort(), unparsed: unparsed.sort() };
+  return cached;
 }
 
 function declaredAt(level: string): string[] {
@@ -145,27 +159,26 @@ function declaredAt(level: string): string[] {
 }
 
 describe("the server function access contract", () => {
-  it("parses every use of createServerFn", () => {
+  it("recognizes every use of createServerFn", () => {
     // The guard that makes the other assertions trustworthy. They compare the
-    // parsed list against ACCESS_CONTRACT, so an endpoint the pattern cannot
-    // read is absent from both sides and reports nothing at all rather than
-    // reporting as undeclared. Two real shapes escaped that way: a type
-    // annotation, and a line break before the initializer.
+    // recognized list against ACCESS_CONTRACT, so a use the scan cannot read is
+    // absent from both sides and reports nothing at all rather than reporting
+    // as undeclared.
     //
-    // If this fails it names the file and line. Widen ENDPOINT_DECLARATION to
-    // cover that shape; do not add it to an ignore list.
+    // If this fails it names the file and line. Teach the scan that shape; do
+    // not add it to an ignore list.
     expect(scan().unparsed).toEqual([]);
   });
 
   it("declares a level for every endpoint that exists", () => {
-    const undeclared = liveEndpoints().filter(
+    const undeclared = scan().declared.filter(
       (endpoint) => !(endpoint in ACCESS_CONTRACT)
     );
     expect(undeclared).toEqual([]);
   });
 
   it("declares no endpoint that has been removed or renamed", () => {
-    const live = new Set(liveEndpoints());
+    const live = new Set(scan().declared);
     const stale = Object.keys(ACCESS_CONTRACT).filter(
       (endpoint) => !live.has(endpoint)
     );
