@@ -79,9 +79,9 @@ export async function saveStorageState(options: {
 
     await page.goto(`${baseURL}/sign-in`, { waitUntil: "load" });
     await waitForHydration(page, "form");
-    await page.fill('input[name="email"]', email);
-    await page.fill('input[name="password"]', password);
-    await page.click('button[type="submit"]');
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(password);
+    await page.getByRole("button", { name: /sign in/i }).click();
     await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"), {
       timeout: 15_000,
     });

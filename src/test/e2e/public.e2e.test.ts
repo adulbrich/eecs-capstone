@@ -25,12 +25,10 @@ test.describe("@smoke public shell", () => {
     await page.goto("/projects");
     await expect(page).toHaveURL(/\/projects\?/);
     // The URL alone proves nothing: a 307 to the normalized search params
-    // followed by an error boundary would satisfy it, which is exactly the
-    // production-build failure this test exists to catch. Assert the list
-    // actually rendered rows.
-    // A link into a project detail page, which only exists if the list
-    // rendered rows. `getByRole("link")` alone would be satisfied by the site
-    // header and prove nothing.
+    // followed by an error boundary would satisfy it, which is the
+    // production-build failure this test exists to catch. A link into a
+    // project detail page only exists if the list rendered rows, where a bare
+    // getByRole("link") would be satisfied by the site header.
     await expect(page.locator('a[href^="/projects/"]').first()).toBeVisible();
 
     const { db, close } = openDb();
