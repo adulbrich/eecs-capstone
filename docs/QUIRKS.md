@@ -285,6 +285,35 @@ Note `inventory_items.current_holder_id`: nulling it does **not** change `status
 
 Deleting an account outright is an operator task, not a feature: `scripts/delete-user.mjs` purges a test account and its own content and refuses when it acted on anything else. See "Delete a test account" in `DEPLOYMENT.md`.
 
+### The categories unique index is an expression index, so read it here
+
+`categories` carries `UNIQUE (domain, coalesce(type, ''), lower(name))`, declared in
+`schema.ts` and created in `drizzle/0015_categories_unique_name.sql`. Each of the three
+parts is doing work a plain `UNIQUE (domain, type, name)` would not do.
+
+`coalesce(type, '')` exists because Postgres treats NULLs as distinct in a unique index,
+and every inventory category carries `type = null`, so a plain index would leave the
+entire inventory domain unconstrained. `NULLS NOT DISTINCT` says the same thing on PG15+,
+and would be the tidier spelling, but Drizzle's index builder cannot express it and the
+index would then have to live only in SQL, invisible in `schema.ts` the way
+`notifications_overdue_unique_idx` is.
+
+`lower(name)` exists because "Robotics" and "robotics" are one category, and `domain` is
+in the key so a project category and an inventory category may share a name.
+
+The migration deduplicates before creating the index, because `CREATE UNIQUE INDEX` fails
+outright if duplicates already exist. Two things about that step are easy to get wrong and
+are commented in the file: the survivor is chosen by `created_at, id` rather than
+`created_at` alone, since migration 0010 inserted every inventory category in one
+statement and those rows share a timestamp; and junction rows move by insert-then-delete
+with `ON CONFLICT DO NOTHING` rather than by `UPDATE`, because both junctions have
+composite primary keys and a project may already carry both duplicates.
+
+`db-reset.ts` only truncates, so the index is schema state that survives between tests.
+`categories-unique.integration.test.ts` drops it to reproduce the duplicates the dedupe
+exists for, and restores it in a `finally`. A test that drops it and dies without
+restoring it disarms every uniqueness assertion for the rest of the run.
+
 ### Timestamps always `withTimezone: true`
 
 Every timestamp column uses `timestamp("col", { withTimezone: true })`. Stored as `timestamptz`. Required ones chain `.notNull().defaultNow()`. Optional event timestamps (`publishedAt`, `archivedAt`, `deletedAt`, `reviewedAt`, `banExpires`) are nullable but still `withTimezone`.

@@ -10,6 +10,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   vector,
 } from "drizzle-orm/pg-core";
@@ -68,25 +69,56 @@ export const programInstructors = pgTable(
   (t) => [primaryKey({ columns: [t.programId, t.userId] })]
 );
 
-export const categories = pgTable("categories", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  name: text("name").notNull(),
-  /**
-   * What this category classifies. A closed set, unlike `type`: domains are
-   * known at design time, facets are invented by staff. Conflating the two in
-   * one column is what made "inventory" render as a fifth project facet.
-   */
-  domain: categoryDomainEnum("domain").notNull(),
-  /**
-   * The facet within the project domain: project_type, technology, industry,
-   * field, or anything staff create. Null for inventory categories, which are
-   * flat.
-   */
-  type: text("type"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const categories = pgTable(
+  "categories",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    /**
+     * What this category classifies. A closed set, unlike `type`: domains are
+     * known at design time, facets are invented by staff. Conflating the two in
+     * one column is what made "inventory" render as a fifth project facet.
+     */
+    domain: categoryDomainEnum("domain").notNull(),
+    /**
+     * The facet within the project domain: project_type, technology, industry,
+     * field, or anything staff create. Null for inventory categories, which are
+     * flat.
+     */
+    type: text("type"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    /**
+     * Two rows may not name the same thing in the same domain. Nothing stopped
+     * that before, and #31 gives the model a creation path at 100+ projects a
+     * term, which turns an occasional duplicate into a catalog of near-identical
+     * rows. A split "Robotics" also breaks the all-match filter: a student who
+     * ticks both chips gets nothing back.
+     *
+     * Three details a plain UNIQUE (domain, type, name) gets wrong.
+     *
+     * `coalesce(type, '')`, because Postgres treats NULLs as distinct in a
+     * unique index and every inventory category carries `type = null`, so they
+     * would all be unconstrained. `NULLS NOT DISTINCT` says the same thing on
+     * PG15+, but Drizzle's index builder cannot express it and a SQL-only index
+     * is invisible here, the way `notifications_overdue_unique_idx` is.
+     *
+     * `lower(name)`, because "Robotics" and "robotics" are one category.
+     *
+     * `domain` in the key, so a project category and an inventory category may
+     * share a name. They are different pickers, and `domain` is closed and
+     * immutable on update.
+     */
+    uniqueIndex("categories_domain_type_name_unique_idx").on(
+      t.domain,
+      sql`coalesce(${t.type}, '')`,
+      sql`lower(${t.name})`
+    ),
+  ]
+);
 
 export const projects = pgTable(
   "projects",
