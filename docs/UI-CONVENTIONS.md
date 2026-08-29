@@ -300,6 +300,14 @@ which turns off local reordering. They are separate because server-ordered does 
 imply paginated. `orderRows(rows, getId)` puts exported rows in the order the table is
 rendering, so a CSV matches the screen; it is a no-op under `serverSorted`.
 
+`resetPageOnSort` is typed `never` unless the route's own search type declares a `page`,
+so setting it on a route that paginates nothing is a compile error rather than a stray
+`page: 1` pushed into a schema with no `page` in it. That is what the hook's `TSearch`
+parameter is for. It does not restore full search-schema checking on the patch: the
+reducer spreads over a generic, TypeScript cannot prove that preserves it, and the cast
+that makes it compile is what stops the compiler seeing the rest. One named failure
+caught beats a boundary that looks typed and checks nothing.
+
 `useAdminTableState` in `#/lib/table-state` is the router-agnostic core underneath, and
 stays directly unit-testable. Every admin route goes through `useAdminTable`; reach past
 it to the core only if you are driving a table from somewhere that has no `navigate`.

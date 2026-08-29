@@ -11,12 +11,15 @@ import {
  * The slice of the router's `navigate` this hook uses. Structural so the hook
  * never imports the router.
  */
-type AdminNavigate = (opts: {
+type AdminNavigate<TSearch> = (opts: {
   replace?: boolean;
-  search: (prev: Record<string, unknown>) => Record<string, unknown>;
+  search: (prev: TSearch) => TSearch;
 }) => unknown;
 
-interface UseAdminTableOptions<TColumn extends AdminTableStateColumn> {
+interface UseAdminTableOptions<
+  TSearch extends AdminTableSearch,
+  TColumn extends AdminTableStateColumn,
+> {
   columns: TColumn[];
   defaultSort: SortState;
   /**
@@ -25,7 +28,7 @@ interface UseAdminTableOptions<TColumn extends AdminTableStateColumn> {
    * calling it inside a generic hook needs casts, while the one line in the
    * route typechecks against the real route path.
    */
-  navigate: AdminNavigate;
+  navigate: AdminNavigate<TSearch>;
   /**
    * Send a sort change back to page one. Set it on a paginated listing: the
    * server returns a newly ordered set, so the page the reader was on no
@@ -33,11 +36,16 @@ interface UseAdminTableOptions<TColumn extends AdminTableStateColumn> {
    *
    * Deliberately separate from `serverSorted` rather than derived from it.
    * They coincide on the only route that sets either, but server-ordered does
-   * not imply paginated, and a route that was one without the other would get
-   * a stray `page: 1` pushed into a search schema with no `page` in it.
+   * not imply paginated.
+   *
+   * `never` unless the route's own search type has a `page`, which is what
+   * stops the failure #96 named: a stray `page: 1` pushed into a schema with
+   * no `page` in it. Threading `TSearch` through `navigate` does not catch
+   * that on its own, because the reducer's return needs a cast either way, and
+   * a cast is what silences the check. This is the part that fails.
    */
-  resetPageOnSort?: boolean;
-  search: AdminTableSearch;
+  resetPageOnSort?: TSearch extends { page: number } ? boolean : never;
+  search: TSearch;
   /** Passed straight through to the table. See its prop docs. */
   serverSorted?: boolean;
   storageKey: string;
@@ -67,7 +75,10 @@ interface UseAdminTableOptions<TColumn extends AdminTableStateColumn> {
  * would break without it. Contrast `resetPageOnSort`, which this hook reads and
  * never forwards: the table has no such prop.
  */
-export function useAdminTable<TColumn extends AdminTableStateColumn>({
+export function useAdminTable<
+  TSearch extends AdminTableSearch,
+  TColumn extends AdminTableStateColumn,
+>({
   columns,
   defaultSort,
   navigate,
@@ -75,17 +86,24 @@ export function useAdminTable<TColumn extends AdminTableStateColumn>({
   search,
   serverSorted,
   storageKey,
-}: UseAdminTableOptions<TColumn>) {
+}: UseAdminTableOptions<TSearch, TColumn>) {
   const setSearch = useCallback(
     (patch: AdminTableSearch) =>
       void navigate({
-        search: (prev: Record<string, unknown>) => ({
-          ...prev,
-          ...patch,
-          ...(resetPageOnSort && ("sort" in patch || "dir" in patch)
-            ? { page: 1 }
-            : {}),
-        }),
+        search: (prev: TSearch) =>
+          ({
+            ...prev,
+            ...patch,
+            ...(resetPageOnSort && ("sort" in patch || "dir" in patch)
+              ? { page: 1 }
+              : {}),
+            // TypeScript cannot prove a spread over a generic preserves that
+            // generic, so the assertion is unavoidable. It is sound here for a
+            // reason worth stating: `patch` only ever carries
+            // `AdminTableSearch` keys, which `TSearch` is constrained to
+            // include, and `page` is only added when `resetPageOnSort` is set,
+            // which the option's type only permits when `TSearch` has one.
+          }) as TSearch,
       }),
     [navigate, resetPageOnSort]
   );
@@ -94,7 +112,7 @@ export function useAdminTable<TColumn extends AdminTableStateColumn>({
     (patch: AdminTableSearch) =>
       void navigate({
         replace: true,
-        search: (prev: Record<string, unknown>) => ({ ...prev, ...patch }),
+        search: (prev: TSearch) => ({ ...prev, ...patch }) as TSearch,
       }),
     [navigate]
   );
