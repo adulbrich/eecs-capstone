@@ -52,25 +52,10 @@ import {
   staffItemView,
   visibleStatuses,
 } from "#/lib/inventory-visibility";
-import { assertStaff, isStaff } from "#/lib/viewer";
+import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
+import type { ListInventoryInput } from "../inventory";
 import { setInventoryItemCategoriesAs } from "./categories";
 import type { Tx } from "./inventory-transitions";
-
-type Viewer = { id: string; role?: string | null | undefined } | null;
-
-export interface ListInventoryInput {
-  categories: string[];
-  page: number;
-  pageSize: number;
-  q: string;
-  status:
-    | "available"
-    | "requested"
-    | "reserved"
-    | "checked_out"
-    | "maintenance"
-    | null;
-}
 
 /**
  * The hold on a read that joined the account. The precedence rules (the
