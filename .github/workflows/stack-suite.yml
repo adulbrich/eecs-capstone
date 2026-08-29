@@ -14,8 +14,10 @@ name: Stack suite
 on:
   workflow_call:
     inputs:
-      command:
-        description: npm script that runs the suite.
+      script:
+        description: >-
+          Name of the npm script that runs the suite, as in `test:integration`.
+          A bare name rather than a command line, so the run step can quote it.
         required: true
         type: string
       seed:
@@ -135,13 +137,14 @@ jobs:
       - if: inputs.browser
         run: npx playwright install --with-deps chromium
 
-      # Through `env` rather than interpolated straight into the `run` line.
-      # Only in-repo callers can reach a `./` workflow_call reference, so this
-      # is injection-shaped rather than exploitable, but the shape costs one
-      # line to remove.
+      # Through `env` and quoted, rather than interpolated into the `run` line.
+      # Only in-repo callers can reach a `./` workflow_call reference, so the
+      # interpolation was injection-shaped rather than exploitable, but taking
+      # a script name instead of a command line removes the shape entirely and
+      # lets the expansion be quoted.
       - env:
-          SUITE_COMMAND: ${{ inputs.command }}
-        run: $SUITE_COMMAND
+          SUITE_SCRIPT: ${{ inputs.script }}
+        run: npm run "$SUITE_SCRIPT"
 
       - if: failure() && inputs.report-path != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
