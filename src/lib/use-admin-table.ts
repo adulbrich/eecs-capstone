@@ -38,13 +38,20 @@ interface UseAdminTableOptions<
    * They coincide on the only route that sets either, but server-ordered does
    * not imply paginated.
    *
-   * `never` unless the route's own search type has a `page`, which is what
-   * stops the failure #96 named: a stray `page: 1` pushed into a schema with
-   * no `page` in it. Threading `TSearch` through `navigate` does not catch
+   * Unsatisfiable unless the route's own search type has a `page`, which is
+   * what stops the failure #96 named: a stray `page: 1` pushed into a schema
+   * with no `page` in it. Threading `TSearch` through `navigate` does not catch
    * that on its own, because the reducer's return needs a cast either way, and
    * a cast is what silences the check. This is the part that fails.
+   *
+   * The false branch is a sentence rather than `never` so the compiler prints
+   * the reason: "Type 'true' is not assignable to type 'resetPageOnSort needs
+   * a `page` ...'". With `never` it reads "not assignable to type 'undefined'",
+   * which is true and tells the reader nothing.
    */
-  resetPageOnSort?: TSearch extends { page: number } ? boolean : never;
+  resetPageOnSort?: TSearch extends { page: number }
+    ? boolean
+    : "resetPageOnSort needs a `page` in this route's search schema";
   search: TSearch;
   /** Passed straight through to the table. See its prop docs. */
   serverSorted?: boolean;

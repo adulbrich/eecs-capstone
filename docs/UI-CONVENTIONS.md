@@ -300,9 +300,10 @@ which turns off local reordering. They are separate because server-ordered does 
 imply paginated. `orderRows(rows, getId)` puts exported rows in the order the table is
 rendering, so a CSV matches the screen; it is a no-op under `serverSorted`.
 
-`resetPageOnSort` is typed `never` unless the route's own search type declares a `page`,
+`resetPageOnSort` is unsatisfiable unless the route's own search type declares a `page`,
 so setting it on a route that paginates nothing is a compile error rather than a stray
-`page: 1` pushed into a schema with no `page` in it. That is what the hook's `TSearch`
+`page: 1` pushed into a schema with no `page` in it. The compiler prints the reason,
+because the false branch of that conditional is a sentence rather than `never`. That is what the hook's `TSearch`
 parameter is for. It does not restore full search-schema checking on the patch: the
 reducer spreads over a generic, TypeScript cannot prove that preserves it, and the cast
 that makes it compile is what stops the compiler seeing the rest. One named failure
