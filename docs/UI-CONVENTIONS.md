@@ -318,8 +318,9 @@ caught beats a boundary that looks typed and checks nothing.
 card's header strip: full width, with no field name in front of it. Use it for a column
 whose content already says what it is, usually a name or title beside a thumbnail, where a
 "Name" label would only squeeze the title into what is left of the row. At most one column
-per table may set it; a second is logged and ignored rather than rendered, because two
-title rows on one card read as a styling oddity and get lived with instead of reported.
+per table may set it. A second one is logged and does not become a header strip; its cell
+still renders as an ordinary labelled field. Two title rows on one card read as a styling
+oddity and get lived with instead of reported, which is why this is checked at all.
 
 `useAdminTableState` in `#/lib/table-state` is the router-agnostic core underneath, and
 stays directly unit-testable. Every admin route goes through `useAdminTable`; reach past
