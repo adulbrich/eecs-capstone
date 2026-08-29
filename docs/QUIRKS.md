@@ -409,6 +409,34 @@ Playwright timeout on a click that works locally, search the job log for
 Retried tests are reported as flaky rather than silently swallowed, so a genuine
 intermittent bug still surfaces in the log.
 
+### The unit suite loads your dotenv files, so an env-dependent test is machine-dependent
+
+`vite.config.ts` declares no `test` block and `npm test` runs bare `vitest run`,
+which makes it easy to conclude the unit suite sees no dotenv at all. It does.
+Vitest builds on the Vite config, and Vite loads `.env` and `.env.local` into
+`process.env` before anything runs. Probe it if you doubt this: a unit test
+asserting `process.env.S3_BUCKET` gets `cs-capstone`, and that value appears
+only in `.env.local`.
+
+**The consequence is a test that passes for you and fails for a colleague.** An
+assertion on a value resolved from the ambient environment is really an
+assertion about the author's `.env.local`. `bedrock-embed.test.ts` had one: it
+compared `EMBEDDING_DIMENSIONS` against the literal 1024, which reds for anyone
+who set `BEDROCK_EMBEDDING_DIMENSIONS` to anything else, and `.env.example`
+ships that variable so it is in the documented setup. CI passes either way,
+because the `verify` job writes no dotenv file at all, so this fails only on
+developer machines and only some of them.
+
+Assert config through a builder given a literal environment
+(`buildEmbedConfig({} as NodeJS.ProcessEnv)`) rather than through whatever the
+process resolved. Where a module-level constant is genuinely the thing under
+test, assert that it matches its builder rather than a literal, which holds in
+any environment.
+
+`docs/superpowers/plans/2026-07-22-interests-embeddings-discovery.md` states the
+opposite. It is a dated plan rather than a live reference, and this entry is the
+correction.
+
 ### Integration tests need DATABASE_URL at config-load time
 
 `src/db/index.ts` reads `DATABASE_URL` at module-import time and throws if missing. Vitest setup files (`setupFiles`) run AFTER the test files start importing. So loading dotenv from `setup.integration.ts` is too late. Load it from `vitest.integration.config.ts` itself:
