@@ -16,7 +16,10 @@ type AdminNavigate = (opts: {
   search: (prev: Record<string, unknown>) => Record<string, unknown>;
 }) => unknown;
 
-interface UseAdminTableOptions<TColumn extends AdminTableStateColumn> {
+interface UseAdminTableOptions<
+  TSearch extends AdminTableSearch,
+  TColumn extends AdminTableStateColumn,
+> {
   columns: TColumn[];
   defaultSort: SortState;
   /**
@@ -33,11 +36,29 @@ interface UseAdminTableOptions<TColumn extends AdminTableStateColumn> {
    *
    * Deliberately separate from `serverSorted` rather than derived from it.
    * They coincide on the only route that sets either, but server-ordered does
-   * not imply paginated, and a route that was one without the other would get
-   * a stray `page: 1` pushed into a search schema with no `page` in it.
+   * not imply paginated.
+   *
+   * Unsatisfiable unless the route's own search type has a `page`, which is
+   * what stops the failure #96 named: a stray `page: 1` pushed into a schema
+   * with no `page` in it.
+   *
+   * `TSearch` is inferred from `search` and used for nothing else. #96 also
+   * proposed typing `navigate`'s reducer `(prev: TSearch) => TSearch` to
+   * restore schema checking on the patch. That was built and thrown away: the
+   * reducer spreads over a generic, TypeScript cannot prove a spread preserves
+   * one, so the return needs a cast, and the cast silences the very check the
+   * typing was for. With the generic and without this conditional, setting
+   * `resetPageOnSort` on a route with no `page` still compiled.
+   *
+   * The false branch is a sentence rather than `never` so the compiler prints
+   * the reason: "Type 'true' is not assignable to type 'resetPageOnSort needs
+   * a `page` ...'". With `never` it reads "not assignable to type 'undefined'",
+   * which is true and tells the reader nothing.
    */
-  resetPageOnSort?: boolean;
-  search: AdminTableSearch;
+  resetPageOnSort?: TSearch extends { page: number }
+    ? boolean
+    : "resetPageOnSort needs a `page` in this route's search schema";
+  search: TSearch;
   /** Passed straight through to the table. See its prop docs. */
   serverSorted?: boolean;
   storageKey: string;
@@ -67,7 +88,10 @@ interface UseAdminTableOptions<TColumn extends AdminTableStateColumn> {
  * would break without it. Contrast `resetPageOnSort`, which this hook reads and
  * never forwards: the table has no such prop.
  */
-export function useAdminTable<TColumn extends AdminTableStateColumn>({
+export function useAdminTable<
+  TSearch extends AdminTableSearch,
+  TColumn extends AdminTableStateColumn,
+>({
   columns,
   defaultSort,
   navigate,
@@ -75,7 +99,7 @@ export function useAdminTable<TColumn extends AdminTableStateColumn>({
   search,
   serverSorted,
   storageKey,
-}: UseAdminTableOptions<TColumn>) {
+}: UseAdminTableOptions<TSearch, TColumn>) {
   const setSearch = useCallback(
     (patch: AdminTableSearch) =>
       void navigate({
@@ -85,6 +109,12 @@ export function useAdminTable<TColumn extends AdminTableStateColumn>({
           ...(resetPageOnSort && ("sort" in patch || "dir" in patch)
             ? { page: 1 }
             : {}),
+          // TypeScript cannot prove a spread over a generic preserves that
+          // generic, so the assertion is unavoidable. It is sound here for a
+          // reason worth stating: `patch` only ever carries
+          // `AdminTableSearch` keys, which `TSearch` is constrained to
+          // include, and `page` is only added when `resetPageOnSort` is set,
+          // which the option's type only permits when `TSearch` has one.
         }),
       }),
     [navigate, resetPageOnSort]
