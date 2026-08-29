@@ -191,7 +191,7 @@ export const approveRequestItem = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => approveSchema.parse(d))
   .handler(async ({ data }) => {
     const { approveRequestItemForCurrentUser } = await import(
-      "./_internal/inventory"
+      "./_internal/inventory-requests"
     );
     return approveRequestItemForCurrentUser(data);
   });
@@ -205,7 +205,7 @@ export const rejectRequestItem = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => rejectSchema.parse(d))
   .handler(async ({ data }) => {
     const { rejectRequestItemForCurrentUser } = await import(
-      "./_internal/inventory"
+      "./_internal/inventory-requests"
     );
     return rejectRequestItemForCurrentUser(data);
   });
@@ -219,7 +219,7 @@ export const cancelRequestItem = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => cancelSchema.parse(d))
   .handler(async ({ data }) => {
     const { cancelRequestItemForCurrentUser } = await import(
-      "./_internal/inventory"
+      "./_internal/inventory-requests"
     );
     return cancelRequestItemForCurrentUser(data);
   });
