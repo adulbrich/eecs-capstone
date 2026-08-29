@@ -76,8 +76,9 @@ const NOT_READ_HERE = new Map([
  * design and not an oversight. See `buildS3Config` and `buildBedrockConfig`.
  *
  * `AWS_REGION` is not here despite fitting the description, because
- * `PLATFORM_VARS` drops it before check 3 ever sees it. An entry that cannot
- * be reached is an entry nobody can tell is wrong.
+ * `PLATFORM_VARS` drops it before check 3 ever sees it, so the entry would
+ * excuse nothing there. The disjointness check below is what keeps that from
+ * being a comment somebody has to remember.
  */
 const UNSET_IN_PRODUCTION = new Map([
   ["S3_ENDPOINT", "task role, see buildS3Config"],
@@ -108,10 +109,10 @@ function readsIn(roots: readonly string[]): Map<string, string[]> {
     for (const file of sourceFiles(root)) {
       // Tests set variables to exercise a builder, so counting them would
       // report requirements nothing in production has.
-      if (file.includes("__tests__") || file.includes(`src${"/"}test/`)) {
+      if (file.includes("__tests__") || file.includes("src/test/")) {
         continue;
       }
-      const isScript = file.startsWith(`scripts${"/"}`);
+      const isScript = file.startsWith("scripts/");
       for (const [, name] of readFileSync(file, "utf8").matchAll(ENV_READ)) {
         // SCRIPT_ARGUMENTS is scoped to scripts on purpose. Suppressing those
         // names everywhere would hide a genuine `src` read of one, and they
@@ -142,7 +143,7 @@ function rawReads(roots: readonly string[]): Set<string> {
   const found = new Set<string>();
   for (const root of roots) {
     for (const file of sourceFiles(root)) {
-      if (file.includes("__tests__") || file.includes(`src${"/"}test/`)) {
+      if (file.includes("__tests__") || file.includes("src/test/")) {
         continue;
       }
       for (const [, name] of readFileSync(file, "utf8").matchAll(ENV_READ)) {
@@ -229,6 +230,17 @@ describe("the environment contract", () => {
     for (const name of [...PLATFORM_VARS.keys(), ...SCRIPT_ARGUMENTS]) {
       expect([name, documented.has(name)]).toEqual([name, false]);
     }
+  });
+
+  it("lists no variable as both platform-supplied and unset in production", () => {
+    // The two overlap silently. PLATFORM_VARS drops a read before check 3
+    // counts it, so an UNSET_IN_PRODUCTION entry for the same name is inert,
+    // and the dead-exemption check below cannot tell, because it scans without
+    // suppressions and so sees the read. AWS_REGION was exactly that pair.
+    const both = [...UNSET_IN_PRODUCTION.keys()].filter((name) =>
+      PLATFORM_VARS.has(name)
+    );
+    expect(both).toEqual([]);
   });
 
   it("carries no exemption for a variable nothing reads any more", () => {
