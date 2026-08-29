@@ -1785,6 +1785,7 @@ describe("staff-assigned holds without a request line", () => {
     const { rows } = await listAdminInventoryAs(admin, {
       categories: [],
       q: holderEmail,
+      retiredOnly: false,
       status: null,
     });
     expect(rows.some((r) => r.id === item.id)).toBe(true);
@@ -1809,6 +1810,7 @@ describe("staff-assigned holds without a request line", () => {
     const byName = await listAdminInventoryAs(admin, {
       categories: [],
       q: `Wilhelmina Walkin ${stamp}`,
+      retiredOnly: false,
       status: null,
     });
     expect(byName.rows.some((r) => r.id === item.id)).toBe(true);
@@ -1829,6 +1831,7 @@ describe("staff-assigned holds without a request line", () => {
     const byProgram = await listAdminInventoryAs(admin, {
       categories: [],
       q: `CS ${stamp}`,
+      retiredOnly: false,
       status: null,
     });
     expect(byProgram.rows.some((r) => r.id === item.id)).toBe(true);
@@ -3125,6 +3128,7 @@ describe("retired visibility", () => {
   const LIST_DEFAULTS = () => ({
     categories: [] as string[],
     q: "",
+    retiredOnly: false,
     status: null,
   });
 

@@ -55,6 +55,8 @@ const listAdminInventorySchema = z.object({
   status: itemStatusEnum.nullable().default(null),
 });
 
+export type ListAdminInventoryInput = z.infer<typeof listAdminInventorySchema>;
+
 export const listAdminInventory = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => listAdminInventorySchema.parse(d))
   .handler(async ({ data }) => {
@@ -102,6 +104,8 @@ export const itemPayloadSchema = z.object({
   imageUrl: z.string().max(500).nullable().default(null),
 });
 
+export type CreateInventoryItemInput = z.infer<typeof itemPayloadSchema>;
+
 export const createInventoryItem = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => itemPayloadSchema.parse(d))
   .handler(async ({ data }) => {
@@ -114,6 +118,8 @@ export const createInventoryItem = createServerFn({ method: "POST" })
 const updatePayloadSchema = itemPayloadSchema.extend({
   id: z.string().uuid(),
 });
+
+export type UpdateInventoryItemInput = z.infer<typeof updatePayloadSchema>;
 
 export const updateInventoryItem = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => updatePayloadSchema.parse(d))
@@ -229,6 +235,8 @@ const requestQueueSchema = z.object({
     .default("pending"),
   q: z.string().default(""),
 });
+
+export type InventoryRequestQueueFilter = z.infer<typeof requestQueueSchema>;
 
 export const listInventoryRequests = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => requestQueueSchema.parse(d))
