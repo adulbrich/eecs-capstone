@@ -202,7 +202,11 @@ Every email renders through `src/lib/email/templates.ts`, which owns the HTML es
 
 ### `trustHost` is enabled in non-development
 
-`src/lib/auth.ts` sets `trustHost: process.env.NODE_ENV !== "development"`. Required behind the CloudFront/ALB proxy chain in production so origin detection works. Disabled in dev where `localhost:3000` is direct.
+`buildAuthConfig` in `src/lib/_internal/auth-config.ts` resolves `trustHost` as `NODE_ENV !== "development"`, and `src/lib/auth.ts` passes it straight through. Required behind the CloudFront/ALB proxy chain in production so origin detection works. Disabled in dev where `localhost:3000` is direct.
+
+Note the predicate is not the one beside it: `useSecureCookies` is `NODE_ENV === "production"`. The two agree under `development` (both off) and `production` (both on), and disagree under every other value, unset included, where `trustHost` is on and secure cookies are off.
+
+Nothing rides on the gap, because deployed code never sees a value in it: `Dockerfile` sets `NODE_ENV=production` in the runtime stage and `infra/ecs.tf` sets it again in the task definition. The difference is residue from the two lines arriving in separate commits, not a decision, so do not read intent into it or build on it.
 
 ### Session role typing
 
@@ -961,6 +965,16 @@ What it was protecting, before the gate existed: an owner can reach `submitted` 
 
 `forceTransitionAs` needs no equivalent; it throws for a non-staff viewer before it reaches `commitTransition`. `TransitionOptions.sendEmail` is untouched and stays available to the nine integration call sites that use it to keep mail out of the suite.
 
+### An unset `BETTER_AUTH_URL` logs, it no longer just drops the mail
+
+Transition emails carry absolute links, because they are followed from a mail client, and the base comes from `BETTER_AUTH_URL`. It used to be optional in the worst sense: `notifyTransitionByEmail` returned early when it was unset, so no mail went out, nothing was logged, and a submitted project sat in a queue nobody had been told about. That is a third quiet failure on top of the two the entry above names, and unlike those two it had no signal at all.
+
+It is required now. `notifyTransitionByEmail` throws when `NotificationConfig.appBaseUrl` is null, and the throw lands in the function's own `catch`, which does `console.error` naming the variable. The function still cannot throw at its caller, which is the property `performTransitionAs` depends on.
+
+**The check is an `if` in the body, not a throw inside `buildNotificationConfig`, and that is not stylistic.** The config arrives as a default parameter, and a default parameter is evaluated before the function body, so a throw in the builder would skip the `try` entirely and reach `projects.ts`. That call happens after the transition is committed, so an escaping error would report a failure on an approval that had already succeeded.
+
+`EMAIL_REVIEW_INBOX` is deliberately not required and still only warns: an unset inbox costs staff a notification, while an unset base URL breaks every transition email including the ones to proposers. See #137 for the open question of which config variables should be fatal at startup rather than at first use.
+
 ### Proposer linking is by email; `proposer_id` is canonical
 
 A project's proposer is either linked to an account (`proposer_id`, a nullable FK) or pending (`proposer_email` set with no account yet). Email is the link key; `proposer_id` is the source of truth once an account exists. Staff set it through the proposer field on the project form (`ProposerPicker`, see below); the server resolves the email to an account id on every write via `resolveProposerId` (`src/server/_internal/projects.ts`), and a non-staff request carrying `proposer_email` is ignored, not honored. `proposer_id` is never accepted from the client.
@@ -1002,6 +1016,28 @@ between them. Embeddings use `bedrock-runtime` through the AWS SDK
 (`src/lib/_internal/bedrock.ts`). AI project review uses `bedrock-mantle`
 through a hand-signed `fetch` (`src/lib/_internal/bedrock-mantle.ts`). Treat a
 fact about one as saying nothing about the other.
+
+### A blank `BEDROCK_EMBEDDING_DIMENSIONS` is zero, not the default
+
+`buildEmbedConfig` (`src/lib/_internal/bedrock-embed.ts`) resolves the value as
+`Number(env.BEDROCK_EMBEDDING_DIMENSIONS ?? "1024")`. `??` catches only
+`undefined` and `null`, so a variable set to the empty string skips the default
+and reaches `Number("")`, which is `0`. Whitespace behaves the same way. Unset
+is the only spelling of "missing" that gets 1024.
+
+**This is worse than a bad request, and that is why it is written down.** The
+model id and the dimension count are both interpolated into a sha256 by
+`embeddingHash` (`src/lib/embedding-source.ts`), and that hash is stored as
+`projects.embedding_source_hash` and compared on every write to decide whether
+a project needs re-embedding. A dimension count that changes for a given
+environment changes every hash, so every project looks modified and re-embeds
+at one paid Bedrock call each. The blank case is pinned by a test rather than
+fixed for exactly that reason: whatever the stored hashes were computed with is
+what the code has to keep computing until someone migrates them deliberately.
+
+Not a live state. `.env.example` and `infra/ecs.tf` both set the variable
+explicitly, so it takes a hand-edit to reach. See #137 for the open question of
+which config values should be validated rather than coerced.
 
 ### The SigV4 service name is `bedrock-mantle`, not `bedrock`
 

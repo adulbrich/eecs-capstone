@@ -4,24 +4,21 @@ import { admin, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { db } from "#/db";
 import {
-  issuerFromDiscoveryUrl,
-  onidProfileFromIdToken,
-} from "#/lib/_internal/onid-profile";
+  buildAuthConfig,
+  warnUnconfiguredProviders,
+} from "#/lib/_internal/auth-config";
+import { onidProfileFromIdToken } from "#/lib/_internal/onid-profile";
 import { getEmailSender } from "#/lib/email/sender";
 import { passwordResetEmail, verificationEmail } from "#/lib/email/templates";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
 
 const emailSender = getEmailSender();
 
-const isProduction = process.env.NODE_ENV === "production";
+const authConfig = buildAuthConfig();
 
-const onidDiscoveryUrl = process.env.ONID_DISCOVERY_URL ?? "";
-// Derived rather than configured separately, because the discovery URL already
-// contains the tenant GUID and a second variable is a second thing to get out
-// of step. An empty discovery URL yields an empty issuer, and the mapper
-// refuses every token in that case: ONID sign-in fails closed when it is not
-// configured, rather than accepting tokens from anywhere.
-const onidIssuer = issuerFromDiscoveryUrl(onidDiscoveryUrl);
+// Said once, at boot, rather than once per failed sign-in. Both providers are
+// optional, so this is the only signal that one of them is off by accident.
+warnUnconfiguredProviders(authConfig.unconfigured);
 
 /**
  * Claims a newly verified user's projects, swallowing any failure.
@@ -42,11 +39,11 @@ async function claimProjectsFor(userId: string, email: string): Promise<void> {
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
-  trustHost: process.env.NODE_ENV !== "development",
+  trustHost: authConfig.trustHost,
   // CloudFront terminates TLS at the edge and forwards to the origin over
   // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in
   // production so a misread request protocol can't silently disable them.
-  advanced: { useSecureCookies: isProduction },
+  advanced: { useSecureCookies: authConfig.isProduction },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
@@ -93,10 +90,7 @@ export const auth = betterAuth({
     },
   },
   socialProviders: {
-    github: {
-      clientId: process.env.GITHUB_CLIENT_ID ?? "",
-      clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
-    },
+    github: authConfig.github,
   },
   account: {
     accountLinking: {
@@ -146,16 +140,18 @@ export const auth = betterAuth({
       config: [
         {
           providerId: "onid",
-          discoveryUrl: onidDiscoveryUrl,
-          clientId: process.env.ONID_CLIENT_ID ?? "",
-          clientSecret: process.env.ONID_CLIENT_SECRET ?? "",
+          discoveryUrl: authConfig.onid.discoveryUrl,
+          clientId: authConfig.onid.clientId,
+          clientSecret: authConfig.onid.clientSecret,
           // `profile` is not decoration: Entra gates the `oid` claim behind it,
           // and `oid` is the account id. Dropping it forks every account onto
           // the `sub` fallback.
           scopes: ["openid", "profile", "email"],
           pkce: true,
           getUserInfo: (tokens) =>
-            Promise.resolve(onidProfileFromIdToken(tokens.idToken, onidIssuer)),
+            Promise.resolve(
+              onidProfileFromIdToken(tokens.idToken, authConfig.onid.issuer)
+            ),
         },
       ],
     }),

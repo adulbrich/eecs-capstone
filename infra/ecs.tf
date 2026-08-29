@@ -129,7 +129,7 @@ resource "aws_ecs_task_definition" "app" {
         # a destination, so it needs no SES identity, and unlike EMAIL_REPLY_TO
         # it is read by the app rather than stamped on outgoing headers.
         { name = "EMAIL_REVIEW_INBOX", value = var.email_review_inbox },
-        # src/lib/email/ses-sender.ts falls back to us-east-1. The identity
+        # src/lib/email/config.ts falls back to us-east-1. The identity
         # lives in var.region, and the mismatch surfaces only as an opaque
         # "email address not verified" error, so pin it explicitly.
         { name = "SES_REGION", value = var.region },

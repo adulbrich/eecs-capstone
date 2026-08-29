@@ -653,9 +653,11 @@ terraform apply -var 'email_reply_to=someone-else@oregonstate.edu'
 ```
 
 It remains optional at every layer, which matters only as a failure mode: the
-task definition always passes the variable, and `createSesEmailSender` treats
-blank as unset and omits the header. Only `EMAIL_FROM` is required under
-`EMAIL_TRANSPORT=ses`, so a blank Reply-To degrades rather than breaks.
+task definition always passes the variable, `buildEmailSenderConfig`
+(`src/lib/email/config.ts`) treats blank as unset, and `SesEmailSender` omits
+the header rather than sending an empty list. Only `EMAIL_FROM` is required
+under `EMAIL_TRANSPORT=ses`, and that throw is still in `createSesEmailSender`,
+so a blank Reply-To degrades rather than breaks.
 
 **This address must be a real, monitored mailbox or distribution list.**
 `oregonstate.edu` MX points at Exchange Online, so it is a tenant-side object
