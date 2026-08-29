@@ -82,7 +82,9 @@ describe("buildAuthConfig", () => {
     expect(
       buildAuthConfig({ NODE_ENV: "test" } as NodeJS.ProcessEnv).trustHost
     ).toBe(true);
-    expect(buildAuthConfig({} as NodeJS.ProcessEnv).trustHost).toBe(true);
+    const unset = buildAuthConfig({} as NodeJS.ProcessEnv);
+    expect(unset.trustHost).toBe(true);
+    expect(unset.isProduction).toBe(false);
   });
 
   it("defaults every credential to an empty string rather than undefined", () => {
