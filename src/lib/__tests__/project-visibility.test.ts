@@ -221,7 +221,6 @@ describe("projectDetailView", () => {
     for (const key of [
       "proposerEmail",
       "proposerId",
-      "programManagerId",
       "publishedAt",
       "archivedAt",
       "searchVector",

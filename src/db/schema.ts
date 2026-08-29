@@ -154,10 +154,6 @@ export const projects = pgTable(
     programId: uuid("program_id").references(() => programs.id, {
       onDelete: "set null",
     }),
-    programManagerId: text("program_manager_id").references(() => user.id, {
-      onDelete: "restrict",
-    }),
-
     status: projectStatusEnum("status").notNull().default("draft"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
