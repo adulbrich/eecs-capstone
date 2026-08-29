@@ -130,10 +130,15 @@ export async function notifyTransitionByEmail(
   }
   try {
     // Absolute, because these links are followed from a mail client, and
-    // required rather than skipped: without it every transition email is
-    // silently dropped, and silence is what made this worth changing. The
-    // throw is caught below, so an unset value costs a named log line rather
-    // than an undone approval.
+    // required rather than skipped: without it every transition email was
+    // silently dropped, and the silence is what made this worth changing.
+    //
+    // Checked here rather than thrown from `buildNotificationConfig` because a
+    // default parameter is evaluated before the body runs, so a throw in the
+    // builder would escape this function's own catch and reach `projects.ts`,
+    // which calls this after the transition is already committed and relies on
+    // it never throwing. Inside the try, an unset value costs a named log line
+    // instead of an undone approval.
     if (!config.appBaseUrl) {
       throw new Error(
         "BETTER_AUTH_URL is not set, so no transition email could be addressed"

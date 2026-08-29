@@ -149,10 +149,15 @@ describe("notifyTransitionByEmail", () => {
       .mockImplementation(() => undefined);
     const send = vi.fn().mockResolvedValue(undefined);
 
-    await notifyTransitionByEmail(PROJECT, "submitted", null, true, send, {
-      ...CONFIG,
-      appBaseUrl: null,
-    });
+    // Resolving, not throwing, is the load-bearing half: projects.ts calls
+    // this after the transition is committed, so an escaping error would undo
+    // nothing but would surface as a failed request on a succeeded approval.
+    await expect(
+      notifyTransitionByEmail(PROJECT, "submitted", null, true, send, {
+        ...CONFIG,
+        appBaseUrl: null,
+      })
+    ).resolves.toBeUndefined();
 
     expect(send).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalledOnce();

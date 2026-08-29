@@ -23,6 +23,12 @@ describe("buildEmailSenderConfig", () => {
       "eu-west-1"
     );
     expect(at({} as NodeJS.ProcessEnv)).toBe("us-east-1");
+    // Blank falls through like unset. An empty region reaches the SDK as an
+    // invalid client rather than as a default, so it must not win.
+    expect(
+      at({ SES_REGION: "  ", AWS_REGION: "eu-west-1" } as NodeJS.ProcessEnv)
+    ).toBe("eu-west-1");
+    expect(at({ SES_REGION: "" } as NodeJS.ProcessEnv)).toBe("us-east-1");
   });
 
   it("treats a blank value as unset, because that is how the task definition sends one", () => {
@@ -43,6 +49,15 @@ describe("buildEmailSenderConfig", () => {
     } as NodeJS.ProcessEnv);
     expect(config.from).toBe("noreply@example.edu");
     expect(config.replyTo).toBe("replies@example.edu");
+  });
+
+  it("keeps a blank transport bare, so it reaches the unknown-transport throw", () => {
+    // The one field blankToNull does not touch. Falling through to "console"
+    // would answer a misconfiguration by silently sending nowhere.
+    expect(
+      buildEmailSenderConfig({ EMAIL_TRANSPORT: "" } as NodeJS.ProcessEnv)
+        .transport
+    ).toBe("");
   });
 
   it("does not throw on a missing EMAIL_FROM under the ses transport", () => {

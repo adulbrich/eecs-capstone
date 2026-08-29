@@ -26,6 +26,13 @@ export interface EmailSenderConfig {
   transport: string;
 }
 
+/**
+ * What `createSesEmailSender` actually reads. Split off so the SES factory
+ * cannot be handed a `transport` it ignores, and so a test constructing one
+ * does not have to invent a field nothing looks at.
+ */
+export type SesSenderConfig = Omit<EmailSenderConfig, "transport">;
+
 export function buildEmailSenderConfig(
   env: NodeJS.ProcessEnv = process.env
 ): EmailSenderConfig {
@@ -33,9 +40,17 @@ export function buildEmailSenderConfig(
     from: blankToNull(env.EMAIL_FROM),
     // AWS_REGION is the SDK's own variable and is set on ECS whether or not
     // anyone configures SES, so it is the fallback rather than a second thing
-    // to remember.
-    region: env.SES_REGION ?? env.AWS_REGION ?? DEFAULT_REGION,
+    // to remember. Blank falls through the same as unset, because an empty
+    // region reaches the SDK as an invalid client rather than a default.
+    region:
+      blankToNull(env.SES_REGION) ??
+      blankToNull(env.AWS_REGION) ??
+      DEFAULT_REGION,
     replyTo: blankToNull(env.EMAIL_REPLY_TO),
+    // Bare `??` on purpose, unlike everything above. A blank transport is a
+    // misconfiguration, and falling through to "console" would answer it by
+    // silently sending nowhere. It reaches the unknown-transport throw in
+    // `getEmailSender` instead, which names the variable.
     transport: env.EMAIL_TRANSPORT ?? "console",
   };
 }
@@ -64,8 +79,10 @@ export function buildNotificationConfig(
 
 /**
  * The ECS task definition passes an empty string for every variable terraform
- * has no value for, so blank is the shape a missing value actually arrives in
- * and treating it as set would be wrong everywhere in this module.
+ * has no value for, so blank is the shape a missing value actually arrives in.
+ *
+ * Applied to the addresses and the region, not to `transport`; see the comment
+ * on that field for why it is the exception.
  */
 function blankToNull(value: string | undefined): string | null {
   return value?.trim() || null;

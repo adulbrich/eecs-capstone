@@ -4,7 +4,7 @@ import {
   type SendEmailCommandInput,
   type SendEmailCommandOutput,
 } from "@aws-sdk/client-sesv2";
-import { buildEmailSenderConfig, type EmailSenderConfig } from "./config";
+import type { SesSenderConfig } from "./config";
 import type { EmailSender } from "./sender";
 import type { RenderedEmail } from "./templates";
 
@@ -57,16 +57,6 @@ export class SesEmailSender implements EmailSender {
   }
 }
 
-let _client: SESv2Client | null = null;
-
-function getSesClient(region: string): SESv2Client {
-  if (!_client) {
-    // Credentials come from the ECS task role via the default provider chain.
-    _client = new SESv2Client({ region });
-  }
-  return _client;
-}
-
 /**
  * The throw lives here rather than in `buildEmailSenderConfig` because the
  * builder is reached at module scope through `getEmailSender()` in
@@ -74,18 +64,24 @@ function getSesClient(region: string): SESv2Client {
  * every transport instead of just the one that needs the variable. Here it
  * fires only when someone has actually asked for SES.
  */
-export function createSesEmailSender(
-  config: EmailSenderConfig = buildEmailSenderConfig()
-): SesEmailSender {
+export function createSesEmailSender(config: SesSenderConfig): SesEmailSender {
   if (!config.from) {
     throw new Error("EMAIL_FROM must be set when EMAIL_TRANSPORT=ses");
   }
+  // One client per sender, built on first send rather than up front, because
+  // `getEmailSender()` runs at module scope and constructing an SDK client at
+  // import costs a credential-chain walk on a path that may never send. It is
+  // scoped to this sender rather than the module so it cannot outlive the
+  // region it was built for; a module-level cache would hand a second sender
+  // in another region the first one's client.
+  let client: SESv2Client | null = null;
+  const sendCommand: SesSendFn = (input) => {
+    // Credentials come from the ECS task role via the default provider chain.
+    client ??= new SESv2Client({ region: config.region });
+    return client.send(new SendEmailCommand(input));
+  };
   // Deliberately not required: the ECS task definition always passes
   // EMAIL_REPLY_TO, as an empty string until an address is decided, and email
   // must not stop working for want of one.
-  return new SesEmailSender(
-    config.from,
-    (input) => getSesClient(config.region).send(new SendEmailCommand(input)),
-    config.replyTo
-  );
+  return new SesEmailSender(config.from, sendCommand, config.replyTo);
 }

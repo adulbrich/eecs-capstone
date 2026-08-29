@@ -40,7 +40,6 @@ describe("createSesEmailSender", () => {
         from: null,
         region: "us-east-1",
         replyTo: null,
-        transport: "ses",
       })
     ).toThrow("EMAIL_FROM must be set when EMAIL_TRANSPORT=ses");
   });
@@ -51,7 +50,6 @@ describe("createSesEmailSender", () => {
         from: "noreply@example.edu",
         region: "us-west-2",
         replyTo: null,
-        transport: "ses",
       })
     ).toBeInstanceOf(SesEmailSender);
   });
