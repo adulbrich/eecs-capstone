@@ -383,13 +383,19 @@ The error names the column: `COLUMN_NEEDS_ITS_OWN_SORTING_FN: "createdAt"` or
 unnoticed. Vitest reports those blocks green whatever the types do; tsc reads
 the file because `tsconfig.json` includes `**/*.ts`.
 
-The one way to make the check pass everything silently is to annotate a shared
-column const `AdminColumn<Row>`, which erases the accessor's return type back to
-`unknown`. Use `satisfies` there instead, with `id: "..." as const`. See
-[`QUIRKS.md`](./QUIRKS.md#a-shared-admin-column-const-uses-satisfies-not-an-annotation).
+A shared column const declared outside the array uses `satisfies
+AdminColumn<Row>` with `id: "..." as const`, never an `AdminColumn<Row>`
+annotation. The annotation erases the accessor's return type back to `unknown`,
+and the failure is loud but misleading: every such column reports
+`ACCESSOR_RETURNS_NULL_USE_UNDEFINED` on an accessor that never returns null.
+See [`QUIRKS.md`](./QUIRKS.md#a-shared-admin-column-const-uses-satisfies-not-an-annotation).
 Annotating the array `defineAdminColumns` returns is only redundant; it still
-checks. `accessorKey` is banned outright, because the check cannot read the
-value type it implies.
+checks.
+
+`accessorKey` and grouped (`columns`) definitions are banned outright. Both used
+to compile with no rule applied at all, which is the one failure this check
+cannot afford: the first carries a value type the check cannot read, the second
+hides its real columns a level down where nothing inspects them.
 
 The component's own test fixtures in `src/test/admin-data-table.test.tsx` stay
 plain `AdminColumn<Row>[]` literals. They exercise the table, not a route, and

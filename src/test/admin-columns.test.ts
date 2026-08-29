@@ -87,6 +87,23 @@ describe("defineAdminColumns", () => {
     ]);
   });
 
+  it("rejects a grouped column, which hides its real columns from the check", () => {
+    defineAdminColumns<Row>()([
+      {
+        // @ts-expect-error grouped columns are banned by `columns?: never`
+        columns: [
+          {
+            accessorFn: (row: Row) => row.createdAt,
+            header: "Created",
+            id: "createdAt",
+          },
+        ],
+        header: "Dates",
+        id: "dates",
+      },
+    ]);
+  });
+
   it("rejects an accessor that returns null", () => {
     defineAdminColumns<Row>()([
       // A string-valued accessor that admits null trips the null rule rather

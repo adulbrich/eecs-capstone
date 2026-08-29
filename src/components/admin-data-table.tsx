@@ -94,17 +94,22 @@ interface AdminColumnExtras {
  * of erased to `unknown`, which is what lets `CheckedAdminColumn` see what a
  * column sorts on.
  *
- * `accessorKey?: never` closes the one way around the check. Dropping
- * `accessorKey` from the constraint is not enough on its own: `C` is inferred
- * from the array literal, so nothing rejects a property the constraint merely
- * fails to mention, and an `accessorKey` column carries a value type
- * `CheckedAdminColumn` cannot read. Banning it costs nothing, because no
- * column under `src/routes/_authed/admin/` uses one.
+ * The two `never`s close the ways around the check. Leaving `accessorKey` and
+ * `columns` out of the constraint is not enough on its own: `C` is inferred
+ * from the array literal, so there is no fixed target type for excess-property
+ * checking to fire against, and a property the constraint merely fails to
+ * mention is simply allowed. An `accessorKey` column carries a value type
+ * `CheckedAdminColumn` cannot read, and a grouped column hides its real
+ * columns one level down where nothing inspects them; both compiled with no
+ * rule applied. Banning them costs nothing: no column under
+ * `src/routes/_authed/admin/` uses either, and a group has no place in a table
+ * that renders one flat header row anyway.
  */
 type TypedAdminColumn<T, TValue> = Omit<ColumnDef<T, unknown>, "accessorFn"> &
   AdminColumnExtras & {
     accessorFn?: (row: T, index: number) => TValue;
     accessorKey?: never;
+    columns?: never;
   };
 
 type ColumnId<C> = C extends { id: infer TId } ? TId : never;
@@ -116,6 +121,10 @@ type ColumnId<C> = C extends { id: infer TId } ? TId : never;
  *
  * 1. A column whose value is not text sets its own `sortingFn`, because the
  *    default comparator sorts `String(value)` (see `localeCompareSortingFn`).
+ *    "Sets" means to a real comparator: the presence test is against
+ *    `NonNullable<unknown>` rather than `unknown` because `undefined` is
+ *    assignable to `unknown`, so an explicit `sortingFn: undefined` would
+ *    otherwise satisfy a rule it declares nothing about.
  * 2. An accessor returns `undefined`, never `null`, for a missing value.
  *    `sortUndefined` is the only knob TanStack offers for grouping empties,
  *    and it does not treat `null` as empty, so a `null` sorts as the string
@@ -169,6 +178,11 @@ type CheckedAdminColumns<C extends readonly unknown[]> = {
 export function defineAdminColumns<T>() {
   return <const C extends readonly TypedAdminColumn<T, unknown>[]>(
     columns: C & CheckedAdminColumns<C>
+    // The one cast in the construct, and it is the whole point of it: `const C`
+    // is what preserves each accessor's return type through the check, and it
+    // also makes every element deeply readonly and literal. Widening back to
+    // `AdminColumn<T>[]` is what the table and `useAdminTable` consume, and no
+    // structural conversion gets there from a readonly tuple of literals.
   ): AdminColumn<T>[] => columns as unknown as AdminColumn<T>[];
 }
 
