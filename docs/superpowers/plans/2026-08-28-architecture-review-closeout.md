@@ -575,71 +575,22 @@ The a11y suite renders these tables, so run it. PR closes #94.
 
 ---
 
-### Task B4: Remove the unused projects.program_manager_id column (#95)
+### Task B4: Remove the unused projects.program_manager_id column (#95) [done, PR #122]
 
-No writer anywhere. Four references, none a write. The column carries
-`onDelete: "restrict"` into `user.id`, which puts it in the FK table in QUIRKS and makes it
-look like a reason a user deletion can fail; that cost a wrong recommendation while
-designing #84.
+The issue said "no writer anywhere" and that was wrong in a way worth recording, because
+its own verification step is what caught it. No writer in `src/`, correct. But
+`scripts/seed-dev.ts` set it on all eight seeded projects, and `scripts/delete-user.mjs`
+queried it as a blocking relation. So in a seeded dev database, deleting an instructor was
+refused because of a column no UI and no server function could clear. That made the case
+for removal stronger than the issue argued, not weaker.
 
-**Files:**
-- Modify: `src/db/schema.ts:125-127`
-- Create: `drizzle/<generated>.sql`
-- Modify: `src/server/_internal/projects-queries.ts:231`
-- Modify: `src/routes/_authed/admin/projects/index.tsx:336-339`
-- Modify: `src/server/__tests__/delete-user-script.integration.test.ts:188`
-- Modify: `docs/QUIRKS.md` (the FK table row)
+Removed along with the column: the eight seed writes and their type field, the
+`delete-user.mjs` relation, the CSV export column, the read in `projects-queries.ts`, the
+key in `project-visibility.test.ts`, and the FK table row in QUIRKS.
 
-- [ ] **Step 1: Verify there is genuinely no writer, including a spread into an insert**
-
-```bash
-grep -rn "programManagerId\|program_manager" src/ scripts/
-```
-
-Expect exactly the references listed above. The issue asks for this check explicitly
-because a form object spread straight into an insert would not show as a named write. If
-anything else appears, stop and report before dropping.
-
-- [ ] **Step 2: Repoint the integration test at a real restrict edge, in its own commit**
-
-`delete-user-script.integration.test.ts:188` sets this column to exercise the restrict
-edge. **Do not delete the assertion.** Pick one of the nine remaining restrict edges from
-the FK table in QUIRKS and rewrite the case against it.
-
-**Commit this alone, passing against the current schema, before the column is dropped.**
-Bundling it with the drop means a bisect lands on one commit where the test rewrite and the
-schema change are indistinguishable as the cause.
-
-```bash
-ulimit -n 8192 && npx vitest run --config vitest.integration.config.ts src/server/__tests__/delete-user-script.integration.test.ts
-git add src/server/__tests__/delete-user-script.integration.test.ts
-git commit -m "test(users): exercise the restrict edge on a column that has a writer"
-```
-
-- [ ] **Step 3: Drop the column and generate the migration**
-
-```bash
-npm run db:generate
-```
-
-Read the generated SQL. Per QUIRKS, FK-rule and tsvector migrations are hand-authored; a
-plain column drop should not need editing, but check.
-
-- [ ] **Step 4: Remove the read and the CSV column**
-
-The CSV header row on the admin projects export loses "Program manager ID". That is the
-only user-visible effect and the PR body should say so.
-
-- [ ] **Step 5: Remove the FK table row in QUIRKS**
-
-- [ ] **Step 6: Migrate and run the full suite**
-
-```bash
-npm run db:migrate
-npm run check && npm run typecheck && ulimit -n 8192 && npm test && npm run test:integration
-```
-
-PR closes #95.
+The integration test that used this restrict edge moved to `project_assignments.student_id`
+rather than being deleted. That relation's check has three arms and only `assigned_by` had
+a test, so the replacement covers an arm nothing exercised.
 
 ---
 

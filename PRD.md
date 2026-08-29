@@ -84,7 +84,6 @@ Each project carries:
 - ✅ Project proposer (linked user account, resolved from email; nullable) and
   a `proposerEmail` link key for proposers without an account yet.
 - ✅ Program association.
-- ✅ Program manager (main instructor).
 - ✅ Teams supported: how many student teams the project can take on (1-5,
   default 1), set and edited by staff on the project form.
 - ✅ Collaborators table (schema present for multi-user project membership).

@@ -328,7 +328,6 @@ async function main() {
     notes: string;
     proposerId: string;
     programId: string;
-    programManagerId: string;
     status:
       | "draft"
       | "submitted"
@@ -364,7 +363,6 @@ async function main() {
         "Sponsor can provide two AMR dev units on loan for spring term if the team reaches hardware integration.",
       proposerId: u.sponsorAcme.id,
       programId: p461.id,
-      programManagerId: u.instructor.id,
       status: "published",
       publishedAt: daysAgo(40),
       categories: [
@@ -397,7 +395,6 @@ async function main() {
         "NorthStar will grant a sandbox AWS account with a monthly credit cap of $200.",
       proposerId: u.sponsorNorthstar.id,
       programId: p461.id,
-      programManagerId: u.facultyAlvarez.id,
       status: "published",
       publishedAt: daysAgo(38),
       categories: [
@@ -431,7 +428,6 @@ async function main() {
         "Dr. Kim can provide a labeled starter set (~5k images) and access to a lab GPU workstation.",
       proposerId: u.facultyKim.id,
       programId: p461.id,
-      programManagerId: u.facultyKim.id,
       status: "published",
       publishedAt: daysAgo(35),
       categories: [
@@ -464,7 +460,6 @@ async function main() {
         "Two Meta Quest 3 headsets are reserved in inventory for this team during winter/spring.",
       proposerId: u.facultyAlvarez.id,
       programId: p461.id,
-      programManagerId: u.facultyAlvarez.id,
       status: "approved",
       publishedAt: null,
       categories: ["Faculty Sponsored", "AR / VR", "Unity / VR"],
@@ -492,7 +487,6 @@ async function main() {
         "Student-led; the team is seeking a faculty advisor. Scope may need trimming to fit one year.",
       proposerId: u.studentJordan.id,
       programId: p461.id,
-      programManagerId: u.instructor.id,
       status: "submitted",
       publishedAt: null,
       categories: ["Student Led", "Web Development", "React", "Mobile", "React Native"],
@@ -520,7 +514,6 @@ async function main() {
         "Hardware (Pi 5, Jetson Orin Nano, Coral accelerator) is available in inventory for checkout.",
       proposerId: u.sponsorVitalink.id,
       programId: p461.id,
-      programManagerId: u.facultyKim.id,
       status: "published",
       publishedAt: daysAgo(20),
       categories: [
@@ -554,7 +547,6 @@ async function main() {
         "Strong fit for students interested in accessibility. Could integrate with the existing handbook site.",
       proposerId: u.facultyAlvarez.id,
       programId: p461.id,
-      programManagerId: u.facultyAlvarez.id,
       status: "published",
       publishedAt: daysAgo(12),
       categories: ["Faculty Sponsored", "Web Development", "React"],
@@ -582,7 +574,6 @@ async function main() {
         "Draft proposal; the team still needs to confirm a faculty sponsor and a test drone (Tello EDU available in inventory).",
       proposerId: u.studentSam.id,
       programId: p461.id,
-      programManagerId: u.instructor.id,
       status: "draft",
       publishedAt: null,
       categories: ["Student Led", "Robotics", "Python", "IoT / Embedded"],

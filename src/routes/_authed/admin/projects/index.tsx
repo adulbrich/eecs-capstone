@@ -333,11 +333,6 @@ const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
     value: (row) => row.programCourseName,
   },
   {
-    header: "Program manager ID",
-    key: "programManagerId",
-    value: (row) => row.programManagerId,
-  },
-  {
     header: "Teams supported",
     key: "teamsSupported",
     value: (row) => row.teamsSupported,

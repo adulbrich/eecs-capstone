@@ -228,7 +228,6 @@ export async function exportAdminProjectsAs(
       licenseRestrictions: projects.licenseRestrictions,
       notes: projects.notes,
       archivedAt: projects.archivedAt,
-      programManagerId: projects.programManagerId,
       // Correlated rather than joined: a join would multiply project rows by
       // their category count and need a GROUP BY over the whole projection.
       categories: sql<string | null>`(

@@ -179,20 +179,24 @@ describe("delete-user script", () => {
     );
   });
 
-  it("refuses when they are the program manager of someone else's project", async () => {
+  it("refuses when they are assigned to someone else's project", async () => {
+    // Replaces a test on projects.program_manager_id, dropped in #95. The
+    // project_assignments check has three arms and only `assigned_by` was
+    // covered, so this is the arm nothing exercised rather than a second test
+    // of the same one.
     const target = await makeUser();
-    const bystander = await makeUser();
-    const otherProject = await makeProject(bystander.id);
-    await db
-      .update(projects)
-      .set({ programManagerId: target.id })
-      .where(eq(projects.id, otherProject));
+    const staff = await makeUser();
+    await db.insert(projectAssignments).values({
+      assignedBy: staff.id,
+      projectId: await makeProject(null),
+      studentId: target.id,
+    });
 
     const result = await purgeUser(pool, target.email);
 
     expect(result.deleted).toBe(false);
     expect(result.blockers.map((b) => b.relation)).toContain(
-      "projects.program_manager_id"
+      "project_assignments"
     );
   });
 

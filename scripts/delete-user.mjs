@@ -95,14 +95,6 @@ const BLOCKERS = [
            WHERE editor_id = $1`,
   },
   {
-    relation: "projects.program_manager_id",
-    reason: "program manager on projects they did not propose",
-    sql: `SELECT count(*)::int AS count
-            FROM projects
-           WHERE program_manager_id = $1
-             AND proposer_id IS DISTINCT FROM $1`,
-  },
-  {
     // project_bids and project_assignments have no UI, so there is no way to
     // clean these up short of SQL. Refuse rather than delete rows the operator
     // cannot see.
