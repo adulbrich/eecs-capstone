@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // `project-emails.ts` statically imports `#/db`, and that module's body throws
 // when DATABASE_URL is unset. Locally Vitest loads `.env.local` and supplies
@@ -12,7 +12,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // here. The database-backed paths are covered by the integration suite.
 vi.mock("#/db", () => ({ db: {} }));
 
+import type { NotificationConfig } from "#/lib/email/config";
 import { notifyTransitionByEmail } from "../project-emails";
+
+// Config is passed as a literal now rather than poked into process.env, which
+// is the point of the seam: no mutation, no afterEach restore, and no way for
+// one case to leak a variable into the next.
+const CONFIG: NotificationConfig = {
+  appBaseUrl: "https://app",
+  reviewInbox: "review@oregonstate.edu",
+};
+const NO_INBOX: NotificationConfig = { ...CONFIG, reviewInbox: null };
 
 const PROJECT = {
   description: "A robot arm.",
@@ -22,19 +32,18 @@ const PROJECT = {
   title: "Robot arm",
 };
 
-const ORIGINAL_ENV = { ...process.env };
-
-afterEach(() => {
-  process.env = { ...ORIGINAL_ENV };
-});
-
 describe("notifyTransitionByEmail", () => {
   it("emails the review inbox when a project is submitted", async () => {
-    process.env.BETTER_AUTH_URL = "https://app";
-    process.env.EMAIL_REVIEW_INBOX = "review@oregonstate.edu";
     const send = vi.fn().mockResolvedValue(undefined);
 
-    await notifyTransitionByEmail(PROJECT, "submitted", null, true, send);
+    await notifyTransitionByEmail(
+      PROJECT,
+      "submitted",
+      null,
+      true,
+      send,
+      CONFIG
+    );
 
     expect(send).toHaveBeenCalledOnce();
     const [to, email] = send.mock.calls[0] ?? [];
@@ -44,16 +53,23 @@ describe("notifyTransitionByEmail", () => {
   });
 
   it("emails the proposer on approval and on changes requested", async () => {
-    process.env.BETTER_AUTH_URL = "https://app";
     const send = vi.fn().mockResolvedValue(undefined);
 
-    await notifyTransitionByEmail(PROJECT, "approved", null, true, send);
+    await notifyTransitionByEmail(
+      PROJECT,
+      "approved",
+      null,
+      true,
+      send,
+      CONFIG
+    );
     await notifyTransitionByEmail(
       PROJECT,
       "changes_requested",
       "Add objectives.",
       true,
-      send
+      send,
+      CONFIG
     );
 
     expect(send).toHaveBeenCalledTimes(2);
@@ -62,41 +78,48 @@ describe("notifyTransitionByEmail", () => {
   });
 
   it("sends nothing for statuses that are not part of review", async () => {
-    process.env.BETTER_AUTH_URL = "https://app";
-    process.env.EMAIL_REVIEW_INBOX = "review@oregonstate.edu";
     const send = vi.fn().mockResolvedValue(undefined);
 
     for (const target of ["draft", "published", "archived"] as const) {
-      await notifyTransitionByEmail(PROJECT, target, null, true, send);
+      await notifyTransitionByEmail(PROJECT, target, null, true, send, CONFIG);
     }
 
     expect(send).not.toHaveBeenCalled();
   });
 
   it("sends nothing when staff opted out", async () => {
-    process.env.BETTER_AUTH_URL = "https://app";
     const send = vi.fn().mockResolvedValue(undefined);
 
-    await notifyTransitionByEmail(PROJECT, "approved", null, false, send);
+    await notifyTransitionByEmail(
+      PROJECT,
+      "approved",
+      null,
+      false,
+      send,
+      CONFIG
+    );
 
     expect(send).not.toHaveBeenCalled();
   });
 
   it("skips the submission email when the review inbox is unset", async () => {
-    process.env.BETTER_AUTH_URL = "https://app";
-    process.env.EMAIL_REVIEW_INBOX = "";
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const send = vi.fn().mockResolvedValue(undefined);
 
-    await notifyTransitionByEmail(PROJECT, "submitted", null, true, send);
+    await notifyTransitionByEmail(
+      PROJECT,
+      "submitted",
+      null,
+      true,
+      send,
+      NO_INBOX
+    );
 
     expect(send).not.toHaveBeenCalled();
     warn.mockRestore();
   });
 
   it("warns when the review inbox is unset rather than failing silently", async () => {
-    process.env.BETTER_AUTH_URL = "https://app";
-    process.env.EMAIL_REVIEW_INBOX = "";
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     await notifyTransitionByEmail(
@@ -104,7 +127,8 @@ describe("notifyTransitionByEmail", () => {
       "submitted",
       null,
       true,
-      vi.fn().mockResolvedValue(undefined)
+      vi.fn().mockResolvedValue(undefined),
+      NO_INBOX
     );
 
     // Not cosmetic. With no inbox configured, staff are never told a project
@@ -115,14 +139,25 @@ describe("notifyTransitionByEmail", () => {
     warn.mockRestore();
   });
 
-  it("skips everything when the app base url is unset", async () => {
-    process.env.BETTER_AUTH_URL = "";
-    process.env.EMAIL_REVIEW_INBOX = "review@oregonstate.edu";
+  it("logs a named error when the app base url is unset, and still sends nothing", async () => {
+    // BETTER_AUTH_URL used to be skipped silently: no mail, no log, and a
+    // review queue nobody was told about. It is required now, and the throw
+    // lands in this function's own catch, so the caller is still protected
+    // from a failed email undoing a committed transition.
+    const error = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
     const send = vi.fn().mockResolvedValue(undefined);
 
-    await notifyTransitionByEmail(PROJECT, "submitted", null, true, send);
+    await notifyTransitionByEmail(PROJECT, "submitted", null, true, send, {
+      ...CONFIG,
+      appBaseUrl: null,
+    });
 
     expect(send).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledOnce();
+    expect(String(error.mock.calls[0]?.[1])).toContain("BETTER_AUTH_URL");
+    error.mockRestore();
   });
 
   it("prefers the account address over a stale stored one", async () => {
@@ -150,7 +185,6 @@ describe("notifyTransitionByEmail", () => {
   });
 
   it("skips the proposer email when there is no address at all", async () => {
-    process.env.BETTER_AUTH_URL = "https://app";
     const send = vi.fn().mockResolvedValue(undefined);
 
     await notifyTransitionByEmail(
@@ -158,18 +192,18 @@ describe("notifyTransitionByEmail", () => {
       "approved",
       null,
       true,
-      send
+      send,
+      CONFIG
     );
 
     expect(send).not.toHaveBeenCalled();
   });
 
   it("never propagates a transport failure to the caller", async () => {
-    process.env.BETTER_AUTH_URL = "https://app";
     const send = vi.fn().mockRejectedValue(new Error("SES is down"));
 
     await expect(
-      notifyTransitionByEmail(PROJECT, "approved", null, true, send)
+      notifyTransitionByEmail(PROJECT, "approved", null, true, send, CONFIG)
     ).resolves.toBeUndefined();
   });
 });

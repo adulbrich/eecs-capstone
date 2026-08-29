@@ -1,6 +1,10 @@
 import { eq } from "drizzle-orm";
 import { db } from "#/db";
 import { user } from "#/db/schema";
+import {
+  buildNotificationConfig,
+  type NotificationConfig,
+} from "#/lib/email/config";
 import { getEmailSender } from "#/lib/email/sender";
 import {
   projectApprovedEmail,
@@ -55,9 +59,9 @@ export function resolveProposerAddress(
 async function sendSubmitted(
   project: TransitionEmailProject,
   url: string,
-  send: SendEmailFn
+  send: SendEmailFn,
+  inbox: string | null
 ): Promise<void> {
-  const inbox = process.env.EMAIL_REVIEW_INBOX?.trim();
   if (!inbox) {
     // Say so rather than returning silently. An unset review inbox means staff
     // are never told a project was submitted, and nothing else in the app
@@ -118,25 +122,29 @@ export async function notifyTransitionByEmail(
   target: Status,
   comment: string | null,
   sendEmail: boolean,
-  send?: SendEmailFn
+  send?: SendEmailFn,
+  config: NotificationConfig = buildNotificationConfig()
 ): Promise<void> {
   if (!sendEmail) {
     return;
   }
   try {
-    // Absolute, because these links are followed from a mail client. The app
-    // host is already configured for auth; a missing one means we cannot build
-    // a usable link, so send nothing rather than something broken.
-    const base = process.env.BETTER_AUTH_URL?.trim();
-    if (!base) {
-      return;
+    // Absolute, because these links are followed from a mail client, and
+    // required rather than skipped: without it every transition email is
+    // silently dropped, and silence is what made this worth changing. The
+    // throw is caught below, so an unset value costs a named log line rather
+    // than an undone approval.
+    if (!config.appBaseUrl) {
+      throw new Error(
+        "BETTER_AUTH_URL is not set, so no transition email could be addressed"
+      );
     }
     const dispatch: SendEmailFn =
       send ?? ((to, email) => getEmailSender().send(to, email));
-    const url = `${base}/projects/${project.id}`;
+    const url = `${config.appBaseUrl}/projects/${project.id}`;
 
     if (target === "submitted") {
-      await sendSubmitted(project, url, dispatch);
+      await sendSubmitted(project, url, dispatch, config.reviewInbox);
       return;
     }
     if (target === "approved" || target === "changes_requested") {

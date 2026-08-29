@@ -4,10 +4,9 @@ import {
   type SendEmailCommandInput,
   type SendEmailCommandOutput,
 } from "@aws-sdk/client-sesv2";
+import { buildEmailSenderConfig, type EmailSenderConfig } from "./config";
 import type { EmailSender } from "./sender";
 import type { RenderedEmail } from "./templates";
-
-const DEFAULT_REGION = "us-east-1";
 
 /**
  * Sends a `SendEmailCommand` to SES. Injected into `SesEmailSender` so the
@@ -60,29 +59,33 @@ export class SesEmailSender implements EmailSender {
 
 let _client: SESv2Client | null = null;
 
-function getSesClient(): SESv2Client {
+function getSesClient(region: string): SESv2Client {
   if (!_client) {
     // Credentials come from the ECS task role via the default provider chain.
-    _client = new SESv2Client({
-      region:
-        process.env.SES_REGION ?? process.env.AWS_REGION ?? DEFAULT_REGION,
-    });
+    _client = new SESv2Client({ region });
   }
   return _client;
 }
 
-export function createSesEmailSender(): SesEmailSender {
-  const from = process.env.EMAIL_FROM;
-  if (!from) {
+/**
+ * The throw lives here rather than in `buildEmailSenderConfig` because the
+ * builder is reached at module scope through `getEmailSender()` in
+ * `src/lib/auth.ts`, so a throw in the builder would fail the app's boot on
+ * every transport instead of just the one that needs the variable. Here it
+ * fires only when someone has actually asked for SES.
+ */
+export function createSesEmailSender(
+  config: EmailSenderConfig = buildEmailSenderConfig()
+): SesEmailSender {
+  if (!config.from) {
     throw new Error("EMAIL_FROM must be set when EMAIL_TRANSPORT=ses");
   }
   // Deliberately not required: the ECS task definition always passes
   // EMAIL_REPLY_TO, as an empty string until an address is decided, and email
   // must not stop working for want of one.
-  const replyTo = process.env.EMAIL_REPLY_TO?.trim() || null;
   return new SesEmailSender(
-    from,
-    (input) => getSesClient().send(new SendEmailCommand(input)),
-    replyTo
+    config.from,
+    (input) => getSesClient(config.region).send(new SendEmailCommand(input)),
+    config.replyTo
   );
 }
