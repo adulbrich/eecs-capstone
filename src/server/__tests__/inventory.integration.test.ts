@@ -33,11 +33,11 @@ import {
   listInventoryCategoriesImpl,
   listInventoryRequestsAs,
   listMyItemsAs,
-  recordOverdueNotificationsAs,
   rejectRequestItemAs,
   submitCartAs,
   updateInventoryItemAs,
 } from "#/server/_internal/inventory";
+import { recordOverdueNotificationsAs } from "#/server/_internal/inventory-overdue";
 import { transitionItem } from "#/server/_internal/inventory-transitions";
 import { itemPayloadSchema } from "#/server/inventory";
 
