@@ -8,8 +8,8 @@ import {
 import { useCallback, useMemo } from "react";
 import { z } from "zod";
 import {
-  type AdminColumn,
   AdminDataTable,
+  defineAdminColumns,
 } from "#/components/admin-data-table";
 import { AdminRequestActions } from "#/components/admin-request-actions";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
@@ -91,8 +91,8 @@ function statusLabel(status: string) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-function buildColumns(onDone: () => void): AdminColumn<Row>[] {
-  return [
+function buildColumns(onDone: () => void) {
+  return defineAdminColumns<Row>()([
     {
       accessorFn: (row) => row.item.name,
       cardHeader: true,
@@ -169,7 +169,7 @@ function buildColumns(onDone: () => void): AdminColumn<Row>[] {
       header: "Actions",
       id: "actions",
     },
-  ];
+  ]);
 }
 
 function AdminRequestQueue() {

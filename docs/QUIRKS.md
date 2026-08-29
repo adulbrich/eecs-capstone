@@ -587,6 +587,24 @@ There is no global middleware, and no grep can tell an ungated endpoint from a g
 
 Two things the table does that are easy to misread. It records the **effective** level, so five project transition endpoints are `staff` even though their gate admits the proposer, because `TRANSITIONS` in `src/lib/project-workflow.ts` decides per role. And it covers all of `src`, not just `src/server`, because the narrow scan missed `lib/auth-guards.ts:getSession`.
 
+### A shared admin column const uses `satisfies`, not an annotation
+
+`defineAdminColumns<Row>()` (in `src/components/admin-data-table.tsx`) checks each column against what its `accessorFn` returns, so it needs that return type to survive to the call site. A type annotation destroys it: `const NAME_COLUMN: AdminColumn<Row> = {...}` makes the variable's type the declared one, whose `accessorFn` returns `unknown`, and `[null] extends [unknown]` is true. Every annotated column then reports `ACCESSOR_RETURNS_NULL_USE_UNDEFINED` on an accessor that never returns null, which reads as a bug in the check rather than in the declaration.
+
+`satisfies` type-checks the same fields while leaving the inferred type in place:
+
+```tsx
+const NAME_COLUMN = {
+  accessorFn: (row) => row.name,
+  id: "name" as const,
+  header: "Name",
+} satisfies AdminColumn<Row>;
+```
+
+`id` needs the `as const` or it widens to `string`, and the diagnostic then says `string` instead of naming the column that broke the rule. That is the difference between an error someone can act on and one they have to bisect. The same applies to the array: let `defineAdminColumns` return type stand alone rather than annotating it `AdminColumn<Row>[]`.
+
+`/admin/categories` is the only route that shares column consts between two tables (a project tab and an inventory tab), so it is the only place this comes up today.
+
 ### Path-by-path convention summary
 
 | Path | What goes there |

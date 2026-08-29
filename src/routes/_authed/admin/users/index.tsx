@@ -7,8 +7,8 @@ import {
 import { useCallback } from "react";
 import { z } from "zod";
 import {
-  type AdminColumn,
   AdminDataTable,
+  defineAdminColumns,
 } from "#/components/admin-data-table";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
@@ -98,7 +98,7 @@ type Row = Awaited<ReturnType<typeof listUsers>>["rows"][number];
 
 const DEFAULT_SORT: SortState = { desc: true, id: "createdAt" };
 
-const COLUMNS: AdminColumn<Row>[] = [
+const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => row.email,
     cell: ({ row }) => row.original.email,
@@ -120,10 +120,16 @@ const COLUMNS: AdminColumn<Row>[] = [
     id: "role",
   },
   {
-    accessorFn: (row) => row.banned,
+    // `banned` is nullable in the auth schema (a default, not a NOT NULL), and
+    // an unset flag means the same thing as false here. Collapsing it in the
+    // accessor keeps a `null` out of the sort, where it would order as the
+    // string "null" between "false" and "true".
+    accessorFn: (row) => row.banned ?? false,
     cell: ({ row }) => (row.original.banned ? "yes" : ""),
     header: "Banned",
     id: "banned",
+    // Boolean, not text: the default comparator would sort String(value).
+    sortingFn: "basic",
   },
   {
     accessorFn: (row) => row.createdAt,
@@ -146,7 +152,7 @@ const COLUMNS: AdminColumn<Row>[] = [
     header: "Actions",
     id: "actions",
   },
-];
+]);
 
 type ExportRow = Awaited<ReturnType<typeof exportUsers>>["rows"][number];
 

@@ -7,8 +7,8 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 import {
-  type AdminColumn,
   AdminDataTable,
+  defineAdminColumns,
 } from "#/components/admin-data-table";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
@@ -115,7 +115,7 @@ const STATUS_ORDER: Record<string, number> = {
 
 const DEFAULT_SORT: SortState = { desc: true, id: "updatedAt" };
 
-const COLUMNS: AdminColumn<Row>[] = [
+const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => row.title,
     cell: ({ row }) => (
@@ -250,7 +250,7 @@ const COLUMNS: AdminColumn<Row>[] = [
     header: "Actions",
     id: "actions",
   },
-];
+]);
 
 type ExportRow = Awaited<
   ReturnType<typeof exportAdminProjects>

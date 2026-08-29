@@ -8,8 +8,8 @@ import {
 import { useState } from "react";
 import { z } from "zod";
 import {
-  type AdminColumn,
   AdminDataTable,
+  defineAdminColumns,
 } from "#/components/admin-data-table";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { LocalTime } from "#/components/local-time";
@@ -66,7 +66,7 @@ type Row = Awaited<ReturnType<typeof listPrograms>>["rows"][number];
 
 const DEFAULT_SORT: SortState = { desc: false, id: "courseId" };
 
-const COLUMNS: AdminColumn<Row>[] = [
+const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => row.courseId,
     cell: ({ row }) => row.original.courseId,
@@ -119,7 +119,7 @@ const COLUMNS: AdminColumn<Row>[] = [
     header: "Actions",
     id: "actions",
   },
-];
+]);
 
 // Every field of the record, independent of which columns are visible.
 // defineCsvColumns<Row>() fails npm run typecheck if a field of Row has no

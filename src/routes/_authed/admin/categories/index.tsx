@@ -10,6 +10,7 @@ import { z } from "zod";
 import {
   type AdminColumn,
   AdminDataTable,
+  defineAdminColumns,
 } from "#/components/admin-data-table";
 import { CategoryTypeCombobox } from "#/components/category-type-combobox";
 import { ExportCsvButton } from "#/components/export-csv-button";
@@ -85,51 +86,56 @@ type Row = Awaited<ReturnType<typeof listCategoriesWithUsage>>["rows"][number];
 const PROJECT_DEFAULT_SORT: SortState = { desc: false, id: "type" };
 const INVENTORY_DEFAULT_SORT: SortState = { desc: false, id: "name" };
 
-const NAME_COLUMN: AdminColumn<Row> = {
+const NAME_COLUMN = {
   accessorFn: (row) => row.name,
   cell: ({ row }) => row.original.name,
   enableHiding: false,
   header: "Name",
-  id: "name",
-};
+  id: "name" as const,
+} satisfies AdminColumn<Row>;
 
 // One column definition per tab rather than one shared "Usage": the header
 // has to name what was counted, and the domain decides which junction table
 // the count came from.
-const PROJECT_USAGE_COLUMN: AdminColumn<Row> = {
+const PROJECT_USAGE_COLUMN = {
   accessorFn: (row) => row.usageCount,
   cell: ({ row }) => row.original.usageCount,
   header: "Projects",
-  id: "usageCount",
+  id: "usageCount" as const,
   // Numeric, not the locale-compare default, which would compare String(n)
   // and sort 10 before 2.
   sortingFn: "basic",
-};
+} satisfies AdminColumn<Row>;
 
-const INVENTORY_USAGE_COLUMN: AdminColumn<Row> = {
+const INVENTORY_USAGE_COLUMN = {
   ...PROJECT_USAGE_COLUMN,
   header: "Items",
-};
+} satisfies AdminColumn<Row>;
 
-const TYPE_COLUMN: AdminColumn<Row> = {
-  accessorFn: (row) => row.type,
+const TYPE_COLUMN = {
+  // `?? undefined` rather than the bare field: `Row` covers both tabs, so its
+  // `type` is nullable even though this column only ever renders on the
+  // project tab, where a typeless category cannot exist. A `null` reaching an
+  // accessor sorts as the string "null" among the real values, which is the
+  // trap `defineAdminColumns` refuses to compile.
+  accessorFn: (row) => row.type ?? undefined,
   cell: ({ row }) => (
     <span className="text-muted-foreground">{row.original.type}</span>
   ),
   header: "Type",
-  id: "type",
-};
+  id: "type" as const,
+} satisfies AdminColumn<Row>;
 
-const CREATED_COLUMN: AdminColumn<Row> = {
+const CREATED_COLUMN = {
   accessorFn: (row) => row.createdAt,
   cell: ({ row }) => <LocalTime dateOnly value={row.original.createdAt} />,
   defaultHidden: true,
   header: "Created",
-  id: "createdAt",
+  id: "createdAt" as const,
   sortingFn: "datetime",
-};
+} satisfies AdminColumn<Row>;
 
-const ACTIONS_COLUMN: AdminColumn<Row> = {
+const ACTIONS_COLUMN = {
   cell: ({ row }) => (
     <Link
       className="hover:underline"
@@ -142,25 +148,25 @@ const ACTIONS_COLUMN: AdminColumn<Row> = {
   enableHiding: false,
   enableSorting: false,
   header: "Actions",
-  id: "actions",
-};
+  id: "actions" as const,
+} satisfies AdminColumn<Row>;
 
 // The project domain keeps the Type column (its facet); the inventory
 // domain is flat, so its table never renders a Type column at all.
-const PROJECT_COLUMNS: AdminColumn<Row>[] = [
+const PROJECT_COLUMNS = defineAdminColumns<Row>()([
   NAME_COLUMN,
   PROJECT_USAGE_COLUMN,
   TYPE_COLUMN,
   CREATED_COLUMN,
   ACTIONS_COLUMN,
-];
+]);
 
-const INVENTORY_COLUMNS: AdminColumn<Row>[] = [
+const INVENTORY_COLUMNS = defineAdminColumns<Row>()([
   NAME_COLUMN,
   INVENTORY_USAGE_COLUMN,
   CREATED_COLUMN,
   ACTIONS_COLUMN,
-];
+]);
 
 // Every field of the record, independent of which columns are visible.
 // defineCsvColumns<Row>() fails npm run typecheck if a field of Row has no

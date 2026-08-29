@@ -79,12 +79,95 @@ const localeCompareSortingFn: SortingFn<unknown> = (rowA, rowB, columnId) =>
  * label would only squeeze the title into what is left of the row. At most
  * one column per table should set it.
  */
-export type AdminColumn<T> = ColumnDef<T, unknown> & {
+export type AdminColumn<T> = ColumnDef<T, unknown> & AdminColumnExtras;
+
+/** The fields `AdminColumn` adds on top of TanStack's `ColumnDef`. */
+interface AdminColumnExtras {
   cardHeader?: boolean;
   defaultHidden?: boolean;
   header: string;
   id: string;
+}
+
+/**
+ * `AdminColumn` with the accessor's return type left as a parameter instead
+ * of erased to `unknown`, which is what lets `CheckedAdminColumn` see what a
+ * column sorts on.
+ *
+ * `Omit` over `ColumnDef`'s union keeps only the keys every member has, so
+ * `accessorKey` and `columns` drop out of the constraint. That is deliberate
+ * twice over: an `accessorKey` column would carry a value type this check
+ * cannot read and would slip past it, and a grouped column has no place in a
+ * table that renders one flat header row.
+ */
+type TypedAdminColumn<T, TValue> = Omit<ColumnDef<T, unknown>, "accessorFn"> &
+  AdminColumnExtras & { accessorFn?: (row: T, index: number) => TValue };
+
+type ColumnId<C> = C extends { id: infer TId } ? TId : never;
+
+/**
+ * Resolves to `C` when a column honours both rules that depend on what its
+ * accessor returns, and to an error object naming the offending column
+ * otherwise:
+ *
+ * 1. A column whose value is not text sets its own `sortingFn`, because the
+ *    default comparator sorts `String(value)` (see `localeCompareSortingFn`).
+ * 2. An accessor returns `undefined`, never `null`, for a missing value.
+ *    `sortUndefined` is the only knob TanStack offers for grouping empties,
+ *    and it does not treat `null` as empty, so a `null` sorts as the string
+ *    "null" among the real values.
+ *
+ * The null check comes first: an accessor returning `string | null` breaks
+ * rule 2 while looking like text to rule 1, and reporting the sorting
+ * failure there would send the reader after the wrong fix.
+ *
+ * A column with no `accessorFn` at all (an actions column, say) has no value
+ * to sort and passes through untouched.
+ */
+type CheckedAdminColumn<C> = C extends {
+  accessorFn: (...args: never[]) => infer TValue;
+}
+  ? [null] extends [TValue]
+    ? { ACCESSOR_RETURNS_NULL_USE_UNDEFINED: ColumnId<C> }
+    : [TValue] extends [string | undefined]
+      ? C
+      : C extends { sortingFn: unknown }
+        ? C
+        : { COLUMN_NEEDS_ITS_OWN_SORTING_FN: ColumnId<C> }
+  : C;
+
+type CheckedAdminColumns<C extends readonly unknown[]> = {
+  [K in keyof C]: CheckedAdminColumn<C[K]>;
 };
+
+/**
+ * Builds a checked column list for one admin table. Call as
+ * `defineAdminColumns<Row>()([...])`.
+ *
+ * Curried for the same reason as `defineCsvColumns` in `#/lib/csv`:
+ * TypeScript infers all type arguments or none, so giving `T` explicitly in
+ * one call would force `C` to be given too, and `C` is exactly what has to be
+ * inferred from the array literal. `const C` is what keeps each element's
+ * accessor return type visible per element rather than unioned across the
+ * array.
+ *
+ * The two rules it enforces used to live only in `docs/UI-CONVENTIONS.md` and
+ * in a comment on the route where someone hit the second one. Both fail
+ * quietly: the table renders, sorts, and looks fine, in the wrong order.
+ *
+ * Callers must let the returned type stand on its own. Annotating the result
+ * `AdminColumn<Row>[]`, or a shared column const `AdminColumn<Row>`, erases
+ * the accessor's return type back to `unknown`, and `[null] extends
+ * [unknown]` is true, so every column would be reported as returning null.
+ * Use `satisfies AdminColumn<Row>` with `id: "..." as const` for a shared
+ * const, which type-checks the same fields while preserving what the accessor
+ * returns.
+ */
+export function defineAdminColumns<T>() {
+  return <const C extends readonly TypedAdminColumn<T, unknown>[]>(
+    columns: C & CheckedAdminColumns<C>
+  ): AdminColumn<T>[] => columns as unknown as AdminColumn<T>[];
+}
 
 export interface AdminDataTableProps<T> {
   /**
