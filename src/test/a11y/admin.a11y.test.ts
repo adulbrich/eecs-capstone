@@ -9,7 +9,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
-import { checkA11y, closeMenu, waitForHydration } from "./helpers";
+import { closeMenu, waitForHydration } from "../shared/playwright";
+import { checkA11y } from "./helpers";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

@@ -33,6 +33,25 @@ jobs:
     with:
       script: test:integration
 
+  # The smoke suite is the browser-level guard on the handful of flows the app
+  # exists for: sign in, propose and publish a project, request and return an
+  # item, and stay out of pages you are not allowed into. It runs against the
+  # production build, which the dev server cannot stand in for, so its
+  # playwright config builds and starts .output rather than `vite dev`. Chromium
+  # only, serial, inside a 5-minute job. Anything larger or flakier than that
+  # belongs to the full suite in #143, which is dispatch-only.
+  #
+  # Advisory for now. It joins the required status checks once it has a known
+  # flake rate, and the check to register there is `smoke / suite`, not `smoke`.
+  smoke:
+    uses: ./.github/workflows/stack-suite.yml
+    with:
+      script: test:smoke
+      seed: true
+      browser: true
+      report-path: playwright-report/e2e
+      report-name: smoke-report
+
   # The a11y suite has existed since 2026-05-26 and did not run in CI until
   # PR #62, so an accessibility regression could reach main unnoticed.
   # `npm test` excludes it on purpose to keep the unit run fast; this is the

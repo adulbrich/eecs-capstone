@@ -16,6 +16,8 @@ todos.json
 src/test/a11y/.user-auth.json
 src/test/a11y/.admin-auth.json
 src/test/a11y/.fixtures.json
+src/test/e2e/.user-auth.json
+src/test/e2e/.admin-auth.json
 playwright-report/
 test-results/
 .playwright-mcp/
