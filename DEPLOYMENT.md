@@ -796,14 +796,20 @@ this config; delete it manually if you are done with the project.
 **Runtime environment (set in the task definition, `infra/ecs.tf`):**
 
 `NODE_ENV`, `PORT`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `ONID_CLIENT_ID`,
-`ONID_DISCOVERY_URL`, `S3_BUCKET`,
-`S3_REGION`, `BEDROCK_REGION`, `BEDROCK_MODEL_ID`, `BEDROCK_REASONING_EFFORT`,
-`AI_REVIEW_LIMIT_PER_HOUR`, `AI_REVIEW_LIMIT_PER_DAY`, `EMAIL_TRANSPORT=console`,
-`EMAIL_FROM`, `EMAIL_REPLY_TO` (blank), `SES_REGION`, plus secrets
+`ONID_DISCOVERY_URL`, `S3_BUCKET`, `S3_REGION`, `BEDROCK_REGION`,
+`BEDROCK_MODEL_ID`, `BEDROCK_REASONING_EFFORT`, `BEDROCK_EMBEDDING_MODEL_ID`,
+`BEDROCK_EMBEDDING_DIMENSIONS`, `AI_REVIEW_LIMIT_PER_HOUR`,
+`AI_REVIEW_LIMIT_PER_DAY`, `EMAIL_TRANSPORT=ses`, `EMAIL_FROM`,
+`EMAIL_REPLY_TO`, `EMAIL_REVIEW_INBOX`, `SES_REGION`, plus secrets
 `DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`,
-`ONID_CLIENT_SECRET`. In production, S3
-and Bedrock use the task role (no access keys). The three email variables are
-inert until `EMAIL_TRANSPORT` flips to `ses` (section 9.5).
+`ONID_CLIENT_SECRET`. In production, S3 and Bedrock use the task role, so no
+access keys and no `S3_ENDPOINT` are set; `BEDROCK_EMBEDDINGS_ENABLED` is
+deliberately not plumbed either.
+
+This list is written by hand and `infra/ecs.tf` is the source of truth. The
+test in `src/lib/__tests__/env-contract.test.ts` checks the task definition
+against what the code reads, which is the part that can be automated; prose
+cannot be, so read it as a summary and not as the contract.
 
 **File map:**
 

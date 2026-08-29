@@ -409,33 +409,33 @@ Playwright timeout on a click that works locally, search the job log for
 Retried tests are reported as flaky rather than silently swallowed, so a genuine
 intermittent bug still surfaces in the log.
 
-### The unit suite loads your dotenv files, so an env-dependent test is machine-dependent
+### The unit suite sees your dotenv files, so an env-dependent test is machine-dependent
 
-`vite.config.ts` declares no `test` block and `npm test` runs bare `vitest run`,
-which makes it easy to conclude the unit suite sees no dotenv at all. It does.
-Vitest builds on the Vite config, and Vite loads `.env` and `.env.local` into
-`process.env` before anything runs. Probe it if you doubt this: a unit test
-asserting `process.env.S3_BUCKET` gets `cs-capstone`, and that value appears
-only in `.env.local`.
+`vite.config.ts` declares no `test` block, which makes it easy to assume the
+unit run sees no dotenv at all. It does: the runner populates `process.env`
+from `.env` and `.env.local` before any test executes. Probe it rather than
+trust either claim, since a plan under `docs/superpowers/plans/` asserts the
+opposite:
 
-**The consequence is a test that passes for you and fails for a colleague.** An
-assertion on a value resolved from the ambient environment is really an
-assertion about the author's `.env.local`. `bedrock-embed.test.ts` had one: it
-compared `EMBEDDING_DIMENSIONS` against the literal 1024, which reds for anyone
-who set `BEDROCK_EMBEDDING_DIMENSIONS` to anything else, and `.env.example`
-ships that variable so it is in the documented setup. CI passes either way,
-because the `verify` job writes no dotenv file at all, so this fails only on
-developer machines and only some of them.
+```ts
+it("probe", () => {
+  // Passes locally. S3_BUCKET is set in .env.local and not in .env.
+  expect(process.env.S3_BUCKET).toBe("cs-capstone");
+});
+```
 
-Assert config through a builder given a literal environment
-(`buildEmbedConfig({} as NodeJS.ProcessEnv)`) rather than through whatever the
-process resolved. Where a module-level constant is genuinely the thing under
-test, assert that it matches its builder rather than a literal, which holds in
-any environment.
+So an assertion on a value the process resolved is really an assertion about
+the author's `.env.local`. `bedrock-embed.test.ts` has one today: it compares
+`EMBEDDING_DIMENSIONS` against the literal `1024`, which reds for anyone who
+set `BEDROCK_EMBEDDING_DIMENSIONS` to anything else. CI never catches it,
+because the `verify` job writes no dotenv file, so it fails on some developer
+machines and nowhere else.
 
-`docs/superpowers/plans/2026-07-22-interests-embeddings-discovery.md` states the
-opposite. It is a dated plan rather than a live reference, and this entry is the
-correction.
+Assert config through a builder handed a literal environment, the way
+`aws-config.test.ts` calls `buildS3Config({ S3_REGION: "us-west-2" } as
+NodeJS.ProcessEnv)`. Where a module-level constant is itself the thing under
+test, assert it matches its builder rather than a literal: that holds in any
+environment.
 
 ### Integration tests need DATABASE_URL at config-load time
 
