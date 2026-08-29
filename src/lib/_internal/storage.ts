@@ -33,7 +33,7 @@ export function buildS3Config(
 
 export interface StorageConfig {
   bucket: string;
-  client: S3ClientConfig;
+  clientConfig: S3ClientConfig;
 }
 
 /**
@@ -47,7 +47,7 @@ export function buildStorageConfig(
 ): StorageConfig {
   return {
     bucket: env.S3_BUCKET ?? "cs-capstone",
-    client: buildS3Config(env),
+    clientConfig: buildS3Config(env),
   };
 }
 
@@ -90,6 +90,6 @@ export function getObjectStorage(): ObjectStorage {
     return _instance;
   }
   const config = buildStorageConfig();
-  _instance = new S3Storage(config.bucket, new S3Client(config.client));
+  _instance = new S3Storage(config.bucket, new S3Client(config.clientConfig));
   return _instance;
 }

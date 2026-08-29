@@ -60,7 +60,7 @@ describe("buildStorageConfig", () => {
       S3_SECRET_KEY: "sk",
     } as NodeJS.ProcessEnv);
     expect(config.bucket).toBe("some-other-bucket");
-    expect(config.client.endpoint).toBe("http://localhost:9000");
-    expect(config.client.forcePathStyle).toBe(true);
+    expect(config.clientConfig.endpoint).toBe("http://localhost:9000");
+    expect(config.clientConfig.forcePathStyle).toBe(true);
   });
 });

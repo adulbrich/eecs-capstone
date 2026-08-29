@@ -975,6 +975,28 @@ between them. Embeddings use `bedrock-runtime` through the AWS SDK
 through a hand-signed `fetch` (`src/lib/_internal/bedrock-mantle.ts`). Treat a
 fact about one as saying nothing about the other.
 
+### A blank `BEDROCK_EMBEDDING_DIMENSIONS` is zero, not the default
+
+`buildEmbedConfig` (`src/lib/_internal/bedrock-embed.ts`) resolves the value as
+`Number(env.BEDROCK_EMBEDDING_DIMENSIONS ?? "1024")`. `??` catches only
+`undefined` and `null`, so a variable set to the empty string skips the default
+and reaches `Number("")`, which is `0`. Whitespace behaves the same way. Unset
+is the only spelling of "missing" that gets 1024.
+
+**This is worse than a bad request, and that is why it is written down.** The
+model id and the dimension count are both interpolated into a sha256 by
+`embeddingHash` (`src/lib/embedding-source.ts`), and that hash is stored as
+`projects.embedding_source_hash` and compared on every write to decide whether
+a project needs re-embedding. A dimension count that changes for a given
+environment changes every hash, so every project looks modified and re-embeds
+at one paid Bedrock call each. The blank case is pinned by a test rather than
+fixed for exactly that reason: whatever the stored hashes were computed with is
+what the code has to keep computing until someone migrates them deliberately.
+
+Not a live state. `.env.example` and `infra/ecs.tf` both set the variable
+explicitly, so it takes a hand-edit to reach. See #137 for the open question of
+which config values should be validated rather than coerced.
+
 ### The SigV4 service name is `bedrock-mantle`, not `bedrock`
 
 Signing a Mantle request as `bedrock` produces a well-formed signature that the
