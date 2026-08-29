@@ -196,14 +196,22 @@ export function AdminDataTable<T>({
     // of them unlabelled and neither obviously wrong: it reads as a styling
     // oddity, so it gets lived with rather than reported. The prop's TSDoc has
     // said "at most one" since it was added, where no compiler could read it.
+    //
+    // Reported, not thrown. Nothing in this app declares an `errorComponent`,
+    // so a render-time throw takes the whole admin page down, and trading a
+    // squeezed card title for a blank screen is the worse bug. Keeping the
+    // first marked column also makes the render deterministic rather than
+    // leaving it to column order to decide how broken the card looks.
     if (marked.length > 1) {
-      throw new Error(
-        `An admin table set cardHeader on ${marked.length} columns (${marked
+      console.error(
+        `AdminDataTable: cardHeader is set on ${marked.length} columns (${marked
           .map((column) => column.id)
-          .join(", ")}). At most one column may title the card.`
+          .join(
+            ", "
+          )}). At most one column may title the mobile card; using "${marked[0].id}".`
       );
     }
-    return new Set(marked.map((column) => column.id));
+    return new Set(marked.slice(0, 1).map((column) => column.id));
   }, [columns]);
   const highlighted = useRef<HTMLTableRowElement | null>(null);
   // Scrolls once the highlighted row has rendered. Deliberately runs on mount

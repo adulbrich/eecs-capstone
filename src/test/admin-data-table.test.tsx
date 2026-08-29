@@ -183,18 +183,37 @@ describe("AdminDataTable", () => {
     expect(cells[1].hasAttribute("data-card-header")).toBe(false);
   });
 
-  it("refuses a column list with two cardHeaders", () => {
+  it("reports two cardHeaders and renders only the first", () => {
     // Two header strips render as two title rows on one mobile card, neither
     // obviously wrong. The prop's TSDoc has said "at most one" since it was
     // added, where no compiler and no test could read it (#94).
+    //
+    // Both halves matter. The console message is what a developer sees, and
+    // rendering one header strip is what stops the page being wrong while they
+    // are not looking. Throwing would take the admin page down over a card
+    // title, since nothing here declares an errorComponent.
+    const error = vi.spyOn(console, "error").mockImplementation(() => {
+      // Silenced: this test asserts on the call, and the message would
+      // otherwise be noise in the run.
+    });
     const twoHeaders = COLUMNS.map((column) => ({
       ...column,
       cardHeader: true,
     }));
 
-    expect(() => renderTable({ columns: twoHeaders })).toThrow(
-      /cardHeader on 2 columns/
+    const { container } = renderTable({ columns: twoHeaders, hidden: [] });
+
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining("cardHeader is set on 2 columns (name, location)")
     );
+    const cells = container
+      .querySelectorAll("tbody tr")[0]
+      .querySelectorAll("td");
+    expect(cells[0].hasAttribute("data-card-header")).toBe(true);
+    // The second column asked to be a card header too and did not get to be.
+    expect(cells[1].hasAttribute("data-card-header")).toBe(false);
+    expect(cells[1].getAttribute("data-label")).toBe("Location");
+    error.mockRestore();
   });
 
   it("keeps every cell labelled when no column opts into cardHeader", () => {
