@@ -20,7 +20,6 @@ import {
   deleteCategoryAs,
 } from "#/server/_internal/categories";
 import {
-  collectedByForRequestItems,
   createInventoryItemAs,
   getInventoryItemAs,
   getInventoryItemDetailAs,
@@ -28,11 +27,14 @@ import {
   listAdminInventoryAs,
   listInventoryAs,
   listInventoryCategoriesImpl,
-  listInventoryRequestsAs,
-  listMyItemsAs,
   updateInventoryItemAs,
 } from "#/server/_internal/inventory";
 import { addToCartAs, submitCartAs } from "#/server/_internal/inventory-cart";
+import {
+  collectedByForRequestItems,
+  listInventoryRequestsAs,
+  listMyItemsAs,
+} from "#/server/_internal/inventory-holdings";
 import { recordOverdueNotificationsAs } from "#/server/_internal/inventory-overdue";
 import {
   approveRequestItemAs,

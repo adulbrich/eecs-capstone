@@ -226,7 +226,9 @@ export const cancelRequestItem = createServerFn({ method: "POST" })
 
 export const listMyItems = createServerFn({ method: "GET" }).handler(
   async () => {
-    const { listMyItemsForCurrentUser } = await import("./_internal/inventory");
+    const { listMyItemsForCurrentUser } = await import(
+      "./_internal/inventory-holdings"
+    );
     return listMyItemsForCurrentUser();
   }
 );
@@ -246,7 +248,7 @@ export const listInventoryRequests = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => requestQueueSchema.parse(d))
   .handler(async ({ data }) => {
     const { listInventoryRequestsForCurrentUser } = await import(
-      "./_internal/inventory"
+      "./_internal/inventory-holdings"
     );
     return listInventoryRequestsForCurrentUser(data);
   });
