@@ -83,9 +83,10 @@ export interface HoldColumns {
  * `thing` carries a name and program too. The domain reading is that they
  * describe a person and so mean little beside a label, but
  * `transitionItemInTx` stores them on that path today and staff search reads
- * them back (`inventory.ts` filters on `current_holder_name` and
- * `current_holder_program`), so dropping them here would lose data and make
- * those rows unfindable. Narrowing this is a behavior change, not a refactor.
+ * them back (`listAdminInventoryAs` in `inventory-catalog.ts` filters on
+ * `current_holder_name` and `current_holder_program`), so dropping them here
+ * would lose data and make those rows unfindable. Narrowing this is a behavior
+ * change, not a refactor.
  *
  * `account.email` is nullable because a read path must represent whatever is
  * in the database, and because an account id can outlive the account row it
