@@ -190,13 +190,21 @@ export function AdminDataTable<T>({
     () => new Map(columns.map((column) => [column.id, column.header])),
     [columns]
   );
-  const cardHeaderIds = useMemo(
-    () =>
-      new Set(
-        columns.filter((column) => column.cardHeader).map((column) => column.id)
-      ),
-    [columns]
-  );
+  const cardHeaderIds = useMemo(() => {
+    const marked = columns.filter((column) => column.cardHeader);
+    // Two header strips render as two title rows on the same mobile card, one
+    // of them unlabelled and neither obviously wrong: it reads as a styling
+    // oddity, so it gets lived with rather than reported. The prop's TSDoc has
+    // said "at most one" since it was added, where no compiler could read it.
+    if (marked.length > 1) {
+      throw new Error(
+        `An admin table set cardHeader on ${marked.length} columns (${marked
+          .map((column) => column.id)
+          .join(", ")}). At most one column may title the card.`
+      );
+    }
+    return new Set(marked.map((column) => column.id));
+  }, [columns]);
   const highlighted = useRef<HTMLTableRowElement | null>(null);
   // Scrolls once the highlighted row has rendered. Deliberately runs on mount
   // only: re-sorting or re-filtering should not yank the viewport back.

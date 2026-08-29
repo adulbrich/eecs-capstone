@@ -183,6 +183,20 @@ describe("AdminDataTable", () => {
     expect(cells[1].hasAttribute("data-card-header")).toBe(false);
   });
 
+  it("refuses a column list with two cardHeaders", () => {
+    // Two header strips render as two title rows on one mobile card, neither
+    // obviously wrong. The prop's TSDoc has said "at most one" since it was
+    // added, where no compiler and no test could read it (#94).
+    const twoHeaders = COLUMNS.map((column) => ({
+      ...column,
+      cardHeader: true,
+    }));
+
+    expect(() => renderTable({ columns: twoHeaders })).toThrow(
+      /cardHeader on 2 columns/
+    );
+  });
+
   it("keeps every cell labelled when no column opts into cardHeader", () => {
     const { container } = renderTable({ hidden: [] });
     const cells = container
