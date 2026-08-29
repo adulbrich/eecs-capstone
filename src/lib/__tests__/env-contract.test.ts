@@ -17,10 +17,13 @@ import { describe, expect, it } from "vitest";
  */
 
 /**
- * The app is `src`. `scripts` is developer and operator tooling that runs from
- * a shell, never inside the ECS task, which is why `.env.example` documents
- * both while the task definition needs only the first. See its "Seed (used by
- * scripts/seed-admin.ts, not by the app)" comment.
+ * The app is `src`. `scripts` is tooling, and it does run inside the task:
+ * `.github/workflows/deploy.yml` invokes `scripts/migrate.mjs` through
+ * `containerOverrides`. What separates them is not where they run but what
+ * they read. A script's own variables are arguments supplied per invocation by
+ * whoever starts it, not standing configuration the task definition carries,
+ * which is the distinction `.env.example` already draws for itself: "Seed
+ * (used by scripts/seed-admin.ts, not by the app)".
  */
 const APP_ROOT = "src";
 const SOURCE_ROOTS = [APP_ROOT, "scripts"];
@@ -38,7 +41,6 @@ const PLATFORM_VARS = new Map([
     "NODE_ENV",
     "set by the task definition, the Dockerfile, vitest and vite dev",
   ],
-  ["PORT", "set by the task definition; locally `vite dev --port` decides it"],
   [
     "AWS_REGION",
     "the AWS SDK's own variable, present on ECS regardless. Read only as a fallback for SES_REGION, which is documented",
@@ -72,6 +74,10 @@ const NOT_READ_HERE = new Map([
  * no custom endpoint, so the SDK's default chain resolves the role. Setting
  * any of them in ECS would defeat that, which is why their absence is the
  * design and not an oversight. See `buildS3Config` and `buildBedrockConfig`.
+ *
+ * `AWS_REGION` is not here despite fitting the description, because
+ * `PLATFORM_VARS` drops it before check 3 ever sees it. An entry that cannot
+ * be reached is an entry nobody can tell is wrong.
  */
 const UNSET_IN_PRODUCTION = new Map([
   ["S3_ENDPOINT", "task role, see buildS3Config"],
@@ -79,7 +85,6 @@ const UNSET_IN_PRODUCTION = new Map([
   ["S3_SECRET_KEY", "task role, see buildS3Config"],
   ["BEDROCK_ACCESS_KEY", "task role, see buildBedrockConfig"],
   ["BEDROCK_SECRET_KEY", "task role, see buildBedrockConfig"],
-  ["AWS_REGION", "supplied by the SDK on ECS"],
   [
     "BEDROCK_EMBEDDINGS_ENABLED",
     "deliberately not plumbed, so turning embeddings off in production is a terraform change rather than a variable flip. See the Bedrock section of docs/QUIRKS.md",
@@ -106,8 +111,16 @@ function readsIn(roots: readonly string[]): Map<string, string[]> {
       if (file.includes("__tests__") || file.includes(`src${"/"}test/`)) {
         continue;
       }
+      const isScript = file.startsWith(`scripts${"/"}`);
       for (const [, name] of readFileSync(file, "utf8").matchAll(ENV_READ)) {
-        if (!name || PLATFORM_VARS.has(name) || SCRIPT_ARGUMENTS.has(name)) {
+        // SCRIPT_ARGUMENTS is scoped to scripts on purpose. Suppressing those
+        // names everywhere would hide a genuine `src` read of one, and they
+        // are ordinary enough words to end up there.
+        if (
+          !name ||
+          PLATFORM_VARS.has(name) ||
+          (isScript && SCRIPT_ARGUMENTS.has(name))
+        ) {
           continue;
         }
         found.set(name, [...(found.get(name) ?? []), file]);
@@ -119,6 +132,28 @@ function readsIn(roots: readonly string[]): Map<string, string[]> {
 
 const readsInSource = () => readsIn(SOURCE_ROOTS);
 const readsInApp = () => readsIn([APP_ROOT]);
+
+/**
+ * Every name the code reads, with no exemption applied. The lists below are
+ * checked against this rather than against each other, so an entry that
+ * outlives the code it excuses shows up as dead rather than as nothing.
+ */
+function rawReads(roots: readonly string[]): Set<string> {
+  const found = new Set<string>();
+  for (const root of roots) {
+    for (const file of sourceFiles(root)) {
+      if (file.includes("__tests__") || file.includes(`src${"/"}test/`)) {
+        continue;
+      }
+      for (const [, name] of readFileSync(file, "utf8").matchAll(ENV_READ)) {
+        if (name) {
+          found.add(name);
+        }
+      }
+    }
+  }
+  return found;
+}
 
 function documentedKeys(): Set<string> {
   return new Set(
@@ -194,5 +229,32 @@ describe("the environment contract", () => {
     for (const name of [...PLATFORM_VARS.keys(), ...SCRIPT_ARGUMENTS]) {
       expect([name, documented.has(name)]).toEqual([name, false]);
     }
+  });
+
+  it("carries no exemption for a variable nothing reads any more", () => {
+    // The half that was missing. Every list above was checked for "still
+    // absent from .env.example" and none for "still read by something", so an
+    // exemption could outlive its code silently. PORT was already in that
+    // state when this was written: nothing read it, so the entry excused
+    // nothing and no test could tell.
+    const everywhere = rawReads(SOURCE_ROOTS);
+    const inApp = rawReads([APP_ROOT]);
+    const dead: string[] = [];
+    for (const name of [...PLATFORM_VARS.keys()]) {
+      if (!everywhere.has(name)) {
+        dead.push(`${name} (PLATFORM_VARS)`);
+      }
+    }
+    for (const name of SCRIPT_ARGUMENTS) {
+      if (!rawReads(["scripts"]).has(name)) {
+        dead.push(`${name} (SCRIPT_ARGUMENTS)`);
+      }
+    }
+    for (const [name] of UNSET_IN_PRODUCTION) {
+      if (!inApp.has(name)) {
+        dead.push(`${name} (UNSET_IN_PRODUCTION)`);
+      }
+    }
+    expect(dead).toEqual([]);
   });
 });
