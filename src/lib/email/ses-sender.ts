@@ -58,6 +58,30 @@ export class SesEmailSender implements EmailSender {
 }
 
 /**
+ * One client per region, for the life of the process.
+ *
+ * Keyed rather than a single slot because the key is the whole point: an
+ * unkeyed cache returns the first client built to every later caller, so a
+ * sender configured for a second region silently sends through the first. It
+ * is also not per-sender, because `project-emails.ts` builds a fresh sender
+ * inside its dispatch lambda for every email, and a per-sender client would
+ * mean a new HTTP handler per message that nothing ever closes.
+ */
+const clientsByRegion = new Map<string, SESv2Client>();
+
+function getSesClient(region: string): SESv2Client {
+  const existing = clientsByRegion.get(region);
+  if (existing) {
+    return existing;
+  }
+  // Credentials come from the ECS task role via the default provider chain,
+  // resolved at signing time rather than here.
+  const client = new SESv2Client({ region });
+  clientsByRegion.set(region, client);
+  return client;
+}
+
+/**
  * The throw lives here rather than in `buildEmailSenderConfig` because the
  * builder is reached at module scope through `getEmailSender()` in
  * `src/lib/auth.ts`, so a throw in the builder would fail the app's boot on
@@ -68,18 +92,8 @@ export function createSesEmailSender(config: SesSenderConfig): SesEmailSender {
   if (!config.from) {
     throw new Error("EMAIL_FROM must be set when EMAIL_TRANSPORT=ses");
   }
-  // One client per sender, built on first send rather than up front, because
-  // `getEmailSender()` runs at module scope and constructing an SDK client at
-  // import costs a credential-chain walk on a path that may never send. It is
-  // scoped to this sender rather than the module so it cannot outlive the
-  // region it was built for; a module-level cache would hand a second sender
-  // in another region the first one's client.
-  let client: SESv2Client | null = null;
-  const sendCommand: SesSendFn = (input) => {
-    // Credentials come from the ECS task role via the default provider chain.
-    client ??= new SESv2Client({ region: config.region });
-    return client.send(new SendEmailCommand(input));
-  };
+  const sendCommand: SesSendFn = (input) =>
+    getSesClient(config.region).send(new SendEmailCommand(input));
   // Deliberately not required: the ECS task definition always passes
   // EMAIL_REPLY_TO, as an empty string until an address is decided, and email
   // must not stop working for want of one.
