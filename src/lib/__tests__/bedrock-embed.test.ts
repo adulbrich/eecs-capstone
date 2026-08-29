@@ -12,17 +12,10 @@ describe("buildEmbedRequestBody", () => {
   it("asks Titan for normalized vectors at the configured size", () => {
     const body = JSON.parse(buildEmbedRequestBody("robotics"));
     expect(body.inputText).toBe("robotics");
+    // Compares the request against the constant that built it, so it pins the
+    // wiring and not the number. `buildEmbedConfig` below pins the number.
     expect(body.dimensions).toBe(EMBEDDING_DIMENSIONS);
     expect(body.normalize).toBe(true);
-  });
-
-  it("asks for the default size on any machine, not just one without a .env", () => {
-    // The assertion above compares the request against the same constant that
-    // built it, so it passes for any value including a wrong one. The
-    // `defaults` case below does pin the number, but through the ambient
-    // constant, so it only passes because `npm test` does not load
-    // `.env.local`. This one reads a literal environment and holds regardless.
-    expect(buildEmbedConfig({} as NodeJS.ProcessEnv).dimensions).toBe(1024);
   });
 });
 
@@ -50,6 +43,13 @@ describe("defaults", () => {
 });
 
 describe("buildEmbedConfig", () => {
+  it("resolves the documented defaults from an empty environment", () => {
+    expect(buildEmbedConfig({} as NodeJS.ProcessEnv)).toEqual({
+      dimensions: 1024,
+      modelId: "amazon.titan-embed-text-v2:0",
+    });
+  });
+
   it("takes both from the environment when they are set", () => {
     expect(
       buildEmbedConfig({
