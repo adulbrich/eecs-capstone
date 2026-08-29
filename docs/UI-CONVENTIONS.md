@@ -314,6 +314,13 @@ reducer spreads over a generic, TypeScript cannot prove that preserves it, and t
 that makes it compile is what stops the compiler seeing the rest. One named failure
 caught beats a boundary that looks typed and checks nothing.
 
+`cardHeader` marks the one column that titles the record. On mobile its cell becomes the
+card's header strip: full width, with no field name in front of it. Use it for a column
+whose content already says what it is, usually a name or title beside a thumbnail, where a
+"Name" label would only squeeze the title into what is left of the row. At most one column
+per table may set it; a second is logged and ignored rather than rendered, because two
+title rows on one card read as a styling oddity and get lived with instead of reported.
+
 `useAdminTableState` in `#/lib/table-state` is the router-agnostic core underneath, and
 stays directly unit-testable. Every admin route goes through `useAdminTable`; reach past
 it to the core only if you are driving a table from somewhere that has no `navigate`.
