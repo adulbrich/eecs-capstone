@@ -385,12 +385,10 @@ the file because `tsconfig.json` includes `**/*.ts`.
 
 A shared column const declared outside the array uses `satisfies
 AdminColumn<Row>` with `id: "..." as const`, never an `AdminColumn<Row>`
-annotation. The annotation erases the accessor's return type back to `unknown`,
-and the failure is loud but misleading: every such column reports
-`ACCESSOR_RETURNS_NULL_USE_UNDEFINED` on an accessor that never returns null.
-See [`QUIRKS.md`](./QUIRKS.md#a-shared-admin-column-const-uses-satisfies-not-an-annotation).
-Annotating the array `defineAdminColumns` returns is only redundant; it still
-checks.
+annotation, which breaks the check in a way that reads as a bug in the check.
+[`QUIRKS.md`](./QUIRKS.md#a-shared-admin-column-const-uses-satisfies-not-an-annotation)
+says why; this section says only that the rule exists, so there is one copy to
+keep true.
 
 `accessorKey` and grouped (`columns`) definitions are banned outright. Both used
 to compile with no rule applied at all, which is the one failure this check

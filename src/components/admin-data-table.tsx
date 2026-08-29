@@ -102,8 +102,7 @@ interface AdminColumnExtras {
  * `CheckedAdminColumn` cannot read, and a grouped column hides its real
  * columns one level down where nothing inspects them; both compiled with no
  * rule applied. Banning them costs nothing: no column under
- * `src/routes/_authed/admin/` uses either, and a group has no place in a table
- * that renders one flat header row anyway.
+ * `src/routes/_authed/admin/` uses either.
  */
 type TypedAdminColumn<T, TValue> = Omit<ColumnDef<T, unknown>, "accessorFn"> &
   AdminColumnExtras & {
@@ -178,12 +177,15 @@ type CheckedAdminColumns<C extends readonly unknown[]> = {
 export function defineAdminColumns<T>() {
   return <const C extends readonly TypedAdminColumn<T, unknown>[]>(
     columns: C & CheckedAdminColumns<C>
-    // The one cast in the construct, and it is the whole point of it: `const C`
-    // is what preserves each accessor's return type through the check, and it
-    // also makes every element deeply readonly and literal. Widening back to
-    // `AdminColumn<T>[]` is what the table and `useAdminTable` consume, and no
-    // structural conversion gets there from a readonly tuple of literals.
-  ): AdminColumn<T>[] => columns as unknown as AdminColumn<T>[];
+  ): AdminColumn<T>[] =>
+    // The one cast in the construct, and it is the price of the check. `const
+    // C` is what preserves each accessor's return type per element, and it
+    // also makes every element deeply readonly and literal. The table and
+    // `useAdminTable` consume `AdminColumn<T>[]`, and no structural
+    // conversion gets there from a readonly tuple of literals: a single
+    // `as AdminColumn<T>[]` fails TS2352, which is why it goes through
+    // `unknown`.
+    columns as unknown as AdminColumn<T>[];
 }
 
 export interface AdminDataTableProps<T> {
