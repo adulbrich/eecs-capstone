@@ -11,6 +11,7 @@ import {
 } from "#/server/_internal/bookmarks";
 import {
   createProjectAs,
+  forceTransitionAs,
   performTransitionAs,
 } from "#/server/_internal/projects";
 
@@ -156,12 +157,39 @@ describe("bookmarks", () => {
     ).toHaveLength(1);
   });
 
+  it("drops a published project pulled back to changes_requested", async () => {
+    // The exact case #106 names, and the reason the write-time gate is not
+    // enough on its own: the student could see this project when they saved
+    // it, and without a second check on read the bookmark row keeps it
+    // rendering, including a description the proposer has since rewritten.
+    //
+    // Reachable through forceTransitionAs, which skips assertTransitionAllowed
+    // entirely. The ordinary transition map takes published only to archived,
+    // which stays visible, so the map alone cannot strand a student's bookmark.
+    const admin = await makeUser(`bp-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`bq2-${Date.now()}@x.com`, "user");
+    const id = await publishedProject(admin);
+    await addBookmarkAs(student, { projectId: id });
+    await addBookmarkAs(admin, { projectId: id });
+    expect((await listMyBookmarksAs(student)).rows.map((r) => r.id)).toEqual([
+      id,
+    ]);
+
+    await forceTransitionAs(admin, id, "changes_requested");
+
+    expect((await listMyBookmarksAs(student)).rows).toEqual([]);
+    // Staff keep it, which is what makes this the viewer's rule rather than a
+    // status blocklist: the same project, the same moment, two answers.
+    expect((await listMyBookmarksAs(admin)).rows.map((r) => r.id)).toEqual([
+      id,
+    ]);
+    // The bookmark row survives, so republishing brings it back.
+    expect(await bookmarkRows(student.id)).toHaveLength(1);
+  });
+
   it("drops a project the viewer may no longer see", async () => {
-    // The stale-authorization case #106 names. The write gate runs once, so
-    // without a second check on read the bookmark row is a permanent
-    // capability. Staff losing the role is the reachable version: a student
-    // can only ever bookmark a published or archived project, and the
-    // transition map takes published to archived and back, both visible.
+    // The other reachable path: staff can bookmark another author's draft, and
+    // losing the role has to take the listing with it.
     const author = await makeUser(`bw-${Date.now()}@x.com`, "admin");
     const staff = await makeUser(`bx-${Date.now()}@x.com`, "admin");
     const { id: draft } = await createProjectAs(author, baseProject());

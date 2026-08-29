@@ -95,9 +95,11 @@ export async function listMyBookmarksAs(viewer: BookmarkViewer) {
     .select({
       ...projectSummarySelect,
       bookmarkedAt: projectBookmarks.createdAt,
-      // Read by canSeeProject below, then dropped. proposerId is what decides
-      // ownership and is staff information; deletedAt is a machine column.
-      // Neither belongs in the payload, and projectSummarySelect omits both.
+      // Selected for canSeeProject below, then dropped: proposerId decides
+      // ownership and is staff information, and neither belongs in the payload.
+      // deletedAt is always null here, since the where clause already excluded
+      // the rest; it is selected to satisfy the check honestly rather than to
+      // decide anything.
       deletedAt: projects.deletedAt,
       proposerId: projects.proposerId,
     })
@@ -115,7 +117,9 @@ export async function listMyBookmarksAs(viewer: BookmarkViewer) {
 
   return {
     rows: rows
-      .filter((row) => canSeeProject(row, viewer))
+      .filter((row) =>
+        canSeeProject(row, { id: viewer.id, role: viewer.role ?? null })
+      )
       .map(({ deletedAt, proposerId, ...row }) => row),
   };
 }
