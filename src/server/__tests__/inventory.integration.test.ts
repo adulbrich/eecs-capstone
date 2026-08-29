@@ -20,7 +20,6 @@ import {
   deleteCategoryAs,
 } from "#/server/_internal/categories";
 import {
-  addToCartAs,
   approveRequestItemAs,
   cancelRequestItemAs,
   collectedByForRequestItems,
@@ -34,9 +33,9 @@ import {
   listInventoryRequestsAs,
   listMyItemsAs,
   rejectRequestItemAs,
-  submitCartAs,
   updateInventoryItemAs,
 } from "#/server/_internal/inventory";
+import { addToCartAs, submitCartAs } from "#/server/_internal/inventory-cart";
 import { recordOverdueNotificationsAs } from "#/server/_internal/inventory-overdue";
 import { transitionItem } from "#/server/_internal/inventory-transitions";
 import { itemPayloadSchema } from "#/server/inventory";

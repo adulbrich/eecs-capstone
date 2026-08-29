@@ -19,12 +19,14 @@ import {
 } from "../src/db/schema";
 import { auth } from "../src/lib/auth";
 import {
-  addToCartAs,
   approveRequestItemAs,
   cancelRequestItemAs,
   rejectRequestItemAs,
-  submitCartAs,
 } from "../src/server/_internal/inventory";
+import {
+  addToCartAs,
+  submitCartAs,
+} from "../src/server/_internal/inventory-cart";
 import { transitionItem } from "../src/server/_internal/inventory-transitions";
 
 const PASSWORD = "password";
