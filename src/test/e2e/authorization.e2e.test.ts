@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { like, not } from "drizzle-orm";
+import { and, ilike, like, not } from "drizzle-orm";
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
 import { USER_AUTH } from "./constants";
@@ -39,17 +39,23 @@ test.describe("@smoke authorization", () => {
   test("hides the staff panels on the public item page from a plain user", async ({
     browser,
   }) => {
-    const itemId = await seededItemId();
+    const item = await seededItem();
 
     const context = await browser.newContext({ storageState: USER_AUTH });
     try {
       const page = await context.newPage();
-      await page.goto(`/inventory/${itemId}`);
+      await page.goto(`/inventory/${item.id}`);
 
       // Prove the page rendered before asserting on what is missing: an error
-      // boundary also has no staff panel, and would pass the checks below.
+      // boundary also has no staff panel and would pass the checks below.
+      //
+      // The heading, not a cart button. Whether "Add to cart" renders depends
+      // on the item's status, and the seed leaves its alphabetically first item
+      // `requested`, which shows "This item is not available right now" and no
+      // button at all. A sentinel for "did this page render" must not itself be
+      // conditional.
       await expect(
-        page.getByRole("button", { name: "Add to cart" })
+        page.getByRole("heading", { level: 1, name: item.name })
       ).toBeVisible();
 
       // InventoryPrivatePanel and StaffInventoryPanel both hang off
@@ -71,13 +77,26 @@ test.describe("@smoke authorization", () => {
  * alphabetical order, so inventory.e2e.test.ts has already put its own item
  * through the lifecycle by the time this runs.
  */
-async function seededItemId(): Promise<string> {
+async function seededItem(): Promise<{ id: string; name: string }> {
   const { db, close } = openDb();
   try {
     const [item] = await db
-      .select({ id: schema.inventoryItems.id })
+      .select({
+        id: schema.inventoryItems.id,
+        name: schema.inventoryItems.name,
+      })
       .from(schema.inventoryItems)
-      .where(not(like(schema.inventoryItems.name, `${E2E_PREFIX}%`)))
+      // Exclude both suites' fixtures, not just this one's. The accessibility
+      // suite seeds "A11Y Test Item", which sorts first and is `available`,
+      // while CI runs the two suites on separate databases so only the dev
+      // seed is present there. That divergence is what made this test pass
+      // locally and fail in CI: the two environments picked different rows.
+      .where(
+        and(
+          not(like(schema.inventoryItems.name, `${E2E_PREFIX}%`)),
+          not(ilike(schema.inventoryItems.name, "a11y%"))
+        )
+      )
       .orderBy(schema.inventoryItems.name)
       .limit(1);
     if (!item) {
@@ -85,7 +104,7 @@ async function seededItemId(): Promise<string> {
         "no seeded inventory item in the database. Run: npm run db:seed:dev"
       );
     }
-    return item.id;
+    return item;
   } finally {
     await close();
   }
