@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import { checkA11y, waitForHydration } from "./helpers";
+import { waitForHydration } from "../shared/playwright";
+import { checkA11y } from "./helpers";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
