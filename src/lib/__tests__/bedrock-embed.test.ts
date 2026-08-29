@@ -35,10 +35,24 @@ describe("parseEmbedResponse", () => {
   });
 });
 
-describe("defaults", () => {
-  it("targets Titan Text Embeddings V2 at 1024 dimensions", () => {
-    expect(EMBEDDING_MODEL_ID).toBe("amazon.titan-embed-text-v2:0");
-    expect(EMBEDDING_DIMENSIONS).toBe(1024);
+describe("the exported constants", () => {
+  it("match what the builder resolves from the same environment", () => {
+    // Asserts the wiring, not the values. It used to assert the literals
+    // against these constants, which resolve from the ambient environment, so
+    // it reddened for any developer who had set either variable to a
+    // non-default value. The values themselves are pinned deterministically by
+    // the buildEmbedConfig cases below.
+    //
+    // What this catches, confirmed by mutation: wiring a constant to the wrong
+    // field, and hardcoding a wrong literal. What it does not catch is
+    // hardcoding the correct default, which is indistinguishable from the
+    // resolved value on a machine with neither variable set. Reaching that
+    // last case is possible, with vi.stubEnv plus vi.resetModules and a
+    // dynamic import, and is not done here: it buys one low-value mutation in
+    // exchange for a re-import dance in a file that otherwise has none.
+    const config = buildEmbedConfig(process.env);
+    expect(EMBEDDING_MODEL_ID).toBe(config.modelId);
+    expect(EMBEDDING_DIMENSIONS).toBe(config.dimensions);
   });
 });
 
