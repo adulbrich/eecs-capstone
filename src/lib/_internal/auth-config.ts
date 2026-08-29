@@ -33,7 +33,7 @@ export interface AuthConfig {
   };
   trustHost: boolean;
   /** Names of unset provider credentials, in `.env.example` order. */
-  unconfigured: string[];
+  unconfigured: readonly string[];
 }
 
 const PROVIDER_VARS = [
@@ -48,12 +48,12 @@ export function buildAuthConfig(
   env: NodeJS.ProcessEnv = process.env
 ): AuthConfig {
   const discoveryUrl = env.ONID_DISCOVERY_URL ?? "";
-  // The credential values below are deliberately not trimmed, while
-  // `unconfigured` below them is. That divergence is on purpose and is the
-  // pre-existing behaviour: a whitespace-only credential is reported as unset
-  // and still handed to the provider verbatim, because trimming it here would
-  // be a behaviour change smuggled into a refactor. Whether a blank credential
-  // should be rejected outright belongs to #137.
+  // The credential values below are not trimmed; `unconfigured` is. Only the
+  // untrimmed pass-through is pre-existing, so the divergence itself is new
+  // here: a whitespace-only credential is now reported as unset while still
+  // reaching the provider verbatim. Trimming the value would be a behaviour
+  // change smuggled into a refactor, so it is left alone. Whether a blank
+  // credential should be rejected outright belongs to #137.
   return {
     github: {
       clientId: env.GITHUB_CLIENT_ID ?? "",

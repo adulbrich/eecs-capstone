@@ -204,7 +204,7 @@ Every email renders through `src/lib/email/templates.ts`, which owns the HTML es
 
 `buildAuthConfig` in `src/lib/_internal/auth-config.ts` resolves `trustHost` as `NODE_ENV !== "development"`, and `src/lib/auth.ts` passes it straight through. Required behind the CloudFront/ALB proxy chain in production so origin detection works. Disabled in dev where `localhost:3000` is direct.
 
-Note the predicate is not the one beside it: `useSecureCookies` is `NODE_ENV === "production"`. The two differ under `NODE_ENV=test`, deliberately, because the proxy chain is absent only on localhost while secure cookies are wanted only in production.
+Note the predicate is not the one beside it: `useSecureCookies` is `NODE_ENV === "production"`. The two agree everywhere that matters and differ only under `NODE_ENV=test`, where `trustHost` is on and secure cookies are off. Nothing depends on that gap: `infra/ecs.tf` is the only place either is set from, and it sets `NODE_ENV=production`, so no deployed environment is a test one. The difference is residue from the two lines arriving in separate commits, not a decision. Do not build on it.
 
 ### Session role typing
 

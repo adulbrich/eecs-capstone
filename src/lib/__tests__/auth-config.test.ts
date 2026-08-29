@@ -69,9 +69,11 @@ describe("buildAuthConfig", () => {
   });
 
   it("trusts the host everywhere except development", () => {
-    // Deliberately not the same predicate as isProduction: the proxy chain is
-    // absent on localhost and present in every deployed environment, including
-    // ones that are not NODE_ENV=production.
+    // Not the same predicate as isProduction. The two only disagree under
+    // NODE_ENV=test, which no deployed environment uses, so the gap has no
+    // consequence; it is pinned here so a future edit to either has to be
+    // deliberate about closing it. See the Better Auth section of
+    // docs/QUIRKS.md.
     expect(
       buildAuthConfig({ NODE_ENV: "development" } as NodeJS.ProcessEnv)
         .trustHost
