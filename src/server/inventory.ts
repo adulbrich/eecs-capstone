@@ -39,7 +39,7 @@ export const listInventory = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => listInventorySchema.parse(d))
   .handler(async ({ data }) => {
     const { listInventoryForCurrentUser } = await import(
-      "./_internal/inventory"
+      "./_internal/inventory-catalog"
     );
     return listInventoryForCurrentUser(data);
   });
@@ -61,7 +61,7 @@ export const listAdminInventory = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => listAdminInventorySchema.parse(d))
   .handler(async ({ data }) => {
     const { listAdminInventoryForCurrentUser } = await import(
-      "./_internal/inventory"
+      "./_internal/inventory-catalog"
     );
     return listAdminInventoryForCurrentUser(data);
   });
@@ -69,7 +69,9 @@ export const listAdminInventory = createServerFn({ method: "GET" })
 export const listInventoryCategories = createServerFn({
   method: "GET",
 }).handler(async () => {
-  const { listInventoryCategoriesImpl } = await import("./_internal/inventory");
+  const { listInventoryCategoriesImpl } = await import(
+    "./_internal/inventory-catalog"
+  );
   return listInventoryCategoriesImpl();
 });
 
@@ -79,7 +81,7 @@ export const getInventoryItem = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => idOnlySchema.parse(d))
   .handler(async ({ data }) => {
     const { getInventoryItemForCurrentUser } = await import(
-      "./_internal/inventory"
+      "./_internal/inventory-catalog"
     );
     return getInventoryItemForCurrentUser(data);
   });
@@ -88,7 +90,7 @@ export const getInventoryItemDetail = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => idOnlySchema.parse(d))
   .handler(async ({ data }) => {
     const { getInventoryItemDetailForCurrentUser } = await import(
-      "./_internal/inventory"
+      "./_internal/inventory-catalog"
     );
     return getInventoryItemDetailForCurrentUser(data);
   });
@@ -110,7 +112,7 @@ export const createInventoryItem = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => itemPayloadSchema.parse(d))
   .handler(async ({ data }) => {
     const { createInventoryItemForCurrentUser } = await import(
-      "./_internal/inventory"
+      "./_internal/inventory-catalog"
     );
     return createInventoryItemForCurrentUser(data);
   });
@@ -125,7 +127,7 @@ export const updateInventoryItem = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => updatePayloadSchema.parse(d))
   .handler(async ({ data }) => {
     const { updateInventoryItemForCurrentUser } = await import(
-      "./_internal/inventory"
+      "./_internal/inventory-catalog"
     );
     return updateInventoryItemForCurrentUser(data);
   });
@@ -139,7 +141,7 @@ export const hardDeleteInventoryItem = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => hardDeleteSchema.parse(d))
   .handler(async ({ data }) => {
     const { hardDeleteInventoryItemForCurrentUser } = await import(
-      "./_internal/inventory"
+      "./_internal/inventory-catalog"
     );
     return hardDeleteInventoryItemForCurrentUser(data);
   });
