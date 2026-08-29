@@ -25,151 +25,25 @@ jobs:
       - run: npm run check:compression
 
   # The integration suite is the only executable specification of the server
-  # behavior in this repo, and until now it ran by hand. That is how a flaky
+  # behavior in this repo, and until PR #21 it ran by hand. That is how a flaky
   # test survived unnoticed and how bookmarks.integration.test.ts drifted into
   # testing Postgres instead of the bookmark path. It takes about two minutes.
   integration:
-    runs-on: ubuntu-latest
-    services:
-      # pgvector, not plain postgres: projects carry an embedding column.
-      postgres:
-        image: pgvector/pgvector:pg18
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: eecs_capstone
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-      # uploads.integration.test.ts writes to a bucket and reads the object
-      # back, so the suite needs object storage as well as a database.
-      rustfs:
-        image: rustfs/rustfs:latest
-        env:
-          RUSTFS_ACCESS_KEY: rustfsadmin
-          RUSTFS_SECRET_KEY: rustfsadmin
-        ports:
-          - 9000:9000
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24.16.0
-          cache: npm
-      - run: npm ci
+    uses: ./.github/workflows/stack-suite.yml
+    with:
+      script: test:integration
 
-      # drizzle-kit, storage-init and vitest.integration.config.ts all read
-      # .env.local, so CI writes one rather than each learning a new source.
-      - name: Write .env.local
-        run: |
-          cat > .env.local <<'EOF'
-          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/eecs_capstone
-          BETTER_AUTH_SECRET=ci-not-a-real-secret
-          BETTER_AUTH_URL=http://localhost:3000
-          S3_ENDPOINT=http://localhost:9000
-          S3_REGION=us-east-1
-          S3_BUCKET=cs-capstone
-          S3_ACCESS_KEY=rustfsadmin
-          S3_SECRET_KEY=rustfsadmin
-          VITE_STORAGE_PUBLIC_BASE=http://localhost:9000/cs-capstone
-          EOF
-
-      - name: Wait for object storage
-        run: |
-          for i in $(seq 1 30); do
-            if curl -sf -o /dev/null http://localhost:9000 \
-              || [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:9000)" != "000" ]; then
-              echo "storage responding"; exit 0
-            fi
-            sleep 2
-          done
-          echo "storage did not come up"; exit 1
-
-      - run: npm run db:migrate
-      - run: npm run storage:init
-      - run: npm run test:integration
-
-  # The a11y suite has existed since 2026-05-26 and has never run in CI, so an
-  # accessibility regression could reach main unnoticed. `npm test` excludes it
-  # on purpose to keep the unit run fast; this is the other half of that trade,
-  # which was never added. It needs the same stack as the integration job plus a
-  # dev seed, because global-setup.ts signs in as the seeded users to capture
-  # their storage state.
+  # The a11y suite has existed since 2026-05-26 and did not run in CI until
+  # PR #62, so an accessibility regression could reach main unnoticed.
+  # `npm test` excludes it on purpose to keep the unit run fast; this is the
+  # other half of that trade. It needs a dev seed on top of the shared stack,
+  # because global-setup.ts signs in as the seeded users to capture their
+  # storage state.
   accessibility:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: pgvector/pgvector:pg18
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: eecs_capstone
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-      rustfs:
-        image: rustfs/rustfs:latest
-        env:
-          RUSTFS_ACCESS_KEY: rustfsadmin
-          RUSTFS_SECRET_KEY: rustfsadmin
-        ports:
-          - 9000:9000
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24.16.0
-          cache: npm
-      - run: npm ci
-
-      - name: Write .env.local
-        run: |
-          cat > .env.local <<'EOF'
-          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/eecs_capstone
-          BETTER_AUTH_SECRET=ci-not-a-real-secret
-          BETTER_AUTH_URL=http://localhost:3000
-          S3_ENDPOINT=http://localhost:9000
-          S3_REGION=us-east-1
-          S3_BUCKET=cs-capstone
-          S3_ACCESS_KEY=rustfsadmin
-          S3_SECRET_KEY=rustfsadmin
-          VITE_STORAGE_PUBLIC_BASE=http://localhost:9000/cs-capstone
-          EOF
-
-      - name: Wait for object storage
-        run: |
-          for i in $(seq 1 30); do
-            if curl -sf -o /dev/null http://localhost:9000 \
-              || [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:9000)" != "000" ]; then
-              echo "storage responding"; exit 0
-            fi
-            sleep 2
-          done
-          echo "storage did not come up"; exit 1
-
-      - run: npm run db:migrate
-      - run: npm run storage:init
-      # global-setup.ts fails with an explicit "run npm run db:seed:dev" message
-      # if these users are missing, so the seed is a hard prerequisite.
-      - run: npm run db:seed:dev
-
-      # Only chromium: playwright.a11y.config.ts defines chromium-light and
-      # chromium-dark and no other browser.
-      - run: npx playwright install --with-deps chromium
-
-      - run: npm run test:accessibility
-
-      - if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: a11y-report
-          path: playwright-report/a11y
-          retention-days: 7
+    uses: ./.github/workflows/stack-suite.yml
+    with:
+      script: test:accessibility
+      seed: true
+      browser: true
+      report-path: playwright-report/a11y
+      report-name: a11y-report
