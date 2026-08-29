@@ -937,6 +937,16 @@ What it was protecting, before the gate existed: an owner can reach `submitted` 
 
 `forceTransitionAs` needs no equivalent; it throws for a non-staff viewer before it reaches `commitTransition`. `TransitionOptions.sendEmail` is untouched and stays available to the nine integration call sites that use it to keep mail out of the suite.
 
+### An unset `BETTER_AUTH_URL` logs, it no longer just drops the mail
+
+Transition emails carry absolute links, because they are followed from a mail client, and the base comes from `BETTER_AUTH_URL`. It used to be optional in the worst sense: `notifyTransitionByEmail` returned early when it was unset, so no mail went out, nothing was logged, and a submitted project sat in a queue nobody had been told about. That is a third quiet failure on top of the two the entry above names, and unlike those two it had no signal at all.
+
+It is required now. `notifyTransitionByEmail` throws when `NotificationConfig.appBaseUrl` is null, and the throw lands in the function's own `catch`, which does `console.error` naming the variable. The function still cannot throw at its caller, which is the property `performTransitionAs` depends on.
+
+**The check is an `if` in the body, not a throw inside `buildNotificationConfig`, and that is not stylistic.** The config arrives as a default parameter, and a default parameter is evaluated before the function body, so a throw in the builder would skip the `try` entirely and reach `projects.ts`. That call happens after the transition is committed, so an escaping error would report a failure on an approval that had already succeeded.
+
+`EMAIL_REVIEW_INBOX` is deliberately not required and still only warns: an unset inbox costs staff a notification, while an unset base URL breaks every transition email including the ones to proposers. See #137 for the open question of which config variables should be fatal at startup rather than at first use.
+
 ### Proposer linking is by email; `proposer_id` is canonical
 
 A project's proposer is either linked to an account (`proposer_id`, a nullable FK) or pending (`proposer_email` set with no account yet). Email is the link key; `proposer_id` is the source of truth once an account exists. Staff set it through the proposer field on the project form (`ProposerPicker`, see below); the server resolves the email to an account id on every write via `resolveProposerId` (`src/server/_internal/projects.ts`), and a non-staff request carrying `proposer_email` is ignored, not honored. `proposer_id` is never accepted from the client.
