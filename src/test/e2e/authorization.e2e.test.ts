@@ -36,7 +36,7 @@ test.describe("@smoke authorization", () => {
     }
   });
 
-  test("hides the staff panels on the public item page from a plain user", async ({
+  test("shows the public item page staff panels to staff and nobody else", async ({
     browser,
   }) => {
     const item = await seededItem();
@@ -96,8 +96,9 @@ test.describe("@smoke authorization", () => {
  * A seeded item, never a fixture from either Playwright suite. Both filters
  * matter for the same reason: this has to pick the same row in every
  * environment. Locally the suites share a database and the accessibility
- * suite's "A11Y Test Item" sorts first; in CI they get separate databases and
- * it does not exist.
+ * suite's "A11Y Test Item" sorts first and is `available`; in CI they get
+ * separate databases and it does not exist. That divergence is what once made
+ * this test pass locally and fail in CI, on two different rows.
  */
 async function seededItem(): Promise<{ id: string; name: string }> {
   const { db, close } = openDb();
@@ -108,11 +109,6 @@ async function seededItem(): Promise<{ id: string; name: string }> {
         name: schema.inventoryItems.name,
       })
       .from(schema.inventoryItems)
-      // Exclude both suites' fixtures, not just this one's. The accessibility
-      // suite seeds "A11Y Test Item", which sorts first and is `available`,
-      // while CI runs the two suites on separate databases so only the dev
-      // seed is present there. That divergence is what made this test pass
-      // locally and fail in CI: the two environments picked different rows.
       .where(
         and(
           not(like(schema.inventoryItems.name, `${E2E_PREFIX}%`)),
