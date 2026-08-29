@@ -8,12 +8,19 @@ import type { Status } from "./project-workflow";
 import type { Viewer } from "./viewer";
 import { isStaff } from "./viewer";
 
+/**
+ * What every predicate below actually reads. Deliberately not "a project row":
+ * a caller that only needs to know whether a viewer may see something should
+ * not have to select columns nobody looks at. `notes` used to be here and is
+ * now on `ProjectRow`, which is the one shape that reads it, so a listing can
+ * run `canSeeProject` without pulling a staff-only column it would then have to
+ * remember to drop.
+ */
 export type VisibleProject = {
   id: string;
   proposerId: string | null;
   status: string;
   deletedAt: Date | null;
-  notes: string | null;
 } & Record<string, unknown>;
 
 export type VisibleComment = {
@@ -108,6 +115,7 @@ export interface ProjectRow extends VisibleProject {
   isSponsored: boolean;
   licenseRestrictions: string | null;
   minQualifications: string | null;
+  notes: string | null;
   objectives: string | null;
   prefQualifications: string | null;
   problemStatement: string | null;

@@ -156,6 +156,67 @@ describe("bookmarks", () => {
     ).toHaveLength(1);
   });
 
+  it("drops a project the viewer may no longer see", async () => {
+    // The stale-authorization case #106 names. The write gate runs once, so
+    // without a second check on read the bookmark row is a permanent
+    // capability. Staff losing the role is the reachable version: a student
+    // can only ever bookmark a published or archived project, and the
+    // transition map takes published to archived and back, both visible.
+    const author = await makeUser(`bw-${Date.now()}@x.com`, "admin");
+    const staff = await makeUser(`bx-${Date.now()}@x.com`, "admin");
+    const { id: draft } = await createProjectAs(author, baseProject());
+
+    await addBookmarkAs(staff, { projectId: draft });
+    expect((await listMyBookmarksAs(staff)).rows.map((r) => r.id)).toEqual([
+      draft,
+    ]);
+
+    await db.update(user).set({ role: "user" }).where(eq(user.id, staff.id));
+
+    const demoted = { id: staff.id, role: "user" };
+    expect((await listMyBookmarksAs(demoted)).rows).toEqual([]);
+    // The row survives, so restoring the role restores the listing.
+    expect(await bookmarkRows(staff.id)).toHaveLength(1);
+  });
+
+  it("keeps a proposer's own unpublished project in their listing", async () => {
+    // The case a hardcoded status list would get wrong, and the reason the
+    // filter calls canSeeProject instead.
+    const proposer = await makeUser(`by-${Date.now()}@x.com`, "user");
+    const { id: draft } = await createProjectAs(proposer, baseProject());
+
+    await addBookmarkAs(proposer, { projectId: draft });
+
+    expect((await listMyBookmarksAs(proposer)).rows.map((r) => r.id)).toEqual([
+      draft,
+    ]);
+  });
+
+  it("does not leak the columns the visibility check reads", async () => {
+    // proposerId and deletedAt are selected only so canSeeProject can run and
+    // are dropped before the payload. Pinned because a refactor that stops
+    // dropping them would leak proposer identity into a student's page with
+    // nothing else failing.
+    const admin = await makeUser(`bz-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`ca-${Date.now()}@x.com`, "user");
+    await addBookmarkAs(student, { projectId: await publishedProject(admin) });
+
+    const { rows } = await listMyBookmarksAs(student);
+
+    expect(Object.keys(rows[0]).sort()).toEqual([
+      "bookmarkedAt",
+      "contactName",
+      "description",
+      "id",
+      "imageUrl",
+      "programCourseId",
+      "programCourseName",
+      "status",
+      "title",
+      "updatedAt",
+    ]);
+  });
+
   it("lists newest first, and only the viewer's own", async () => {
     const admin = await makeUser(`bt-${Date.now()}@x.com`, "admin");
     const mine = await makeUser(`bu-${Date.now()}@x.com`, "user");

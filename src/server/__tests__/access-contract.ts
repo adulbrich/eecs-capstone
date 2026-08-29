@@ -74,7 +74,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/bookmarks.ts:isBookmarked": { level: "authenticated" },
   "server/bookmarks.ts:listMyBookmarks": {
     level: "authenticated",
-    note: "Scoped to the viewer's own rows, and filtered on deletedAt only. canSeeProject runs when the bookmark is added, not when the list is read, so a project bookmarked while published and later returned to draft keeps rendering for that bookmarker. #106 is open to fix that; do not read this note as if it were already done.",
+    note: "Scoped to the viewer's own rows. Soft-deleted projects are dropped in SQL, and every remaining row is then filtered through canSeeProject, so the write-time gate cannot become a permanent capability. proposerId and deletedAt are selected for that check and dropped before the payload.",
   },
   "server/bookmarks.ts:removeBookmark": {
     level: "authenticated",
