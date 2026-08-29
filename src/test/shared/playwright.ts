@@ -6,6 +6,9 @@
 import type { Browser, Page } from "@playwright/test";
 import { chromium, expect } from "@playwright/test";
 
+/** The password scripts/seed-dev.ts sets on every seeded user. */
+export const SEED_PASSWORD = "password";
+
 /**
  * Waits for React to attach its event listeners before a test interacts with
  * the page. The server-rendered markup (including buttons) is present and

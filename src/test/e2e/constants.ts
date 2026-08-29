@@ -11,9 +11,6 @@ import { fileURLToPath } from "node:url";
 export const PORT = 3001;
 export const BASE_URL = `http://localhost:${PORT}`;
 
-/** Must match the value set by scripts/seed-dev.ts. */
-export const SEED_PASSWORD = "password";
-
 // Absolute, because ESM has no __dirname and every caller would otherwise
 // rebuild the same fileURLToPath dance.
 const HERE = dirname(fileURLToPath(import.meta.url));

@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { waitForHydration } from "../shared/playwright";
-import { SEED_PASSWORD } from "./constants";
+import { SEED_PASSWORD, waitForHydration } from "../shared/playwright";
 
 /**
  * Every other test in this suite starts from a saved storage state, which means

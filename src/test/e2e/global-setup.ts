@@ -9,8 +9,8 @@
 import { eq } from "drizzle-orm";
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
-import { saveStorageState } from "../shared/playwright";
-import { ADMIN_AUTH, BASE_URL, SEED_PASSWORD, USER_AUTH } from "./constants";
+import { SEED_PASSWORD, saveStorageState } from "../shared/playwright";
+import { ADMIN_AUTH, BASE_URL, USER_AUTH } from "./constants";
 import { type Db, openDb, sweepOrphans } from "./fixtures";
 
 export default async function globalSetup() {

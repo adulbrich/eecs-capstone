@@ -37,9 +37,9 @@ jobs:
   # exists for: sign in, propose and publish a project, request and return an
   # item, and stay out of pages you are not allowed into. It runs against the
   # production build, which the dev server cannot stand in for, so its
-  # playwright config builds and starts .output rather than `vite dev`. Five
-  # flows, chromium only, serial, inside a 5-minute job. Anything larger or
-  # flakier than that belongs to the full suite in #143, which is dispatch-only.
+  # playwright config builds and starts .output rather than `vite dev`. Chromium
+  # only, serial, inside a 5-minute job. Anything larger or flakier than that
+  # belongs to the full suite in #143, which is dispatch-only.
   #
   # Advisory for now. It joins the required status checks once it has a known
   # flake rate, and the check to register there is `smoke / suite`, not `smoke`.

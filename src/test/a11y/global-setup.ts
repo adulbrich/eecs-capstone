@@ -9,7 +9,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
-import { saveStorageState } from "../shared/playwright";
+import { SEED_PASSWORD, saveStorageState } from "../shared/playwright";
 
 // Prefixes used by the create-dialog-plus-dropdown coverage in
 // admin.a11y.test.ts. Those rows are deleted by the test itself on success,
@@ -26,8 +26,6 @@ const PAGINATION_USER_COUNT = 15;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BASE_URL = "http://localhost:3000";
-// Must match the value set by scripts/seed-dev.ts.
-const PASSWORD = "password";
 
 export default async function globalSetup() {
   loadDotenv({ path: [".env.local", ".env"] });
@@ -45,13 +43,13 @@ export default async function globalSetup() {
     saveStorageState({
       baseURL: BASE_URL,
       email: "user@example.com",
-      password: PASSWORD,
+      password: SEED_PASSWORD,
       outputPath: join(__dirname, ".user-auth.json"),
     }),
     saveStorageState({
       baseURL: BASE_URL,
       email: "admin@example.com",
-      password: PASSWORD,
+      password: SEED_PASSWORD,
       outputPath: join(__dirname, ".admin-auth.json"),
     }),
   ]);

@@ -389,107 +389,82 @@ Tests closed successfully but something prevents Vite server from exiting
 The test results above those lines are still authoritative. The exit code is
 still correct.
 
-### The smoke suite runs the production build, and that changes what breaks
+### A missing DATABASE_URL fails every route, including `/api/healthz`
 
-`playwright.e2e.config.ts` starts `npm run build && npm run start`, not
-`vite dev`. Three consequences that cost real time to rediscover.
+`src/routes/api/healthz.ts` returns a hardcoded 200 and its comment says it
+avoids the database on purpose, for the ALB. That is true of the route and false
+of the server. `src/db/index.ts` throws at module scope, so in the built output a
+missing `DATABASE_URL` fails the whole SSR graph: the process starts, binds the
+port, stays up, and answers 500 on every route, healthz included. Measured
+directly, both `/` and `/api/healthz` return 500.
 
-**`npm run start` gets no dotenv.** It is plain `node .output/server/index.mjs`
-with no `--env-file`, while the dev server gets `.env.local` for free through
-Vite. The config calls `loadDotenv` at module scope for exactly this reason, and
-Playwright hands its `process.env` to `webServer`. Remove that call and the
-server still boots, still binds the port, and answers 500 on every route, which
-reads like an application bug rather than a missing variable.
+This is why `playwright.e2e.config.ts` uses healthz as its `webServer.url`.
+Playwright waits for 2xx or 3xx, so a misconfigured server never goes ready and
+the run fails as "server did not start" rather than as five confusing test
+failures.
 
-**Point `webServer.url` at `/api/healthz`, never `/`.** Because a server with no
-database still answers, a readiness probe against any page-serving route lets a
-broken server look ready and turns one env problem into five confusing test
-failures. `/api/healthz` returns 500 until the database is actually reachable,
-so a misconfigured run fails as "server did not start".
+### `npm run start` gets no dotenv, unlike the dev server
 
-**`VITE_STORAGE_PUBLIC_BASE` is inlined at build time**, and `src/lib/storage.ts`
-falls back to `/storage` when it is missing. That fallback produces
-working-looking relative URLs against an origin that serves nothing, so a build
-run without the variable is silently wrong rather than loudly broken. The CI job
-writes `.env.local` before the build for this reason.
+`start` is bare `node .output/server/index.mjs` with no `--env-file`, while the
+dev server gets `.env.local` through Vite. `playwright.e2e.config.ts` calls
+`loadDotenv` at module scope for this reason, and Playwright passes its
+`process.env` down to `webServer`. Remove that call and you get the 500-on-every-
+route behavior above, which reads like an application bug.
 
-The config also sets `reuseExistingServer: false` unconditionally and runs on
-port 3001 rather than 3000. A dev server left running would otherwise substitute
-the dev build for the production build the suite exists to exercise, and report
-green. `BETTER_AUTH_URL` moves to 3001 with it, because Better Auth checks the
-request origin and a mismatch fails sign-in for a reason that looks nothing like
-a port problem.
+Related: `VITE_STORAGE_PUBLIC_BASE` is inlined at build time and
+`src/lib/storage.ts` falls back to `/storage`, so a build without it produces
+working-looking relative URLs against an origin that serves nothing. The CI job
+writes `.env.local` before the build.
 
-### Smoke tests create the rows they mutate, on every attempt
+### The smoke suite runs on port 3001 and never reuses a server
 
-`src/test/e2e/fixtures.ts` creates fixtures inside the test, not in global
-setup, and global setup only sweeps `E2E-` rows left by earlier runs.
+`reuseExistingServer: false` unconditionally, because a dev server left on 3000
+would substitute the dev build for the production build the suite exists to
+exercise, and report green. Port 3001 keeps both runnable at once.
+`BETTER_AUTH_URL` moves with it, because Better Auth checks the request origin
+and a mismatch fails sign-in for a reason that looks nothing like a port problem.
 
-The reason is that a retry has to mean something. The inventory flow walks one
-item through `available -> requested -> reserved -> checked_out -> available`.
-An attempt that dies at "Check out" leaves the item `reserved`, so a retry
-starting from that state fails at "Add to cart" for an unrelated reason and
-hides the original failure. Global setup cannot repair this, because it ran
-before the first attempt.
+### Smoke fixtures are created per attempt, and swept by prefix
 
-Sweep order matters: `inventory_request_items.item_id` is the one FK in that
-graph declared `onDelete: "restrict"`, and every other reference to an item
-cascades. Request lines, and the requests holding them, have to go before the
-items do.
+`src/test/e2e/fixtures.ts` creates mutated rows inside the test; global setup
+only sweeps `E2E-` orphans. A retry has to mean something: the inventory flow
+walks an item through `available -> requested -> reserved -> checked_out ->
+available`, so an attempt dying at check-out leaves it `reserved`, and a retry
+then fails at "Add to cart" for an unrelated reason. Global setup cannot repair
+that, having run before the first attempt.
+
+Sweep order matters. `inventory_request_items.item_id` is the one FK in that
+graph declared `onDelete: "restrict"`; the others cascade. Request lines, and the
+requests holding them, go before the items.
 
 ### Assert that a transition landed, not that its dialog closed
 
-A popover or dialog closes on failure as readily as on success, so
-`expect(confirmButton).toBeHidden()` is not evidence the write happened. This
-cost a real debugging session: the inventory test approved a request, asserted
-the popover closed, moved on, and then failed several steps later on a missing
-`Check out` button, because the item was still `requested` and the panel offers
-`Approve / reserve` in that state.
-
-Assert the thing the page only shows when the transition actually landed. For
-the approve step that is the row leaving a list filtered to pending requests.
-
-`playwright.e2e.config.ts` also sets `actionTimeout: 10_000`. Without it a stuck
-click is bounded only by the test timeout, so a whole flow dies with
-`Test timeout of 30000ms exceeded` and names no locator at all.
-
-### The smoke and accessibility suites share one local database
-
-In CI they never meet: each runs on its own runner with its own Postgres. Locally
-they share the dev database, and the smoke suite writes to it as
-`user@example.com`, which is the same account the accessibility suite scans as.
-
-Running the smoke suite and then the accessibility suite produced five failures
-that had nothing to do with accessibility. Three were leftover `E2E-` inventory
-rows changing what the admin and my-items pages listed; those clear themselves,
-because the next smoke run sweeps by prefix before it starts. The other two were
-notifications the smoke flows generated for that user, which made the
-notification bell render a badge that had never been scanned before and which
-fails contrast in dark mode (#145). Those do not clear: nothing sweeps
-notifications or status history.
-
-So a red accessibility run right after a smoke run is not automatically a
-regression. Reset the dev database before treating it as one. And when adding a
-flow to either suite, remember the account is shared: state one leaves behind is
-state the other scans.
+A popover closes on failure as readily as on success, so
+`expect(confirmButton).toBeHidden()` is not evidence a write happened. The
+inventory test approved a request, asserted the popover closed, and died four
+steps later on a missing `Check out` button because the item was still
+`requested`. Assert what the page shows only on success: here, the row leaving a
+list filtered to pending. Relatedly, `actionTimeout` is set, because without it a
+stuck click is bounded only by the test timeout and names no locator.
 
 ### The smoke budget is read, not enforced
 
-The smoke job targets 5 minutes of wall clock, and `globalTimeout` is set well
-above that at 8 minutes, deliberately. It is a hang catcher for a wedged browser
-or a server that never came up, not a budget enforcer.
+The job targets 5 minutes; `globalTimeout` is 8. Two identical CI runs of the
+accessibility suite took 2m31s and 3m33s, so a timeout sized to the budget fails
+on a slow runner rather than on a broken test. `globalTimeout` is a hang catcher;
+the budget is a number read off the job duration. Three consecutive runs over it
+is the signal to demote a flow to #143. One run over is a slow runner.
 
-Two identical CI runs of the accessibility suite, minutes apart on the same
-commit content, took 2m31s and 3m33s. Against roughly 40% run-to-run variance on
-a shared runner, a timeout sized to the budget fails on a slow runner rather
-than on a broken test, and the first time that happens someone raises the
-number, which is where enforcement was meant not to end up.
+### The smoke and accessibility suites share one local database
 
-So the budget is a number someone reads off the job duration. Three consecutive
-runs over it is the signal to demote a flow to the full suite (#143); one run
-over is indistinguishable from a slow runner. A smoke test that flakes twice
-gets fixed or demoted, never retried harder: the config allows one retry in CI
-and none locally.
+In CI they never meet, each having its own runner and Postgres. Locally they
+share the dev database and both act as `user@example.com`. Running smoke then
+accessibility produced five failures unrelated to accessibility: three were
+leftover `E2E-` rows, which the next smoke run sweeps, and two were notifications
+the smoke flows created, which made the notification bell render a badge that had
+never been scanned and which fails contrast in dark mode (#145). Nothing sweeps
+notifications or history, so reset the dev database before treating a red
+accessibility run after a smoke run as a regression.
 
 ### The accessibility suite retries in CI, and only in CI
 

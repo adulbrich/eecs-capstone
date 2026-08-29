@@ -61,11 +61,19 @@ export default defineConfig({
     // VITE_ variable that failed to inline. The build costs a few seconds.
     command: "npm run build && npm run start",
 
-    // /api/healthz, not /. A server that booted without a database still binds
-    // the port and still answers on every route, so a readiness check that
-    // accepts any response would let a misconfigured server look ready and turn
-    // one env problem into five confusing test failures. healthz returns 500
-    // until the database is actually reachable.
+    // /api/healthz, because readiness should not depend on a page rendering:
+    // it is a fixed text response with no data behind it.
+    //
+    // Do not read that route's source and conclude this cannot catch a missing
+    // DATABASE_URL. The handler returns a hardcoded 200 and deliberately avoids
+    // the database, for the ALB's sake. But `src/db/index.ts` throws at module
+    // scope, so in the built server a missing DATABASE_URL fails the whole SSR
+    // graph and every route answers 500, healthz included, while the process
+    // stays up and bound. Measured: both / and /api/healthz return 500.
+    //
+    // That is what makes this a real gate. Playwright waits for 2xx or 3xx, so
+    // a misconfigured server never goes ready and the run fails as "server did
+    // not start" rather than as five confusing test failures.
     url: `${BASE_URL}/api/healthz`,
 
     // Never reuse, in CI or locally. A dev server left running would otherwise
