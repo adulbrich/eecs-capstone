@@ -3,7 +3,13 @@ import { join } from "node:path";
 import { asc, eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
-import { categories, projectCategories, projects } from "#/db/schema";
+import {
+  categories,
+  inventoryItemCategories,
+  inventoryItems,
+  projectCategories,
+  projects,
+} from "#/db/schema";
 
 /**
  * The constraint from #99, tested against the database rather than the schema
@@ -28,13 +34,52 @@ function insert(row: {
   return db.insert(categories).values(row);
 }
 
+interface PgError {
+  cause?: unknown;
+  code?: string;
+  constraint?: string;
+}
+
+/**
+ * Asserts the insert was refused by this index, not merely that it failed.
+ *
+ * Drizzle wraps the driver error, so the message on the thrown object is
+ * "Failed query: insert into ..." and the SQLSTATE sits one level down in
+ * `cause`. The first version of this file matched the outer message against
+ * `/duplicate key|unique/`, which matched nothing at all: the index was working
+ * and all three rejection tests failed anyway. Matching a message was the wrong
+ * idea twice over, since a regex loose enough to catch the real error is also
+ * loose enough to pass on an unrelated one. `23505` is unique_violation, and
+ * naming the constraint means a different index cannot satisfy this.
+ */
+async function expectRejectedByTheIndex(pending: Promise<unknown>) {
+  const thrown = await pending.then(
+    () => undefined,
+    (error: unknown) => error
+  );
+
+  let violation: PgError | undefined;
+  for (let error = thrown as PgError | undefined; error; ) {
+    if (error.code === "23505") {
+      violation = error;
+      break;
+    }
+    error = error.cause as PgError | undefined;
+  }
+
+  expect({
+    code: violation?.code,
+    constraint: violation?.constraint,
+  }).toEqual({ code: "23505", constraint: INDEX });
+}
+
 describe("the categories unique index", () => {
   it("rejects the same name twice in one domain and type", async () => {
     await insert({ domain: "project", name: "Robotics", type: "field" });
 
-    await expect(
+    await expectRejectedByTheIndex(
       insert({ domain: "project", name: "Robotics", type: "field" })
-    ).rejects.toThrow(/duplicate key|unique/i);
+    );
   });
 
   it("allows the same name in a different domain", async () => {
@@ -56,9 +101,9 @@ describe("the categories unique index", () => {
   it("rejects names that differ only in case", async () => {
     await insert({ domain: "project", name: "Robotics", type: "field" });
 
-    await expect(
+    await expectRejectedByTheIndex(
       insert({ domain: "project", name: "robotics", type: "field" })
-    ).rejects.toThrow(/duplicate key|unique/i);
+    );
   });
 
   it("rejects two inventory categories with the same name and a null type", async () => {
@@ -66,9 +111,9 @@ describe("the categories unique index", () => {
     // treats NULLs as distinct, and every inventory category carries type null.
     await insert({ domain: "inventory", name: "Multimeter", type: null });
 
-    await expect(
+    await expectRejectedByTheIndex(
       insert({ domain: "inventory", name: "Multimeter", type: null })
-    ).rejects.toThrow(/duplicate key|unique/i);
+    );
   });
 });
 
@@ -135,6 +180,17 @@ describe("the dedupe step in migration 0015", () => {
         { categoryId: newer.id, projectId: project.id },
       ]);
 
+      // The other junction, which is a separate INSERT in the migration and
+      // would otherwise never run in any test. This item carries only the
+      // loser, so it exercises the plain move rather than the conflict.
+      const [item] = await db
+        .insert(inventoryItems)
+        .values({ name: "Also tagged" })
+        .returning();
+      await db
+        .insert(inventoryItemCategories)
+        .values({ categoryId: newer.id, itemId: item.id });
+
       await db.execute(sql.raw(dedupe));
 
       const remaining = await db
@@ -148,6 +204,12 @@ describe("the dedupe step in migration 0015", () => {
         .from(projectCategories)
         .where(eq(projectCategories.projectId, project.id));
       expect(links).toEqual([{ categoryId: older.id, projectId: project.id }]);
+
+      const itemLinks = await db
+        .select()
+        .from(inventoryItemCategories)
+        .where(eq(inventoryItemCategories.itemId, item.id));
+      expect(itemLinks).toEqual([{ categoryId: older.id, itemId: item.id }]);
     } finally {
       // Restore it even on failure: the index is schema state, and db-reset
       // only truncates, so leaving it dropped would disarm every assertion in

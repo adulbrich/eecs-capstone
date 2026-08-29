@@ -285,34 +285,29 @@ Note `inventory_items.current_holder_id`: nulling it does **not** change `status
 
 Deleting an account outright is an operator task, not a feature: `scripts/delete-user.mjs` purges a test account and its own content and refuses when it acted on anything else. See "Delete a test account" in `DEPLOYMENT.md`.
 
-### The categories unique index is an expression index, so read it here
+### `categories` uniqueness needs an expression index, not a plain UNIQUE
 
-`categories` carries `UNIQUE (domain, coalesce(type, ''), lower(name))`, declared in
-`schema.ts` and created in `drizzle/0015_categories_unique_name.sql`. Each of the three
-parts is doing work a plain `UNIQUE (domain, type, name)` would not do.
+`UNIQUE (domain, coalesce(type, ''), lower(name))`, declared in `schema.ts` and created in
+`drizzle/0015_categories_unique_name.sql`.
 
-`coalesce(type, '')` exists because Postgres treats NULLs as distinct in a unique index,
-and every inventory category carries `type = null`, so a plain index would leave the
-entire inventory domain unconstrained. `NULLS NOT DISTINCT` says the same thing on PG15+,
-and would be the tidier spelling, but Drizzle's index builder cannot express it and the
-index would then have to live only in SQL, invisible in `schema.ts` the way
-`notifications_overdue_unique_idx` is.
+```sql
+CREATE UNIQUE INDEX "categories_domain_type_name_unique_idx"
+  ON "categories" USING btree ("domain", coalesce("type", ''), lower("name"));
+```
 
-`lower(name)` exists because "Robotics" and "robotics" are one category, and `domain` is
-in the key so a project category and an inventory category may share a name.
+`coalesce(type, '')` is load-bearing: Postgres treats NULLs as distinct in a unique index
+and every inventory category carries `type = null`, so a plain `UNIQUE (domain, type,
+name)` leaves the whole inventory domain unconstrained. `NULLS NOT DISTINCT` says the same
+thing on PG15+, but Drizzle's `nullsNotDistinct` is on unique *constraints*, which cannot
+take expressions, so using it would mean a SQL-only index invisible in `schema.ts`. The
+migration dedupes before creating the index, since `CREATE UNIQUE INDEX` fails outright on
+existing duplicates; the two non-obvious parts of that step (a `created_at, id` tie-break,
+and moving junction rows by insert-then-delete rather than `UPDATE`) are commented in the
+file.
 
-The migration deduplicates before creating the index, because `CREATE UNIQUE INDEX` fails
-outright if duplicates already exist. Two things about that step are easy to get wrong and
-are commented in the file: the survivor is chosen by `created_at, id` rather than
-`created_at` alone, since migration 0010 inserted every inventory category in one
-statement and those rows share a timestamp; and junction rows move by insert-then-delete
-with `ON CONFLICT DO NOTHING` rather than by `UPDATE`, because both junctions have
-composite primary keys and a project may already carry both duplicates.
-
-`db-reset.ts` only truncates, so the index is schema state that survives between tests.
-`categories-unique.integration.test.ts` drops it to reproduce the duplicates the dedupe
-exists for, and restores it in a `finally`. A test that drops it and dies without
-restoring it disarms every uniqueness assertion for the rest of the run.
+`db-reset.ts` only truncates, so this index is schema state that outlives a test. The
+dedupe test drops it to create the duplicates it exists for and restores it in a `finally`;
+a test that drops it and dies without restoring disarms every uniqueness assertion after it.
 
 ### Timestamps always `withTimezone: true`
 
