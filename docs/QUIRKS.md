@@ -285,6 +285,30 @@ Note `inventory_items.current_holder_id`: nulling it does **not** change `status
 
 Deleting an account outright is an operator task, not a feature: `scripts/delete-user.mjs` purges a test account and its own content and refuses when it acted on anything else. See "Delete a test account" in `DEPLOYMENT.md`.
 
+### `categories` uniqueness needs an expression index, not a plain UNIQUE
+
+`UNIQUE (domain, coalesce(type, ''), lower(name))`, declared in `schema.ts` and created in
+`drizzle/0015_categories_unique_name.sql`.
+
+```sql
+CREATE UNIQUE INDEX "categories_domain_type_name_unique_idx"
+  ON "categories" USING btree ("domain", coalesce("type", ''), lower("name"));
+```
+
+`coalesce(type, '')` is load-bearing: Postgres treats NULLs as distinct in a unique index
+and every inventory category carries `type = null`, so a plain `UNIQUE (domain, type,
+name)` leaves the whole inventory domain unconstrained. `NULLS NOT DISTINCT` says the same
+thing on PG15+, but Drizzle's `nullsNotDistinct` is on unique *constraints*, which cannot
+take expressions, so using it would mean a SQL-only index invisible in `schema.ts`. The
+migration dedupes before creating the index, since `CREATE UNIQUE INDEX` fails outright on
+existing duplicates; the two non-obvious parts of that step (a `created_at, id` tie-break,
+and moving junction rows by insert-then-delete rather than `UPDATE`) are commented in the
+file.
+
+`db-reset.ts` only truncates, so this index is schema state that outlives a test. The
+dedupe test drops it to create the duplicates it exists for and restores it in a `finally`;
+a test that drops it and dies without restoring disarms every uniqueness assertion after it.
+
 ### Timestamps always `withTimezone: true`
 
 Every timestamp column uses `timestamp("col", { withTimezone: true })`. Stored as `timestamptz`. Required ones chain `.notNull().defaultNow()`. Optional event timestamps (`publishedAt`, `archivedAt`, `deletedAt`, `reviewedAt`, `banExpires`) are nullable but still `withTimezone`.
