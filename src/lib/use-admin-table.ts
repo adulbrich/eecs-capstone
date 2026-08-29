@@ -11,9 +11,9 @@ import {
  * The slice of the router's `navigate` this hook uses. Structural so the hook
  * never imports the router.
  */
-type AdminNavigate<TSearch> = (opts: {
+type AdminNavigate = (opts: {
   replace?: boolean;
-  search: (prev: TSearch) => TSearch;
+  search: (prev: Record<string, unknown>) => Record<string, unknown>;
 }) => unknown;
 
 interface UseAdminTableOptions<
@@ -28,7 +28,7 @@ interface UseAdminTableOptions<
    * calling it inside a generic hook needs casts, while the one line in the
    * route typechecks against the real route path.
    */
-  navigate: AdminNavigate<TSearch>;
+  navigate: AdminNavigate;
   /**
    * Send a sort change back to page one. Set it on a paginated listing: the
    * server returns a newly ordered set, so the page the reader was on no
@@ -40,9 +40,15 @@ interface UseAdminTableOptions<
    *
    * Unsatisfiable unless the route's own search type has a `page`, which is
    * what stops the failure #96 named: a stray `page: 1` pushed into a schema
-   * with no `page` in it. Threading `TSearch` through `navigate` does not catch
-   * that on its own, because the reducer's return needs a cast either way, and
-   * a cast is what silences the check. This is the part that fails.
+   * with no `page` in it.
+   *
+   * `TSearch` is inferred from `search` and used for nothing else. #96 also
+   * proposed typing `navigate`'s reducer `(prev: TSearch) => TSearch` to
+   * restore schema checking on the patch. That was built and thrown away: the
+   * reducer spreads over a generic, TypeScript cannot prove a spread preserves
+   * one, so the return needs a cast, and the cast silences the very check the
+   * typing was for. With the generic and without this conditional, setting
+   * `resetPageOnSort` on a route with no `page` still compiled.
    *
    * The false branch is a sentence rather than `never` so the compiler prints
    * the reason: "Type 'true' is not assignable to type 'resetPageOnSort needs
@@ -97,20 +103,19 @@ export function useAdminTable<
   const setSearch = useCallback(
     (patch: AdminTableSearch) =>
       void navigate({
-        search: (prev: TSearch) =>
-          ({
-            ...prev,
-            ...patch,
-            ...(resetPageOnSort && ("sort" in patch || "dir" in patch)
-              ? { page: 1 }
-              : {}),
-            // TypeScript cannot prove a spread over a generic preserves that
-            // generic, so the assertion is unavoidable. It is sound here for a
-            // reason worth stating: `patch` only ever carries
-            // `AdminTableSearch` keys, which `TSearch` is constrained to
-            // include, and `page` is only added when `resetPageOnSort` is set,
-            // which the option's type only permits when `TSearch` has one.
-          }) as TSearch,
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          ...patch,
+          ...(resetPageOnSort && ("sort" in patch || "dir" in patch)
+            ? { page: 1 }
+            : {}),
+          // TypeScript cannot prove a spread over a generic preserves that
+          // generic, so the assertion is unavoidable. It is sound here for a
+          // reason worth stating: `patch` only ever carries
+          // `AdminTableSearch` keys, which `TSearch` is constrained to
+          // include, and `page` is only added when `resetPageOnSort` is set,
+          // which the option's type only permits when `TSearch` has one.
+        }),
       }),
     [navigate, resetPageOnSort]
   );
@@ -119,7 +124,7 @@ export function useAdminTable<
     (patch: AdminTableSearch) =>
       void navigate({
         replace: true,
-        search: (prev: TSearch) => ({ ...prev, ...patch }) as TSearch,
+        search: (prev: Record<string, unknown>) => ({ ...prev, ...patch }),
       }),
     [navigate]
   );

@@ -303,7 +303,12 @@ rendering, so a CSV matches the screen; it is a no-op under `serverSorted`.
 `resetPageOnSort` is unsatisfiable unless the route's own search type declares a `page`,
 so setting it on a route that paginates nothing is a compile error rather than a stray
 `page: 1` pushed into a schema with no `page` in it. The compiler prints the reason,
-because the false branch of that conditional is a sentence rather than `never`. That is what the hook's `TSearch`
+because the false branch of that conditional is a sentence rather than `never`.
+
+That is all the route's search type is used for. Typing `navigate`'s reducer against it
+as well was built and thrown away: the reducer spreads over a generic, so its return needs
+a cast, and the cast silences the check the typing was for. It caught nothing the
+conditional does not. That is what the hook's `TSearch`
 parameter is for. It does not restore full search-schema checking on the patch: the
 reducer spreads over a generic, TypeScript cannot prove that preserves it, and the cast
 that makes it compile is what stops the compiler seeing the rest. One named failure
