@@ -413,6 +413,36 @@ Playwright timeout on a click that works locally, search the job log for
 Retried tests are reported as flaky rather than silently swallowed, so a genuine
 intermittent bug still surfaces in the log.
 
+### The unit suite sees your dotenv files, so an env-dependent test is machine-dependent
+
+`vite.config.ts` declares no `test` block, which makes it easy to assume the
+unit run sees no dotenv at all. It does: the runner populates `process.env`
+from `.env` and `.env.local` before any test executes. Probe it rather than
+trust either claim, since a plan under `docs/superpowers/plans/` asserts the
+opposite:
+
+```ts
+it("probe", () => {
+  // Passes locally. S3_BUCKET is set in .env.local and not in .env.
+  expect(process.env.S3_BUCKET).toBe("cs-capstone");
+});
+```
+
+So an assertion on a value the process resolved is really an assertion about
+the author's `.env.local`, and CI never catches it, because the `verify` job
+writes no dotenv file. It fails on some developer machines and nowhere else.
+
+`bedrock-embed.test.ts` had one: it compared `EMBEDDING_DIMENSIONS` against the
+literal `1024`, which reds for anyone who set `BEDROCK_EMBEDDING_DIMENSIONS` to
+anything else, and `.env.example` ships that variable. It now asserts the
+constant matches `buildEmbedConfig(process.env)` instead, which pins the wiring
+and holds in any environment. That is the pattern for a module-level constant
+that is itself the thing under test.
+
+For config generally, assert through a builder handed a literal environment,
+the way `aws-config.test.ts` calls `buildS3Config({ S3_REGION: "us-west-2" } as
+NodeJS.ProcessEnv)`.
+
 ### Integration tests need DATABASE_URL at config-load time
 
 `src/db/index.ts` reads `DATABASE_URL` at module-import time and throws if missing. Vitest setup files (`setupFiles`) run AFTER the test files start importing. So loading dotenv from `setup.integration.ts` is too late. Load it from `vitest.integration.config.ts` itself:
