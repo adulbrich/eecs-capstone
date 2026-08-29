@@ -175,7 +175,9 @@ describe("bookmarks", () => {
       id,
     ]);
 
-    await forceTransitionAs(admin, id, "changes_requested");
+    // forceTransitionAs skips the transition map, not the rest of the rules:
+    // commitTransition still requires a comment for changes_requested.
+    await forceTransitionAs(admin, id, "changes_requested", "Needs work");
 
     expect((await listMyBookmarksAs(student)).rows).toEqual([]);
     // Staff keep it, which is what makes this the viewer's rule rather than a
