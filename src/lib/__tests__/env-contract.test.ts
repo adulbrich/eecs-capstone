@@ -77,8 +77,8 @@ const NOT_READ_HERE = new Map([
  *
  * `AWS_REGION` is not here despite fitting the description, because
  * `PLATFORM_VARS` drops it before check 3 ever sees it, so the entry would
- * excuse nothing there. The disjointness check below is what keeps that from
- * being a comment somebody has to remember.
+ * excuse nothing there. The pairwise-disjointness check below is what keeps
+ * that from being a comment somebody has to remember.
  */
 const UNSET_IN_PRODUCTION = new Map([
   ["S3_ENDPOINT", "task role, see buildS3Config"],
@@ -232,15 +232,42 @@ describe("the environment contract", () => {
     }
   });
 
-  it("lists no variable as both platform-supplied and unset in production", () => {
-    // The two overlap silently. PLATFORM_VARS drops a read before check 3
-    // counts it, so an UNSET_IN_PRODUCTION entry for the same name is inert,
-    // and the dead-exemption check below cannot tell, because it scans without
-    // suppressions and so sees the read. AWS_REGION was exactly that pair.
-    const both = [...UNSET_IN_PRODUCTION.keys()].filter((name) =>
-      PLATFORM_VARS.has(name)
-    );
-    expect(both).toEqual([]);
+  it("names no variable on two exemption lists at once", () => {
+    // Any overlap is inert and invisible, in both directions. PLATFORM_VARS
+    // and SCRIPT_ARGUMENTS drop a read before anything counts it, so an entry
+    // elsewhere for the same name excuses nothing, while the dead-exemption
+    // check below still sees the raw read and calls it alive. The remaining
+    // pairs are outright contradictions: NOT_READ_HERE asserts a name is
+    // documented, the other three assert it is not.
+    //
+    // Asserted over every pair rather than the one that bit. AWS_REGION was
+    // on PLATFORM_VARS and UNSET_IN_PRODUCTION, and closing only that pair
+    // left CONFIRM free to sit on PLATFORM_VARS and SCRIPT_ARGUMENTS with the
+    // same effect and the same silence.
+    // Arrays, not `Map.keys()`. That returns a one-shot iterator, so the
+    // first pair to consume one leaves every later pair reading an empty
+    // sequence. Written that way this checked one pair of the six and passed.
+    const lists: [string, string[]][] = [
+      ["PLATFORM_VARS", [...PLATFORM_VARS.keys()]],
+      ["SCRIPT_ARGUMENTS", [...SCRIPT_ARGUMENTS]],
+      ["NOT_READ_HERE", [...NOT_READ_HERE.keys()]],
+      ["UNSET_IN_PRODUCTION", [...UNSET_IN_PRODUCTION.keys()]],
+    ];
+    const overlaps: string[] = [];
+    for (const [aName, a] of lists) {
+      for (const [bName, b] of lists) {
+        if (aName >= bName) {
+          continue;
+        }
+        const shared = new Set(b);
+        for (const name of a) {
+          if (shared.has(name)) {
+            overlaps.push(`${name} (${aName} and ${bName})`);
+          }
+        }
+      }
+    }
+    expect(overlaps).toEqual([]);
   });
 
   it("carries no exemption for a variable nothing reads any more", () => {
