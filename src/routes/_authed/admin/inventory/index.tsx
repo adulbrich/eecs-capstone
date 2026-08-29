@@ -7,8 +7,8 @@ import {
 import { useCallback } from "react";
 import { z } from "zod";
 import {
-  type AdminColumn,
   AdminDataTable,
+  defineAdminColumns,
 } from "#/components/admin-data-table";
 import { CategoryChip } from "#/components/category-chip";
 import { CategoryFilterCombobox } from "#/components/category-filter-combobox";
@@ -158,7 +158,7 @@ function reservedFor(row: Row): string | null {
     : null;
 }
 
-const COLUMNS: AdminColumn<Row>[] = [
+const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => row.name,
     cell: ({ row }) => {
@@ -340,7 +340,7 @@ const COLUMNS: AdminColumn<Row>[] = [
     header: "Actions",
     id: "actions",
   },
-];
+]);
 
 // Every field of the record, independent of which columns are visible.
 // defineCsvColumns<Row>() fails npm run typecheck if a field of Row (i.e. of

@@ -335,32 +335,69 @@ markup, and nothing to add by hand.
 A hand-rolled `<table>` in an admin route collapses to an unreadable horizontal
 scroll on a phone, which is the whole reason this component exists.
 
-### A column that is not text sets its own `sortingFn`
+### An admin route's column list goes through `defineAdminColumns<Row>()`
 
-`AdminDataTable` defaults every column without one to a locale-aware **string**
-comparator, so whatever the `accessorFn` returns is sorted through `String(value)`.
-That is correct for text and wrong for everything else:
+```tsx
+const COLUMNS = defineAdminColumns<Row>()([
+  { accessorFn: (row) => row.name, header: "Name", id: "name" },
+  {
+    accessorFn: (row) => row.createdAt,
+    cell: ({ row }) => <LocalTime dateOnly value={row.original.createdAt} />,
+    header: "Created",
+    id: "createdAt",
+    sortingFn: "datetime",
+  },
+]);
+```
+
+The builder turns two rules about what an `accessorFn` returns into compile
+errors. Both used to be prose, and both fail the same way: the table renders,
+sorts, and looks fine, in the wrong order.
+
+**A column that is not text sets its own `sortingFn`.** `AdminDataTable` defaults
+every column without one to a locale-aware **string** comparator, so whatever the
+accessor returns is sorted through `String(value)`. That is correct for text and
+wrong for everything else:
 
 | Column value | `sortingFn` | What the default does instead |
 | --- | --- | --- |
 | `Date` | `"datetime"` | `String(date)` starts with the weekday name, so ascending reads Fri, Fri, Mon, Wed. |
 | number | `"basic"` | `"10"` sorts before `"2"`. |
+| boolean | `"basic"` | `"false" < "true"` happens to read right, until a nullable flag puts `"null"` between them. |
 
-```tsx
-{
-  accessorFn: (row) => row.createdAt,
-  cell: ({ row }) => <LocalTime dateOnly value={row.original.createdAt} />,
-  header: "Created",
-  id: "createdAt",
-  sortingFn: "datetime",
-}
-```
+**An accessor returns `undefined` for a missing value, never `null`.**
+`sortUndefined: "last"` is the only knob TanStack offers for grouping empties and
+it does not special-case `null`, so a `null` sorts as the string "null" among the
+real values. Map it at the accessor: `(row) => row.label ?? undefined`.
 
 Both are easy to ship and hard to notice. Seeded rows written in one run share a
 timestamp, and the numeric cases are ordinals that stay single-digit for a long
-time, so the column looks sorted until real data arrives. Every non-text column
-under `src/routes/_authed/admin/` sets this, so a new one that forgets is the
-outlier rather than the pattern.
+time, so the column looks sorted until real data arrives. Two columns were
+already breaking a rule when the check landed, one of them the users table's
+Banned flag, which is nullable in the auth schema.
+
+The error names the column: `COLUMN_NEEDS_ITS_OWN_SORTING_FN: "createdAt"` or
+`ACCESSOR_RETURNS_NULL_USE_UNDEFINED: "note"`. `npm run typecheck`, not
+`npm test`, is what enforces it, and `src/test/admin-columns.test.ts` holds a
+`@ts-expect-error` per rejection case so the check cannot degrade to a no-op
+unnoticed. Vitest reports those blocks green whatever the types do; tsc reads
+the file because `tsconfig.json` includes `**/*.ts`.
+
+A shared column const declared outside the array uses `satisfies
+AdminColumn<Row>` with `id: "..." as const`, never an `AdminColumn<Row>`
+annotation, which breaks the check in a way that reads as a bug in the check.
+[`QUIRKS.md`](./QUIRKS.md#a-shared-admin-column-const-uses-satisfies-not-an-annotation)
+says why; this section says only that the rule exists, so there is one copy to
+keep true.
+
+`accessorKey` and grouped (`columns`) definitions are banned outright. Both used
+to compile with no rule applied at all, which is the one failure this check
+cannot afford: the first carries a value type the check cannot read, the second
+hides its real columns a level down where nothing inspects them.
+
+The component's own test fixtures in `src/test/admin-data-table.test.tsx` stay
+plain `AdminColumn<Row>[]` literals. They exercise the table, not a route, and
+some of them are deliberately shaped in ways a route's columns never are.
 
 ---
 

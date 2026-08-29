@@ -79,12 +79,114 @@ const localeCompareSortingFn: SortingFn<unknown> = (rowA, rowB, columnId) =>
  * label would only squeeze the title into what is left of the row. At most
  * one column per table should set it.
  */
-export type AdminColumn<T> = ColumnDef<T, unknown> & {
+export type AdminColumn<T> = ColumnDef<T, unknown> & AdminColumnExtras;
+
+/** The fields `AdminColumn` adds on top of TanStack's `ColumnDef`. */
+interface AdminColumnExtras {
   cardHeader?: boolean;
   defaultHidden?: boolean;
   header: string;
   id: string;
+}
+
+/**
+ * `AdminColumn` with the accessor's return type left as a parameter instead
+ * of erased to `unknown`, which is what lets `CheckedAdminColumn` see what a
+ * column sorts on.
+ *
+ * The two `never`s close the ways around the check. Leaving `accessorKey` and
+ * `columns` out of the constraint is not enough on its own: `C` is inferred
+ * from the array literal, so there is no fixed target type for excess-property
+ * checking to fire against, and a property the constraint merely fails to
+ * mention is simply allowed. An `accessorKey` column carries a value type
+ * `CheckedAdminColumn` cannot read, and a grouped column hides its real
+ * columns one level down where nothing inspects them; both compiled with no
+ * rule applied. Banning them costs nothing: no column under
+ * `src/routes/_authed/admin/` uses either.
+ */
+type TypedAdminColumn<T, TValue> = Omit<ColumnDef<T, unknown>, "accessorFn"> &
+  AdminColumnExtras & {
+    accessorFn?: (row: T, index: number) => TValue;
+    accessorKey?: never;
+    columns?: never;
+  };
+
+type ColumnId<C> = C extends { id: infer TId } ? TId : never;
+
+/**
+ * Resolves to `C` when a column honours both rules that depend on what its
+ * accessor returns, and to an error object naming the offending column
+ * otherwise:
+ *
+ * 1. A column whose value is not text sets its own `sortingFn`, because the
+ *    default comparator sorts `String(value)` (see `localeCompareSortingFn`).
+ *    "Sets" means to a real comparator: the presence test is against
+ *    `NonNullable<unknown>` rather than `unknown` because `undefined` is
+ *    assignable to `unknown`, so an explicit `sortingFn: undefined` would
+ *    otherwise satisfy a rule it declares nothing about.
+ * 2. An accessor returns `undefined`, never `null`, for a missing value.
+ *    `sortUndefined` is the only knob TanStack offers for grouping empties,
+ *    and it does not treat `null` as empty, so a `null` sorts as the string
+ *    "null" among the real values.
+ *
+ * The null check comes first: an accessor returning `string | null` breaks
+ * rule 2 while looking like text to rule 1, and reporting the sorting
+ * failure there would send the reader after the wrong fix.
+ *
+ * A column with no `accessorFn` at all (an actions column, say) has no value
+ * to sort and passes through untouched.
+ */
+type CheckedAdminColumn<C> = C extends {
+  accessorFn: (...args: never[]) => infer TValue;
+}
+  ? [null] extends [TValue]
+    ? { ACCESSOR_RETURNS_NULL_USE_UNDEFINED: ColumnId<C> }
+    : [TValue] extends [string | undefined]
+      ? C
+      : C extends { sortingFn: NonNullable<unknown> }
+        ? C
+        : { COLUMN_NEEDS_ITS_OWN_SORTING_FN: ColumnId<C> }
+  : C;
+
+type CheckedAdminColumns<C extends readonly unknown[]> = {
+  [K in keyof C]: CheckedAdminColumn<C[K]>;
 };
+
+/**
+ * Builds a checked column list for one admin table. Call as
+ * `defineAdminColumns<Row>()([...])`.
+ *
+ * Curried for the same reason as `defineCsvColumns` in `#/lib/csv`:
+ * TypeScript infers all type arguments or none, so giving `T` explicitly in
+ * one call would force `C` to be given too, and `C` is exactly what has to be
+ * inferred from the array literal. `const C` is what keeps each element's
+ * accessor return type visible per element rather than unioned across the
+ * array.
+ *
+ * The two rules it enforces used to live only in `docs/UI-CONVENTIONS.md` and
+ * in a comment on the route where someone hit the second one. Both fail
+ * quietly: the table renders, sorts, and looks fine, in the wrong order.
+ *
+ * A shared column const declared outside the array uses `satisfies
+ * AdminColumn<Row>` with `id: "..." as const`, never an `AdminColumn<Row>`
+ * annotation: the annotation erases the accessor's return type back to
+ * `unknown`, `[null] extends [unknown]` is true, and every such column would
+ * then report as returning null. See `docs/QUIRKS.md`. Annotating the
+ * returned array is merely redundant and still checks.
+ */
+export function defineAdminColumns<T>() {
+  return <const C extends readonly TypedAdminColumn<T, unknown>[]>(
+    columns: C & CheckedAdminColumns<C>
+  ): AdminColumn<T>[] =>
+    // The one cast in the construct, and it is the price of the check. `const
+    // C` is what preserves each accessor's return type per element, and it
+    // also makes every element deeply readonly and literal. The table and
+    // `useAdminTable` consume `AdminColumn<T>[]`, and no structural
+    // conversion gets there from a readonly tuple of literals: a single
+    // `as AdminColumn<T>[]` fails TS2352, which is why it goes through
+    // `unknown`.
+    columns as unknown as AdminColumn<T>[];
+}
 
 export interface AdminDataTableProps<T> {
   /**

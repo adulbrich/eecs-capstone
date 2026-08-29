@@ -8,8 +8,8 @@ import {
 import { useCallback, useState } from "react";
 import { z } from "zod";
 import {
-  type AdminColumn,
   AdminDataTable,
+  defineAdminColumns,
 } from "#/components/admin-data-table";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import {
@@ -153,7 +153,7 @@ const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
   { header: "Created", key: "createdAt", value: (row) => row.createdAt },
 ]);
 
-const COLUMNS: AdminColumn<Row>[] = [
+const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => row.name ?? undefined,
     cell: ({ row }) => row.original.name ?? "(none)",
@@ -182,7 +182,7 @@ const COLUMNS: AdminColumn<Row>[] = [
     header: "Capacity",
     id: "capacity",
   },
-];
+]);
 
 function MentorsAdmin() {
   const { rows } = Route.useLoaderData();
