@@ -69,11 +69,12 @@ describe("buildAuthConfig", () => {
   });
 
   it("trusts the host everywhere except development", () => {
-    // Not the same predicate as isProduction. The two only disagree under
-    // NODE_ENV=test, which no deployed environment uses, so the gap has no
-    // consequence; it is pinned here so a future edit to either has to be
-    // deliberate about closing it. See the Better Auth section of
-    // docs/QUIRKS.md.
+    // Not the same predicate as isProduction: they agree under development
+    // and production and disagree under everything else, unset included, as
+    // the unset case below shows. Deployed code never lands in that gap
+    // because the Dockerfile and the task definition both set production.
+    // Pinned here so closing the gap has to be deliberate. See the Better
+    // Auth section of docs/QUIRKS.md.
     expect(
       buildAuthConfig({ NODE_ENV: "development" } as NodeJS.ProcessEnv)
         .trustHost

@@ -66,11 +66,13 @@ export function buildAuthConfig(
       discoveryUrl,
       issuer: issuerFromDiscoveryUrl(discoveryUrl),
     },
-    // Not `=== "production"` like `isProduction` above, and the difference is
-    // load-bearing rather than an inconsistency: this is on everywhere except
-    // development, because the app sits behind CloudFront and an ALB in
-    // production and behind nothing on localhost. See the Better Auth section
-    // of docs/QUIRKS.md.
+    // Not `=== "production"` like `isProduction` above. The two agree under
+    // `development` and `production` and disagree under every other value,
+    // unset included. Nothing rides on that, because both the Dockerfile and
+    // the ECS task definition set `production` explicitly, so deployed code
+    // only ever sees a value they agree on. It is residue from the two lines
+    // arriving in separate commits, not a decision. See the Better Auth
+    // section of docs/QUIRKS.md.
     trustHost: env.NODE_ENV !== "development",
     unconfigured: PROVIDER_VARS.filter((name) => !env[name]?.trim()),
   };

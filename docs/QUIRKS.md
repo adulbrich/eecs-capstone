@@ -204,7 +204,9 @@ Every email renders through `src/lib/email/templates.ts`, which owns the HTML es
 
 `buildAuthConfig` in `src/lib/_internal/auth-config.ts` resolves `trustHost` as `NODE_ENV !== "development"`, and `src/lib/auth.ts` passes it straight through. Required behind the CloudFront/ALB proxy chain in production so origin detection works. Disabled in dev where `localhost:3000` is direct.
 
-Note the predicate is not the one beside it: `useSecureCookies` is `NODE_ENV === "production"`. The two agree everywhere that matters and differ only under `NODE_ENV=test`, where `trustHost` is on and secure cookies are off. Nothing depends on that gap: `infra/ecs.tf` is the only place either is set from, and it sets `NODE_ENV=production`, so no deployed environment is a test one. The difference is residue from the two lines arriving in separate commits, not a decision. Do not build on it.
+Note the predicate is not the one beside it: `useSecureCookies` is `NODE_ENV === "production"`. The two agree under `development` (both off) and `production` (both on), and disagree under every other value, unset included, where `trustHost` is on and secure cookies are off.
+
+Nothing rides on the gap, because deployed code never sees a value in it: `Dockerfile` sets `NODE_ENV=production` in the runtime stage and `infra/ecs.tf` sets it again in the task definition. The difference is residue from the two lines arriving in separate commits, not a decision, so do not read intent into it or build on it.
 
 ### Session role typing
 
