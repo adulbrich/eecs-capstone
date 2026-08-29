@@ -429,17 +429,19 @@ it("probe", () => {
 ```
 
 So an assertion on a value the process resolved is really an assertion about
-the author's `.env.local`. `bedrock-embed.test.ts` has one today: it compares
-`EMBEDDING_DIMENSIONS` against the literal `1024`, which reds for anyone who
-set `BEDROCK_EMBEDDING_DIMENSIONS` to anything else. CI never catches it,
-because the `verify` job writes no dotenv file, so it fails on some developer
-machines and nowhere else.
+the author's `.env.local`, and CI never catches it, because the `verify` job
+writes no dotenv file. It fails on some developer machines and nowhere else.
 
-Assert config through a builder handed a literal environment, the way
-`aws-config.test.ts` calls `buildS3Config({ S3_REGION: "us-west-2" } as
-NodeJS.ProcessEnv)`. Where a module-level constant is itself the thing under
-test, assert it matches its builder rather than a literal: that holds in any
-environment.
+`bedrock-embed.test.ts` had one: it compared `EMBEDDING_DIMENSIONS` against the
+literal `1024`, which reds for anyone who set `BEDROCK_EMBEDDING_DIMENSIONS` to
+anything else, and `.env.example` ships that variable. It now asserts the
+constant matches `buildEmbedConfig(process.env)` instead, which pins the wiring
+and holds in any environment. That is the pattern for a module-level constant
+that is itself the thing under test.
+
+For config generally, assert through a builder handed a literal environment,
+the way `aws-config.test.ts` calls `buildS3Config({ S3_REGION: "us-west-2" } as
+NodeJS.ProcessEnv)`.
 
 ### Integration tests need DATABASE_URL at config-load time
 
