@@ -190,13 +190,33 @@ export function AdminDataTable<T>({
     () => new Map(columns.map((column) => [column.id, column.header])),
     [columns]
   );
-  const cardHeaderIds = useMemo(
+  const marked = useMemo(
     () =>
-      new Set(
-        columns.filter((column) => column.cardHeader).map((column) => column.id)
-      ),
+      columns.filter((column) => column.cardHeader).map((column) => column.id),
     [columns]
   );
+  // Only the first marked column titles the card. Two header strips render as
+  // two title rows on one mobile card, one of them unlabelled and neither
+  // obviously wrong, so it reads as a styling oddity and gets lived with. The
+  // prop's TSDoc has said "at most one" since it was added, where no compiler
+  // could read it.
+  const cardHeaderIds = useMemo(() => new Set(marked.slice(0, 1)), [marked]);
+  // Joined so the dependency is stable by value rather than by array identity.
+  const tooManyCardHeaders = marked.length > 1 ? marked.join(", ") : null;
+  useEffect(() => {
+    if (!tooManyCardHeaders) {
+      return;
+    }
+    // Reported rather than thrown: nothing in this app declares an
+    // `errorComponent`, so a render-time throw replaces the whole admin page,
+    // and trading a squeezed card title for a blank screen is the worse bug.
+    // In an effect rather than in the memo above because a memo can run and be
+    // discarded, which would make the warning appear or not on a detail of
+    // React's scheduling.
+    console.error(
+      `AdminDataTable: cardHeader is set on more than one column (${tooManyCardHeaders}). At most one column may title the mobile card, so only the first is used.`
+    );
+  }, [tooManyCardHeaders]);
   const highlighted = useRef<HTMLTableRowElement | null>(null);
   // Scrolls once the highlighted row has rendered. Deliberately runs on mount
   // only: re-sorting or re-filtering should not yank the viewport back.

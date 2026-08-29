@@ -183,6 +183,50 @@ describe("AdminDataTable", () => {
     expect(cells[1].hasAttribute("data-card-header")).toBe(false);
   });
 
+  it("reports two cardHeaders and renders only the first", () => {
+    // Two header strips render as two title rows on one mobile card, neither
+    // obviously wrong. The prop's TSDoc has said "at most one" since it was
+    // added, where no compiler and no test could read it (#94).
+    //
+    // Both halves matter. The message is what a developer sees, and promoting
+    // exactly one cell is what stops the page being wrong while nobody is
+    // looking. Throwing would take the admin page down over a card title,
+    // since nothing here declares an errorComponent.
+    const error = vi.spyOn(console, "error").mockImplementation(() => {
+      // Silenced: this test asserts on the call, and the message would
+      // otherwise be noise in the run.
+    });
+    const twoHeaders = COLUMNS.map((column) => ({
+      ...column,
+      cardHeader: true,
+    }));
+
+    try {
+      const { container } = renderTable({
+        columns: twoHeaders,
+        hidden: [],
+      });
+
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining("more than one column (name, location)")
+      );
+      const cells = container
+        .querySelectorAll("tbody tr")[0]
+        .querySelectorAll("td");
+      expect(cells[0].hasAttribute("data-card-header")).toBe(true);
+      // The second column asked to title the card and did not get to. Its cell
+      // still renders as an ordinary labelled field, which is the part the
+      // word "ignored" would get wrong.
+      expect(cells[1].hasAttribute("data-card-header")).toBe(false);
+      expect(cells[1].getAttribute("data-label")).toBe("Location");
+    } finally {
+      // Restored here rather than after the assertions: a failure above would
+      // otherwise leave console.error silenced for every later test in this
+      // file.
+      error.mockRestore();
+    }
+  });
+
   it("keeps every cell labelled when no column opts into cardHeader", () => {
     const { container } = renderTable({ hidden: [] });
     const cells = container
