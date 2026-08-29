@@ -145,7 +145,7 @@ export const hardDeleteInventoryItem = createServerFn({ method: "POST" })
   });
 
 export const getCart = createServerFn({ method: "GET" }).handler(async () => {
-  const { getCartForCurrentUser } = await import("./_internal/inventory");
+  const { getCartForCurrentUser } = await import("./_internal/inventory-cart");
   return getCartForCurrentUser();
 });
 
@@ -154,7 +154,9 @@ const addToCartSchema = z.object({ itemId: z.string().uuid() });
 export const addToCart = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => addToCartSchema.parse(d))
   .handler(async ({ data }) => {
-    const { addToCartForCurrentUser } = await import("./_internal/inventory");
+    const { addToCartForCurrentUser } = await import(
+      "./_internal/inventory-cart"
+    );
     return addToCartForCurrentUser(data);
   });
 
@@ -162,7 +164,7 @@ export const removeFromCart = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => addToCartSchema.parse(d))
   .handler(async ({ data }) => {
     const { removeFromCartForCurrentUser } = await import(
-      "./_internal/inventory"
+      "./_internal/inventory-cart"
     );
     return removeFromCartForCurrentUser(data);
   });
@@ -174,7 +176,9 @@ const submitCartSchema = z.object({
 export const submitCart = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => submitCartSchema.parse(d))
   .handler(async ({ data }) => {
-    const { submitCartForCurrentUser } = await import("./_internal/inventory");
+    const { submitCartForCurrentUser } = await import(
+      "./_internal/inventory-cart"
+    );
     return submitCartForCurrentUser(data);
   });
 
