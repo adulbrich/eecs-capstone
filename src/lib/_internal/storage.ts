@@ -31,6 +31,26 @@ export function buildS3Config(
   };
 }
 
+export interface StorageConfig {
+  bucket: string;
+  client: S3ClientConfig;
+}
+
+/**
+ * `buildS3Config` stays separate and exported because its return type is the
+ * SDK's own `S3ClientConfig`, which has no room for a bucket name. This is the
+ * pairing of the two, so the bucket stops being the one storage variable read
+ * inline at the point of use.
+ */
+export function buildStorageConfig(
+  env: NodeJS.ProcessEnv = process.env
+): StorageConfig {
+  return {
+    bucket: env.S3_BUCKET ?? "cs-capstone",
+    client: buildS3Config(env),
+  };
+}
+
 export interface ObjectStorage {
   delete(key: string): Promise<void>;
   put(key: string, body: Buffer, contentType: string): Promise<void>;
@@ -69,7 +89,7 @@ export function getObjectStorage(): ObjectStorage {
   if (_instance) {
     return _instance;
   }
-  const client = new S3Client(buildS3Config());
-  _instance = new S3Storage(process.env.S3_BUCKET ?? "cs-capstone", client);
+  const config = buildStorageConfig();
+  _instance = new S3Storage(config.bucket, new S3Client(config.client));
   return _instance;
 }

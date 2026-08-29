@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildEmbedConfig,
   buildEmbedRequestBody,
   EMBEDDING_DIMENSIONS,
   EMBEDDING_MODEL_ID,
@@ -12,6 +13,14 @@ describe("buildEmbedRequestBody", () => {
     expect(body.inputText).toBe("robotics");
     expect(body.dimensions).toBe(EMBEDDING_DIMENSIONS);
     expect(body.normalize).toBe(true);
+  });
+
+  it("asks for the default size when nothing is configured", () => {
+    // The assertion above compares the request against the same constant that
+    // built it, so it passes for any value including a wrong one. This is the
+    // one that pins an actual number, which it can only do now that the
+    // default is reachable from a literal environment.
+    expect(buildEmbedConfig({} as NodeJS.ProcessEnv).dimensions).toBe(1024);
   });
 });
 

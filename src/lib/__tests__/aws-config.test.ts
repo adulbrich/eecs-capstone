@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildBedrockConfig } from "../_internal/bedrock";
-import { buildS3Config } from "../_internal/storage";
+import { buildS3Config, buildStorageConfig } from "../_internal/storage";
 
 describe("buildS3Config", () => {
   it("omits credentials when no static keys are set (prod uses the task role)", () => {
@@ -43,5 +43,24 @@ describe("buildBedrockConfig", () => {
       accessKeyId: "ak",
       secretAccessKey: "sk",
     });
+  });
+});
+
+describe("buildStorageConfig", () => {
+  it("defaults the bucket, so a bare checkout still names one", () => {
+    const config = buildStorageConfig({} as NodeJS.ProcessEnv);
+    expect(config.bucket).toBe("cs-capstone");
+  });
+
+  it("pairs the bucket with the client config the SDK type cannot carry", () => {
+    const config = buildStorageConfig({
+      S3_BUCKET: "some-other-bucket",
+      S3_ENDPOINT: "http://localhost:9000",
+      S3_ACCESS_KEY: "ak",
+      S3_SECRET_KEY: "sk",
+    } as NodeJS.ProcessEnv);
+    expect(config.bucket).toBe("some-other-bucket");
+    expect(config.client.endpoint).toBe("http://localhost:9000");
+    expect(config.client.forcePathStyle).toBe(true);
   });
 });
