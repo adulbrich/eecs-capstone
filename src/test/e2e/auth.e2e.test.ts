@@ -12,8 +12,8 @@ test.describe("@smoke authentication", () => {
     await page.goto("/sign-in");
     await waitForHydration(page, "form");
 
-    await page.fill('input[name="email"]', "user@example.com");
-    await page.fill('input[name="password"]', SEED_PASSWORD);
+    await page.getByLabel("Email").fill("user@example.com");
+    await page.getByLabel("Password").fill(SEED_PASSWORD);
     await page.getByRole("button", { name: /sign in/i }).click();
 
     await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"), {

@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { eq } from "drizzle-orm";
+import { and, eq, like, not } from "drizzle-orm";
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
-import { openDb } from "./fixtures";
+import { E2E_PREFIX, openDb } from "./fixtures";
 
 /**
  * The only test in the smoke set that runs with no auth cookie at all.
@@ -24,6 +24,14 @@ test.describe("@smoke public shell", () => {
     // let the query string be whatever the route's defaults are.
     await page.goto("/projects");
     await expect(page).toHaveURL(/\/projects\?/);
+    // The URL alone proves nothing: a 307 to the normalized search params
+    // followed by an error boundary would satisfy it, which is exactly the
+    // production-build failure this test exists to catch. Assert the list
+    // actually rendered rows.
+    // A link into a project detail page, which only exists if the list
+    // rendered rows. `getByRole("link")` alone would be satisfied by the site
+    // header and prove nothing.
+    await expect(page.locator('a[href^="/projects/"]').first()).toBeVisible();
 
     const { db, close } = openDb();
     let publishedId: string;
@@ -32,7 +40,17 @@ test.describe("@smoke public shell", () => {
       const [published] = await db
         .select({ id: schema.projects.id, title: schema.projects.title })
         .from(schema.projects)
-        .where(eq(schema.projects.status, "published"))
+        // Never an E2E- row. Playwright runs files alphabetically, so
+        // projects.e2e.test.ts has already published one of its own by now,
+        // and a bare limit(1) with no ORDER BY would let row order decide
+        // whether this test asserts against another file's fixture.
+        .where(
+          and(
+            eq(schema.projects.status, "published"),
+            not(like(schema.projects.title, `${E2E_PREFIX}%`))
+          )
+        )
+        .orderBy(schema.projects.title)
         .limit(1);
       if (!published) {
         throw new Error(
