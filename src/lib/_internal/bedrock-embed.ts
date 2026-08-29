@@ -11,12 +11,37 @@ import { embeddingsEnabled } from "./embeddings-flag";
  */
 export type EmbedFn = (text: string) => Promise<number[]>;
 
-export const EMBEDDING_MODEL_ID =
-  process.env.BEDROCK_EMBEDDING_MODEL_ID ?? "amazon.titan-embed-text-v2:0";
+export interface EmbedConfig {
+  dimensions: number;
+  modelId: string;
+}
 
-export const EMBEDDING_DIMENSIONS = Number(
-  process.env.BEDROCK_EMBEDDING_DIMENSIONS ?? "1024"
-);
+/**
+ * Both values are hashed into `projects.embedding_source_hash` by
+ * `embeddingHash`, and that hash is what decides whether a project needs
+ * re-embedding. So this is not only a client setting: change what it returns
+ * for a given environment and every stored hash stops matching, which silently
+ * re-embeds every project at one paid Bedrock call each.
+ *
+ * That is why the blank case is preserved rather than tidied. `Number("")` is
+ * `0`, not the default, so `BEDROCK_EMBEDDING_DIMENSIONS=""` yields dimensions
+ * of zero. It is a wart, but it is the wart the stored hashes were computed
+ * with. Fixing it belongs with the other config-validation questions in #137.
+ */
+export function buildEmbedConfig(
+  env: NodeJS.ProcessEnv = process.env
+): EmbedConfig {
+  return {
+    dimensions: Number(env.BEDROCK_EMBEDDING_DIMENSIONS ?? "1024"),
+    modelId: env.BEDROCK_EMBEDDING_MODEL_ID ?? "amazon.titan-embed-text-v2:0",
+  };
+}
+
+const embedConfig = buildEmbedConfig();
+
+export const EMBEDDING_MODEL_ID = embedConfig.modelId;
+
+export const EMBEDDING_DIMENSIONS = embedConfig.dimensions;
 
 export function buildEmbedRequestBody(text: string): string {
   return JSON.stringify({

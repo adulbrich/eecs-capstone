@@ -17,14 +17,35 @@ import { PROPOSAL_SCOPE_RULE } from "#/lib/proposal-guidance";
 
 export const TOOL_NAME = "propose_project_improvements";
 
-const MODEL_ID = process.env.BEDROCK_MODEL_ID ?? "openai.gpt-5.6-luna";
+export interface ReviewConfig {
+  modelId: string;
+  /**
+   * Reasoning tokens are billed and counted as output, and editing seven prose
+   * fields needs no deliberation. "none" turns reasoning off entirely on the
+   * GPT-5.6 models if a deployment wants that.
+   */
+  reasoningEffort: string;
+}
 
 /**
- * Reasoning tokens are billed and counted as output, and editing seven prose
- * fields needs no deliberation. "none" turns reasoning off entirely on the
- * GPT-5.6 models if a deployment wants that.
+ * Both values are recorded on every `ai_review_usage` row, so they are the
+ * record of what a given review actually cost and asked for, not just inputs
+ * to the call.
  */
-const REASONING_EFFORT = process.env.BEDROCK_REASONING_EFFORT ?? "medium";
+export function buildReviewConfig(
+  env: NodeJS.ProcessEnv = process.env
+): ReviewConfig {
+  return {
+    modelId: env.BEDROCK_MODEL_ID ?? "openai.gpt-5.6-luna",
+    reasoningEffort: env.BEDROCK_REASONING_EFFORT ?? "medium",
+  };
+}
+
+const reviewConfig = buildReviewConfig();
+
+const MODEL_ID = reviewConfig.modelId;
+
+const REASONING_EFFORT = reviewConfig.reasoningEffort;
 
 /**
  * Reasoning tokens burn down the same budget as the visible answer, so a
