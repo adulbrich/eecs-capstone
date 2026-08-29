@@ -57,6 +57,14 @@ We use the `_internal/` directory convention instead:
 
 The wrapper does ONE dynamic import per handler (just `./_internal/x`). The impl handles auth itself (statically imports `requireUser` and calls it). Two dynamic imports per handler (one for impl, one for auth) also works, but doubles the warning surface if anything goes wrong.
 
+### An impl imports its input types back from its own wrapper, never the schema
+
+The wrapper owns the Zod schema, so the impl takes `import type { XInput } from "../x"` rather than hand-writing an interface that drifts from it. This is the house pattern, not an exception: `categories`, `comments`, `profile`, `programs`, `projects`, `search`, `users` and `inventory` all do it, by relative path.
+
+`import type` is erased, so no runtime edge to a `createServerFn` module survives; `verbatimModuleSyntax` is what turns a dropped `type` into a tsc error instead of a silent bundler hazard. The rule that keeps it safe is **type-only, never the schema value**. Reaching for `listInventorySchema` itself pulls `createServerFn` into a server-only impl and makes the cycle real; an impl that needs a schema as a value means the schema belongs in a client-safe logic module under `src/lib/`, alongside `inventory-visibility.ts` and `hold.ts`.
+
+Grep for it with `grep -rn 'from "\.\./' src/server/_internal/*.ts`; the `#/server/` alias form finds none of them. Two things skew a careless count: `categories.ts` spreads its import over several lines, and a recursive grep picks up `__tests__/` files, whose `../` imports are ordinary value imports of a sibling impl and are not this pattern.
+
 ### `getRequest`, not `getWebRequest`
 
 The currently installed version of `@tanstack/react-start/server` exports `getRequest`. Older docs and examples reference `getWebRequest`, which does not exist. Use `getRequest()` to access the in-flight `Request`.
@@ -705,7 +713,7 @@ Inventory full-text search no longer matches category names. Before this feature
 
 Before this there were two `isStaff` and **five** `assertStaff`, and `isStaff` was exported from `src/lib/project-visibility.ts`, which ten files across seven non-project domains imported. That is what made the module's name wrong: a domain module owned something that is not domain-specific. Consumers import from `viewer.ts` directly rather than through a re-export, because Biome's `noBarrelFile` rejects the re-export and this project's no-shims rule would too.
 
-There are **seven** `AuthUser` interfaces in `_internal/` (`comments`, `uploads`, `projects`, `programs`, `users`, `categories`, `project-review`), and six are byte-identical to `NonNullable<Viewer>`, so no adapter is needed at a call site. The seventh, in `uploads.ts`, genuinely extends it with an optional `image` that only the avatar paths read. `inventory.ts:59` additionally declares its own local `Viewer` while importing `isStaff` from `#/lib/viewer` four lines above. Collapsing them is a loose end, not a blocker. This entry said "four" for several months while the count grew, so treat it as a lower bound and count before you cite it.
+There are **seven** `AuthUser` interfaces in `_internal/` (`comments`, `uploads`, `projects`, `programs`, `users`, `categories`, `project-review`), and six are byte-identical to `NonNullable<Viewer>`, so no adapter is needed at a call site. The seventh, in `uploads.ts`, genuinely extends it with an optional `image` that only the avatar paths read. `inventory.ts` used to declare a local `Viewer` too, narrower than the shared one by a missing `undefined`; it imports the shared type now. This entry said "four" for several months while the count grew, so treat it as a lower bound and count before you cite it.
 
 `assertStaff` carries `asserts viewer is NonNullable<Viewer>`, and the narrowing is load-bearing: call sites read `viewer.id` immediately afterwards with no second null check.
 
