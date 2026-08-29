@@ -12,7 +12,7 @@ export const uploadInventoryImage = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => expectFormData(data))
   .handler(async ({ data }) => {
     const { uploadInventoryImageForCurrentUser } = await import(
-      "./_internal/inventory"
+      "./_internal/inventory-images"
     );
     return uploadInventoryImageForCurrentUser(data);
   });
