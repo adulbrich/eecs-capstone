@@ -19,6 +19,7 @@ import {
   createCategoryAs,
   deleteCategoryAs,
 } from "#/server/_internal/categories";
+import { addToCartAs, submitCartAs } from "#/server/_internal/inventory-cart";
 import {
   createInventoryItemAs,
   getInventoryItemAs,
@@ -28,8 +29,7 @@ import {
   listInventoryAs,
   listInventoryCategoriesImpl,
   updateInventoryItemAs,
-} from "#/server/_internal/inventory";
-import { addToCartAs, submitCartAs } from "#/server/_internal/inventory-cart";
+} from "#/server/_internal/inventory-catalog";
 import {
   collectedByForRequestItems,
   listInventoryRequestsAs,

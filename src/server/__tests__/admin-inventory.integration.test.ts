@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { inventoryItems, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
-import { listAdminInventoryAs } from "#/server/_internal/inventory";
+import { listAdminInventoryAs } from "#/server/_internal/inventory-catalog";
 
 async function makeAdmin(email: string) {
   await auth.api.signUpEmail({
@@ -122,7 +122,9 @@ describe("listAdminInventoryAs", () => {
 
 describe("public inventory search stays narrow", () => {
   it("does not match a staff-only serial", async () => {
-    const { listInventoryAs } = await import("#/server/_internal/inventory");
+    const { listInventoryAs } = await import(
+      "#/server/_internal/inventory-catalog"
+    );
     await db
       .insert(inventoryItems)
       .values([{ name: "Oscilloscope", serial: "SN-99812" }]);
