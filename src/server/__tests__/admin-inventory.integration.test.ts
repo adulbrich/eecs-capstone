@@ -25,7 +25,12 @@ async function makeHolder(email: string, name: string) {
   return u.id;
 }
 
-const EMPTY = { categories: [] as string[], q: "", status: null } as const;
+const EMPTY = {
+  categories: [] as string[],
+  q: "",
+  retiredOnly: false,
+  status: null,
+} as const;
 
 describe("listAdminInventoryAs", () => {
   it("returns every matching row rather than one page", async () => {

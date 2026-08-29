@@ -53,7 +53,13 @@ import {
   visibleStatuses,
 } from "#/lib/inventory-visibility";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
-import type { ListInventoryInput } from "../inventory";
+import type {
+  CreateInventoryItemInput,
+  InventoryRequestQueueFilter,
+  ListAdminInventoryInput,
+  ListInventoryInput,
+  UpdateInventoryItemInput,
+} from "../inventory";
 import { setInventoryItemCategoriesAs } from "./categories";
 import type { Tx } from "./inventory-transitions";
 
@@ -252,14 +258,6 @@ export async function listInventoryForCurrentUser(data: ListInventoryInput) {
   return listInventoryAs(session?.user ?? null, data);
 }
 
-export interface ListAdminInventoryInput {
-  categories: string[];
-  q: string;
-  /** Optional so existing callers compile; the wire schema always sends it. */
-  retiredOnly?: boolean;
-  status: ListInventoryInput["status"];
-}
-
 /**
  * The staff inventory listing: every matching row, unpaginated, because the
  * table sorts client-side and a page of 20 would make "sort by name" a lie.
@@ -362,17 +360,6 @@ export async function getInventoryItemForCurrentUser(data: { id: string }) {
   return getInventoryItemAs(session?.user ?? null, data);
 }
 
-export interface CreateInventoryItemInput {
-  categoryIds: string[];
-  description: string | null;
-  imageUrl: string | null;
-  label: string | null;
-  location: string | null;
-  name: string;
-  notes: string | null;
-  serial: string | null;
-}
-
 /**
  * Resolves an item's categories to `{id, name}[]`, ordered by name.
  *
@@ -427,10 +414,6 @@ export async function createInventoryItemAs(
     return staffItemView(row, await categoriesFor(row.id, tx), storedHold(row));
   });
 }
-
-export type UpdateInventoryItemInput = CreateInventoryItemInput & {
-  id: string;
-};
 
 export async function updateInventoryItemAs(
   viewer: Viewer,
@@ -1265,17 +1248,6 @@ export async function collectedByForRequestItems(
     });
   }
   return map;
-}
-
-export interface InventoryRequestQueueFilter {
-  q: string;
-  status:
-    | "all"
-    | "approved"
-    | "cancelled"
-    | "pending"
-    | "rejected"
-    | "returned";
 }
 
 export async function listInventoryRequestsAs(

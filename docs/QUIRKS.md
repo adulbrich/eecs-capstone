@@ -63,7 +63,7 @@ The wrapper owns the Zod schema, so the impl takes `import type { XInput } from 
 
 `import type` is erased, so no runtime edge to a `createServerFn` module survives; `verbatimModuleSyntax` is what turns a dropped `type` into a tsc error instead of a silent bundler hazard. The rule that keeps it safe is **type-only, never the schema value**. Reaching for `listInventorySchema` itself pulls `createServerFn` into a server-only impl and makes the cycle real; an impl that needs a schema as a value means the schema belongs in a client-safe logic module under `src/lib/`, alongside `inventory-visibility.ts` and `hold.ts`.
 
-Grep for it with `grep -rn 'from "\.\./' src/server/_internal/*.ts`; the `#/server/` alias form finds none of them. Two things skew a careless count: `categories.ts` spreads its import over several lines, and a recursive grep picks up `__tests__/` files, whose `../` imports are ordinary value imports of a sibling impl and are not this pattern.
+Grep for it with `grep -rn 'from "\.\./' src/server/_internal/*.ts`; the `#/server/` alias form finds none of them. Two things skew a careless count: `categories.ts` and `inventory.ts` spread their imports over several lines, and a recursive grep picks up `__tests__/` files, whose `../` imports are ordinary value imports of a sibling impl and are not this pattern.
 
 ### `getRequest`, not `getWebRequest`
 
