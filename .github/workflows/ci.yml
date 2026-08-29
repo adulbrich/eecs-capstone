@@ -34,7 +34,7 @@ jobs:
       command: npm run test:integration
 
   # The a11y suite has existed since 2026-05-26 and did not run in CI until
-  # PR #21, so an accessibility regression could reach main unnoticed.
+  # PR #62, so an accessibility regression could reach main unnoticed.
   # `npm test` excludes it on purpose to keep the unit run fast; this is the
   # other half of that trade. It needs a dev seed on top of the shared stack,
   # because global-setup.ts signs in as the seeded users to capture their

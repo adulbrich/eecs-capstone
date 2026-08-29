@@ -20,9 +20,9 @@ on:
         type: string
       seed:
         description: >-
-          Run `npm run db:seed:dev` first. Playwright suites need it because
-          their global setup signs in as the seeded users; the integration
-          suite builds its own rows and does not.
+          Run `npm run db:seed:dev` first. A Playwright suite needs it when
+          its global setup signs in as the seeded users; the integration suite
+          builds its own rows and does not.
         type: boolean
         default: false
       browser:
@@ -108,9 +108,9 @@ jobs:
       - run: npm run db:migrate
       - run: npm run storage:init
 
-      # The Playwright global setups fail with an explicit "run npm run
-      # db:seed:dev" message if these users are missing, so the seed is a hard
-      # prerequisite for them.
+      # The a11y global setup fails with an explicit "run npm run db:seed:dev"
+      # message if these users are missing, so the seed is a hard prerequisite
+      # for any suite that signs in as them.
       - if: inputs.seed
         run: npm run db:seed:dev
 
@@ -135,7 +135,13 @@ jobs:
       - if: inputs.browser
         run: npx playwright install --with-deps chromium
 
-      - run: ${{ inputs.command }}
+      # Through `env` rather than interpolated straight into the `run` line.
+      # Only in-repo callers can reach a `./` workflow_call reference, so this
+      # is injection-shaped rather than exploitable, but the shape costs one
+      # line to remove.
+      - env:
+          SUITE_COMMAND: ${{ inputs.command }}
+        run: $SUITE_COMMAND
 
       - if: failure() && inputs.report-path != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
