@@ -601,7 +601,7 @@ const NAME_COLUMN = {
 } satisfies AdminColumn<Row>;
 ```
 
-`id` needs the `as const` or it widens to `string`, and the diagnostic then says `string` instead of naming the column that broke the rule. That is the difference between an error someone can act on and one they have to bisect. The same applies to the array: let `defineAdminColumns` return type stand alone rather than annotating it `AdminColumn<Row>[]`.
+`id` needs the `as const` or it widens to `string`, and the diagnostic then says `string` instead of naming the column that broke the rule. That is the difference between an error someone can act on and one they have to bisect. Only the const is affected: annotating the array `defineAdminColumns` returns is redundant but harmless, because that return type mentions no inference variable for the annotation to feed back into.
 
 `/admin/categories` is the only route that shares column consts between two tables (a project tab and an inventory tab), so it is the only place this comes up today.
 

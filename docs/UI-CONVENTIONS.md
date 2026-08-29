@@ -335,7 +335,7 @@ markup, and nothing to add by hand.
 A hand-rolled `<table>` in an admin route collapses to an unreadable horizontal
 scroll on a phone, which is the whole reason this component exists.
 
-### Column lists go through `defineAdminColumns<Row>()`
+### An admin route's column list goes through `defineAdminColumns<Row>()`
 
 ```tsx
 const COLUMNS = defineAdminColumns<Row>()([
@@ -372,20 +372,28 @@ real values. Map it at the accessor: `(row) => row.label ?? undefined`.
 
 Both are easy to ship and hard to notice. Seeded rows written in one run share a
 timestamp, and the numeric cases are ordinals that stay single-digit for a long
-time, so the column looks sorted until real data arrives. The check found two
-columns already breaking a rule on the day it landed, one of them the users
-table's Banned flag, which is nullable in the auth schema.
+time, so the column looks sorted until real data arrives. Two columns were
+already breaking a rule when the check landed, one of them the users table's
+Banned flag, which is nullable in the auth schema.
 
 The error names the column: `COLUMN_NEEDS_ITS_OWN_SORTING_FN: "createdAt"` or
-`ACCESSOR_RETURNS_NULL_USE_UNDEFINED: "note"`. `src/test/admin-columns.test.ts`
-pins that all three cases still fail to compile, because a green typecheck over
-the routes only proves the compliant shapes still pass.
+`ACCESSOR_RETURNS_NULL_USE_UNDEFINED: "note"`. `npm run typecheck`, not
+`npm test`, is what enforces it, and `src/test/admin-columns.test.ts` holds a
+`@ts-expect-error` per rejection case so the check cannot degrade to a no-op
+unnoticed. Vitest reports those blocks green whatever the types do; tsc reads
+the file because `tsconfig.json` includes `**/*.ts`.
 
-Two things will make the check pass everything silently, so avoid both. Do not
-annotate the result `AdminColumn<Row>[]`, and do not annotate a shared column
-const `AdminColumn<Row>`: an annotation erases the accessor's return type back to
-`unknown`. Use `satisfies` for a shared const, with `id: "..." as const`. See
+The one way to make the check pass everything silently is to annotate a shared
+column const `AdminColumn<Row>`, which erases the accessor's return type back to
+`unknown`. Use `satisfies` there instead, with `id: "..." as const`. See
 [`QUIRKS.md`](./QUIRKS.md#a-shared-admin-column-const-uses-satisfies-not-an-annotation).
+Annotating the array `defineAdminColumns` returns is only redundant; it still
+checks. `accessorKey` is banned outright, because the check cannot read the
+value type it implies.
+
+The component's own test fixtures in `src/test/admin-data-table.test.tsx` stay
+plain `AdminColumn<Row>[]` literals. They exercise the table, not a route, and
+some of them are deliberately shaped in ways a route's columns never are.
 
 ---
 

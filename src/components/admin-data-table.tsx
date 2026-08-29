@@ -94,14 +94,18 @@ interface AdminColumnExtras {
  * of erased to `unknown`, which is what lets `CheckedAdminColumn` see what a
  * column sorts on.
  *
- * `Omit` over `ColumnDef`'s union keeps only the keys every member has, so
- * `accessorKey` and `columns` drop out of the constraint. That is deliberate
- * twice over: an `accessorKey` column would carry a value type this check
- * cannot read and would slip past it, and a grouped column has no place in a
- * table that renders one flat header row.
+ * `accessorKey?: never` closes the one way around the check. Dropping
+ * `accessorKey` from the constraint is not enough on its own: `C` is inferred
+ * from the array literal, so nothing rejects a property the constraint merely
+ * fails to mention, and an `accessorKey` column carries a value type
+ * `CheckedAdminColumn` cannot read. Banning it costs nothing, because no
+ * column under `src/routes/_authed/admin/` uses one.
  */
 type TypedAdminColumn<T, TValue> = Omit<ColumnDef<T, unknown>, "accessorFn"> &
-  AdminColumnExtras & { accessorFn?: (row: T, index: number) => TValue };
+  AdminColumnExtras & {
+    accessorFn?: (row: T, index: number) => TValue;
+    accessorKey?: never;
+  };
 
 type ColumnId<C> = C extends { id: infer TId } ? TId : never;
 
@@ -131,7 +135,7 @@ type CheckedAdminColumn<C> = C extends {
     ? { ACCESSOR_RETURNS_NULL_USE_UNDEFINED: ColumnId<C> }
     : [TValue] extends [string | undefined]
       ? C
-      : C extends { sortingFn: unknown }
+      : C extends { sortingFn: NonNullable<unknown> }
         ? C
         : { COLUMN_NEEDS_ITS_OWN_SORTING_FN: ColumnId<C> }
   : C;
@@ -155,13 +159,12 @@ type CheckedAdminColumns<C extends readonly unknown[]> = {
  * in a comment on the route where someone hit the second one. Both fail
  * quietly: the table renders, sorts, and looks fine, in the wrong order.
  *
- * Callers must let the returned type stand on its own. Annotating the result
- * `AdminColumn<Row>[]`, or a shared column const `AdminColumn<Row>`, erases
- * the accessor's return type back to `unknown`, and `[null] extends
- * [unknown]` is true, so every column would be reported as returning null.
- * Use `satisfies AdminColumn<Row>` with `id: "..." as const` for a shared
- * const, which type-checks the same fields while preserving what the accessor
- * returns.
+ * A shared column const declared outside the array uses `satisfies
+ * AdminColumn<Row>` with `id: "..." as const`, never an `AdminColumn<Row>`
+ * annotation: the annotation erases the accessor's return type back to
+ * `unknown`, `[null] extends [unknown]` is true, and every such column would
+ * then report as returning null. See `docs/QUIRKS.md`. Annotating the
+ * returned array is merely redundant and still checks.
  */
 export function defineAdminColumns<T>() {
   return <const C extends readonly TypedAdminColumn<T, unknown>[]>(

@@ -42,12 +42,14 @@ describe("defineAdminColumns", () => {
     ]);
   });
 
-  // The three cases below are the point of this file. A green typecheck over
+  // The cases below are the point of this file, and `npm run typecheck` is
+  // what runs them: `tsconfig.json` includes `**/*.ts`, so tsc reads them even
+  // though vitest is what reports these blocks green. A green typecheck over
   // the wrapped routes only proves the compliant shapes still compile; it says
   // nothing about whether the check rejects anything, and `CheckedAdminColumn`
   // could quietly degrade to a no-op without a single route failing.
-  // `@ts-expect-error` inverts that: each line fails the build if it ever
-  // becomes legal again.
+  // `@ts-expect-error` inverts that: each directive turns into an "unused
+  // '@ts-expect-error'" error the moment its line becomes legal again.
   it("rejects a Date column with no sortingFn", () => {
     defineAdminColumns<Row>()([
       // @ts-expect-error COLUMN_NEEDS_ITS_OWN_SORTING_FN: "createdAt"
@@ -63,6 +65,25 @@ describe("defineAdminColumns", () => {
     defineAdminColumns<Row>()([
       // @ts-expect-error COLUMN_NEEDS_ITS_OWN_SORTING_FN: "usageCount"
       { accessorFn: (row) => row.usageCount, header: "Uses", id: "usageCount" },
+    ]);
+  });
+
+  it("does not count an explicitly undefined sortingFn as setting one", () => {
+    defineAdminColumns<Row>()([
+      // @ts-expect-error COLUMN_NEEDS_ITS_OWN_SORTING_FN: "createdAt"
+      {
+        accessorFn: (row) => row.createdAt,
+        header: "Created",
+        id: "createdAt",
+        sortingFn: undefined,
+      },
+    ]);
+  });
+
+  it("rejects an accessorKey column, whose value type it cannot read", () => {
+    defineAdminColumns<Row>()([
+      // @ts-expect-error accessorKey is banned by `accessorKey?: never`
+      { accessorKey: "createdAt", header: "Created", id: "createdAt" },
     ]);
   });
 
