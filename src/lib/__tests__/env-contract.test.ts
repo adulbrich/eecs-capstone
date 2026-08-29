@@ -233,12 +233,16 @@ describe("the environment contract", () => {
   });
 
   it("names no variable on two exemption lists at once", () => {
-    // Any overlap is inert and invisible, in both directions. PLATFORM_VARS
-    // and SCRIPT_ARGUMENTS drop a read before anything counts it, so an entry
-    // elsewhere for the same name excuses nothing, while the dead-exemption
-    // check below still sees the raw read and calls it alive. The remaining
-    // pairs are outright contradictions: NOT_READ_HERE asserts a name is
-    // documented, the other three assert it is not.
+    // Every pair is a contradiction or a mask, and none of them announces
+    // itself.
+    //
+    // PLATFORM_VARS drops a read everywhere and SCRIPT_ARGUMENTS drops one
+    // inside `scripts`, so a second entry for the same name excuses nothing
+    // there while the dead-exemption check below still sees the raw read and
+    // calls it alive. The rest disagree outright: those two say a name is
+    // absent from `.env.example` where NOT_READ_HERE says it is present, and
+    // NOT_READ_HERE says a name is unread where UNSET_IN_PRODUCTION says the
+    // app reads it.
     //
     // Asserted over every pair rather than the one that bit. AWS_REGION was
     // on PLATFORM_VARS and UNSET_IN_PRODUCTION, and closing only that pair
