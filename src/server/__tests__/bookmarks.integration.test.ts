@@ -11,6 +11,7 @@ import {
 } from "#/server/_internal/bookmarks";
 import {
   createProjectAs,
+  forceTransitionAs,
   performTransitionAs,
 } from "#/server/_internal/projects";
 
@@ -154,6 +155,96 @@ describe("bookmarks", () => {
           )
         )
     ).toHaveLength(1);
+  });
+
+  it("drops a published project pulled back to changes_requested", async () => {
+    // The exact case #106 names, and the reason the write-time gate is not
+    // enough on its own: the student could see this project when they saved
+    // it, and without a second check on read the bookmark row keeps it
+    // rendering, including a description the proposer has since rewritten.
+    //
+    // Reachable through forceTransitionAs, which skips assertTransitionAllowed
+    // entirely. The ordinary transition map takes published only to archived,
+    // which stays visible, so the map alone cannot strand a student's bookmark.
+    const admin = await makeUser(`bp-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`bq2-${Date.now()}@x.com`, "user");
+    const id = await publishedProject(admin);
+    await addBookmarkAs(student, { projectId: id });
+    await addBookmarkAs(admin, { projectId: id });
+    expect((await listMyBookmarksAs(student)).rows.map((r) => r.id)).toEqual([
+      id,
+    ]);
+
+    // forceTransitionAs skips the transition map, not the rest of the rules:
+    // commitTransition still requires a comment for changes_requested.
+    await forceTransitionAs(admin, id, "changes_requested", "Needs work");
+
+    expect((await listMyBookmarksAs(student)).rows).toEqual([]);
+    // Staff keep it, which is what makes this the viewer's rule rather than a
+    // status blocklist: the same project, the same moment, two answers.
+    expect((await listMyBookmarksAs(admin)).rows.map((r) => r.id)).toEqual([
+      id,
+    ]);
+    // The bookmark row survives, so republishing brings it back.
+    expect(await bookmarkRows(student.id)).toHaveLength(1);
+  });
+
+  it("drops a project the viewer may no longer see", async () => {
+    // The other reachable path: staff can bookmark another author's draft, and
+    // losing the role has to take the listing with it.
+    const author = await makeUser(`bw-${Date.now()}@x.com`, "admin");
+    const staff = await makeUser(`bx-${Date.now()}@x.com`, "admin");
+    const { id: draft } = await createProjectAs(author, baseProject());
+
+    await addBookmarkAs(staff, { projectId: draft });
+    expect((await listMyBookmarksAs(staff)).rows.map((r) => r.id)).toEqual([
+      draft,
+    ]);
+
+    await db.update(user).set({ role: "user" }).where(eq(user.id, staff.id));
+
+    const demoted = { id: staff.id, role: "user" };
+    expect((await listMyBookmarksAs(demoted)).rows).toEqual([]);
+    // The row survives, so restoring the role restores the listing.
+    expect(await bookmarkRows(staff.id)).toHaveLength(1);
+  });
+
+  it("keeps a proposer's own unpublished project in their listing", async () => {
+    // The case a hardcoded status list would get wrong, and the reason the
+    // filter calls canSeeProject instead.
+    const proposer = await makeUser(`by-${Date.now()}@x.com`, "user");
+    const { id: draft } = await createProjectAs(proposer, baseProject());
+
+    await addBookmarkAs(proposer, { projectId: draft });
+
+    expect((await listMyBookmarksAs(proposer)).rows.map((r) => r.id)).toEqual([
+      draft,
+    ]);
+  });
+
+  it("does not leak the columns the visibility check reads", async () => {
+    // proposerId and deletedAt are selected only so canSeeProject can run and
+    // are dropped before the payload. Pinned because a refactor that stops
+    // dropping them would leak proposer identity into a student's page with
+    // nothing else failing.
+    const admin = await makeUser(`bz-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`ca-${Date.now()}@x.com`, "user");
+    await addBookmarkAs(student, { projectId: await publishedProject(admin) });
+
+    const { rows } = await listMyBookmarksAs(student);
+
+    expect(Object.keys(rows[0]).sort()).toEqual([
+      "bookmarkedAt",
+      "contactName",
+      "description",
+      "id",
+      "imageUrl",
+      "programCourseId",
+      "programCourseName",
+      "status",
+      "title",
+      "updatedAt",
+    ]);
   });
 
   it("lists newest first, and only the viewer's own", async () => {

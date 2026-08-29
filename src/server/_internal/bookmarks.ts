@@ -76,22 +76,52 @@ export async function isBookmarkedAs(
   return { bookmarked: !!row };
 }
 
+/**
+ * `addBookmarkAs` gates on `canSeeProject`, and this re-runs it on read. Without
+ * the second check the row is a permanent capability: a project published when
+ * a student saved it and later pushed back to `changes_requested` keeps
+ * rendering for them, description and all, long after staff pulled it. Not a
+ * guessed-id leak, which the write gate stops, but a stale authorization.
+ *
+ * `canSeeProject` rather than a status list, because the same call keeps a
+ * proposer's own unpublished bookmark visible to them, which a list of allowed
+ * statuses would wrongly hide. Same argument as `filterCommentsForViewer`: one
+ * rule in one place, not two that drift.
+ *
+ * The bookmark row survives, so a project that is republished comes back.
+ */
 export async function listMyBookmarksAs(viewer: BookmarkViewer) {
   const rows = await db
     .select({
       ...projectSummarySelect,
       bookmarkedAt: projectBookmarks.createdAt,
+      // Selected for canSeeProject below, then dropped: proposerId decides
+      // ownership and is staff information, and neither belongs in the payload.
+      // deletedAt is always null here, since the where clause already excluded
+      // the rest; it is selected to satisfy the check honestly rather than to
+      // decide anything.
+      deletedAt: projects.deletedAt,
+      proposerId: projects.proposerId,
     })
     .from(projectBookmarks)
     .innerJoin(projects, eq(projectBookmarks.projectId, projects.id))
     .leftJoin(programs, eq(projects.programId, programs.id))
     // A project soft-deleted after it was bookmarked drops out of the listing
-    // rather than rendering as a dead row.
+    // rather than rendering as a dead row. Kept in SQL rather than left to
+    // canSeeProject, which returns true for staff on a deleted project: a dead
+    // row is no more useful to staff than to anyone else on their own shortlist.
     .where(
       and(eq(projectBookmarks.userId, viewer.id), isNull(projects.deletedAt))
     )
     .orderBy(desc(projectBookmarks.createdAt));
-  return { rows };
+
+  return {
+    rows: rows
+      .filter((row) =>
+        canSeeProject(row, { id: viewer.id, role: viewer.role ?? null })
+      )
+      .map(({ deletedAt, proposerId, ...row }) => row),
+  };
 }
 
 export async function addBookmarkForCurrentUser(data: { projectId: string }) {
