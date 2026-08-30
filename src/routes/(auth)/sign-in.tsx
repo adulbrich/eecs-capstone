@@ -120,7 +120,14 @@ function SignIn() {
               type="password"
             />
           </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          {/* `role="alert"`, like the OAuth error above: a sign-in failure has
+              to reach a screen reader, and it is the only announcement this
+              form makes. */}
+          {error && (
+            <p className="text-destructive text-sm" role="alert">
+              {error}
+            </p>
+          )}
           <Button className="w-full" disabled={loading} type="submit">
             {loading ? "Signing in..." : "Sign in"}
           </Button>

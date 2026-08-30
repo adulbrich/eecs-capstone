@@ -156,7 +156,16 @@ test.describe("inventory hard delete gate", () => {
       // checking it straight away passes before the retire lands and would go
       // on passing if retiring disabled it.
       await retire(staff);
-      await expect(statusSection(staff).getByText("Retired")).toBeVisible();
+
+      // `exact`, which is case-sensitive and whole-string, and load-bearing.
+      // The Status section holds the override select as well as the badge, and
+      // `onOverrideChange` sets the select's own value before awaiting the
+      // transition, so its trigger reads "retired" for the whole in-flight
+      // window. A default `getByText` is case-insensitive substring matching
+      // and would match that trigger, passing before the server answered.
+      await expect(
+        statusSection(staff).getByText("Retired", { exact: true })
+      ).toBeVisible();
       await expect(
         staff.getByRole("button", { name: "Hard delete item" })
       ).toBeEnabled();

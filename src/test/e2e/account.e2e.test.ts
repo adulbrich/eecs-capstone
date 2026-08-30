@@ -38,7 +38,6 @@ test.describe("account lifecycle", () => {
     // Unverified accounts cannot sign in: `requireEmailVerification` is on, so
     // this is the state the link has to get the account out of. Asserting it
     // here is what makes the verification step below mean something.
-    //
     await page.goto("/sign-in");
     await waitForHydration(page, "form");
     await page.getByLabel("Email").fill(email);
@@ -117,21 +116,19 @@ test.describe("account lifecycle", () => {
 /**
  * Asserts a sign-in attempt was refused.
  *
- * The error paragraph, not the URL and not the button. Staying on `/sign-in` is
- * already true the instant the click lands, and the button's own label comes
- * back the moment the request settles either way, so both pass before the
- * server has said anything: against an app that signed the account in, they
- * would race it and win. The error is the one monotonic signal on this page,
- * null before the attempt and set afterwards for good.
+ * The error, not the URL and not the button. Staying on `/sign-in` is already
+ * true the instant the click lands, and the button's own label comes back the
+ * moment the request settles either way, so both pass before the server has
+ * said anything: against an app that signed the account in, they would race it
+ * and win. The error is the one monotonic signal on this page, null before the
+ * attempt and set afterwards for good.
  *
- * Located by its class because there is nothing else to hold on to: the message
- * is a bare `<p>` with no role, no label and no `data-slot`, and its text comes
- * from Better Auth rather than this repo, so matching on the words would pin
- * the test to a dependency's copy. `text-destructive` is the semantic error
- * token from `docs/UI-CONVENTIONS.md`, not an incidental utility class.
+ * By role, and asserted on text only through the role: the message comes from
+ * Better Auth rather than this repo, so matching on the words would pin this
+ * test to a dependency's copy.
  */
 async function expectRefused(page: Page): Promise<void> {
-  await expect(page.locator("p.text-destructive")).toBeVisible();
+  await expect(page.getByRole("alert")).toBeVisible();
   await expect(page).toHaveURL(/\/sign-in/);
 }
 

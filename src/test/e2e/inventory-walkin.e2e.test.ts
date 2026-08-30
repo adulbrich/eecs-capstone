@@ -95,7 +95,12 @@ test.describe("inventory walk-in checkout", () => {
       await dialog.getByRole("button", { name: "Confirm" }).click();
 
       // The status, not the closed dialog. A dialog closes on failure too.
-      await expect(status.getByText("Checked out")).toBeVisible();
+      // `exact` for the reason the delete-gate test spells out: this section
+      // also holds the override select, whose trigger renders a status name in
+      // lowercase while a transition is in flight.
+      await expect(
+        status.getByText("Checked out", { exact: true })
+      ).toBeVisible();
       await expect(status.getByText(holderLabel)).toBeVisible();
 
       await staff.getByRole("button", { name: "Return" }).click();

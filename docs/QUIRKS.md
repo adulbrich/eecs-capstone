@@ -533,12 +533,18 @@ leftover `E2E-` rows, which the next smoke run sweeps, and two were notification
 the smoke flows created, which made the notification bell render a badge that had
 never been scanned and which fails contrast in dark mode (#145).
 
-`sweepOrphans` now deletes notifications whose title carries the `E2E-` prefix,
-which covers the ones these suites generate, and clears the avatar column on the
-two seeded students the upload flow writes to. It still sweeps nothing from
-request history and nothing from object storage, and the overdue flow files a
-notification deliberately, so reset the dev database before treating a red
-accessibility run after an end-to-end run as a regression.
+`sweepOrphans` deletes notifications whose title carries the `E2E-` prefix and
+clears the avatar column on the two seeded students the upload flow writes to,
+but it runs at the *start* of an end-to-end run, so the database is dirty for
+whatever runs next. Sweep or reseed before treating a red accessibility run
+after an end-to-end run as a regression.
+
+The two shapes it takes, both seen: `color-contrast` on
+`notification-bell.tsx`'s unread badge in dark mode (#145), from notifications
+the flows filed; and `admin projects table shows its default-hidden columns
+when toggled on` failing its own non-empty-cell assertion, because a fixture
+project sorts into the first row carrying nothing but a title. Neither is an
+accessibility regression. Cleared of `E2E-` rows, the suite is 102 green.
 
 ### The accessibility suite retries in CI, and only in CI
 
