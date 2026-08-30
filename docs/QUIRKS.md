@@ -511,7 +511,9 @@ retired" from first paint, whatever the item's status is, so bare `"Available"`
 and `"Retired"` both match it; and the Status section's override select renders
 a lowercase status name in its own trigger for the length of an in-flight
 transition, so it matches before the write lands. Two assertions in the
-end-to-end suite passed on those, one on each.
+end-to-end suite passed on them. Which decoy satisfied which is not worth
+reconstructing: both were on the page, and `.first()` picks by DOM order rather
+than by what the test meant.
 
 Pass `{ exact: true }`, which is case-sensitive and whole-string, whenever the
 text is a status label, and scope to `statusSection` from

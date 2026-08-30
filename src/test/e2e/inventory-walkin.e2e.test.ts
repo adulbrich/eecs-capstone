@@ -58,12 +58,11 @@ test.describe("inventory walk-in checkout", () => {
       // passing on a page that simply rendered nothing.
       //
       // `exact` defensively. Default text matching is case-insensitive
-      // substring, and two things on a staff item page say "available" without
-      // being the status: the Danger zone hint, and the "This item is not
-      // available right now." line. Neither renders for an anonymous viewer,
-      // who gets "Sign in to request items." and no staff panel at all, so the
-      // collision is one change to `CartAction` or to this test's viewer away
-      // rather than live.
+      // substring, and two things say "available" without being the status:
+      // the Danger zone hint, which staff get, and "This item is not available
+      // right now.", which any signed-in viewer gets. An anonymous viewer gets
+      // neither, only "Sign in to request items.", so the collision here is one
+      // change to `CartAction` or to this test's viewer away rather than live.
       await expect(
         visitor.getByText("Available", { exact: true })
       ).toBeVisible();
