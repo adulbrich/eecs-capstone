@@ -8,6 +8,7 @@ import {
   openDb,
   toDateInput,
 } from "./fixtures";
+import { statusSection } from "./locators";
 
 /**
  * The counter path: staff hand an item to someone standing in front of them,
@@ -76,13 +77,7 @@ test.describe("inventory walk-in checkout", () => {
       await staff.goto(`/inventory/${itemId}`);
       await waitForHydration(staff);
 
-      // The staff panel's own Status section, not the page. The public header
-      // renders a status badge too, so an unscoped `getByText("Checked out")`
-      // matches twice and cannot say which of the two moved. `exact` keeps this
-      // off the neighbouring "Status history" section.
-      const statusSection = staff.locator("section").filter({
-        has: staff.getByRole("heading", { name: "Status", exact: true }),
-      });
+      const status = statusSection(staff);
 
       await staff.getByRole("button", { name: "Check out" }).click();
       const dialog = staff.getByRole("dialog");
@@ -100,8 +95,8 @@ test.describe("inventory walk-in checkout", () => {
       await dialog.getByRole("button", { name: "Confirm" }).click();
 
       // The status, not the closed dialog. A dialog closes on failure too.
-      await expect(statusSection.getByText("Checked out")).toBeVisible();
-      await expect(statusSection.getByText(holderLabel)).toBeVisible();
+      await expect(status.getByText("Checked out")).toBeVisible();
+      await expect(status.getByText(holderLabel)).toBeVisible();
 
       await staff.getByRole("button", { name: "Return" }).click();
 
@@ -109,7 +104,7 @@ test.describe("inventory walk-in checkout", () => {
       await expect(
         staff.getByRole("button", { name: "Check out" })
       ).toBeVisible();
-      await expect(statusSection.getByText(holderLabel)).toHaveCount(0);
+      await expect(status.getByText(holderLabel)).toHaveCount(0);
     } finally {
       await staffContext.close();
     }

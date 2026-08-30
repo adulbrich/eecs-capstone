@@ -41,3 +41,16 @@ export function entryFor(page: Page, itemName: string): Locator {
     .locator("> div > div")
     .filter({ hasText: itemName });
 }
+
+/**
+ * The staff panel's own Status section on an item page.
+ *
+ * Scoped, because the public header renders a status badge too: an unscoped
+ * `getByText("Retired")` matches twice and cannot say which of the two moved.
+ * `exact` keeps this off the neighbouring "Status history" section.
+ */
+export function statusSection(page: Page): Locator {
+  return page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Status", exact: true }),
+  });
+}

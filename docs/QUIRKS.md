@@ -493,13 +493,15 @@ second run.
 
 ### Browser suites select by role and name, and add no test IDs
 
-Both Playwright suites locate by accessible role and name, falling back to
-`data-slot` where no role fits, and never by a test id added to a production
-component: a selector nobody can reach with a screen reader is a selector that
-says nothing about whether the page works. `src/test/e2e/locators.ts` holds the
-handful of places where the markup offers no role, each with the reason written
-down. The two known exceptions are react-image-crop's canvas and the uploader's
-hidden file input, neither of which exposes an accessible handle.
+Both Playwright suites locate by accessible role and name first, falling back to
+`data-slot`, and never to a test id added to a production component: a selector
+nobody can reach with a screen reader says nothing about whether the page works.
+Plenty of the app is plain divs, so structural and attribute selectors do appear
+(`> div > div` for a list entry, `time[datetime]` for a rendered date,
+`img[src^=]` for a stored image, `p.text-destructive` for a form error). Each
+is a place the markup offers no role, and each carries the reason inline;
+`src/test/e2e/locators.ts` holds the ones more than one flow needs. Reach for one
+only after checking there is no role, and write down which.
 
 ### Do not navigate away from a write that has not answered
 

@@ -9,7 +9,7 @@ import {
   openDb,
   userIdByEmail,
 } from "./fixtures";
-import { rowFor } from "./locators";
+import { rowFor, statusSection } from "./locators";
 
 /**
  * Staff maintaining the catalog itself: creating an item, editing it, taking it
@@ -150,10 +150,13 @@ test.describe("inventory hard delete gate", () => {
         staff.getByRole("button", { name: "Hard delete item" })
       ).toBeEnabled();
 
-      // Retired is the gate's other allowed status, asserted on the same button
-      // so both arms of "available or retired" live in this block rather than
-      // one of them sitting in the administration test next door.
+      // Retired is the gate's other allowed status. The status has to be
+      // asserted before the button is: `retire` is a status write nothing waits
+      // on, and the button is already enabled from the assertion above, so
+      // checking it straight away passes before the retire lands and would go
+      // on passing if retiring disabled it.
       await retire(staff);
+      await expect(statusSection(staff).getByText("Retired")).toBeVisible();
       await expect(
         staff.getByRole("button", { name: "Hard delete item" })
       ).toBeEnabled();

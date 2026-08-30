@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { waitForHydration } from "../shared/playwright";
 import { SERVER_LOG } from "./constants";
@@ -38,19 +39,12 @@ test.describe("account lifecycle", () => {
     // this is the state the link has to get the account out of. Asserting it
     // here is what makes the verification step below mean something.
     //
-    // The button first, then the URL, for the reason spelled out at the second
-    // refused sign-in below: staying on /sign-in is already true the instant
-    // the click lands, so the URL alone would pass against an app that signs
-    // unverified accounts straight in.
     await page.goto("/sign-in");
     await waitForHydration(page, "form");
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill(firstPassword);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await expect(
-      page.getByRole("button", { name: "Sign in", exact: true })
-    ).toBeVisible();
-    await expect(page).toHaveURL(/\/sign-in/);
+    await expectRefused(page);
 
     await page.goto(await emailLink(email, "Verify your email"));
 
@@ -108,17 +102,7 @@ test.describe("account lifecycle", () => {
 
     // The old password is dead. Without this the test would pass against a
     // reset that silently did nothing, because the account would still sign in.
-    //
-    // Waiting for the button to come back before reading the URL. The form
-    // disables it and relabels it "Signing in..." for the length of the
-    // request, so its own name returning is the request having been answered.
-    // Staying on /sign-in is true the instant the click lands and stays true
-    // while the request is still out, so asserting the URL alone passes before
-    // the server has said anything and the retry below then races the form.
-    await expect(
-      page.getByRole("button", { name: "Sign in", exact: true })
-    ).toBeVisible();
-    await expect(page).toHaveURL(/\/sign-in/);
+    await expectRefused(page);
 
     await page.getByLabel("Password").fill(secondPassword);
     await page.getByRole("button", { name: /sign in/i }).click();
@@ -129,6 +113,27 @@ test.describe("account lifecycle", () => {
     await expect(page).toHaveURL(/\/my\/projects/);
   });
 });
+
+/**
+ * Asserts a sign-in attempt was refused.
+ *
+ * The error paragraph, not the URL and not the button. Staying on `/sign-in` is
+ * already true the instant the click lands, and the button's own label comes
+ * back the moment the request settles either way, so both pass before the
+ * server has said anything: against an app that signed the account in, they
+ * would race it and win. The error is the one monotonic signal on this page,
+ * null before the attempt and set afterwards for good.
+ *
+ * Located by its class because there is nothing else to hold on to: the message
+ * is a bare `<p>` with no role, no label and no `data-slot`, and its text comes
+ * from Better Auth rather than this repo, so matching on the words would pin
+ * the test to a dependency's copy. `text-destructive` is the semantic error
+ * token from `docs/UI-CONVENTIONS.md`, not an incidental utility class.
+ */
+async function expectRefused(page: Page): Promise<void> {
+  await expect(page.locator("p.text-destructive")).toBeVisible();
+  await expect(page).toHaveURL(/\/sign-in/);
+}
 
 /**
  * The most recent link the server mailed to one address.
