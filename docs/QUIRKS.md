@@ -515,9 +515,12 @@ end-to-end suite passed on those, one on each.
 
 Pass `{ exact: true }`, which is case-sensitive and whole-string, whenever the
 text is a status label, and scope to `statusSection` from
-`src/test/e2e/locators.ts` when the badge is what you mean. Both, not either:
-scoping alone still catches the override trigger, and `exact` alone still
-catches nothing on a page whose badge happens to be elsewhere.
+`src/test/e2e/locators.ts` when the badge is what you mean. They do different
+jobs. `exact` is what excludes the decoys: the hint is a longer string and the
+trigger is lowercase, so neither survives a whole-string case-sensitive match.
+Scoping is what disambiguates the two *legitimate* badges, because a staff
+viewer gets one in the page header and one in the panel, both reading exactly
+`Retired`, and an unscoped exact match resolves to both and trips strict mode.
 
 ### Do not navigate away from a write that has not answered
 
