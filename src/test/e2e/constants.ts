@@ -16,3 +16,12 @@ export const BASE_URL = `http://localhost:${PORT}`;
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const USER_AUTH = join(HERE, ".user-auth.json");
 export const ADMIN_AUTH = join(HERE, ".admin-auth.json");
+
+/**
+ * A second plain user, for the flows that assert one student cannot see
+ * another's. Those assertions need a signed-in viewer who is neither staff nor
+ * the owner of the row under test, and `user@example.com` is the owner in every
+ * one of them. Seeded by `scripts/seed-dev.ts` with role `user`.
+ */
+export const OTHER_AUTH = join(HERE, ".other-auth.json");
+export const OTHER_EMAIL = "leej@oregonstate.edu";
