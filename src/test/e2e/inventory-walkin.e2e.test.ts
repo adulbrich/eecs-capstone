@@ -57,10 +57,12 @@ test.describe("inventory walk-in checkout", () => {
       // to, and asserting it is what stops the absence checks below from
       // passing on a page that simply rendered nothing.
       //
-      // `exact`, because the page renders "This item is not available right
-      // now." for an item in any other state and default text matching is
-      // case-insensitive substring: without it this assertion passes on the
-      // exact state it is meant to rule out.
+      // `exact` defensively rather than to fix a live bug. Default text
+      // matching is case-insensitive substring, and the page does render "This
+      // item is not available right now." for an item in another state, which
+      // a bare "Available" would match. It cannot render here: `CartAction`
+      // returns "Sign in to request items." for an anonymous viewer before it
+      // reaches that branch. One change to that ordering is all it would take.
       await expect(
         visitor.getByText("Available", { exact: true })
       ).toBeVisible();

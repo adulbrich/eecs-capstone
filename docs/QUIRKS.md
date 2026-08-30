@@ -505,19 +505,21 @@ only after checking there is no role, and write down which.
 
 ### `getByText` is case-insensitive substring matching, so status words need `exact`
 
-A status word is almost never unique on the page that shows it. Asserting
-`getByText("Retired")` on an item page matches the Danger zone's "allowed only
-when status is available or retired", from first paint, whatever the item's
-status is. `getByText("Available")` matches "This item is not available right
-now.", which is the one state it exists to rule out. And the Status section's
-override select renders a lowercase status name in its own trigger for the
-length of an in-flight transition, so it matches before the write lands.
+A status word is rarely unique on the page that shows it. `getByText("Retired")`
+on an item page matches the Danger zone's "allowed only when status is available
+or retired" from first paint, whatever the item's status is, and the Status
+section's override select renders a lowercase status name in its own trigger for
+the length of an in-flight transition, so it matches before the write lands. One
+assertion passed unconditionally on both of those, and it was rewritten twice
+before it actually asserted anything.
 
-Three assertions passed unconditionally on this before it was noticed, two of
-them written while fixing the first. Pass `{ exact: true }`, which is
-case-sensitive and whole-string, whenever the text is a single word or a status
-label, and scope to `statusSection` from `src/test/e2e/locators.ts` when the
-badge is what you mean.
+Pass `{ exact: true }`, which is case-sensitive and whole-string, whenever the
+text is a status label, and scope to `statusSection` from
+`src/test/e2e/locators.ts` when the badge is what you mean. Do it even where the
+collision is not live today: the item page renders "This item is not available
+right now." only for a signed-in viewer, so a bare `getByText("Available")` is
+safe in an anonymous context and one reordering of `CartAction` away from
+matching the state it rules out.
 
 ### Do not navigate away from a write that has not answered
 
