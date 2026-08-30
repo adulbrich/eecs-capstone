@@ -57,12 +57,13 @@ test.describe("inventory walk-in checkout", () => {
       // to, and asserting it is what stops the absence checks below from
       // passing on a page that simply rendered nothing.
       //
-      // `exact` defensively rather than to fix a live bug. Default text
-      // matching is case-insensitive substring, and the page does render "This
-      // item is not available right now." for an item in another state, which
-      // a bare "Available" would match. It cannot render here: `CartAction`
-      // returns "Sign in to request items." for an anonymous viewer before it
-      // reaches that branch. One change to that ordering is all it would take.
+      // `exact` defensively. Default text matching is case-insensitive
+      // substring, and two things on a staff item page say "available" without
+      // being the status: the Danger zone hint, and the "This item is not
+      // available right now." line. Neither renders for an anonymous viewer,
+      // who gets "Sign in to request items." and no staff panel at all, so the
+      // collision is one change to `CartAction` or to this test's viewer away
+      // rather than live.
       await expect(
         visitor.getByText("Available", { exact: true })
       ).toBeVisible();
