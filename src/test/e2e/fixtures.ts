@@ -68,17 +68,16 @@ export async function createFixtureItem(
 }
 
 /**
- * The statuses a fixture may start a project in. Spelled out rather than taken
- * as a string: `publishedAt` is derived from this value, so a typo would
- * compile and produce a project that is published with no publication date.
+ * The statuses a fixture may start a project in.
+ *
+ * Derived from the column's own enum rather than typed as a string, because
+ * `publishedAt` is computed from this value: a typo would otherwise compile and
+ * produce a project that is published with no publication date. Derived rather
+ * than hand-listed for the usual reason, that a second copy is a second thing
+ * to keep in step.
  */
 export type ProjectStatus =
-  | "draft"
-  | "submitted"
-  | "changes_requested"
-  | "approved"
-  | "published"
-  | "archived";
+  (typeof schema.projectStatusEnum.enumValues)[number];
 
 /** The seeded user rows the fixtures attribute things to. */
 export async function userIdByEmail(db: Db, email: string): Promise<string> {
@@ -170,13 +169,17 @@ export async function createFixtureRequestLine(
  * `DeadlineEntry` the walk-in and overdue flows exercise. `currentDueAt` in the
  * past is what makes it overdue: overdue is derived at read time, never stored,
  * so there is no flag to set instead.
+ *
+ * Checked out, with no status parameter. A `reserved` hold is answerable for
+ * `currentPickupBy` rather than `currentDueAt`, so offering the status without
+ * the date would build the kind of half-written row this module exists to avoid.
+ * Add both together when a flow needs one.
  */
 export async function giveFixtureHold(
   db: Db,
   input: {
     itemId: string;
     holderEmail: string;
-    status?: "reserved" | "checked_out";
     dueAt?: Date | null;
   }
 ): Promise<void> {
@@ -189,7 +192,7 @@ export async function giveFixtureHold(
   await db
     .update(schema.inventoryItems)
     .set({
-      status: input.status ?? "checked_out",
+      status: "checked_out",
       currentHolderId: holderId,
       currentHolderEmail: input.holderEmail,
       currentDueAt: input.dueAt ?? null,

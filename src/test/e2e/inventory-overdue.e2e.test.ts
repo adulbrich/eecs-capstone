@@ -32,7 +32,6 @@ test.describe("inventory overdue derivation", () => {
       await giveFixtureHold(db, {
         itemId,
         holderEmail: "user@example.com",
-        status: "checked_out",
         dueAt,
       });
     } finally {

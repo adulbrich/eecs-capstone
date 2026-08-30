@@ -13,10 +13,10 @@ import type { Locator, Page } from "@playwright/test";
 /**
  * One row of an admin table, by text it contains.
  *
- * `getByRole("row")` rather than `locator("tr")`, per the suite's
- * accessible-role-first convention. Filtered rather than named, because a row's
- * accessible name is every cell concatenated and matching against that is
- * matching against the whole row's layout.
+ * `getByRole("row")` rather than `locator("tr")`, per the convention recorded
+ * in `docs/QUIRKS.md` under "Browser suites select by role and name". Filtered
+ * rather than named, because a row's accessible name is every cell concatenated
+ * and matching against that is matching against the whole row's layout.
  */
 export function rowFor(page: Page, text: string): Locator {
   return page.getByRole("row").filter({ hasText: text });
@@ -27,8 +27,8 @@ export function rowFor(page: Page, text: string): Locator {
  *
  * The tab panel holds a single wrapper div whose children are the entries, so
  * `> div > div` is the entry row. There is no role here to use instead: the
- * entries are plain divs, and adding a test id to reach them is exactly what
- * the suite's conventions forbid.
+ * entries are plain divs, and adding a test id to reach them is what the
+ * convention in `docs/QUIRKS.md` rules out.
  *
  * Filtering plain `div` by text instead lands on the innermost box holding the
  * name, which is the text column beside the Cancel button rather than the row

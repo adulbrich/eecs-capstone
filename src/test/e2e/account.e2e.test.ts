@@ -37,11 +37,19 @@ test.describe("account lifecycle", () => {
     // Unverified accounts cannot sign in: `requireEmailVerification` is on, so
     // this is the state the link has to get the account out of. Asserting it
     // here is what makes the verification step below mean something.
+    //
+    // The button first, then the URL, for the reason spelled out at the second
+    // refused sign-in below: staying on /sign-in is already true the instant
+    // the click lands, so the URL alone would pass against an app that signs
+    // unverified accounts straight in.
     await page.goto("/sign-in");
     await waitForHydration(page, "form");
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill(firstPassword);
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Sign in", exact: true })
+    ).toBeVisible();
     await expect(page).toHaveURL(/\/sign-in/);
 
     await page.goto(await emailLink(email, "Verify your email"));

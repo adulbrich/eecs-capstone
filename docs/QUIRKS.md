@@ -491,6 +491,16 @@ That test signs up a real account. Addresses are `e2e-<uuid>@example.com` and
 the sweep deletes them by prefix. A fixed address would fail at sign-up on the
 second run.
 
+### Browser suites select by role and name, and add no test IDs
+
+Both Playwright suites locate by accessible role and name, falling back to
+`data-slot` where no role fits, and never by a test id added to a production
+component: a selector nobody can reach with a screen reader is a selector that
+says nothing about whether the page works. `src/test/e2e/locators.ts` holds the
+handful of places where the markup offers no role, each with the reason written
+down. The two known exceptions are react-image-crop's canvas and the uploader's
+hidden file input, neither of which exposes an accessible handle.
+
 ### Do not navigate away from a write that has not answered
 
 A `goto` or `reload` over an in-flight server function aborts it, and the page

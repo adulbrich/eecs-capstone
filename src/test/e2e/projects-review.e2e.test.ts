@@ -77,15 +77,25 @@ test.describe("project changes-requested round trip", () => {
         owner.getByRole("heading", { name: "Staff panel", exact: true })
       ).toHaveCount(0);
 
+      const rewritten = `Rewritten after the review. ${fixtureName("Edit")}`;
       await owner.goto(`/projects/${projectId}/edit`);
       await waitForHydration(owner, "form");
-      await owner
-        .getByLabel("Description")
-        .fill("Rewritten after the review comment.");
+      await owner.getByLabel("Description").fill(rewritten);
       await owner.getByRole("button", { name: "Save" }).click();
 
-      await owner.goto(`/projects/${projectId}`);
+      // Waited for, not navigated past. The form saves and only then navigates
+      // back to the project, so a `goto` here aborts the update in flight and
+      // the page renders the project exactly as it was: the edit step would
+      // pass having changed nothing.
+      await owner.waitForURL(new RegExp(`/projects/${projectId}$`), {
+        timeout: 15_000,
+      });
       await waitForHydration(owner);
+
+      // The new text on the page, which is the only thing that distinguishes a
+      // save that landed from one that was thrown away.
+      await expect(owner.getByText(rewritten)).toBeVisible();
+
       await owner.getByRole("button", { name: "Resubmit for review" }).click();
 
       // Back in staff's hands, which the owner's own card says by offering the

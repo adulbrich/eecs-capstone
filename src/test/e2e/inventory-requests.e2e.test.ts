@@ -115,10 +115,13 @@ test.describe("inventory request self-cancel", () => {
       await expect(user.getByText(itemName)).toBeVisible();
 
       // The second student never had a control to press, because the entry is
-      // not on their list at all. The server's own refusal of a cross-user
-      // cancel is asserted in the integration suite, which can call
-      // `cancelRequestItem` as the wrong viewer; a browser cannot reach a
-      // button that was never rendered.
+      // not on their list at all, and a browser cannot reach a button that was
+      // never rendered. That is the whole of the browser-level assertion.
+      //
+      // The server's own refusal of a cross-user cancel is stated in
+      // `src/server/__tests__/access-contract.ts` and tested nowhere: every
+      // `cancelRequestItemAs` case in the integration suite passes the same
+      // student. Tracked separately rather than claimed here.
       const other = await otherContext.newPage();
       await other.goto("/my/items?tab=active");
       await waitForHydration(other);

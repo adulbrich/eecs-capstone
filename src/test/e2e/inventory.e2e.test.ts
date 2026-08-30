@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { waitForHydration } from "../shared/playwright";
 import { ADMIN_AUTH, USER_AUTH } from "./constants";
 import { createFixtureItem, fixtureName, openDb } from "./fixtures";
+import { rowFor } from "./locators";
 
 /**
  * The full cart path: available -> requested -> reserved -> checked_out ->
@@ -48,7 +49,7 @@ test.describe("@smoke inventory lifecycle", () => {
 
       // Scope to this item's row: the page lists every pending request, and the
       // seed drives several of its own through the same states.
-      const row = staff.locator("tr", { hasText: itemName });
+      const row = rowFor(staff, itemName);
       await row.getByRole("button", { name: "Approve" }).click();
       await staff.getByRole("button", { name: "Confirm approve" }).click();
       // The page lists pending requests, so an approved line leaving the table

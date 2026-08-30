@@ -7,6 +7,7 @@ import {
   openDb,
   userIdByEmail,
 } from "./fixtures";
+import { confirmed } from "./waits";
 
 /**
  * Bookmarks are the one project feature with no staff involvement and no
@@ -51,7 +52,13 @@ test.describe("project bookmarks", () => {
       // visible text says "Bookmarked" while the label says "Remove bookmark".
       // Naming the label is what makes this assertion about the control the
       // screen reader announces rather than the glyph beside it.
-      await user.getByRole("button", { name: "Bookmark", exact: true }).click();
+      // Waited for, not just clicked. `BookmarkButton` flips its own label
+      // before the request resolves, so the assertion below is true whether or
+      // not the row was ever written, and the navigation that follows would
+      // abort the write.
+      await confirmed(user, () =>
+        user.getByRole("button", { name: "Bookmark", exact: true }).click()
+      );
       await expect(
         user.getByRole("button", { name: "Remove bookmark" })
       ).toBeVisible();
@@ -71,7 +78,9 @@ test.describe("project bookmarks", () => {
 
       await user.goto(`/projects/${projectId}`);
       await waitForHydration(user);
-      await user.getByRole("button", { name: "Remove bookmark" }).click();
+      await confirmed(user, () =>
+        user.getByRole("button", { name: "Remove bookmark" }).click()
+      );
       await expect(
         user.getByRole("button", { name: "Bookmark", exact: true })
       ).toBeVisible();

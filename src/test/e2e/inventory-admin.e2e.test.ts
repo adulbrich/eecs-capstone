@@ -101,16 +101,6 @@ test.describe("inventory item administration", () => {
 
       await staff.getByLabel("Show only retired").click();
       await expect(row).toHaveCount(1);
-
-      // Retired is the second status the delete gate allows, and the only one
-      // reachable without checking an item out first. Asserting it here rather
-      // than in a fourth fixture keeps the gate's two arms proven against the
-      // same button.
-      await staff.goto(itemUrl);
-      await waitForHydration(staff);
-      await expect(
-        staff.getByRole("button", { name: "Hard delete item" })
-      ).toBeEnabled();
     } finally {
       await context.close();
     }
@@ -138,7 +128,6 @@ test.describe("inventory hard delete gate", () => {
       await giveFixtureHold(db, {
         itemId,
         holderEmail: "user@example.com",
-        status: "checked_out",
       });
     } finally {
       await close();
@@ -157,6 +146,14 @@ test.describe("inventory hard delete gate", () => {
       // this the assertion above would also pass on a button that is disabled
       // in every state.
       await staff.getByRole("button", { name: "Return" }).click();
+      await expect(
+        staff.getByRole("button", { name: "Hard delete item" })
+      ).toBeEnabled();
+
+      // Retired is the gate's other allowed status, asserted on the same button
+      // so both arms of "available or retired" live in this block rather than
+      // one of them sitting in the administration test next door.
+      await retire(staff);
       await expect(
         staff.getByRole("button", { name: "Hard delete item" })
       ).toBeEnabled();
@@ -184,7 +181,6 @@ test.describe("inventory hard delete gate", () => {
       await giveFixtureHold(db, {
         itemId: usedId,
         holderEmail: "user@example.com",
-        status: "checked_out",
       });
     } finally {
       await close();
