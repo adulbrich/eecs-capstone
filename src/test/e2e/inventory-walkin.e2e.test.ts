@@ -56,7 +56,14 @@ test.describe("inventory walk-in checkout", () => {
       // Status is public. This is the half of the page a student is entitled
       // to, and asserting it is what stops the absence checks below from
       // passing on a page that simply rendered nothing.
-      await expect(visitor.getByText("Available")).toBeVisible();
+      //
+      // `exact`, because the page renders "This item is not available right
+      // now." for an item in any other state and default text matching is
+      // case-insensitive substring: without it this assertion passes on the
+      // exact state it is meant to rule out.
+      await expect(
+        visitor.getByText("Available", { exact: true })
+      ).toBeVisible();
 
       await expect(
         visitor.getByRole("button", { name: "Check out" })

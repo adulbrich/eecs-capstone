@@ -88,7 +88,16 @@ test.describe("inventory item administration", () => {
       await expect(staff.getByText(location)).toBeVisible();
 
       await retire(staff);
-      await expect(staff.getByText("Retired").first()).toBeVisible();
+
+      // Scoped and exact, for two reasons that both make an unscoped
+      // `getByText("Retired")` pass on a page where nothing was retired. The
+      // Danger zone renders "allowed only when status is available or retired"
+      // on every staff item page, and the override select's trigger reads
+      // "retired" while the transition is in flight. Default text matching is
+      // case-insensitive substring, so it matches both.
+      await expect(
+        statusSection(staff).getByText("Retired", { exact: true })
+      ).toBeVisible();
 
       // Retired items leave the management table. That is the whole point of
       // retiring rather than deleting, and it is a filter default rather than

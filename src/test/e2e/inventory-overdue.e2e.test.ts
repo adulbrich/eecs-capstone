@@ -83,7 +83,7 @@ test.describe("inventory overdue derivation", () => {
       await waitForHydration(staff);
 
       const row = rowFor(staff, itemName);
-      await expect(row.getByText("Checked out")).toBeVisible();
+      await expect(row.getByText("Checked out", { exact: true })).toBeVisible();
 
       // The row carries more than one timestamp once every column is on, so
       // the due date is addressed by its own value rather than by "the time

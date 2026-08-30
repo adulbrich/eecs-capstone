@@ -503,6 +503,22 @@ is a place the markup offers no role, and each carries the reason inline;
 `src/test/e2e/locators.ts` holds the ones more than one flow needs. Reach for one
 only after checking there is no role, and write down which.
 
+### `getByText` is case-insensitive substring matching, so status words need `exact`
+
+A status word is almost never unique on the page that shows it. Asserting
+`getByText("Retired")` on an item page matches the Danger zone's "allowed only
+when status is available or retired", from first paint, whatever the item's
+status is. `getByText("Available")` matches "This item is not available right
+now.", which is the one state it exists to rule out. And the Status section's
+override select renders a lowercase status name in its own trigger for the
+length of an in-flight transition, so it matches before the write lands.
+
+Three assertions passed unconditionally on this before it was noticed, two of
+them written while fixing the first. Pass `{ exact: true }`, which is
+case-sensitive and whole-string, whenever the text is a single word or a status
+label, and scope to `statusSection` from `src/test/e2e/locators.ts` when the
+badge is what you mean.
+
 ### Do not navigate away from a write that has not answered
 
 A `goto` or `reload` over an in-flight server function aborts it, and the page
@@ -536,8 +552,10 @@ never been scanned and which fails contrast in dark mode (#145).
 `sweepOrphans` deletes notifications whose title carries the `E2E-` prefix and
 clears the avatar column on the two seeded students the upload flow writes to,
 but it runs at the *start* of an end-to-end run, so the database is dirty for
-whatever runs next. Sweep or reseed before treating a red accessibility run
-after an end-to-end run as a regression.
+whatever runs next. `npm run test:e2e:sweep` runs that sweep on its own; do that
+before treating a red accessibility run after an end-to-end run as a regression.
+`db:seed:dev` is not an alternative, because it creates and updates rows and
+removes nothing.
 
 The two shapes it takes, both seen: `color-contrast` on
 `notification-bell.tsx`'s unread badge in dark mode (#145), from notifications
