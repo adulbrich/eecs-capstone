@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { config as loadDotenv } from "dotenv";
-import { BASE_URL, PORT } from "./src/test/e2e/constants";
+import { BASE_URL, PORT, SERVER_LOG_RELATIVE } from "./src/test/e2e/constants";
 
 // `npm run start` is plain `node .output/server/index.mjs` with no --env-file,
 // unlike the dev server, which gets .env.local for free through Vite. Playwright
@@ -59,7 +59,12 @@ export default defineConfig({
     // Builds every run. The point of this suite is the production output: the
     // dev server cannot see SSR-only breakage, a broken production chunk, or a
     // VITE_ variable that failed to inline. The build costs a few seconds.
-    command: "npm run build && npm run start",
+    // Teed rather than piped straight through. The console email transport
+    // writes to stderr and nothing stores its links, so the account-lifecycle
+    // test reads them back out of this file; `tee` truncates on open, so each
+    // run starts from an empty log. Playwright still gets its copy through the
+    // pipe below.
+    command: `npm run build && npm run start 2>&1 | tee ${SERVER_LOG_RELATIVE}`,
 
     // /api/healthz, because readiness should not depend on a page rendering:
     // it is a fixed text response with no data behind it.

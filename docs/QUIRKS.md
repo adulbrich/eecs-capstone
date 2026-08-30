@@ -437,6 +437,15 @@ Sweep order matters. `inventory_request_items.item_id` is the one FK in that
 graph declared `onDelete: "restrict"`; the others cascade. Request lines, and the
 requests holding them, go before the items.
 
+Four things outlive the rows and are swept separately: notifications, which
+carry no FK to what they are about and are matched on the prefix inside their
+title; the accounts the sign-up flow creates, matched on an `e2e-` address
+prefix, with their `verification` rows, which have no FK either; and the avatar
+column on the two seeded students, because the upload flow writes to a seeded
+row rather than a fixture one. Objects in the bucket are not swept, deliberately:
+a few kilobytes of webp per run under keys nothing lists, against a sweep that
+would have to reach into storage from a module whose job is the database.
+
 ### Assert that a transition landed, not that its dialog closed
 
 A popover closes on failure as readily as on success, so
@@ -455,6 +464,56 @@ on a slow runner rather than on a broken test. `globalTimeout` is a hang catcher
 the budget is a number read off the job duration. Three consecutive runs over it
 is the signal to demote a flow to #143. One run over is a slow runner.
 
+### The full suite is the same config with a longer leash
+
+`test:smoke` and `test:e2e` share `playwright.e2e.config.ts`; the smoke script is
+that config plus `--grep @smoke`. What differs is on the npm script, not in the
+config: `test:e2e` passes `--global-timeout`, because the config's 8 minutes is
+the smoke run's hang catcher and the full suite has thirteen more flows, two
+uploads and a sign-up to get through. Changing the config value instead would
+quietly lengthen the pull-request path's catcher.
+
+Only the smoke subset runs on pull requests. The full suite is
+`workflow_dispatch` in `.github/workflows/full-e2e.yml`, which drifts by design;
+the trigger is "before a release".
+
+### The account flow reads the server's log, because nothing stores those tokens
+
+Better Auth signs the email-verification and password-reset tokens rather than
+storing them: the `verification` table is empty after a sign-up, so there is no
+row to read a token out of. The console email transport writes to stderr, and
+there is no file transport. So `playwright.e2e.config.ts` tees the built
+server's output into `src/test/e2e/.server.log`, and `account.e2e.test.ts` polls
+that file for the link addressed to its own generated address. `tee` truncates
+on open, so each run starts from an empty log.
+
+That test signs up a real account. Addresses are `e2e-<uuid>@example.com` and
+the sweep deletes them by prefix. A fixed address would fail at sign-up on the
+second run.
+
+### Do not navigate away from a write that has not answered
+
+Three flows were green against code that had done nothing, all the same way. The
+avatar test reloaded straight after confirming a crop, which aborted the upload
+in flight; the uploader had already swapped in a local blob URL, so the assertion
+that an image was on screen passed anyway. The password-reset test navigated to
+`/sign-in` immediately after submitting, aborting the reset, and then signed in
+with the old password and called it success. The item edit did the same with a
+`goto` over a save.
+
+Where the app navigates on success, wait for the URL. Where it does not, wait for
+the response: server functions POST to `/_serverFn/<hash>`, and the hash is a
+build artifact no test can predict, so match the prefix on a page that fires only
+the one request.
+
+### The header avatar is a page load behind the profile page
+
+`site-header.tsx` reads `authClient.useSession()`, Better Auth's own client
+session cache, which `router.invalidate()` does not refresh. Uploading an avatar
+updates the profile page's preview immediately and leaves the header showing
+initials until the next full load. The end-to-end test asserts the header only
+after a reload, for that reason rather than out of caution.
+
 ### The smoke and accessibility suites share one local database
 
 In CI they never meet, each having its own runner and Postgres. Locally they
@@ -462,9 +521,14 @@ share the dev database and both act as `user@example.com`. Running smoke then
 accessibility produced five failures unrelated to accessibility: three were
 leftover `E2E-` rows, which the next smoke run sweeps, and two were notifications
 the smoke flows created, which made the notification bell render a badge that had
-never been scanned and which fails contrast in dark mode (#145). Nothing sweeps
-notifications or history, so reset the dev database before treating a red
-accessibility run after a smoke run as a regression.
+never been scanned and which fails contrast in dark mode (#145).
+
+`sweepOrphans` now deletes notifications whose title carries the `E2E-` prefix,
+which covers the ones these suites generate, and clears the avatar column on the
+two seeded students the upload flow writes to. It still sweeps nothing from
+request history and nothing from object storage, and the overdue flow files a
+notification deliberately, so reset the dev database before treating a red
+accessibility run after an end-to-end run as a regression.
 
 ### The accessibility suite retries in CI, and only in CI
 
