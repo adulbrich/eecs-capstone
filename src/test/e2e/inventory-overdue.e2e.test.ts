@@ -7,8 +7,8 @@ import {
   fixtureName,
   giveFixtureHold,
   openDb,
-  userIdByEmail,
 } from "./fixtures";
+import { entryFor, rowFor } from "./locators";
 
 /**
  * Overdue is derived, never stored. There is no cron and no `overdue` column:
@@ -29,10 +29,8 @@ test.describe("inventory overdue derivation", () => {
     let itemId: string;
     try {
       ({ id: itemId } = await createFixtureItem(db, itemName));
-      const holderId = await userIdByEmail(db, "user@example.com");
       await giveFixtureHold(db, {
         itemId,
-        holderId,
         holderEmail: "user@example.com",
         status: "checked_out",
         dueAt,
@@ -49,10 +47,7 @@ test.describe("inventory overdue derivation", () => {
       await user.goto("/my/items?tab=active");
       await waitForHydration(user);
 
-      const entry = user
-        .getByRole("tabpanel")
-        .locator("> div > div")
-        .filter({ hasText: itemName });
+      const entry = entryFor(user, itemName);
 
       // A staff-assigned hold, which is the arm of DeadlineEntry whose dates
       // live on the item rather than on a request line. "Assigned by staff" is
@@ -88,7 +83,7 @@ test.describe("inventory overdue derivation", () => {
       await staff.goto(`/admin/inventory?q=${encodeURIComponent(itemName)}`);
       await waitForHydration(staff);
 
-      const row = staff.locator("tr", { hasText: itemName });
+      const row = rowFor(staff, itemName);
       await expect(row.getByText("Checked out")).toBeVisible();
 
       // The row carries more than one timestamp once every column is on, so

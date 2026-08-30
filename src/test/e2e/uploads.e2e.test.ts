@@ -60,9 +60,15 @@ test.describe("project image upload", () => {
         timeout: 15_000,
       });
 
-      const image = owner.locator(`img[src^="${storageBase()}"]`).first();
+      // Scoped by the key prefix, not by a landmark: only the landing page
+      // wraps its content in `<main>`. The header renders the signed-in user's
+      // own avatar from this same origin, so a match on the origin alone can be
+      // satisfied by an avatar while the project image never loads at all.
+      // Storage keys are `projects/<id>/<uuid>.webp` and `avatars/<id>/...`,
+      // which separates the two without depending on the page's structure.
+      const image = owner.locator(`img[src^="${storageBase()}/projects/"]`);
       await expect(image).toBeVisible();
-      await expect(await decoded(image)).toBe(true);
+      await expectDecoded(image);
     } finally {
       await context.close();
     }
@@ -100,7 +106,9 @@ test.describe("avatar upload and clear", () => {
       // wherever the app shows it to others" has no surface to assert against
       // rather than a missing assertion.
       const preview = page.getByAltText("Current");
-      const headerAvatar = page.locator(`header img[src^="${storageBase()}"]`);
+      const headerAvatar = page.locator(
+        `header img[src^="${storageBase()}/avatars/"]`
+      );
       await expect(preview).toHaveCount(0);
       await expect(headerAvatar).toHaveCount(0);
 
@@ -121,7 +129,7 @@ test.describe("avatar upload and clear", () => {
       await page.reload();
       await waitForHydration(page);
       await expect(headerAvatar).toBeVisible();
-      await expect(await decoded(headerAvatar)).toBe(true);
+      await expectDecoded(headerAvatar);
 
       await confirmed(page, () =>
         page.getByRole("button", { name: "Remove" }).click()
@@ -238,15 +246,25 @@ async function dragCrop(page: Page): Promise<void> {
 }
 
 /**
- * Whether the browser actually decoded the image at that URL.
+ * Asserts the browser actually decoded the image at that URL.
  *
  * `naturalWidth` is zero for an <img> whose src 404s, which is the difference
  * between "the markup points somewhere" and "the bytes came back".
+ *
+ * Polled rather than read once: decoding is asynchronous, so a single
+ * `expect(await ...)` snapshots whatever was true the instant the element
+ * appeared and fails on an image that was merely still loading.
  */
-function decoded(image: Locator): Promise<boolean> {
-  return image.evaluate(
-    (el) =>
-      (el as HTMLImageElement).complete &&
-      (el as HTMLImageElement).naturalWidth > 0
-  );
+async function expectDecoded(image: Locator): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        image.evaluate(
+          (el) =>
+            (el as HTMLImageElement).complete &&
+            (el as HTMLImageElement).naturalWidth > 0
+        ),
+      { timeout: 10_000 }
+    )
+    .toBe(true);
 }

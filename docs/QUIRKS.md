@@ -493,18 +493,16 @@ second run.
 
 ### Do not navigate away from a write that has not answered
 
-Three flows were green against code that had done nothing, all the same way. The
-avatar test reloaded straight after confirming a crop, which aborted the upload
-in flight; the uploader had already swapped in a local blob URL, so the assertion
-that an image was on screen passed anyway. The password-reset test navigated to
-`/sign-in` immediately after submitting, aborting the reset, and then signed in
-with the old password and called it success. The item edit did the same with a
-`goto` over a save.
+A `goto` or `reload` over an in-flight server function aborts it, and the page
+then looks exactly as it does after the write succeeded. Where the app navigates
+on success, wait for the URL; where it does not, wait for the response. Server
+functions POST to `/_serverFn/<hash>`, whose hash is a build artifact no test can
+predict, so match the prefix on a page that fires only the one request.
 
-Where the app navigates on success, wait for the URL. Where it does not, wait for
-the response: server functions POST to `/_serverFn/<hash>`, and the hash is a
-build artifact no test can predict, so match the prefix on a page that fires only
-the one request.
+Three flows were green against code that had done nothing before this: the avatar
+upload (the uploader shows a local blob URL, so "an image is on screen" was true
+either way), the password reset (the test then signed in with the old password
+and passed), and an item edit.
 
 ### The header avatar is a page load behind the profile page
 

@@ -1,4 +1,3 @@
-import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { waitForHydration } from "../shared/playwright";
 import { ADMIN_AUTH, OTHER_AUTH, OTHER_EMAIL, USER_AUTH } from "./constants";
@@ -9,6 +8,7 @@ import {
   openDb,
   userIdByEmail,
 } from "./fixtures";
+import { entryFor, rowFor } from "./locators";
 
 /**
  * The two ways a request ends without the item ever changing hands: staff
@@ -45,7 +45,7 @@ test.describe("inventory request rejection", () => {
 
       // Scoped to this item's row: the queue lists every pending request and
       // the dev seed drives several of its own.
-      const row = staff.locator("tr", { hasText: itemName });
+      const row = rowFor(staff, itemName);
       await row.getByRole("button", { name: "Reject" }).click();
       await staff.getByLabel("Reason (sent to requester)").fill(reason);
       await staff.getByRole("button", { name: "Confirm reject" }).click();
@@ -129,6 +129,47 @@ test.describe("inventory request self-cancel", () => {
     }
   });
 
+  test("the requester cancels an approved line before pickup", async ({
+    browser,
+  }) => {
+    const itemName = fixtureName("Item");
+    const { db, close } = openDb();
+    try {
+      const { id: itemId } = await createFixtureItem(db, itemName);
+      const userId = await userIdByEmail(db, "user@example.com");
+      // Approved but not yet collected. The window between the two is the half
+      // of "pending or approved" that the pending case cannot reach, and it is
+      // the one the gate below is actually about: the control survives the
+      // line being approved and dies at the item being picked up.
+      await createFixtureRequestLine(db, {
+        itemId,
+        userId,
+        lineStatus: "approved",
+        itemStatus: "reserved",
+      });
+    } finally {
+      await close();
+    }
+
+    const context = await browser.newContext({ storageState: USER_AUTH });
+    try {
+      const user = await context.newPage();
+      await user.goto("/my/items?tab=active");
+      await waitForHydration(user);
+
+      await entryFor(user, itemName)
+        .getByRole("button", { name: "Cancel" })
+        .click();
+
+      await expect(user.getByText(itemName)).toHaveCount(0);
+      await user.goto("/my/items?tab=history");
+      await waitForHydration(user);
+      await expect(user.getByText(itemName)).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+
   test("the cancel control is gone once the item is checked out", async ({
     browser,
   }) => {
@@ -189,20 +230,3 @@ test("the second storage state is the second seeded student", async ({
     await context.close();
   }
 });
-
-/**
- * One entry on `/my/items`, by the item it is about.
- *
- * The tab panel holds a single wrapper div whose children are the entries, so
- * `> div > div` is the entry row. Filtering plain `div` by text instead lands
- * on the innermost box holding the name, which is the text column beside the
- * Cancel button rather than the row containing both. That locator finds the
- * item and then reports no button, which is exactly what a broken gate would
- * also look like.
- */
-function entryFor(page: Page, itemName: string) {
-  return page
-    .getByRole("tabpanel")
-    .locator("> div > div")
-    .filter({ hasText: itemName });
-}

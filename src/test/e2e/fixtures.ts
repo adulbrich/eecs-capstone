@@ -67,6 +67,19 @@ export async function createFixtureItem(
   return { id: item.id, name: item.name };
 }
 
+/**
+ * The statuses a fixture may start a project in. Spelled out rather than taken
+ * as a string: `publishedAt` is derived from this value, so a typo would
+ * compile and produce a project that is published with no publication date.
+ */
+export type ProjectStatus =
+  | "draft"
+  | "submitted"
+  | "changes_requested"
+  | "approved"
+  | "published"
+  | "archived";
+
 /** The seeded user rows the fixtures attribute things to. */
 export async function userIdByEmail(db: Db, email: string): Promise<string> {
   const [row] = await db
@@ -90,16 +103,17 @@ export async function userIdByEmail(db: Db, email: string): Promise<string> {
  */
 export async function createFixtureProject(
   db: Db,
-  input: { title: string; proposerId: string; status?: string }
+  input: { title: string; proposerId: string; status?: ProjectStatus }
 ): Promise<{ id: string; title: string }> {
+  const status = input.status ?? "draft";
   const [project] = await db
     .insert(schema.projects)
     .values({
       title: input.title,
       description: "Created by the end-to-end suite. Safe to delete.",
       proposerId: input.proposerId,
-      status: (input.status ?? "draft") as "draft",
-      publishedAt: input.status === "published" ? new Date() : null,
+      status,
+      publishedAt: status === "published" ? new Date() : null,
     })
     .returning();
   return { id: project.id, title: project.title };
@@ -141,7 +155,7 @@ export async function createFixtureRequestLine(
   await db
     .update(schema.inventoryItems)
     .set({
-      status: (input.itemStatus ?? "requested") as "requested",
+      status: input.itemStatus ?? "requested",
       currentRequestItemId: line.id,
       currentHolderId: input.userId,
       currentDueAt: input.dueAt ?? null,
@@ -161,21 +175,24 @@ export async function giveFixtureHold(
   db: Db,
   input: {
     itemId: string;
-    holderId: string;
     holderEmail: string;
     status?: "reserved" | "checked_out";
     dueAt?: Date | null;
-    pickupBy?: Date | null;
   }
 ): Promise<void> {
+  // One address in, both columns out. The id and the address always name the
+  // same person here, so taking both would let a caller spell them differently
+  // and produce a hold the app cannot: `current_holder_id` is what the overdue
+  // scan attributes a notification to, and `current_holder_email` is what the
+  // page displays.
+  const holderId = await userIdByEmail(db, input.holderEmail);
   await db
     .update(schema.inventoryItems)
     .set({
-      status: (input.status ?? "checked_out") as "checked_out",
-      currentHolderId: input.holderId,
+      status: input.status ?? "checked_out",
+      currentHolderId: holderId,
       currentHolderEmail: input.holderEmail,
       currentDueAt: input.dueAt ?? null,
-      currentPickupBy: input.pickupBy ?? null,
       updatedAt: new Date(),
     })
     .where(eq(schema.inventoryItems.id, input.itemId));

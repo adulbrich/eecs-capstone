@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { waitForHydration } from "../shared/playwright";
-import { OTHER_AUTH, USER_AUTH } from "./constants";
+import { OTHER_AUTH, OTHER_EMAIL, USER_AUTH } from "./constants";
 import {
   createFixtureProject,
   fixtureName,
@@ -29,7 +29,7 @@ test.describe("project bookmarks", () => {
       // Proposed by the *other* user, so the bookmarking student has no
       // ownership claim on it. A student bookmarking their own proposal would
       // pass even if the list were keyed on the proposer by mistake.
-      const proposerId = await userIdByEmail(db, "leej@oregonstate.edu");
+      const proposerId = await userIdByEmail(db, OTHER_EMAIL);
       ({ id: projectId } = await createFixtureProject(db, {
         title,
         proposerId,

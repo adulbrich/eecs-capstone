@@ -9,6 +9,7 @@ import {
   openDb,
   userIdByEmail,
 } from "./fixtures";
+import { rowFor } from "./locators";
 
 /**
  * Staff maintaining the catalog itself: creating an item, editing it, taking it
@@ -19,18 +20,33 @@ import {
  * redirect, so it is visible in a browser and nowhere else.
  */
 test.describe("inventory item administration", () => {
-  test("a signed-in student cannot reach the new-item form", async ({
+  test("a signed-in student cannot reach either staff form", async ({
     browser,
   }) => {
+    const itemName = fixtureName("Item");
+    const { db, close } = openDb();
+    let itemId: string;
+    try {
+      ({ id: itemId } = await createFixtureItem(db, itemName));
+    } finally {
+      await close();
+    }
+
     const context = await browser.newContext({ storageState: USER_AUTH });
     try {
       const page = await context.newPage();
-      await page.goto("/inventory/new");
 
-      // Home, not a 403. The admin layout and these two routes both redirect
-      // rather than render a refusal, which is a decision worth pinning: a 403
-      // page would be a different product.
-      await expect(page).toHaveURL("/");
+      // Both routes, because they carry their own `beforeLoad` gate rather than
+      // inheriting one: `_authed` guarantees only that somebody is signed in,
+      // so each is separately capable of being left open.
+      for (const path of ["/inventory/new", `/inventory/${itemId}/edit`]) {
+        await page.goto(path);
+
+        // Home, not a 403. The admin layout and these two routes all redirect
+        // rather than render a refusal, which is a decision worth pinning: a
+        // 403 page would be a different product.
+        await expect(page).toHaveURL("/");
+      }
     } finally {
       await context.close();
     }
@@ -80,11 +96,21 @@ test.describe("inventory item administration", () => {
       const listUrl = `/admin/inventory?q=${encodeURIComponent(itemName)}`;
       await staff.goto(listUrl);
       await waitForHydration(staff);
-      const row = staff.locator("tr", { hasText: itemName });
+      const row = rowFor(staff, itemName);
       await expect(row).toHaveCount(0);
 
       await staff.getByLabel("Show only retired").click();
       await expect(row).toHaveCount(1);
+
+      // Retired is the second status the delete gate allows, and the only one
+      // reachable without checking an item out first. Asserting it here rather
+      // than in a fourth fixture keeps the gate's two arms proven against the
+      // same button.
+      await staff.goto(itemUrl);
+      await waitForHydration(staff);
+      await expect(
+        staff.getByRole("button", { name: "Hard delete item" })
+      ).toBeEnabled();
     } finally {
       await context.close();
     }
@@ -109,10 +135,8 @@ test.describe("inventory hard delete gate", () => {
     let itemId: string;
     try {
       ({ id: itemId } = await createFixtureItem(db, itemName));
-      const holderId = await userIdByEmail(db, "user@example.com");
       await giveFixtureHold(db, {
         itemId,
-        holderId,
         holderEmail: "user@example.com",
         status: "checked_out",
       });
@@ -159,7 +183,6 @@ test.describe("inventory hard delete gate", () => {
       // below about the request history rather than about the status.
       await giveFixtureHold(db, {
         itemId: usedId,
-        holderId: userId,
         holderEmail: "user@example.com",
         status: "checked_out",
       });
@@ -203,7 +226,7 @@ test.describe("inventory hard delete gate", () => {
       await staff.goto(
         `/admin/inventory?q=${encodeURIComponent(cleanName)}&retiredOnly=true`
       );
-      await expect(staff.locator("tr", { hasText: cleanName })).toHaveCount(0);
+      await expect(rowFor(staff, cleanName)).toHaveCount(0);
     } finally {
       await context.close();
     }

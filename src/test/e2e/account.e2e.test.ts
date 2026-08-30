@@ -101,11 +101,15 @@ test.describe("account lifecycle", () => {
     // The old password is dead. Without this the test would pass against a
     // reset that silently did nothing, because the account would still sign in.
     //
-    // The error message, not the URL. Staying on /sign-in is true the instant
-    // the click lands and stays true while the request is still out, so a URL
-    // assertion here passes before the server has answered and the retry below
-    // then races a form whose button still reads "Signing in...".
-    await expect(page.locator("p.text-destructive")).toBeVisible();
+    // Waiting for the button to come back before reading the URL. The form
+    // disables it and relabels it "Signing in..." for the length of the
+    // request, so its own name returning is the request having been answered.
+    // Staying on /sign-in is true the instant the click lands and stays true
+    // while the request is still out, so asserting the URL alone passes before
+    // the server has said anything and the retry below then races the form.
+    await expect(
+      page.getByRole("button", { name: "Sign in", exact: true })
+    ).toBeVisible();
     await expect(page).toHaveURL(/\/sign-in/);
 
     await page.getByLabel("Password").fill(secondPassword);
