@@ -1,12 +1,16 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
-import { createProjectAs } from "#/server/_internal/projects";
+import { createProjectAs, updateProjectAs } from "#/server/_internal/projects";
 import {
   clearAvatarAs,
   uploadAvatarAs,
@@ -57,25 +61,29 @@ function fakeFile(name: string, bytes: Buffer, type = "image/jpeg") {
   throw new Error("File constructor not available");
 }
 
+function baseProject() {
+  return {
+    title: "test",
+    description: null,
+    problemStatement: null,
+    objectives: null,
+    minQualifications: null,
+    prefQualifications: null,
+    url: "",
+    contactEmail: "",
+    contactName: null,
+    imageUrl: "",
+    licenseRestrictions: null,
+    programId: null,
+    notes: null,
+  };
+}
+
 describe("uploadProjectImageAs", () => {
-  it("writes to the bucket and updates the project row", async () => {
+  it("writes to the bucket and deliberately leaves the row alone", async () => {
     const admin = await makeUser(`u-${Date.now()}@x.com`, "admin");
     const viewer = { id: admin.id, role: admin.role };
-    const { id: projectId } = await createProjectAs(viewer, {
-      title: "test",
-      description: null,
-      problemStatement: null,
-      objectives: null,
-      minQualifications: null,
-      prefQualifications: null,
-      url: "",
-      contactEmail: "",
-      contactName: null,
-      imageUrl: "",
-      licenseRestrictions: null,
-      programId: null,
-      notes: null,
-    });
+    const { id: projectId } = await createProjectAs(viewer, baseProject());
 
     const form = new FormData();
     form.append("projectId", projectId);
@@ -94,11 +102,41 @@ describe("uploadProjectImageAs", () => {
     expect(head.ContentType).toBe("image/webp");
     expect(head.ContentLength).toBeGreaterThan(0);
 
+    // The row is deliberately untouched. The caller passes the returned key
+    // into updateProject, which is what puts the change in the edit log and
+    // what makes a failed upload leave nothing half saved. See #88.
     const [row] = await db
       .select()
       .from(projects)
       .where(eq(projects.id, projectId));
-    expect(row.imageUrl).toBe(result.key);
+    expect(row.imageUrl).toBeNull();
+  });
+
+  it("refuses a file that is not an allowed image", async () => {
+    const admin = await makeUser(`u-rej-${Date.now()}@x.com`, "admin");
+    const viewer = { id: admin.id, role: admin.role };
+    const { id: projectId } = await createProjectAs(viewer, baseProject());
+    await db
+      .update(projects)
+      .set({ imageUrl: "projects/original.webp", title: "before" })
+      .where(eq(projects.id, projectId));
+
+    const form = new FormData();
+    form.append("projectId", projectId);
+    form.append(
+      "file",
+      new File([Buffer.from("not an image")], "x.txt", { type: "text/plain" })
+    );
+    await expect(uploadProjectImageAs(viewer, form)).rejects.toThrow(
+      /Unsupported image type/
+    );
+
+    const [row] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, projectId));
+    expect(row.imageUrl).toBe("projects/original.webp");
+    expect(row.title).toBe("before");
   });
 });
 
@@ -167,5 +205,67 @@ describe("clearAvatarAs", () => {
     await expect(
       clearAvatarAs({ id: u.id, role: u.role, image: null })
     ).resolves.toEqual({ ok: true });
+  });
+});
+
+const BUCKET = process.env.S3_BUCKET ?? "cs-capstone";
+
+async function putObject(key: string) {
+  await s3Client().send(
+    new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: "x" })
+  );
+}
+
+async function objectExists(key: string): Promise<boolean> {
+  try {
+    await s3Client().send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+describe("updateProjectAs image cleanup", () => {
+  it("deletes the object its own key replaced", async () => {
+    const admin = await makeUser(`cl-a-${Date.now()}@x.com`, "admin");
+    const viewer = { id: admin.id, role: admin.role };
+    const { id } = await createProjectAs(viewer, baseProject());
+    const oldKey = `projects/${id}/old.webp`;
+    await putObject(oldKey);
+    await updateProjectAs(viewer, { id, ...baseProject(), imageUrl: oldKey });
+
+    await updateProjectAs(viewer, {
+      id,
+      ...baseProject(),
+      imageUrl: `projects/${id}/new.webp`,
+    });
+
+    expect(await objectExists(oldKey)).toBe(false);
+  });
+
+  it("leaves a key outside the project's own prefix alone", async () => {
+    // imageUrl is a client-writable column, so a caller can point their own
+    // project at another project's key. Without the prefix guard the next save
+    // deletes that object, and the other project's image is gone from storage
+    // rather than merely unlinked. An orphan is the cheaper failure.
+    const admin = await makeUser(`cl-b-${Date.now()}@x.com`, "admin");
+    const viewer = { id: admin.id, role: admin.role };
+    const { id: victimId } = await createProjectAs(viewer, baseProject());
+    const { id: attackerId } = await createProjectAs(viewer, baseProject());
+    const victimKey = `projects/${victimId}/victim.webp`;
+    await putObject(victimKey);
+
+    await updateProjectAs(viewer, {
+      id: attackerId,
+      ...baseProject(),
+      imageUrl: victimKey,
+    });
+    await updateProjectAs(viewer, {
+      id: attackerId,
+      ...baseProject(),
+      imageUrl: `projects/${attackerId}/mine.webp`,
+    });
+
+    expect(await objectExists(victimKey)).toBe(true);
   });
 });

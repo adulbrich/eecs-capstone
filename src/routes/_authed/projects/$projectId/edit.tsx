@@ -7,6 +7,7 @@ import {
 import { ProjectForm } from "#/components/project-form";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
+import { projectImageUrlToSave } from "#/lib/project-image-save";
 import {
   listProjectCategories,
   setProjectCategories,
@@ -83,10 +84,18 @@ function EditProject() {
           }}
           initialCategoryIds={categoryIds}
           onSubmit={async (values, nextCategoryIds, pendingImage) => {
+            // Before the row write, never after: see project-image-save.ts.
+            const imageUrl = await projectImageUrlToSave({
+              currentImageUrl: values.imageUrl,
+              pendingImage,
+              projectId,
+              upload: uploadProjectImage,
+            });
             await updateProject({
               data: {
                 id: projectId,
                 ...values,
+                imageUrl,
                 programId: values.programId || null,
                 notes: values.notes || null,
                 proposerEmail: viewerIsStaff
@@ -94,12 +103,6 @@ function EditProject() {
                   : undefined,
               },
             });
-            if (pendingImage) {
-              const form = new FormData();
-              form.append("projectId", projectId);
-              form.append("file", pendingImage);
-              await uploadProjectImage({ data: form });
-            }
             if (viewerIsStaff) {
               await setProjectCategories({
                 data: { projectId, categoryIds: nextCategoryIds },

@@ -161,7 +161,20 @@ async function buildProjectValues(
   if (canWritePrivateNotes(existing, visibility)) {
     newValues.notes = data.notes ?? null;
   }
-  if (isStaff(visibility)) {
+  // Omitted and cleared are different asks, and only staff may make either.
+  // An empty string is the explicit unlink the edit form sends when a staff
+  // member clears the field. `undefined` is "this save is not about the
+  // proposer", which is what the new-project route means when it saves an
+  // uploaded image key. Treating the two alike is what made omission silently
+  // destructive, and it cost a spurious "proposer changed" row in the edit log
+  // the one time a caller had to round-trip the address to avoid it.
+  //
+  // Only this field is three-state, and that is deliberate: every other key in
+  // `newValues` is `data.x ?? null`, so a caller that omits one clears it.
+  // Making them all three-state would cost the property the type comment above
+  // depends on, that this object is the one statement of which columns an edit
+  // touches. This is not a general partial-update facility.
+  if (isStaff(visibility) && data.proposerEmail !== undefined) {
     const proposerEmail = data.proposerEmail || null;
     newValues.proposerEmail = proposerEmail;
     newValues.proposerId = proposerEmail
@@ -205,6 +218,20 @@ export async function updateProjectAs(
       newValues: newDiff,
     });
   });
+
+  // After the commit, never inside it: a rollback would otherwise destroy the
+  // object the surviving row still points at. This is the only place a project
+  // image is cleaned up, because this is the only place an existing key is
+  // replaced; create only ever writes a first one.
+  if (changedFields.includes("imageUrl")) {
+    const { deleteReplacedObject, projectImageKeys } = await import(
+      "#/lib/_internal/storage"
+    );
+    await deleteReplacedObject(
+      existing.imageUrl,
+      projectImageKeys(existing.id)
+    );
+  }
 
   if (existing.status === "published") {
     await refreshProjectEmbedding(existing.id, embed);

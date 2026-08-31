@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ProjectForm } from "#/components/project-form";
 import { pageTitle } from "#/lib/page-title";
+import { projectImageUrlToSave } from "#/lib/project-image-save";
 import { setProjectCategories } from "#/server/categories";
-import { createProject } from "#/server/projects";
+import { createProject, updateProject } from "#/server/projects";
 import { uploadProjectImage } from "#/server/uploads";
 
 export const Route = createFileRoute("/_authed/projects/new")({
@@ -24,21 +25,42 @@ function NewProject() {
         <ProjectForm
           enableAiReview
           onSubmit={async (values, categoryIds, pendingImage) => {
+            const payload = {
+              ...values,
+              programId: values.programId || null,
+              notes: values.notes || null,
+            };
             const { id } = await createProject({
               data: {
-                ...values,
-                programId: values.programId || null,
-                notes: values.notes || null,
+                ...payload,
                 proposerEmail: isStaff
                   ? values.proposerEmail || null
                   : undefined,
               },
             });
+            // Create cannot upload first: the key is `projects/<id>/...` and
+            // the upload guard loads the project to check the viewer, so there
+            // is nothing to upload into until the row exists. Hence a second
+            // write here, unlike the edit path, and an edit-log row naming
+            // imageUrl on a brand new draft.
             if (pendingImage) {
-              const form = new FormData();
-              form.append("projectId", id);
-              form.append("file", pendingImage);
-              await uploadProjectImage({ data: form });
+              const imageUrl = await projectImageUrlToSave({
+                currentImageUrl: values.imageUrl,
+                pendingImage,
+                projectId: id,
+                upload: uploadProjectImage,
+              });
+              await updateProject({
+                data: {
+                  ...payload,
+                  id,
+                  imageUrl,
+                  // Omitted on purpose: this save is about the image, and an
+                  // omitted proposer leaves the one create just set alone. The
+                  // form's blank field would unlink it.
+                  proposerEmail: undefined,
+                },
+              });
             }
             if (isStaff && categoryIds.length > 0) {
               await setProjectCategories({
