@@ -15,7 +15,7 @@
  * than letting two copies drift.
  */
 
-export const ALLOWED_IMAGE_TYPES = new Set([
+export const ALLOWED_IMAGE_TYPES: ReadonlySet<string> = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
@@ -29,9 +29,10 @@ export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export const IMAGE_FILE_ACCEPT = [...ALLOWED_IMAGE_TYPES].join(",");
 
 /**
- * The server-side guard. Messages are load-bearing: the integration suites
- * and the forms' error handling both match on them, so change them only
- * with those call sites.
+ * The server-side guard. Every upload surface renders the thrown message
+ * verbatim, and `uploads.integration.test.ts` matches on
+ * `Unsupported image type`, so changing the wording is a user-visible change
+ * with one test to update.
  */
 export function assertImageFile(file: unknown): asserts file is File {
   if (!(file instanceof File)) {
