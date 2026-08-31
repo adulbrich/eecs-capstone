@@ -985,11 +985,13 @@ commits, and why it refuses a key outside the row's own prefix are all under
 Projects section below, and are not repeated here. Two things that section
 cannot say because they are inventory's:
 
-- Retiring an item touches neither its row nor its object, so a retired item
-  keeps its photo. That is not the same as saying only a hard delete can drop
-  one: `updateInventoryItemAs` gates on staff and not on status, so staff
-  replacing or clearing a retired item's photo through the ordinary edit form
-  deletes the object it replaced, exactly as for a live item.
+- Retiring writes the row, through `transitionItem` like any other status
+  change, but it never writes `image_url` and never touches storage, so a
+  retired item keeps its photo. That is not the same as saying only a hard
+  delete can drop one: `updateInventoryItemAs` gates on staff and not on
+  status, and nothing gates the edit form on status either, so staff replacing
+  or clearing a retired item's photo deletes the object it replaced exactly as
+  for a live item.
 - Both create paths reach their first key through a second write, because the
   key is `<domain>/<id>/...` and the upload needs the row to exist. That second
   write is an ordinary edit, so a brand new project or item carries one

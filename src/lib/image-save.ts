@@ -12,7 +12,8 @@
  * rejection without a server. The owner arrives as one object rather than a
  * field name beside a separate id, which removes the mismatch worth removing:
  * two arguments that have to agree and nothing making them. It does not stop
- * a caller putting an item id under the `projectId` key; no type could.
+ * a caller putting an item id under the `projectId` key; nothing in this
+ * union's shape does, and branding the two id types is not worth it here.
  *
  * Removal needs no branch here: both uploaders clear the form's image field
  * when the user clicks Remove, so `currentImageUrl` is already empty. What
