@@ -1473,6 +1473,42 @@ describe("request lifecycle", () => {
     ).rejects.toThrow(/checkout/);
   });
 
+  it("refuses a cancel from a student who does not own the line", async () => {
+    // The requesterId check in cancelRequestItemAs is the whole enforcement
+    // of "only the requester may cancel". assertAuthorized cannot help: it
+    // reads authority, holderId and holderEmail and never the line's
+    // requester, so it waves self_cancel through on a path that supplies
+    // neither holder field. Delete that check and every other cancel case in
+    // this file still passes, because they all pass the owning viewer.
+    const requester = await makeUser(`cx-req-${Date.now()}@x.com`, "user");
+    const otherStudent = await makeUser(`cx-oth-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, item.id));
+
+    await expect(
+      cancelRequestItemAs(otherStudent, {
+        requestItemId: line.id,
+        note: "not mine",
+      })
+    ).rejects.toThrow(/Only the requester can cancel/);
+
+    const [untouched] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.id, line.id));
+    expect(untouched.status).toBe("pending");
+    const [stillHeld] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(stillHeld.status).toBe("requested");
+  });
+
   it("clears the walk-in name and program when a cancel releases the item", async () => {
     // Regression for the two release paths (reject, cancel) writing the
     // available arm's holder columns by hand instead of going through
