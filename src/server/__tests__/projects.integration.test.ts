@@ -1003,9 +1003,13 @@ describe("updateProjectAs cross-user guard", () => {
   it("refuses a write from a viewer who is neither proposer nor staff", async () => {
     // #155: `canEditProject` is unit tested against a rejected viewer in
     // `project-visibility.test.ts`, but no test drove one through this server
-    // seam, so deleting the guard here left the suite green. `notes` is in the
-    // payload on purpose: it is staff-only, so a guard that admitted a
-    // stranger would leak a write to it as well as to the ordinary fields.
+    // seam, so deleting the guard here left the suite green.
+    //
+    // `notes` is in the payload as a second, independent gate, not because a
+    // stranger could otherwise write it: `buildProjectValues` asks
+    // `canWritePrivateNotes` on its own, so with this guard deleted a
+    // stranger's notes are dropped there anyway. It is the title that proves
+    // the guard fired. Notes is owner-or-staff, not staff-only.
     const owner = await makeUser(`x-o-${Date.now()}@x.com`, "user");
     const stranger = await makeUser(`x-s-${Date.now()}@x.com`, "user");
     const { id } = await createProjectAs(owner, {

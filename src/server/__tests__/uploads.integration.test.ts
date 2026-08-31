@@ -143,6 +143,23 @@ describe("uploadProjectImageAs", () => {
   });
 });
 
+/** A project whose image exists in both the row and the bucket. */
+async function seededProject(owner: { id: string; role: string | null }) {
+  const { id } = await createProjectAs(
+    { id: owner.id, role: owner.role },
+    baseProject()
+  );
+  const key = `projects/${id}/original.webp`;
+  await updateProjectAs(
+    { id: owner.id, role: owner.role },
+    { id, ...baseProject(), imageUrl: key }
+  );
+  await s3Client().send(
+    new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: "x" })
+  );
+  return id;
+}
+
 describe("uploadProjectImageAs cross-user guard", () => {
   it("refuses a signed-in viewer who is neither proposer nor staff", async () => {
     // #155 asked for two assertions here, "imageUrl still points at the
@@ -152,19 +169,14 @@ describe("uploadProjectImageAs cross-user guard", () => {
     // updateProjectAs, and the first assertion went with them: the row is
     // trivially unchanged now and would hold with the guard deleted.
     //
-    // The second survives, and is what this asserts. The project starts with
-    // an image, and the refused upload leaves that exact key and no other. A
-    // stranger who got through would add a key, so the count moves 1 -> 2.
+    // The second survives, and is what kills the mutant here. The project
+    // starts with an image, in the row and in the bucket, and the refused
+    // upload leaves that exact key and no other. A stranger who got through
+    // would add a key, so the listing moves from one entry to two.
     const owner = await makeUser(`g-o-${Date.now()}@x.com`, "user");
     const stranger = await makeUser(`g-s-${Date.now()}@x.com`, "user");
-    const { id: projectId } = await createProjectAs(
-      { id: owner.id, role: owner.role },
-      baseProject()
-    );
+    const projectId = await seededProject(owner);
     const originalKey = `projects/${projectId}/original.webp`;
-    await s3Client().send(
-      new PutObjectCommand({ Bucket: BUCKET, Key: originalKey, Body: "x" })
-    );
 
     const form = new FormData();
     form.append("projectId", projectId);
@@ -174,8 +186,16 @@ describe("uploadProjectImageAs cross-user guard", () => {
       uploadProjectImageAs({ id: stranger.id, role: stranger.role }, form)
     ).rejects.toThrow(/Forbidden/);
 
-    // Listed rather than headed, because what matters is that nothing was
-    // ADDED, and a stranger's key is a uuid no caller could name in advance.
+    // #155's first assertion, kept because it states the invariant even though
+    // it cannot fail on its own: this seam has written no row since #88.
+    const [row] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, projectId));
+    expect(row.imageUrl).toBe(originalKey);
+
+    // The one that does the work. Listed rather than headed, because a
+    // stranger's key is a uuid no caller could name in advance.
     const listed = await s3Client().send(
       new ListObjectsV2Command({
         Bucket: BUCKET,
