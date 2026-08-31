@@ -1005,8 +1005,8 @@ describe("updateProjectAs cross-user guard", () => {
     // `project-visibility.test.ts`, but no test drove one through this server
     // seam, so deleting the guard here left the suite green.
     //
-    // The payload is the whole form, `notes` included, because that is what a
-    // real caller sends. It is not extra coverage of `notes`:
+    // The payload carries `notes` because a real caller's does. It is not extra
+    // coverage of that field:
     // `buildProjectValues` gates that field on `canWritePrivateNotes`
     // separately. And `notes` is owner-or-staff, not staff-only as #155 twice
     // calls it, since `canWritePrivateNotes` is `isStaff || isOwner`.
