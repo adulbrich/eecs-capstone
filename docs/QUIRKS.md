@@ -934,8 +934,9 @@ the local `makeUser` helper and call the `*As` variant directly. See
 project and avatar paths are covered in
 `uploads.integration.test.ts`. Note that since #88 the project upload
 writes no row at all: it stores the object and returns the key, and
-the caller saves it. Its test therefore covers Sharp plus the bucket,
-and the row write is asserted on the update path instead.
+the caller saves it. Its test therefore covers Sharp plus the bucket, and
+asserts the row is NOT written; that an image change reaches the row and the
+edit log is asserted on the update path instead.
 
 ### Buffer is not a BlobPart in lib.dom
 
@@ -1166,7 +1167,7 @@ Inventory carried the same list until 2026-08-28, under the name `EDITABLE_FIELD
 
 The predicates are still a second spelling of what `validateStatusInvariants` decides in its `case` labels, because those labels are what make a seventh `ItemStatus` a compile error and cannot be collapsed into a helper without losing that. So `inventory-workflow.test.ts` derives the agreement by asking the rules: for every status the panel can target, `needsHolder` must be true exactly when a holderless transition is refused, and `needsDueAt` true exactly when a dated one is required. The panel keeps its friendlier wording; only the decision is shared.
 
-`imageUrl` used to be a real exception: `uploadProjectImageAs` wrote the column on its own request, so an image change reached neither this diff nor the edit log. #88 closed that by making the upload store the object and return its key, which the caller then passes to `updateProject` as an ordinary field. `updateProjectAs` (`src/server/_internal/projects.ts`) is now the only writer of `projects.image_url`, and therefore the only place a project image is cleaned up. Checkable:
+`imageUrl` used to be a real exception: `uploadProjectImageAs` wrote the column on its own request, so an image change reached neither this diff nor the edit log. #88 closed that by making the upload store the object and return its key, which the caller then passes to `updateProject` as an ordinary field. `createProjectAs` still writes the column on insert, but `updateProjectAs` (`src/server/_internal/projects.ts`) is now the only place an existing `projects.image_url` is replaced, and therefore the only place a project image needs cleaning up. Checkable:
 
 ```bash
 # no hits: the upload path writes no row at all

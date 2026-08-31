@@ -81,38 +81,10 @@ function ndaFields(data: {
   };
 }
 
-/**
- * The address that re-resolves to a project's current proposer: the linked
- * account's own email when there is one, because that is what
- * `resolveProposerId` looks up, and otherwise the stored string, which is what
- * a project proposed by someone with no account has.
- */
-async function effectiveProposerEmail(
-  proposerId: string | null,
-  storedEmail: string | null
-): Promise<string | null> {
-  if (!proposerId) {
-    return storedEmail;
-  }
-  const [account] = await db
-    .select({ email: user.email })
-    .from(user)
-    .where(eq(user.id, proposerId));
-  return account?.email ?? storedEmail;
-}
-
-/**
- * Returns the resolved proposer address alongside the id, because a caller
- * that creates and then updates cannot echo the form's blank field back: blank
- * means "default the proposer to the creator" here and "unlink the proposer"
- * in `buildProjectValues`. The new-project route makes exactly that pair of
- * calls to save an uploaded image key. Not a disclosure: the address is either
- * one staff just typed or the caller's own.
- */
 export async function createProjectAs(
   viewer: AuthUser,
   data: ProjectInput
-): Promise<{ id: string; proposerEmail: string | null }> {
+): Promise<{ id: string }> {
   const staff = isStaff(viewerToVisibility(viewer));
   const proposerEmail = staff ? data.proposerEmail || null : null;
   // On create a blank proposer email defaults the proposer to the creator, so a
@@ -150,13 +122,7 @@ export async function createProjectAs(
       teamsSupported: data.teamsSupported ?? 1,
     })
     .returning();
-  return {
-    id: created.id,
-    proposerEmail: await effectiveProposerEmail(
-      created.proposerId,
-      created.proposerEmail
-    ),
-  };
+  return { id: created.id };
 }
 
 /**
@@ -195,7 +161,15 @@ async function buildProjectValues(
   if (canWritePrivateNotes(existing, visibility)) {
     newValues.notes = data.notes ?? null;
   }
-  if (isStaff(visibility)) {
+  // Omitted and cleared are different asks, and only staff may make either.
+  // An empty string is the explicit unlink the edit form sends when a staff
+  // member clears the field. `undefined` is "this save is not about the
+  // proposer", which is what a caller that never showed the field means: the
+  // new-project route saving an uploaded image key, and any future partial
+  // save. Treating the two alike is what made omission silently destructive,
+  // and it cost a spurious "proposer changed" row in the edit log the one time
+  // a caller had to round-trip the address to avoid it.
+  if (isStaff(visibility) && data.proposerEmail !== undefined) {
     const proposerEmail = data.proposerEmail || null;
     newValues.proposerEmail = proposerEmail;
     newValues.proposerId = proposerEmail
@@ -242,7 +216,8 @@ export async function updateProjectAs(
 
   // After the commit, never inside it: a rollback would otherwise destroy the
   // object the surviving row still points at. This is the only place a project
-  // image is cleaned up, because this is the only place the column is written.
+  // image is cleaned up, because this is the only place an existing key is
+  // replaced; create only ever writes a first one.
   if (changedFields.includes("imageUrl")) {
     const { deleteReplacedObject, projectImageKeys } = await import(
       "#/lib/_internal/storage"

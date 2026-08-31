@@ -30,7 +30,7 @@ function NewProject() {
               programId: values.programId || null,
               notes: values.notes || null,
             };
-            const { id, proposerEmail } = await createProject({
+            const { id } = await createProject({
               data: {
                 ...payload,
                 proposerEmail: isStaff
@@ -41,8 +41,8 @@ function NewProject() {
             // Create cannot upload first: the key is `projects/<id>/...` and
             // the upload guard loads the project to check the viewer, so there
             // is nothing to upload into until the row exists. Hence a second
-            // write here, unlike the edit path, and an edit-log row recording
-            // the image on a brand new draft.
+            // write here, unlike the edit path, and an edit-log row naming
+            // imageUrl on a brand new draft.
             if (pendingImage) {
               const imageUrl = await projectImageUrlToSave({
                 currentImageUrl: values.imageUrl,
@@ -55,9 +55,10 @@ function NewProject() {
                   ...payload,
                   id,
                   imageUrl,
-                  // The address create resolved, not the blank field the form
-                  // sent: blank unlinks the proposer on this path.
-                  proposerEmail: isStaff ? proposerEmail : undefined,
+                  // Omitted on purpose: this save is about the image, and an
+                  // omitted proposer leaves the one create just set alone. The
+                  // form's blank field would unlink it.
+                  proposerEmail: undefined,
                 },
               });
             }

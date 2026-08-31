@@ -80,7 +80,7 @@ function baseProject() {
 }
 
 describe("uploadProjectImageAs", () => {
-  it("writes to the bucket and updates the project row", async () => {
+  it("writes to the bucket and deliberately leaves the row alone", async () => {
     const admin = await makeUser(`u-${Date.now()}@x.com`, "admin");
     const viewer = { id: admin.id, role: admin.role };
     const { id: projectId } = await createProjectAs(viewer, baseProject());
@@ -112,7 +112,7 @@ describe("uploadProjectImageAs", () => {
     expect(row.imageUrl).toBeNull();
   });
 
-  it("leaves the project untouched when the upload is rejected", async () => {
+  it("refuses a file that is not an allowed image", async () => {
     const admin = await makeUser(`u-rej-${Date.now()}@x.com`, "admin");
     const viewer = { id: admin.id, role: admin.role };
     const { id: projectId } = await createProjectAs(viewer, baseProject());

@@ -478,10 +478,10 @@ describe("private notes", () => {
     const owner = await makeUser(`pn-o4-${Date.now()}@x.com`, "user");
     const admin = await makeUser(`pn-a4-${Date.now()}@x.com`, "admin");
     const { id } = await createProjectAs(owner, baseProject());
-    // The staff edit form prefills proposerEmail from getProposerForEdit,
-    // so a staff save always sends it back. Omitting it here would be an
-    // explicit unlink, which would drop the owner and make this test pass for
-    // the wrong reason.
+    // The staff edit form prefills proposerEmail from getProposerForEdit, so a
+    // staff save always sends it back. Sent explicitly here because that is
+    // what the form does; omitting it would now leave the proposer alone
+    // rather than unlink, so this no longer depends on remembering to.
     await updateProjectAs(admin, {
       id,
       ...baseProject(),
@@ -541,25 +541,24 @@ describe("private notes", () => {
     expect(log[0].editorId).toBe(owner.id);
   });
 
-  it("createProjectAs returns a proposer email that survives a follow-up update", async () => {
-    // The new-project route creates, uploads, then updates to save the key, and
-    // a blank proposer email means "default to the creator" on create but
-    // "unlink the proposer" on update. Echoing the form's blank field back
-    // would drop the link, so create returns the address it resolved.
+  it("a staff save that omits proposerEmail leaves the proposer alone", async () => {
+    // Omitted and cleared are different asks. The new-project route creates,
+    // uploads, then updates to save the image key, and that update is not about
+    // the proposer at all. Before this distinction existed, omitting the field
+    // unlinked the proposer, and round-tripping the address to avoid that wrote
+    // a "proposer changed" row into the edit log that no one had asked for.
     const admin = await makeUser(`prop-a-${Date.now()}@x.com`, "admin");
-    const { id, proposerEmail } = await createProjectAs(admin, baseProject());
+    const { id } = await createProjectAs(admin, baseProject());
     const [afterCreate] = await db
       .select()
       .from(projects)
       .where(eq(projects.id, id));
     expect(afterCreate.proposerId).toBe(admin.id);
-    expect(proposerEmail).toBe(admin.email);
 
     await updateProjectAs(admin, {
       id,
       ...baseProject(),
       imageUrl: `projects/${id}/k.webp`,
-      proposerEmail,
     });
 
     const [afterUpdate] = await db
@@ -567,6 +566,25 @@ describe("private notes", () => {
       .from(projects)
       .where(eq(projects.id, id));
     expect(afterUpdate.proposerId).toBe(admin.id);
+
+    // And the log says only what changed.
+    const log = await db
+      .select()
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
+    expect(log).toHaveLength(1);
+    expect(log[0].changedFields).toEqual(["imageUrl"]);
+  });
+
+  it("a staff save that clears proposerEmail still unlinks the proposer", async () => {
+    const admin = await makeUser(`prop-b-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(admin, baseProject());
+
+    await updateProjectAs(admin, { id, ...baseProject(), proposerEmail: "" });
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.proposerId).toBeNull();
+    expect(row.proposerEmail).toBeNull();
   });
 
   it("never returns proposerEmail to anyone, staff included", async () => {
