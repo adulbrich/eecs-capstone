@@ -4,11 +4,10 @@
  *
  * Client-safe on purpose. The server guard and the file picker's `accept`
  * attribute have to agree about which types are allowed, and the only way to
- * keep them agreeing is to have them read the same constant. This module was
- * two private copies in `_internal/uploads.ts` and `_internal/inventory-images.ts`
- * plus a hardcoded string in `image-uploader.tsx`; nothing kept the three in
- * step, so adding a type to one silently gave the app two upload policies
- * depending on which form the user was filling in.
+ * keep them agreeing is to have them read the same constant. This was three
+ * copies with nothing keeping them in step, so adding a type to one silently
+ * gave the app two upload policies depending on which form the user was
+ * filling in. QUIRKS lists who reads this; do not repeat the list here.
  *
  * If a reason ever emerges for one surface to allow something another must
  * not, write the reason down here and split the constant deliberately rather

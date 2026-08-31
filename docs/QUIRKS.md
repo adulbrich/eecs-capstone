@@ -791,7 +791,7 @@ const NAME_COLUMN = {
 | --- | --- |
 | `src/lib/*.ts` | Pure modules, client-safe wrappers. |
 | `src/lib/_internal/*.ts` | Server-only helpers (auth-guards). |
-| `src/lib/__tests__/*.test.ts` | Pure-module unit tests, plus two integration suites (`auth`, `role-gate`) that need a database. |
+| `src/lib/__tests__/*.test.ts` | Pure-module unit tests, plus two integration suites (`auth`, `role-gate`) that need a database, plus the one source scan that belongs to a pure module (`image-upload-policy`). |
 | `src/server/*.ts` | createServerFn wrappers (Zod schemas + dynamic-import handlers). Client-importable. |
 | `src/server/_internal/*.ts` | Impl + `*As(viewer, ...)` + `*ForCurrentUser(...)` helpers. Server-only. |
 | `src/server/__tests__/*.integration.test.ts` | Integration tests against docker Postgres. |
@@ -868,6 +868,14 @@ images and avatars), `_internal/inventory-images.ts`, and the file picker's
 copies, and nothing kept them in step, so the app could have accepted a type on
 one form that another rejected. Change the allowlist or the cap there and every
 surface moves together.
+
+`src/lib/__tests__/image-upload-policy.test.ts` is what keeps that true. Besides
+the guard's own cases it walks `src` for a stray `accept=` naming image MIME
+types, in the quoted, brace and template forms alike, so a fourth surface
+spelling the list out again is a red test rather than a policy nobody notices
+has split. Mutation-check it in the brace form if you touch it: an earlier
+version of that regex anchored to the quote and let `accept={"image/..."}`
+straight through.
 
 ### TanStack Start FormData server functions
 

@@ -68,18 +68,24 @@ describe("IMAGE_FILE_ACCEPT", () => {
 
   it("is the only image allowlist a file picker reads", () => {
     const offenders: string[] = [];
-    for (const file of walk("src")) {
-      if (file.includes("__tests__") || file.includes(".test.")) {
+    for (const path of walk("src")) {
+      if (path.includes("__tests__") || path.includes(".test.")) {
         continue;
       }
-      readFileSync(file, "utf8")
+      readFileSync(path, "utf8")
         .split("\n")
         .forEach((line, i) => {
-          if (/accept\s*=\s*["'][^"']*image\//.test(line)) {
-            offenders.push(`${file}:${i + 1}`);
+          // The brace forms matter as much as the quoted one: `accept={"..."}`
+          // is what JSX is most likely to be written as, and an earlier regex
+          // that anchored to the quote let exactly that through.
+          if (/accept\s*=\s*\{?\s*["'`][^"'`]*image\//.test(line)) {
+            offenders.push(`${path}:${i + 1}`);
           }
         });
     }
-    expect(offenders).toEqual([]);
+    expect(
+      offenders,
+      `Spell the allowlist once: import IMAGE_FILE_ACCEPT from #/lib/image-upload-policy instead. Offenders: ${offenders.join(", ")}`
+    ).toEqual([]);
   });
 });
