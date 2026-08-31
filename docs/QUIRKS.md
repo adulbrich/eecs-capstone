@@ -791,7 +791,7 @@ const NAME_COLUMN = {
 | --- | --- |
 | `src/lib/*.ts` | Pure modules, client-safe wrappers. |
 | `src/lib/_internal/*.ts` | Server-only helpers (auth-guards). |
-| `src/lib/__tests__/*.test.ts` | Pure-module unit tests, plus two integration suites (`auth`, `role-gate`) that need a database, plus two suites that read source off disk rather than importing it (`env-contract`, which also reads `scripts`, `.env.example` and `infra/`, and `image-upload-policy`). |
+| `src/lib/__tests__/*.test.ts` | Pure-module unit tests, plus two integration suites (`auth`, `role-gate`) that need a database, plus two suites that also read source off disk (`env-contract`, which reads `src`, `scripts`, `.env.example` and `infra/`, and `image-upload-policy`, whose other cases import the module normally). |
 | `src/server/*.ts` | createServerFn wrappers (Zod schemas + dynamic-import handlers). Client-importable. |
 | `src/server/_internal/*.ts` | Impl + `*As(viewer, ...)` + `*ForCurrentUser(...)` helpers. Server-only. |
 | `src/server/__tests__/*.integration.test.ts` | Integration tests against docker Postgres. |
@@ -870,13 +870,15 @@ one form that another rejected. Change the allowlist or the cap there and every
 surface moves together.
 
 `src/lib/__tests__/image-upload-policy.test.ts` is what keeps that true. Besides
-the guard's own cases it walks `src` and fails any file outside the policy
-module that names two or more distinct image MIME types, in any arrangement:
-one comma-separated string, a multi-line `Set`, a `t !== "image/jpeg" && ...`
-chain, a union type. One type on its own is left alone, because `image/webp` is
-the output content type Sharp and the canvas both name rather than a policy
-being restated. A second rule catches the shape a type count cannot see, a
-picker narrowed by hand with one type per branch.
+the guard's own cases it walks `src` and fails any file, other than the policy
+module itself and the test files, whose code names two or more distinct image
+MIME types, in any arrangement: one comma-separated string, a multi-line `Set`,
+a `t !== "image/jpeg" && ...` chain, a union type. Comment lines are dropped
+before counting, so prose explaining the rule may quote it. One type on its own
+is left alone, because `image/webp` is the output content type Sharp and the
+canvas both name rather than a policy being restated. A second rule runs only
+when the count did not fire, and catches a picker narrowed by hand to a single
+type in a file that names no other.
 
 If you touch that scan, mutate more than the form it was written for. Every
 narrowing it has needed was found that way and not by reading. Requiring a

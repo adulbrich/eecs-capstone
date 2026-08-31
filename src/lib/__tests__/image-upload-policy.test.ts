@@ -78,9 +78,10 @@ describe("IMAGE_FILE_ACCEPT", () => {
     // One type is not drift: `image/webp` alone is the output content type
     // Sharp and the canvas both name, which is why the threshold is two.
     const MIME = /image\/[a-z0-9.+-]+/g;
-    // Narrowing the picker by hand is the one shape a type count misses,
-    // since `accept={x ? "image/jpeg" : "image/png"}` may sit in a file that
-    // names nothing else.
+    // Only reachable when the count did not fire, so this is about a picker
+    // narrowed to a SINGLE type in a file that names no other. Anything
+    // naming two, a ternary with one type per branch included, is already an
+    // offender by count.
     const NARROWS_A_PICKER = /accept[^"'`]*["'`][^"'`]*image\//;
     const offenders: string[] = [];
     for (const path of walk("src")) {
@@ -91,11 +92,23 @@ describe("IMAGE_FILE_ACCEPT", () => {
       ) {
         continue;
       }
-      const source = readFileSync(path, "utf8");
-      const types = new Set(source.match(MIME) ?? []);
+      // Comment lines are dropped before counting, because a comment
+      // explaining this rule has to be able to quote it, and this file is
+      // not the only place that will want to.
+      const code = readFileSync(path, "utf8")
+        .split("\n")
+        .filter((line) => {
+          const t = line.trim();
+          return !(
+            t.startsWith("*") ||
+            t.startsWith("//") ||
+            t.startsWith("/*")
+          );
+        });
+      const types = new Set(code.join("\n").match(MIME) ?? []);
       if (types.size > 1) {
         offenders.push(`${path} names ${[...types].sort().join(" ")}`);
-      } else if (source.split("\n").some((l) => NARROWS_A_PICKER.test(l))) {
+      } else if (code.some((line) => NARROWS_A_PICKER.test(line))) {
         offenders.push(`${path} narrows the picker by hand`);
       }
     }
