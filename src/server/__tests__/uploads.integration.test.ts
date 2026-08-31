@@ -98,7 +98,7 @@ describe("uploadProjectImageAs", () => {
     const client = s3Client();
     const head = await client.send(
       new HeadObjectCommand({
-        Bucket: process.env.S3_BUCKET ?? "cs-capstone",
+        Bucket: BUCKET,
         Key: result.key,
       })
     );
@@ -145,20 +145,25 @@ describe("uploadProjectImageAs", () => {
 
 describe("uploadProjectImageAs cross-user guard", () => {
   it("refuses a signed-in viewer who is neither proposer nor staff", async () => {
-    // #155: the guard had no test, and this is the seam where losing it is
-    // worst. What that costs has moved since: before #88 the write deleted the
-    // previous S3 object, so a stranger's upload destroyed the original rather
-    // than replacing it in the UI. Today the upload writes no row and deletes
-    // nothing, so the loss is bounded to a stranger writing objects into
-    // another project's key space. The guard is what stops both, which is why
-    // the assertion is that no object exists rather than that the row is
-    // unchanged: the row is trivially unchanged now, and would pass with the
-    // guard deleted.
+    // #155 asked for two assertions here, "imageUrl still points at the
+    // original key" and "the old S3 object still exists", because at the time
+    // this seam wrote the column and deleted the object it replaced, so a
+    // stranger's upload destroyed the original. #88 moved both to
+    // updateProjectAs, and the first assertion went with them: the row is
+    // trivially unchanged now and would hold with the guard deleted.
+    //
+    // The second survives, and is what this asserts. The project starts with
+    // an image, and the refused upload leaves that exact key and no other. A
+    // stranger who got through would add a key, so the count moves 1 -> 2.
     const owner = await makeUser(`g-o-${Date.now()}@x.com`, "user");
     const stranger = await makeUser(`g-s-${Date.now()}@x.com`, "user");
     const { id: projectId } = await createProjectAs(
       { id: owner.id, role: owner.role },
       baseProject()
+    );
+    const originalKey = `projects/${projectId}/original.webp`;
+    await s3Client().send(
+      new PutObjectCommand({ Bucket: BUCKET, Key: originalKey, Body: "x" })
     );
 
     const form = new FormData();
@@ -169,15 +174,15 @@ describe("uploadProjectImageAs cross-user guard", () => {
       uploadProjectImageAs({ id: stranger.id, role: stranger.role }, form)
     ).rejects.toThrow(/Forbidden/);
 
-    // Nothing was stored under the project's prefix. Listing rather than
-    // heading a known key, because the key is a uuid the caller never saw.
+    // Listed rather than headed, because what matters is that nothing was
+    // ADDED, and a stranger's key is a uuid no caller could name in advance.
     const listed = await s3Client().send(
       new ListObjectsV2Command({
         Bucket: BUCKET,
         Prefix: `projects/${projectId}/`,
       })
     );
-    expect(listed.KeyCount ?? 0).toBe(0);
+    expect(listed.Contents?.map((o) => o.Key)).toEqual([originalKey]);
   });
 });
 
@@ -199,7 +204,7 @@ describe("uploadAvatarAs", () => {
     const client = s3Client();
     const head = await client.send(
       new HeadObjectCommand({
-        Bucket: process.env.S3_BUCKET ?? "cs-capstone",
+        Bucket: BUCKET,
         Key: result.key,
       })
     );
