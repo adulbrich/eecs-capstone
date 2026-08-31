@@ -46,8 +46,7 @@ function NewProject() {
             if (pendingImage) {
               const imageUrl = await imageUrlToSave({
                 currentImageUrl: values.imageUrl,
-                ownerField: "projectId",
-                ownerId: id,
+                owner: { projectId: id },
                 pendingImage,
                 upload: uploadProjectImage,
               });

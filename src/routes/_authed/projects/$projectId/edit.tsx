@@ -87,8 +87,7 @@ function EditProject() {
             // Before the row write, never after: see image-save.ts.
             const imageUrl = await imageUrlToSave({
               currentImageUrl: values.imageUrl,
-              ownerField: "projectId",
-              ownerId: projectId,
+              owner: { projectId },
               pendingImage,
               upload: uploadProjectImage,
             });

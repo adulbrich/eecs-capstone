@@ -9,27 +9,31 @@
  * the key having no way to reach the write.
  *
  * Takes the uploader as a parameter so a test can drive every branch and the
- * rejection without a server, and takes the owner field name because that is
- * the only thing that differs between the two domains.
+ * rejection without a server. The owner arrives as one object rather than a
+ * field name beside an id, so pairing `projectId` with an item id is not a
+ * thing a caller can express.
  *
  * Removal needs no branch here: both uploaders clear the form's image field
  * when the user clicks Remove, so `currentImageUrl` is already empty. What
  * "empty" means differs by form ("" for projects, null for inventory) and this
  * passes either through untouched, because the schemas accept both.
  */
-export async function imageUrlToSave<Current extends string | null>(args: {
-  currentImageUrl: Current;
-  ownerField: "itemId" | "projectId";
-  ownerId: string;
+export async function imageUrlToSave(args: {
+  currentImageUrl: string | null;
+  owner: { itemId: string } | { projectId: string };
   pendingImage: File | null | undefined;
   upload: (opts: { data: FormData }) => Promise<{ key: string }>;
-}): Promise<Current | string> {
-  const { currentImageUrl, ownerField, ownerId, pendingImage, upload } = args;
+}): Promise<string | null> {
+  const { currentImageUrl, owner, pendingImage, upload } = args;
   if (!(pendingImage instanceof File)) {
     return currentImageUrl;
   }
   const form = new FormData();
-  form.append(ownerField, ownerId);
+  const [field, id] =
+    "projectId" in owner
+      ? ["projectId", owner.projectId]
+      : ["itemId", owner.itemId];
+  form.append(field, id);
   form.append("file", pendingImage);
   const { key } = await upload({ data: form });
   return key;

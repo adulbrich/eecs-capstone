@@ -102,8 +102,7 @@ export function InventoryForm({
           // half applied. Same fix as #88 on the project side.
           const imageUrl = await imageUrlToSave({
             currentImageUrl: payload.imageUrl,
-            ownerField: "itemId",
-            ownerId: itemId,
+            owner: { itemId },
             pendingImage,
             upload: uploadInventoryImage,
           });
@@ -120,8 +119,7 @@ export function InventoryForm({
           if (pendingImage instanceof File) {
             const imageUrl = await imageUrlToSave({
               currentImageUrl: payload.imageUrl,
-              ownerField: "itemId",
-              ownerId: savedId,
+              owner: { itemId: savedId },
               pendingImage,
               upload: uploadInventoryImage,
             });

@@ -505,13 +505,15 @@ export async function updateInventoryItemAs(
   });
 
   // After the transaction commits, never inside it: a rollback would otherwise
-  // destroy the object the surviving row still points at. This is the only
-  // place an existing inventory image is replaced, so it is the only place one
-  // needs cleaning up. See #126.
-  const { deleteReplacedObject, inventoryImageKeys } = await import(
-    "#/lib/_internal/storage"
-  );
-  await deleteReplacedObject(replacedImage, inventoryImageKeys(data.id));
+  // destroy the object the surviving row still points at. Guarded so an edit
+  // that did not touch the image does not pull the S3 SDK into the request at
+  // all, which is what `updateProjectAs` does for the same reason. See #126.
+  if (replacedImage) {
+    const { deleteReplacedObject, inventoryImageKeys } = await import(
+      "#/lib/_internal/storage"
+    );
+    await deleteReplacedObject(replacedImage, inventoryImageKeys(data.id));
+  }
   return view;
 }
 
@@ -550,10 +552,12 @@ export async function hardDeleteInventoryItemAs(
   await db.delete(inventoryItems).where(eq(inventoryItems.id, data.id));
   // The row is gone, so nothing will ever reference the object again. Retire
   // is deliberately not here: a retired item keeps both its row and its photo.
-  const { deleteReplacedObject, inventoryImageKeys } = await import(
-    "#/lib/_internal/storage"
-  );
-  await deleteReplacedObject(row.imageUrl, inventoryImageKeys(data.id));
+  if (row.imageUrl) {
+    const { deleteReplacedObject, inventoryImageKeys } = await import(
+      "#/lib/_internal/storage"
+    );
+    await deleteReplacedObject(row.imageUrl, inventoryImageKeys(data.id));
+  }
   return { ok: true as const };
 }
 

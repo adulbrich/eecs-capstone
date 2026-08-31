@@ -966,6 +966,38 @@ When updating, keep the structure: short headline, one-paragraph explanation, co
 
 ## Inventory
 
+### Who writes an image column, and who deletes the object
+
+Both `projects.image_url` and `inventory_items.image_url` follow one rule, and
+the uploads follow none of it by design (#88, #126):
+
+| Path | Writes the column | Deletes what it replaced |
+| --- | --- | --- |
+| `uploadProjectImageAs`, `uploadInventoryImageAs` | No, returns the key | No |
+| `updateProjectAs`, `updateInventoryItemAs` | Yes | Yes |
+| `createProjectAs`, `createInventoryItemAs` | On insert, so nothing to replace | No |
+| `hardDeleteInventoryItemAs` | Deletes the row | Yes |
+| `hardDeleteProjectAs` | Deletes the row | No, and that is a leak |
+
+The reasoning, the post-commit ordering and the prefix scoping are one section
+up, under the projects heading, and are not repeated here. Two things that
+section cannot say because they are inventory's:
+
+- Retire is not delete. A retired item keeps its row and its photo, and
+  `hardDeleteInventoryItemAs` is the only inventory path that drops either.
+- Both create paths reach their first key through a second write, because the
+  key is `<domain>/<id>/...` and the upload needs the row to exist. That second
+  write is an ordinary edit, so a brand new project or item carries one
+  edit-log row naming `imageUrl`.
+
+Checkable:
+
+```bash
+# no hits: neither upload path writes a row
+grep -n 'update(projects)' src/server/_internal/uploads.ts
+grep -n 'update(inventoryItems)' src/server/_internal/inventory-images.ts
+```
+
 ### Categories: `domain` is closed, `type` is an open project-only facet, filtering is all-match
 
 `categories.domain` is a closed enum (`"project" | "inventory"`) fixed at creation and immutable on update; it decides which picker a category can appear in and, for inventory, is enforced again at the junction-table read (`listInventoryCategoriesImpl` in `src/server/_internal/inventory-catalog.ts` re-filters on `domain = 'inventory'` even though nothing today writes a project-domain row into `inventory_item_categories`: belt and suspenders, not a defense against something that currently happens). `categories.type` is a separate, nullable, free-text facet (grouping label like "technology" or "industry") that only the project domain uses for grouping in the UI; inventory categories always carry `type = null` and are rendered as one flat list, not grouped. An inventory item can carry many categories through `inventory_item_categories` (many-to-many), the same shape `project_categories` already used for projects.
@@ -1175,39 +1207,6 @@ grep -n 'update(projects)' src/server/_internal/uploads.ts
 ```
 
 The cleanup runs after the transaction commits rather than inside it, because a rollback would otherwise destroy the object the surviving row still points at, and it is scoped to the project's own `projects/<id>/` key prefix: `imageUrl` is client-writable, so an unscoped delete lets a caller point their row at another project's key and have the next save destroy it.
-
-### One rule for every image column: the writer owns the object
-
-`projects.image_url` and `inventory_items.image_url` both follow it, and the
-uploads follow neither by design:
-
-| Path | Writes the column | Deletes the object it replaced |
-| --- | --- | --- |
-| `uploadProjectImageAs`, `uploadInventoryImageAs` | No, returns the key | No |
-| `updateProjectAs`, `updateInventoryItemAs` | Yes | Yes |
-| `createProjectAs`, `createInventoryItemAs` | First key only | Nothing to replace |
-| `hardDeleteInventoryItemAs` | Deletes the row | Yes |
-| `hardDeleteProjectAs` | Deletes the row | No, and that is a leak |
-
-Three things this buys, and they are why the uploads write no row (#88, #126).
-The change reaches the edit log, because `imageUrl` is an ordinary key in the
-writer's object and `diffRowFields` reads that object. A failed upload leaves
-the row untouched, because there is one column write instead of two. And the
-cleanup has one home per domain instead of being spread over every writer.
-
-Two rules the cleanup itself follows. It runs AFTER the transaction commits,
-never inside it, or a rollback destroys the object the surviving row still
-points at. And it refuses any key outside the row's own `KeySpace`
-(`src/lib/_internal/storage.ts`), because both columns are client-writable, so
-an unscoped delete lets a caller point their row at someone else's key and have
-the next save destroy it. Not deleting is always the safe direction: the cost
-is an orphan, and the cost of the other direction is someone else's image.
-
-`KeySpace` pairs the key builder with the prefix the delete checks, because a
-layout changed in one and not the other would make cleanup a permanent silent
-no-op rather than a visible failure.
-
-Retire is not delete: a retired inventory item keeps its row and its photo.
 
 ### `commitTransition` is the only writer of `project_status_history`
 

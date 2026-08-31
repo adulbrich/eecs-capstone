@@ -13,8 +13,7 @@ describe("imageUrlToSave", () => {
     await expect(
       imageUrlToSave({
         currentImageUrl: "projects/p1/old.webp",
-        ownerField: "projectId",
-        ownerId: "p1",
+        owner: { projectId: "p1" },
         pendingImage: null,
         upload,
       })
@@ -29,8 +28,7 @@ describe("imageUrlToSave", () => {
     await expect(
       imageUrlToSave({
         currentImageUrl: "",
-        ownerField: "projectId",
-        ownerId: "p1",
+        owner: { projectId: "p1" },
         pendingImage: null,
         upload,
       })
@@ -43,8 +41,7 @@ describe("imageUrlToSave", () => {
     await expect(
       imageUrlToSave({
         currentImageUrl: "projects/p1/old.webp",
-        ownerField: "projectId",
-        ownerId: "p1",
+        owner: { projectId: "p1" },
         pendingImage: file(),
         upload,
       })
@@ -60,8 +57,7 @@ describe("imageUrlToSave", () => {
     await expect(
       imageUrlToSave({
         currentImageUrl: null,
-        ownerField: "itemId",
-        ownerId: "i1",
+        owner: { itemId: "i1" },
         pendingImage: file(),
         upload,
       })
@@ -74,8 +70,7 @@ describe("imageUrlToSave", () => {
     await expect(
       imageUrlToSave({
         currentImageUrl: null,
-        ownerField: "itemId",
-        ownerId: "i1",
+        owner: { itemId: "i1" },
         pendingImage: undefined,
         upload,
       })
@@ -93,8 +88,7 @@ describe("imageUrlToSave", () => {
     await expect(
       imageUrlToSave({
         currentImageUrl: "projects/p1/old.webp",
-        ownerField: "projectId",
-        ownerId: "p1",
+        owner: { projectId: "p1" },
         pendingImage: file(),
         upload,
       })
