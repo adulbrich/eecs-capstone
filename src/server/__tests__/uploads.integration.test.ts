@@ -143,17 +143,18 @@ describe("uploadProjectImageAs", () => {
   });
 });
 
-/** A project whose image exists in both the row and the bucket. */
+/**
+ * A project whose image exists in both the row and the bucket.
+ *
+ * The column is set with a direct update rather than through
+ * `updateProjectAs`, matching the sibling test above: this test is about the
+ * upload guard, and routing its setup through another seam would let a
+ * regression there fail this test for an unrelated reason.
+ */
 async function seededProject(owner: { id: string; role: string | null }) {
-  const { id } = await createProjectAs(
-    { id: owner.id, role: owner.role },
-    baseProject()
-  );
+  const { id } = await createProjectAs(owner, baseProject());
   const key = `projects/${id}/original.webp`;
-  await updateProjectAs(
-    { id: owner.id, role: owner.role },
-    { id, ...baseProject(), imageUrl: key }
-  );
+  await db.update(projects).set({ imageUrl: key }).where(eq(projects.id, id));
   await s3Client().send(
     new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: "x" })
   );
@@ -166,8 +167,8 @@ describe("uploadProjectImageAs cross-user guard", () => {
     // original key" and "the old S3 object still exists", because at the time
     // this seam wrote the column and deleted the object it replaced, so a
     // stranger's upload destroyed the original. #88 moved both to
-    // updateProjectAs, and the first assertion went with them: the row is
-    // trivially unchanged now and would hold with the guard deleted.
+    // updateProjectAs. The first is asserted below and labelled, because it
+    // can no longer fail from anything this seam does.
     //
     // The second survives, and is what kills the mutant here. The project
     // starts with an image, in the row and in the bucket, and the refused
@@ -186,8 +187,10 @@ describe("uploadProjectImageAs cross-user guard", () => {
       uploadProjectImageAs({ id: stranger.id, role: stranger.role }, form)
     ).rejects.toThrow(/Forbidden/);
 
-    // #155's first assertion, kept because it states the invariant even though
-    // it cannot fail on its own: this seam has written no row since #88.
+    // #155's first assertion. Stated because it is the invariant the issue
+    // named, and labelled because it cannot fail from a mutant in this seam:
+    // `uploadProjectImageAs` only selects the row, it has written none since
+    // #88.
     const [row] = await db
       .select()
       .from(projects)

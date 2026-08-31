@@ -1008,14 +1008,14 @@ describe("updateProjectAs cross-user guard", () => {
     // `notes` is in the payload as a second, independent gate, not because a
     // stranger could otherwise write it: `buildProjectValues` asks
     // `canWritePrivateNotes` on its own, so with this guard deleted a
-    // stranger's notes are dropped there anyway. It is the title that proves
-    // the guard fired. Notes is owner-or-staff, not staff-only.
+    // stranger's notes are dropped there anyway. Notes is owner-or-staff, not
+    // staff-only, whatever #155 says.
     const owner = await makeUser(`x-o-${Date.now()}@x.com`, "user");
     const stranger = await makeUser(`x-s-${Date.now()}@x.com`, "user");
     const { id } = await createProjectAs(owner, {
       ...baseProject(),
       title: "owned",
-      notes: "staff only",
+      notes: "owner wrote this",
     });
 
     await expect(
@@ -1029,7 +1029,7 @@ describe("updateProjectAs cross-user guard", () => {
 
     const [row] = await db.select().from(projects).where(eq(projects.id, id));
     expect(row.title).toBe("owned");
-    expect(row.notes).toBe("staff only");
+    expect(row.notes).toBe("owner wrote this");
     // And nothing was logged, because nothing was written.
     const log = await db
       .select()
