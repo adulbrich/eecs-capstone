@@ -3,6 +3,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { FieldError } from "#/components/ui/field";
 import { applyServerErrors } from "#/lib/apply-server-errors";
+import { imageUrlToSave } from "#/lib/image-save";
 import {
   PRIVATE_NOTES_INVENTORY_HINT,
   PRIVATE_NOTES_LABEL,
@@ -95,20 +96,39 @@ export function InventoryForm({
 
         let savedId: string;
         if (itemId) {
+          // Upload before the row write, so the key is an ordinary field on the
+          // save. The old order wrote the row and then uploaded, which kept the
+          // image change out of the item's edit log and left a failed upload
+          // half applied. Same fix as #88 on the project side.
+          const imageUrl = await imageUrlToSave({
+            currentImageUrl: payload.imageUrl,
+            ownerField: "itemId",
+            ownerId: itemId,
+            pendingImage,
+            upload: uploadInventoryImage,
+          });
           const result = await updateInventoryItem({
-            data: { id: itemId, ...payload },
+            data: { id: itemId, ...payload, imageUrl },
           });
           savedId = result.id;
         } else {
+          // Create cannot upload first: the key is `inventory/<id>/...` and the
+          // upload loads the item to check it exists, so there is nothing to
+          // upload into until the row does. Hence a second write here.
           const result = await createInventoryItem({ data: payload });
           savedId = result.id;
-        }
-
-        if (pendingImage instanceof File) {
-          const fd = new FormData();
-          fd.append("itemId", savedId);
-          fd.append("file", pendingImage);
-          await uploadInventoryImage({ data: fd });
+          if (pendingImage instanceof File) {
+            const imageUrl = await imageUrlToSave({
+              currentImageUrl: payload.imageUrl,
+              ownerField: "itemId",
+              ownerId: savedId,
+              pendingImage,
+              upload: uploadInventoryImage,
+            });
+            await updateInventoryItem({
+              data: { id: savedId, ...payload, imageUrl },
+            });
+          }
         }
 
         if (onSaved) {

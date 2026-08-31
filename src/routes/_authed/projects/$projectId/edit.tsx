@@ -5,9 +5,9 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { ProjectForm } from "#/components/project-form";
+import { imageUrlToSave } from "#/lib/image-save";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
-import { projectImageUrlToSave } from "#/lib/project-image-save";
 import {
   listProjectCategories,
   setProjectCategories,
@@ -84,11 +84,12 @@ function EditProject() {
           }}
           initialCategoryIds={categoryIds}
           onSubmit={async (values, nextCategoryIds, pendingImage) => {
-            // Before the row write, never after: see project-image-save.ts.
-            const imageUrl = await projectImageUrlToSave({
+            // Before the row write, never after: see image-save.ts.
+            const imageUrl = await imageUrlToSave({
               currentImageUrl: values.imageUrl,
+              ownerField: "projectId",
+              ownerId: projectId,
               pendingImage,
-              projectId,
               upload: uploadProjectImage,
             });
             await updateProject({

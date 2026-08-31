@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ProjectForm } from "#/components/project-form";
+import { imageUrlToSave } from "#/lib/image-save";
 import { pageTitle } from "#/lib/page-title";
-import { projectImageUrlToSave } from "#/lib/project-image-save";
 import { setProjectCategories } from "#/server/categories";
 import { createProject, updateProject } from "#/server/projects";
 import { uploadProjectImage } from "#/server/uploads";
@@ -44,10 +44,11 @@ function NewProject() {
             // write here, unlike the edit path, and an edit-log row naming
             // imageUrl on a brand new draft.
             if (pendingImage) {
-              const imageUrl = await projectImageUrlToSave({
+              const imageUrl = await imageUrlToSave({
                 currentImageUrl: values.imageUrl,
+                ownerField: "projectId",
+                ownerId: id,
                 pendingImage,
-                projectId: id,
                 upload: uploadProjectImage,
               });
               await updateProject({

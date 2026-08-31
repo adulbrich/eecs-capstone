@@ -403,7 +403,7 @@ export async function updateInventoryItemAs(
   data: UpdateInventoryItemInput
 ) {
   assertStaff(viewer);
-  return await db.transaction(async (tx) => {
+  const { replacedImage, view } = await db.transaction(async (tx) => {
     const [before] = await tx
       .select()
       .from(inventoryItems)
@@ -464,7 +464,10 @@ export async function updateInventoryItemAs(
     }
 
     if (changed.length === 0) {
-      return staffItemView(before, beforeCategories, storedHold(before));
+      return {
+        replacedImage: null,
+        view: staffItemView(before, beforeCategories, storedHold(before)),
+      };
     }
 
     await tx
@@ -495,8 +498,21 @@ export async function updateInventoryItemAs(
       .select()
       .from(inventoryItems)
       .where(eq(inventoryItems.id, data.id));
-    return staffItemView(after, afterCategories, storedHold(after));
+    return {
+      replacedImage: changed.includes("imageUrl") ? before.imageUrl : null,
+      view: staffItemView(after, afterCategories, storedHold(after)),
+    };
   });
+
+  // After the transaction commits, never inside it: a rollback would otherwise
+  // destroy the object the surviving row still points at. This is the only
+  // place an existing inventory image is replaced, so it is the only place one
+  // needs cleaning up. See #126.
+  const { deleteReplacedObject, inventoryImageKeys } = await import(
+    "#/lib/_internal/storage"
+  );
+  await deleteReplacedObject(replacedImage, inventoryImageKeys(data.id));
+  return view;
 }
 
 export async function hardDeleteInventoryItemAs(
@@ -532,6 +548,12 @@ export async function hardDeleteInventoryItemAs(
     );
   }
   await db.delete(inventoryItems).where(eq(inventoryItems.id, data.id));
+  // The row is gone, so nothing will ever reference the object again. Retire
+  // is deliberately not here: a retired item keeps both its row and its photo.
+  const { deleteReplacedObject, inventoryImageKeys } = await import(
+    "#/lib/_internal/storage"
+  );
+  await deleteReplacedObject(row.imageUrl, inventoryImageKeys(data.id));
   return { ok: true as const };
 }
 
