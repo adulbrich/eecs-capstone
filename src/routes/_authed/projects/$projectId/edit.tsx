@@ -83,10 +83,24 @@ function EditProject() {
           }}
           initialCategoryIds={categoryIds}
           onSubmit={async (values, nextCategoryIds, pendingImage) => {
+            // Upload first, then save the key as an ordinary field. The old
+            // order saved the row and then uploaded, so a failed upload left
+            // the edit half applied, and the image change never reached the
+            // edit log because the upload wrote the column behind its back.
+            // Removal needs nothing here: the uploader clears the form field,
+            // so `values.imageUrl` is already "".
+            let imageUrl = values.imageUrl;
+            if (pendingImage) {
+              const form = new FormData();
+              form.append("projectId", projectId);
+              form.append("file", pendingImage);
+              ({ key: imageUrl } = await uploadProjectImage({ data: form }));
+            }
             await updateProject({
               data: {
                 id: projectId,
                 ...values,
+                imageUrl,
                 programId: values.programId || null,
                 notes: values.notes || null,
                 proposerEmail: viewerIsStaff
@@ -94,12 +108,6 @@ function EditProject() {
                   : undefined,
               },
             });
-            if (pendingImage) {
-              const form = new FormData();
-              form.append("projectId", projectId);
-              form.append("file", pendingImage);
-              await uploadProjectImage({ data: form });
-            }
             if (viewerIsStaff) {
               await setProjectCategories({
                 data: { projectId, categoryIds: nextCategoryIds },

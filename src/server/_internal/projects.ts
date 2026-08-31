@@ -81,10 +81,46 @@ function ndaFields(data: {
   };
 }
 
+/**
+ * Returns the effective proposer address alongside the id, and that second
+ * field is not decoration.
+ *
+ * A blank proposer email means two opposite things on the two paths. Here it
+ * means "default the proposer to the creator" (`proposerId = viewer.id`
+ * below); in `buildProjectValues` it means "unlink the proposer"
+ * (`proposerId = null`). So a caller that creates a project and then updates
+ * it, which the new-project route must do to save an uploaded image key,
+ * would silently drop the proposer link by echoing back a blank field.
+ *
+ * The address returned is the one the edit form would prefill, for exactly the
+ * reason `getProposerForEditAs` prefills it: proposerId is canonical, so an
+ * untouched save has to re-resolve to the same proposer.
+ */
+/**
+ * The address that re-resolves to the project's current proposer.
+ *
+ * The linked account's own email when there is one, because that is what
+ * `resolveProposerId` will look up. Otherwise the stored string, which is what
+ * a project proposed by someone with no account has.
+ */
+async function effectiveProposerEmail(
+  proposerId: string | null,
+  storedEmail: string | null
+): Promise<string | null> {
+  if (!proposerId) {
+    return storedEmail;
+  }
+  const [account] = await db
+    .select({ email: user.email })
+    .from(user)
+    .where(eq(user.id, proposerId));
+  return account?.email ?? storedEmail;
+}
+
 export async function createProjectAs(
   viewer: AuthUser,
   data: ProjectInput
-): Promise<{ id: string }> {
+): Promise<{ id: string; proposerEmail: string | null }> {
   const staff = isStaff(viewerToVisibility(viewer));
   const proposerEmail = staff ? data.proposerEmail || null : null;
   // On create a blank proposer email defaults the proposer to the creator, so a
@@ -122,7 +158,13 @@ export async function createProjectAs(
       teamsSupported: data.teamsSupported ?? 1,
     })
     .returning();
-  return { id: created.id };
+  return {
+    id: created.id,
+    proposerEmail: await effectiveProposerEmail(
+      created.proposerId,
+      created.proposerEmail
+    ),
+  };
 }
 
 /**
@@ -205,6 +247,14 @@ export async function updateProjectAs(
       newValues: newDiff,
     });
   });
+
+  // After the commit, never inside it: a rollback would otherwise destroy the
+  // object the surviving row still points at. This is the only place a project
+  // image is cleaned up, because this is the only place the column is written.
+  if (changedFields.includes("imageUrl")) {
+    const { deleteReplacedObject } = await import("#/lib/_internal/storage");
+    await deleteReplacedObject(existing.imageUrl, `projects/${existing.id}/`);
+  }
 
   if (existing.status === "published") {
     await refreshProjectEmbedding(existing.id, embed);

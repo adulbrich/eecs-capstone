@@ -17,6 +17,20 @@ interface AuthUser {
   role?: string | null | undefined;
 }
 
+/**
+ * Stores a project image and returns its key. Deliberately writes no row.
+ *
+ * The caller passes the key into `updateProject` as an ordinary field, which
+ * buys three things this function cannot: the change goes through
+ * `diffRowFields` and lands in `project_edit_log` like every other edit, a
+ * failed upload leaves the project untouched rather than half saved, and the
+ * object the key replaces is deleted by whoever owns the column. It used to
+ * write `projects.imageUrl` on its own request, which is why an image change
+ * was the one edit the log never showed. See #88.
+ *
+ * The guard stays here regardless: this writes into a project's key space, so
+ * it has to know the viewer may edit that project.
+ */
 export async function uploadProjectImageAs(
   viewer: AuthUser,
   form: FormData
@@ -48,25 +62,7 @@ export async function uploadProjectImageAs(
 
   const key = `projects/${projectId}/${randomUUID()}.webp`;
   const { getObjectStorage } = await import("#/lib/_internal/storage");
-  const storage = getObjectStorage();
-  await storage.put(key, buffer, contentType);
-
-  const previousKey = project.imageUrl;
-  await db
-    .update(projects)
-    .set({ imageUrl: key, updatedAt: new Date() })
-    .where(eq(projects.id, projectId));
-
-  // Best-effort cleanup of the previous key (skip http(s) legacy URLs).
-  if (
-    previousKey &&
-    !previousKey.startsWith("http://") &&
-    !previousKey.startsWith("https://")
-  ) {
-    storage.delete(previousKey).catch((e) => {
-      console.warn(`Failed to delete previous key ${previousKey}:`, e);
-    });
-  }
+  await getObjectStorage().put(key, buffer, contentType);
 
   return { key };
 }
@@ -98,15 +94,10 @@ export async function uploadAvatarAs(viewer: AuthUser, form: FormData) {
     .set({ image: key, updatedAt: new Date() })
     .where(eq(user.id, viewer.id));
 
-  if (
-    previousImage &&
-    !previousImage.startsWith("http://") &&
-    !previousImage.startsWith("https://")
-  ) {
-    storage.delete(previousImage).catch((e) => {
-      console.warn(`Failed to delete previous avatar ${previousImage}:`, e);
-    });
-  }
+  // After the write, and scoped to the viewer's own key space: an OAuth
+  // account's `user.image` is a remote URL, which fails the prefix check.
+  const { deleteReplacedObject } = await import("#/lib/_internal/storage");
+  await deleteReplacedObject(previousImage, `avatars/${viewer.id}/`);
 
   return { key };
 }
@@ -117,18 +108,8 @@ export async function clearAvatarAs(viewer: AuthUser) {
     .update(user)
     .set({ image: null, updatedAt: new Date() })
     .where(eq(user.id, viewer.id));
-  if (
-    previousImage &&
-    !previousImage.startsWith("http://") &&
-    !previousImage.startsWith("https://")
-  ) {
-    const { getObjectStorage } = await import("#/lib/_internal/storage");
-    getObjectStorage()
-      .delete(previousImage)
-      .catch((e) => {
-        console.warn(`Failed to delete previous avatar ${previousImage}:`, e);
-      });
-  }
+  const { deleteReplacedObject } = await import("#/lib/_internal/storage");
+  await deleteReplacedObject(previousImage, `avatars/${viewer.id}/`);
   return { ok: true as const };
 }
 

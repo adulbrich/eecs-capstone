@@ -517,6 +517,58 @@ describe("private notes", () => {
     expect(log[0].editorId).toBe(owner.id);
   });
 
+  it("logs an image change like any other field", async () => {
+    // The defect this closes: the upload path wrote projects.image_url on its
+    // own request, so staff reading a project's edit history saw every text
+    // field that moved and no sign the image had changed at all. See #88.
+    const owner = await makeUser(`img-o-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, baseProject());
+    await updateProjectAs(owner, {
+      id,
+      ...baseProject(),
+      imageUrl: `projects/${id}/new.webp`,
+    });
+
+    const log = await db
+      .select()
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
+    expect(log).toHaveLength(1);
+    expect(log[0].changedFields).toContain("imageUrl");
+    expect(log[0].newValues).toMatchObject({
+      imageUrl: `projects/${id}/new.webp`,
+    });
+    expect(log[0].editorId).toBe(owner.id);
+  });
+
+  it("createProjectAs returns a proposer email that survives a follow-up update", async () => {
+    // The new-project route creates, uploads, then updates to save the key, and
+    // a blank proposer email means "default to the creator" on create but
+    // "unlink the proposer" on update. Echoing the form's blank field back
+    // would drop the link, so create returns the address it resolved.
+    const admin = await makeUser(`prop-a-${Date.now()}@x.com`, "admin");
+    const { id, proposerEmail } = await createProjectAs(admin, baseProject());
+    const [afterCreate] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, id));
+    expect(afterCreate.proposerId).toBe(admin.id);
+    expect(proposerEmail).toBe(admin.email);
+
+    await updateProjectAs(admin, {
+      id,
+      ...baseProject(),
+      imageUrl: `projects/${id}/k.webp`,
+      proposerEmail,
+    });
+
+    const [afterUpdate] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, id));
+    expect(afterUpdate.proposerId).toBe(admin.id);
+  });
+
   it("never returns proposerEmail to anyone, staff included", async () => {
     // It is the private link key. It used to ride the payload for every viewer
     // and be nulled for the wrong ones; now it is not on the wire at all. The
