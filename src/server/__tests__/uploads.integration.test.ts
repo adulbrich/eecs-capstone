@@ -163,17 +163,15 @@ async function seededProject(owner: { id: string; role: string | null }) {
 
 describe("uploadProjectImageAs cross-user guard", () => {
   it("refuses a signed-in viewer who is neither proposer nor staff", async () => {
-    // #155 asked for two assertions here, "imageUrl still points at the
-    // original key" and "the old S3 object still exists", because at the time
-    // this seam wrote the column and deleted the object it replaced, so a
-    // stranger's upload destroyed the original. #88 moved both to
-    // updateProjectAs. The first is asserted below and labelled, because it
-    // can no longer fail from anything this seam does.
+    // #155 asked for two assertions here: that the project's imageUrl still
+    // points at the original key, and that the old S3 object still exists.
+    // Both described this seam as it was, when it wrote the column and deleted
+    // the key it replaced, so a stranger's upload destroyed the original. #88
+    // moved those two behaviours to `updateProjectAs`; what is left here
+    // stores an object and returns its key.
     //
-    // The second survives, and is what kills the mutant here. The project
-    // starts with an image, in the row and in the bucket, and the refused
-    // upload leaves that exact key and no other. A stranger who got through
-    // would add a key, so the listing moves from one entry to two.
+    // The project therefore starts with an image in both places, and both of
+    // #155's assertions are made below against that starting state.
     const owner = await makeUser(`g-o-${Date.now()}@x.com`, "user");
     const stranger = await makeUser(`g-s-${Date.now()}@x.com`, "user");
     const projectId = await seededProject(owner);
@@ -187,9 +185,7 @@ describe("uploadProjectImageAs cross-user guard", () => {
       uploadProjectImageAs({ id: stranger.id, role: stranger.role }, form)
     ).rejects.toThrow(/Forbidden/);
 
-    // #155's first assertion. Stated because it is the invariant the issue
-    // named, and labelled because it cannot fail from a mutant in this seam:
-    // `uploadProjectImageAs` only selects the row, it has written none since
+    // `uploadProjectImageAs` only selects the row; it has written none since
     // #88.
     const [row] = await db
       .select()
@@ -197,8 +193,8 @@ describe("uploadProjectImageAs cross-user guard", () => {
       .where(eq(projects.id, projectId));
     expect(row.imageUrl).toBe(originalKey);
 
-    // The one that does the work. Listed rather than headed, because a
-    // stranger's key is a uuid no caller could name in advance.
+    // Listed rather than headed, because a stranger's key would be a uuid no
+    // caller could name in advance.
     const listed = await s3Client().send(
       new ListObjectsV2Command({
         Bucket: BUCKET,

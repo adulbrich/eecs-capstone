@@ -1005,11 +1005,11 @@ describe("updateProjectAs cross-user guard", () => {
     // `project-visibility.test.ts`, but no test drove one through this server
     // seam, so deleting the guard here left the suite green.
     //
-    // `notes` is in the payload as a second, independent gate, not because a
-    // stranger could otherwise write it: `buildProjectValues` asks
-    // `canWritePrivateNotes` on its own, so with this guard deleted a
-    // stranger's notes are dropped there anyway. Notes is owner-or-staff, not
-    // staff-only, whatever #155 says.
+    // The payload is the whole form, `notes` included, because that is what a
+    // real caller sends. It is not extra coverage of `notes`:
+    // `buildProjectValues` gates that field on `canWritePrivateNotes`
+    // separately. And `notes` is owner-or-staff, not staff-only as #155 twice
+    // calls it, since `canWritePrivateNotes` is `isStaff || isOwner`.
     const owner = await makeUser(`x-o-${Date.now()}@x.com`, "user");
     const stranger = await makeUser(`x-s-${Date.now()}@x.com`, "user");
     const { id } = await createProjectAs(owner, {
