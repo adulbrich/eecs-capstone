@@ -859,6 +859,16 @@ the same column can hold both shapes.
 Why keys: swapping to a CDN, changing buckets, or moving to signed
 URLs is a one-line change in the helper, not a data migration.
 
+### One image upload policy, in `src/lib/image-upload-policy.ts`
+
+The MIME allowlist, the 10MB cap and the `assertImageFile` guard live there,
+client-safe, and every upload surface reads them: `_internal/uploads.ts` (project
+images and avatars), `_internal/inventory-images.ts`, and the file picker's
+`accept` attribute in `components/image-uploader.tsx`. They used to be three
+copies, and nothing kept them in step, so the app could have accepted a type on
+one form that another rejected. Change the allowlist or the cap there and every
+surface moves together.
+
 ### TanStack Start FormData server functions
 
 `createServerFn(...).inputValidator(...)` accepts FormData when the

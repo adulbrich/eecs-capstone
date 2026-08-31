@@ -5,6 +5,7 @@ import ReactCrop, {
   centerCrop,
   makeAspectCrop,
 } from "react-image-crop";
+import { IMAGE_FILE_ACCEPT } from "#/lib/image-upload-policy";
 import { getPublicUrl } from "#/lib/storage";
 import { Button } from "./ui/button";
 
@@ -200,7 +201,7 @@ export function ImageUploader({
             )}
           </div>
           <input
-            accept="image/jpeg,image/png,image/webp,image/gif"
+            accept={IMAGE_FILE_ACCEPT}
             className="hidden"
             onChange={onPickFile}
             ref={fileInputRef}

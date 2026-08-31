@@ -3,27 +3,8 @@ import { eq } from "drizzle-orm";
 import { db } from "#/db";
 import { inventoryItems } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
+import { assertImageFile } from "#/lib/image-upload-policy";
 import { assertStaff, type Viewer } from "#/lib/viewer";
-
-const ALLOWED_IMAGE_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-]);
-const MAX_INPUT_BYTES = 10 * 1024 * 1024;
-
-function assertImageFile(file: unknown): asserts file is File {
-  if (!(file instanceof File)) {
-    throw new Error("Missing file");
-  }
-  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-    throw new Error("Unsupported image type");
-  }
-  if (file.size > MAX_INPUT_BYTES) {
-    throw new Error(`File too large (max ${MAX_INPUT_BYTES} bytes)`);
-  }
-}
 
 export async function uploadInventoryImageAs(
   viewer: Viewer,
