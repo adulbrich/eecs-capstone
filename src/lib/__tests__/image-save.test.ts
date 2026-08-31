@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { projectImageUrlToSave } from "../project-image-save";
+import { imageUrlToSave } from "../image-save";
 
 function file() {
   return new File([new Uint8Array([1, 2, 3])], "x.webp", {
@@ -7,14 +7,14 @@ function file() {
   });
 }
 
-describe("projectImageUrlToSave", () => {
+describe("imageUrlToSave", () => {
   it("keeps the current key when the user did not touch the image", async () => {
     const upload = vi.fn();
     await expect(
-      projectImageUrlToSave({
+      imageUrlToSave({
         currentImageUrl: "projects/p1/old.webp",
+        owner: { projectId: "p1" },
         pendingImage: null,
-        projectId: "p1",
         upload,
       })
     ).resolves.toBe("projects/p1/old.webp");
@@ -26,10 +26,10 @@ describe("projectImageUrlToSave", () => {
     // current value IS the removal, and it must not be confused for "unchanged".
     const upload = vi.fn();
     await expect(
-      projectImageUrlToSave({
+      imageUrlToSave({
         currentImageUrl: "",
+        owner: { projectId: "p1" },
         pendingImage: null,
-        projectId: "p1",
         upload,
       })
     ).resolves.toBe("");
@@ -39,10 +39,10 @@ describe("projectImageUrlToSave", () => {
   it("uploads the pending file and returns the key the save writes", async () => {
     const upload = vi.fn().mockResolvedValue({ key: "projects/p1/new.webp" });
     await expect(
-      projectImageUrlToSave({
+      imageUrlToSave({
         currentImageUrl: "projects/p1/old.webp",
+        owner: { projectId: "p1" },
         pendingImage: file(),
-        projectId: "p1",
         upload,
       })
     ).resolves.toBe("projects/p1/new.webp");
@@ -50,6 +50,32 @@ describe("projectImageUrlToSave", () => {
     const form = upload.mock.calls[0][0].data as FormData;
     expect(form.get("projectId")).toBe("p1");
     expect(form.get("file")).toBeInstanceOf(File);
+  });
+
+  it("names the owner field the inventory upload expects", async () => {
+    const upload = vi.fn().mockResolvedValue({ key: "inventory/i1/new.webp" });
+    await expect(
+      imageUrlToSave({
+        currentImageUrl: null,
+        owner: { itemId: "i1" },
+        pendingImage: file(),
+        upload,
+      })
+    ).resolves.toBe("inventory/i1/new.webp");
+    expect((upload.mock.calls[0][0].data as FormData).get("itemId")).toBe("i1");
+  });
+
+  it("passes a null current value through, which is how inventory clears", async () => {
+    const upload = vi.fn();
+    await expect(
+      imageUrlToSave({
+        currentImageUrl: null,
+        owner: { itemId: "i1" },
+        pendingImage: undefined,
+        upload,
+      })
+    ).resolves.toBeNull();
+    expect(upload).not.toHaveBeenCalled();
   });
 
   it("rejects when the upload rejects, so no key reaches the save", async () => {
@@ -60,10 +86,10 @@ describe("projectImageUrlToSave", () => {
       .fn()
       .mockRejectedValue(new Error("Unsupported image type"));
     await expect(
-      projectImageUrlToSave({
+      imageUrlToSave({
         currentImageUrl: "projects/p1/old.webp",
+        owner: { projectId: "p1" },
         pendingImage: file(),
-        projectId: "p1",
         upload,
       })
     ).rejects.toThrow(/Unsupported image type/);

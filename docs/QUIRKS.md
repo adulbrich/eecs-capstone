@@ -966,6 +966,45 @@ When updating, keep the structure: short headline, one-paragraph explanation, co
 
 ## Inventory
 
+### Who writes an image column, and who deletes the object
+
+Both `projects.image_url` and `inventory_items.image_url` follow one rule, and
+the uploads follow none of it by design (#88, #126):
+
+| Path | Writes the column | Deletes what it replaced |
+| --- | --- | --- |
+| `uploadProjectImageAs`, `uploadInventoryImageAs` | No, returns the key | No |
+| `updateProjectAs`, `updateInventoryItemAs` | Yes | Yes |
+| `createProjectAs`, `createInventoryItemAs` | On insert, so nothing to replace | No |
+| `hardDeleteInventoryItemAs` | Deletes the row | Yes |
+| `hardDeleteProjectAs` | Deletes the row | No, and that is a leak |
+
+Why the uploads write nothing, why the cleanup runs after the transaction
+commits, and why it refuses a key outside the row's own prefix are all under
+"An image change is an ordinary edit, and who cleans up after it" in the
+Projects section below, and are not repeated here. Two things that section
+cannot say because they are inventory's:
+
+- Retiring writes the row, through `transitionItem` like any other status
+  change, but it never writes `image_url` and never touches storage, so a
+  retired item keeps its photo. That is not the same as saying only a hard
+  delete can drop one: `updateInventoryItemAs` gates on staff and not on
+  status, and nothing gates the edit form on status either, so staff replacing
+  or clearing a retired item's photo deletes the object it replaced exactly as
+  for a live item.
+- Both create paths reach their first key through a second write, because the
+  key is `<domain>/<id>/...` and the upload needs the row to exist. That second
+  write is an ordinary edit, so a brand new project or item carries one
+  edit-log row naming `imageUrl`.
+
+Checkable:
+
+```bash
+# no hits: neither upload path writes a row
+grep -n 'update(projects)' src/server/_internal/uploads.ts
+grep -n 'update(inventoryItems)' src/server/_internal/inventory-images.ts
+```
+
 ### Categories: `domain` is closed, `type` is an open project-only facet, filtering is all-match
 
 `categories.domain` is a closed enum (`"project" | "inventory"`) fixed at creation and immutable on update; it decides which picker a category can appear in and, for inventory, is enforced again at the junction-table read (`listInventoryCategoriesImpl` in `src/server/_internal/inventory-catalog.ts` re-filters on `domain = 'inventory'` even though nothing today writes a project-domain row into `inventory_item_categories`: belt and suspenders, not a defense against something that currently happens). `categories.type` is a separate, nullable, free-text facet (grouping label like "technology" or "industry") that only the project domain uses for grouping in the UI; inventory categories always carry `type = null` and are rendered as one flat list, not grouped. An inventory item can carry many categories through `inventory_item_categories` (many-to-many), the same shape `project_categories` already used for projects.
@@ -1076,7 +1115,7 @@ Requester and holder are both listed when they differ, so a request entry is exa
 
 ### `transitionItem` is the only writer
 
-Every status change to an inventory item goes through `src/server/_internal/inventory-transitions.ts::transitionItem`. It is the only place that writes `inventory_item_status_history` rows and the only place that syncs `current_holder_*` columns with the item status. This is now literally true, and checkable: `grep -rn '\.update(inventoryItems)\|insert(inventoryItemStatusHistory)' src --include='*.ts' | grep -v __tests__` returns four hits, two in `inventory-transitions.ts` and two that touch attribute columns only: `updateInventoryItemAs` in `inventory-catalog.ts` and `uploadInventoryImageAs` in `inventory-images.ts`, neither of which writes status or holder. The count is the invariant; the file names are not, and #104 moved them once already. Re-run the grep rather than trusting this sentence's attribution.
+Every status change to an inventory item goes through `src/server/_internal/inventory-transitions.ts::transitionItem`. It is the only place that writes `inventory_item_status_history` rows and the only place that syncs `current_holder_*` columns with the item status. This is now literally true, and checkable: `grep -rn '\.update(inventoryItems)\|insert(inventoryItemStatusHistory)' src --include='*.ts' | grep -v __tests__` returns three hits, two in `inventory-transitions.ts` and one that touches attribute columns only: `updateInventoryItemAs` in `inventory-catalog.ts`, which writes neither status nor holder. It was four until #126 stopped `uploadInventoryImageAs` writing a row at all. The count is the invariant; the file names are not, and #104 moved them once already. Re-run the grep rather than trusting this sentence's attribution.
 
 An earlier version of this entry granted reject and cancel a standing exemption "because they emit custom notifications and need different transaction shapes". Both were routed through `transitionItem`, along with `submitCartAs`, which had been writing inline without the entry mentioning it at all. The exemption had already cost one bug: `4c22016 fix(inventory): clear the walk-in name and program on reject and cancel` is what happens when two new hold columns are added and only two of four writers learn about them.
 
@@ -1167,6 +1206,8 @@ Inventory carried the same list until 2026-08-28, under the name `EDITABLE_FIELD
 
 The predicates are still a second spelling of what `validateStatusInvariants` decides in its `case` labels, because those labels are what make a seventh `ItemStatus` a compile error and cannot be collapsed into a helper without losing that. So `inventory-workflow.test.ts` derives the agreement by asking the rules: for every status the panel can target, `needsHolder` must be true exactly when a holderless transition is refused, and `needsDueAt` true exactly when a dated one is required. The panel keeps its friendlier wording; only the decision is shared.
 
+### An image change is an ordinary edit, and who cleans up after it
+
 `imageUrl` used to be a real exception: `uploadProjectImageAs` wrote the column on its own request, so an image change reached neither this diff nor the edit log. #88 closed that by making the upload store the object and return its key, which the caller then passes to `updateProject` as an ordinary field. `createProjectAs` still writes the column on insert, but `updateProjectAs` (`src/server/_internal/projects.ts`) is now the only place an existing `projects.image_url` is replaced, and therefore the only place a project image is cleaned up. Not the only place one could need to be: `hardDeleteProjectAs` drops the row without touching storage, which orphans the object. That predates #88 and is the project-side twin of #126. Checkable:
 
 ```bash
@@ -1185,7 +1226,7 @@ The cleanup runs after the transaction commits rather than inside it, because a 
 grep -rn 'insert(projectStatusHistory)' src --include='*.ts' | grep -v __tests__
 ```
 
-**Read the claim narrowly, because the wider one is false.** This says one writer of the *history table*, not one writer of `projects.status`. `update(projects)` has five legitimate non-status writers (`claim-projects.ts`, `project-embeddings.ts`, `softDeleteProjectAs`, `restoreProjectAs`, `updateProjectAs`), so a grep on that proves nothing. `softDeleteProjectAs` and `restoreProjectAs` write `deleted_at` and send their own notifications without writing history, and they are outside this rule on purpose: neither is a transition. This is deliberately narrower than inventory's "`transitionItem` is the only writer", which can make the broader claim because `update(inventoryItems)` has only four hits in total.
+**Read the claim narrowly, because the wider one is false.** This says one writer of the *history table*, not one writer of `projects.status`. `update(projects)` has five legitimate non-status writers (`claim-projects.ts`, `project-embeddings.ts`, `softDeleteProjectAs`, `restoreProjectAs`, `updateProjectAs`), so a grep on that proves nothing. `softDeleteProjectAs` and `restoreProjectAs` write `deleted_at` and send their own notifications without writing history, and they are outside this rule on purpose: neither is a transition. This is deliberately narrower than inventory's "`transitionItem` is the only writer", which can make the broader claim because `update(inventoryItems)` has only two hits in total.
 
 Three ordering rules live in `commitTransition` rather than in a comment a caller has to obey:
 

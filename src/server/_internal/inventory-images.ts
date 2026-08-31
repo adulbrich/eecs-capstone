@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "#/db";
 import { inventoryItems } from "#/db/schema";
@@ -6,6 +5,19 @@ import { requireUser } from "#/lib/_internal/auth-guards";
 import { assertImageFile } from "#/lib/image-upload-policy";
 import { assertStaff, type Viewer } from "#/lib/viewer";
 
+/**
+ * Stores an inventory photo and returns its key. Writes no row, for the same
+ * three reasons the project upload does not (#88): the change lands in
+ * `inventory_item_edit_log` through `diffRowFields` like every other column, a
+ * failed upload leaves the item untouched instead of half saved, and the object
+ * the key replaces is deleted by whoever owns the column.
+ *
+ * The item is still loaded, because a photo may only be stored under an item
+ * that exists, and `assertStaff` still gates the whole thing.
+ *
+ * The cost, stated because it is a trade and not a free win: an upload whose
+ * save then fails leaves an object nothing references.
+ */
 export async function uploadInventoryImageAs(
   viewer: Viewer,
   form: FormData
@@ -33,27 +45,11 @@ export async function uploadInventoryImageAs(
     maxHeight: 1200,
   });
 
-  const key = `inventory/${itemId}/${randomUUID()}.webp`;
-  const { getObjectStorage } = await import("#/lib/_internal/storage");
-  const storage = getObjectStorage();
-  await storage.put(key, buffer, contentType);
-
-  const previousKey = item.imageUrl;
-  await db
-    .update(inventoryItems)
-    .set({ imageUrl: key, updatedAt: new Date() })
-    .where(eq(inventoryItems.id, itemId));
-
-  // Best-effort cleanup of the previous key (skip http(s) legacy URLs).
-  if (
-    previousKey &&
-    !previousKey.startsWith("http://") &&
-    !previousKey.startsWith("https://")
-  ) {
-    storage.delete(previousKey).catch((e) => {
-      console.warn(`Failed to delete previous key ${previousKey}:`, e);
-    });
-  }
+  const { getObjectStorage, inventoryImageKeys } = await import(
+    "#/lib/_internal/storage"
+  );
+  const key = inventoryImageKeys(itemId).newKey();
+  await getObjectStorage().put(key, buffer, contentType);
 
   return { key };
 }
