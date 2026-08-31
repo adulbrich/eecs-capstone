@@ -66,7 +66,18 @@ describe("IMAGE_FILE_ACCEPT", () => {
     expect(IMAGE_FILE_ACCEPT).toBe("image/jpeg,image/png,image/webp,image/gif");
   });
 
-  it("is the only image allowlist a file picker reads", () => {
+  it("is the only image allowlist src spells out", () => {
+    // Two rules, because there are two shapes the drift takes and neither
+    // catches the other. A hand-written allowlist is always two or more MIME
+    // types together, wherever it is assigned: an earlier version matched
+    // only next to `accept=`, and a `const LOCAL = "image/jpeg,image/png"`
+    // one line above `accept={LOCAL}` walked straight past it. A single
+    // `image/webp` is not drift, it is the output type Sharp and the canvas
+    // both name, so matching one type alone would fire on honest code. The
+    // second rule is deliberately loose about what sits between `accept` and
+    // the literal, so a ternary picking one type per branch is caught too.
+    const SPELLS_OUT_A_LIST = /image\/[a-z+]+["'`]?\s*,\s*["'`]?image\//;
+    const NARROWS_A_PICKER = /accept[^"'`]*["'`][^"'`]*image\//;
     const offenders: string[] = [];
     for (const path of walk("src")) {
       if (path.includes("__tests__") || path.includes(".test.")) {
@@ -75,17 +86,23 @@ describe("IMAGE_FILE_ACCEPT", () => {
       readFileSync(path, "utf8")
         .split("\n")
         .forEach((line, i) => {
-          // The brace forms matter as much as the quoted one: `accept={"..."}`
-          // is what JSX is most likely to be written as, and an earlier regex
-          // that anchored to the quote let exactly that through.
-          if (/accept\s*=\s*\{?\s*["'`][^"'`]*image\//.test(line)) {
+          const trimmed = line.trim();
+          // A comment explaining the rule must be able to quote it.
+          if (
+            trimmed.startsWith("*") ||
+            trimmed.startsWith("//") ||
+            trimmed.startsWith("/*")
+          ) {
+            return;
+          }
+          if (SPELLS_OUT_A_LIST.test(line) || NARROWS_A_PICKER.test(line)) {
             offenders.push(`${path}:${i + 1}`);
           }
         });
     }
     expect(
       offenders,
-      `Spell the allowlist once: import IMAGE_FILE_ACCEPT from #/lib/image-upload-policy instead. Offenders: ${offenders.join(", ")}`
+      `Spell the allowlist once: import ALLOWED_IMAGE_TYPES or IMAGE_FILE_ACCEPT from #/lib/image-upload-policy instead. Offenders: ${offenders.join(", ")}`
     ).toEqual([]);
   });
 });

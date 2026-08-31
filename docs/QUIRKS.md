@@ -791,7 +791,7 @@ const NAME_COLUMN = {
 | --- | --- |
 | `src/lib/*.ts` | Pure modules, client-safe wrappers. |
 | `src/lib/_internal/*.ts` | Server-only helpers (auth-guards). |
-| `src/lib/__tests__/*.test.ts` | Pure-module unit tests, plus two integration suites (`auth`, `role-gate`) that need a database, plus the one source scan that belongs to a pure module (`image-upload-policy`). |
+| `src/lib/__tests__/*.test.ts` | Pure-module unit tests, plus two integration suites (`auth`, `role-gate`) that need a database, plus source scans belonging to a pure module (`env-contract`, `image-upload-policy`). |
 | `src/server/*.ts` | createServerFn wrappers (Zod schemas + dynamic-import handlers). Client-importable. |
 | `src/server/_internal/*.ts` | Impl + `*As(viewer, ...)` + `*ForCurrentUser(...)` helpers. Server-only. |
 | `src/server/__tests__/*.integration.test.ts` | Integration tests against docker Postgres. |
@@ -870,12 +870,18 @@ one form that another rejected. Change the allowlist or the cap there and every
 surface moves together.
 
 `src/lib/__tests__/image-upload-policy.test.ts` is what keeps that true. Besides
-the guard's own cases it walks `src` for a stray `accept=` naming image MIME
-types, in the quoted, brace and template forms alike, so a fourth surface
-spelling the list out again is a red test rather than a policy nobody notices
-has split. Mutation-check it in the brace form if you touch it: an earlier
-version of that regex anchored to the quote and let `accept={"image/..."}`
-straight through.
+the guard's own cases it walks `src` for two shapes: two or more image MIME
+types together on one line, wherever they are assigned, and a MIME literal on
+any line that mentions `accept`. A single `image/webp` is left alone, because
+that is the output type Sharp and the canvas both name rather than a policy
+being restated. So a fourth surface spelling the list out is a red test rather
+than a split nobody notices.
+
+If you touch that scan, mutate more than the form it was written for. Both
+narrowings it has already needed were found that way and not by reading:
+matching only next to `accept=` let `accept={"image/..."}` through, and
+anchoring to the quote let a `const` holding the list one line above
+`accept={LOCAL}` through, which is the shape a real fourth surface would take.
 
 ### TanStack Start FormData server functions
 
