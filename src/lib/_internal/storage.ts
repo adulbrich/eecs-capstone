@@ -118,9 +118,6 @@ export const projectImageKeys = (projectId: string): KeySpace =>
 export const avatarKeys = (userId: string): KeySpace =>
   keySpace(`avatars/${userId}/`);
 
-export const inventoryImageKeys = (itemId: string): KeySpace =>
-  keySpace(`inventory/${itemId}/`);
-
 /**
  * Deletes an object a column has stopped pointing at.
  *
