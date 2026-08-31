@@ -998,3 +998,43 @@ describe("sponsorship flag", () => {
     expect(anonView.project?.requiresNdaIp).toBe(true);
   });
 });
+
+describe("updateProjectAs cross-user guard", () => {
+  it("refuses a write from a viewer who is neither proposer nor staff", async () => {
+    // #155: `canEditProject` is unit tested against a rejected viewer in
+    // `project-visibility.test.ts`, but no test drove one through this server
+    // seam, so deleting the guard here left the suite green.
+    //
+    // The payload carries `notes` because a real caller's does. It is not extra
+    // coverage of that field:
+    // `buildProjectValues` gates that field on `canWritePrivateNotes`
+    // separately. And `notes` is owner-or-staff, not staff-only as #155 twice
+    // calls it, since `canWritePrivateNotes` is `isStaff || isOwner`.
+    const owner = await makeUser(`x-o-${Date.now()}@x.com`, "user");
+    const stranger = await makeUser(`x-s-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      title: "owned",
+      notes: "owner wrote this",
+    });
+
+    await expect(
+      updateProjectAs(stranger, {
+        id,
+        ...baseProject(),
+        title: "taken over",
+        notes: "written by a stranger",
+      })
+    ).rejects.toThrow(/Forbidden/);
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.title).toBe("owned");
+    expect(row.notes).toBe("owner wrote this");
+    // And nothing was logged, because nothing was written.
+    const log = await db
+      .select()
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
+    expect(log).toHaveLength(0);
+  });
+});

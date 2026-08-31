@@ -284,3 +284,28 @@ describe("comments + notifications", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("addCommentAs cross-user guard", () => {
+  it("refuses a viewer who is neither proposer nor staff, and writes nothing", async () => {
+    // #155. The guard is read-adjacent as well as a write gate: comments are
+    // what `comments.ts` calls a private submitter to staff dialogue, so a
+    // stranger who could post would be joining a thread they may not read.
+    const owner = await makeUser(`c-o-${Date.now()}@x.com`, "user");
+    const stranger = await makeUser(`c-s-${Date.now()}@x.com`, "user");
+    const { id: projectId } = await createProjectAs(owner, baseProject());
+
+    await expect(
+      addCommentAs(stranger, {
+        projectId,
+        content: "let me in",
+        isInternal: false,
+      })
+    ).rejects.toThrow(/Forbidden/);
+
+    const rows = await db
+      .select()
+      .from(projectComments)
+      .where(eq(projectComments.projectId, projectId));
+    expect(rows).toHaveLength(0);
+  });
+});

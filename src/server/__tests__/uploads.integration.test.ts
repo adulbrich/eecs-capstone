@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -28,6 +29,8 @@ const fixture = readFileSync(
     "sample.jpg"
   )
 );
+
+const BUCKET = process.env.S3_BUCKET ?? "cs-capstone";
 
 function s3Client() {
   const endpoint = process.env.S3_ENDPOINT;
@@ -95,7 +98,7 @@ describe("uploadProjectImageAs", () => {
     const client = s3Client();
     const head = await client.send(
       new HeadObjectCommand({
-        Bucket: process.env.S3_BUCKET ?? "cs-capstone",
+        Bucket: BUCKET,
         Key: result.key,
       })
     );
@@ -140,6 +143,68 @@ describe("uploadProjectImageAs", () => {
   });
 });
 
+/**
+ * A project whose image exists in both the row and the bucket.
+ *
+ * The column is set with a direct update rather than through
+ * `updateProjectAs`, matching the sibling test above: this test is about the
+ * upload guard, and routing its setup through another seam would let a
+ * regression there fail this test for an unrelated reason.
+ */
+async function seededProject(owner: { id: string; role: string | null }) {
+  const { id } = await createProjectAs(owner, baseProject());
+  const key = `projects/${id}/original.webp`;
+  await db.update(projects).set({ imageUrl: key }).where(eq(projects.id, id));
+  await s3Client().send(
+    new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: "x" })
+  );
+  return id;
+}
+
+describe("uploadProjectImageAs cross-user guard", () => {
+  it("refuses a signed-in viewer who is neither proposer nor staff", async () => {
+    // #155 asked for two assertions here: that the project's imageUrl still
+    // points at the original key, and that the old S3 object still exists.
+    // Both described this seam as it was, when it wrote the column and deleted
+    // the key it replaced, so a stranger's upload destroyed the original. #88
+    // moved those two behaviours to `updateProjectAs`; what is left here
+    // stores an object and returns its key.
+    //
+    // The project therefore starts with an image in both places, and both of
+    // #155's assertions are made below against that starting state.
+    const owner = await makeUser(`g-o-${Date.now()}@x.com`, "user");
+    const stranger = await makeUser(`g-s-${Date.now()}@x.com`, "user");
+    const projectId = await seededProject(owner);
+    const originalKey = `projects/${projectId}/original.webp`;
+
+    const form = new FormData();
+    form.append("projectId", projectId);
+    form.append("file", fakeFile("sample.jpg", fixture));
+
+    await expect(
+      uploadProjectImageAs({ id: stranger.id, role: stranger.role }, form)
+    ).rejects.toThrow(/Forbidden/);
+
+    // `uploadProjectImageAs` only selects the row; it has written none since
+    // #88.
+    const [row] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, projectId));
+    expect(row.imageUrl).toBe(originalKey);
+
+    // Listed rather than headed, because a stranger's key would be a uuid no
+    // caller could name in advance.
+    const listed = await s3Client().send(
+      new ListObjectsV2Command({
+        Bucket: BUCKET,
+        Prefix: `projects/${projectId}/`,
+      })
+    );
+    expect(listed.Contents?.map((o) => o.Key)).toEqual([originalKey]);
+  });
+});
+
 describe("uploadAvatarAs", () => {
   // This block was `describe.skip` with a placeholder, because requireUser()
   // inside the implementation needed a request context the harness does not
@@ -158,7 +223,7 @@ describe("uploadAvatarAs", () => {
     const client = s3Client();
     const head = await client.send(
       new HeadObjectCommand({
-        Bucket: process.env.S3_BUCKET ?? "cs-capstone",
+        Bucket: BUCKET,
         Key: result.key,
       })
     );
@@ -207,8 +272,6 @@ describe("clearAvatarAs", () => {
     ).resolves.toEqual({ ok: true });
   });
 });
-
-const BUCKET = process.env.S3_BUCKET ?? "cs-capstone";
 
 async function putObject(key: string) {
   await s3Client().send(
