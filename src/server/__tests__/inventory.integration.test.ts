@@ -1476,15 +1476,15 @@ describe("request lifecycle", () => {
   it("refuses a cancel from a student who does not own the line", async () => {
     // The requesterId check in cancelRequestItemAs is the whole enforcement
     // of "only the requester may cancel". assertAuthorized cannot help: it
-    // never sees the line, and waves self_cancel through because this path
-    // supplies neither holderId nor holderEmail. Delete that check and every
-    // other cancel case in this file still passes, because they all pass the
-    // owning viewer.
-    const owner = await makeUser(`cx-own-${Date.now()}@x.com`, "user");
-    const other = await makeUser(`cx-oth-${Date.now()}@x.com`, "user");
+    // reads authority, holderId and holderEmail and never the line's
+    // requester, so it waves self_cancel through on a path that supplies
+    // neither holder field. Delete that check and every other cancel case in
+    // this file still passes, because they all pass the owning viewer.
+    const requester = await makeUser(`cx-req-${Date.now()}@x.com`, "user");
+    const otherStudent = await makeUser(`cx-oth-${Date.now()}@x.com`, "user");
     const item = await makeItem();
-    await addToCartAs(owner, { itemId: item.id });
-    await submitCartAs(owner, { note: null });
+    await addToCartAs(requester, { itemId: item.id });
+    await submitCartAs(requester, { note: null });
     const [line] = await db
       .select()
       .from(inventoryRequestItems)
@@ -1494,7 +1494,7 @@ describe("request lifecycle", () => {
     // that can fire. Matching its message is what keeps this test honest:
     // a bare rejects.toThrow() would pass on the status guard instead.
     await expect(
-      cancelRequestItemAs(other, {
+      cancelRequestItemAs(otherStudent, {
         requestItemId: line.id,
         note: "not mine",
       })
