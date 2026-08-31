@@ -1490,10 +1490,6 @@ describe("request lifecycle", () => {
       .from(inventoryRequestItems)
       .where(eq(inventoryRequestItems.itemId, item.id));
 
-    // Pending and not checked out, so ownership is the only guard that can
-    // fire. Matching its message pins which one did: should this setup ever
-    // drift into a closed or checked-out line, a bare rejects.toThrow()
-    // would pass on that guard and prove nothing about ownership.
     await expect(
       cancelRequestItemAs(otherStudent, {
         requestItemId: line.id,
