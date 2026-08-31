@@ -67,42 +67,41 @@ describe("IMAGE_FILE_ACCEPT", () => {
   });
 
   it("is the only image allowlist src spells out", () => {
-    // Two rules, because there are two shapes the drift takes and neither
-    // catches the other. A hand-written allowlist is always two or more MIME
-    // types together, wherever it is assigned: an earlier version matched
-    // only next to `accept=`, and a `const LOCAL = "image/jpeg,image/png"`
-    // one line above `accept={LOCAL}` walked straight past it. A single
-    // `image/webp` is not drift, it is the output type Sharp and the canvas
-    // both name, so matching one type alone would fire on honest code. The
-    // second rule is deliberately loose about what sits between `accept` and
-    // the literal, so a ternary picking one type per branch is caught too.
-    const SPELLS_OUT_A_LIST = /image\/[a-z+]+["'`]?\s*,\s*["'`]?image\//;
+    // Per file, not per line. A hand-written allowlist names two or more
+    // distinct types, but it need not put them on one line and need not use
+    // commas: a `Set` literal copy-pasted from this module spreads over five
+    // lines, and a re-implemented guard reads
+    // `t !== "image/jpeg" && t !== "image/png"`. Both walked past the
+    // line-and-comma rule this replaced. Counting distinct types per file
+    // catches every arrangement of them at once.
+    //
+    // One type is not drift: `image/webp` alone is the output content type
+    // Sharp and the canvas both name, which is why the threshold is two.
+    const MIME = /image\/[a-z0-9.+-]+/g;
+    // Narrowing the picker by hand is the one shape a type count misses,
+    // since `accept={x ? "image/jpeg" : "image/png"}` may sit in a file that
+    // names nothing else.
     const NARROWS_A_PICKER = /accept[^"'`]*["'`][^"'`]*image\//;
     const offenders: string[] = [];
     for (const path of walk("src")) {
-      if (path.includes("__tests__") || path.includes(".test.")) {
+      if (
+        path.includes("__tests__") ||
+        path.includes(".test.") ||
+        path.endsWith("image-upload-policy.ts")
+      ) {
         continue;
       }
-      readFileSync(path, "utf8")
-        .split("\n")
-        .forEach((line, i) => {
-          const trimmed = line.trim();
-          // A comment explaining the rule must be able to quote it.
-          if (
-            trimmed.startsWith("*") ||
-            trimmed.startsWith("//") ||
-            trimmed.startsWith("/*")
-          ) {
-            return;
-          }
-          if (SPELLS_OUT_A_LIST.test(line) || NARROWS_A_PICKER.test(line)) {
-            offenders.push(`${path}:${i + 1}`);
-          }
-        });
+      const source = readFileSync(path, "utf8");
+      const types = new Set(source.match(MIME) ?? []);
+      if (types.size > 1) {
+        offenders.push(`${path} names ${[...types].sort().join(" ")}`);
+      } else if (source.split("\n").some((l) => NARROWS_A_PICKER.test(l))) {
+        offenders.push(`${path} narrows the picker by hand`);
+      }
     }
     expect(
       offenders,
-      `Spell the allowlist once: import ALLOWED_IMAGE_TYPES or IMAGE_FILE_ACCEPT from #/lib/image-upload-policy instead. Offenders: ${offenders.join(", ")}`
+      `Spell the allowlist once: import ALLOWED_IMAGE_TYPES or IMAGE_FILE_ACCEPT from #/lib/image-upload-policy instead. Offenders: ${offenders.join("; ")}`
     ).toEqual([]);
   });
 });
