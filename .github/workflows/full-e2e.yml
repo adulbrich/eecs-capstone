@@ -1,0 +1,35 @@
+# The full end-to-end suite: the smoke set plus the tier-one flows from #143.
+#
+# `workflow_dispatch` only, with no schedule. That is a starting point rather
+# than an oversight, and it has a known cost: a suite nobody triggers drifts
+# until it is red for reasons nobody remembers. The trigger is "run it before a
+# release", and revisiting the schedule is a follow-up once the suite's real
+# runtime on a runner is known rather than guessed.
+#
+# It is not on the pull-request path on purpose. `ci.yml` runs the smoke subset
+# there against a 5-minute budget; this one has no budget, drives uploads and a
+# crop, signs up a real account, and reads the server's own log for a
+# verification link. Anything here that turns out to be both fast and stable
+# belongs in smoke instead.
+name: Full E2E
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    uses: ./.github/workflows/stack-suite.yml
+    with:
+      # `test:e2e` carries `--global-timeout`, which the config does not: the
+      # config's 8 minutes is the smoke run's hang catcher and shortening this
+      # suite to fit it would kill a healthy run.
+      script: test:e2e
+      # The suite signs in as the seeded users to mint its storage states, and
+      # the fixtures attribute rows to them by address.
+      seed: true
+      browser: true
+      report-path: playwright-report/e2e
+      report-name: full-e2e-report
