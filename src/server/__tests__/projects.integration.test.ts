@@ -517,6 +517,39 @@ describe("private notes", () => {
     expect(log[0].editorId).toBe(owner.id);
   });
 
+  it("refuses a write from a viewer who is neither proposer nor staff", async () => {
+    // #155: `canEditProject` had thirteen call sites and no test that passed a
+    // viewer it would reject. `notes` is in the payload on purpose: it is
+    // staff-only, so a guard that admitted a stranger would leak a write to it
+    // as well as to the ordinary fields.
+    const owner = await makeUser(`x-o-${Date.now()}@x.com`, "user");
+    const stranger = await makeUser(`x-s-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      title: "owned",
+      notes: "staff only",
+    });
+
+    await expect(
+      updateProjectAs(stranger, {
+        id,
+        ...baseProject(),
+        title: "taken over",
+        notes: "written by a stranger",
+      })
+    ).rejects.toThrow(/Forbidden/);
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.title).toBe("owned");
+    expect(row.notes).toBe("staff only");
+    // And nothing was logged, because nothing was written.
+    const log = await db
+      .select()
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
+    expect(log).toHaveLength(0);
+  });
+
   it("logs an image change like any other field", async () => {
     // The defect this closes: the upload path wrote projects.image_url on its
     // own request, so staff reading a project's edit history saw every text
