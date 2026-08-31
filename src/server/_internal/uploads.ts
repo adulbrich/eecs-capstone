@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "#/db";
 import { projects, user } from "#/db/schema";
@@ -30,6 +29,10 @@ interface AuthUser {
  *
  * The guard stays here regardless: this writes into a project's key space, so
  * it has to know the viewer may edit that project.
+ *
+ * The cost of this order, stated because it is a real trade and not a free
+ * win: an upload whose save then fails leaves an object nothing references.
+ * That is cheaper than the half-applied edit it replaces, and no sweep exists.
  */
 export async function uploadProjectImageAs(
   viewer: AuthUser,
@@ -60,8 +63,10 @@ export async function uploadProjectImageAs(
     maxHeight: 900,
   });
 
-  const key = `projects/${projectId}/${randomUUID()}.webp`;
-  const { getObjectStorage } = await import("#/lib/_internal/storage");
+  const { getObjectStorage, projectImageKeys } = await import(
+    "#/lib/_internal/storage"
+  );
+  const key = projectImageKeys(projectId).newKey();
   await getObjectStorage().put(key, buffer, contentType);
 
   return { key };
@@ -83,10 +88,12 @@ export async function uploadAvatarAs(viewer: AuthUser, form: FormData) {
     maxHeight: 512,
   });
 
-  const key = `avatars/${viewer.id}/${randomUUID()}.webp`;
-  const { getObjectStorage } = await import("#/lib/_internal/storage");
-  const storage = getObjectStorage();
-  await storage.put(key, buffer, contentType);
+  const { avatarKeys, deleteReplacedObject, getObjectStorage } = await import(
+    "#/lib/_internal/storage"
+  );
+  const space = avatarKeys(viewer.id);
+  const key = space.newKey();
+  await getObjectStorage().put(key, buffer, contentType);
 
   const previousImage = viewer.image;
   await db
@@ -96,8 +103,7 @@ export async function uploadAvatarAs(viewer: AuthUser, form: FormData) {
 
   // After the write, and scoped to the viewer's own key space: an OAuth
   // account's `user.image` is a remote URL, which fails the prefix check.
-  const { deleteReplacedObject } = await import("#/lib/_internal/storage");
-  await deleteReplacedObject(previousImage, `avatars/${viewer.id}/`);
+  await deleteReplacedObject(previousImage, space);
 
   return { key };
 }
@@ -108,8 +114,10 @@ export async function clearAvatarAs(viewer: AuthUser) {
     .update(user)
     .set({ image: null, updatedAt: new Date() })
     .where(eq(user.id, viewer.id));
-  const { deleteReplacedObject } = await import("#/lib/_internal/storage");
-  await deleteReplacedObject(previousImage, `avatars/${viewer.id}/`);
+  const { avatarKeys, deleteReplacedObject } = await import(
+    "#/lib/_internal/storage"
+  );
+  await deleteReplacedObject(previousImage, avatarKeys(viewer.id));
   return { ok: true as const };
 }
 

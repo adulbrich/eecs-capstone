@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   DeleteObjectCommand,
   PutObjectCommand,
@@ -95,6 +96,32 @@ export function getObjectStorage(): ObjectStorage {
 }
 
 /**
+ * The keys one row's images live under, and the only way to mint a new one.
+ *
+ * Both halves together on purpose. The delete below refuses any key outside
+ * the space, so a key layout that changed in the builder but not at the delete
+ * site would turn cleanup into a permanent silent no-op. Handing out one
+ * object means there is no second spelling to forget.
+ */
+export interface KeySpace {
+  newKey(): string;
+  readonly prefix: string;
+}
+
+function keySpace(prefix: string): KeySpace {
+  return { prefix, newKey: () => `${prefix}${randomUUID()}.webp` };
+}
+
+export const projectImageKeys = (projectId: string): KeySpace =>
+  keySpace(`projects/${projectId}/`);
+
+export const avatarKeys = (userId: string): KeySpace =>
+  keySpace(`avatars/${userId}/`);
+
+export const inventoryImageKeys = (itemId: string): KeySpace =>
+  keySpace(`inventory/${itemId}/`);
+
+/**
  * Deletes an object a column has stopped pointing at.
  *
  * Best effort by design: an object that outlives its row costs storage, while
@@ -102,22 +129,21 @@ export function getObjectStorage(): ObjectStorage {
  * never rejects, and callers await it only so a test can assert on the result
  * rather than race it.
  *
- * `ownedPrefix` is the key space the row owns, `projects/<id>/` or
- * `inventory/<id>/` or `avatars/<id>/`. A key outside it is left alone, and
- * that guard is the point rather than a detail: `imageUrl` is an ordinary
- * client-writable column, so without it a caller could point their own row at
- * another row's key and have the next save destroy an object they never had
- * access to. Legacy absolute `http(s)://` values fail the same check, which is
- * what the hand-rolled skip at each old call site was for.
+ * A key outside the row's own space is left alone, and that guard is the point
+ * rather than a detail: `imageUrl` is an ordinary client-writable column, so
+ * without it a caller could point their own row at another row's key and have
+ * the next save destroy an object they never had access to. Legacy absolute
+ * `http(s)://` values fail the same check, which is what the hand-rolled skip
+ * at each old call site was for.
  *
  * Not deleting is always the safe direction here: the cost is an orphan, and
  * the cost of the other direction is someone else's image.
  */
 export async function deleteReplacedObject(
   key: string | null | undefined,
-  ownedPrefix: string
+  space: KeySpace
 ): Promise<void> {
-  if (!key?.startsWith(ownedPrefix)) {
+  if (!key?.startsWith(space.prefix)) {
     return;
   }
   try {

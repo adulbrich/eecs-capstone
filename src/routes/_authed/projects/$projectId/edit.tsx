@@ -7,6 +7,7 @@ import {
 import { ProjectForm } from "#/components/project-form";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
+import { projectImageUrlToSave } from "#/lib/project-image-save";
 import {
   listProjectCategories,
   setProjectCategories,
@@ -83,19 +84,13 @@ function EditProject() {
           }}
           initialCategoryIds={categoryIds}
           onSubmit={async (values, nextCategoryIds, pendingImage) => {
-            // Upload first, then save the key as an ordinary field. The old
-            // order saved the row and then uploaded, so a failed upload left
-            // the edit half applied, and the image change never reached the
-            // edit log because the upload wrote the column behind its back.
-            // Removal needs nothing here: the uploader clears the form field,
-            // so `values.imageUrl` is already "".
-            let imageUrl = values.imageUrl;
-            if (pendingImage) {
-              const form = new FormData();
-              form.append("projectId", projectId);
-              form.append("file", pendingImage);
-              ({ key: imageUrl } = await uploadProjectImage({ data: form }));
-            }
+            // Before the row write, never after: see project-image-save.ts.
+            const imageUrl = await projectImageUrlToSave({
+              currentImageUrl: values.imageUrl,
+              pendingImage,
+              projectId,
+              upload: uploadProjectImage,
+            });
             await updateProject({
               data: {
                 id: projectId,

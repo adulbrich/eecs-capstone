@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ProjectForm } from "#/components/project-form";
 import { pageTitle } from "#/lib/page-title";
+import { projectImageUrlToSave } from "#/lib/project-image-save";
 import { setProjectCategories } from "#/server/categories";
 import { createProject, updateProject } from "#/server/projects";
 import { uploadProjectImage } from "#/server/uploads";
@@ -24,38 +25,38 @@ function NewProject() {
         <ProjectForm
           enableAiReview
           onSubmit={async (values, categoryIds, pendingImage) => {
+            const payload = {
+              ...values,
+              programId: values.programId || null,
+              notes: values.notes || null,
+            };
             const { id, proposerEmail } = await createProject({
               data: {
-                ...values,
-                programId: values.programId || null,
-                notes: values.notes || null,
+                ...payload,
                 proposerEmail: isStaff
                   ? values.proposerEmail || null
                   : undefined,
               },
             });
-            // Create cannot upload first: the storage key is
-            // `projects/<id>/...` and the upload guard needs a project row to
-            // check the viewer against, so there is nothing to upload into
-            // until the project exists. That costs a second write here, unlike
-            // the edit path. It is honest rather than free: the image lands in
-            // the edit log as a change on a brand new draft.
+            // Create cannot upload first: the key is `projects/<id>/...` and
+            // the upload guard loads the project to check the viewer, so there
+            // is nothing to upload into until the row exists. Hence a second
+            // write here, unlike the edit path, and an edit-log row recording
+            // the image on a brand new draft.
             if (pendingImage) {
-              const form = new FormData();
-              form.append("projectId", id);
-              form.append("file", pendingImage);
-              const { key } = await uploadProjectImage({ data: form });
+              const imageUrl = await projectImageUrlToSave({
+                currentImageUrl: values.imageUrl,
+                pendingImage,
+                projectId: id,
+                upload: uploadProjectImage,
+              });
               await updateProject({
                 data: {
+                  ...payload,
                   id,
-                  ...values,
-                  imageUrl: key,
-                  programId: values.programId || null,
-                  notes: values.notes || null,
-                  // The address create actually resolved, not the blank field
-                  // the form sent. Blank means "default to the creator" on
-                  // create and "unlink the proposer" on update, so echoing it
-                  // back would drop the link this project just got.
+                  imageUrl,
+                  // The address create resolved, not the blank field the form
+                  // sent: blank unlinks the proposer on this path.
                   proposerEmail: isStaff ? proposerEmail : undefined,
                 },
               });

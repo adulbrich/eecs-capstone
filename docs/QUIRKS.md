@@ -930,10 +930,12 @@ into two layers:
 Integration tests construct a synthetic viewer (`{ id, role }`) via
 the local `makeUser` helper and call the `*As` variant directly. See
 `uploadProjectImageAs` / `uploadProjectImageForCurrentUser` in
-`src/server/_internal/uploads.ts` for the canonical pair. The avatar
-upload path is not test-covered because the same split would be
-needed; the project test covers the same Sharp + bucket + row update
-pipeline.
+`src/server/_internal/uploads.ts` for the canonical pair. Both the
+project and avatar paths are covered in
+`uploads.integration.test.ts`. Note that since #88 the project upload
+writes no row at all: it stores the object and returns the key, and
+the caller saves it. Its test therefore covers Sharp plus the bucket,
+and the row write is asserted on the update path instead.
 
 ### Buffer is not a BlobPart in lib.dom
 
@@ -1164,7 +1166,14 @@ Inventory carried the same list until 2026-08-28, under the name `EDITABLE_FIELD
 
 The predicates are still a second spelling of what `validateStatusInvariants` decides in its `case` labels, because those labels are what make a seventh `ItemStatus` a compile error and cannot be collapsed into a helper without losing that. So `inventory-workflow.test.ts` derives the agreement by asking the rules: for every status the panel can target, `needsHolder` must be true exactly when a holderless transition is refused, and `needsDueAt` true exactly when a dated one is required. The panel keeps its friendlier wording; only the decision is shared.
 
-`imageUrl` is a real exception to all of this and not an oversight: `uploadProjectImageAs` (`src/server/_internal/uploads.ts`) writes the column directly on its own request, so an image change never reaches this diff or the edit log at all. See issue #88.
+`imageUrl` used to be a real exception: `uploadProjectImageAs` wrote the column on its own request, so an image change reached neither this diff nor the edit log. #88 closed that by making the upload store the object and return its key, which the caller then passes to `updateProject` as an ordinary field. `updateProjectAs` (`src/server/_internal/projects.ts`) is now the only writer of `projects.image_url`, and therefore the only place a project image is cleaned up. Checkable:
+
+```bash
+# no hits: the upload path writes no row at all
+grep -n 'update(projects)' src/server/_internal/uploads.ts
+```
+
+The cleanup runs after the transaction commits rather than inside it, because a rollback would otherwise destroy the object the surviving row still points at, and it is scoped to the project's own `projects/<id>/` key prefix: `imageUrl` is client-writable, so an unscoped delete lets a caller point their row at another project's key and have the next save destroy it.
 
 ### `commitTransition` is the only writer of `project_status_history`
 

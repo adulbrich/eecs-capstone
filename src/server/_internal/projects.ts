@@ -82,25 +82,9 @@ function ndaFields(data: {
 }
 
 /**
- * Returns the effective proposer address alongside the id, and that second
- * field is not decoration.
- *
- * A blank proposer email means two opposite things on the two paths. Here it
- * means "default the proposer to the creator" (`proposerId = viewer.id`
- * below); in `buildProjectValues` it means "unlink the proposer"
- * (`proposerId = null`). So a caller that creates a project and then updates
- * it, which the new-project route must do to save an uploaded image key,
- * would silently drop the proposer link by echoing back a blank field.
- *
- * The address returned is the one the edit form would prefill, for exactly the
- * reason `getProposerForEditAs` prefills it: proposerId is canonical, so an
- * untouched save has to re-resolve to the same proposer.
- */
-/**
- * The address that re-resolves to the project's current proposer.
- *
- * The linked account's own email when there is one, because that is what
- * `resolveProposerId` will look up. Otherwise the stored string, which is what
+ * The address that re-resolves to a project's current proposer: the linked
+ * account's own email when there is one, because that is what
+ * `resolveProposerId` looks up, and otherwise the stored string, which is what
  * a project proposed by someone with no account has.
  */
 async function effectiveProposerEmail(
@@ -117,6 +101,14 @@ async function effectiveProposerEmail(
   return account?.email ?? storedEmail;
 }
 
+/**
+ * Returns the resolved proposer address alongside the id, because a caller
+ * that creates and then updates cannot echo the form's blank field back: blank
+ * means "default the proposer to the creator" here and "unlink the proposer"
+ * in `buildProjectValues`. The new-project route makes exactly that pair of
+ * calls to save an uploaded image key. Not a disclosure: the address is either
+ * one staff just typed or the caller's own.
+ */
 export async function createProjectAs(
   viewer: AuthUser,
   data: ProjectInput
@@ -252,8 +244,13 @@ export async function updateProjectAs(
   // object the surviving row still points at. This is the only place a project
   // image is cleaned up, because this is the only place the column is written.
   if (changedFields.includes("imageUrl")) {
-    const { deleteReplacedObject } = await import("#/lib/_internal/storage");
-    await deleteReplacedObject(existing.imageUrl, `projects/${existing.id}/`);
+    const { deleteReplacedObject, projectImageKeys } = await import(
+      "#/lib/_internal/storage"
+    );
+    await deleteReplacedObject(
+      existing.imageUrl,
+      projectImageKeys(existing.id)
+    );
   }
 
   if (existing.status === "published") {
