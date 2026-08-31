@@ -10,8 +10,9 @@
  *
  * Takes the uploader as a parameter so a test can drive every branch and the
  * rejection without a server. The owner arrives as one object rather than a
- * field name beside an id, so pairing `projectId` with an item id is not a
- * thing a caller can express.
+ * field name beside a separate id, which removes the mismatch worth removing:
+ * two arguments that have to agree and nothing making them. It does not stop
+ * a caller putting an item id under the `projectId` key; no type could.
  *
  * Removal needs no branch here: both uploaders clear the form's image field
  * when the user clicks Remove, so `currentImageUrl` is already empty. What

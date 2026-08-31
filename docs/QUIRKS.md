@@ -979,12 +979,17 @@ the uploads follow none of it by design (#88, #126):
 | `hardDeleteInventoryItemAs` | Deletes the row | Yes |
 | `hardDeleteProjectAs` | Deletes the row | No, and that is a leak |
 
-The reasoning, the post-commit ordering and the prefix scoping are one section
-up, under the projects heading, and are not repeated here. Two things that
-section cannot say because they are inventory's:
+Why the uploads write nothing, why the cleanup runs after the transaction
+commits, and why it refuses a key outside the row's own prefix are all under
+"An image change is an ordinary edit, and who cleans up after it" in the
+Projects section below, and are not repeated here. Two things that section
+cannot say because they are inventory's:
 
-- Retire is not delete. A retired item keeps its row and its photo, and
-  `hardDeleteInventoryItemAs` is the only inventory path that drops either.
+- Retiring an item touches neither its row nor its object, so a retired item
+  keeps its photo. That is not the same as saying only a hard delete can drop
+  one: `updateInventoryItemAs` gates on staff and not on status, so staff
+  replacing or clearing a retired item's photo through the ordinary edit form
+  deletes the object it replaced, exactly as for a live item.
 - Both create paths reach their first key through a second write, because the
   key is `<domain>/<id>/...` and the upload needs the row to exist. That second
   write is an ordinary edit, so a brand new project or item carries one
@@ -1198,6 +1203,8 @@ Inventory carried the same list until 2026-08-28, under the name `EDITABLE_FIELD
 `needsHolder` and `needsDueAt` (`src/lib/inventory-workflow.ts`) exist for `inventory-lifecycle-panel.tsx`, which used to spell both rules inline as `status === "reserved" || status === "checked_out"` and used the answer to decide `requestItemId` as well as an error message. Two implementations of one rule with nothing linking them is the shape that produced the edit-diff bug above, and a client that disagrees with the server about which transitions need a holder either blocks a legal one or lets an illegal one reach a refusal it could have explained better.
 
 The predicates are still a second spelling of what `validateStatusInvariants` decides in its `case` labels, because those labels are what make a seventh `ItemStatus` a compile error and cannot be collapsed into a helper without losing that. So `inventory-workflow.test.ts` derives the agreement by asking the rules: for every status the panel can target, `needsHolder` must be true exactly when a holderless transition is refused, and `needsDueAt` true exactly when a dated one is required. The panel keeps its friendlier wording; only the decision is shared.
+
+### An image change is an ordinary edit, and who cleans up after it
 
 `imageUrl` used to be a real exception: `uploadProjectImageAs` wrote the column on its own request, so an image change reached neither this diff nor the edit log. #88 closed that by making the upload store the object and return its key, which the caller then passes to `updateProject` as an ordinary field. `createProjectAs` still writes the column on insert, but `updateProjectAs` (`src/server/_internal/projects.ts`) is now the only place an existing `projects.image_url` is replaced, and therefore the only place a project image is cleaned up. Not the only place one could need to be: `hardDeleteProjectAs` drops the row without touching storage, which orphans the object. That predates #88 and is the project-side twin of #126. Checkable:
 
