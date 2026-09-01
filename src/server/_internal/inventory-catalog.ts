@@ -373,6 +373,11 @@ export async function createInventoryItemAs(
   data: CreateInventoryItemInput
 ) {
   assertStaff(viewer);
+  // Same reason as `createProjectAs`: the key is `inventory/<id>/` and the id
+  // does not exist yet, so no legal key can be in hand. See #162.
+  if (data.imageUrl) {
+    throw new Error("Invalid image");
+  }
   return await db.transaction(async (tx) => {
     const [row] = await tx
       .insert(inventoryItems)
@@ -444,6 +449,16 @@ export async function updateInventoryItemAs(
       newDiff: newValues,
       oldDiff: oldValues,
     } = diffRowFields(before, values);
+
+    // Only when the value CHANGES, so a row still holding a legacy absolute
+    // URL stays editable. Throwing here rolls the transaction back, which is
+    // why it sits before any write rather than after. See #162.
+    if (changed.includes("imageUrl")) {
+      const { assertOwnedKey, inventoryImageKeys } = await import(
+        "#/lib/_internal/storage"
+      );
+      assertOwnedKey(values.imageUrl, inventoryImageKeys(data.id));
+    }
 
     // Categories are outside that diff along with the column, so they need
     // their own, computed before the early return: otherwise

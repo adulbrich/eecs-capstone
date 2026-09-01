@@ -311,22 +311,21 @@ describe("updateProjectAs image cleanup", () => {
   });
 
   it("leaves a key outside the project's own prefix alone", async () => {
-    // imageUrl is a client-writable column, so a caller can point their own
-    // project at another project's key. Without the prefix guard the next save
-    // deletes that object, and the other project's image is gone from storage
-    // rather than merely unlinked. An orphan is the cheaper failure.
+    // Defence in depth behind the write guard below: a row that already holds
+    // another project's key, however it got there, must not take that object
+    // down on the next save. An orphan is the cheaper failure. The bad value
+    // is seeded with a raw update because the write guard refuses it.
     const admin = await makeUser(`cl-b-${Date.now()}@x.com`, "admin");
     const viewer = { id: admin.id, role: admin.role };
     const { id: victimId } = await createProjectAs(viewer, baseProject());
     const { id: attackerId } = await createProjectAs(viewer, baseProject());
     const victimKey = `projects/${victimId}/victim.webp`;
     await putObject(victimKey);
+    await db
+      .update(projects)
+      .set({ imageUrl: victimKey })
+      .where(eq(projects.id, attackerId));
 
-    await updateProjectAs(viewer, {
-      id: attackerId,
-      ...baseProject(),
-      imageUrl: victimKey,
-    });
     await updateProjectAs(viewer, {
       id: attackerId,
       ...baseProject(),
@@ -334,6 +333,111 @@ describe("updateProjectAs image cleanup", () => {
     });
 
     expect(await objectExists(victimKey)).toBe(true);
+  });
+});
+
+describe("what imageUrl may be set to", () => {
+  it("refuses a third-party URL", async () => {
+    // The point of the whole guard: without it any signed-in user can make
+    // every viewer of their project, a reviewing staff member above all,
+    // fetch a URL the proposer controls. See #162.
+    const admin = await makeUser(`iu-a-${Date.now()}@x.com`, "admin");
+    const viewer = { id: admin.id, role: admin.role };
+    const { id } = await createProjectAs(viewer, baseProject());
+
+    await expect(
+      updateProjectAs(viewer, {
+        id,
+        ...baseProject(),
+        imageUrl: "https://example.com/x.png",
+      })
+    ).rejects.toThrow("Invalid image");
+  });
+
+  it("refuses a key under another project's prefix", async () => {
+    const admin = await makeUser(`iu-b-${Date.now()}@x.com`, "admin");
+    const viewer = { id: admin.id, role: admin.role };
+    const { id: victimId } = await createProjectAs(viewer, baseProject());
+    const { id } = await createProjectAs(viewer, baseProject());
+
+    await expect(
+      updateProjectAs(viewer, {
+        id,
+        ...baseProject(),
+        imageUrl: `projects/${victimId}/victim.webp`,
+      })
+    ).rejects.toThrow("Invalid image");
+  });
+
+  it("refuses a traversal out of its own prefix", async () => {
+    // `startsWith` alone would pass this. It is a distinct key in S3, so it
+    // destroys nothing, but a browser normalizes the path it renders into.
+    const admin = await makeUser(`iu-c-${Date.now()}@x.com`, "admin");
+    const viewer = { id: admin.id, role: admin.role };
+    const { id: victimId } = await createProjectAs(viewer, baseProject());
+    const { id } = await createProjectAs(viewer, baseProject());
+
+    await expect(
+      updateProjectAs(viewer, {
+        id,
+        ...baseProject(),
+        imageUrl: `projects/${id}/../${victimId}/victim.webp`,
+      })
+    ).rejects.toThrow("Invalid image");
+  });
+
+  it("accepts a key under its own prefix, and accepts clearing it", async () => {
+    const admin = await makeUser(`iu-d-${Date.now()}@x.com`, "admin");
+    const viewer = { id: admin.id, role: admin.role };
+    const { id } = await createProjectAs(viewer, baseProject());
+
+    await updateProjectAs(viewer, {
+      id,
+      ...baseProject(),
+      imageUrl: `projects/${id}/mine.webp`,
+    });
+    await updateProjectAs(viewer, { id, ...baseProject(), imageUrl: "" });
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.imageUrl).toBeNull();
+  });
+
+  it("still lets a row holding a legacy absolute URL be edited", async () => {
+    // The guard is on CHANGE, not on content. Real rows hold absolute URLs
+    // (the dev seed writes Unsplash links) and the edit form round-trips the
+    // field, so checking content would make those rows uneditable.
+    const admin = await makeUser(`iu-e-${Date.now()}@x.com`, "admin");
+    const viewer = { id: admin.id, role: admin.role };
+    const { id } = await createProjectAs(viewer, baseProject());
+    const legacy = "https://images.unsplash.com/photo-123";
+    await db
+      .update(projects)
+      .set({ imageUrl: legacy })
+      .where(eq(projects.id, id));
+
+    await updateProjectAs(viewer, {
+      id,
+      ...baseProject(),
+      title: "edited",
+      imageUrl: legacy,
+    });
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.title).toBe("edited");
+    expect(row.imageUrl).toBe(legacy);
+  });
+
+  it("refuses any imageUrl on create, where no key can exist yet", async () => {
+    // Guarding only the edit path is bypassed by never editing.
+    const admin = await makeUser(`iu-f-${Date.now()}@x.com`, "admin");
+    const viewer = { id: admin.id, role: admin.role };
+
+    await expect(
+      createProjectAs(viewer, {
+        ...baseProject(),
+        imageUrl: "https://example.com/x.png",
+      })
+    ).rejects.toThrow("Invalid image");
   });
 });
 

@@ -982,8 +982,9 @@ the uploads follow none of it by design (#88, #126):
 Why the uploads write nothing, why the cleanup runs after the row is written
 rather than inside the transaction, and why it refuses a key outside the row's
 own prefix are all under "An image change is an ordinary edit, and who cleans
-up after it" in the Projects section below, and are not repeated here. Two
-things that section cannot say because they are inventory's:
+up after it" in the Projects section below, and what the column may contain is
+under "What `image_url` may contain" beside it. Neither is repeated here. Two
+things those sections cannot say because they are inventory's:
 
 - Retiring writes the row, through `transitionItem` like any other status
   change, but it never writes `image_url` and never touches storage, so a
@@ -1219,6 +1220,42 @@ grep -n 'update(projects)' src/server/_internal/uploads.ts
 ```
 
 The cleanup runs after the row write lands, never inside the transaction, because a rollback would otherwise destroy the object the surviving row still points at. `hardDeleteProjectAs` opens no transaction at all, so there it simply follows the row delete. Either way it is scoped to the project's own `projects/<id>/` key prefix: `imageUrl` is client-writable, so an unscoped delete lets a caller point their row at another project's key and have the next save destroy it.
+
+### What `image_url` may contain, and why the check is on the change
+
+One rule, both domains: a write may only CHANGE `image_url` to empty, or to a
+key the row's own `KeySpace` could have minted. `assertOwnedKey` in
+`src/lib/_internal/storage.ts` is the check, and `KeySpace.owns` is the one
+predicate behind it and behind `deleteOwnedObject` (#162).
+
+Until then the column was validated for length and nothing else, so any
+signed-in user could set a project's `imageUrl` to a URL they control, and
+every viewer of that project fetched it. The reliable target is not the public
+but the staff member reviewing the draft. `img` is not in the markdown
+allowlist (`ALLOWED_ELEMENTS` in `src/components/markdown.tsx`) and there is no
+CSP anywhere in `src/` or `infra/`, so this was the only field a non-staff user
+could use to get an image element rendered, with nothing behind it.
+
+Three things about the shape, each of which is load-bearing:
+
+- **The check is on the change, not on the content.** Real rows hold absolute
+  URLs from before the upload flow (the dev seed writes Unsplash links), the
+  edit form round-trips the field, and `getPublicUrl` returns any `http(s)://`
+  value unchanged by design. Checking content would make every one of those
+  rows uneditable. Saving a legacy value back unchanged is not a change, so
+  nothing checks it. The consequence, stated rather than discovered: a row that
+  already holds a bad value keeps it. Remediating those is a separate job.
+- **Both create paths refuse any `imageUrl` at all**, because the key is
+  `<domain>/<id>/` and the id does not exist until the insert does. Guarding
+  only the edit path is bypassed by never editing, and `createProject` is
+  `authenticated`, not staff.
+- **`owns` is tighter than `startsWith(prefix)`**, which accepts
+  `projects/<own-id>/../<other-id>/x.webp`. That is a distinct key in S3 so it
+  destroys nothing, but a browser normalizes the path it is rendered into.
+
+This narrows what a permitted writer may put in the column. It moves nothing in
+`access-contract.ts`: the column is still writable by the project's proposer or
+staff, and by staff only on inventory.
 
 ### `commitTransition` is the only writer of `project_status_history`
 

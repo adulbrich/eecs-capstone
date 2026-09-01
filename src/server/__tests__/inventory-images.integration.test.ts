@@ -11,6 +11,7 @@ import { db } from "#/db";
 import { inventoryItems, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import {
+  createInventoryItemAs,
   hardDeleteInventoryItemAs,
   updateInventoryItemAs,
 } from "#/server/_internal/inventory-catalog";
@@ -164,20 +165,17 @@ describe("inventory image cleanup", () => {
   });
 
   it("leaves a key outside the item's own prefix alone", async () => {
-    // imageUrl is a staff-writable column, so an item can be pointed at another
-    // item's key. Deleting that on the next save would destroy a photo the
-    // caller never owned; an orphan is the cheaper failure.
+    // Defence in depth behind the write guard: an item that already holds
+    // another item's key must not destroy that photo on the next save; an
+    // orphan is the cheaper failure. `makeItem` inserts the row directly,
+    // which is the only way in now that the write guard refuses the value.
     const staff = await makeStaff(`inv-x-${Date.now()}@x.com`);
     const victim = await makeItem(`Victim-${Date.now()}`);
     const victimKey = `inventory/${victim.id}/victim.webp`;
     await putObject(victimKey);
     const name = `Thief-${Date.now()}`;
-    const thief = await makeItem(name);
+    const thief = await makeItem(name, victimKey);
 
-    await updateInventoryItemAs(staff, {
-      id: thief.id,
-      ...payload(name, victimKey),
-    });
     await updateInventoryItemAs(staff, {
       id: thief.id,
       ...payload(name, `inventory/${thief.id}/mine.webp`),
@@ -212,5 +210,93 @@ describe("inventory image cleanup", () => {
     await transitionItem(staff, { itemId: item.id, nextStatus: "retired" });
 
     expect(await objectExists(key)).toBe(true);
+  });
+});
+
+describe("what an inventory imageUrl may be set to", () => {
+  it("refuses a third-party URL", async () => {
+    const staff = await makeStaff(`inv-u-${Date.now()}@x.com`);
+    const name = `Url-${Date.now()}`;
+    const item = await makeItem(name);
+
+    await expect(
+      updateInventoryItemAs(staff, {
+        id: item.id,
+        ...payload(name, "https://example.com/x.png"),
+      })
+    ).rejects.toThrow("Invalid image");
+  });
+
+  it("refuses a key under another item's prefix", async () => {
+    const staff = await makeStaff(`inv-p-${Date.now()}@x.com`);
+    const victim = await makeItem(`OtherVictim-${Date.now()}`);
+    const name = `Prefix-${Date.now()}`;
+    const item = await makeItem(name);
+
+    await expect(
+      updateInventoryItemAs(staff, {
+        id: item.id,
+        ...payload(name, `inventory/${victim.id}/victim.webp`),
+      })
+    ).rejects.toThrow("Invalid image");
+  });
+
+  it("refuses a traversal out of its own prefix", async () => {
+    const staff = await makeStaff(`inv-tr-${Date.now()}@x.com`);
+    const victim = await makeItem(`TravVictim-${Date.now()}`);
+    const name = `Trav-${Date.now()}`;
+    const item = await makeItem(name);
+
+    await expect(
+      updateInventoryItemAs(staff, {
+        id: item.id,
+        ...payload(name, `inventory/${item.id}/../${victim.id}/victim.webp`),
+      })
+    ).rejects.toThrow("Invalid image");
+  });
+
+  it("accepts a key under its own prefix, and accepts clearing it", async () => {
+    const staff = await makeStaff(`inv-ok-${Date.now()}@x.com`);
+    const name = `Ok-${Date.now()}`;
+    const item = await makeItem(name);
+
+    await updateInventoryItemAs(staff, {
+      id: item.id,
+      ...payload(name, `inventory/${item.id}/mine.webp`),
+    });
+    const view = await updateInventoryItemAs(staff, {
+      id: item.id,
+      ...payload(name, null),
+    });
+
+    expect(view.imageUrl).toBeNull();
+  });
+
+  it("still lets a row holding a legacy absolute URL be edited", async () => {
+    // The guard is on CHANGE, not on content, so a pre-upload row stays
+    // editable while the edit form round-trips its absolute URL.
+    const staff = await makeStaff(`inv-lg-${Date.now()}@x.com`);
+    const name = `Legacy-${Date.now()}`;
+    const legacy = "https://images.unsplash.com/photo-123";
+    const item = await makeItem(name, legacy);
+
+    const view = await updateInventoryItemAs(staff, {
+      id: item.id,
+      ...payload(name, legacy),
+      location: "Lab 204",
+    });
+
+    expect(view.location).toBe("Lab 204");
+    expect(view.imageUrl).toBe(legacy);
+  });
+
+  it("refuses any imageUrl on create, where no key can exist yet", async () => {
+    const staff = await makeStaff(`inv-cr-${Date.now()}@x.com`);
+
+    await expect(
+      createInventoryItemAs(staff, {
+        ...payload(`Created-${Date.now()}`, "https://example.com/x.png"),
+      })
+    ).rejects.toThrow("Invalid image");
   });
 });

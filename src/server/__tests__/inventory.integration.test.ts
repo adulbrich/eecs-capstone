@@ -673,11 +673,15 @@ describe("catalog CRUD", () => {
       { field: "label", from: null, to: "Bench 3" },
       { field: "location", from: "Shelf A", to: "Shelf B" },
       { field: "notes", from: null, to: "Private note" },
-      { field: "imageUrl", from: null, to: "inventory/x.jpg" },
+      // `to` is a placeholder for this one field: an image key has to sit
+      // under the item's own prefix, which is not known until the row below
+      // exists, so the loop resolves it. See #162.
+      { field: "imageUrl", from: null, to: "" },
     ] as const;
 
-    for (const { field, from, to } of edits) {
+    for (const { field, from, to: literal } of edits) {
       const item = await makeItem({ name: "Before", location: "Shelf A" });
+      const to = field === "imageUrl" ? `inventory/${item.id}/x.webp` : literal;
       const base = {
         id: item.id,
         categoryIds: [],
@@ -723,7 +727,7 @@ describe("catalog CRUD", () => {
       categoryIds: [],
       description: "d",
       id: item.id,
-      imageUrl: "inventory/x.jpg",
+      imageUrl: `inventory/${item.id}/x.webp`,
       label: "Bench 3",
       location: "Shelf B",
       name: "After",

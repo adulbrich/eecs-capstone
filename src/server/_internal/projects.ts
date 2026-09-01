@@ -99,6 +99,15 @@ export async function createProjectAs(
   // nothing to gate here. The update path re-checks per project.
   const allowedNotes = data.notes ?? null;
 
+  // A project image lives under `projects/<id>/`, and the id does not exist
+  // until the row below does, so no caller can hold a legal key at this point.
+  // The client uploads after create and saves the key through the edit path,
+  // which is where the real check lives. Without this, the edit-path guard is
+  // bypassed by never editing. See #162.
+  if (data.imageUrl) {
+    throw new Error("Invalid image");
+  }
+
   const [created] = await db
     .insert(projects)
     .values({
@@ -203,6 +212,16 @@ export async function updateProjectAs(
 
   if (changedFields.length === 0) {
     return { id: existing.id, updated: false };
+  }
+
+  // Only when the value CHANGES, which is the whole reason a row still holding
+  // a legacy absolute URL stays editable: saving it back unchanged is not a
+  // change, so nothing checks it. See #162.
+  if (changedFields.includes("imageUrl")) {
+    const { assertOwnedKey, projectImageKeys } = await import(
+      "#/lib/_internal/storage"
+    );
+    assertOwnedKey(newValues.imageUrl, projectImageKeys(existing.id));
   }
 
   await db.transaction(async (tx) => {
