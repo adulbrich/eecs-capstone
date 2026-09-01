@@ -344,8 +344,5 @@ export async function listProjectCategoriesAs(
 
 export async function listProjectCategoriesImpl(data: { projectId: string }) {
   const session = await readSession();
-  const viewer: Viewer = session?.user
-    ? { id: session.user.id, role: session.user.role ?? null }
-    : null;
-  return listProjectCategoriesAs(viewer, data);
+  return listProjectCategoriesAs(session?.user ?? null, data);
 }
