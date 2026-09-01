@@ -981,10 +981,9 @@ the uploads follow none of it by design (#88, #126):
 
 Why the uploads write nothing, why the cleanup runs after the row is written
 rather than inside the transaction, and why it refuses a key outside the row's
-own prefix are all under
-"An image change is an ordinary edit, and who cleans up after it" in the
-Projects section below, and are not repeated here. Two things that section
-cannot say because they are inventory's:
+own prefix are all under "An image change is an ordinary edit, and who cleans
+up after it" in the Projects section below, and are not repeated here. Two
+things that section cannot say because they are inventory's:
 
 - Retiring writes the row, through `transitionItem` like any other status
   change, but it never writes `image_url` and never touches storage, so a

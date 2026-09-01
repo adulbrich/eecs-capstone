@@ -150,6 +150,6 @@ export async function deleteOwnedObject(
   try {
     await getObjectStorage().delete(key);
   } catch (e) {
-    console.warn(`Failed to delete replaced object ${key}:`, e);
+    console.warn(`Failed to delete object ${key}:`, e);
   }
 }
