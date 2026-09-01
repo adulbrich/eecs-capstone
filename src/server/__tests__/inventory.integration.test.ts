@@ -3344,3 +3344,36 @@ describe("listInventoryRequestsAs", () => {
     ).toHaveLength(0);
   });
 });
+
+describe("hasRequestHistory on the staff detail", () => {
+  it("is false for an item nobody has requested", async () => {
+    const admin = await makeUser(`hrh-a1-${Date.now()}@x.com`, "admin");
+    const item = await makeItem();
+    const view = await getInventoryItemDetailAs(admin, { id: item.id });
+    if (!view?.viewerIsStaff) {
+      throw new Error("expected the staff branch");
+    }
+    expect(view.hasRequestHistory).toBe(false);
+  });
+
+  it("is true once a request line exists, whatever the line's state", async () => {
+    const admin = await makeUser(`hrh-a2-${Date.now()}@x.com`, "admin");
+    const holder = await makeUser(`hrh-h2-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    await makeRequestLine(holder.id, item.id);
+    const view = await getInventoryItemDetailAs(admin, { id: item.id });
+    if (!view?.viewerIsStaff) {
+      throw new Error("expected the staff branch");
+    }
+    expect(view.hasRequestHistory).toBe(true);
+  });
+
+  it("is not part of the public branch", async () => {
+    const holder = await makeUser(`hrh-h3-${Date.now()}@x.com`, "user");
+    const item = await makeItem();
+    await makeRequestLine(holder.id, item.id);
+    const view = await getInventoryItemDetailAs(null, { id: item.id });
+    expect(view?.viewerIsStaff).toBe(false);
+    expect(Object.keys(view ?? {})).not.toContain("hasRequestHistory");
+  });
+});

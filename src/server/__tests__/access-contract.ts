@@ -59,7 +59,7 @@ interface AccessDeclaration {
  * of a claim this specific is two chances to correct only one of them.
  */
 const PUBLIC_ITEM_VIEW_NOTE =
-  "The projection branches on isStaff, not on having a session, so anonymous and signed-in non-staff callers get the same public view and only staff see more. publicItemView omits holder identity, serial, label, location and notes. getInventoryItemDetail withholds one thing more: the staff branch returns the status history, joined to user.name, where the public branch returns an empty array.";
+  "The projection branches on isStaff, not on having a session, so anonymous and signed-in non-staff callers get the same public view and only staff see more. publicItemView omits holder identity, serial, label, location and notes. getInventoryItemDetail withholds two things more: the staff branch returns the status history, joined to user.name, where the public branch returns an empty array, and a hasRequestHistory flag that exists only on the staff branch.";
 
 export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/admin.ts:getAdminStats": {

@@ -32,7 +32,9 @@ export interface StaffPanelItem {
 export function StaffInventoryPanel({
   item,
   history,
+  hasRequestHistory,
 }: {
+  hasRequestHistory: boolean;
   history: HistoryRow[];
   item: StaffPanelItem;
 }) {
@@ -53,6 +55,7 @@ export function StaffInventoryPanel({
 
       {/* Renders its own PanelSections, so it slots into the same rhythm. */}
       <InventoryLifecyclePanel
+        hasRequestHistory={hasRequestHistory}
         history={history}
         item={{
           id: item.id,
