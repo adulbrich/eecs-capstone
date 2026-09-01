@@ -16,6 +16,7 @@ import {
   listCategoriesImpl,
   listCategoriesWithUsageAs,
   listCategoryTypesImpl,
+  listProjectCategoriesAs,
   setProjectCategoriesAs,
   updateCategoryAs,
 } from "#/server/_internal/categories";
@@ -281,6 +282,59 @@ describe("listCategoriesWithUsageAs", () => {
     const student = await makeUser("usage-student@x.com", "user");
     await expect(
       listCategoriesWithUsageAs(student, { domain: "project" })
+    ).rejects.toThrow("Forbidden");
+  });
+});
+
+describe("listProjectCategoriesAs", () => {
+  async function draftWithCategory() {
+    const admin = await makeUser(`lpc-admin-${Date.now()}@x.com`, "admin");
+    const proposer = await makeUser(`lpc-owner-${Date.now()}@x.com`, "user");
+    const { id: categoryId } = await createCategoryAs(admin, {
+      domain: "project",
+      name: `Robotics ${Date.now()}`,
+      type: "technology",
+    });
+    const { id: projectId } = await createProjectAs(proposer, baseProject());
+    await db.insert(projectCategories).values({ projectId, categoryId });
+    return { admin, proposer, projectId, categoryId };
+  }
+
+  it("refuses a stranger and an anonymous viewer on a draft", async () => {
+    const { projectId } = await draftWithCategory();
+    const stranger = await makeUser(`lpc-stranger-${Date.now()}@x.com`, "user");
+    await expect(
+      listProjectCategoriesAs(stranger, { projectId })
+    ).rejects.toThrow("Forbidden");
+    await expect(listProjectCategoriesAs(null, { projectId })).rejects.toThrow(
+      "Forbidden"
+    );
+  });
+
+  it("returns the rows to the proposer and to staff on a draft", async () => {
+    const { admin, proposer, projectId, categoryId } =
+      await draftWithCategory();
+    const own = await listProjectCategoriesAs(proposer, { projectId });
+    expect(own.rows.map((r) => r.id)).toEqual([categoryId]);
+    const staff = await listProjectCategoriesAs(admin, { projectId });
+    expect(staff.rows.map((r) => r.id)).toEqual([categoryId]);
+  });
+
+  it("returns the rows to anyone on a published project", async () => {
+    const { projectId, categoryId } = await draftWithCategory();
+    await db
+      .update(projects)
+      .set({ status: "published" })
+      .where(eq(projects.id, projectId));
+    const { rows } = await listProjectCategoriesAs(null, { projectId });
+    expect(rows.map((r) => r.id)).toEqual([categoryId]);
+  });
+
+  it("refuses an unknown project id the same way", async () => {
+    await expect(
+      listProjectCategoriesAs(null, {
+        projectId: "00000000-0000-0000-0000-000000000000",
+      })
     ).rejects.toThrow("Forbidden");
   });
 });

@@ -7,9 +7,9 @@ import {
   projectCategories,
   projects,
 } from "#/db/schema";
-import { requireUser } from "#/lib/_internal/auth-guards";
+import { readSession, requireUser } from "#/lib/_internal/auth-guards";
 import { canSeeProject } from "#/lib/project-visibility";
-import { assertStaff } from "#/lib/viewer";
+import { assertStaff, type Viewer } from "#/lib/viewer";
 import type {
   CategoryInput,
   CategoryUpdateInput,
@@ -309,7 +309,26 @@ export async function listCategoriesWithUsageForCurrentUser(data: {
   return listCategoriesWithUsageAs(viewer, data);
 }
 
-export async function listProjectCategoriesImpl(data: { projectId: string }) {
+export async function listProjectCategoriesAs(
+  viewer: Viewer,
+  data: { projectId: string }
+) {
+  // Same gate as listProjectCommentsAs: a draft's category names are visible
+  // to the people who can see the draft, and to nobody else. Both callers
+  // (the public detail page and the edit route) already load the project
+  // through a gated read, so this refuses only a call made with a bare id.
+  const [project] = await db
+    .select({
+      id: projects.id,
+      proposerId: projects.proposerId,
+      status: projects.status,
+      deletedAt: projects.deletedAt,
+    })
+    .from(projects)
+    .where(eq(projects.id, data.projectId));
+  if (!(project && canSeeProject(project, viewer))) {
+    throw new Error("Forbidden");
+  }
   const rows = await db
     .select({
       id: categories.id,
@@ -321,4 +340,9 @@ export async function listProjectCategoriesImpl(data: { projectId: string }) {
     .where(eq(projectCategories.projectId, data.projectId))
     .orderBy(categories.type, categories.name);
   return { rows };
+}
+
+export async function listProjectCategoriesImpl(data: { projectId: string }) {
+  const session = await readSession();
+  return listProjectCategoriesAs(session?.user ?? null, data);
 }
