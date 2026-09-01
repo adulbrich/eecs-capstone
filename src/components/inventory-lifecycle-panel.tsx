@@ -5,7 +5,11 @@ import {
   formatHoldShort,
   holdFromStoredRow,
 } from "#/lib/hold";
-import { needsDueAt, needsHolder } from "#/lib/inventory-workflow";
+import {
+  HARD_DELETE_HISTORY_REFUSAL,
+  needsDueAt,
+  needsHolder,
+} from "#/lib/inventory-workflow";
 import {
   hardDeleteInventoryItem,
   transitionInventoryItem,
@@ -67,6 +71,12 @@ export interface HistoryRow {
 }
 
 interface Props {
+  /**
+   * Whether a request line has ever pointed at the item. Hard delete is
+   * refused on the server while one exists, so the button is disabled here
+   * for the same reason rather than after a typed confirmation.
+   */
+  hasRequestHistory: boolean;
   history: HistoryRow[];
   item: {
     id: string;
@@ -282,7 +292,11 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
   );
 }
 
-export function InventoryLifecyclePanel({ item, history }: Props) {
+export function InventoryLifecyclePanel({
+  item,
+  history,
+  hasRequestHistory,
+}: Props) {
   const router = useRouter();
   const status = item.status as Status;
   const rec = recommendedNext(status);
@@ -473,7 +487,8 @@ export function InventoryLifecyclePanel({ item, history }: Props) {
     }
   }
 
-  const canHardDelete = status === "available" || status === "retired";
+  const statusAllowsHardDelete = status === "available" || status === "retired";
+  const canHardDelete = statusAllowsHardDelete && !hasRequestHistory;
   const holderDisplay = formatHolderDisplay(item);
 
   return (
@@ -536,6 +551,9 @@ export function InventoryLifecyclePanel({ item, history }: Props) {
           Hard delete is allowed only when status is available or retired and
           the item has no historical request lines.
         </p>
+        {hasRequestHistory && (
+          <p className="mt-2 text-sm">{HARD_DELETE_HISTORY_REFUSAL}</p>
+        )}
         <div className="mt-2">
           <Button
             disabled={!canHardDelete || busy}

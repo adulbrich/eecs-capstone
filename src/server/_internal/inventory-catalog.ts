@@ -37,6 +37,7 @@ import {
   staffItemView,
   visibleStatuses,
 } from "#/lib/inventory-visibility";
+import { HARD_DELETE_HISTORY_REFUSAL } from "#/lib/inventory-workflow";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type {
   CreateInventoryItemInput,
@@ -552,16 +553,11 @@ export async function hardDeleteInventoryItemAs(
     );
   }
   // Pre-check the RESTRICT FK on inventory_request_items.item_id so the
-  // caller gets a friendly error instead of a raw Postgres 23503.
-  const [historical] = await db
-    .select({ id: inventoryRequestItems.id })
-    .from(inventoryRequestItems)
-    .where(eq(inventoryRequestItems.itemId, data.id))
-    .limit(1);
-  if (historical) {
-    throw new Error(
-      "Cannot hard delete; this item has historical request records. Retire it instead."
-    );
+  // caller gets a friendly error instead of a raw Postgres 23503. The same
+  // predicate feeds the staff detail, so the page can disable the button for
+  // the same reason before anyone types a name.
+  if (await itemHasRequestHistory(data.id)) {
+    throw new Error(HARD_DELETE_HISTORY_REFUSAL);
   }
   await db.delete(inventoryItems).where(eq(inventoryItems.id, data.id));
   // The row is gone, so nothing will ever reference the object again. Retire
@@ -638,11 +634,26 @@ export async function getItemHistoryAs(
  */
 export type InventoryItemDetail =
   | {
+      /**
+       * Whether any request line has ever pointed at the item. A RESTRICT
+       * foreign key makes hard delete impossible while one exists, and this
+       * is what lets the page say so before the confirmation dialog.
+       */
+      hasRequestHistory: boolean;
       history: Awaited<ReturnType<typeof getItemHistoryAs>>;
       item: InventoryItemStaff;
       viewerIsStaff: true;
     }
   | { history: never[]; item: InventoryItemPublic; viewerIsStaff: false };
+
+async function itemHasRequestHistory(itemId: string): Promise<boolean> {
+  const [line] = await db
+    .select({ id: inventoryRequestItems.id })
+    .from(inventoryRequestItems)
+    .where(eq(inventoryRequestItems.itemId, itemId))
+    .limit(1);
+  return line !== undefined;
+}
 
 export async function getInventoryItemDetailAs(
   viewer: Viewer,
@@ -660,6 +671,7 @@ export async function getInventoryItemDetailAs(
     return {
       item: toStaffDetail(row),
       history: await getItemHistoryAs(viewer, { itemId: data.id }),
+      hasRequestHistory: await itemHasRequestHistory(data.id),
       viewerIsStaff: true,
     };
   }

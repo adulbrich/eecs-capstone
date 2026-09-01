@@ -117,15 +117,14 @@ test.describe("inventory item administration", () => {
 });
 
 /**
- * Hard delete has two conditions and the panel only enforces one of them.
+ * Hard delete has two conditions and the panel enforces both.
  *
- * The button is disabled purely on status. The other half, that the item has
- * no historical request lines, is a server-side pre-check standing in front of
- * the RESTRICT foreign key on `inventory_request_items.item_id`, so the only
- * way to see it is to press an enabled button and read what comes back. The
- * issue that asked for this describes the button as gated on both; it is not,
- * and asserting the described behavior rather than the real one would have
- * produced a test that fails against correct code.
+ * Status is one. The other, that the item has no historical request lines,
+ * is a server-side pre-check standing in front of the RESTRICT foreign key on
+ * `inventory_request_items.item_id`; since #152 the detail loader carries
+ * the same answer, so the button is disabled with the reason beside it
+ * before anyone types a name. The server check stays, and the clean-item
+ * half of the second test is what proves the delete still goes through.
  */
 test.describe("inventory hard delete gate", () => {
   test("status alone disables the button", async ({ browser }) => {
@@ -214,24 +213,21 @@ test.describe("inventory hard delete gate", () => {
       await staff.goto(`/inventory/${usedId}`);
       await waitForHydration(staff);
       await staff.getByRole("button", { name: "Return" }).click();
+      // Returned, so status no longer blocks it. The request line still does,
+      // and the answer arrives with the page rather than after a typed name.
+      await expect(
+        statusSection(staff).getByText("Available", { exact: true })
+      ).toBeVisible();
       await expect(
         staff.getByRole("button", { name: "Hard delete item" })
-      ).toBeEnabled();
-
-      await confirmHardDelete(staff, usedName);
-
-      // Scoped to the dialog. The panel mirrors its own error into the Status
-      // section, so the message is on screen twice and an unscoped locator
-      // cannot say the dialog is the one that reported it.
+      ).toBeDisabled();
       await expect(
-        staff
-          .getByRole("dialog")
-          .getByText(
-            "Cannot hard delete; this item has historical request records. Retire it instead."
-          )
+        staff.getByText(
+          "Cannot hard delete; this item has historical request records. Retire it instead.",
+          { exact: true }
+        )
       ).toBeVisible();
-      // Still there, which is the half of the refusal that matters.
-      await expect(staff).toHaveURL(new RegExp(`/inventory/${usedId}$`));
+      await expect(staff.getByRole("dialog")).toHaveCount(0);
 
       await staff.goto(`/inventory/${cleanId}`);
       await waitForHydration(staff);

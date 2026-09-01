@@ -104,7 +104,11 @@ function ItemDetail() {
       {detail.viewerIsStaff && (
         <>
           <InventoryPrivatePanel item={detail.item} />
-          <StaffInventoryPanel history={detail.history} item={detail.item} />
+          <StaffInventoryPanel
+            hasRequestHistory={detail.hasRequestHistory}
+            history={detail.history}
+            item={detail.item}
+          />
         </>
       )}
     </div>
