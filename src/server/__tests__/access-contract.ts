@@ -98,7 +98,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/categories.ts:listProjectCategories": {
     level: "public",
-    note: "Takes a project id and returns that project's category names without checking canSeeProject, so an unpublished draft's categories are readable by anyone holding the id. Low severity and possibly intended; #113 decides whether to gate it.",
+    note: "canSeeProject gates the project inside listProjectCategoriesAs, so a draft's category names reach staff and the proposer only; published and archived are public. Both callers load the project through a gated read first, so the guard refuses only a bare id.",
   },
   "server/categories.ts:setProjectCategories": {
     level: "staff",
