@@ -16,10 +16,6 @@ export const Route = createFileRoute("/(auth)/verify-email")({
 
 function VerifyEmail() {
   const { error } = Route.useSearch();
-  return <VerifyEmailContent error={error} />;
-}
-
-function VerifyEmailContent({ error }: { error?: string }) {
   if (error) {
     return (
       <div className="mx-auto max-w-sm px-4 py-6 md:p-8">
