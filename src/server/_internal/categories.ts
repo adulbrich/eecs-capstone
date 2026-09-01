@@ -16,6 +16,7 @@ import type {
   SetProjectCategoriesInput,
 } from "../categories";
 import type { Tx } from "./inventory-transitions";
+import { findUniqueViolation } from "./pg-errors";
 
 type CategoryDomain = (typeof categoryDomainEnum.enumValues)[number];
 
@@ -26,6 +27,36 @@ interface AuthUser {
 
 function viewerToVisibility(viewer: AuthUser) {
   return { id: viewer.id, role: viewer.role ?? null };
+}
+
+const NAME_INDEX = "categories_domain_type_name_unique_idx";
+
+/**
+ * Turns a unique violation on the (domain, type, lower(name)) index into the
+ * sentence the staff form should show, naming the stored spelling so a
+ * staff member who typed "robotics" sees that "Robotics" is the same row.
+ * Anything else is rethrown untouched.
+ */
+async function rethrowNameCollision(
+  error: unknown,
+  data: { domain: CategoryDomain; name: string; type: string | null }
+): Promise<never> {
+  if (!findUniqueViolation(error, NAME_INDEX)) {
+    throw error;
+  }
+  const [existing] = await db
+    .select({ name: categories.name })
+    .from(categories)
+    .where(
+      and(
+        eq(categories.domain, data.domain),
+        sql`coalesce(${categories.type}, '') = coalesce(${data.type}, '')`,
+        sql`lower(${categories.name}) = lower(${data.name})`
+      )
+    );
+  const name = existing?.name ?? data.name;
+  const where = data.type ? ` with type "${data.type}"` : "";
+  throw new Error(`A category named "${name}" already exists${where}.`);
 }
 
 export async function listCategoriesImpl(data: {
@@ -91,11 +122,15 @@ export async function getCategoryImpl(data: { id: string }) {
 export async function createCategoryAs(viewer: AuthUser, data: CategoryInput) {
   assertStaff(viewer);
   assertDomainShape(data);
-  const [row] = await db
-    .insert(categories)
-    .values({ name: data.name, domain: data.domain, type: data.type })
-    .returning();
-  return { id: row.id };
+  try {
+    const [row] = await db
+      .insert(categories)
+      .values({ name: data.name, domain: data.domain, type: data.type })
+      .returning();
+    return { id: row.id };
+  } catch (error) {
+    return rethrowNameCollision(error, data);
+  }
 }
 
 export async function createCategoryForCurrentUser(data: CategoryInput) {
@@ -125,10 +160,14 @@ export async function updateCategoryAs(
   if (existing.domain !== data.domain) {
     throw new Error("A category's domain cannot be changed");
   }
-  await db
-    .update(categories)
-    .set({ name: data.name, domain: data.domain, type: data.type })
-    .where(eq(categories.id, data.id));
+  try {
+    await db
+      .update(categories)
+      .set({ name: data.name, domain: data.domain, type: data.type })
+      .where(eq(categories.id, data.id));
+  } catch (error) {
+    return rethrowNameCollision(error, data);
+  }
   return { id: data.id };
 }
 

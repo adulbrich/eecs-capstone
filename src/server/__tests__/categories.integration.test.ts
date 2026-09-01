@@ -338,3 +338,111 @@ describe("listProjectCategoriesAs", () => {
     ).rejects.toThrow("Forbidden");
   });
 });
+
+describe("category name collisions", () => {
+  it("create names the existing row on an exact duplicate", async () => {
+    const admin = await makeUser(`col-admin-${Date.now()}@x.com`, "admin");
+    const name = `Vision ${Date.now()}`;
+    await createCategoryAs(admin, {
+      domain: "project",
+      name,
+      type: "technology",
+    });
+    await expect(
+      createCategoryAs(admin, { domain: "project", name, type: "technology" })
+    ).rejects.toThrow(
+      `A category named "${name}" already exists with type "technology".`
+    );
+  });
+
+  it("create names the stored spelling on a case variant", async () => {
+    const admin = await makeUser(`col-admin2-${Date.now()}@x.com`, "admin");
+    const stored = `Robotics ${Date.now()}`;
+    await createCategoryAs(admin, {
+      domain: "project",
+      name: stored,
+      type: "technology",
+    });
+    await expect(
+      createCategoryAs(admin, {
+        domain: "project",
+        name: stored.toLowerCase(),
+        type: "technology",
+      })
+    ).rejects.toThrow(
+      `A category named "${stored}" already exists with type "technology".`
+    );
+  });
+
+  it("create in the inventory domain omits the type clause", async () => {
+    const admin = await makeUser(`col-admin3-${Date.now()}@x.com`, "admin");
+    const name = `Cables ${Date.now()}`;
+    await createCategoryAs(admin, { domain: "inventory", name, type: null });
+    await expect(
+      createCategoryAs(admin, {
+        domain: "inventory",
+        name: name.toUpperCase(),
+        type: null,
+      })
+    ).rejects.toThrow(`A category named "${name}" already exists.`);
+  });
+
+  it("create allows the same name in another domain or type", async () => {
+    const admin = await makeUser(`col-admin4-${Date.now()}@x.com`, "admin");
+    const name = `Shared ${Date.now()}`;
+    await createCategoryAs(admin, {
+      domain: "project",
+      name,
+      type: "technology",
+    });
+    await expect(
+      createCategoryAs(admin, { domain: "project", name, type: "domain" })
+    ).resolves.toMatchObject({ id: expect.any(String) });
+    await expect(
+      createCategoryAs(admin, { domain: "inventory", name, type: null })
+    ).resolves.toMatchObject({ id: expect.any(String) });
+  });
+
+  it("update names the existing row when renaming onto it", async () => {
+    const admin = await makeUser(`col-admin5-${Date.now()}@x.com`, "admin");
+    const taken = `Taken ${Date.now()}`;
+    await createCategoryAs(admin, {
+      domain: "project",
+      name: taken,
+      type: "technology",
+    });
+    const { id } = await createCategoryAs(admin, {
+      domain: "project",
+      name: `Free ${Date.now()}`,
+      type: "technology",
+    });
+    await expect(
+      updateCategoryAs(admin, {
+        id,
+        domain: "project",
+        name: taken.toUpperCase(),
+        type: "technology",
+      })
+    ).rejects.toThrow(
+      `A category named "${taken}" already exists with type "technology".`
+    );
+  });
+
+  it("update still allows saving a row under its own name", async () => {
+    const admin = await makeUser(`col-admin6-${Date.now()}@x.com`, "admin");
+    const name = `Self ${Date.now()}`;
+    const { id } = await createCategoryAs(admin, {
+      domain: "project",
+      name,
+      type: "technology",
+    });
+    await expect(
+      updateCategoryAs(admin, {
+        id,
+        domain: "project",
+        name,
+        type: "technology",
+      })
+    ).resolves.toEqual({ id });
+  });
+});
