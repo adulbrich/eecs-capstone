@@ -1,6 +1,7 @@
 import { and, eq, isNotNull, type SQL, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
+  CATEGORY_NAME_INDEX,
   categories,
   type categoryDomainEnum,
   inventoryItemCategories,
@@ -29,8 +30,6 @@ function viewerToVisibility(viewer: AuthUser) {
   return { id: viewer.id, role: viewer.role ?? null };
 }
 
-const NAME_INDEX = "categories_domain_type_name_unique_idx";
-
 /**
  * Turns a unique violation on the (domain, type, lower(name)) index into the
  * sentence the staff form should show, naming the stored spelling so a
@@ -41,7 +40,7 @@ async function rethrowNameCollision(
   error: unknown,
   data: { domain: CategoryDomain; name: string; type: string | null }
 ): Promise<never> {
-  if (!findUniqueViolation(error, NAME_INDEX)) {
+  if (!findUniqueViolation(error, CATEGORY_NAME_INDEX)) {
     throw error;
   }
   const [existing] = await db

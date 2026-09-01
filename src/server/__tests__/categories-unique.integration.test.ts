@@ -4,6 +4,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import {
+  CATEGORY_NAME_INDEX,
   categories,
   inventoryItemCategories,
   inventoryItems,
@@ -20,7 +21,7 @@ import { findUniqueViolation } from "#/server/_internal/pg-errors";
  * things TypeScript can state.
  */
 
-const INDEX = "categories_domain_type_name_unique_idx";
+const INDEX = CATEGORY_NAME_INDEX;
 const MIGRATION = join(
   process.cwd(),
   "drizzle",

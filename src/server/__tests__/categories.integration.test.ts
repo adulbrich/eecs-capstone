@@ -428,6 +428,50 @@ describe("category name collisions", () => {
     );
   });
 
+  it("update names the existing row on an exact duplicate", async () => {
+    const admin = await makeUser(`col-admin7-${Date.now()}@x.com`, "admin");
+    const taken = `Exact ${Date.now()}`;
+    await createCategoryAs(admin, {
+      domain: "project",
+      name: taken,
+      type: "technology",
+    });
+    const { id } = await createCategoryAs(admin, {
+      domain: "project",
+      name: `Other ${Date.now()}`,
+      type: "technology",
+    });
+    await expect(
+      updateCategoryAs(admin, {
+        id,
+        domain: "project",
+        name: taken,
+        type: "technology",
+      })
+    ).rejects.toThrow(
+      `A category named "${taken}" already exists with type "technology".`
+    );
+  });
+
+  it("update allows renaming onto a name held under another type", async () => {
+    const admin = await makeUser(`col-admin8-${Date.now()}@x.com`, "admin");
+    const name = `Held ${Date.now()}`;
+    await createCategoryAs(admin, { domain: "project", name, type: "domain" });
+    const { id } = await createCategoryAs(admin, {
+      domain: "project",
+      name: `Renaming ${Date.now()}`,
+      type: "technology",
+    });
+    await expect(
+      updateCategoryAs(admin, {
+        id,
+        domain: "project",
+        name,
+        type: "technology",
+      })
+    ).resolves.toEqual({ id });
+  });
+
   it("update still allows saving a row under its own name", async () => {
     const admin = await makeUser(`col-admin6-${Date.now()}@x.com`, "admin");
     const name = `Self ${Date.now()}`;
