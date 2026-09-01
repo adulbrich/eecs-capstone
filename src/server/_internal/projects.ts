@@ -236,7 +236,7 @@ export async function updateProjectAs(
 
   // After the commit, never inside it: a rollback would otherwise destroy the
   // object the surviving row still points at. This is the only place a key is
-  // replaced; create only ever writes a first one, and
+  // written at all; create refuses one and writes null, and
   // `hardDeleteProjectAs` drops the last one.
   if (changedFields.includes("imageUrl")) {
     const { deleteOwnedObject, projectImageKeys } = await import(

@@ -12,6 +12,12 @@
  * If a reason ever emerges for one surface to allow something another must
  * not, write the reason down here and split the constant deliberately rather
  * than letting two copies drift.
+ *
+ * The bottom of the file widens that a little: what an image COLUMN may hold
+ * on an insert, which is the same kind of rule and has the same reason to sit
+ * somewhere client-safe. What the column may hold on an EDIT needs a
+ * `KeySpace` and so lives in `src/lib/_internal/storage.ts`; the two share the
+ * message below rather than each spelling it.
  */
 
 export const ALLOWED_IMAGE_TYPES: ReadonlySet<string> = new Set([
@@ -59,7 +65,8 @@ export const INVALID_IMAGE = "Invalid image";
  * than staff. See #162.
  *
  * Here rather than beside `assertOwnedKey` because this needs no `KeySpace`,
- * and reaching for that module would pull the S3 SDK into every create.
+ * so it can be a plain static import at both call sites instead of the dynamic
+ * one every other reach into the storage module has to be.
  */
 export function assertNoImageKeyOnCreate(key: string | null | undefined): void {
   if (key) {

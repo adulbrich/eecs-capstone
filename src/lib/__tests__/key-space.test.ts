@@ -24,12 +24,16 @@ describe("KeySpace", () => {
     });
   }
 
-  it("owns a key of any name and extension under its prefix", () => {
-    // Deliberately looser than what `newKey` mints: a key naming nothing in
-    // the bucket is a broken image, not a leak.
+  it("owns one plain filename under its prefix, not only what newKey mints", () => {
+    // Looser than `<uuid>.webp` on purpose: a key naming nothing in the bucket
+    // is a broken image, not a leak. Still one segment and one dot, which is
+    // what makes the traversal case below fail.
     const space = projectImageKeys("p1");
     expect(space.owns("projects/p1/x.webp")).toBe(true);
     expect(space.owns("projects/p1/Photo.PNG")).toBe(true);
+    expect(space.owns("projects/p1/IMG_1-2.jpeg")).toBe(true);
+    expect(space.owns("projects/p1/my.photo.webp")).toBe(false);
+    expect(space.owns("projects/p1/noextension")).toBe(false);
   });
 
   it("disowns another row's prefix, a traversal, and an absolute URL", () => {

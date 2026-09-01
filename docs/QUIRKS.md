@@ -1212,7 +1212,7 @@ The predicates are still a second spelling of what `validateStatusInvariants` de
 
 ### An image change is an ordinary edit, and who cleans up after it
 
-`imageUrl` used to be a real exception: `uploadProjectImageAs` wrote the column on its own request, so an image change reached neither this diff nor the edit log. #88 closed that by making the upload store the object and return its key, which the caller then passes to `updateProject` as an ordinary field. `createProjectAs` still writes the column on insert, but `updateProjectAs` (`src/server/_internal/projects.ts`) is the only place an existing `projects.image_url` is replaced. It is not the only place a project image is cleaned up: `hardDeleteProjectAs` drops the last one after deleting the row, through the same `deleteOwnedObject` call, because nothing will ever reference that object again (#159). Both go through that one helper rather than calling storage directly, which is what keeps the refusal of a key outside the row's own prefix in one place. Checkable:
+`imageUrl` used to be a real exception: `uploadProjectImageAs` wrote the column on its own request, so an image change reached neither this diff nor the edit log. #88 closed that by making the upload store the object and return its key, which the caller then passes to `updateProject` as an ordinary field. `createProjectAs` writes a literal `null` and refuses any key a caller sends (see "What `image_url` may contain" below), so `updateProjectAs` (`src/server/_internal/projects.ts`) is the only place `projects.image_url` is ever set to a key at all. It is not the only place a project image is cleaned up: `hardDeleteProjectAs` drops the last one after deleting the row, through the same `deleteOwnedObject` call, because nothing will ever reference that object again (#159). Both go through that one helper rather than calling storage directly, which is what keeps the refusal of a key outside the row's own prefix in one place. Checkable:
 
 ```bash
 # no hits: the upload path writes no row at all
@@ -1228,10 +1228,12 @@ single filename directly under the row's own prefix. `assertOwnedKey` in
 `src/lib/_internal/storage.ts` is the check, and `KeySpace.owns` is the one
 predicate behind it and behind `deleteOwnedObject` (#162).
 
-`owns` accepts any name and any extension, not only the `<uuid>.webp` that
-`newKey` mints. That is deliberate: a key naming nothing in the bucket renders
-a broken image rather than leaking anything, so demanding a uuid buys nothing
-and would force every test to mint one to say anything at all.
+"Single filename" means one segment of letters, digits, underscore or hyphen,
+one dot, an alphanumeric extension. That is looser than the `<uuid>.webp`
+`newKey` mints, deliberately: a key naming nothing in the bucket renders a
+broken image rather than leaking anything, so demanding a uuid buys nothing and
+would force every test to mint one to say anything at all. It is still tighter
+than "a name", which is what rejects the traversal below.
 
 Until then the column was validated for length and nothing else, so any
 signed-in user could set a project's `imageUrl` to a URL they control, and

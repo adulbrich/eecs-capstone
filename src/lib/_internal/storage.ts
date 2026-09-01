@@ -113,10 +113,12 @@ export interface KeySpace {
 }
 
 /**
- * One filename, directly under the prefix. Any name and any extension, not
- * just the `<uuid>.webp` `newKey` mints: a key that names nothing in the
- * bucket is a broken image, not a leak, so there is nothing to buy by
- * demanding a uuid, and the tests would have to mint one to say anything.
+ * One plain filename directly under the prefix: letters, digits, underscore or
+ * hyphen, one dot, an alphanumeric extension. Looser than the `<uuid>.webp`
+ * `newKey` mints, because a key that names nothing in the bucket is a broken
+ * image rather than a leak, so demanding a uuid buys nothing and would force
+ * every test to mint one to say anything. Tighter than "a name", because the
+ * point below is to have one honest meaning for "inside this space".
  *
  * What it does buy is one honest meaning for "inside this space".
  * `startsWith(prefix)` accepts `projects/<own-id>/../<other-id>/x.webp`, which
