@@ -34,15 +34,20 @@ jobs:
       script: test:integration
 
   # The smoke suite is the browser-level guard on the handful of flows the app
-  # exists for: sign in, propose and publish a project, request and return an
-  # item, and stay out of pages you are not allowed into. It runs against the
+  # exists for: render a public page for an anonymous visitor, sign in, propose
+  # and publish a project, request and return an item, and stay out of pages you
+  # are not allowed into. That is one per `@smoke` describe in `src/test/e2e/`,
+  # and the list is worth keeping in step: AGENTS.md sends a reader here to
+  # decide whether a change needs the suite run locally. It runs against the
   # production build, which the dev server cannot stand in for, so its
   # playwright config builds and starts .output rather than `vite dev`. Chromium
   # only, serial, inside a 5-minute job. Anything larger or flakier than that
   # belongs to the full suite in #143, which is dispatch-only.
   #
-  # Advisory for now. It joins the required status checks once it has a known
-  # flake rate, and the check to register there is `smoke / suite`, not `smoke`.
+  # Required. It is registered on the `main` ruleset as `smoke / suite`, not
+  # `smoke`: a `workflow_call` reference renders a check as
+  # `<caller job> / <called job>`, and the bare name would never resolve, which
+  # blocks every pull request indefinitely rather than failing loudly.
   smoke:
     uses: ./.github/workflows/stack-suite.yml
     with:

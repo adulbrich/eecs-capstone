@@ -35,12 +35,16 @@ fast, so a green `npm test` says nothing about either. Run `npm run test:integra
 the UI, rather than finding out from CI. The accessibility suite needs more setup than
 the integration one: the same Postgres and RustFS, plus `npm run db:seed:dev` (its
 global setup signs in as the seeded users) and `npx playwright install chromium`.
+`npm run test:smoke` wants that same setup and builds the production output itself,
+which is the point of it: the dev server cannot show SSR-only breakage. Run it when
+you touch one of the flows it covers, listed in the job comment in `ci.yml`, because
+unlike the integration and accessibility suites a red one blocks the merge.
 Other scripts live in `package.json`.
 
-Only `verify` can block a merge today. The `integration` and `accessibility` jobs run
-on every pull request and a red one still merges, so read their results rather than
-trusting the merge button. The ruleset is the source of truth and the list endpoint
-does not carry the rules, so it takes two calls:
+`verify` and `smoke / suite` can block a merge today. The `integration` and
+`accessibility` jobs run on every pull request and a red one still merges, so read
+their results rather than trusting the merge button. The ruleset is the source of
+truth and the list endpoint does not carry the rules, so it takes two calls:
 
 ```bash
 gh api repos/adulbrich/eecs-capstone/rulesets --jq '.[].id'
@@ -81,8 +85,9 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
 - **Stage files by name.** Never `git add -A` or `git add .`, which sweeps up
   unrelated work in progress.
 - **Never commit to `main`.** A branch ruleset rejects direct pushes, including the
-  user's. Branch, push, open a PR, and let the `verify` check go green. GitHub asks
-  for no approving review, so nothing but the rule below stops a PR merging unread.
+  user's. Branch, push, open a PR, and let the required checks go green. GitHub
+  asks for no approving review, so nothing but the rule below stops a PR merging
+  unread.
 - **Run `mattpocock-skills:code-review` on every PR before merging, then again after
   addressing what it found, until a pass raises nothing you have not already
   answered.** A PR that draws no findings meets that after one pass. Answered
