@@ -88,7 +88,7 @@ export async function uploadAvatarAs(viewer: AuthUser, form: FormData) {
     maxHeight: 512,
   });
 
-  const { avatarKeys, deleteReplacedObject, getObjectStorage } = await import(
+  const { avatarKeys, deleteOwnedObject, getObjectStorage } = await import(
     "#/lib/_internal/storage"
   );
   const space = avatarKeys(viewer.id);
@@ -103,7 +103,7 @@ export async function uploadAvatarAs(viewer: AuthUser, form: FormData) {
 
   // After the write, and scoped to the viewer's own key space: an OAuth
   // account's `user.image` is a remote URL, which fails the prefix check.
-  await deleteReplacedObject(previousImage, space);
+  await deleteOwnedObject(previousImage, space);
 
   return { key };
 }
@@ -114,10 +114,10 @@ export async function clearAvatarAs(viewer: AuthUser) {
     .update(user)
     .set({ image: null, updatedAt: new Date() })
     .where(eq(user.id, viewer.id));
-  const { avatarKeys, deleteReplacedObject } = await import(
+  const { avatarKeys, deleteOwnedObject } = await import(
     "#/lib/_internal/storage"
   );
-  await deleteReplacedObject(previousImage, avatarKeys(viewer.id));
+  await deleteOwnedObject(previousImage, avatarKeys(viewer.id));
   return { ok: true as const };
 }
 

@@ -122,7 +122,8 @@ export const inventoryImageKeys = (itemId: string): KeySpace =>
   keySpace(`inventory/${itemId}/`);
 
 /**
- * Deletes an object a column has stopped pointing at.
+ * Deletes an object the row that owns it has stopped pointing at, whether
+ * because a new key replaced it or because the row itself is gone.
  *
  * Best effort by design: an object that outlives its row costs storage, while
  * a delete that throws would fail a write that has already committed. So this
@@ -139,7 +140,7 @@ export const inventoryImageKeys = (itemId: string): KeySpace =>
  * Not deleting is always the safe direction here: the cost is an orphan, and
  * the cost of the other direction is someone else's image.
  */
-export async function deleteReplacedObject(
+export async function deleteOwnedObject(
   key: string | null | undefined,
   space: KeySpace
 ): Promise<void> {
