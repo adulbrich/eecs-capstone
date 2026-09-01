@@ -971,19 +971,19 @@ When updating, keep the structure: short headline, one-paragraph explanation, co
 Both `projects.image_url` and `inventory_items.image_url` follow one rule, and
 the uploads follow none of it by design (#88, #126):
 
-| Path | Writes the column | Deletes what it replaced |
+| Path | Writes the column | Deletes the object |
 | --- | --- | --- |
 | `uploadProjectImageAs`, `uploadInventoryImageAs` | No, returns the key | No |
 | `updateProjectAs`, `updateInventoryItemAs` | Yes | Yes |
 | `createProjectAs`, `createInventoryItemAs` | On insert, so nothing to replace | No |
 | `hardDeleteInventoryItemAs` | Deletes the row | Yes |
-| `hardDeleteProjectAs` | Deletes the row | No, and that is a leak |
+| `hardDeleteProjectAs` | Deletes the row | Yes |
 
-Why the uploads write nothing, why the cleanup runs after the transaction
-commits, and why it refuses a key outside the row's own prefix are all under
-"An image change is an ordinary edit, and who cleans up after it" in the
-Projects section below, and are not repeated here. Two things that section
-cannot say because they are inventory's:
+Why the uploads write nothing, why the cleanup runs after the row is written
+rather than inside the transaction, and why it refuses a key outside the row's
+own prefix are all under "An image change is an ordinary edit, and who cleans
+up after it" in the Projects section below, and are not repeated here. Two
+things that section cannot say because they are inventory's:
 
 - Retiring writes the row, through `transitionItem` like any other status
   change, but it never writes `image_url` and never touches storage, so a
@@ -996,6 +996,9 @@ cannot say because they are inventory's:
   key is `<domain>/<id>/...` and the upload needs the row to exist. That second
   write is an ordinary edit, so a brand new project or item carries one
   edit-log row naming `imageUrl`.
+
+Both hard deletes clean up. Soft delete does not: a soft-deleted project keeps
+its row, so it keeps its image (#159).
 
 Checkable:
 
@@ -1208,14 +1211,14 @@ The predicates are still a second spelling of what `validateStatusInvariants` de
 
 ### An image change is an ordinary edit, and who cleans up after it
 
-`imageUrl` used to be a real exception: `uploadProjectImageAs` wrote the column on its own request, so an image change reached neither this diff nor the edit log. #88 closed that by making the upload store the object and return its key, which the caller then passes to `updateProject` as an ordinary field. `createProjectAs` still writes the column on insert, but `updateProjectAs` (`src/server/_internal/projects.ts`) is now the only place an existing `projects.image_url` is replaced, and therefore the only place a project image is cleaned up. Not the only place one could need to be: `hardDeleteProjectAs` drops the row without touching storage, which orphans the object. That predates #88 and is the project-side twin of #126. Checkable:
+`imageUrl` used to be a real exception: `uploadProjectImageAs` wrote the column on its own request, so an image change reached neither this diff nor the edit log. #88 closed that by making the upload store the object and return its key, which the caller then passes to `updateProject` as an ordinary field. `createProjectAs` still writes the column on insert, but `updateProjectAs` (`src/server/_internal/projects.ts`) is the only place an existing `projects.image_url` is replaced. It is not the only place a project image is cleaned up: `hardDeleteProjectAs` drops the last one after deleting the row, through the same `deleteOwnedObject` call, because nothing will ever reference that object again (#159). Both go through that one helper rather than calling storage directly, which is what keeps the refusal of a key outside the row's own prefix in one place. Checkable:
 
 ```bash
 # no hits: the upload path writes no row at all
 grep -n 'update(projects)' src/server/_internal/uploads.ts
 ```
 
-The cleanup runs after the transaction commits rather than inside it, because a rollback would otherwise destroy the object the surviving row still points at, and it is scoped to the project's own `projects/<id>/` key prefix: `imageUrl` is client-writable, so an unscoped delete lets a caller point their row at another project's key and have the next save destroy it.
+The cleanup runs after the row write lands, never inside the transaction, because a rollback would otherwise destroy the object the surviving row still points at. `hardDeleteProjectAs` opens no transaction at all, so there it simply follows the row delete. Either way it is scoped to the project's own `projects/<id>/` key prefix: `imageUrl` is client-writable, so an unscoped delete lets a caller point their row at another project's key and have the next save destroy it.
 
 ### `commitTransition` is the only writer of `project_status_history`
 

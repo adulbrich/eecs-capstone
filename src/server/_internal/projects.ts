@@ -220,17 +220,14 @@ export async function updateProjectAs(
   });
 
   // After the commit, never inside it: a rollback would otherwise destroy the
-  // object the surviving row still points at. This is the only place a project
-  // image is cleaned up, because this is the only place an existing key is
-  // replaced; create only ever writes a first one.
+  // object the surviving row still points at. This is the only place a key is
+  // replaced; create only ever writes a first one, and
+  // `hardDeleteProjectAs` drops the last one.
   if (changedFields.includes("imageUrl")) {
-    const { deleteReplacedObject, projectImageKeys } = await import(
+    const { deleteOwnedObject, projectImageKeys } = await import(
       "#/lib/_internal/storage"
     );
-    await deleteReplacedObject(
-      existing.imageUrl,
-      projectImageKeys(existing.id)
-    );
+    await deleteOwnedObject(existing.imageUrl, projectImageKeys(existing.id));
   }
 
   if (existing.status === "published") {
@@ -434,6 +431,15 @@ export async function hardDeleteProjectAs(
     throw new Error("Forbidden");
   }
   await db.delete(projects).where(eq(projects.id, id));
+  // The row is gone, so nothing will ever reference the object again. Soft
+  // delete is deliberately not here: it keeps the row, so it keeps the image,
+  // exactly as a retired inventory item does. See #159.
+  if (project.imageUrl) {
+    const { deleteOwnedObject, projectImageKeys } = await import(
+      "#/lib/_internal/storage"
+    );
+    await deleteOwnedObject(project.imageUrl, projectImageKeys(id));
+  }
   return { id };
 }
 

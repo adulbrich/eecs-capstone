@@ -509,10 +509,10 @@ export async function updateInventoryItemAs(
   // that did not touch the image does not pull the S3 SDK into the request at
   // all, which is what `updateProjectAs` does for the same reason. See #126.
   if (replacedImage) {
-    const { deleteReplacedObject, inventoryImageKeys } = await import(
+    const { deleteOwnedObject, inventoryImageKeys } = await import(
       "#/lib/_internal/storage"
     );
-    await deleteReplacedObject(replacedImage, inventoryImageKeys(data.id));
+    await deleteOwnedObject(replacedImage, inventoryImageKeys(data.id));
   }
   return view;
 }
@@ -553,10 +553,10 @@ export async function hardDeleteInventoryItemAs(
   // The row is gone, so nothing will ever reference the object again. Retire
   // is deliberately not here: a retired item keeps both its row and its photo.
   if (row.imageUrl) {
-    const { deleteReplacedObject, inventoryImageKeys } = await import(
+    const { deleteOwnedObject, inventoryImageKeys } = await import(
       "#/lib/_internal/storage"
     );
-    await deleteReplacedObject(row.imageUrl, inventoryImageKeys(data.id));
+    await deleteOwnedObject(row.imageUrl, inventoryImageKeys(data.id));
   }
   return { ok: true as const };
 }
