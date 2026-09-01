@@ -1224,9 +1224,14 @@ The cleanup runs after the row write lands, never inside the transaction, becaus
 ### What `image_url` may contain, and why the check is on the change
 
 One rule, both domains: a write may only CHANGE `image_url` to empty, or to a
-key the row's own `KeySpace` could have minted. `assertOwnedKey` in
+single filename directly under the row's own prefix. `assertOwnedKey` in
 `src/lib/_internal/storage.ts` is the check, and `KeySpace.owns` is the one
 predicate behind it and behind `deleteOwnedObject` (#162).
+
+`owns` accepts any name and any extension, not only the `<uuid>.webp` that
+`newKey` mints. That is deliberate: a key naming nothing in the bucket renders
+a broken image rather than leaking anything, so demanding a uuid buys nothing
+and would force every test to mint one to say anything at all.
 
 Until then the column was validated for length and nothing else, so any
 signed-in user could set a project's `imageUrl` to a URL they control, and
@@ -1245,13 +1250,21 @@ Three things about the shape, each of which is load-bearing:
   rows uneditable. Saving a legacy value back unchanged is not a change, so
   nothing checks it. The consequence, stated rather than discovered: a row that
   already holds a bad value keeps it. Remediating those is a separate job.
-- **Both create paths refuse any `imageUrl` at all**, because the key is
-  `<domain>/<id>/` and the id does not exist until the insert does. Guarding
-  only the edit path is bypassed by never editing, and `createProject` is
-  `authenticated`, not staff.
+- **Both create paths refuse any `imageUrl` at all**, through
+  `assertNoImageKeyOnCreate` in `src/lib/image-upload-policy.ts`, because the
+  key is `<domain>/<id>/` and the id does not exist until the insert does.
+  Guarding only the edit path is bypassed by never editing, and `createProject`
+  is `authenticated`, not staff. It lives beside the upload policy rather than
+  beside `assertOwnedKey` because it needs no `KeySpace`, and reaching for that
+  module would pull the S3 SDK into every create; both guards throw the one
+  `INVALID_IMAGE` message so the wording has a single home.
 - **`owns` is tighter than `startsWith(prefix)`**, which accepts
   `projects/<own-id>/../<other-id>/x.webp`. That is a distinct key in S3 so it
-  destroys nothing, but a browser normalizes the path it is rendered into.
+  destroys nothing, and it is not the third-party fetch this issue is about
+  either: a browser normalizes the path, so it renders another row's image out
+  of this app's own bucket. A content integrity nit on its own. The reason to
+  reject it is that both call sites read one predicate, and "inside this space"
+  should mean one thing.
 
 This narrows what a permitted writer may put in the column. It moves nothing in
 `access-contract.ts`: the column is still writable by the project's proposer or

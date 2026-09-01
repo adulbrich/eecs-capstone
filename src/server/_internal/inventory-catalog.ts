@@ -27,6 +27,7 @@ import {
   holdFromJoinedRow,
   holdFromStoredRow,
 } from "#/lib/hold";
+import { assertNoImageKeyOnCreate } from "#/lib/image-upload-policy";
 import {
   canReadInventoryItem,
   type InventoryItemPublic,
@@ -373,11 +374,7 @@ export async function createInventoryItemAs(
   data: CreateInventoryItemInput
 ) {
   assertStaff(viewer);
-  // Same reason as `createProjectAs`: the key is `inventory/<id>/` and the id
-  // does not exist yet, so no legal key can be in hand. See #162.
-  if (data.imageUrl) {
-    throw new Error("Invalid image");
-  }
+  assertNoImageKeyOnCreate(data.imageUrl);
   return await db.transaction(async (tx) => {
     const [row] = await tx
       .insert(inventoryItems)
@@ -388,7 +385,9 @@ export async function createInventoryItemAs(
         label: data.label,
         location: data.location,
         notes: data.notes,
-        imageUrl: data.imageUrl,
+        // Always null: `assertNoImageKeyOnCreate` above refuses anything else,
+        // and the first key arrives through a second write.
+        imageUrl: null,
       })
       .returning();
     // Written inside the same transaction as the item itself, so a failure

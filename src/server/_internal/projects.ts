@@ -9,6 +9,7 @@ import {
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
 import { diffRowFields } from "#/lib/edit-diff";
+import { assertNoImageKeyOnCreate } from "#/lib/image-upload-policy";
 import { canEditProject, canWritePrivateNotes } from "#/lib/project-visibility";
 import {
   type ActorRole,
@@ -99,14 +100,7 @@ export async function createProjectAs(
   // nothing to gate here. The update path re-checks per project.
   const allowedNotes = data.notes ?? null;
 
-  // A project image lives under `projects/<id>/`, and the id does not exist
-  // until the row below does, so no caller can hold a legal key at this point.
-  // The client uploads after create and saves the key through the edit path,
-  // which is where the real check lives. Without this, the edit-path guard is
-  // bypassed by never editing. See #162.
-  if (data.imageUrl) {
-    throw new Error("Invalid image");
-  }
+  assertNoImageKeyOnCreate(data.imageUrl);
 
   const [created] = await db
     .insert(projects)
@@ -120,7 +114,9 @@ export async function createProjectAs(
       url: (data.url || null) as string | null,
       contactEmail: (data.contactEmail || null) as string | null,
       contactName: data.contactName ?? null,
-      imageUrl: (data.imageUrl || null) as string | null,
+      // Always null: `assertNoImageKeyOnCreate` above refuses anything else,
+      // and the first key arrives through a second write.
+      imageUrl: null,
       ...ndaFields(data),
       isSponsored: data.isSponsored ?? false,
       programId: data.programId ?? null,

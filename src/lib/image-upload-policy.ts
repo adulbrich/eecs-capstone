@@ -44,3 +44,25 @@ export function assertImageFile(file: unknown): asserts file is File {
     throw new Error(`File too large (max ${MAX_IMAGE_BYTES} bytes)`);
   }
 }
+
+/** What both image-column guards report, so the wording has one home. */
+export const INVALID_IMAGE = "Invalid image";
+
+/**
+ * Refuses any image key on an insert.
+ *
+ * A key lives under `<domain>/<row id>/`, and the id does not exist until the
+ * insert does, so no caller can hold a legal one at this point. Both clients
+ * already send empty here and save the key through a second write. Without
+ * this, the edit-path guard (`assertOwnedKey` in `src/lib/_internal/storage.ts`)
+ * is bypassed by never editing, and `createProject` is `authenticated` rather
+ * than staff. See #162.
+ *
+ * Here rather than beside `assertOwnedKey` because this needs no `KeySpace`,
+ * and reaching for that module would pull the S3 SDK into every create.
+ */
+export function assertNoImageKeyOnCreate(key: string | null | undefined): void {
+  if (key) {
+    throw new Error(INVALID_IMAGE);
+  }
+}

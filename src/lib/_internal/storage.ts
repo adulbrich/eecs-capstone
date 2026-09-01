@@ -5,6 +5,7 @@ import {
   S3Client,
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
+import { INVALID_IMAGE } from "#/lib/image-upload-policy";
 
 const DEFAULT_REGION = "us-east-1";
 
@@ -112,12 +113,18 @@ export interface KeySpace {
 }
 
 /**
- * What `newKey` mints, minus the uuid: one file directly under the prefix.
+ * One filename, directly under the prefix. Any name and any extension, not
+ * just the `<uuid>.webp` `newKey` mints: a key that names nothing in the
+ * bucket is a broken image, not a leak, so there is nothing to buy by
+ * demanding a uuid, and the tests would have to mint one to say anything.
  *
- * Deliberately tighter than `startsWith(prefix)`, which accepts
- * `projects/<own-id>/../<other-id>/x.webp`. That is a distinct key in S3 so it
- * destroys nothing, but a browser normalizes the path it is rendered into, so
- * the prefix alone does not mean what it looks like it means.
+ * What it does buy is one honest meaning for "inside this space".
+ * `startsWith(prefix)` accepts `projects/<own-id>/../<other-id>/x.webp`, which
+ * is a distinct key in S3 so it destroys nothing, and it is not the
+ * third-party fetch #162 is about either: it renders ANOTHER row's image out
+ * of this app's own bucket, because a browser normalizes the path. A content
+ * integrity nit on its own, but it means the prefix alone does not mean what
+ * it looks like it means, and both call sites read this one predicate.
  */
 const OWNED_FILENAME = /^[A-Za-z0-9_-]+\.[A-Za-z0-9]+$/;
 
@@ -193,6 +200,6 @@ export function assertOwnedKey(
   space: KeySpace
 ): void {
   if (key && !space.owns(key)) {
-    throw new Error("Invalid image");
+    throw new Error(INVALID_IMAGE);
   }
 }
