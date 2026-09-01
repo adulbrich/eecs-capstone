@@ -52,12 +52,7 @@ const PLATFORM_VARS = new Map([
  * `process.env.X ?? process.argv[2]`. They parameterise an invocation rather
  * than configure the app, which is why they are not in `.env.example`.
  */
-const SCRIPT_ARGUMENTS = new Set([
-  "ADMIN_EMAIL",
-  "ALLOW_ADMIN",
-  "CONFIRM",
-  "TARGET_EMAIL",
-]);
+const SCRIPT_ARGUMENTS = new Set(["ADMIN_EMAIL"]);
 
 /** Documented, but never read by this codebase, each for a stated reason. */
 const NOT_READ_HERE = new Map([

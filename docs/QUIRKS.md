@@ -297,7 +297,7 @@ Note `inventory_items.current_holder_id`: nulling it does **not** change `status
 
 `project_bids.project_id`, `project_bids.program_id`, and `project_assignments.project_id` declare no rule at all and so are `NO ACTION`. Those two tables have no UI yet; if they ever get one, give them explicit rules first.
 
-Deleting an account outright is an operator task, not a feature: `scripts/delete-user.mjs` purges a test account and its own content and refuses when it acted on anything else. See "Delete a test account" in `DEPLOYMENT.md`.
+Deleting an account outright is not supported. Nine `onDelete: "restrict"` edges into `user.id` carry authorship and audit records, so the row has to survive; ban a real user, and see #84 for the anonymize-in-place path. A one-off purge script for test accounts existed until 2026-09-01 and was removed unused.
 
 ### `categories` uniqueness needs an expression index, not a plain UNIQUE
 
