@@ -223,7 +223,8 @@ test.describe("inventory hard delete gate", () => {
       ).toBeDisabled();
       await expect(
         staff.getByText(
-          "This item has historical request records. Retire it instead."
+          "Cannot hard delete; this item has historical request records. Retire it instead.",
+          { exact: true }
         )
       ).toBeVisible();
       await expect(staff.getByRole("dialog")).toHaveCount(0);

@@ -5,7 +5,11 @@ import {
   formatHoldShort,
   holdFromStoredRow,
 } from "#/lib/hold";
-import { needsDueAt, needsHolder } from "#/lib/inventory-workflow";
+import {
+  HARD_DELETE_HISTORY_REFUSAL,
+  needsDueAt,
+  needsHolder,
+} from "#/lib/inventory-workflow";
 import {
   hardDeleteInventoryItem,
   transitionInventoryItem,
@@ -548,9 +552,7 @@ export function InventoryLifecyclePanel({
           the item has no historical request lines.
         </p>
         {hasRequestHistory && (
-          <p className="mt-2 text-sm">
-            This item has historical request records. Retire it instead.
-          </p>
+          <p className="mt-2 text-sm">{HARD_DELETE_HISTORY_REFUSAL}</p>
         )}
         <div className="mt-2">
           <Button

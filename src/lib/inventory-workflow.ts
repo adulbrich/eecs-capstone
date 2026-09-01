@@ -179,6 +179,14 @@ function assertAuthorized(viewer: TransitionActor, input: TransitionInput) {
  * used its answer to decide both an error message and whether to send
  * `requestItemId`.
  */
+/**
+ * Why an item with request lines cannot be hard deleted. One string, because
+ * the server throws it and the staff panel shows it beside the disabled
+ * button, and a test that pins one copy should be pinning both.
+ */
+export const HARD_DELETE_HISTORY_REFUSAL =
+  "Cannot hard delete; this item has historical request records. Retire it instead.";
+
 export function needsHolder(status: ItemStatus): boolean {
   return status === "reserved" || status === "checked_out";
 }

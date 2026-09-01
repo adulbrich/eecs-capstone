@@ -37,6 +37,7 @@ import {
   staffItemView,
   visibleStatuses,
 } from "#/lib/inventory-visibility";
+import { HARD_DELETE_HISTORY_REFUSAL } from "#/lib/inventory-workflow";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type {
   CreateInventoryItemInput,
@@ -555,10 +556,8 @@ export async function hardDeleteInventoryItemAs(
   // caller gets a friendly error instead of a raw Postgres 23503. The same
   // predicate feeds the staff detail, so the page can disable the button for
   // the same reason before anyone types a name.
-  if (await hasRequestLines(data.id)) {
-    throw new Error(
-      "Cannot hard delete; this item has historical request records. Retire it instead."
-    );
+  if (await itemHasRequestHistory(data.id)) {
+    throw new Error(HARD_DELETE_HISTORY_REFUSAL);
   }
   await db.delete(inventoryItems).where(eq(inventoryItems.id, data.id));
   // The row is gone, so nothing will ever reference the object again. Retire
@@ -647,7 +646,7 @@ export type InventoryItemDetail =
     }
   | { history: never[]; item: InventoryItemPublic; viewerIsStaff: false };
 
-async function hasRequestLines(itemId: string): Promise<boolean> {
+async function itemHasRequestHistory(itemId: string): Promise<boolean> {
   const [line] = await db
     .select({ id: inventoryRequestItems.id })
     .from(inventoryRequestItems)
@@ -672,7 +671,7 @@ export async function getInventoryItemDetailAs(
     return {
       item: toStaffDetail(row),
       history: await getItemHistoryAs(viewer, { itemId: data.id }),
-      hasRequestHistory: await hasRequestLines(data.id),
+      hasRequestHistory: await itemHasRequestHistory(data.id),
       viewerIsStaff: true,
     };
   }
