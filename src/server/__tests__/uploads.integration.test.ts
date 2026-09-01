@@ -11,7 +11,11 @@ import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
-import { createProjectAs, updateProjectAs } from "#/server/_internal/projects";
+import {
+  createProjectAs,
+  hardDeleteProjectAs,
+  updateProjectAs,
+} from "#/server/_internal/projects";
 import {
   clearAvatarAs,
   uploadAvatarAs,
@@ -328,6 +332,42 @@ describe("updateProjectAs image cleanup", () => {
       ...baseProject(),
       imageUrl: `projects/${attackerId}/mine.webp`,
     });
+
+    expect(await objectExists(victimKey)).toBe(true);
+  });
+});
+
+describe("hardDeleteProjectAs image cleanup", () => {
+  it("deletes the object the vanished row pointed at", async () => {
+    const admin = await makeUser(`hd-a-${Date.now()}@x.com`, "admin");
+    const viewer = { id: admin.id, role: admin.role };
+    const { id } = await createProjectAs(viewer, baseProject());
+    const key = `projects/${id}/only.webp`;
+    await putObject(key);
+    await updateProjectAs(viewer, { id, ...baseProject(), imageUrl: key });
+
+    await hardDeleteProjectAs(viewer, id);
+
+    expect(await objectExists(key)).toBe(false);
+  });
+
+  it("leaves a key outside the project's own prefix alone", async () => {
+    // Same reasoning as the update path: a row pointed at someone else's key
+    // must not take that object down with it. An orphan is the cheaper
+    // failure. The bad value goes in with a raw update so the case survives
+    // whatever the write path comes to allow.
+    const admin = await makeUser(`hd-b-${Date.now()}@x.com`, "admin");
+    const viewer = { id: admin.id, role: admin.role };
+    const { id: victimId } = await createProjectAs(viewer, baseProject());
+    const { id: attackerId } = await createProjectAs(viewer, baseProject());
+    const victimKey = `projects/${victimId}/victim.webp`;
+    await putObject(victimKey);
+    await db
+      .update(projects)
+      .set({ imageUrl: victimKey })
+      .where(eq(projects.id, attackerId));
+
+    await hardDeleteProjectAs(viewer, attackerId);
 
     expect(await objectExists(victimKey)).toBe(true);
   });

@@ -977,7 +977,7 @@ the uploads follow none of it by design (#88, #126):
 | `updateProjectAs`, `updateInventoryItemAs` | Yes | Yes |
 | `createProjectAs`, `createInventoryItemAs` | On insert, so nothing to replace | No |
 | `hardDeleteInventoryItemAs` | Deletes the row | Yes |
-| `hardDeleteProjectAs` | Deletes the row | No, and that is a leak |
+| `hardDeleteProjectAs` | Deletes the row | Yes |
 
 Why the uploads write nothing, why the cleanup runs after the transaction
 commits, and why it refuses a key outside the row's own prefix are all under
@@ -996,6 +996,9 @@ cannot say because they are inventory's:
   key is `<domain>/<id>/...` and the upload needs the row to exist. That second
   write is an ordinary edit, so a brand new project or item carries one
   edit-log row naming `imageUrl`.
+
+Both hard deletes clean up, and both soft paths do not: a soft-deleted project
+and a retired item each keep their row, so each keeps its image (#159).
 
 Checkable:
 
@@ -1208,7 +1211,7 @@ The predicates are still a second spelling of what `validateStatusInvariants` de
 
 ### An image change is an ordinary edit, and who cleans up after it
 
-`imageUrl` used to be a real exception: `uploadProjectImageAs` wrote the column on its own request, so an image change reached neither this diff nor the edit log. #88 closed that by making the upload store the object and return its key, which the caller then passes to `updateProject` as an ordinary field. `createProjectAs` still writes the column on insert, but `updateProjectAs` (`src/server/_internal/projects.ts`) is now the only place an existing `projects.image_url` is replaced, and therefore the only place a project image is cleaned up. Not the only place one could need to be: `hardDeleteProjectAs` drops the row without touching storage, which orphans the object. That predates #88 and is the project-side twin of #126. Checkable:
+`imageUrl` used to be a real exception: `uploadProjectImageAs` wrote the column on its own request, so an image change reached neither this diff nor the edit log. #88 closed that by making the upload store the object and return its key, which the caller then passes to `updateProject` as an ordinary field. `createProjectAs` still writes the column on insert, but `updateProjectAs` (`src/server/_internal/projects.ts`) is the only place an existing `projects.image_url` is replaced. It is not the only place a project image is cleaned up: `hardDeleteProjectAs` drops the last one after deleting the row, through the same `deleteReplacedObject` call, because nothing will ever reference that object again (#159). Both go through that one helper rather than calling storage directly, which is what keeps the refusal of a key outside the row's own prefix in one place. Checkable:
 
 ```bash
 # no hits: the upload path writes no row at all
