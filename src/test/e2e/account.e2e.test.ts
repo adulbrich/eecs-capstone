@@ -18,6 +18,21 @@ import { fixtureEmail } from "./fixtures";
  * identity provider that no runner can drive.
  */
 test.describe("account lifecycle", () => {
+  test("a bad verification token lands on the failure copy", async ({
+    page,
+  }) => {
+    // Better Auth checks the token before redirecting and appends
+    // `?error=<code>` to the callback on failure, so the page must read it
+    // rather than assume every arrival is a success (#149).
+    await page.goto(
+      "/api/auth/verify-email?token=not-a-token&callbackURL=%2Fverify-email"
+    );
+    await expect(page).toHaveURL(/\/verify-email\?error=INVALID_TOKEN$/);
+    await expect(
+      page.getByRole("heading", { name: "Link not valid" })
+    ).toBeVisible();
+  });
+
   test("sign up, verify, reset the password, sign back in", async ({
     page,
   }) => {
@@ -45,15 +60,17 @@ test.describe("account lifecycle", () => {
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expectRefused(page);
 
-    await page.goto(await emailLink(email, "Verify your email"));
-
-    // Home, not `/verify-email`. `src/lib/auth.ts` sets
-    // `emailVerification.callbackURL: "/verify-email"`, but the link the
-    // sign-up path mails carries `callbackURL=%2F`, so the app's own
-    // "Email verified" page is unreachable from this flow. Asserted as it
-    // behaves rather than as it is configured, with the mismatch reported
-    // rather than papered over.
-    await expect(page).toHaveURL("/");
+    // The sign-up call chooses where the link lands, and Better Auth defaults
+    // it to "/" when nothing is passed, which is how the app's own "Email
+    // verified" page went unreachable once (#149). Asserted on the link
+    // itself, not only on where the browser ends up.
+    const verifyLink = await emailLink(email, "Verify your email");
+    expect(verifyLink).toContain("callbackURL=%2Fverify-email");
+    await page.goto(verifyLink);
+    await expect(page).toHaveURL(/\/verify-email$/);
+    await expect(
+      page.getByRole("heading", { name: "Email verified" })
+    ).toBeVisible();
 
     // `autoSignInAfterVerification` is on, so following the link is also a
     // sign-in. A route behind the auth guard is the proof, since landing on a

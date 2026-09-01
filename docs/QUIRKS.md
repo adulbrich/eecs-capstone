@@ -184,6 +184,10 @@ When a server function throws a `ZodError`, the helper `src/lib/apply-server-err
 
 The password-reset trigger method is `authClient.requestPasswordReset({ email, redirectTo })`. Older docs and some examples show `forgetPassword`, which does not exist.
 
+### `betterAuth()` does not reject an option it does not know
+
+`betterAuth` is declared `<Options extends BetterAuthOptions>(options: Options)`, so the config literal is inferred as `Options` and TypeScript's excess-property check never runs on it. A misspelled or invented key compiles and does nothing. `emailVerification.callbackURL` sat in `src/lib/auth.ts` that way until 2026-09-01 (#149): the landing page after verification is read from the request body of the call that mails the link, and there is no server option for it. When an option seems to have no effect, check the key against `@better-auth/core/dist/types/init-options.d.mts` before looking anywhere else.
+
 ### `user.id` is `text`, not `uuid`
 
 Better Auth's CLI generates `text` PKs by default. Overriding requires `advanced.database.generateId` config and risks breaking plugin assumptions about ID format. We accept the default. Every FK that previously was a `uuid` referencing the old `users.id` is now a `text` column referencing `user.id`. Drizzle declarations and integration test mocks use `text` accordingly.

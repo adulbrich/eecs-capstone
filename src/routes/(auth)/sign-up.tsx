@@ -32,6 +32,10 @@ function SignUp() {
       name: String(form.get("name") ?? ""),
       email: String(form.get("email") ?? ""),
       password: String(form.get("password") ?? ""),
+      // Where the mailed verification link lands after the token is checked.
+      // Better Auth reads it from this request body and defaults to "/", and
+      // has no server-side option for it, so it has to be passed here.
+      callbackURL: "/verify-email",
     });
     setLoading(false);
     if (signUpError) {

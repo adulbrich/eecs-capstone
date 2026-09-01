@@ -54,7 +54,10 @@ export const auth = betterAuth({
   emailVerification: {
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
-    callbackURL: "/verify-email",
+    // The page the link lands on is not configured here: Better Auth takes it
+    // from the request body of whichever call mails the link, and defaults to
+    // "/". Today that is only sign-up, see `callbackURL` in sign-up.tsx; a
+    // sign-in resend (`sendOnSignIn`) would need the same value passed there.
     sendVerificationEmail: async ({ user, url }) => {
       await emailSender.send(user.email, verificationEmail({ url }));
     },
