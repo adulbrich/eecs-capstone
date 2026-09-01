@@ -69,6 +69,9 @@ export const programInstructors = pgTable(
   (t) => [primaryKey({ columns: [t.programId, t.userId] })]
 );
 
+/** Named so the writers can recognise a violation of exactly this index. */
+export const CATEGORY_NAME_INDEX = "categories_domain_type_name_unique_idx";
+
 export const categories = pgTable(
   "categories",
   {
@@ -112,7 +115,7 @@ export const categories = pgTable(
      * share a name. They are different pickers, and `domain` is closed and
      * immutable on update.
      */
-    uniqueIndex("categories_domain_type_name_unique_idx").on(
+    uniqueIndex(CATEGORY_NAME_INDEX).on(
       t.domain,
       sql`coalesce(${t.type}, '')`,
       sql`lower(${t.name})`

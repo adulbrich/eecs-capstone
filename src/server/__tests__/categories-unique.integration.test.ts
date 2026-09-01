@@ -4,12 +4,14 @@ import { asc, eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import {
+  CATEGORY_NAME_INDEX,
   categories,
   inventoryItemCategories,
   inventoryItems,
   projectCategories,
   projects,
 } from "#/db/schema";
+import { findUniqueViolation } from "#/server/_internal/pg-errors";
 
 /**
  * The constraint from #99, tested against the database rather than the schema
@@ -19,7 +21,7 @@ import {
  * things TypeScript can state.
  */
 
-const INDEX = "categories_domain_type_name_unique_idx";
+const INDEX = CATEGORY_NAME_INDEX;
 const MIGRATION = join(
   process.cwd(),
   "drizzle",
@@ -34,39 +36,17 @@ function insert(row: {
   return db.insert(categories).values(row);
 }
 
-interface PgError {
-  cause?: unknown;
-  code?: string;
-  constraint?: string;
-}
-
 /**
  * Asserts the insert was refused by this index, not merely that it failed.
- *
- * Drizzle wraps the driver error, so the message on the thrown object is
- * "Failed query: insert into ..." and the SQLSTATE sits one level down in
- * `cause`. The first version of this file matched the outer message against
- * `/duplicate key|unique/`, which matched nothing at all: the index was working
- * and all three rejection tests failed anyway. Matching a message was the wrong
- * idea twice over, since a regex loose enough to catch the real error is also
- * loose enough to pass on an unrelated one. `23505` is unique_violation, and
- * naming the constraint means a different index cannot satisfy this.
+ * `findUniqueViolation` walks the cause chain for SQLSTATE 23505 on exactly
+ * this constraint; see its doc for why matching the message is wrong.
  */
 async function expectRejectedByTheIndex(pending: Promise<unknown>) {
   const thrown = await pending.then(
     () => undefined,
     (error: unknown) => error
   );
-
-  let violation: PgError | undefined;
-  for (let error = thrown as PgError | undefined; error; ) {
-    if (error.code === "23505") {
-      violation = error;
-      break;
-    }
-    error = error.cause as PgError | undefined;
-  }
-
+  const violation = findUniqueViolation(thrown, INDEX);
   expect({
     code: violation?.code,
     constraint: violation?.constraint,
