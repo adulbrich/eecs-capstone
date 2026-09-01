@@ -1257,9 +1257,10 @@ Three things about the shape, each of which is load-bearing:
   key is `<domain>/<id>/` and the id does not exist until the insert does.
   Guarding only the edit path is bypassed by never editing, and `createProject`
   is `authenticated`, not staff. It lives beside the upload policy rather than
-  beside `assertOwnedKey` because it needs no `KeySpace`, and reaching for that
-  module would pull the S3 SDK into every create; both guards throw the one
-  `INVALID_IMAGE` message so the wording has a single home.
+  beside `assertOwnedKey` because it needs no `KeySpace`, so it can be a plain
+  static import at both call sites instead of the dynamic one every other reach
+  into the storage module has to be. Both guards throw the one `INVALID_IMAGE`
+  message so the wording has a single home.
 - **`owns` is tighter than `startsWith(prefix)`**, which accepts
   `projects/<own-id>/../<other-id>/x.webp`. That is a distinct key in S3 so it
   destroys nothing, and it is not the third-party fetch this issue is about
