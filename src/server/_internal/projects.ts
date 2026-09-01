@@ -9,6 +9,7 @@ import {
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
 import { diffRowFields } from "#/lib/edit-diff";
+import { assertNoImageKeyOnCreate } from "#/lib/image-upload-policy";
 import { canEditProject, canWritePrivateNotes } from "#/lib/project-visibility";
 import {
   type ActorRole,
@@ -99,6 +100,8 @@ export async function createProjectAs(
   // nothing to gate here. The update path re-checks per project.
   const allowedNotes = data.notes ?? null;
 
+  assertNoImageKeyOnCreate(data.imageUrl);
+
   const [created] = await db
     .insert(projects)
     .values({
@@ -111,7 +114,9 @@ export async function createProjectAs(
       url: (data.url || null) as string | null,
       contactEmail: (data.contactEmail || null) as string | null,
       contactName: data.contactName ?? null,
-      imageUrl: (data.imageUrl || null) as string | null,
+      // Always null: `assertNoImageKeyOnCreate` above refuses anything else,
+      // and the first key arrives through a second write.
+      imageUrl: null,
       ...ndaFields(data),
       isSponsored: data.isSponsored ?? false,
       programId: data.programId ?? null,
@@ -205,6 +210,16 @@ export async function updateProjectAs(
     return { id: existing.id, updated: false };
   }
 
+  // Only when the value CHANGES, which is the whole reason a row still holding
+  // a legacy absolute URL stays editable: saving it back unchanged is not a
+  // change, so nothing checks it. See #162.
+  if (changedFields.includes("imageUrl")) {
+    const { assertOwnedKey, projectImageKeys } = await import(
+      "#/lib/_internal/storage"
+    );
+    assertOwnedKey(newValues.imageUrl, projectImageKeys(existing.id));
+  }
+
   await db.transaction(async (tx) => {
     await tx
       .update(projects)
@@ -221,7 +236,7 @@ export async function updateProjectAs(
 
   // After the commit, never inside it: a rollback would otherwise destroy the
   // object the surviving row still points at. This is the only place a key is
-  // replaced; create only ever writes a first one, and
+  // written at all; create refuses one and writes null, and
   // `hardDeleteProjectAs` drops the last one.
   if (changedFields.includes("imageUrl")) {
     const { deleteOwnedObject, projectImageKeys } = await import(

@@ -27,6 +27,7 @@ import {
   holdFromJoinedRow,
   holdFromStoredRow,
 } from "#/lib/hold";
+import { assertNoImageKeyOnCreate } from "#/lib/image-upload-policy";
 import {
   canReadInventoryItem,
   type InventoryItemPublic,
@@ -373,6 +374,7 @@ export async function createInventoryItemAs(
   data: CreateInventoryItemInput
 ) {
   assertStaff(viewer);
+  assertNoImageKeyOnCreate(data.imageUrl);
   return await db.transaction(async (tx) => {
     const [row] = await tx
       .insert(inventoryItems)
@@ -383,7 +385,9 @@ export async function createInventoryItemAs(
         label: data.label,
         location: data.location,
         notes: data.notes,
-        imageUrl: data.imageUrl,
+        // Always null: `assertNoImageKeyOnCreate` above refuses anything else,
+        // and the first key arrives through a second write.
+        imageUrl: null,
       })
       .returning();
     // Written inside the same transaction as the item itself, so a failure
@@ -444,6 +448,16 @@ export async function updateInventoryItemAs(
       newDiff: newValues,
       oldDiff: oldValues,
     } = diffRowFields(before, values);
+
+    // Only when the value CHANGES, so a row still holding a legacy absolute
+    // URL stays editable. Throwing here rolls the transaction back, which is
+    // why it sits before any write rather than after. See #162.
+    if (changed.includes("imageUrl")) {
+      const { assertOwnedKey, inventoryImageKeys } = await import(
+        "#/lib/_internal/storage"
+      );
+      assertOwnedKey(values.imageUrl, inventoryImageKeys(data.id));
+    }
 
     // Categories are outside that diff along with the column, so they need
     // their own, computed before the early return: otherwise

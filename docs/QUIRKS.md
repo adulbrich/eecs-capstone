@@ -982,8 +982,9 @@ the uploads follow none of it by design (#88, #126):
 Why the uploads write nothing, why the cleanup runs after the row is written
 rather than inside the transaction, and why it refuses a key outside the row's
 own prefix are all under "An image change is an ordinary edit, and who cleans
-up after it" in the Projects section below, and are not repeated here. Two
-things that section cannot say because they are inventory's:
+up after it" in the Projects section below, and what the column may contain is
+under "What `image_url` may contain" beside it. Neither is repeated here. Two
+things those sections cannot say because they are inventory's:
 
 - Retiring writes the row, through `transitionItem` like any other status
   change, but it never writes `image_url` and never touches storage, so a
@@ -1211,7 +1212,7 @@ The predicates are still a second spelling of what `validateStatusInvariants` de
 
 ### An image change is an ordinary edit, and who cleans up after it
 
-`imageUrl` used to be a real exception: `uploadProjectImageAs` wrote the column on its own request, so an image change reached neither this diff nor the edit log. #88 closed that by making the upload store the object and return its key, which the caller then passes to `updateProject` as an ordinary field. `createProjectAs` still writes the column on insert, but `updateProjectAs` (`src/server/_internal/projects.ts`) is the only place an existing `projects.image_url` is replaced. It is not the only place a project image is cleaned up: `hardDeleteProjectAs` drops the last one after deleting the row, through the same `deleteOwnedObject` call, because nothing will ever reference that object again (#159). Both go through that one helper rather than calling storage directly, which is what keeps the refusal of a key outside the row's own prefix in one place. Checkable:
+`imageUrl` used to be a real exception: `uploadProjectImageAs` wrote the column on its own request, so an image change reached neither this diff nor the edit log. #88 closed that by making the upload store the object and return its key, which the caller then passes to `updateProject` as an ordinary field. `createProjectAs` writes a literal `null` and refuses any key a caller sends (see "What `image_url` may contain" below), so `updateProjectAs` (`src/server/_internal/projects.ts`) is the only place `projects.image_url` is ever set to a key at all. It is not the only place a project image is cleaned up: `hardDeleteProjectAs` drops the last one after deleting the row, through the same `deleteOwnedObject` call, because nothing will ever reference that object again (#159). Both go through that one helper rather than calling storage directly, which is what keeps the refusal of a key outside the row's own prefix in one place. Checkable:
 
 ```bash
 # no hits: the upload path writes no row at all
@@ -1219,6 +1220,58 @@ grep -n 'update(projects)' src/server/_internal/uploads.ts
 ```
 
 The cleanup runs after the row write lands, never inside the transaction, because a rollback would otherwise destroy the object the surviving row still points at. `hardDeleteProjectAs` opens no transaction at all, so there it simply follows the row delete. Either way it is scoped to the project's own `projects/<id>/` key prefix: `imageUrl` is client-writable, so an unscoped delete lets a caller point their row at another project's key and have the next save destroy it.
+
+### What `image_url` may contain, and why the check is on the change
+
+One rule, both domains: a write may only CHANGE `image_url` to empty, or to a
+single filename directly under the row's own prefix. `assertOwnedKey` in
+`src/lib/_internal/storage.ts` is the check, and `KeySpace.owns` is the one
+predicate behind it and behind `deleteOwnedObject` (#162).
+
+"Single filename" means one segment of letters, digits, underscore or hyphen,
+one dot, an alphanumeric extension. That is looser than the `<uuid>.webp`
+`newKey` mints, deliberately: a key naming nothing in the bucket renders a
+broken image rather than leaking anything, so demanding a uuid buys nothing and
+would force every test to mint one to say anything at all. It is still tighter
+than "a name", which is what rejects the traversal below.
+
+Until then the column was validated for length and nothing else, so any
+signed-in user could set a project's `imageUrl` to a URL they control, and
+every viewer of that project fetched it. The reliable target is not the public
+but the staff member reviewing the draft. `img` is not in the markdown
+allowlist (`ALLOWED_ELEMENTS` in `src/components/markdown.tsx`) and there is no
+CSP anywhere in `src/` or `infra/`, so this was the only field a non-staff user
+could use to get an image element rendered, with nothing behind it.
+
+Three things about the shape, each of which is load-bearing:
+
+- **The check is on the change, not on the content.** Real rows hold absolute
+  URLs from before the upload flow (the dev seed writes Unsplash links), the
+  edit form round-trips the field, and `getPublicUrl` returns any `http(s)://`
+  value unchanged by design. Checking content would make every one of those
+  rows uneditable. Saving a legacy value back unchanged is not a change, so
+  nothing checks it. The consequence, stated rather than discovered: a row that
+  already holds a bad value keeps it. Remediating those is a separate job.
+- **Both create paths refuse any `imageUrl` at all**, through
+  `assertNoImageKeyOnCreate` in `src/lib/image-upload-policy.ts`, because the
+  key is `<domain>/<id>/` and the id does not exist until the insert does.
+  Guarding only the edit path is bypassed by never editing, and `createProject`
+  is `authenticated`, not staff. It lives beside the upload policy rather than
+  beside `assertOwnedKey` because it needs no `KeySpace`, so it can be a plain
+  static import at both call sites instead of the dynamic one every other reach
+  into the storage module has to be. Both guards throw the one `INVALID_IMAGE`
+  message so the wording has a single home.
+- **`owns` is tighter than `startsWith(prefix)`**, which accepts
+  `projects/<own-id>/../<other-id>/x.webp`. That is a distinct key in S3 so it
+  destroys nothing, and it is not the third-party fetch this issue is about
+  either: a browser normalizes the path, so it renders another row's image out
+  of this app's own bucket. A content integrity nit on its own. The reason to
+  reject it is that both call sites read one predicate, and "inside this space"
+  should mean one thing.
+
+This narrows what a permitted writer may put in the column. It moves nothing in
+`access-contract.ts`: the column is still writable by the project's proposer or
+staff, and by staff only on inventory.
 
 ### `commitTransition` is the only writer of `project_status_history`
 

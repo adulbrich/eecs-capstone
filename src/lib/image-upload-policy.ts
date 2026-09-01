@@ -12,6 +12,12 @@
  * If a reason ever emerges for one surface to allow something another must
  * not, write the reason down here and split the constant deliberately rather
  * than letting two copies drift.
+ *
+ * The bottom of the file widens that a little: what an image COLUMN may hold
+ * on an insert, which is the same kind of rule and has the same reason to sit
+ * somewhere client-safe. What the column may hold on an EDIT needs a
+ * `KeySpace` and so lives in `src/lib/_internal/storage.ts`; the two share the
+ * message below rather than each spelling it.
  */
 
 export const ALLOWED_IMAGE_TYPES: ReadonlySet<string> = new Set([
@@ -42,5 +48,28 @@ export function assertImageFile(file: unknown): asserts file is File {
   }
   if (file.size > MAX_IMAGE_BYTES) {
     throw new Error(`File too large (max ${MAX_IMAGE_BYTES} bytes)`);
+  }
+}
+
+/** What both image-column guards report, so the wording has one home. */
+export const INVALID_IMAGE = "Invalid image";
+
+/**
+ * Refuses any image key on an insert.
+ *
+ * A key lives under `<domain>/<row id>/`, and the id does not exist until the
+ * insert does, so no caller can hold a legal one at this point. Both clients
+ * already send empty here and save the key through a second write. Without
+ * this, the edit-path guard (`assertOwnedKey` in `src/lib/_internal/storage.ts`)
+ * is bypassed by never editing, and `createProject` is `authenticated` rather
+ * than staff. See #162.
+ *
+ * Here rather than beside `assertOwnedKey` because this needs no `KeySpace`,
+ * so it can be a plain static import at both call sites instead of the dynamic
+ * one every other reach into the storage module has to be.
+ */
+export function assertNoImageKeyOnCreate(key: string | null | undefined): void {
+  if (key) {
+    throw new Error(INVALID_IMAGE);
   }
 }
