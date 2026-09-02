@@ -210,6 +210,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "staff",
     note: "The endpoint that exists to return proposerEmail, the private link key that joins a project to an account which may not exist yet. Staff only, and it must not widen: leaking it exposes the address a proposer was invited by, not one they chose to publish.",
   },
+  "server/projects-queries.ts:getProjectMentorship": {
+    level: "staff",
+    note: "Returns mentorEmail, an address staff typed rather than one the person published. The public payload carries only the resolved name and the seeking flag.",
+  },
   "server/projects-queries.ts:listAdminProjects": {
     level: "staff",
     note: "Reads adminProjectSummarySelect, so it carries proposerEmail and contactEmail both. Staff is what keeps the first out of a public read.",

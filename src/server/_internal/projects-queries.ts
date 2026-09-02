@@ -385,6 +385,48 @@ export async function getProposerForEditAs(
   };
 }
 
+export interface ProjectMentorship {
+  /** As stored. Empty string when unset, so the input can bind to it directly. */
+  mentorEmail: string;
+  /** The account at that address, if one exists. Null is "no account yet". */
+  mentorName: string | null;
+  studentProposed: boolean;
+}
+
+/**
+ * The staff read of the mentor address. The public payload carries only the
+ * resolved name; this is the one endpoint that returns the address, and it
+ * must not widen, for the same reason `getProposerForEditAs` does not.
+ */
+export async function getProjectMentorshipAs(
+  viewer: Viewer,
+  data: { projectId: string }
+): Promise<ProjectMentorship> {
+  if (!isStaff(viewer)) {
+    throw new Error("Forbidden");
+  }
+  const [row] = await db
+    .select({
+      mentorEmail: projects.mentorEmail,
+      mentorName: mentorNameSql,
+      studentProposed: projects.studentProposed,
+    })
+    .from(projects)
+    .where(eq(projects.id, data.projectId));
+  if (!row) {
+    throw new Error("Project not found");
+  }
+  return {
+    mentorEmail: row.mentorEmail ?? "",
+    mentorName: row.mentorName,
+    studentProposed: row.studentProposed,
+  };
+}
+
+export async function getProjectMentorshipImpl(data: { projectId: string }) {
+  return getProjectMentorshipAs(await getViewer(), data);
+}
+
 /**
  * Request-context wrapper. Mirrors the *As / *Impl split the rest of this file
  * uses so integration tests can call the As form directly.

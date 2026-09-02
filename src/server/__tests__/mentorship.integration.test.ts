@@ -10,7 +10,10 @@ import {
   updateProjectAs,
   updateProjectMentorshipAs,
 } from "#/server/_internal/projects";
-import { getProjectAs } from "#/server/_internal/projects-queries";
+import {
+  getProjectAs,
+  getProjectMentorshipAs,
+} from "#/server/_internal/projects-queries";
 
 async function makeUser(email: string, role: "user" | "admin") {
   await auth.api.signUpEmail({
@@ -219,5 +222,37 @@ describe("the three public states", () => {
     const { project } = await getProjectAs(owner, { id });
     expect(project).not.toBeNull();
     expect("mentorEmail" in (project ?? {})).toBe(false);
+  });
+});
+
+describe("getProjectMentorshipAs", () => {
+  it("returns the raw address and the resolved name to staff, and Forbidden to anyone else", async () => {
+    const owner = await makeUser(`go-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`ga-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+
+    expect(await getProjectMentorshipAs(admin, { projectId: id })).toEqual({
+      mentorEmail: "",
+      mentorName: null,
+      studentProposed: false,
+    });
+
+    await updateProjectMentorshipAs(admin, {
+      id,
+      mentorEmail: owner.email.toUpperCase(),
+      studentProposed: true,
+    });
+    expect(await getProjectMentorshipAs(admin, { projectId: id })).toEqual({
+      mentorEmail: owner.email.toUpperCase(),
+      mentorName: owner.name,
+      studentProposed: true,
+    });
+
+    await expect(
+      getProjectMentorshipAs(owner, { projectId: id })
+    ).rejects.toThrow("Forbidden");
+    await expect(
+      getProjectMentorshipAs(null, { projectId: id })
+    ).rejects.toThrow("Forbidden");
   });
 });
