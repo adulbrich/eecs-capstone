@@ -26,9 +26,9 @@ the originating spec; the design doc records where the issue's picture of the tr
 - Conventional Commits, lowercase imperative subject, area in parens:
   `feat(projects): add the student-proposed and mentor columns`.
 - Keep the body short or leave it out. Keep the `Co-Authored-By` trailer. Never publish a
-  `claude.ai/code/session` link.
+  session link of any kind.
 - Stage files by name. Never `git add -A` or `git add .`.
-- Branch is `claude/issue-75-mentorship`. Never commit to `main`.
+- Branch is `feat/project-mentorship`. Never commit to `main`.
 - `*As(viewer, ...)` first, wrapper second, in the same file. `src/server/__tests__/seam-convention.test.ts` enforces it.
 - Every `createServerFn` gets a line in `src/server/__tests__/access-contract.ts` or `access-contract.test.ts` fails.
 - Import `createServerFn` from `@tanstack/react-start`; use `.inputValidator(...)`.
@@ -1316,7 +1316,7 @@ Expected: all green. If the integration suite has pre-existing noise, `docs/QUIR
 ```bash
 git add PRD.md docs/QUIRKS.md
 git commit -m "docs(projects): record the mentorship rules"
-git push -u origin claude/issue-75-mentorship
+git push -u origin feat/project-mentorship
 ```
 
 - [ ] **Step 4: Open the PR**

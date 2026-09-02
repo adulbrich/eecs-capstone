@@ -1,7 +1,7 @@
 # Student-proposed projects and mentors
 
 Date: 2026-09-02
-Status: Design approved in chat, implementing on `claude/issue-75-mentorship`.
+Status: Design approved in chat, implementing on `feat/project-mentorship`.
 Issue: #75. Feeds #34 (analytics) and #84 (account deletion scrubs `mentor_email`).
 
 ## Summary

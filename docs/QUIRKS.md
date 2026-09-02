@@ -1386,6 +1386,24 @@ single user row with two `account` rows: Better Auth links them implicitly, and
 only when the local row is already verified. So no third hook is needed, and the
 `proposer_id is null` guard makes the claim idempotent anyway.
 
+### Mentorship is two staff-only columns and one derived flag
+
+`projects.student_proposed` and `projects.mentor_email` are written only by
+`updateProjectMentorshipAs`. Neither is on `ProjectInput`, so `updateProjectAs`
+cannot touch them; keep it that way rather than adding staff branches to the form.
+`isSponsored` is not the precedent here: it sits on the shared form and the proposer
+edits it.
+
+The mentor is resolved at read time by `mentorNameSql`, a case-insensitive match on
+`user.email`. There is no `mentor_id`: mentorship grants no permission, so an id would
+only be a denormalization. `seekingMentor` is `student_proposed AND mentor_email IS
+NULL`, computed in `seekingMentorSql`, because the public payload does not carry the
+address and a client cannot otherwise tell "no mentor" from "a mentor who has not signed
+up yet". The second state shows nothing, on purpose. `mentor_email` reaches exactly one
+endpoint, `getProjectMentorship`, which is staff. Both fragments live in
+`project-summary.ts` and ride `projectSummarySelect`, so the admin CSV export, whose
+column list is exhaustiveness-checked, carries the three public fields too. See #75.
+
 ---
 
 ## Amazon Bedrock

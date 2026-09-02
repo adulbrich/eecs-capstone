@@ -86,6 +86,11 @@ Each project carries:
 - ✅ Program association.
 - ✅ Teams supported: how many student teams the project can take on (1-5,
   default 1), set and edited by staff on the project form.
+- ✅ Student-proposed marker and mentor: staff mark a project as student-proposed
+  and record a mentor's email from the staff panel. The public sees a "Student
+  proposed" badge, a "Seeking mentor" badge while no address is on file, and the
+  mentor's name once that address has an account. The address itself never
+  leaves staff reads. (#75)
 - ✅ Collaborators table (schema present for multi-user project membership).
 - ✅ Full-text search vector (Postgres generated `tsvector`, weighted across
   title, description, problem statement, objectives, and qualifications).
