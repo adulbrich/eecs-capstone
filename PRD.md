@@ -60,6 +60,11 @@ For developer setup, architecture notes, and the active roadmap, see
   (1-5, default 1). Opting in requires an affiliation. Staff act on these via
   the mentors admin surface (see §14).
 - ✅ Change password from the profile page.
+- ✅ Privacy policy at `/privacy`: a short public page, static in the repo,
+  stating what the app collects, that published projects stay public, and what
+  closing an account removes and keeps. Linked from sign-up (as a notice, not a
+  checkbox; nothing is recorded), sign-in, and the profile page. No footer and
+  no separate terms document. (#91)
 - ✅ Avatar upload with the shared crop + resize image pipeline.
 - ✅ Account detail view (shows the user's role).
 

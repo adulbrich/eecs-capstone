@@ -843,6 +843,10 @@ const NAME_COLUMN = {
 | `docs/QUIRKS.md` | This file. |
 | `docs/UI-CONVENTIONS.md` | Design system rules: components, tokens, responsive layout. |
 
+### `/privacy` is a promise the deletion flow makes, so its copy and #84 move together
+
+`src/routes/privacy.tsx` is public, outside `_authed`, and static: the body lives in `src/components/privacy-policy.tsx` and only a developer changes it. Its account-closure paragraph names what deletion removes (name, email, affiliation, interests) and what it keeps (projects, re-attributed to "Deleted user"; equipment records, as institutional property), because the confirmation dialog in #84 makes exactly those promises and a policy that said less would leave them backed by nothing. Change one and change the other. The sign-up line pointing here is a notice, not a checkbox; nothing writes to `user`, and a recorded acceptance would be a schema change plus a policy version, which is its own issue. `brand.supportEmail` has this page as its first and only consumer. `public.e2e.test.ts` loads it with no cookie, which is the only proof a route outside `_authed` stays outside it. See #91.
+
 ### Workflow conventions
 
 - **Brainstorm before writing code** for any new feature. The brainstorming skill is the entry point. Output is a spec doc.

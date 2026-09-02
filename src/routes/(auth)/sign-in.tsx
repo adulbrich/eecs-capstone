@@ -158,9 +158,14 @@ function SignIn() {
         >
           Continue with GitHub
         </Button>
-        <p className="mt-6 text-muted-foreground text-sm">
+        <p className="mt-6 flex flex-wrap gap-x-4 text-muted-foreground text-sm">
           <Link className="underline" to="/forgot-password">
             Forgot password?
+          </Link>
+          {/* Deliberately not the sign-up sentence: nobody is creating an
+              account on this page, so "you agree" would be false here. */}
+          <Link className="underline" to="/privacy">
+            Privacy policy
           </Link>
         </p>
         <p className="mt-2 text-muted-foreground text-sm">

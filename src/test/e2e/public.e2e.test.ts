@@ -13,11 +13,19 @@ import { E2E_PREFIX, openDb } from "./fixtures";
  * production build that boots but cannot render.
  */
 test.describe("@smoke public shell", () => {
-  test("renders the landing page, the project list, and a published project", async ({
+  test("renders the landing page, the privacy page, the project list, and a published project", async ({
     page,
   }) => {
     await page.goto("/");
     await expect(page.getByRole("banner")).toBeVisible();
+
+    // The one page a prospective student reads before deciding to sign up.
+    // The accessibility scan of /privacy proves nothing here: a redirect to
+    // /sign-in is axe-clean too. Only the heading says the route is public.
+    await page.goto("/privacy");
+    await expect(
+      page.getByRole("heading", { name: "Privacy", exact: true })
+    ).toBeVisible();
 
     // TanStack Router normalizes search params with a 307 before rendering, so
     // /projects lands on /projects?q=&categories=%5B%5D&... Match the path and

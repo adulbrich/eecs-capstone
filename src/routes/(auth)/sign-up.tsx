@@ -134,6 +134,13 @@ function SignUp() {
             Sign in
           </Link>
         </p>
+        <p className="mt-2 text-muted-foreground text-sm">
+          By creating an account, you agree to the{" "}
+          <Link className="underline" to="/privacy">
+            privacy policy
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );
