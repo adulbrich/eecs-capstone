@@ -57,6 +57,8 @@ function RemoveBookmarkButton({ row }: { row: BookmarkRow }) {
   );
 }
 
+const shared = projectSummaryColumns<BookmarkRow>();
+
 /**
  * A fixed, small, decision-oriented set: no column picker, no card mode. Every
  * column is a field `listMyBookmarksAs` already returns, and that projection
@@ -64,8 +66,6 @@ function RemoveBookmarkButton({ row }: { row: BookmarkRow }) {
  * could not open. `enableHiding: false` throughout is what removes the picker.
  * The five columns shared with /projects come from `projectSummaryColumns`.
  */
-const shared = projectSummaryColumns<BookmarkRow>();
-
 export const BOOKMARK_TABLE_COLUMNS = defineAdminColumns<BookmarkRow>()([
   {
     accessorFn: (row) => row.title,

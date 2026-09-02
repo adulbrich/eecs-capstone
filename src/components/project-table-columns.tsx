@@ -62,14 +62,14 @@ function proseColumn(field: TextField, header: string) {
   };
 }
 
+const shared = projectSummaryColumns<ProjectListRow>();
+
 /**
  * The public listing's table mode. Every column is a field
  * `projectDetailView` returns to an anonymous viewer; nothing here makes a
  * new field public. The list lives outside the route so
  * `project-table-columns.test.tsx` can render it through `AdminDataTable`.
  */
-const shared = projectSummaryColumns<ProjectListRow>();
-
 export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
   {
     accessorFn: (row) => row.title,

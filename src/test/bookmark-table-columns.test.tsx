@@ -96,6 +96,14 @@ const ROWS: BookmarkRow[] = [
     studentProposed: true,
     mentorName: "Sam Mentor",
   }),
+  bookmark({
+    id: "Four",
+    teamsSupported: 4,
+    bookmarkedAt: new Date("2026-03-01T00:00:00.000Z"), // Sunday
+    // A mentor address on file but nobody signed up at it: neither seeking
+    // nor nameable, so the student-proposed fact stands alone.
+    studentProposed: true,
+  }),
 ];
 
 function renderTable(sort: SortState = BOOKMARK_TABLE_DEFAULT_SORT) {
@@ -131,19 +139,19 @@ describe("the bookmarks table", () => {
   it("opens sorted by Saved on, newest first", () => {
     expect(BOOKMARK_TABLE_DEFAULT_SORT).toEqual({ desc: true, id: "savedAt" });
     renderTable();
-    expect(titlesInOrder()).toEqual(["Ten", "Two", "Three"]);
+    expect(titlesInOrder()).toEqual(["Ten", "Two", "Three", "Four"]);
   });
 
   it("sorts Saved on chronologically, not as text", () => {
-    // Alphabetical on Date strings would give Sun, Sat, Mon: Three, Two, Ten.
+    // Alphabetical on Date strings would start with Mon (Ten), not March.
     renderTable({ desc: false, id: "savedAt" });
-    expect(titlesInOrder()).toEqual(["Three", "Two", "Ten"]);
+    expect(titlesInOrder()).toEqual(["Four", "Three", "Two", "Ten"]);
   });
 
   it("sorts Teams supported numerically, not as text", () => {
     // Text would put "10" before "2".
     renderTable({ desc: false, id: "teams" });
-    expect(titlesInOrder()).toEqual(["Two", "Three", "Ten"]);
+    expect(titlesInOrder()).toEqual(["Two", "Three", "Four", "Ten"]);
   });
 
   it("shows the fixed column set with no column picker", () => {
@@ -177,6 +185,12 @@ describe("the bookmarks table", () => {
     expect(within(three).getByText("Student proposed")).toBeTruthy();
     expect(within(three).getByText("Sam Mentor")).toBeTruthy();
     expect(within(ten).queryByText("Student proposed")).toBeNull();
+    const four = screen.getByRole("link", { name: "Four" }).closest("tr");
+    if (!four) {
+      throw new Error("no row");
+    }
+    expect(within(four).getByText("Student proposed")).toBeTruthy();
+    expect(within(four).queryByText("Seeking mentor")).toBeNull();
   });
 
   it("marks a closed roster and an NDA, and removes through the loader", async () => {

@@ -1,4 +1,3 @@
-import type { CellContext } from "@tanstack/react-table";
 import type { AdminColumn } from "#/components/admin-data-table";
 import { ApplicantsBadge } from "./applicants-badge";
 import { MentorshipBadges } from "./mentorship-badges";
@@ -23,34 +22,35 @@ export interface ProjectSummaryRow {
  * is typed on the row, and the two tables have different rows that both
  * extend this one. `satisfies` rather than an annotation, per QUIRKS: an
  * annotation would erase the accessor's return type that
- * `defineAdminColumns` checks. Callers spread and override (`enableHiding`,
- * `header`) rather than passing options in.
+ * `defineAdminColumns` checks, while `satisfies` still types every `row`
+ * below. Only `id` needs `as const`, so the diagnostic can name the column.
+ * Callers spread and override (`enableHiding`, `header`) rather than passing
+ * options in.
  */
 export function projectSummaryColumns<Row extends ProjectSummaryRow>() {
   const program = {
-    accessorFn: (row: Row) => programLabel(row) ?? undefined,
-    cell: ({ row }: CellContext<Row, unknown>) =>
-      programLabel(row.original) ?? "-",
+    accessorFn: (row) => programLabel(row) ?? undefined,
+    cell: ({ row }) => programLabel(row.original) ?? "-",
     header: "Program",
     id: "program" as const,
-    sortUndefined: "last" as const,
+    sortUndefined: "last",
   } satisfies AdminColumn<Row>;
 
   const teams = {
-    accessorFn: (row: Row) => row.teamsSupported,
-    cell: ({ row }: CellContext<Row, unknown>) => row.original.teamsSupported,
+    accessorFn: (row) => row.teamsSupported,
+    cell: ({ row }) => row.original.teamsSupported,
     header: "Teams supported",
     id: "teams" as const,
     // Numeric, not text: the locale-compare default would compare String(n),
     // where "10" sorts before "2".
-    sortingFn: "basic" as const,
+    sortingFn: "basic",
   } satisfies AdminColumn<Row>;
 
   const accepting = {
-    accessorFn: (row: Row) => row.acceptingApplicants,
+    accessorFn: (row) => row.acceptingApplicants,
     // "Yes" rather than the dash the NDA column uses for its ordinary case:
     // under this header a dash would read as "no", the opposite of the truth.
-    cell: ({ row }: CellContext<Row, unknown>) =>
+    cell: ({ row }) =>
       row.original.acceptingApplicants ? (
         "Yes"
       ) : (
@@ -59,12 +59,12 @@ export function projectSummaryColumns<Row extends ProjectSummaryRow>() {
     header: "Accepting applicants",
     id: "accepting" as const,
     // Boolean, not text: see the Teams column.
-    sortingFn: "basic" as const,
+    sortingFn: "basic",
   } satisfies AdminColumn<Row>;
 
   const nda = {
-    accessorFn: (row: Row) => row.requiresNdaIp,
-    cell: ({ row }: CellContext<Row, unknown>) =>
+    accessorFn: (row) => row.requiresNdaIp,
+    cell: ({ row }) =>
       row.original.requiresNdaIp ? (
         <Badge variant="outline">Required</Badge>
       ) : (
@@ -72,14 +72,14 @@ export function projectSummaryColumns<Row extends ProjectSummaryRow>() {
       ),
     header: "NDA/IP required",
     id: "nda" as const,
-    sortingFn: "basic" as const,
+    sortingFn: "basic",
   } satisfies AdminColumn<Row>;
 
   const mentorship = {
     // Seeking a mentor ranks highest, then student proposed, then the rest.
     // TanStack starts a numeric column descending, so the first header click
     // puts the projects a prospective mentor is looking for at the top.
-    accessorFn: (row: Row) => {
+    accessorFn: (row) => {
       if (row.seekingMentor) {
         return 2;
       }
@@ -89,7 +89,7 @@ export function projectSummaryColumns<Row extends ProjectSummaryRow>() {
     // anything on a student-proposed project, so a column of its own would
     // be blank on most rows; combined, blank honestly means "an ordinary
     // proposal" rather than looking like missing data.
-    cell: ({ row }: CellContext<Row, unknown>) => {
+    cell: ({ row }) => {
       const { mentorName, seekingMentor, studentProposed } = row.original;
       if (!(studentProposed || seekingMentor || mentorName)) {
         return "-";
@@ -106,7 +106,7 @@ export function projectSummaryColumns<Row extends ProjectSummaryRow>() {
     },
     header: "Mentorship",
     id: "mentorship" as const,
-    sortingFn: "basic" as const,
+    sortingFn: "basic",
   } satisfies AdminColumn<Row>;
 
   return { accepting, mentorship, nda, program, teams };
