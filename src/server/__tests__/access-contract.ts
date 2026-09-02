@@ -146,6 +146,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "public",
     note: "Public catalog. No join to user.",
   },
+  "server/inventory.ts:listInventoryItemEditLog": {
+    level: "staff",
+    note: "The item's edit log, staff by the same rule as listProjectEditLog: it names who edited the item and which fields they touched. Narrower than that one on purpose, selecting four columns rather than the row, because oldValues and newValues carry notes, serial and location and nothing renders them. Never on the public item page.",
+  },
   "server/inventory.ts:listInventoryRequests": { level: "staff" },
   "server/inventory.ts:listMyItems": {
     level: "authenticated",

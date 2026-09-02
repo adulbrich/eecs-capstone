@@ -28,6 +28,7 @@ import {
   listAdminInventoryAs,
   listInventoryAs,
   listInventoryCategoriesImpl,
+  listInventoryItemEditLogAs,
   updateInventoryItemAs,
 } from "#/server/_internal/inventory-catalog";
 import {
@@ -3375,5 +3376,89 @@ describe("hasRequestHistory on the staff detail", () => {
     const view = await getInventoryItemDetailAs(null, { id: item.id });
     expect(view?.viewerIsStaff).toBe(false);
     expect(Object.keys(view ?? {})).not.toContain("hasRequestHistory");
+  });
+});
+
+describe("listInventoryItemEditLogAs", () => {
+  it("returns the item's edits, newest first", async () => {
+    const admin = await makeUser(`iel-a1-${Date.now()}@x.com`, "admin");
+    const item = await makeItem({ name: "Old", location: "Shelf A" });
+
+    await updateInventoryItemAs(admin, {
+      ...baseItemInput("New"),
+      id: item.id,
+      categoryIds: [],
+      location: "Shelf B",
+    });
+    await updateInventoryItemAs(admin, {
+      ...baseItemInput("Newer"),
+      id: item.id,
+      categoryIds: [],
+      location: "Shelf B",
+    });
+
+    const { rows } = await listInventoryItemEditLogAs(admin, {
+      itemId: item.id,
+    });
+    expect(rows).toHaveLength(2);
+    // Newest first, matching the project log. The panel renders them in the
+    // order they arrive, so this ordering is the rendered ordering.
+    expect(rows[0].changedFields).toEqual(["name"]);
+    expect(new Set(rows[1].changedFields)).toEqual(
+      new Set(["name", "location"])
+    );
+    expect(rows[0].editorId).toBe(admin.id);
+  });
+
+  it("returns nothing for an item nobody has edited", async () => {
+    const admin = await makeUser(`iel-a2-${Date.now()}@x.com`, "admin");
+    const item = await makeItem();
+    const { rows } = await listInventoryItemEditLogAs(admin, {
+      itemId: item.id,
+    });
+    expect(rows).toEqual([]);
+  });
+
+  it("refuses a signed-in non-staff caller and an anonymous one", async () => {
+    // Staff-only for the same reason listProjectEditLog is: the rows name who
+    // edited the item and which fields they touched.
+    //
+    // Both arguments go straight at the *As seam, which is the gate itself. An
+    // anonymous HTTP caller never gets this far: the ForCurrentUser wrapper
+    // calls requireUser() and is redirected to sign-in first. Passing null
+    // here pins that the seam also fails closed on its own, for any future
+    // caller that reaches it without that wrapper.
+    const admin = await makeUser(`iel-a3-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`iel-s3-${Date.now()}@x.com`, "user");
+    const item = await makeItem({ name: "Old" });
+    await updateInventoryItemAs(admin, {
+      ...baseItemInput("New"),
+      id: item.id,
+      categoryIds: [],
+    });
+
+    await expect(
+      listInventoryItemEditLogAs(
+        { id: student.id, role: student.role },
+        { itemId: item.id }
+      )
+    ).rejects.toThrow(/Forbidden/);
+    await expect(
+      listInventoryItemEditLogAs(null, { itemId: item.id })
+    ).rejects.toThrow(/Forbidden/);
+  });
+
+  it("scopes to the item asked for", async () => {
+    const admin = await makeUser(`iel-a4-${Date.now()}@x.com`, "admin");
+    const a = await makeItem({ name: "A" });
+    const b = await makeItem({ name: "B" });
+    await updateInventoryItemAs(admin, {
+      ...baseItemInput("A edited"),
+      id: a.id,
+      categoryIds: [],
+    });
+
+    const { rows } = await listInventoryItemEditLogAs(admin, { itemId: b.id });
+    expect(rows).toEqual([]);
   });
 });

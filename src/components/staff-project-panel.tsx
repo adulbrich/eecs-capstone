@@ -15,7 +15,7 @@ import {
   listProjectEditLog,
 } from "#/server/projects-queries";
 import { ConfirmDialog } from "./confirm-dialog";
-import { LocalTime } from "./local-time";
+import { type EditLogEntry, EditLogList } from "./edit-log-list";
 import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { ProposerSummary } from "./proposer-summary";
 import { Button } from "./ui/button";
@@ -55,15 +55,6 @@ interface Project {
   status: string;
 }
 
-interface EditLogRow {
-  changedFields: string[];
-  createdAt: Date | string;
-  editorId: string;
-  id: string;
-  newValues: unknown;
-  oldValues: unknown;
-}
-
 export function StaffProjectPanel({
   project,
   onChanged,
@@ -78,7 +69,7 @@ export function StaffProjectPanel({
     force: boolean;
   } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [editLog, setEditLog] = useState<EditLogRow[]>([]);
+  const [editLog, setEditLog] = useState<EditLogEntry[]>([]);
   const [sendEmail, setSendEmail] = useState(true);
   const [proposer, setProposer] = useState<ProposerForEdit>({
     accountLinked: false,
@@ -95,7 +86,7 @@ export function StaffProjectPanel({
         const { rows } = await listProjectEditLog({
           data: { id: project.id },
         });
-        setEditLog(rows as EditLogRow[]);
+        setEditLog(rows as EditLogEntry[]);
       } catch {
         // ignored
       }
@@ -390,23 +381,7 @@ export function StaffProjectPanel({
           content and would be duplicated here. */}
 
       <PanelSection title="Edit log">
-        {editLog.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No edits yet.</p>
-        ) : (
-          <ul className="space-y-2 text-sm">
-            {editLog.map((row) => (
-              <li className="border-border border-l-2 pl-3" key={row.id}>
-                <div className="text-muted-foreground text-xs">
-                  {row.editorId.slice(0, 8)} at{" "}
-                  <LocalTime value={row.createdAt} />
-                </div>
-                <div className="text-xs">
-                  Changed: {row.changedFields.join(", ")}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        <EditLogList rows={editLog} />
       </PanelSection>
 
       {/* Last, as on the item page: the irreversible actions sit at the far

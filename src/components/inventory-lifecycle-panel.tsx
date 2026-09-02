@@ -1,5 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   formatHoldDetailed,
   formatHoldShort,
@@ -12,8 +12,10 @@ import {
 } from "#/lib/inventory-workflow";
 import {
   hardDeleteInventoryItem,
+  listInventoryItemEditLog,
   transitionInventoryItem,
 } from "#/server/inventory";
+import { type EditLogEntry, EditLogList } from "./edit-log-list";
 import { HolderField } from "./holder-field";
 import { InventoryStatusBadge } from "./inventory-status-badge";
 import { LocalTime } from "./local-time";
@@ -214,6 +216,43 @@ function holdOfHistoryRow(h: HistoryRow) {
 }
 
 const HISTORY_PAGE_SIZE = 10;
+
+/**
+ * Who changed which fields on the item, and when.
+ *
+ * Rows have been written since #126 and read by nothing, so "an image change
+ * now reaches the item's edit log" was true and invisible.
+ *
+ * Fetched here rather than folded into `getInventoryItemDetail`, so the public
+ * loader feeding this page never carries staff-only rows it would then have to
+ * remember to drop. Same shape as the project panel's own effect.
+ */
+function EditLogSection({ itemId }: { itemId: string }) {
+  const [rows, setRows] = useState<EditLogEntry[]>([]);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const result = await listInventoryItemEditLog({ data: { itemId } });
+        setRows(result.rows);
+        setFailed(false);
+      } catch {
+        // Staff-only endpoint rendered from a staff-only branch, so a failure
+        // here is a transport problem rather than a permission one. Said out
+        // loud rather than swallowed: an empty list would otherwise claim the
+        // item has no edits, which is a different and possibly false thing.
+        setFailed(true);
+      }
+    })();
+  }, [itemId]);
+
+  return (
+    <PanelSection title="Edit log">
+      <EditLogList error={failed} rows={rows} />
+    </PanelSection>
+  );
+}
 
 function StatusHistorySection({ history }: { history: HistoryRow[] }) {
   const [page, setPage] = useState(1);
@@ -545,6 +584,10 @@ export function InventoryLifecyclePanel({
       </PanelSection>
 
       <StatusHistorySection history={history} />
+
+      {/* After status history and before the danger zone, the order the
+          project page's staff panel uses for the same two regions. */}
+      <EditLogSection itemId={item.id} />
 
       <PanelSection title="Danger zone" tone="danger">
         <p className="text-muted-foreground text-xs">
