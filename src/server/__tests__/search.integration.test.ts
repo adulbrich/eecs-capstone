@@ -112,7 +112,6 @@ describe("searchProjects", () => {
     const { id } = await createProjectAs(admin, baseProject("Draft project"));
     const { rows } = await searchProjectsImpl({
       ...SEARCH_DEFAULTS,
-      query: "",
     });
     expect(rows.find((r) => r.id === id)).toBeUndefined();
   });
@@ -123,7 +122,6 @@ describe("searchProjects", () => {
     const second = await publish(admin, "Second");
     const { rows } = await searchProjectsImpl({
       ...SEARCH_DEFAULTS,
-      query: "",
     });
     const order = rows.map((r) => r.id);
     expect(order.indexOf(second)).toBeLessThan(order.indexOf(first));
@@ -150,7 +148,6 @@ describe("searchProjects", () => {
 
     const { rows } = await searchProjectsImpl({
       ...SEARCH_DEFAULTS,
-      query: "",
     });
     expect(Object.keys(rows[0]).sort()).toEqual([
       "acceptingApplicants",

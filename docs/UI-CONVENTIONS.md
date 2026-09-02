@@ -154,10 +154,11 @@ Status colors have no Tailwind alias, so reference the variable directly:
 `--status-success-bg` and its siblings supply the matching tinted backgrounds. All of
 them are redefined under the dark selector in `styles.css`.
 
-What the four mean, so two badges for the same kind of news cannot pick two
+What the five mean, so two badges for the same kind of news cannot pick two
 colors: `success` is done or approved; `warning` is pending or missing, something
 the reader may still act on (a review waiting, "Seeking mentor"); `error` is a hard
-stop for the reader (deleted, "Not accepting applicants"); `info` is neutral news.
+stop for the reader (deleted, "Not accepting applicants"); `info` is news with no
+verdict in it; `neutral` is inactive (draft, archived).
 
 ---
 

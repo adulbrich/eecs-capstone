@@ -133,11 +133,11 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
   },
   {
     accessorFn: (row) => row.acceptingApplicants,
-    // Badge or dash, the same shape as the NDA column beside it: the row
-    // that needs a second look carries the mark, the ordinary one is quiet.
+    // "Yes" rather than the dash the NDA column uses for its ordinary case:
+    // under this header a dash would read as "no", the opposite of the truth.
     cell: ({ row }) =>
       row.original.acceptingApplicants ? (
-        "-"
+        "Yes"
       ) : (
         <ApplicantsBadge acceptingApplicants={false} />
       ),
@@ -156,7 +156,6 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
       ),
     header: "NDA/IP required",
     id: "nda",
-    // Boolean, not text, for the same reason as the Teams column.
     sortingFn: "basic",
   },
   {
