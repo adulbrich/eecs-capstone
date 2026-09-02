@@ -15,6 +15,16 @@ vi.mock("#/components/project-image-uploader", () => ({
 vi.mock("#/server/project-review", () => ({
   reviewProject: vi.fn(),
 }));
+vi.mock("#/server/projects", () => ({
+  createProject: vi.fn(),
+  updateProject: vi.fn(),
+}));
+vi.mock("#/server/categories", () => ({
+  setProjectCategories: vi.fn(),
+}));
+vi.mock("#/server/uploads", () => ({
+  uploadProjectImage: vi.fn(),
+}));
 
 import { ProjectForm } from "#/components/project-form";
 import { reviewProject } from "#/server/project-review";
@@ -34,7 +44,7 @@ function renderForm() {
     <ProjectForm
       enableAiReview
       initial={{ title: "Old title", description: "Old description" }}
-      onSubmit={vi.fn()}
+      isStaff={false}
       projectId="00000000-0000-0000-0000-000000000001"
       showCategories={false}
       showNotes={false}
@@ -124,8 +134,8 @@ describe("ProjectForm AI review without a project", () => {
     return render(
       <ProjectForm
         enableAiReview
+        isStaff={false}
         {...(initial ? { initial } : {})}
-        onSubmit={vi.fn()}
         showCategories={false}
         showNotes={false}
         submitLabel="Create draft"

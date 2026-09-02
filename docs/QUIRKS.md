@@ -164,13 +164,23 @@ Neither form schema carries defaults now, and neither needs them: `defaultValues
 
 ### `field.state.meta.errors` is a heterogeneous array
 
-Entries can be strings or `{ message }` objects depending on which validator produced them, and since the forms pass a Standard Schema the object shape is now the common path rather than the unusual one. `FieldErrors` (`src/components/field-errors.tsx`) is the one place that knows this; render field errors through it rather than inline:
+Entries can be strings or `{ message }` objects depending on which validator produced them, and since the forms pass a Standard Schema the object shape is now the common path rather than the unusual one. `FieldError` (`src/components/ui/field.tsx`) is the one place that knows this; render field errors through it rather than inline:
 
 ```tsx
-<FieldErrors errors={field.state.meta.errors} />
+<FieldError errors={field.state.meta.errors} />
 ```
 
 **Every `form.Field` render prop needs this, and six of them did not have it.** The coercer used to be inline inside each form's shared `Field` helper, so any field rendered through a raw `form.Field` (`imageUrl`, `programId`, `teamsSupported`, `proposerEmail`, `categoryIds`) displayed nothing at all. What that cost: type a malformed address into the proposer field, click Save, and validation failed, `canSubmit` flipped false so the button greyed out, and no message appeared anywhere, because `formError` only ever carries server errors. A disabled button and silence.
+
+### Both forms own their save; the route components only navigate
+
+`InventoryForm` and `ProjectForm` import the server functions and write the row themselves. A route passes configuration in and gets a saved id back through `onSaved`; its loader still loads, but its component does nothing but navigate. `ProjectForm` took an `onSubmit` prop until 2026-09-02, so `new.tsx` and `edit.tsx` each held a copy of the payload rules, and nothing could test either: `src/test/` has no route tests, because a route is a `createFileRoute` call rather than a renderable component.
+
+Three rules live in that save, and each looks like cleanup waiting to happen:
+
+- **`proposerEmail` is three-state.** Absent leaves the proposer alone, `null` unlinks, an address links. Create's second write, the one saving the image key, sends `undefined` rather than the form's blank value, or it unlinks the proposer `createProject` just set. `src/server/_internal/projects.ts` tests `data.proposerEmail !== undefined`, which is what makes the three states real.
+- **The category write is asymmetric.** Edit calls `setProjectCategories` unconditionally for staff, because clearing every category must reach the server. Create guards on a non-empty list, because a new project has nothing to clear.
+- **`isStaff` is its own required prop, not `showProposer`.** `showProposer` and `showCategories` decide what is drawn; `isStaff` decides what is sent. A display prop gating the payload would make hiding a control change the request.
 
 ### Server errors via `applyServerErrors`
 

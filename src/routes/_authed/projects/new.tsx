@@ -1,10 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ProjectForm } from "#/components/project-form";
-import { imageUrlToSave } from "#/lib/image-save";
 import { pageTitle } from "#/lib/page-title";
-import { setProjectCategories } from "#/server/categories";
-import { createProject, updateProject } from "#/server/projects";
-import { uploadProjectImage } from "#/server/uploads";
 
 export const Route = createFileRoute("/_authed/projects/new")({
   head: () => ({ meta: [{ title: pageTitle("New Project") }] }),
@@ -24,53 +20,9 @@ function NewProject() {
       <div className="mt-6">
         <ProjectForm
           enableAiReview
-          onSubmit={async (values, categoryIds, pendingImage) => {
-            const payload = {
-              ...values,
-              programId: values.programId || null,
-              notes: values.notes || null,
-            };
-            const { id } = await createProject({
-              data: {
-                ...payload,
-                proposerEmail: isStaff
-                  ? values.proposerEmail || null
-                  : undefined,
-              },
-            });
-            // Create cannot upload first: the key is `projects/<id>/...` and
-            // the upload guard loads the project to check the viewer, so there
-            // is nothing to upload into until the row exists. Hence a second
-            // write here, unlike the edit path, and an edit-log row naming
-            // imageUrl on a brand new draft.
-            if (pendingImage) {
-              const imageUrl = await imageUrlToSave({
-                currentImageUrl: values.imageUrl,
-                owner: { projectId: id },
-                pendingImage,
-                upload: uploadProjectImage,
-              });
-              await updateProject({
-                data: {
-                  ...payload,
-                  id,
-                  imageUrl,
-                  // Omitted on purpose: this save is about the image, and an
-                  // omitted proposer leaves the one create just set alone. The
-                  // form's blank field would unlink it.
-                  proposerEmail: undefined,
-                },
-              });
-            }
-            if (isStaff && categoryIds.length > 0) {
-              await setProjectCategories({
-                data: { projectId: id, categoryIds },
-              });
-            }
-            navigate({
-              to: "/projects/$projectId",
-              params: { projectId: id },
-            });
+          isStaff={isStaff}
+          onSaved={(projectId) => {
+            navigate({ to: "/projects/$projectId", params: { projectId } });
           }}
           proposer={{ accountLinked: false, accountName: null, email: "" }}
           showCategories={isStaff}

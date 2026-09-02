@@ -5,16 +5,10 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { ProjectForm } from "#/components/project-form";
-import { imageUrlToSave } from "#/lib/image-save";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
-import {
-  listProjectCategories,
-  setProjectCategories,
-} from "#/server/categories";
-import { updateProject } from "#/server/projects";
+import { listProjectCategories } from "#/server/categories";
 import { getProject, getProposerForEdit } from "#/server/projects-queries";
-import { uploadProjectImage } from "#/server/uploads";
 
 export const Route = createFileRoute("/_authed/projects/$projectId/edit")({
   head: () => ({ meta: [{ title: pageTitle("Edit Project") }] }),
@@ -83,35 +77,9 @@ function EditProject() {
             teamsSupported: project.teamsSupported ?? 1,
           }}
           initialCategoryIds={categoryIds}
-          onSubmit={async (values, nextCategoryIds, pendingImage) => {
-            // Before the row write, never after: see image-save.ts.
-            const imageUrl = await imageUrlToSave({
-              currentImageUrl: values.imageUrl,
-              owner: { projectId },
-              pendingImage,
-              upload: uploadProjectImage,
-            });
-            await updateProject({
-              data: {
-                id: projectId,
-                ...values,
-                imageUrl,
-                programId: values.programId || null,
-                notes: values.notes || null,
-                proposerEmail: viewerIsStaff
-                  ? values.proposerEmail || null
-                  : undefined,
-              },
-            });
-            if (viewerIsStaff) {
-              await setProjectCategories({
-                data: { projectId, categoryIds: nextCategoryIds },
-              });
-            }
-            navigate({
-              to: "/projects/$projectId",
-              params: { projectId },
-            });
+          isStaff={viewerIsStaff}
+          onSaved={() => {
+            navigate({ to: "/projects/$projectId", params: { projectId } });
           }}
           projectId={projectId}
           proposer={proposer}
