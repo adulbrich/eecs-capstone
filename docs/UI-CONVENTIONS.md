@@ -255,6 +255,12 @@ and escape-dismissible for free. Three rules keep it correct:
 - Keep the `SheetHeader` title (`Navigation`) present for screen readers.
 - Render the notification bell in the mobile header bar, outside the Sheet, so it
   stays reachable without opening the drawer.
+- The source link is the last row of the Sheet's navigation block, not a third
+  icon in the top bar, which is already logo, bell and hamburger at `h-14`. It
+  sits outside the signed-in block because the Sheet renders regardless of
+  session. On desktop it is a ghost icon button left of the bell, ahead of both
+  session branches. Its accessible name is "Source code on GitHub", never
+  "GitHub": `/sign-in` and `/sign-up` render a "Continue with GitHub" button.
 
 ```tsx
 <Sheet open={open} onOpenChange={setOpen}>
