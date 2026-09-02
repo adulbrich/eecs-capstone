@@ -1,83 +1,59 @@
 import { and, eq } from "drizzle-orm";
 import type { db as Db } from "#/db";
 import { notifications, projectComments } from "#/db/schema";
+import {
+  commentNotifications,
+  type NotifiableComment,
+  type NotifiableProject,
+  softDeleteNotification,
+  statusChangeNotification,
+} from "#/lib/project-notifications";
+import type { Status } from "#/lib/project-workflow";
 
 type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
 
-interface Project {
-  id: string;
-  proposerId: string | null;
-  title: string;
-}
-
-interface Comment {
-  authorId: string;
-  content: string;
-  id: string;
-  isInternal: boolean | null;
-  parentId: string | null;
-  projectId: string;
-}
-
 export async function recordStatusChangeNotifications(
   tx: Tx,
-  project: Project,
-  newStatus: string,
+  project: NotifiableProject,
+  newStatus: Status,
   actorId: string,
   comment?: string | null
 ): Promise<void> {
-  if (!project.proposerId || project.proposerId === actorId) {
-    return;
+  const row = statusChangeNotification(project, newStatus, actorId, comment);
+  if (row) {
+    await tx.insert(notifications).values(row);
   }
-  const changesRequested = newStatus === "changes_requested";
-  const trimmed = comment?.trim();
-  await tx.insert(notifications).values({
-    userId: project.proposerId,
-    type: "status_change",
-    title: changesRequested
-      ? `Changes requested on '${project.title}'`
-      : `Your project '${project.title}' is now ${newStatus}`,
-    message:
-      changesRequested && trimmed
-        ? `Changes requested: ${trimmed}`
-        : `Status changed to ${newStatus}.`,
-    link: `/projects/${project.id}`,
-  });
 }
 
 export async function recordSoftDeleteNotification(
   tx: Tx,
-  project: Project,
+  project: NotifiableProject,
   action: "soft-deleted" | "restored" | "hard-deleted",
   actorId: string
 ): Promise<void> {
-  if (!project.proposerId || project.proposerId === actorId) {
-    return;
+  const row = softDeleteNotification(project, action, actorId);
+  if (row) {
+    await tx.insert(notifications).values(row);
   }
-  await tx.insert(notifications).values({
-    userId: project.proposerId,
-    type: "soft_delete",
-    title: `Your project '${project.title}' was ${action} by staff`,
-    message: `Staff performed: ${action}.`,
-    link: `/projects/${project.id}`,
-  });
 }
 
 export async function recordCommentNotifications(
   tx: Tx,
-  project: Project,
-  comment: Comment
+  project: NotifiableProject,
+  comment: NotifiableComment
 ): Promise<void> {
-  if (comment.isInternal) {
-    return;
-  }
-
-  const recipients = new Set<string>();
-  if (project.proposerId && comment.authorId !== project.proposerId) {
-    recipients.add(project.proposerId);
-  }
-
-  if (comment.parentId) {
+  // The one read the decision cannot make for itself, so it happens here and
+  // only its answer crosses the seam. Scoped to this project as well as to the
+  // id, so a parent id belonging to another project resolves to nobody rather
+  // than notifying a stranger.
+  //
+  // `isInternal` is tested here as well as inside the decision, which is not a
+  // duplicated rule so much as the reason this query is skippable: an internal
+  // comment tells nobody, so looking up who to tell is work with no reader.
+  // The decision keeps its own copy because it must be correct when called
+  // directly, as the unit tests call it.
+  let parentAuthorId: string | null = null;
+  if (comment.parentId && !comment.isInternal) {
     const [parent] = await tx
       .select({ authorId: projectComments.authorId })
       .from(projectComments)
@@ -87,18 +63,10 @@ export async function recordCommentNotifications(
           eq(projectComments.projectId, project.id)
         )
       );
-    if (parent && parent.authorId !== comment.authorId) {
-      recipients.add(parent.authorId);
-    }
+    parentAuthorId = parent?.authorId ?? null;
   }
 
-  for (const recipient of recipients) {
-    await tx.insert(notifications).values({
-      userId: recipient,
-      type: "comment",
-      title: `New comment on '${project.title}'`,
-      message: comment.content.slice(0, 200),
-      link: `/projects/${project.id}#comment-${comment.id}`,
-    });
+  for (const row of commentNotifications(project, comment, parentAuthorId)) {
+    await tx.insert(notifications).values(row);
   }
 }

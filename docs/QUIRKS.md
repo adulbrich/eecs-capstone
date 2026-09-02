@@ -1063,20 +1063,24 @@ The precedence order (name, then address, then label) has two renderings, and th
 
 `holderFields` in `src/components/inventory-lifecycle-panel.tsx` deliberately does **not** call `holdFromInput`. The constructor asks "is there an account?"; the dialog asks "do I know there is no account?", and `AccountStatus` has a third state, `unknown`, because the lookup is debounced. Expressing "an account exists but I do not know which" would need a fabricated account id. The client refusing to compose an illegal payload and the server defining what is illegal are two different jobs, and the server re-derives independently either way.
 
-### `src/lib/inventory-notifications.ts` decides, the transaction inserts
+### The notification modules decide, the transaction inserts
 
-Who receives an inventory notification and what it says lives in one pure, client-safe module, beside `hold.ts`, `inventory-deadlines.ts`, `inventory-visibility.ts` and `inventory-workflow.ts`. `notificationFor(prev, input, holderId, closed)` returns one row or null; `overdueNotifications(candidates, now)` returns many and owns the dedupe. `transitionItem` and `recordOverdueNotificationsAs` only insert what comes back.
+Both domains split this the same way. Who receives an inventory notification and what it says lives in one pure, client-safe module, beside `hold.ts`, `inventory-deadlines.ts`, `inventory-visibility.ts` and `inventory-workflow.ts`. `notificationFor(prev, input, holderId, closed)` returns one row or null; `overdueNotifications(candidates, now)` returns many and owns the dedupe. `transitionItem` and `recordOverdueNotificationsAs` only insert what comes back.
 
 Before this the decision was welded to the write: ninety-odd pure lines wrapped around five `tx.insert` calls, so the subtlest rule in the domain could only be exercised through a full request lifecycle against docker. Asserting the requester-versus-holder rule cost twenty-four lines of arrange. It is now a line.
+
+`src/lib/project-notifications.ts` is the project half, added later and to the same shape: `statusChangeNotification`, `softDeleteNotification` and `commentNotifications` return rows, and `src/server/_internal/notify.ts` keeps the transaction. Its strings moved verbatim from the old inline writers, so a wording change there is a deliberate change, never a refactor's side effect.
+
+One asymmetry between the two, and it is the interesting part. `commentNotifications` takes `parentAuthorId` as a parameter rather than finding it, because finding a parent comment's author is a `tx.select` and a pure module cannot run one. The seam therefore falls between the lookup and the decision: `notify.ts` runs the query, scoped to the project as well as to the parent id so a parent belonging to another project resolves to nobody, and only the answer crosses. The inventory module never needed this because its equivalent, the closed request line, was already resolved by the time the decision ran.
+
+`NotificationRow` is the five columns both modules return, and it lives in `src/lib/notification-row.ts` rather than in either of them. Inventory declared it first and projects would otherwise have imported an inventory module to borrow a type, which is the coupling that moved `isStaff` out of `project-visibility.ts`. Declared structurally rather than from `typeof notifications.$inferInsert`, which would carry `id`, `read` and `createdAt` and pull Drizzle into a client-safe module.
 
 Two rules that look wrong until you know why:
 
 - **A denial is answered before the recipient guard.** The guard asks who holds the item, and a hold on a bare label answers nobody, which would silently swallow the notice owed to the person who asked. The rejection branch therefore comes first and reads its recipient off the closed line, not off the item.
-- **Inventory does not suppress the actor**, unlike `notify.ts`, which does it in all three project functions. Suppression here is keyed on `authority === "self_cancel"` instead, because staff assigning a hold to their own address is also actor-equals-recipient and *does* want the pickup deadline in their bell.
+- **Inventory does not suppress the actor**, unlike the project module, whose two single-recipient decisions open with `proposerToTell`. Its comment writer does not: a reply notifies the parent's author too, so it excludes the actor per recipient rather than up front. Suppression here is keyed on `authority === "self_cancel"` instead, because staff assigning a hold to their own address is also actor-equals-recipient and *does* want the pickup deadline in their bell.
 
-**New recipient or content cases belong in `src/lib/__tests__/inventory-notifications.test.ts`, not the integration suite.** The twelve integration tests that assert notification rows stay: they are the only proof a row reaches Postgres, and they were the evidence the extraction was faithful, since they passed unedited.
-
-`notify.ts` keeps its own three project sites and its own actor rule; the `NotificationRow` type is inventory-scoped and `notify.ts` could adopt it later.
+**New recipient or content cases belong in `src/lib/__tests__/inventory-notifications.test.ts` or `project-notifications.test.ts`, not the integration suite.** The integration tests that assert notification rows stay: they are the only proof a row reaches Postgres, and on both extractions they were the evidence it was faithful, since they passed unedited.
 
 ### The dev seed drives the real write path
 
