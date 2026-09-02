@@ -36,17 +36,19 @@ the UI, rather than finding out from CI. The accessibility suite needs more setu
 the integration one: the same Postgres and RustFS, plus `npm run db:seed:dev` (its
 global setup signs in as the seeded users) and `npx playwright install chromium`.
 Only the scans tagged `@smoke` run on a pull request, through
-`npm run test:accessibility:smoke`; the rest run from the dispatch-only
-`full-accessibility.yml`, so a change to a page outside that subset needs the full
-run locally. `npm run test:smoke` wants that same setup and builds the production
+`npm run test:accessibility:smoke`, listed in the `accessibility-smoke` job comment in
+`ci.yml`; the rest run from the dispatch-only `full-accessibility.yml`, so a change to
+a page outside that subset needs the full run locally. `npm run test:smoke` wants that same setup and builds the production
 output itself, which is the point of it: the dev server cannot show SSR-only
 breakage. Run it when you touch one of the flows it covers, listed in the job
 comment in `ci.yml`, because unlike the integration suite a red one blocks the
 merge. Other scripts live in `package.json`.
 
-`verify`, `smoke / suite` and `accessibility-smoke / suite` can block a merge today.
-The `integration` job runs on every pull request and a red one still merges, so read
-its result rather than trusting the merge button. The ruleset is the source of
+`verify` and `smoke / suite` can block a merge today. `accessibility-smoke / suite`
+is meant to join them once it is registered on the ruleset (its job comment in
+`ci.yml` says how); until then it reports and does not block. The `integration` job
+runs on every pull request and a red one still merges, so read both results rather
+than trusting the merge button. The ruleset is the source of
 truth and the list endpoint does not carry the rules, so it takes two calls:
 
 ```bash

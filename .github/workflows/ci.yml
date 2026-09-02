@@ -65,8 +65,10 @@ jobs:
   # shared stack, because global-setup.ts signs in as the seeded users to
   # capture their storage state.
   #
-  # Required, registered on the `main` ruleset as `accessibility-smoke / suite`
-  # for the same `<caller job> / <called job>` reason as smoke above.
+  # Advisory until it is registered. The check to add to the `main` ruleset
+  # is `accessibility-smoke / suite`, for the same `<caller job> / <called job>`
+  # reason as smoke above, and only after it has reported on main once: a
+  # required context that has never reported blocks every pull request.
   accessibility-smoke:
     uses: ./.github/workflows/stack-suite.yml
     with:

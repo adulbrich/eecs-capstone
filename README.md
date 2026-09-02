@@ -251,6 +251,9 @@ port 3000):
 npm run test:accessibility
 ```
 
+Pull requests run only the scans tagged `@smoke` (`npm run test:accessibility:smoke`);
+the whole suite runs from the dispatch-only Full Accessibility workflow.
+
 > TODO (future): integration tests currently run against the same database as
 > dev and TRUNCATE every table before each test, which wipes dev data. Point them
 > at a dedicated `eecs_capstone_test` database via a separate `TEST_DATABASE_URL`.
