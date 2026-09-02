@@ -140,10 +140,13 @@ describe("bookmarks", () => {
       .set({ deletedAt: new Date() })
       .where(eq(projects.id, deleted));
 
-    const { rows } = await listMyBookmarksAs(student);
+    const { rows, unavailableCount } = await listMyBookmarksAs(student);
     const ids = rows.map((r) => r.id);
     expect(ids).toContain(kept);
     expect(ids).not.toContain(deleted);
+    // Gone for everyone is not "not currently available": the count is only
+    // what the visibility check removed.
+    expect(unavailableCount).toBe(0);
     // The bookmark row itself survives; only the listing hides it.
     expect(
       await db
@@ -180,12 +183,16 @@ describe("bookmarks", () => {
     // commitTransition still requires a comment for changes_requested.
     await forceTransitionAs(admin, id, "changes_requested", "Needs work");
 
-    expect((await listMyBookmarksAs(student)).rows).toEqual([]);
+    const pulled = await listMyBookmarksAs(student);
+    expect(pulled.rows).toEqual([]);
+    // The page says how many dropped out, so the list shrinking does not read
+    // as a lost bookmark.
+    expect(pulled.unavailableCount).toBe(1);
     // Staff keep it, which is what makes this the viewer's rule rather than a
     // status blocklist: the same project, the same moment, two answers.
-    expect((await listMyBookmarksAs(admin)).rows.map((r) => r.id)).toEqual([
-      id,
-    ]);
+    const kept = await listMyBookmarksAs(admin);
+    expect(kept.rows.map((r) => r.id)).toEqual([id]);
+    expect(kept.unavailableCount).toBe(0);
     // The bookmark row survives, so republishing brings it back.
     expect(await bookmarkRows(student.id)).toHaveLength(1);
   });

@@ -56,8 +56,28 @@ test("my projects", async ({ page }) => {
   await checkA11y(page);
 });
 
-test("my bookmarks", async ({ page }) => {
+test("my bookmarks, as a table with a saved project", async ({ page }) => {
+  // The seed leaves the user with no bookmarks, so an empty scan would miss
+  // the table entirely. Save one from its page, scan the table, then put the
+  // fixture back the way it was.
+  await page.goto(`/projects/${projectId}`);
+  await waitForHydration(page);
+  const save = page.getByRole("button", { name: "Bookmark" });
+  if (await save.isVisible()) {
+    await save.click();
+    await expect(
+      page.getByRole("button", { name: "Remove bookmark" })
+    ).toBeVisible();
+  }
   await page.goto("/my/bookmarks");
+  await waitForHydration(page);
+  await expect(page.getByRole("table", { name: "My bookmarks" })).toBeVisible();
+  await checkA11y(page);
+  await page
+    .getByRole("button", { name: /^Remove .* from bookmarks$/ })
+    .first()
+    .click();
+  await expect(page.getByText(/No bookmarks yet/)).toBeVisible();
   await checkA11y(page);
 });
 
