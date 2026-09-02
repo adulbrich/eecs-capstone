@@ -101,19 +101,23 @@ beforeEach(() => {
 
 const PROJECT_ID = "00000000-0000-0000-0000-0000000000p1";
 
-function project(status: string) {
-  return { id: PROJECT_ID, status, deletedAt: null };
+function project(status: string, id = PROJECT_ID) {
+  return { id, status, deletedAt: null };
 }
 
-function renderPanel(status: string) {
-  return render(
+function panel(status: string, id = PROJECT_ID) {
+  return (
     <StaffProjectPanel
       onChanged={() => {
         // no-op
       }}
-      project={project(status)}
+      project={project(status, id)}
     />
   );
+}
+
+function renderPanel(status: string) {
+  return render(panel(status));
 }
 
 describe("StaffProjectPanel proposer block", () => {
@@ -381,18 +385,7 @@ describe("StaffProjectPanel mentorship across a project change", () => {
     ).toBe("first@x.test");
 
     getProjectMentorship.mockReturnValueOnce(new Promise(() => undefined));
-    view.rerender(
-      <StaffProjectPanel
-        onChanged={() => {
-          // no-op
-        }}
-        project={{
-          id: "00000000-0000-0000-0000-0000000000p2",
-          status: "submitted",
-          deletedAt: null,
-        }}
-      />
-    );
+    view.rerender(panel("submitted", "00000000-0000-0000-0000-0000000000p2"));
 
     const input = screen.getByLabelText("Mentor email") as HTMLInputElement;
     expect(input.value).toBe("");

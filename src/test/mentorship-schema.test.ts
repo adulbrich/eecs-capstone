@@ -37,13 +37,23 @@ describe("mentorshipSchema", () => {
         studentProposed: false,
       }).success
     ).toBe(false);
-    const long = `${"a".repeat(195)}@x.com`;
+    // Exactly 200 passes and 201 fails, so the ceiling is pinned at 200 and
+    // the rejection is the length rule rather than the address format.
+    const atCeiling = `${"a".repeat(194)}@x.com`;
+    expect(atCeiling).toHaveLength(200);
     expect(
       mentorshipSchema.safeParse({
         id: ID,
-        mentorEmail: long,
+        mentorEmail: atCeiling,
         studentProposed: false,
       }).success
-    ).toBe(false);
+    ).toBe(true);
+    const over = mentorshipSchema.safeParse({
+      id: ID,
+      mentorEmail: `a${atCeiling}`,
+      studentProposed: false,
+    });
+    expect(over.success).toBe(false);
+    expect(over.error?.issues.map((i) => i.code)).toContain("too_big");
   });
 });

@@ -133,6 +133,10 @@ Search-driven loaders need `loaderDeps` so navigation with a new search param re
 
 Convention adopted in Spec 2: each project has ONE URL (`/projects/$id`), and staff-only sections (notes, internal comments, action buttons) render conditionally inside that page based on viewer role. We deliberately do NOT have a separate `/admin/projects/$id`. This avoids URL duplication and lets staff share URLs with non-staff. List views can still live at separate URLs (`/admin/projects` IS distinct from `/projects`) because the underlying query is genuinely different.
 
+### A route component is reused across a param change; key any child that holds a draft
+
+Navigating from `/projects/A` to `/projects/B` re-runs the loader and re-renders the same component instance with new props. Nothing remounts unless the route sets `remountDeps`, and nothing in `src/` does. So a child that keeps draft state in `useState` and loads its record in an effect keeps A's drafts on screen while B's record is in flight, and a Save clicked in that window posts A's values onto B. `StaffMentorshipSection` had exactly this until it was keyed: `<StaffMentorshipSection key={project.id} ... />` in `staff-project-panel.tsx`, which makes a param change a remount for that one child, and a test in `staff-project-panel.test.tsx` rerenders the panel with a second id to prove it. Key the child, not the route: `remountDeps` would also discard state the page should keep, such as an open dialog's scroll position. `StaffProjectPanel`'s own `pending` and `comment` state has the same shape and is not yet keyed; see #190.
+
 ---
 
 ## TanStack Form
