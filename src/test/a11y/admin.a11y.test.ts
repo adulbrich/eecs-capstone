@@ -64,7 +64,7 @@ test("admin dashboard", async ({ page }) => {
   await checkA11y(page);
 });
 
-test("admin inventory list", async ({ page }) => {
+test("@smoke admin inventory list", async ({ page }) => {
   await page.goto("/admin/inventory");
   await checkA11y(page);
 });
@@ -107,7 +107,7 @@ test("admin inventory requests", async ({ page }) => {
   await checkA11y(page);
 });
 
-test("admin projects list", async ({ page }) => {
+test("@smoke admin projects list", async ({ page }) => {
   await page.goto("/admin/projects");
   await checkA11y(page);
 });

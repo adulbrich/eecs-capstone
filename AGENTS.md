@@ -35,15 +35,20 @@ fast, so a green `npm test` says nothing about either. Run `npm run test:integra
 the UI, rather than finding out from CI. The accessibility suite needs more setup than
 the integration one: the same Postgres and RustFS, plus `npm run db:seed:dev` (its
 global setup signs in as the seeded users) and `npx playwright install chromium`.
-`npm run test:smoke` wants that same setup and builds the production output itself,
-which is the point of it: the dev server cannot show SSR-only breakage. Run it when
-you touch one of the flows it covers, listed in the job comment in `ci.yml`, because
-unlike the integration and accessibility suites a red one blocks the merge.
-Other scripts live in `package.json`.
+Only the scans tagged `@smoke` run on a pull request, through
+`npm run test:accessibility:smoke`, listed in the `accessibility-smoke` job comment in
+`ci.yml`; the rest run from the dispatch-only `full-accessibility.yml`, so a change to
+a page outside that subset needs the full run locally. `npm run test:smoke` wants
+that same setup and builds the production output itself, which is the point of it:
+the dev server cannot show SSR-only breakage. Run it when you touch one of the flows
+it covers, listed in the job comment in `ci.yml`, because unlike the integration
+suite a red one blocks the merge. Other scripts live in `package.json`.
 
-`verify` and `smoke / suite` can block a merge today. The `integration` and
-`accessibility` jobs run on every pull request and a red one still merges, so read
-their results rather than trusting the merge button. The ruleset is the source of
+`verify` and `smoke / suite` can block a merge today. `accessibility-smoke / suite`
+is meant to join them once it is registered on the ruleset (its job comment in
+`ci.yml` says how); until then it reports and does not block. The `integration` job
+runs on every pull request and a red one still merges, so read both results rather
+than trusting the merge button. The ruleset is the source of
 truth and the list endpoint does not carry the rules, so it takes two calls:
 
 ```bash

@@ -57,17 +57,23 @@ jobs:
       report-path: playwright-report/e2e
       report-name: smoke-report
 
-  # The a11y suite has existed since 2026-05-26 and did not run in CI until
-  # PR #62, so an accessibility regression could reach main unnoticed.
-  # `npm test` excludes it on purpose to keep the unit run fast; this is the
-  # other half of that trade. It needs a dev seed on top of the shared stack,
-  # because global-setup.ts signs in as the seeded users to capture their
-  # storage state.
-  accessibility:
+  # The accessibility scans tagged `@smoke`: every public page, the two admin
+  # data tables, and the /my/items tab panels, each in light and dark. The
+  # full suite scans a hundred pages and took four minutes on a runner, so it
+  # moved to full-accessibility.yml, dispatch-only, on 2026-09-02; this subset
+  # is what stays on the pull-request path. It needs a dev seed on top of the
+  # shared stack, because global-setup.ts signs in as the seeded users to
+  # capture their storage state.
+  #
+  # Advisory until it is registered. The check to add to the `main` ruleset
+  # is `accessibility-smoke / suite`, for the same `<caller job> / <called job>`
+  # reason as smoke above. Register it after this job has reported on a pull
+  # request, which the ruleset picker needs before it offers the name.
+  accessibility-smoke:
     uses: ./.github/workflows/stack-suite.yml
     with:
-      script: test:accessibility
+      script: test:accessibility:smoke
       seed: true
       browser: true
       report-path: playwright-report/a11y
-      report-name: a11y-report
+      report-name: a11y-smoke-report
