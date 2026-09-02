@@ -65,6 +65,16 @@ For developer setup, architecture notes, and the active roadmap, see
   closing an account removes and keeps. Linked from sign-up (as a notice, not a
   checkbox; nothing is recorded), sign-in, and the profile page. No footer and
   no separate terms document. (#91)
+- ✅ Self-service account deletion from the profile page, behind a dialog that
+  states what stays and requires the person to type their own email. The `user`
+  row is anonymized in place rather than deleted, because authorship and audit
+  records point at it; only what a real DELETE would cascade (sessions,
+  accounts, interests, bookmarks, cart, notifications, program memberships,
+  collaborations, review usage) is removed. Projects stay published and read
+  "Deleted user"; contact details typed into them and equipment records stay.
+  Blocked while an item is out or a request is approved, and for the only admin.
+  Irreversible, immediate, and a re-registered address cannot reclaim old
+  projects. (#84; the admin-executed version is #29)
 - ✅ Avatar upload with the shared crop + resize image pipeline.
 - ✅ Account detail view (shows the user's role).
 
