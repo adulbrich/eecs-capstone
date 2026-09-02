@@ -195,6 +195,10 @@ describe("bookmarks", () => {
     expect(kept.unavailableCount).toBe(0);
     // The bookmark row survives, so republishing brings it back.
     expect(await bookmarkRows(student.id)).toHaveLength(1);
+    await forceTransitionAs(admin, id, "published");
+    const back = await listMyBookmarksAs(student);
+    expect(back.rows.map((r) => r.id)).toEqual([id]);
+    expect(back.unavailableCount).toBe(0);
   });
 
   it("drops a project the viewer may no longer see", async () => {

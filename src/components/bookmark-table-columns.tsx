@@ -1,15 +1,14 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import { toast } from "sonner";
 import { defineAdminColumns } from "#/components/admin-data-table";
 import { projectImageSrc } from "#/lib/project-image";
 import type { SortState } from "#/lib/table-state";
 import { type listMyBookmarks, removeBookmark } from "#/server/bookmarks";
-import { ApplicantsBadge } from "./applicants-badge";
 import { ImageOrFallback } from "./image-or-fallback";
 import { LocalTime } from "./local-time";
-import { programLabel } from "./project-card";
+import { projectSummaryColumns } from "./project-summary-columns";
 import { StatusBadge } from "./status-badge";
-import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 
 /** One row of `/my/bookmarks`, as `listMyBookmarks` returns it. */
@@ -24,31 +23,6 @@ export const BOOKMARK_TABLE_DEFAULT_SORT: SortState = {
 };
 
 /**
- * Both of #75's public facts in one cell. Mentor state only means anything
- * on a student-proposed project, so a mentor column of its own would be blank
- * on most rows; combined, blank honestly means "an ordinary proposal" rather
- * than looking like missing data.
- */
-export function originLabel(row: {
-  mentorName: string | null;
-  seekingMentor: boolean;
-  studentProposed: boolean;
-}): string | null {
-  if (!row.studentProposed) {
-    return null;
-  }
-  if (row.seekingMentor) {
-    return "Student proposed, seeking mentor";
-  }
-  if (row.mentorName) {
-    return `Student proposed, mentored by ${row.mentorName}`;
-  }
-  // A mentor address is on file but nobody has signed up at it yet: neither
-  // seeking nor nameable, so the student-proposed fact stands alone.
-  return "Student proposed";
-}
-
-/**
  * The bookmark toggle, for a page whose rows are the bookmarks: removing one
  * removes the row, so the loader is what has to refresh, not a shared set.
  */
@@ -60,6 +34,11 @@ function RemoveBookmarkButton({ row }: { row: BookmarkRow }) {
     try {
       await removeBookmark({ data: { projectId: row.id } });
       await router.invalidate();
+    } catch (err) {
+      // The row stays, which is the truth; say why rather than leaving a
+      // button that seemed to do nothing.
+      console.error(err);
+      toast.error("Could not remove the bookmark. Try again.");
     } finally {
       setPending(false);
     }
@@ -71,7 +50,7 @@ function RemoveBookmarkButton({ row }: { row: BookmarkRow }) {
       onClick={() => void remove()}
       size="sm"
       type="button"
-      variant="outline"
+      variant="ghost"
     >
       Remove
     </Button>
@@ -83,7 +62,10 @@ function RemoveBookmarkButton({ row }: { row: BookmarkRow }) {
  * column is a field `listMyBookmarksAs` already returns, and that projection
  * re-checks visibility on read, so nothing here is disclosed that the viewer
  * could not open. `enableHiding: false` throughout is what removes the picker.
+ * The five columns shared with /projects come from `projectSummaryColumns`.
  */
+const shared = projectSummaryColumns<BookmarkRow>();
+
 export const BOOKMARK_TABLE_COLUMNS = defineAdminColumns<BookmarkRow>()([
   {
     accessorFn: (row) => row.title,
@@ -107,14 +89,7 @@ export const BOOKMARK_TABLE_COLUMNS = defineAdminColumns<BookmarkRow>()([
     header: "Title",
     id: "title",
   },
-  {
-    accessorFn: (row) => programLabel(row) ?? undefined,
-    cell: ({ row }) => programLabel(row.original) ?? "-",
-    enableHiding: false,
-    header: "Program",
-    id: "program",
-    sortUndefined: "last",
-  },
+  { ...shared.program, enableHiding: false },
   {
     accessorFn: (row) => row.status,
     cell: ({ row }) => <StatusBadge status={row.original.status} />,
@@ -122,58 +97,12 @@ export const BOOKMARK_TABLE_COLUMNS = defineAdminColumns<BookmarkRow>()([
     header: "Status",
     id: "status",
   },
-  {
-    accessorFn: (row) => row.acceptingApplicants,
-    // "Yes" rather than a dash, as on /projects: under this header a dash
-    // would read as "no".
-    cell: ({ row }) =>
-      row.original.acceptingApplicants ? (
-        "Yes"
-      ) : (
-        <ApplicantsBadge acceptingApplicants={false} />
-      ),
-    enableHiding: false,
-    header: "Accepting applicants",
-    id: "accepting",
-    sortingFn: "basic",
-  },
-  {
-    accessorFn: (row) => row.teamsSupported,
-    cell: ({ row }) => row.original.teamsSupported,
-    enableHiding: false,
-    header: "Teams supported",
-    id: "teams",
-    // Numeric, not text: the locale-compare default would put "10" before "2".
-    sortingFn: "basic",
-  },
-  {
-    accessorFn: (row) => row.requiresNdaIp,
-    cell: ({ row }) =>
-      row.original.requiresNdaIp ? (
-        <Badge variant="outline">Required</Badge>
-      ) : (
-        "-"
-      ),
-    enableHiding: false,
-    header: "NDA/IP required",
-    id: "nda",
-    sortingFn: "basic",
-  },
-  {
-    // Seeking a mentor first, then student proposed, then the rest, so the
-    // first header click surfaces what a prospective mentor is looking for.
-    accessorFn: (row) => {
-      if (row.seekingMentor) {
-        return 2;
-      }
-      return row.studentProposed ? 1 : 0;
-    },
-    cell: ({ row }) => originLabel(row.original) ?? "-",
-    enableHiding: false,
-    header: "Origin",
-    id: "origin",
-    sortingFn: "basic",
-  },
+  { ...shared.accepting, enableHiding: false },
+  { ...shared.teams, enableHiding: false },
+  { ...shared.nda, enableHiding: false },
+  // Named for what it answers here, "where did this project come from",
+  // which is the same two facts /projects files under Mentorship.
+  { ...shared.mentorship, enableHiding: false, header: "Origin" },
   {
     accessorFn: (row) => row.bookmarkedAt,
     cell: ({ row }) => <LocalTime dateOnly value={row.original.bookmarkedAt} />,

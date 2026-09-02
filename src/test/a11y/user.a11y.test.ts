@@ -58,26 +58,36 @@ test("my projects", async ({ page }) => {
 
 test("my bookmarks, as a table with a saved project", async ({ page }) => {
   // The seed leaves the user with no bookmarks, so an empty scan would miss
-  // the table entirely. Save one from its page, scan the table, then put the
-  // fixture back the way it was.
+  // the table entirely. Save one from its page, scan the table, remove it,
+  // and scan whatever the page shows after.
   await page.goto(`/projects/${projectId}`);
   await waitForHydration(page);
-  const save = page.getByRole("button", { name: "Bookmark" });
-  if (await save.isVisible()) {
-    await save.click();
+  const toggle = page.getByRole("button", {
+    name: /^(Bookmark|Remove bookmark)$/,
+  });
+  await expect(toggle).toBeVisible();
+  // "Remove bookmark" means a crashed earlier run left it saved; fine.
+  if ((await toggle.textContent())?.trim() === "Bookmark") {
+    await toggle.click();
+    // The label flips before the write lands and the button is disabled
+    // until it does; navigating on the label alone aborts the request.
     await expect(
       page.getByRole("button", { name: "Remove bookmark" })
-    ).toBeVisible();
+    ).toBeEnabled();
   }
   await page.goto("/my/bookmarks");
   await waitForHydration(page);
   await expect(page.getByRole("table", { name: "My bookmarks" })).toBeVisible();
   await checkA11y(page);
-  await page
-    .getByRole("button", { name: /^Remove .* from bookmarks$/ })
-    .first()
-    .click();
-  await expect(page.getByText(/No bookmarks yet/)).toBeVisible();
+
+  const removes = page.getByRole("button", {
+    name: /^Remove .* from bookmarks$/,
+  });
+  const before = await removes.count();
+  await removes.first().click();
+  // Not the empty state: the seeded user may hold other bookmarks, and this
+  // scan must not depend on that.
+  await expect(removes).toHaveCount(before - 1);
   await checkA11y(page);
 });
 

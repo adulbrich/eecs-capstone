@@ -206,8 +206,9 @@ pages (`profile.tsx`, `admin/categories/$categoryId.tsx`) plus `max-w-sm` on
 `verify-email.tsx`. Of the six `max-w-4xl` pages, five hold a single-column
 card list (`projects/index.tsx`, `inventory/index.tsx`, `my/bookmarks.tsx`,
 `my/projects.tsx`, `my/items.tsx`) and `inventory/$itemId.tsx` holds a
-two-column detail layout. `projects/index.tsx` in table mode lets the table run
-full width below the bounded title and filter bar, the way the admin tables do. The sign-in/sign-up/forgot/reset-password cards
+two-column detail layout. `projects/index.tsx` in table mode and `my/bookmarks.tsx`
+let the table run full width below the bounded title (and filter bar), the way
+the admin tables do. The sign-in/sign-up/forgot/reset-password cards
 are narrower still but live inside the separate `island-shell` container below, not
 this padding pattern.
 

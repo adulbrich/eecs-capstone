@@ -557,3 +557,38 @@ describe("highlightedRowId", () => {
     expect(scrollIntoView).toHaveBeenCalled();
   });
 });
+
+describe("the Columns menu", () => {
+  it("is absent when no column can be hidden", () => {
+    // A picker over an empty set is a control that exists to be ignored;
+    // /my/bookmarks is the table that relies on this.
+    const columns: AdminColumn<Row>[] = [
+      {
+        accessorFn: (row) => row.name,
+        enableHiding: false,
+        header: "Name",
+        id: "name",
+      },
+    ];
+    render(
+      <AdminDataTable
+        caption="Fixed"
+        columns={columns}
+        data={DATA}
+        defaultSort={{ desc: false, id: "name" }}
+        emptyMessage="Nothing."
+        getRowId={(row) => row.id}
+        hidden={[]}
+        onHiddenChange={() => {
+          // unused
+        }}
+        onSortChange={() => {
+          // unused
+        }}
+        sort={{ desc: false, id: "name" }}
+        storageKey="fixed"
+      />
+    );
+    expect(screen.queryByRole("button", { name: "Columns" })).toBeNull();
+  });
+});

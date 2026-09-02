@@ -9,6 +9,7 @@ const { router, server } = vi.hoisted(() => ({
 }));
 
 vi.mock("#/server/bookmarks", () => server);
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({
     children,
@@ -32,7 +33,6 @@ import {
   BOOKMARK_TABLE_COLUMNS,
   BOOKMARK_TABLE_DEFAULT_SORT,
   type BookmarkRow,
-  originLabel,
 } from "#/components/bookmark-table-columns";
 import type { SortState } from "#/lib/table-state";
 
@@ -165,18 +165,18 @@ describe("the bookmarks table", () => {
   });
 
   it("carries both mentorship facts in one Origin cell", () => {
-    expect(originLabel(ROWS[0])).toBeNull();
-    expect(originLabel(ROWS[1])).toBe("Student proposed, seeking mentor");
-    expect(originLabel(ROWS[2])).toBe(
-      "Student proposed, mentored by Sam Mentor"
-    );
-    expect(
-      originLabel({
-        mentorName: null,
-        seekingMentor: false,
-        studentProposed: true,
-      })
-    ).toBe("Student proposed");
+    renderTable();
+    const two = screen.getByRole("link", { name: "Two" }).closest("tr");
+    const three = screen.getByRole("link", { name: "Three" }).closest("tr");
+    const ten = screen.getByRole("link", { name: "Ten" }).closest("tr");
+    if (!(two && three && ten)) {
+      throw new Error("no row");
+    }
+    expect(within(two).getByText("Student proposed")).toBeTruthy();
+    expect(within(two).getByText("Seeking mentor")).toBeTruthy();
+    expect(within(three).getByText("Student proposed")).toBeTruthy();
+    expect(within(three).getByText("Sam Mentor")).toBeTruthy();
+    expect(within(ten).queryByText("Student proposed")).toBeNull();
   });
 
   it("marks a closed roster and an NDA, and removes through the loader", async () => {
