@@ -50,8 +50,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-3 text-sm">
-          {/* Ahead of both session branches: source availability is a
-              statement to the public, so it does not sit behind sign-in. */}
+          {/* Ahead of both session branches: public, signed in or not. */}
           <SourceLink />
           {(() => {
             if (isPending) {
@@ -152,9 +151,7 @@ function MobileMenu({
               Admin
             </NavItem>
           )}
-          {/* In the Sheet rather than the top bar, which is already logo,
-              bell and hamburger at h-14. Last, and outside the signed-in
-              block, because the Sheet renders regardless of session. */}
+          {/* Placement and naming: docs/UI-CONVENTIONS.md, Mobile navigation. */}
           <NavItem aria-label={SOURCE_LINK_LABEL} href={brand.repositoryUrl}>
             Source code
           </NavItem>
@@ -213,13 +210,17 @@ function NavItem(
   );
 }
 
-// Not "GitHub": /sign-in and /sign-up render a "Continue with GitHub" button,
-// and a bare glyph with that name would read as a second route to it.
+// Not "GitHub", which /sign-in's "Continue with GitHub" button already means.
 const SOURCE_LINK_LABEL = "Source code on GitHub";
 
 function SourceLink() {
   return (
-    <Button aria-label={SOURCE_LINK_LABEL} asChild size="sm" variant="ghost">
+    <Button
+      aria-label={SOURCE_LINK_LABEL}
+      asChild
+      size="icon-sm"
+      variant="ghost"
+    >
       <a href={brand.repositoryUrl} rel="noopener noreferrer" target="_blank">
         <Github aria-hidden="true" className="h-5 w-5" />
       </a>
