@@ -21,6 +21,18 @@ export const projectCategoriesList = sql<ProjectCategory[]>`coalesce((
 ), '[]'::json)`;
 
 /**
+ * The same categories as one `; `-separated string of names, for the staff
+ * CSV export, whose cell is text. Same order, so the file reads like the
+ * chips.
+ */
+export const projectCategoriesText = sql<string | null>`(
+  SELECT string_agg(c.name, '; ' ORDER BY c.type, c.name)
+  FROM project_categories pc
+  JOIN categories c ON c.id = pc.category_id
+  WHERE pc.project_id = ${projects.id}
+)`;
+
+/**
  * The mentor, resolved at read time. A correlated subquery rather than a join
  * so the four consumers of `projectSummarySelect` pick it up without each
  * adding a join, same as `categories` in the admin export. Case-insensitive

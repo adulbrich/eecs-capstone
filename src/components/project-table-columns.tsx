@@ -144,8 +144,9 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     sortingFn: "basic",
   },
   {
-    // Seeking a mentor sorts first, then student proposed, then the rest:
-    // the order a prospective mentor scanning the catalog wants.
+    // Seeking a mentor ranks highest, then student proposed, then the rest.
+    // TanStack starts a numeric column descending, so the first header click
+    // puts the projects a prospective mentor is looking for at the top.
     accessorFn: (row) => {
       if (row.seekingMentor) {
         return 2;

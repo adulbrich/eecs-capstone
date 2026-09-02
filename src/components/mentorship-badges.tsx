@@ -10,7 +10,7 @@ import { Badge } from "./ui/badge";
  * whose mentor has not signed up yet show nothing rather than a false
  * "Seeking mentor". See #75.
  *
- * Rendered by the card, the row and the detail page, so the three cannot
+ * Rendered by the card, the table and the detail page, so the three cannot
  * compute the badges three ways.
  */
 export function MentorshipBadges({

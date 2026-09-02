@@ -31,6 +31,7 @@ import { isStaff, type Viewer } from "#/lib/viewer";
 import {
   adminProjectSummarySelect,
   mentorNameSql,
+  projectCategoriesText,
   projectSummarySelect,
   seekingMentorSql,
 } from "./project-summary";
@@ -222,6 +223,8 @@ export async function exportAdminProjectsAs(
   const rows = await db
     .select({
       ...adminProjectSummarySelect,
+      // The CSV wants text, not the chip objects the listing renders.
+      categories: projectCategoriesText,
       notes: projects.notes,
       archivedAt: projects.archivedAt,
     })
