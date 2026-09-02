@@ -17,7 +17,11 @@ import {
   type Status,
 } from "#/lib/project-workflow";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
-import type { ProjectInput, UpdateProjectInput } from "../projects";
+import type {
+  MentorshipInput,
+  ProjectInput,
+  UpdateProjectInput,
+} from "../projects";
 import {
   recordSoftDeleteNotification,
   recordStatusChangeNotifications,
@@ -245,6 +249,60 @@ export async function updateProjectAs(
   }
 
   return { id: existing.id, updated: true };
+}
+
+/**
+ * The only writer of `studentProposed` and `mentorEmail`.
+ *
+ * Staff-only, and deliberately not part of `updateProjectAs`: neither key
+ * exists on `ProjectInput`, so the shared form cannot carry them and a
+ * proposer has no endpoint that accepts them. That is what makes "staff edit
+ * these" structural rather than a check someone remembers to keep.
+ *
+ * The address is trimmed and stored as typed. Matching is case-insensitive
+ * at read time (`mentorNameSql`), so lowercasing here would only hide what
+ * staff entered from the edit log.
+ *
+ * No embedding refresh: neither column is part of the embedding source text.
+ */
+export async function updateProjectMentorshipAs(
+  viewer: Viewer,
+  data: MentorshipInput
+): Promise<{ id: string; updated: boolean }> {
+  assertStaff(viewer);
+  const existing = await loadProjectOr404(data.id);
+  const newValues: Partial<typeof projects.$inferSelect> = {
+    studentProposed: data.studentProposed,
+    mentorEmail: data.mentorEmail?.trim() || null,
+  };
+  const { changedFields, newDiff, oldDiff } = diffRowFields(
+    existing,
+    newValues
+  );
+  if (changedFields.length === 0) {
+    return { id: existing.id, updated: false };
+  }
+  await db.transaction(async (tx) => {
+    await tx
+      .update(projects)
+      .set({ ...newValues, updatedAt: new Date() })
+      .where(eq(projects.id, existing.id));
+    await tx.insert(projectEditLog).values({
+      projectId: existing.id,
+      editorId: viewer.id,
+      changedFields,
+      oldValues: oldDiff,
+      newValues: newDiff,
+    });
+  });
+  return { id: existing.id, updated: true };
+}
+
+export async function updateProjectMentorshipForCurrentUser(
+  data: MentorshipInput
+) {
+  const viewer = await requireUser();
+  return updateProjectMentorshipAs(viewer, data);
 }
 
 function assertChangesRequestedHasComment(

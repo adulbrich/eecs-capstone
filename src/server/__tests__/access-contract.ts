@@ -271,6 +271,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     note: "draft or changes_requested to submitted is open to both roles in TRANSITIONS.",
   },
   "server/projects.ts:updateProject": { level: "owner-or-staff" },
+  "server/projects.ts:updateProjectMentorship": {
+    level: "staff",
+    note: "The only writer of studentProposed and mentorEmail. Neither key exists on ProjectInput, so updateProject cannot reach them; this endpoint is what keeps the pair staff-only.",
+  },
 
   "server/search.ts:searchProjects": {
     level: "public",
