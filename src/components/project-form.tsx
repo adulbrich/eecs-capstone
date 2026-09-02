@@ -3,6 +3,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { FieldError } from "#/components/ui/field";
 import { applyServerErrors } from "#/lib/apply-server-errors";
+import { imageUrlToSave } from "#/lib/image-save";
 import {
   PRIVATE_NOTES_LABEL,
   PRIVATE_NOTES_PROJECT_HINT,
@@ -14,8 +15,11 @@ import {
   IMPROVABLE_FIELDS,
   type ImprovableField,
 } from "#/lib/project-review-fields";
+import { setProjectCategories } from "#/server/categories";
 import { reviewProject } from "#/server/project-review";
+import { createProject, updateProject } from "#/server/projects";
 import type { ProposerForEdit } from "#/server/projects-queries";
+import { uploadProjectImage } from "#/server/uploads";
 import { CategoryMultiSelect } from "./category-multi-select";
 import { MarkdownField } from "./markdown-field";
 import { Panel, PanelHeader, PanelNote } from "./panel";
@@ -76,11 +80,20 @@ interface Props {
   enableAiReview?: boolean;
   initial?: Partial<ProjectFormValues>;
   initialCategoryIds?: string[];
-  onSubmit: (
-    values: ProjectFormValues,
-    categoryIds: string[],
-    pendingImage: File | null
-  ) => Promise<unknown>;
+  /**
+   * Whether the viewer may write the staff-only fields. Separate from
+   * `showProposer` and `showCategories` on purpose, even though all three are
+   * the same boolean at both call sites today: those two decide what is drawn,
+   * this one decides what is sent. Collapsing them would make hiding a control
+   * silently change the payload, and the `proposerEmail` gate below is where
+   * that would stay invisible until it unlinked somebody's project.
+   *
+   * Required rather than optional for the same reason. Omitting it would draw
+   * the proposer input and silently discard whatever was typed into it.
+   */
+  isStaff: boolean;
+  /** Called with the saved project's id, for the route to navigate with. */
+  onSaved?: (projectId: string) => void;
   projectId?: string;
   proposer?: ProposerForEdit;
   showCategories: boolean;
@@ -96,8 +109,9 @@ export function ProjectForm({
   showNotes,
   showCategories,
   submitLabel,
-  onSubmit,
+  onSaved,
   enableAiReview,
+  isStaff,
   projectId,
   proposer,
   showProposer,
@@ -148,7 +162,10 @@ export function ProjectForm({
     onSubmit: async ({ value }) => {
       setFormError(null);
       try {
-        await onSubmit(value, categoryIds, pendingImage ?? null);
+        const savedId = await save(value);
+        if (onSaved) {
+          onSaved(savedId);
+        }
       } catch (err) {
         const handled = applyServerErrors(
           form as unknown as Parameters<typeof applyServerErrors>[0],
@@ -160,6 +177,97 @@ export function ProjectForm({
       }
     },
   });
+
+  /**
+   * The write, both paths of it, and the one thing this component owes the
+   * server beyond the field values.
+   *
+   * Declared after `useForm` and before the review helpers because
+   * `form.onSubmit` above closes over it; a function declaration hoists, so
+   * the order here is for the reader rather than for the runtime.
+   */
+  async function save(value: ProjectFormValues): Promise<string> {
+    // `programId` and `notes` are blank-to-null because the columns are
+    // nullable and an empty string is not the same as "unset" to a filter or
+    // to `??`. Both routes used to spell this out separately, which is what
+    // let them drift.
+    const payload = {
+      ...value,
+      programId: value.programId || null,
+      notes: value.notes || null,
+    };
+    // Kept out of `payload`: that object is the field values, and this is a
+    // permission decision about one of them.
+    const proposerEmail = isStaff ? value.proposerEmail || null : undefined;
+
+    if (projectId) {
+      // Upload before the row write, never after: see image-save.ts. A failed
+      // upload must not leave the edit committed with the image change absent
+      // from the edit log (#88).
+      const imageUrl = await imageUrlToSave({
+        currentImageUrl: value.imageUrl,
+        owner: { projectId },
+        pendingImage,
+        upload: uploadProjectImage,
+      });
+      await updateProject({
+        data: {
+          ...payload,
+          id: projectId,
+          imageUrl,
+          proposerEmail,
+        },
+      });
+      if (isStaff) {
+        // Unconditional, unlike create below: clearing every category on an
+        // edit has to reach the server, and an early return on an empty array
+        // would silently keep the old ones.
+        await setProjectCategories({
+          data: { projectId, categoryIds },
+        });
+      }
+      return projectId;
+    }
+
+    const { id } = await createProject({
+      data: {
+        ...payload,
+        proposerEmail,
+      },
+    });
+    // Create cannot upload first: the key is `projects/<id>/...` and the
+    // upload guard loads the project to check the viewer, so there is nothing
+    // to upload into until the row exists. Hence a second write here, unlike
+    // the edit path, and an edit-log row naming imageUrl on a brand new draft.
+    if (pendingImage instanceof File) {
+      const imageUrl = await imageUrlToSave({
+        currentImageUrl: value.imageUrl,
+        owner: { projectId: id },
+        pendingImage,
+        upload: uploadProjectImage,
+      });
+      await updateProject({
+        data: {
+          ...payload,
+          id,
+          imageUrl,
+          // Omitted on purpose, and not the same as sending null: this save is
+          // about the image, and an omitted proposer leaves the one create
+          // just set alone. The form's blank field would unlink it.
+          proposerEmail: undefined,
+        },
+      });
+    }
+    if (isStaff && categoryIds.length > 0) {
+      // Guarded on a non-empty list, unlike edit above: a brand new project
+      // has no categories to clear, so an empty array is a write with nothing
+      // to say.
+      await setProjectCategories({
+        data: { projectId: id, categoryIds },
+      });
+    }
+    return id;
+  }
 
   // An entirely blank form short-circuits server-side and comes back with
   // "No improvements suggested", which reads as a bug rather than as an

@@ -20,6 +20,16 @@ vi.mock("#/components/project-image-uploader", () => ({
 vi.mock("#/server/project-review", () => ({
   reviewProject: vi.fn(),
 }));
+vi.mock("#/server/projects", () => ({
+  createProject: vi.fn(),
+  updateProject: vi.fn(),
+}));
+vi.mock("#/server/categories", () => ({
+  setProjectCategories: vi.fn(),
+}));
+vi.mock("#/server/uploads", () => ({
+  uploadProjectImage: vi.fn(),
+}));
 vi.mock("#/server/users", () => ({
   searchUsers: vi.fn().mockResolvedValue([]),
 }));
@@ -34,7 +44,7 @@ afterEach(cleanup);
 function renderForm() {
   render(
     <ProjectForm
-      onSubmit={vi.fn()}
+      isStaff={false}
       showCategories
       showNotes
       showProposer
