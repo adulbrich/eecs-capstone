@@ -31,6 +31,7 @@ export function ViewToggle({ current }: { current: ViewMode }) {
         className={cn("rounded-r-none", current === "card" && "bg-secondary")}
         onClick={() => setMode("card")}
         size="icon"
+        type="button"
         variant="outline"
       >
         <LayoutGrid className="h-4 w-4" />
@@ -44,6 +45,7 @@ export function ViewToggle({ current }: { current: ViewMode }) {
         )}
         onClick={() => setMode("table")}
         size="icon"
+        type="button"
         variant="outline"
       >
         <Table className="h-4 w-4" />

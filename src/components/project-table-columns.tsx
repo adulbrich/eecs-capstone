@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import type { CellContext } from "@tanstack/react-table";
 import { defineAdminColumns } from "#/components/admin-data-table";
 import { projectImageSrc } from "#/lib/project-image";
 import { stripMarkdown } from "#/lib/strip-markdown";
@@ -34,32 +35,31 @@ function Prose({ text }: { text: string | null }) {
   return <div className="line-clamp-3 max-w-xs">{stripMarkdown(text)}</div>;
 }
 
-type ProseField = {
+/** The nullable text columns of a row: what a prose cell can be pointed at. */
+type TextField = {
   [K in keyof ProjectListRow]: ProjectListRow[K] extends string | null
-    ? K
+    ? null extends ProjectListRow[K]
+      ? K
+      : never
     : never;
 }[keyof ProjectListRow];
 
 /**
- * A hidden-by-default prose column. No `accessorFn` and `enableSorting:
- * false`: without an accessor TanStack already refuses to sort, but
- * `useAdminTableState` reads the flag, and the flag is what keeps
- * `?sort=description` out of the sortable set.
+ * A hidden-by-default prose column, with the field name as its id. No
+ * `accessorFn` and `enableSorting: false`: without an accessor TanStack
+ * already refuses to sort, but `useAdminTableState` reads the flag, and the
+ * flag is what keeps `?sort=description` out of the sortable set.
  */
-function proseColumn<TId extends string>(
-  id: TId,
-  header: string,
-  field: ProseField
-) {
+function proseColumn(field: TextField, header: string) {
   return {
-    cell: ({ row }: { row: { original: ProjectListRow } }) => (
+    cell: ({ row }: CellContext<ProjectListRow, unknown>) => (
       <Prose text={row.original[field]} />
     ),
     defaultHidden: true,
     enableSorting: false,
     header,
-    id,
-  } as const;
+    id: field,
+  };
 }
 
 /**
@@ -67,7 +67,6 @@ function proseColumn<TId extends string>(
  * `projectDetailView` returns to an anonymous viewer; nothing here makes a
  * new field public. The list lives outside the route so
  * `project-table-columns.test.tsx` can render it through `AdminDataTable`.
- *
  */
 export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
   {
@@ -165,20 +164,12 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     id: "updatedAt",
     sortingFn: "datetime",
   },
-  proseColumn("description", "Description", "description"),
-  proseColumn("problemStatement", "Problem statement", "problemStatement"),
-  proseColumn("objectives", "Objectives", "objectives"),
-  proseColumn("minQualifications", "Min qualifications", "minQualifications"),
-  proseColumn(
-    "prefQualifications",
-    "Pref qualifications",
-    "prefQualifications"
-  ),
-  proseColumn(
-    "licenseRestrictions",
-    "License restrictions",
-    "licenseRestrictions"
-  ),
+  proseColumn("description", "Description"),
+  proseColumn("problemStatement", "Problem statement"),
+  proseColumn("objectives", "Objectives"),
+  proseColumn("minQualifications", "Min qualifications"),
+  proseColumn("prefQualifications", "Pref qualifications"),
+  proseColumn("licenseRestrictions", "License restrictions"),
   {
     accessorFn: (row) => row.url ?? undefined,
     cell: ({ row }) =>
