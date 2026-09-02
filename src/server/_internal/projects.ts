@@ -16,7 +16,7 @@ import {
   assertTransitionAllowed,
   type Status,
 } from "#/lib/project-workflow";
-import { isStaff, type Viewer } from "#/lib/viewer";
+import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type { ProjectInput, UpdateProjectInput } from "../projects";
 import {
   recordSoftDeleteNotification,
@@ -35,10 +35,6 @@ export interface TransitionOptions {
   /** Test seam. Production callers omit it and the notifier resolves its own transport. */
   send?: SendEmailFn;
   sendEmail?: boolean;
-}
-
-function viewerToVisibility(viewer: AuthUser): Viewer {
-  return { id: viewer.id, role: viewer.role ?? null };
 }
 
 async function loadProjectOr404(id: string) {
@@ -86,7 +82,7 @@ export async function createProjectAs(
   viewer: AuthUser,
   data: ProjectInput
 ): Promise<{ id: string }> {
-  const staff = isStaff(viewerToVisibility(viewer));
+  const staff = isStaff(viewer);
   const proposerEmail = staff ? data.proposerEmail || null : null;
   // On create a blank proposer email defaults the proposer to the creator, so a
   // new project always has an owner. Staff link a different proposer by entering
@@ -141,7 +137,7 @@ export async function createProjectAs(
 async function buildProjectValues(
   data: UpdateProjectInput,
   existing: Awaited<ReturnType<typeof loadProjectOr404>>,
-  visibility: Viewer
+  viewer: Viewer
 ): Promise<Partial<typeof projects.$inferSelect>> {
   // Typed against the table rather than as a loose record, because this object
   // is the only statement of which columns an edit may touch. `diffRowFields`
@@ -163,7 +159,7 @@ async function buildProjectValues(
     programId: data.programId ?? null,
     teamsSupported: data.teamsSupported ?? 1,
   };
-  if (canWritePrivateNotes(existing, visibility)) {
+  if (canWritePrivateNotes(existing, viewer)) {
     newValues.notes = data.notes ?? null;
   }
   // Omitted and cleared are different asks, and only staff may make either.
@@ -179,7 +175,7 @@ async function buildProjectValues(
   // Making them all three-state would cost the property the type comment above
   // depends on, that this object is the one statement of which columns an edit
   // touches. This is not a general partial-update facility.
-  if (isStaff(visibility) && data.proposerEmail !== undefined) {
+  if (isStaff(viewer) && data.proposerEmail !== undefined) {
     const proposerEmail = data.proposerEmail || null;
     newValues.proposerEmail = proposerEmail;
     newValues.proposerId = proposerEmail
@@ -194,12 +190,11 @@ export async function updateProjectAs(
   data: UpdateProjectInput,
   embed?: EmbedFn
 ): Promise<{ id: string; updated: boolean }> {
-  const visibility = viewerToVisibility(viewer);
   const existing = await loadProjectOr404(data.id);
-  if (!canEditProject(existing, visibility)) {
+  if (!canEditProject(existing, viewer)) {
     throw new Error("Forbidden");
   }
-  const newValues = await buildProjectValues(data, existing, visibility);
+  const newValues = await buildProjectValues(data, existing, viewer);
 
   const { changedFields, newDiff, oldDiff } = diffRowFields(
     existing,
@@ -352,12 +347,11 @@ export async function performTransitionAs(
   comment?: string,
   opts?: TransitionOptions
 ): Promise<{ id: string; status: Status }> {
-  const visibility = viewerToVisibility(viewer);
   const project = await loadProjectOr404(id);
-  if (!isStaff(visibility) && project.proposerId !== viewer.id) {
+  if (!isStaff(viewer) && project.proposerId !== viewer.id) {
     throw new Error("Forbidden");
   }
-  const role: ActorRole = isStaff(visibility) ? "staff" : "owner";
+  const role: ActorRole = isStaff(viewer) ? "staff" : "owner";
   assertTransitionAllowed(project.status as Status, target, role);
   // Skipping the mail is a staff affordance, so the decision is made here from
   // the role rather than read off the request. `sendEmail` cannot be gated by
@@ -379,10 +373,7 @@ export async function softDeleteProjectAs(
   viewer: AuthUser,
   id: string
 ): Promise<{ id: string }> {
-  const visibility = viewerToVisibility(viewer);
-  if (!isStaff(visibility)) {
-    throw new Error("Forbidden");
-  }
+  assertStaff(viewer);
   const project = await loadProjectOr404(id);
   if (project.status === "draft") {
     throw new Error("Cannot soft-delete a draft; hard-delete instead.");
@@ -409,10 +400,7 @@ export async function restoreProjectAs(
   viewer: AuthUser,
   id: string
 ): Promise<{ id: string }> {
-  const visibility = viewerToVisibility(viewer);
-  if (!isStaff(visibility)) {
-    throw new Error("Forbidden");
-  }
+  assertStaff(viewer);
   const project = await loadProjectOr404(id);
   if (!project.deletedAt) {
     throw new Error("Not soft-deleted.");
@@ -436,13 +424,12 @@ export async function hardDeleteProjectAs(
   viewer: AuthUser,
   id: string
 ): Promise<{ id: string }> {
-  const visibility = viewerToVisibility(viewer);
   const project = await loadProjectOr404(id);
   if (project.status !== "draft") {
     throw new Error("Hard delete only allowed on drafts.");
   }
   const isOwner = project.proposerId === viewer.id;
-  if (!(isOwner || isStaff(visibility))) {
+  if (!(isOwner || isStaff(viewer))) {
     throw new Error("Forbidden");
   }
   await db.delete(projects).where(eq(projects.id, id));
@@ -465,10 +452,7 @@ export async function forceTransitionAs(
   comment?: string,
   opts?: TransitionOptions
 ): Promise<{ id: string; status: Status }> {
-  const visibility = viewerToVisibility(viewer);
-  if (!isStaff(visibility)) {
-    throw new Error("Forbidden");
-  }
+  assertStaff(viewer);
   const project = await loadProjectOr404(id);
   if (project.status === target) {
     throw new Error("Project is already in that status.");
