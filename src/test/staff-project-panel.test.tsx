@@ -367,3 +367,39 @@ describe("StaffProjectPanel mentorship save gate", () => {
     ).toBe(true);
   });
 });
+
+describe("StaffProjectPanel mentorship across a project change", () => {
+  it("drops the previous project's drafts and disables Save while the next record loads", async () => {
+    getProjectMentorship.mockResolvedValueOnce({
+      mentorEmail: "first@x.test",
+      mentorName: null,
+      studentProposed: true,
+    });
+    const view = renderPanel("submitted");
+    expect(
+      ((await screen.findByLabelText("Mentor email")) as HTMLInputElement).value
+    ).toBe("first@x.test");
+
+    getProjectMentorship.mockReturnValueOnce(new Promise(() => undefined));
+    view.rerender(
+      <StaffProjectPanel
+        onChanged={() => {
+          // no-op
+        }}
+        project={{
+          id: "00000000-0000-0000-0000-0000000000p2",
+          status: "submitted",
+          deletedAt: null,
+        }}
+      />
+    );
+
+    const input = screen.getByLabelText("Mentor email") as HTMLInputElement;
+    expect(input.value).toBe("");
+    expect(
+      screen
+        .getByRole("button", { name: "Save mentorship" })
+        .hasAttribute("disabled")
+    ).toBe(true);
+  });
+});

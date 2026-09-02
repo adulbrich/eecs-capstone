@@ -1227,7 +1227,7 @@ Two things worth knowing about the new shape. `proposerEmail` is **absent, not n
 
 The rule that replaces it: **a read is staff-only when its query reaches a column of somebody's account**, by projection or by join.
 
-One public read reaches `user` on purpose: `mentorNameSql` in `projectSummarySelect` resolves `projects.mentor_email` to `user.name` and nothing else. It returns a name the person will have typed into a public profile, for a project they are publicly mentoring, and never the address it matched on. That is the whole exception; see "Mentorship is two staff-only columns and one derived flag" below before adding a second one.
+One public fragment reaches `user` on purpose: `mentorNameSql`, which `projectSummarySelect` carries into the listing, search, bookmarks and my-projects, and which `getProjectAs` selects for the detail page. It resolves `projects.mentor_email` to `user.name` and nothing else. It returns a name the person will have typed into a public profile, for a project they are publicly mentoring, and never the address it matched on. That is the whole exception; see "Mentorship is two staff-written columns and one derived flag" below before adding a second one.
 
 The reason it survived review is worth more than the fix. Every consumer of both endpoints is an admin-only page, so reading the call sites says the code is fine, and it is, right until someone calls the endpoint without the page. **A `createServerFn` endpoint is reachable on its own; the route guard protects the page, not the data.** There is no global middleware, so the guard an endpoint carries is the only guard it has, which is the same point the `transitionInventoryItem` note above makes from the other direction.
 
@@ -1388,7 +1388,7 @@ single user row with two `account` rows: Better Auth links them implicitly, and
 only when the local row is already verified. So no third hook is needed, and the
 `proposer_id is null` guard makes the claim idempotent anyway.
 
-### Mentorship is two staff-only columns and one derived flag
+### Mentorship is two staff-written columns and one derived flag
 
 `projects.student_proposed` and `projects.mentor_email` are written only by
 `updateProjectMentorshipAs`. Neither is on `ProjectInput`, so `updateProjectAs`

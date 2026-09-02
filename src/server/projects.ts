@@ -51,7 +51,7 @@ const updateProjectSchema = projectInputSchema.extend({
 
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 
-const mentorshipSchema = z.object({
+export const mentorshipSchema = z.object({
   id: z.string().uuid(),
   // A string in transit, null only in the column: empty is the form clearing
   // the field, and the impl folds it to null. Same ceiling as contactEmail.

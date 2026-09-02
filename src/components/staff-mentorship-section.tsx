@@ -67,9 +67,7 @@ export function StaffMentorshipSection({
       setMentorEmail(saved.mentorEmail);
       setStudentProposed(saved.studentProposed);
     } catch (e) {
-      // Reported, not swallowed: with no record the drafts are blank, and a
-      // save from blank drafts would clear a mentor that is really on file.
-      // Save stays disabled until a record exists, see below.
+      // Reported, not swallowed, and Save stays disabled: see the gate below.
       setError((e as Error)?.message || "Could not load the mentorship record");
     }
   }, [projectId]);

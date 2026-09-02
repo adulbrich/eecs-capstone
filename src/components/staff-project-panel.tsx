@@ -204,7 +204,15 @@ export function StaffProjectPanel({
         <ProposerSummary proposer={proposer} />
       </PanelSection>
 
-      <StaffMentorshipSection onChanged={onChanged} projectId={project.id} />
+      {/* Keyed so a navigation between two project pages remounts it: the
+          route component is reused across a param change, and a section
+          holding project A's drafts with Save enabled while B loads would
+          post A's mentor onto B. */}
+      <StaffMentorshipSection
+        key={project.id}
+        onChanged={onChanged}
+        projectId={project.id}
+      />
 
       <PanelSection title="Status">
         {/* Status stepper: vertical on mobile, horizontal on md+ */}
