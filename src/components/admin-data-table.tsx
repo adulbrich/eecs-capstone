@@ -471,15 +471,10 @@ export function AdminDataTable<T>({
               </Button>
             </DropdownMenuTrigger>
             {/*
-              tabIndex 0, not Radix's -1: with enough columns (the public
-              projects table has fifteen) the menu is taller than the space
-              Radix gives it and scrolls. Its items are roving-focus targets
-              at tabindex -1, which axe does not count as keyboard access to
-              a scrollable region, and the scan fails with
-              scrollable-region-focusable. Making the region itself
-              focusable satisfies the rule and changes nothing a keyboard
-              user does: Radix still focuses the menu on open and arrows
-              still move between items.
+              tabIndex 0, not Radix's -1: a menu with enough columns to
+              scroll (the public projects table has fifteen) fails axe's
+              scrollable-region-focusable otherwise. See docs/QUIRKS.md,
+              "A Columns menu that scrolls must be focusable itself".
             */}
             <DropdownMenuContent align="end" tabIndex={0}>
               <DropdownMenuLabel>Visible columns</DropdownMenuLabel>

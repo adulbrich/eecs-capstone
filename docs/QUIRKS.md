@@ -625,6 +625,12 @@ Playwright timeout on a click that works locally, search the job log for
 Retried tests are reported as flaky rather than silently swallowed, so a genuine
 intermittent bug still surfaces in the log.
 
+### A Columns menu that scrolls must be focusable itself
+
+`AdminDataTable` passes `tabIndex={0}` to its `DropdownMenuContent`. Radix gives menu content `tabindex="-1"` (from `FocusScope`, which overrides roving-focus's own value), and honours a caller's `tabIndex` because the prop is spread last onto the innermost element. With four hideable columns the menu never scrolls and nothing notices. The public projects table has fifteen, the menu is taller than the space Radix gives it, and axe reports `scrollable-region-focusable`: a menu opened by pointer keeps focus on the content with every item at `tabindex="-1"` (a keyboard open moves it to the first item), and axe counts neither a `-1` element nor `-1` descendants as keyboard access to a scrollable region. Making the region itself tabbable satisfies the rule and changes nothing a keyboard user does: Radix focuses the content on open regardless, swallows Tab inside the menu, and unmounts the content on close, so it never joins the page tab order.
+
+The scan that catches it is `projects table interactions` in `public.a11y.test.ts`, which is not `@smoke`, so a regression here shows up in the dispatch-only full run and not on a pull request. The neighbouring `modal={false}` comment in `admin-data-table.tsx` is the other Radix menu lesson: a modal menu puts the rest of the page under `aria-hidden`, which is a different rule (`aria-hidden-focus`) with a different fix.
+
 ### The unit suite sees your dotenv files, so an env-dependent test is machine-dependent
 
 `vite.config.ts` declares no `test` block, which makes it easy to assume the
