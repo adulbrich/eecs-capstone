@@ -6,6 +6,7 @@ import { stripMarkdown } from "#/lib/strip-markdown";
 import type { SortState } from "#/lib/table-state";
 import type { searchProjects } from "#/server/search";
 import { BookmarkToggle } from "./bookmark-set";
+import { CategoryChip } from "./category-chip";
 import { ImageOrFallback } from "./image-or-fallback";
 import { LocalTime } from "./local-time";
 import { programLabel } from "./project-card";
@@ -105,8 +106,16 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     sortUndefined: "last",
   },
   {
-    accessorFn: (row) => row.categories ?? undefined,
-    cell: ({ row }) => row.original.categories ?? "-",
+    cell: ({ row }) =>
+      row.original.categories.length === 0 ? (
+        "-"
+      ) : (
+        <div className="flex flex-wrap gap-1">
+          {row.original.categories.map((category) => (
+            <CategoryChip category={category} key={category.id} />
+          ))}
+        </div>
+      ),
     enableSorting: false,
     header: "Categories",
     id: "categories",
@@ -153,6 +162,9 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
       ) : (
         "-"
       ),
+    // Hidden by default since 2026-09-02: eight visible columns overflowed
+    // 1280px, and the address is the one a reader wants least while scanning.
+    defaultHidden: true,
     header: "Contact email",
     id: "contactEmail",
     sortUndefined: "last",

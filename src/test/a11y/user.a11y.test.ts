@@ -36,6 +36,17 @@ test("projects table, signed in, with bookmark controls", async ({ page }) => {
   await checkA11y(page);
 });
 
+test("inventory table, signed in, with add-to-cart controls", async ({
+  page,
+}) => {
+  await page.goto("/inventory?view=table");
+  await waitForHydration(page);
+  await expect(
+    page.getByRole("button", { name: /^(Add to cart|In cart)$/ }).first()
+  ).toBeVisible();
+  await checkA11y(page);
+});
+
 test("my projects", async ({ page }) => {
   await page.goto("/my/projects");
   await checkA11y(page);

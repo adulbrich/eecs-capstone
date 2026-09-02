@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2 } from "lucide-react";
+import { authClient } from "#/lib/auth-client";
+import { useHasMounted } from "#/lib/use-has-mounted";
 import { addToCart, getCart } from "#/server/inventory";
 import { Button } from "./ui/button";
 
@@ -88,4 +90,29 @@ function addToCartLabel(isPending: boolean, isError: boolean): string {
     return "Could not add, try again";
   }
   return "Add to cart";
+}
+
+/**
+ * The add-to-cart control for a row of the public inventory table. The
+ * column list is a module constant with no route to hand it the session, so
+ * this reads the session itself and renders nothing until the client has
+ * mounted, the viewer is signed in, and the item is available: the same
+ * three conditions `InventoryCard` gets from its route, and the same
+ * hydration rule as `BookmarkToggle`.
+ */
+export function ListingAddToCart({
+  className,
+  itemId,
+  status,
+}: {
+  className?: string;
+  itemId: string;
+  status: string;
+}) {
+  const { data: session } = authClient.useSession();
+  const hasMounted = useHasMounted();
+  if (!(hasMounted && session?.user && status === "available")) {
+    return null;
+  }
+  return <AddToCartButton className={className} itemId={itemId} />;
 }

@@ -173,6 +173,62 @@ test("@smoke inventory list", async ({ page }) => {
   await checkA11y(page);
 });
 
+test("@smoke inventory list, table mode", async ({ page }) => {
+  await page.goto("/inventory?view=table");
+  await expect(page.locator(".admin-table")).toBeVisible();
+  await checkA11y(page);
+});
+
+test("inventory list: the view toggle writes the mode into the URL", async ({
+  page,
+}) => {
+  await page.goto("/inventory");
+  await waitForHydration(page);
+  await expect(page).not.toHaveURL(/[?&]view=/);
+  await page.getByRole("button", { name: "Table view" }).click();
+  await expect(page).toHaveURL(/[?&]view=table(&|$)/);
+  await expect(page.locator(".admin-table")).toBeVisible();
+  await page.getByRole("button", { name: "Card view" }).click();
+  await expect(page).toHaveURL(/[?&]view=card(&|$)/);
+  await expect(page.locator(".admin-table")).toHaveCount(0);
+});
+
+test("inventory table interactions", async ({ page }) => {
+  await page.goto("/inventory?view=table");
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Columns" }).click();
+  await checkA11y(page);
+  await closeMenu(page);
+
+  // Not "Name": that is the page's default sort column, so its header
+  // already carries aria-sort before any click.
+  const header = page.getByRole("columnheader", {
+    exact: true,
+    name: "Status",
+  });
+  const before = await header.getAttribute("aria-sort");
+  await page.getByRole("button", { name: "Status", exact: true }).click();
+  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/);
+  expect(await header.getAttribute("aria-sort")).not.toBe(before);
+  await expect(page).toHaveURL(/[?&]sort=status(&|$)/);
+  await expect(page).toHaveURL(/[?&]dir=(asc|desc)(&|$)/);
+  await checkA11y(page);
+});
+
+test("inventory table shows its description column when toggled on", async ({
+  page,
+}) => {
+  await page.goto("/inventory?view=table");
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Columns" }).click();
+  await toggleColumnOn(page, "Description");
+  await closeMenu(page);
+  const cell = page.locator('td[data-label="Description"]').first();
+  await expect(cell).toBeVisible();
+  expect(((await cell.textContent()) ?? "").trim().length).toBeGreaterThan(0);
+  await checkA11y(page);
+});
+
 test("@smoke inventory item detail", async ({ page }) => {
   await page.goto(`/inventory/${itemId}`);
   // One page now serves both audiences, so prove the staff half is absent

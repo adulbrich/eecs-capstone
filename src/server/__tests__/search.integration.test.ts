@@ -162,5 +162,7 @@ describe("searchProjects", () => {
       "updatedAt",
       "url",
     ]);
+    // An array, never null: the chips map over it without a guard.
+    expect(rows[0].categories).toEqual([]);
   });
 });

@@ -5,7 +5,8 @@ Issue: #78
 
 Two display modes on the public project listing, each responsive, replacing the
 two non-responsive ones there today. The inventory listing gets the card half of
-the same change and loses its toggle until its table half is designed.
+the same change: the card half first, and the table half once its column
+list was settled on the issue.
 
 ---
 
@@ -100,11 +101,11 @@ public.
 | --- | --- | --- | --- | --- |
 | Title | `title` | visible, not hideable | text | `cardHeader`. Thumbnail and bookmark control render inside this cell beside the link, as `/admin/projects` does for the thumbnail. Neither is its own column. |
 | Program | `program` | visible | text, empties last | `programLabel`, course id and name |
-| Categories | `categories` | visible | none | correlated `string_agg`, `; ` separated, ordered by type then name |
+| Categories | `categories` | visible | none | chips from a correlated `json_agg` of `{ id, name, type }`, ordered by type then name |
 | Teams supported | `teams` | visible | `basic` | |
 | NDA/IP required | `nda` | visible | `basic` | `Badge` reading "Required", or a dash |
 | Contact name | `contactName` | visible | text, empties last | |
-| Contact email | `contactEmail` | visible | text, empties last | `mailto:` link, as the detail page renders it |
+| Contact email | `contactEmail` | hidden | text, empties last | `mailto:` link, as the detail page renders it |
 | Updated | `updatedAt` | visible | `datetime` | `LocalTime dateOnly` |
 | Description | `description` | hidden | none | prose |
 | Problem statement | `problemStatement` | hidden | none | prose |
@@ -195,17 +196,50 @@ Consequences:
 
 ## Inventory
 
-`/inventory` gets the card half: `InventoryCard` becomes responsive the same
+`/inventory` gets both modes. `InventoryCard` becomes responsive the same
 way, `inventory-row.tsx` is deleted, and the grid becomes the same bounded
-single-column list. Its table half is not built here: #78 says the public
-column list against `publicItemView` is to be settled first. Rather than ship a
-toggle whose table option does nothing, the inventory filter bar drops
-`ViewToggle` and the route drops `view` from its search schema. Nothing is
-lost: the responsive card already is today's row at `md` and today's card
-below it, which is all the toggle used to choose between. When the inventory
-table lands, the toggle returns and reads the same stored preference.
+single-column list. The table is an `AdminDataTable` under
+`storageKey: "public-inventory"`, its column list in
+`src/components/inventory-table-columns.tsx` for the same testability reason
+as the projects one.
 
-`ViewToggle` then has one consumer and loses its `value`/`onChange` branch.
+`publicItemView` (`src/lib/inventory-visibility.ts`) is the authority. Its
+column list was settled on #78 on 2026-09-02:
+
+| Column | id | Default | Sort | Notes |
+| --- | --- | --- | --- | --- |
+| Name | `name` | visible, not hideable | text | `cardHeader`. Thumbnail, link, and the add-to-cart control for a signed-in viewer when the item is available, all inside this cell. No Actions column |
+| Status | `status` | visible | lifecycle order, `basic` | badge; available first, as `/admin/inventory` sorts it |
+| Categories | `categories` | visible | none | chips, as the cards render them |
+| Description | `description` | hidden | none | plain text, `max-w-xs line-clamp-3` |
+
+Not columns: `pickupBy` and `dueAt`. They are in `publicItemView` but nowhere
+on the public UI, and #193 removes them from it: a hold's dates belong to
+staff, the requester and the holder.
+
+Default sort is Name ascending. The server orders the listing by `updatedAt`,
+which is a staff column, and the table must sort by one it shows; widening
+the projection to match the card order would make a new field public.
+
+The add-to-cart control in the table is `ListingAddToCart`
+(`add-to-cart-button.tsx`): the column list is a module constant with no
+route to hand it the session, so it reads the session itself and renders
+nothing until mounted, signed in, and the item is available, the same
+hydration rule as `BookmarkToggle`.
+
+`ViewToggle` takes `onChange` rather than navigating itself: the two routes
+navigate from different paths and `useNavigate({ from })` typechecks only
+against a literal one. One stored preference covers both listings, so table
+on projects means table on inventory.
+
+### Two changes to the projects table from seeing it rendered
+
+Categories are chips there too. The projection carries `{ id, name, type }`
+objects (a `json_agg`, coalesced to `[]`) instead of a `string_agg`, and the
+admin CSV joins the names back. Contact email is hidden by default: eight
+visible columns overflowed 1280px, and the address is the field a reader
+wants least while scanning. The container scrolls sideways for the rest, as
+the admin tables do.
 
 ## Test coverage
 
@@ -239,7 +273,12 @@ Accessibility (`npm run test:accessibility`, public suite):
 
 Accessibility, user suite: two signed-in scans of `/projects`, card and table
 mode, because the bookmark toggle renders for nobody the public suite signs in
-as, and those are the only scans that ever see it.
+as, and those are the only scans that ever see it; and one of `/inventory` in
+table mode, for the add-to-cart control on the same grounds.
+
+Accessibility, inventory: the same four shapes as projects, a `@smoke` scan of
+`/inventory?view=table`, the toggle writing the URL, the Columns menu and a
+Status sort writing `sort` and `dir`, and the Description column toggled on.
 
 Smoke (`npm run test:smoke`): the public flow already asserts a detail link on
 `/projects`; it is run, not extended.
@@ -254,7 +293,6 @@ Smoke (`npm run test:smoke`): the public flow already asserts a detail link on
 
 ## Out of scope
 
-- The inventory table mode and its column list.
 - "Accepting applicants" and the mentor state as columns (#72, #75).
 - The bookmarks count on the title row (#82).
 - A "keep server order" state for `AdminDataTable`.

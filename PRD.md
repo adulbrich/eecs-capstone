@@ -235,7 +235,10 @@ Each project carries:
   Stripped from every non-staff list row and detail payload; the audience line
   differs from the project one because an item has no proposer.
 - ✅ Users browse inventory (default: available) and can also see requested,
-  reserved, checked out, and in-maintenance items, but not retired items.
+  reserved, checked out, and in-maintenance items, but not retired items. The
+  listing has the same card and table modes as projects (`?view=card|table`,
+  one stored preference for both), the table limited to name, status,
+  categories and description.
 - ✅ Users cannot see who has requested/reserved/checked out an item.
 - ✅ Staff add, edit, and delete inventory items. Every item-scoped surface
   lives under `/inventory` (`/inventory/new`, `/inventory/$itemId`,

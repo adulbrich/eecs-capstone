@@ -15,9 +15,11 @@ function renderBar(
       onCategoriesChange={() => {}}
       onQChange={() => {}}
       onStatusChange={() => {}}
+      onViewChange={() => {}}
       q=""
       selectedCategories={[]}
       status={null}
+      view="card"
       {...overrides}
     />
   );
@@ -63,9 +65,13 @@ describe("InventoryFilterBar", () => {
         onStatusChange={() => {
           // no-op
         }}
+        onViewChange={() => {
+          // no-op
+        }}
         q="fromBack"
         selectedCategories={[]}
         status={null}
+        view="card"
       />
     );
     await act(async () => {
@@ -76,10 +82,12 @@ describe("InventoryFilterBar", () => {
     vi.useRealTimers();
   });
 
-  it("renders the status dropdown", () => {
+  it("renders the status dropdown and the view toggle", () => {
     const { getByLabelText } = renderBar();
     // Select triggers are labelled via their associated <Label htmlFor>.
     expect(getByLabelText("Status")).toBeTruthy();
+    expect(getByLabelText("Card view")).toBeTruthy();
+    expect(getByLabelText("Table view")).toBeTruthy();
   });
 
   it("renders a checkbox per category, checked according to selection", () => {

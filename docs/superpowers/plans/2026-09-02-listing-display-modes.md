@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Implement inline, phase by phase, test first within each step, with a code review gate at the end. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the non-responsive card and row modes on `/projects` with a responsive card mode and an `AdminDataTable` mode, add a bookmark control to both, widen the listing projection to every public field, and give `/inventory` the responsive card.
+**Goal:** Replace the non-responsive card and row modes on `/projects` with a responsive card mode and an `AdminDataTable` mode, add a bookmark control to both, widen the listing projection to every public field, and give `/inventory` the same two modes (its card first, its table once the column list was settled).
 
 **Spec:** `docs/superpowers/specs/2026-09-02-listing-display-modes-design.md`
 
@@ -35,7 +35,7 @@
 | File | Responsibility |
 | --- | --- |
 | `src/lib/view-preference.ts` | `ViewMode = "card" \| "table"` |
-| `src/components/view-toggle.tsx` | two buttons, `current` only |
+| `src/components/view-toggle.tsx` | two buttons, `current` plus `onChange` |
 | `src/components/project-card.tsx` | one responsive card with a bookmark slot |
 | `src/components/project-row.tsx`, `project-list-item.tsx` | deleted |
 | `src/components/inventory-card.tsx` | one responsive card |
@@ -48,7 +48,8 @@
 | `src/server/__tests__/access-contract.ts` | new entry |
 | `src/routes/projects/index.tsx` | two modes, `order` param, narrowed `loaderDeps` |
 | `src/components/projects-filter-bar.tsx` | `order` prop |
-| `src/routes/inventory/index.tsx`, `inventory-filter-bar.tsx` | toggle and `view` removed |
+| `src/routes/inventory/index.tsx`, `inventory-filter-bar.tsx` | both modes; see Phase 8 |
+| `src/components/inventory-table-columns.tsx` | inventory column list and default sort |
 | `src/routes/_authed/my/projects.tsx`, `my/bookmarks.tsx` | `ProjectCard` in a column list |
 | `src/routes/_authed/admin/projects/index.tsx` | CSV gains NDA column |
 | `src/test/a11y/public.a11y.test.ts` | table mode coverage |
@@ -95,3 +96,11 @@
 
 - [ ] **Step 7.1** `UI-CONVENTIONS.md`, `QUIRKS.md`, `PRD.md`.
 - [ ] **Step 7.2** Push, open the PR, run `mattpocock-skills:code-review` until a pass raises nothing unanswered.
+
+## Phase 8: the inventory table (added 2026-09-02, after the column list was settled on #78)
+
+- [ ] **Step 8.1** `inventory-table-columns.test.tsx`: headers, default-hidden set, chips, status badge, add-to-cart in the Name cell for a signed-in viewer and an available item. Red, then `inventory-table-columns.tsx` and `ListingAddToCart`.
+- [ ] **Step 8.2** `ViewToggle` takes `onChange`; both filter bars pass the route's navigate.
+- [ ] **Step 8.3** `/inventory`: `view`, `cols`, `dir`, `sort`; narrowed `loaderDeps`; `InventoryTable` under `storageKey: "public-inventory"`.
+- [ ] **Step 8.4** Projects: categories as `{ id, name, type }` chips; Contact email hidden by default; CSV joins the names.
+- [ ] **Step 8.5** Accessibility coverage for the inventory table in both suites; integration, smoke, review passes.

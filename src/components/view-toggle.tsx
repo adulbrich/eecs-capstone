@@ -1,25 +1,27 @@
-import { useNavigate } from "@tanstack/react-router";
 import { LayoutGrid, Table } from "lucide-react";
 import { cn } from "#/lib/utils.ts";
 import { type ViewMode, writeStoredView } from "#/lib/view-preference";
 import { Button } from "./ui/button";
 
 /**
- * The card/table switch on the public project listing. It writes the choice
- * to storage and into `?view=`, and the route reads the URL back; there is no
- * callback because the URL is the state.
+ * The card/table switch on the two public listings. It writes the choice to
+ * storage and hands it to the route, which owns the `?view=` param: the two
+ * routes navigate from different paths, and `useNavigate({ from })` typechecks
+ * only against a literal one.
  */
-export function ViewToggle({ current }: { current: ViewMode }) {
-  const navigate = useNavigate({ from: "/projects/" });
-
+export function ViewToggle({
+  current,
+  onChange,
+}: {
+  current: ViewMode;
+  onChange: (view: ViewMode) => void;
+}) {
   function setMode(view: ViewMode) {
     if (view === current) {
       return;
     }
     writeStoredView(view);
-    void navigate({
-      search: (prev) => ({ ...prev, view }),
-    });
+    onChange(view);
   }
 
   return (

@@ -44,7 +44,10 @@ afterEach(cleanup);
 
 const ROWS: ProjectListRow[] = [
   {
-    categories: "Robotics; Web",
+    categories: [
+      { id: "c1", name: "Robotics", type: "field" },
+      { id: "c2", name: "Web", type: "field" },
+    ],
     contactEmail: "jane@example.com",
     contactName: "Jane Doe",
     description: "A **bold** description that goes on.",
@@ -65,7 +68,7 @@ const ROWS: ProjectListRow[] = [
     url: "https://example.com/rover",
   },
   {
-    categories: null,
+    categories: [],
     contactEmail: null,
     contactName: null,
     description: null,
@@ -129,6 +132,7 @@ describe("the public project table", () => {
     // The literal lists come from the issue's column table, not from the
     // module, so a column added on the wrong side of the line fails here.
     expect([...DEFAULT_HIDDEN].sort()).toEqual([
+      "contactEmail",
       "description",
       "licenseRestrictions",
       "minQualifications",
@@ -147,9 +151,18 @@ describe("the public project table", () => {
       "Teams supported",
       "NDA/IP required",
       "Contact name",
-      "Contact email",
       "Updated",
     ]);
+  });
+
+  it("renders categories as chips, and a dash for none", () => {
+    renderTable(DEFAULT_HIDDEN);
+    const row = rowFor("Rover Telemetry");
+    expect(
+      row.getByText("Robotics").closest('[data-slot="badge"]')
+    ).not.toBeNull();
+    expect(row.getByText("Web").closest('[data-slot="badge"]')).not.toBeNull();
+    expect(rowFor("Bare Minimum").getAllByText("-").length).toBeGreaterThan(0);
   });
 
   it("clamps prose to a fixed width and strips its markdown", () => {

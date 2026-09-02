@@ -1,18 +1,23 @@
 import { sql } from "drizzle-orm";
 import { programs, projects, user } from "#/db/schema";
 
+export interface ProjectCategory {
+  id: string;
+  name: string;
+  type: string;
+}
+
 /**
- * The project's category names in one string, `; ` separated and ordered by
- * type then name. Correlated rather than joined: a join would multiply
- * project rows by their category count and need a GROUP BY over the whole
- * projection.
+ * The project's categories, ordered by type then name, as the chips render
+ * them. Correlated rather than joined: a join would multiply project rows by
+ * their category count and need a GROUP BY over the whole projection.
  */
-export const projectCategoriesList = sql<string | null>`(
-  SELECT string_agg(c.name, '; ' ORDER BY c.type, c.name)
+export const projectCategoriesList = sql<ProjectCategory[]>`coalesce((
+  SELECT json_agg(json_build_object('id', c.id, 'name', c.name, 'type', c.type) ORDER BY c.type, c.name)
   FROM project_categories pc
   JOIN categories c ON c.id = pc.category_id
   WHERE pc.project_id = ${projects.id}
-)`;
+), '[]'::json)`;
 
 /**
  * Column projection shared by every query that feeds the project card and

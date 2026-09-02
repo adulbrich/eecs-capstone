@@ -2,42 +2,34 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const navigate = vi.fn();
-vi.mock("@tanstack/react-router", () => ({
-  useNavigate: () => navigate,
-}));
-
 import { ViewToggle } from "#/components/view-toggle";
 import { readStoredView } from "#/lib/view-preference";
 
 afterEach(() => {
   cleanup();
   localStorage.clear();
-  navigate.mockReset();
 });
 
 describe("ViewToggle", () => {
   it("persists the chosen view to storage when toggled", () => {
-    render(<ViewToggle current="card" />);
+    render(<ViewToggle current="card" onChange={vi.fn()} />);
     screen.getByRole("button", { name: "Table view" }).click();
     expect(readStoredView()).toBe("table");
   });
 
-  it("writes the choice into the URL", () => {
-    render(<ViewToggle current="card" />);
+  it("hands the choice to the route", () => {
+    const onChange = vi.fn();
+    render(<ViewToggle current="card" onChange={onChange} />);
     screen.getByRole("button", { name: "Table view" }).click();
-    expect(navigate).toHaveBeenCalledTimes(1);
-    const [{ search }] = navigate.mock.calls[0] as [
-      { search: (prev: Record<string, unknown>) => Record<string, unknown> },
-    ];
-    expect(search({ q: "rover" })).toEqual({ q: "rover", view: "table" });
+    expect(onChange).toHaveBeenCalledWith("table");
   });
 
   it("marks the current mode pressed and ignores a click on it", () => {
-    render(<ViewToggle current="table" />);
+    const onChange = vi.fn();
+    render(<ViewToggle current="table" onChange={onChange} />);
     const table = screen.getByRole("button", { name: "Table view" });
     expect(table.getAttribute("aria-pressed")).toBe("true");
     table.click();
-    expect(navigate).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

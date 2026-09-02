@@ -151,7 +151,12 @@ export function ProjectsFilterBar({
           type="search"
           value={queryDraft}
         />
-        <ViewToggle current={view} />
+        <ViewToggle
+          current={view}
+          onChange={(next) =>
+            void navigate({ search: (prev) => ({ ...prev, view: next }) })
+          }
+        />
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-3">
