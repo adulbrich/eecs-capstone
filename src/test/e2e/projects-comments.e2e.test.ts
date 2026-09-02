@@ -108,14 +108,10 @@ test.describe("project internal comments", () => {
 
       await expect(staff.getByText(publicText)).toBeVisible();
 
-      // Reloaded rather than typed straight into. Posting runs both
-      // `refreshComments()` and `router.invalidate()`, and the comment
-      // appearing only means the first of those came back. Measured, not
-      // guessed: typed into the live page, the second comment's text was gone
-      // from the textarea by the time Post was clicked, the `required`
-      // attribute blocked the empty submit, and the failure read as a missing
-      // comment rather than as a cleared form. The reload also proves the
-      // first comment was stored rather than only rendered.
+      // Reloaded rather than typed straight into, for the reason recorded in
+      // docs/QUIRKS.md under "A second comment posted in one page load needs a
+      // reload first". The reload also proves the first comment was stored
+      // rather than only rendered.
       await staff.reload();
       await waitForHydration(staff);
       await expect(staff.getByText(publicText)).toBeVisible();
@@ -145,19 +141,31 @@ test.describe("project internal comments", () => {
       await expect(owner.getByText(internalText)).toHaveCount(0);
       await expect(owner.getByText("internal", { exact: true })).toHaveCount(0);
 
-      // No way to write one either. The proposer is inside the private panel,
-      // which is what makes the missing control a permission rather than a
-      // missing panel.
+      // No way to write one either. The composer is asserted present first
+      // because an absence is worth what the proof it could have been present
+      // is worth, and the comment list rendering says nothing about a control
+      // in a different subtree: a bug that hid the whole composer from the
+      // proposer would otherwise pass here for the wrong reason.
+      await expect(owner.getByLabel("Comment")).toBeVisible();
       await expect(
         owner.getByRole("checkbox", { name: "Internal (staff only)" })
       ).toHaveCount(0);
 
       await settled();
 
-      // The guard that keeps the next assertion honest: if nothing was
-      // captured, or the comment fetch was missed, "no body contains the
-      // internal text" would pass on an empty list.
-      expect(bodies.some((body) => body.includes(publicText))).toBe(true);
+      // The guard that keeps the assertion below honest: with nothing
+      // captured, "no body contains the internal text" passes on an empty
+      // list. `isInternal` as well as the text, because the text alone does
+      // not prove the comment fetch was among the bodies: a comment
+      // notification carries `content.slice(0, 200)` as its message, and the
+      // header bell fetches notifications on mount, so the proposer's browser
+      // receives the public comment's words either way. `isInternal` is a
+      // field only the comment payload has.
+      expect(
+        bodies.filter(
+          (body) => body.includes(publicText) && body.includes("isInternal")
+        ).length
+      ).toBeGreaterThan(0);
       expect(bodies.some((body) => body.includes(internalText))).toBe(false);
     } finally {
       await staffContext.close();

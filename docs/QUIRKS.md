@@ -553,15 +553,17 @@ and passed), and an item edit.
 
 ### A second comment posted in one page load needs a reload first
 
-Posting a project comment runs `refreshComments()` and `router.invalidate()`. The
-new comment appearing means only the first of those has returned. Measured on the
-comment composer: text typed after that point was gone from the textarea by the
-time Post was clicked, the `required` attribute blocked the empty submit, and the
-failure read as a missing second comment rather than as a cleared form. Reload
-between the two posts. Only the comment composer was measured, so treat this as a
-fact about that form rather than about every form in the app. This is not the
-reverse of the rule above: there a navigation aborted a write in flight, here the
-reload is what puts the form in a settled state before the next write starts.
+Measured on the project comment composer: after a comment posts and renders,
+text typed into the same textarea was gone by the time Post was clicked, the
+`required` attribute blocked the empty submit, and the failure read as a missing
+second comment rather than as a cleared form. The cause was not established, only
+the behavior, and only on this one form, so do not read it as a fact about every
+form in the app. Reload between the two posts. `confirmed()` in
+`src/test/e2e/waits.ts` does not cover this: posting fires `addComment` and then
+the `refreshComments` its `onChanged` runs, so the one-request precondition in
+its docstring does not hold. This is not the reverse of the rule above: there a
+navigation aborted a write in flight, here the reload is what puts the form in a
+settled state before the next write starts.
 
 ### The header avatar is a page load behind the profile page
 
