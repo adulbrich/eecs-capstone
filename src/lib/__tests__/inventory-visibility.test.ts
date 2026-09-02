@@ -7,6 +7,7 @@ import {
   myRequestLineView,
   publicItemView,
   staffItemView,
+  statusRank,
   visibleStatuses,
 } from "../inventory-visibility";
 import type { Viewer } from "../viewer";
@@ -241,5 +242,31 @@ describe("staffItemView", () => {
     expect(view.currentHolderId).toBe("u-holder");
     expect(view.currentHolderLabel).toBeNull();
     expect(view.currentHolderProgram).toBeNull();
+  });
+});
+
+describe("statusRank", () => {
+  it("orders the lifecycle with available first and retired last", () => {
+    const ranked = [
+      "retired",
+      "checked_out",
+      "available",
+      "maintenance",
+      "requested",
+      "reserved",
+    ].sort((a, b) => statusRank(a) - statusRank(b));
+    expect(ranked).toEqual([
+      "available",
+      "requested",
+      "reserved",
+      "checked_out",
+      "maintenance",
+      "retired",
+    ]);
+  });
+
+  it("ranks an unknown status with retired, after everything live", () => {
+    expect(statusRank("banana")).toBe(statusRank("retired"));
+    expect(statusRank("banana")).toBeGreaterThan(statusRank("maintenance"));
   });
 });

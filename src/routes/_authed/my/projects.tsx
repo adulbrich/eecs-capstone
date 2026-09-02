@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { EmptyState } from "#/components/empty-state";
-import { ProjectRow } from "#/components/project-row";
+import { ProjectCard } from "#/components/project-card";
 import { Button } from "#/components/ui/button";
 import { Label } from "#/components/ui/label";
 import {
@@ -89,7 +89,7 @@ function MyProjects() {
       ) : (
         <div className="mt-6 flex flex-col gap-3">
           {rows.map((p) => (
-            <ProjectRow key={p.id} project={p} />
+            <ProjectCard key={p.id} project={p} />
           ))}
         </div>
       )}

@@ -108,7 +108,9 @@ who has not signed up.
 - `ProjectCard` and `ProjectRow`: `MentorshipBadges` under the title, a "Student
   proposed" badge (`outline` variant) and a "Seeking mentor" badge (`status` variant,
   warning tokens). A resolved mentor name is not shown on the listing; it is a
-  detail-page fact.
+  detail-page fact. Amended 2026-09-02 by the listing display modes (#78): the
+  card still omits it, and the public table shows it in its Mentorship column,
+  since `projectDetailView` already returns it to anonymous viewers.
 - `/projects/$projectId`: the same badges under the title, and a "Mentor" section showing
   the resolved name when there is one.
 - `StaffProjectPanel`: a "Mentorship" `PanelSection` between Proposer and Status, with the

@@ -470,7 +470,13 @@ export function AdminDataTable<T>({
                 Columns
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            {/*
+              tabIndex 0, not Radix's -1: a menu with enough columns to
+              scroll (the public projects table has fifteen) fails axe's
+              scrollable-region-focusable otherwise. See docs/QUIRKS.md,
+              "A Columns menu that scrolls must be focusable itself".
+            */}
+            <DropdownMenuContent align="end" tabIndex={0}>
               <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {hideable.map((column) => (

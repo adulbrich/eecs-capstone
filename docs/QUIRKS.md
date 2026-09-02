@@ -633,6 +633,12 @@ Playwright timeout on a click that works locally, search the job log for
 Retried tests are reported as flaky rather than silently swallowed, so a genuine
 intermittent bug still surfaces in the log.
 
+### A Columns menu that scrolls must be focusable itself
+
+`AdminDataTable` passes `tabIndex={0}` to its `DropdownMenuContent`. Radix gives menu content `tabindex="-1"` (from `FocusScope`, which overrides roving-focus's own value), and honours a caller's `tabIndex` because the prop is spread last onto the innermost element. With four hideable columns the menu never scrolls and nothing notices. The public projects table has fifteen, the menu is taller than the space Radix gives it, and axe reports `scrollable-region-focusable`: a menu opened by pointer keeps focus on the content with every item at `tabindex="-1"` (a keyboard open moves it to the first item), and axe counts neither a `-1` element nor `-1` descendants as keyboard access to a scrollable region. Making the region itself tabbable satisfies the rule and changes nothing a keyboard user does: Radix focuses the content on open regardless, swallows Tab inside the menu, and unmounts the content on close, so it never joins the page tab order.
+
+The scan that catches it is `projects table interactions` in `public.a11y.test.ts`, which is not `@smoke`, so a regression here shows up in the dispatch-only full run and not on a pull request. The neighbouring `modal={false}` comment in `admin-data-table.tsx` is the other Radix menu lesson: a modal menu puts the rest of the page under `aria-hidden`, which is a different rule (`aria-hidden-focus`) with a different fix.
+
 ### The unit suite sees your dotenv files, so an env-dependent test is machine-dependent
 
 `vite.config.ts` declares no `test` block, which makes it easy to assume the
@@ -1230,6 +1236,14 @@ Two things worth knowing about the new shape. `proposerEmail` is **absent, not n
 `canEdit` in that return value **is** authoritative, and reads `canEditProject` directly (`projects-queries.ts:311`). It used to reimplement the rule inline and disagree with the predicate for exactly one case, staff on an archived project: the inline copy said no, the predicate said yes, so the page hid the edit affordance for a write `updateProjectAs` would have accepted. That was issue #40, now closed. `projects.integration.test.ts:718` pins the agreement for staff, owner and anonymous on an archived project, and `project-visibility.test.ts:108` still pins the predicate itself. This paragraph told readers not to trust the value for some time after it became trustworthy.
 
 **Inventory got here first, and an earlier version of this entry said it "does not have this hazard", full stop, which was false for as long as it stood.** A projection function guarantees only what passes through it, and there are three non-staff read paths for `inventory_items`, not two: `listMyItemsAs` called neither view. It selected whole table objects and spread the joined rows, so `/my/items` shipped `serial`, `notes`, `label` and `location` off the item, and `reviewedBy`, `reviewedAt`, `reviewComment`, `closedBy` and `closedAt` off the request line, to the student the row belonged to. The blast radius was the viewer's own items rather than anyone else's, which is why it read as a docs contradiction rather than an exposure, and it is also why nobody found it: this paragraph told them not to look. All three paths now go through the module, and `inventory.integration.test.ts` asserts the exact key set of both `/my/items` arms, because the type system cannot say "every read path must project" and the thing that broke was the `db.select()` above the projection, not the projection.
+
+### The listing projection is bounded by `projectDetailView` and pinned by a key-set test
+
+`projectSummarySelect` (`src/server/_internal/project-summary.ts`) feeds the public listing, "my projects" and "my bookmarks", and since 2026-09-02 it carries every public field rather than nine, because the listing's table mode shows them. The rule for what may be in it is not written in that file: it is whatever `projectDetailView` returns to an anonymous viewer, minus `notes`, `isSponsored`, `programId` and `deletedAt`, which no listing reads. `search.integration.test.ts` ("returns exactly the public field set") pins the sorted key list of `searchProjectsImpl`, and `bookmarks.integration.test.ts` pins the same list plus `bookmarkedAt`. Adding a column to the projection fails both until the literals are updated, which is the moment to ask whether the column is public. `proposerEmail` and `notes` must never appear in either list.
+
+`adminProjectSummarySelect` spreads the public one and adds proposer identity and the lifecycle dates. Do not add a field to the admin projection that the public one already carries; two of those existed (`contactEmail`, `teamsSupported`) and were removed when the public one widened.
+
+The listing's SSR payload is larger for it, on the page anonymous users hit first, times the page size. #78 says a lazy fetch of the prose columns is the fix if that turns out to matter, and not to build it until it has been measured.
 
 ### A read is public or staff-only per endpoint, not per domain
 

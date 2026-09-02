@@ -87,7 +87,7 @@ describe("InventoryFilterBar", () => {
     // Select triggers are labelled via their associated <Label htmlFor>.
     expect(getByLabelText("Status")).toBeTruthy();
     expect(getByLabelText("Card view")).toBeTruthy();
-    expect(getByLabelText("Row view")).toBeTruthy();
+    expect(getByLabelText("Table view")).toBeTruthy();
   });
 
   it("renders a checkbox per category, checked according to selection", () => {

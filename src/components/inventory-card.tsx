@@ -23,41 +23,46 @@ interface Props {
   signedIn: boolean;
 }
 
+/**
+ * One item in the public listing, at both widths: image on top below `md`,
+ * image on the left from `md` up. The same shape as `ProjectCard`, for the
+ * same reason: the viewport picks the layout, not a toggle.
+ */
 export function InventoryCard({ item, signedIn }: Props) {
   const src = getPublicUrl(item.imageUrl);
   const canAdd = signedIn && item.status === "available";
   return (
-    <Card className="flex flex-col overflow-hidden" interactive>
+    <Card
+      className="flex flex-col overflow-hidden md:flex-row md:items-center md:gap-3 md:p-3"
+      interactive
+    >
       <Link
-        className="flex flex-1 flex-col"
+        className="flex min-w-0 flex-1 flex-col md:flex-row md:items-center md:gap-3"
         params={{ itemId: item.id }}
         to="/inventory/$itemId"
       >
         <ImageOrFallback
-          className="aspect-[16/9] w-full object-cover"
+          className="aspect-[16/9] w-full object-cover md:aspect-[3/2] md:w-40 md:shrink-0 md:rounded-md"
           src={src}
         />
-        <div className="flex flex-1 flex-col p-4">
+        <div className="flex min-w-0 flex-1 flex-col p-4 md:p-0">
           <h3 className="font-semibold leading-tight">{item.name}</h3>
           {item.description && (
-            <p className="mt-2 line-clamp-3 text-muted-foreground text-sm">
+            <p className="mt-2 line-clamp-3 text-muted-foreground text-sm md:mt-1">
               {item.description}
             </p>
           )}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2 md:mt-1">
             <InventoryStatusBadge status={item.status} />
             {item.categories.map((category) => (
-              <CategoryChip
-                category={{ ...category, type: null }}
-                key={category.id}
-              />
+              <CategoryChip category={category} key={category.id} />
             ))}
           </div>
         </div>
       </Link>
       {canAdd && (
-        <div className="p-4 pt-0">
-          <AddToCartButton className="w-full" itemId={item.id} />
+        <div className="px-4 pb-4 md:shrink-0 md:px-0 md:pb-0">
+          <AddToCartButton className="w-full md:w-auto" itemId={item.id} />
         </div>
       )}
     </Card>

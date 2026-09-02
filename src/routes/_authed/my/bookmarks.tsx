@@ -23,7 +23,7 @@ function MyBookmarks() {
           click the bookmark icon to save one.
         </EmptyState>
       ) : (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <div className="mx-auto mt-6 flex max-w-4xl flex-col gap-3">
           {rows.map((p) => (
             <ProjectCard key={p.id} project={p} />
           ))}

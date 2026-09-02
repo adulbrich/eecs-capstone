@@ -1,4 +1,5 @@
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import type { ViewMode } from "#/lib/view-preference";
 import { Card } from "./ui/card";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
@@ -25,11 +26,11 @@ interface Props {
   onCategoriesChange: (next: string[]) => void;
   onQChange: (q: string) => void;
   onStatusChange: (s: StatusFilter) => void;
-  onViewChange: (v: "card" | "row") => void;
+  onViewChange: (view: ViewMode) => void;
   q: string;
   selectedCategories: string[];
   status: StatusFilter;
-  view: "card" | "row";
+  view: ViewMode;
 }
 
 const STATUS_OPTIONS: { value: NonNullable<StatusFilter>; label: string }[] = [
@@ -60,7 +61,7 @@ export function InventoryFilterBar(props: Props) {
           placeholder="Search inventory"
           value={localQ}
         />
-        <ViewToggle onChange={props.onViewChange} value={props.view} />
+        <ViewToggle current={props.view} onChange={props.onViewChange} />
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">

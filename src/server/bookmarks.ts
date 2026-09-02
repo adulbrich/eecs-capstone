@@ -36,3 +36,12 @@ export const listMyBookmarks = createServerFn({ method: "GET" }).handler(
     return listMyBookmarksForCurrentUser();
   }
 );
+
+export const listMyBookmarkIds = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const { listMyBookmarkIdsForCurrentUser } = await import(
+      "./_internal/bookmarks"
+    );
+    return listMyBookmarkIdsForCurrentUser();
+  }
+);

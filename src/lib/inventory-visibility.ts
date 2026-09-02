@@ -33,6 +33,9 @@ export type ItemStatus =
  *
  * Retired is the archive. It is excluded from every listing by default, for
  * staff as well, and reachable only through the retired-only filter.
+ *
+ * The order is significant: `statusRank` below reads it as the lifecycle
+ * order the status tables sort by, so reordering this list reorders them.
  */
 export const ACTIVE_STATUSES: ItemStatus[] = [
   "available",
@@ -41,6 +44,16 @@ export const ACTIVE_STATUSES: ItemStatus[] = [
   "checked_out",
   "maintenance",
 ];
+
+/**
+ * Where a status sits in the lifecycle, for a table that sorts by it:
+ * available first, then the states an item moves through. Alphabetical order
+ * means nothing to a reader. Retired, and anything unknown, sorts last.
+ */
+export function statusRank(status: string): number {
+  const index = ACTIVE_STATUSES.indexOf(status as ItemStatus);
+  return index === -1 ? ACTIVE_STATUSES.length : index;
+}
 
 /**
  * The one rule about retired items, from which the two below derive.

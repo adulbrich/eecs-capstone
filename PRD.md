@@ -88,8 +88,8 @@ Each project carries:
 - ✅ The long text fields (description, problem statement, objectives, both
   qualification fields, license/IP restrictions) accept Markdown, authored with
   a formatting toolbar and Edit/Preview tabs and rendered safely as React
-  elements (no raw HTML, no `dangerouslySetInnerHTML`). Card and row summaries
-  strip the markup back to plain text.
+  elements (no raw HTML, no `dangerouslySetInnerHTML`). Listing cards and table
+  cells strip the markup back to plain text.
 - ✅ Semantic embedding vector (pgvector), written when a project is published
   and refreshed when its indexed text changes, powering recommendations (§8).
 - ✅ Private notes (`notes`) field, labelled "Private notes" wherever it
@@ -166,7 +166,7 @@ Each project carries:
   (`/projects/$id/edit`).
 - ✅ Staff project list (`/admin/projects`) with status and program filters and
   a show-soft-deleted switch, all held in URL search params.
-- ✅ Consistent list presentation: fixed-ratio row thumbnails, boolean filters
+- ✅ Consistent list presentation: fixed-ratio thumbnails, boolean filters
   rendered as switches aligned with the adjacent inputs, status dropdowns
   (including an "All statuses" option), and a shared centered empty state across
   the list pages.
@@ -178,8 +178,10 @@ Each project carries:
 - ✅ Filter by program.
 - ✅ Filter by category.
 - ✅ All filter/search state lives in URL search params (shareable links).
-- ✅ Card / row listing toggle (`?view=card|row`); filters and search apply
-  identically in both modes.
+- ✅ Card / table listing toggle (`?view=card|table`); filters and search apply
+  identically in both modes. The card is responsive (image on top below `md`,
+  beside the text from `md` up); the table is the same `AdminDataTable` the
+  admin pages use, with column visibility and a client-side column sort.
 - ✅ Sort control on the public listing: most relevant (default), newest, and
   "recommended for you".
 - ✅ Personalized recommendations: signed-in users write an interests statement
@@ -188,8 +190,8 @@ Each project carries:
   by cosine similarity to the interests vector. Falls back to relevance ordering
   when a viewer has no interest vector yet; interest vectors never leave the
   server, and projects are embedded only on publish.
-- ✅ Bookmarks: bookmark button on project detail (authed) and a
-  `/my/bookmarks` view.
+- ✅ Bookmarks: bookmark button on project detail and a toggle on every row of
+  the public listing (authed), and a `/my/bookmarks` view.
 
 ## 9. Categories & Programs
 
@@ -253,7 +255,10 @@ Each project carries:
   Stripped from every non-staff list row and detail payload; the audience line
   differs from the project one because an item has no proposer.
 - ✅ Users browse inventory (default: available) and can also see requested,
-  reserved, checked out, and in-maintenance items, but not retired items.
+  reserved, checked out, and in-maintenance items, but not retired items. The
+  listing has the same card and table modes as projects (`?view=card|table`,
+  one stored preference for both), the table limited to name, status,
+  categories and description.
 - ✅ Users cannot see who has requested/reserved/checked out an item.
 - ✅ Staff add, edit, and delete inventory items. Every item-scoped surface
   lives under `/inventory` (`/inventory/new`, `/inventory/$itemId`,

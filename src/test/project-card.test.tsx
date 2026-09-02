@@ -3,12 +3,33 @@ import { cleanup, render } from "@testing-library/react";
 import type * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// The card imports the bookmark control, which imports server functions and
+// the auth client. Neither is exercised here (no provider, so no control
+// renders), but the server-function import cannot resolve under jsdom.
+vi.mock("#/server/bookmarks", () => ({
+  addBookmark: vi.fn(),
+  listMyBookmarkIds: vi.fn(),
+  removeBookmark: vi.fn(),
+}));
+vi.mock("#/lib/auth-client", () => ({
+  authClient: { useSession: () => ({ data: null }) },
+}));
 vi.mock("@tanstack/react-router", () => ({
+  // `to` becomes the href so the anchor has the link role; the real Link
+  // interpolates params, which no assertion here depends on.
   Link: ({
     children,
+    params: _params,
+    to,
     ...rest
-  }: { children: React.ReactNode } & Record<string, unknown>) => (
-    <a {...rest}>{children}</a>
+  }: {
+    children: React.ReactNode;
+    params?: unknown;
+    to: string;
+  } & Record<string, unknown>) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
   ),
 }));
 
@@ -68,6 +89,29 @@ describe("ProjectCard", () => {
     const updated = container.querySelector("time");
     expect(updated?.getAttribute("dateTime")).toBe(base.updatedAt);
     expect(updated?.closest("p")?.textContent).toMatch(/^Updated /);
+  });
+
+  it("stacks the image above the text below md and beside it from md up", () => {
+    // One component for both shapes: the old card (image on top, 16:9) below
+    // the breakpoint, the old row (image left, 3:2, w-40) at and above it.
+    const { container } = render(<ProjectCard project={base} />);
+    const img = container.querySelector("img");
+    const classes = img?.className ?? "";
+    expect(classes).toContain("aspect-[16/9]");
+    expect(classes).toContain("w-full");
+    expect(classes).toContain("md:aspect-[3/2]");
+    expect(classes).toContain("md:w-40");
+    expect(classes).not.toContain("self-stretch");
+  });
+
+  it("is a surface holding a link, not a link itself", () => {
+    // The bookmark control is a sibling of the link (see
+    // bookmark-toggle.test.tsx), so the card root cannot be the anchor.
+    const { container } = render(<ProjectCard project={base} />);
+    const root = container.firstElementChild;
+    expect(root?.tagName).not.toBe("A");
+    expect(root?.querySelector("a")?.getAttribute("href")).toBeTruthy();
+    expect(container.querySelector("button")).toBeNull();
   });
 });
 

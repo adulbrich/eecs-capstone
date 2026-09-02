@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import type { z } from "zod";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import type { ViewMode } from "#/lib/view-preference";
 import { listCategories, type listSchema } from "#/server/categories";
 import { getMyInterests } from "#/server/interests";
 import { listPrograms } from "#/server/programs";
@@ -33,10 +34,10 @@ interface Program {
 interface Props {
   archivedOnly: boolean;
   categories: string[];
+  order: "relevance" | "newest" | "recommended";
   program: string | null;
   q: string;
-  sort: "relevance" | "newest" | "recommended";
-  view: "card" | "row";
+  view: ViewMode;
 }
 
 export function ProjectsFilterBar({
@@ -44,7 +45,7 @@ export function ProjectsFilterBar({
   categories,
   program,
   archivedOnly,
-  sort,
+  order,
   view,
 }: Props) {
   const navigate = useNavigate({ from: "/projects/" });
@@ -101,8 +102,8 @@ export function ProjectsFilterBar({
     });
   }
 
-  function setSort(value: "relevance" | "newest" | "recommended") {
-    void navigate({ search: (prev) => ({ ...prev, sort: value, page: 1 }) });
+  function setOrder(value: "relevance" | "newest" | "recommended") {
+    void navigate({ search: (prev) => ({ ...prev, order: value, page: 1 }) });
   }
 
   function clearAll() {
@@ -113,7 +114,7 @@ export function ProjectsFilterBar({
         categories: [],
         program: null,
         archivedOnly: false,
-        sort: "relevance",
+        order: "relevance",
         page: 1,
       }),
     });
@@ -137,7 +138,7 @@ export function ProjectsFilterBar({
     categories.length > 0 ||
     program ||
     archivedOnly ||
-    sort !== "relevance";
+    order !== "relevance";
 
   return (
     <Card className="bg-transparent p-4">
@@ -150,7 +151,12 @@ export function ProjectsFilterBar({
           type="search"
           value={queryDraft}
         />
-        <ViewToggle current={view} />
+        <ViewToggle
+          current={view}
+          onChange={(next) =>
+            void navigate({ search: (prev) => ({ ...prev, view: next }) })
+          }
+        />
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -177,9 +183,9 @@ export function ProjectsFilterBar({
           <Label htmlFor="filter-sort">Sort</Label>
           <Select
             onValueChange={(v) =>
-              setSort(v as "relevance" | "newest" | "recommended")
+              setOrder(v as "relevance" | "newest" | "recommended")
             }
-            value={sort}
+            value={order}
           >
             <SelectTrigger className="mt-1 w-full" id="filter-sort">
               <SelectValue />
@@ -203,7 +209,7 @@ export function ProjectsFilterBar({
         </div>
       </div>
 
-      {sort === "recommended" && canRecommend && (
+      {order === "recommended" && canRecommend && (
         <p className="mt-2 text-muted-foreground text-xs">
           Ranked by your interests.{" "}
           <Link className="text-brand hover:underline" to="/profile">

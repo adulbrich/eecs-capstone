@@ -37,10 +37,10 @@ describe("Card", () => {
   });
 
   it("keeps the interactive treatment when composed via asChild", () => {
-    // The combination both real call sites use: project-card.tsx and
-    // project-row.tsx are Link-rooted AND interactive. `interactive` resolves
-    // through cn() before the element swap, so the two are independent, but
-    // nothing proved they compose until now.
+    // No call site combines the two today (the listing cards stopped being
+    // asChild when they gained a control beside the link), but `interactive`
+    // resolves through cn() before the element swap, so the two are
+    // independent, and this is what proves they compose.
     render(
       <Card asChild interactive>
         <a href="/x">linked card</a>

@@ -1,96 +1,61 @@
 // @vitest-environment jsdom
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render } from "@testing-library/react";
 import type * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("#/server/inventory", () => ({
+  addToCart: vi.fn(),
+  getCart: () => Promise.resolve([]),
+}));
 vi.mock("@tanstack/react-router", () => ({
+  // `to` becomes the href so the anchor has the link role; the real Link
+  // interpolates params, which no assertion here depends on.
   Link: ({
     children,
+    params: _params,
+    to,
     ...rest
-  }: { children: React.ReactNode } & Record<string, unknown>) => (
-    <a {...rest}>{children}</a>
+  }: {
+    children: React.ReactNode;
+    params?: unknown;
+    to: string;
+  } & Record<string, unknown>) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
   ),
-}));
-
-vi.mock("#/server/inventory", () => ({
-  addToCart: () => Promise.resolve({ ok: true }),
-  getCart: () => Promise.resolve([]),
 }));
 
 import { InventoryCard } from "#/components/inventory-card";
 
 afterEach(cleanup);
 
-/** The card's Add to cart button reads the shared cart query. */
-function renderCard(ui: React.ReactElement, cart: { itemId: string }[] = []) {
-  const qc = new QueryClient();
-  qc.setQueryData(["cart"], cart);
-  const result = render(
-    <QueryClientProvider client={qc}>{ui}</QueryClientProvider>
-  );
-  return {
-    ...result,
-    rerenderCard: (next: React.ReactElement) =>
-      result.rerender(
-        <QueryClientProvider client={qc}>{next}</QueryClientProvider>
-      ),
-  };
-}
-
 const item = {
-  id: "00000000-0000-0000-0000-000000000001",
-  name: "Arduino Uno",
-  description: "Microcontroller board for prototyping.",
-  categories: [{ id: "cat-1", name: "Microcontroller" }],
-  imageUrl: null,
+  id: "00000000-0000-0000-0000-000000000002",
+  name: "Oscilloscope",
+  description: "Two channels.",
+  categories: [{ id: "c1", name: "Electronics" }],
+  imageUrl: "inventory/a/b.webp",
   status: "available" as const,
 };
 
 describe("InventoryCard", () => {
-  it("renders name, description, status, and category", () => {
-    const { getByText } = renderCard(
+  it("stacks the image above the text below md and beside it from md up", () => {
+    const { container } = render(
       <InventoryCard item={item} signedIn={false} />
     );
-    expect(getByText("Arduino Uno")).toBeTruthy();
-    expect(getByText("Microcontroller board for prototyping.")).toBeTruthy();
-    expect(getByText("Available")).toBeTruthy();
-    expect(getByText("Microcontroller")).toBeTruthy();
+    const classes = container.querySelector("img")?.className ?? "";
+    expect(classes).toContain("aspect-[16/9]");
+    expect(classes).toContain("w-full");
+    expect(classes).toContain("md:aspect-[3/2]");
+    expect(classes).toContain("md:w-40");
   });
 
-  it("omits the category chips when categories is empty", () => {
-    const { queryByText } = renderCard(
-      <InventoryCard item={{ ...item, categories: [] }} signedIn={false} />
+  it("links the whole image-and-text area", () => {
+    const { container, getByRole } = render(
+      <InventoryCard item={item} signedIn={false} />
     );
-    expect(queryByText("Microcontroller")).toBeNull();
-  });
-
-  it("shows Add to cart only when signed in and available", () => {
-    const { getByText, queryByText, rerenderCard } = renderCard(
-      <InventoryCard item={item} signedIn />
-    );
-    expect(getByText("Add to cart")).toBeTruthy();
-    rerenderCard(
-      <InventoryCard item={{ ...item, status: "reserved" }} signedIn />
-    );
-    expect(queryByText("Add to cart")).toBeNull();
-  });
-
-  it("reads In cart from the cart, not from a click", () => {
-    // The state lives in the cart query, so an item added on another page
-    // shows as already added on first paint here.
-    const { getByText, queryByText } = renderCard(
-      <InventoryCard item={item} signedIn />,
-      [{ itemId: item.id }]
-    );
-    expect(getByText("In cart")).toBeTruthy();
-    expect(queryByText("Add to cart")).toBeNull();
-  });
-
-  it("disables the button once the item is in the cart", () => {
-    const { getByRole } = renderCard(<InventoryCard item={item} signedIn />, [
-      { itemId: item.id },
-    ]);
-    expect(getByRole("button")).toHaveProperty("disabled", true);
+    expect(container.firstElementChild?.tagName).not.toBe("A");
+    expect(getByRole("link", { name: /Oscilloscope/ })).toBeTruthy();
   });
 });

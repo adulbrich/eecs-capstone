@@ -2,10 +2,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@tanstack/react-router", () => ({
-  useNavigate: () => vi.fn(),
-}));
-
 import { ViewToggle } from "#/components/view-toggle";
 import { readStoredView } from "#/lib/view-preference";
 
@@ -16,15 +12,24 @@ afterEach(() => {
 
 describe("ViewToggle", () => {
   it("persists the chosen view to storage when toggled", () => {
-    render(<ViewToggle onChange={vi.fn()} value="card" />);
-    screen.getByRole("button", { name: "Row view" }).click();
-    expect(readStoredView()).toBe("row");
+    render(<ViewToggle current="card" onChange={vi.fn()} />);
+    screen.getByRole("button", { name: "Table view" }).click();
+    expect(readStoredView()).toBe("table");
   });
 
-  it("still reports the choice to onChange when toggled", () => {
+  it("hands the choice to the route", () => {
     const onChange = vi.fn();
-    render(<ViewToggle onChange={onChange} value="card" />);
-    screen.getByRole("button", { name: "Row view" }).click();
-    expect(onChange).toHaveBeenCalledWith("row");
+    render(<ViewToggle current="card" onChange={onChange} />);
+    screen.getByRole("button", { name: "Table view" }).click();
+    expect(onChange).toHaveBeenCalledWith("table");
+  });
+
+  it("marks the current mode pressed and ignores a click on it", () => {
+    const onChange = vi.fn();
+    render(<ViewToggle current="table" onChange={onChange} />);
+    const table = screen.getByRole("button", { name: "Table view" });
+    expect(table.getAttribute("aria-pressed")).toBe("true");
+    table.click();
+    expect(onChange).not.toHaveBeenCalled();
   });
 });
