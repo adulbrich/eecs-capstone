@@ -1227,6 +1227,8 @@ Two things worth knowing about the new shape. `proposerEmail` is **absent, not n
 
 The rule that replaces it: **a read is staff-only when its query reaches a column of somebody's account**, by projection or by join.
 
+One public read reaches `user` on purpose: `mentorNameSql` in `projectSummarySelect` resolves `projects.mentor_email` to `user.name` and nothing else. It returns a name the person will have typed into a public profile, for a project they are publicly mentoring, and never the address it matched on. That is the whole exception; see "Mentorship is two staff-only columns and one derived flag" below before adding a second one.
+
 The reason it survived review is worth more than the fix. Every consumer of both endpoints is an admin-only page, so reading the call sites says the code is fine, and it is, right until someone calls the endpoint without the page. **A `createServerFn` endpoint is reachable on its own; the route guard protects the page, not the data.** There is no global middleware, so the guard an endpoint carries is the only guard it has, which is the same point the `transitionInventoryItem` note above makes from the other direction.
 
 `programs.integration.test.ts` pins both halves: the two gated reads refuse a non-staff viewer, and the public list is pinned to the six `programs` columns. A future join into that bare `select()` would nest the row under table keys, so `courseId` stops resolving and the test fails rather than leaking.
@@ -1395,14 +1397,19 @@ cannot touch them; keep it that way rather than adding staff branches to the for
 edits it.
 
 The mentor is resolved at read time by `mentorNameSql`, a case-insensitive match on
-`user.email`. There is no `mentor_id`: mentorship grants no permission, so an id would
-only be a denormalization. `seekingMentor` is `student_proposed AND mentor_email IS
-NULL`, computed in `seekingMentorSql`, because the public payload does not carry the
-address and a client cannot otherwise tell "no mentor" from "a mentor who has not signed
-up yet". The second state shows nothing, on purpose. `mentor_email` reaches exactly one
-endpoint, `getProjectMentorship`, which is staff. Both fragments live in
-`project-summary.ts` and ride `projectSummarySelect`, so the admin CSV export, whose
-column list is exhaustiveness-checked, carries the three public fields too. See #75.
+`user.email`. It is a correlated subquery with `LIMIT 1` rather than the `LEFT JOIN` #75
+prescribes: a join on `lower(email)` would fan a project out into two rows if two accounts
+ever differed only by case, and the subquery lets the four consumers of
+`projectSummarySelect` pick it up without touching their joins. There is no `mentor_id`:
+mentorship grants no permission, so an id would only be a denormalization.
+`seekingMentor` is `student_proposed AND mentor_email IS NULL`, computed in
+`seekingMentorSql`, because the public payload does not carry the address and a client
+cannot otherwise tell "no mentor" from "a mentor who has not signed up yet". The second
+state shows nothing, on purpose. `mentor_email` leaves the server through two staff
+reads only: `getProjectMentorship`, and the edit log, whose `oldValues` and `newValues`
+record it like any other edited column. Both fragments live in `project-summary.ts` and
+ride `projectSummarySelect`, so the admin CSV export, whose column list is
+exhaustiveness-checked, carries the three public fields too. See #75.
 
 ---
 

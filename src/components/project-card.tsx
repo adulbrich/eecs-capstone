@@ -14,9 +14,9 @@ interface ProjectSummary {
   imageUrl?: string | null;
   programCourseId?: string | null;
   programCourseName?: string | null;
-  seekingMentor?: boolean;
+  seekingMentor: boolean;
   status: string;
-  studentProposed?: boolean;
+  studentProposed: boolean;
   title: string;
   updatedAt?: Date | string | null;
 }
@@ -64,8 +64,8 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
           </div>
           <MentorshipBadges
             className="mt-2"
-            seekingMentor={project.seekingMentor ?? false}
-            studentProposed={project.studentProposed ?? false}
+            seekingMentor={project.seekingMentor}
+            studentProposed={project.studentProposed}
           />
           {project.description && (
             <p className="mt-2 line-clamp-3 text-muted-foreground text-sm">

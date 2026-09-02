@@ -31,6 +31,16 @@ The issue says the new fields match `isSponsored`, and that the staff panel alre
 round-trips through `updateProject`, so the proposer edits it. There is no staff-only field
 edit in the app today. This design introduces that pattern rather than widening the form.
 
+Two smaller departures, recorded so nobody reconciles them back:
+
+- The issue prescribes a `LEFT JOIN` on `lower(user.email)`. This uses a correlated
+  subquery with `LIMIT 1` instead. A join on a `lower()` equality fans a project out into
+  two rows if two accounts ever differ only by case, and the subquery reaches the four
+  consumers of `projectSummarySelect` without changing any of their joins.
+- The issue asks for "columns in the table" on the public listing. The listing's two
+  display modes from #78 are `card` and `row`, both `Card` components, and there is no
+  table. Both modes render the same badges.
+
 ## Write path
 
 One server function, `updateProjectMentorship({ id, studentProposed, mentorEmail })`, in
@@ -105,8 +115,11 @@ who has not signed up.
   checkbox, the email input, a hint line stating whether the address matches an account
   (name, or "No account with this address yet"), and a Save button. Saves call
   `updateProjectMentorship` and then `onChanged()`.
-- Admin projects table and CSV export: unchanged. Not in the issue's surface list; the
-  analytics in #34 read the columns directly.
+- Admin projects table: unchanged. The CSV export gains "Student proposed", "Seeking
+  mentor" and "Mentor" (the resolved name, never the address): its column list is
+  exhaustiveness-checked against the projection it reads, so widening
+  `projectSummarySelect` makes those columns a compile requirement rather than a choice.
+  The analytics in #34 read the columns directly.
 
 ## Schema
 

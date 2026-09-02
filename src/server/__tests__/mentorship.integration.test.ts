@@ -107,7 +107,7 @@ describe("updateProjectMentorshipAs", () => {
     expect(log[0].changedFields).toEqual(["studentProposed", "mentorEmail"]);
   });
 
-  it("clears the address when given null or an empty string", async () => {
+  it("clears the address when given an empty string", async () => {
     const admin = await makeUser(`mc-${Date.now()}@x.com`, "admin");
     const { id } = await createProjectAs(admin, baseProject());
     await updateProjectMentorshipAs(admin, {
@@ -164,7 +164,7 @@ describe("the three public states", () => {
 
     await updateProjectMentorshipAs(admin, {
       id,
-      mentorEmail: null,
+      mentorEmail: "",
       studentProposed: true,
     });
     ({ project } = await getProjectAs(null, { id }));
@@ -196,7 +196,7 @@ describe("the three public states", () => {
     const { admin, id } = await publishedProject();
     await updateProjectMentorshipAs(admin, {
       id,
-      mentorEmail: null,
+      mentorEmail: "",
       studentProposed: true,
     });
     const [row] = await db

@@ -273,7 +273,7 @@ export async function updateProjectMentorshipAs(
   const existing = await loadProjectOr404(data.id);
   const newValues: Partial<typeof projects.$inferSelect> = {
     studentProposed: data.studentProposed,
-    mentorEmail: data.mentorEmail?.trim() || null,
+    mentorEmail: data.mentorEmail.trim() || null,
   };
   const { changedFields, newDiff, oldDiff } = diffRowFields(
     existing,

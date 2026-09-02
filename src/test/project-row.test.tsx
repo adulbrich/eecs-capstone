@@ -23,6 +23,8 @@ const base: ProjectSummary = {
   title: "Rover Telemetry",
   description: "Short description.",
   status: "published",
+  seekingMentor: false,
+  studentProposed: false,
   imageUrl: null,
   contactName: "Jane Doe",
   programCourseId: "CS 461",

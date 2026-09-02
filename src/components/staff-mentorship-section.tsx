@@ -66,9 +66,11 @@ export function StaffMentorshipSection({
       setRecord(saved);
       setMentorEmail(saved.mentorEmail);
       setStudentProposed(saved.studentProposed);
-    } catch {
-      // Staff-only endpoint; on failure the section stays at its defaults and
-      // a save still round-trips through the server's own gate.
+    } catch (e) {
+      // Reported, not swallowed: with no record the drafts are blank, and a
+      // save from blank drafts would clear a mentor that is really on file.
+      // Save stays disabled until a record exists, see below.
+      setError((e as Error)?.message || "Could not load the mentorship record");
     }
   }, [projectId]);
 
@@ -120,7 +122,10 @@ export function StaffMentorshipSection({
         </div>
         {error && <p className="text-destructive text-sm">{error}</p>}
         <Button
-          disabled={busy}
+          // Disabled until the saved record has arrived: the drafts start
+          // blank, and posting blank drafts over a real record would clear the
+          // mentor and log an edit nobody made.
+          disabled={busy || record === null}
           onClick={() => void save()}
           size="sm"
           type="button"

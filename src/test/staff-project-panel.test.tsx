@@ -326,3 +326,44 @@ describe("StaffProjectPanel mentorship block", () => {
     await waitFor(() => expect(getProjectMentorship).toHaveBeenCalledTimes(2));
   });
 });
+
+describe("StaffProjectPanel mentorship save gate", () => {
+  it("keeps Save disabled until the record has loaded, so blank drafts cannot clear a mentor", async () => {
+    let resolveLoad: (value: {
+      mentorEmail: string;
+      mentorName: string | null;
+      studentProposed: boolean;
+    }) => void = () => {
+      // replaced below
+    };
+    getProjectMentorship.mockReturnValue(
+      new Promise((resolve) => {
+        resolveLoad = resolve;
+      })
+    );
+    renderPanel("submitted");
+
+    const save = screen.getByRole("button", { name: "Save mentorship" });
+    expect(save.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(save);
+    expect(updateProjectMentorship).not.toHaveBeenCalled();
+
+    resolveLoad({
+      mentorEmail: "mentor@x.test",
+      mentorName: null,
+      studentProposed: false,
+    });
+    await waitFor(() => expect(save.hasAttribute("disabled")).toBe(false));
+  });
+
+  it("reports a failed load and keeps Save disabled", async () => {
+    getProjectMentorship.mockRejectedValue(new Error("Forbidden"));
+    renderPanel("submitted");
+    expect(await screen.findByText("Forbidden")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "Save mentorship" })
+        .hasAttribute("disabled")
+    ).toBe(true);
+  });
+});

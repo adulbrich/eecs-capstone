@@ -53,8 +53,9 @@ export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 
 const mentorshipSchema = z.object({
   id: z.string().uuid(),
-  // Empty string is the form clearing the field; the impl folds it to null.
-  mentorEmail: z.string().email().max(320).nullable().or(z.literal("")),
+  // A string in transit, null only in the column: empty is the form clearing
+  // the field, and the impl folds it to null. Same ceiling as contactEmail.
+  mentorEmail: z.string().email().max(200).or(z.literal("")),
   studentProposed: z.boolean(),
 });
 

@@ -33,8 +33,8 @@ export function ProjectRow({ project }: { project: ProjectSummary }) {
           </div>
           <MentorshipBadges
             className="mt-1"
-            seekingMentor={project.seekingMentor ?? false}
-            studentProposed={project.studentProposed ?? false}
+            seekingMentor={project.seekingMentor}
+            studentProposed={project.studentProposed}
           />
           {project.description && (
             <p className="mt-1 line-clamp-3 text-muted-foreground text-sm">

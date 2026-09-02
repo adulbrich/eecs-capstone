@@ -299,8 +299,9 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
       "title",
       "url",
     ];
+    const owner = await makeUser(`keys-o-${Date.now()}@x.com`, "user");
     const admin = await makeUser(`keys-a-${Date.now()}@x.com`, "admin");
-    const { id } = await createProjectAs(admin, {
+    const { id } = await createProjectAs(owner, {
       ...baseProject(),
       notes: "internal staff note",
     });
@@ -313,9 +314,15 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
     expect(forAnon?.notes).toBeNull();
     expect("mentorEmail" in (forAnon ?? {})).toBe(false);
 
+    // Same key set for all three. Only the value of `notes` differs, which is
+    // the design: one shape, one viewer-dependent field. The proposer is the
+    // viewer most likely to be handed a wider row by mistake, since they see
+    // notes and isSponsored, so their key set is pinned too.
+    const { project: forOwner } = await getProjectAs(owner, { id });
+    expect(Object.keys(forOwner ?? {}).sort()).toEqual(PUBLIC_KEYS);
+    expect(forOwner?.notes).toBe("internal staff note");
+
     const { project: forAdmin } = await getProjectAs(admin, { id });
-    // Same key set for both. Only the value of `notes` differs, which is the
-    // design: one shape, one viewer-dependent field.
     expect(Object.keys(forAdmin ?? {}).sort()).toEqual(PUBLIC_KEYS);
     expect(forAdmin?.notes).toBe("internal staff note");
   });
