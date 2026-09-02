@@ -68,3 +68,22 @@ describe("ProjectCard", () => {
     expect(updated?.closest("p")?.textContent).toMatch(/^Updated /);
   });
 });
+
+describe("ProjectCard mentorship", () => {
+  it("shows the badges when the summary carries them, and never an address", () => {
+    const { getByText, queryByText } = render(
+      <ProjectCard
+        project={{ ...base, seekingMentor: true, studentProposed: true }}
+      />
+    );
+    expect(getByText("Student proposed")).toBeTruthy();
+    expect(getByText("Seeking mentor")).toBeTruthy();
+    expect(queryByText(/@/)).toBeNull();
+  });
+
+  it("shows nothing when the summary omits them", () => {
+    const { queryByText } = render(<ProjectCard project={base} />);
+    expect(queryByText("Student proposed")).toBeNull();
+    expect(queryByText("Seeking mentor")).toBeNull();
+  });
+});

@@ -55,3 +55,16 @@ describe("ProjectRow thumbnail", () => {
     expect(container.querySelector(".self-stretch")).toBeNull();
   });
 });
+
+describe("ProjectRow mentorship", () => {
+  it("shows the badges when the summary carries them, and never an address", () => {
+    const { getByText, queryByText } = render(
+      <ProjectRow
+        project={{ ...base, seekingMentor: true, studentProposed: true }}
+      />
+    );
+    expect(getByText("Student proposed")).toBeTruthy();
+    expect(getByText("Seeking mentor")).toBeTruthy();
+    expect(queryByText(/@/)).toBeNull();
+  });
+});

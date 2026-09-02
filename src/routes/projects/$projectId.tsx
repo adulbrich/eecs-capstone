@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { BookmarkButton } from "#/components/bookmark-button";
 import { CategoryChip } from "#/components/category-chip";
 import { Markdown } from "#/components/markdown";
+import { MentorshipBadges } from "#/components/mentorship-badges";
 import { OwnerProjectActions } from "#/components/owner-project-actions";
 import { ProjectPrivatePanel } from "#/components/project-private-panel";
 import { SectionHeading } from "#/components/section-heading";
@@ -118,6 +119,11 @@ function ProjectDetail() {
         <h1 className="font-semibold text-2xl">{project.title}</h1>
         <StatusBadge status={project.status} />
       </div>
+      <MentorshipBadges
+        className="mt-3"
+        seekingMentor={project.seekingMentor}
+        studentProposed={project.studentProposed}
+      />
       <div className="mt-3 flex items-center gap-2">
         <BookmarkButton projectId={project.id} />
         {canEdit && (
@@ -172,6 +178,7 @@ function ProjectDetail() {
         label="Preferred qualifications"
       />
       <ContactSection email={project.contactEmail} name={project.contactName} />
+      <MentorSection name={project.mentorName} />
       <AgreementSection
         body={project.licenseRestrictions}
         required={project.requiresNdaIp}
@@ -275,6 +282,23 @@ function ContactSection({
           </a>
         )}
       </p>
+    </section>
+  );
+}
+
+/**
+ * The mentor as a name only. When the address on file matches no account this
+ * renders nothing, by design: the email would publish a person who has not
+ * signed up, and "Seeking mentor" would be false. See #75.
+ */
+function MentorSection({ name }: { name: string | null }) {
+  if (!name) {
+    return null;
+  }
+  return (
+    <section className="mt-8">
+      <SectionHeading>Mentor</SectionHeading>
+      <p className="mt-2">{name}</p>
     </section>
   );
 }
