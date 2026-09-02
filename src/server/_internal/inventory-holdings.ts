@@ -75,8 +75,8 @@ export interface HistoryEntry {
 export function heldByViewer(
   viewerId: string,
   verifiedEmail: string | null
-): SQL {
-  const held = and(
+): SQL | undefined {
+  return and(
     inArray(inventoryItems.status, ["reserved", "checked_out"]),
     or(
       eq(inventoryItems.currentHolderId, viewerId),
@@ -88,10 +88,6 @@ export function heldByViewer(
         : undefined
     )
   );
-  if (!held) {
-    throw new Error("heldByViewer built an empty predicate");
-  }
-  return held;
 }
 
 export async function listMyItemsAs(viewer: Viewer) {
