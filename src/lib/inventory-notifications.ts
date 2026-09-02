@@ -19,21 +19,7 @@
 
 import { overdueFlags } from "./inventory-deadlines";
 import type { ItemStatus } from "./inventory-visibility";
-
-/**
- * The five columns every notification insert in the app builds by hand.
- *
- * Declared structurally rather than from `typeof notifications.$inferInsert`,
- * which would carry `id`, `read` and `createdAt` and pull Drizzle into a
- * client-safe module.
- */
-export interface NotificationRow {
-  link: string;
-  message: string;
-  title: string;
-  type: string;
-  userId: string;
-}
+import type { NotificationRow } from "./notification-row";
 
 /** The item as it stood before the transition. */
 export interface TransitionSubject {

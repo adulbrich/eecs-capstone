@@ -78,7 +78,6 @@ export async function addCommentAs(
       { id: project.id, title: project.title, proposerId: project.proposerId },
       {
         id: row.id,
-        projectId: row.projectId,
         authorId: row.authorId,
         parentId: row.parentId,
         isInternal: row.isInternal,
