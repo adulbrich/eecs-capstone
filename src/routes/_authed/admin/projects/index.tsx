@@ -346,6 +346,19 @@ const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
     key: "teamsSupported",
     value: (row) => row.teamsSupported,
   },
+  {
+    header: "Student proposed",
+    key: "studentProposed",
+    value: (row) => row.studentProposed,
+  },
+  {
+    header: "Seeking mentor",
+    key: "seekingMentor",
+    value: (row) => row.seekingMentor,
+  },
+  // The resolved name, not the address: the export reads the same projection
+  // the public listing does, and mentorEmail is not in it. See #75.
+  { header: "Mentor", key: "mentorName", value: (row) => row.mentorName },
   { header: "Created", key: "createdAt", value: (row) => row.createdAt },
   { header: "Published", key: "publishedAt", value: (row) => row.publishedAt },
   { header: "Archived", key: "archivedAt", value: (row) => row.archivedAt },

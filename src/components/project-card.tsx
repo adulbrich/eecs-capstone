@@ -4,6 +4,7 @@ import { stripMarkdown } from "#/lib/strip-markdown";
 import { BookmarkToggle } from "./bookmark-set";
 import { ImageOrFallback } from "./image-or-fallback";
 import { LocalTime } from "./local-time";
+import { MentorshipBadges } from "./mentorship-badges";
 import { StatusBadge } from "./status-badge";
 import { Card } from "./ui/card";
 
@@ -14,7 +15,9 @@ interface ProjectSummary {
   imageUrl?: string | null;
   programCourseId?: string | null;
   programCourseName?: string | null;
+  seekingMentor: boolean;
   status: string;
+  studentProposed: boolean;
   title: string;
   updatedAt?: Date | string | null;
 }
@@ -78,6 +81,11 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
               <StatusBadge status={project.status} />
             )}
           </div>
+          <MentorshipBadges
+            className="mt-2"
+            seekingMentor={project.seekingMentor}
+            studentProposed={project.studentProposed}
+          />
           {project.description && (
             <p className="mt-2 line-clamp-3 text-muted-foreground text-sm md:mt-1">
               {stripMarkdown(project.description)}

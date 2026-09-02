@@ -9,6 +9,7 @@ import { BookmarkToggle } from "./bookmark-set";
 import { CategoryChip } from "./category-chip";
 import { ImageOrFallback } from "./image-or-fallback";
 import { LocalTime } from "./local-time";
+import { MentorshipBadges } from "./mentorship-badges";
 import { programLabel } from "./project-card";
 import { Badge } from "./ui/badge";
 
@@ -140,6 +141,35 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     header: "NDA/IP required",
     id: "nda",
     // Boolean, not text, for the same reason as the Teams column.
+    sortingFn: "basic",
+  },
+  {
+    // Seeking a mentor sorts first, then student proposed, then the rest:
+    // the order a prospective mentor scanning the catalog wants.
+    accessorFn: (row) => {
+      if (row.seekingMentor) {
+        return 2;
+      }
+      return row.studentProposed ? 1 : 0;
+    },
+    cell: ({ row }) => {
+      const { mentorName, seekingMentor, studentProposed } = row.original;
+      if (!(studentProposed || seekingMentor || mentorName)) {
+        return "-";
+      }
+      return (
+        <div className="flex flex-col gap-1">
+          <MentorshipBadges
+            seekingMentor={seekingMentor}
+            studentProposed={studentProposed}
+          />
+          {mentorName && <span className="text-sm">{mentorName}</span>}
+        </div>
+      );
+    },
+    header: "Mentorship",
+    id: "mentorship",
+    // Numeric, not text, for the same reason as the Teams column.
     sortingFn: "basic",
   },
   {

@@ -128,7 +128,9 @@ describe("BookmarkToggle", () => {
       id: "p1",
       title: "Rover",
       description: null,
+      seekingMentor: false,
       status: "published",
+      studentProposed: false,
     };
     render(
       <BookmarkSetProvider>

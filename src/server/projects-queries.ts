@@ -5,7 +5,10 @@ import { z } from "zod";
 // without importing server internals. A type-only export; `verbatimModuleSyntax`
 // erases it entirely, so it pulls no runtime code into any bundle. Mirrors how
 // `src/server/inventory.ts` re-exports its staff detail types.
-export type { ProposerForEdit } from "./_internal/projects-queries";
+export type {
+  ProjectMentorship,
+  ProposerForEdit,
+} from "./_internal/projects-queries";
 
 const STATUS_FILTER_VALUES = [
   "all",
@@ -73,6 +76,17 @@ export const getProposerForEdit = createServerFn({ method: "GET" })
       "./_internal/projects-queries"
     );
     return getProposerForEditImpl(data);
+  });
+
+export const getProjectMentorship = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) =>
+    z.object({ projectId: z.string().uuid() }).parse(data)
+  )
+  .handler(async ({ data }) => {
+    const { getProjectMentorshipImpl } = await import(
+      "./_internal/projects-queries"
+    );
+    return getProjectMentorshipImpl(data);
   });
 
 export const listProjectEditLog = createServerFn({ method: "GET" })

@@ -302,6 +302,11 @@ function Profile() {
         >
           Sign out
         </Button>
+        <p className="mt-3 text-center text-muted-foreground text-sm">
+          <Link className="underline" to="/privacy">
+            Privacy policy
+          </Link>
+        </p>
       </div>
     </div>
   );

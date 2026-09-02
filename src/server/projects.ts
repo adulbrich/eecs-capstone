@@ -51,6 +51,16 @@ const updateProjectSchema = projectInputSchema.extend({
 
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 
+export const mentorshipSchema = z.object({
+  id: z.string().uuid(),
+  // A string in transit, null only in the column: empty is the form clearing
+  // the field, and the impl folds it to null. Same ceiling as contactEmail.
+  mentorEmail: z.string().email().max(200).or(z.literal("")),
+  studentProposed: z.boolean(),
+});
+
+export type MentorshipInput = z.infer<typeof mentorshipSchema>;
+
 // Defaults true so a partial caller sends mail rather than silently swallowing
 // it. Staff opt out per action from the transition dialog.
 const SEND_EMAIL_FIELD = { sendEmail: z.boolean().default(true) };
@@ -79,6 +89,15 @@ export const updateProject = createServerFn({ method: "POST" })
       "./_internal/projects"
     );
     return updateProjectForCurrentUser(data);
+  });
+
+export const updateProjectMentorship = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => mentorshipSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { updateProjectMentorshipForCurrentUser } = await import(
+      "./_internal/projects"
+    );
+    return updateProjectMentorshipForCurrentUser(data);
   });
 
 export const submitProject = createServerFn({ method: "POST" })

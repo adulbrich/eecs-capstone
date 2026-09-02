@@ -30,7 +30,9 @@ import {
 import { isStaff, type Viewer } from "#/lib/viewer";
 import {
   adminProjectSummarySelect,
+  mentorNameSql,
   projectSummarySelect,
+  seekingMentorSql,
 } from "./project-summary";
 
 type JsonValue =
@@ -241,10 +243,24 @@ export async function exportAdminProjectsImpl(data: AdminProjectsFilter) {
  * convention used by the mutation helpers.
  */
 export async function getProjectAs(viewer: Viewer, data: { id: string }) {
-  const [project] = await db
-    .select()
+  // The row plus the two read-time mentor fields. Selected here rather than
+  // joined by the view, because the view is pure and this is the only place
+  // a project row is read for the detail page.
+  const [row] = await db
+    .select({
+      project: projects,
+      mentorName: mentorNameSql,
+      seekingMentor: seekingMentorSql,
+    })
     .from(projects)
     .where(eq(projects.id, data.id));
+  const project = row
+    ? {
+        ...row.project,
+        mentorName: row.mentorName,
+        seekingMentor: row.seekingMentor,
+      }
+    : undefined;
   if (!project) {
     return {
       project: null,
@@ -353,6 +369,48 @@ export async function getProposerForEditAs(
     accountName: null,
     email: project.proposerEmail ?? "",
   };
+}
+
+export interface ProjectMentorship {
+  /** As stored. Empty string when unset, so the input can bind to it directly. */
+  mentorEmail: string;
+  /** The account at that address, if one exists. Null is "no account yet". */
+  mentorName: string | null;
+  studentProposed: boolean;
+}
+
+/**
+ * The staff read of the mentor address. The public payload carries only the
+ * resolved name; this is the one endpoint that returns the address, and it
+ * must not widen, for the same reason `getProposerForEditAs` does not.
+ */
+export async function getProjectMentorshipAs(
+  viewer: Viewer,
+  data: { projectId: string }
+): Promise<ProjectMentorship> {
+  if (!isStaff(viewer)) {
+    throw new Error("Forbidden");
+  }
+  const [row] = await db
+    .select({
+      mentorEmail: projects.mentorEmail,
+      mentorName: mentorNameSql,
+      studentProposed: projects.studentProposed,
+    })
+    .from(projects)
+    .where(eq(projects.id, data.projectId));
+  if (!row) {
+    throw new Error("Project not found");
+  }
+  return {
+    mentorEmail: row.mentorEmail ?? "",
+    mentorName: row.mentorName,
+    studentProposed: row.studentProposed,
+  };
+}
+
+export async function getProjectMentorshipImpl(data: { projectId: string }) {
+  return getProjectMentorshipAs(await getViewer(), data);
 }
 
 /**

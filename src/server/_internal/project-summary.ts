@@ -21,6 +21,30 @@ export const projectCategoriesList = sql<ProjectCategory[]>`coalesce((
 ), '[]'::json)`;
 
 /**
+ * The mentor, resolved at read time. A correlated subquery rather than a join
+ * so the four consumers of `projectSummarySelect` pick it up without each
+ * adding a join, same as `categories` in the admin export. Case-insensitive
+ * on purpose, and therefore not on the `user.email` index; at capstone scale
+ * that costs nothing and it is the same trade `claim-projects.ts` makes.
+ *
+ * `LIMIT 1` is belt and braces: `user.email` is unique, but only byte-wise.
+ */
+export const mentorNameSql = sql<string | null>`(
+  SELECT ${user.name} FROM ${user}
+  WHERE lower(${user.email}) = lower(${projects.mentorEmail})
+  LIMIT 1
+)`;
+
+/**
+ * "Needs a mentor" is derived, never stored, so it cannot drift from the
+ * mentor being assigned. It lives here rather than in the client because the
+ * public payload does not carry `mentorEmail`: without this flag a client
+ * could not tell "no mentor" from "a mentor is lined up who has not signed up
+ * yet", and the second must show nothing rather than "Seeking mentor".
+ */
+export const seekingMentorSql = sql<boolean>`(${projects.studentProposed} AND ${projects.mentorEmail} IS NULL)`;
+
+/**
  * Column projection shared by every query that feeds the project card and
  * the public table: the public listing, "my projects" and "my bookmarks".
  * Join `programs` via leftJoin before using it so the program columns
@@ -53,6 +77,12 @@ export const projectSummarySelect = {
   programCourseId: programs.courseId,
   programCourseName: programs.courseName,
   categories: projectCategoriesList,
+  // Public by design, all three. The address itself is not here and must not
+  // be: it is staff information, see `adminProjectSummarySelect`'s note on
+  // proposerEmail for the same distinction.
+  studentProposed: projects.studentProposed,
+  seekingMentor: seekingMentorSql,
+  mentorName: mentorNameSql,
 };
 
 /**

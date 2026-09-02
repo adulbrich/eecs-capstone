@@ -189,10 +189,10 @@ carries this padding signature, with `max-w-*` chosen per page (see below):
 `px-4 py-6` gives comfortable touch margins; `md:p-8` expands to the desktop-standard
 32px. A bare `p-8` wrapper wastes a third of the width on a phone.
 
-Page width is chosen by content, not fixed. Counting the 17 route roots that carry
-this `px-4 py-6 md:p-8` signature: `max-w-2xl` on the 7 form and dashboard pages
+Page width is chosen by content, not fixed. Counting the 18 route roots that carry
+this `px-4 py-6 md:p-8` signature: `max-w-2xl` on the 8 form, dashboard and prose pages
 (`projects/new`, `projects/$projectId/edit`, `admin/index`, `admin/programs/$programId`,
-`admin/users/$userId`, `inventory/new`, `inventory/$itemId/edit`), `max-w-4xl` on 6
+`admin/users/$userId`, `inventory/new`, `inventory/$itemId/edit`, `privacy`), `max-w-4xl` on 6
 pages that hold a list or a two-column detail layout, `max-w-3xl` on the one
 long-form page (`projects/$projectId.tsx`), and `max-w-md` on two narrow-content
 pages (`profile.tsx`, `admin/categories/$categoryId.tsx`) plus `max-w-sm` on

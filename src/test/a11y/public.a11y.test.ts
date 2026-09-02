@@ -32,6 +32,11 @@ test("@smoke sign-up page", async ({ page }) => {
   await checkA11y(page);
 });
 
+test("@smoke privacy page", async ({ page }) => {
+  await page.goto("/privacy");
+  await checkA11y(page);
+});
+
 test("@smoke verify-email page", async ({ page }) => {
   await page.goto("/verify-email");
   await checkA11y(page);

@@ -104,6 +104,7 @@ public.
 | Categories | `categories` | visible | none | name-only chips from a correlated `json_agg` of `{ id, name, type }`, ordered by type then name; the type is the chip's `title`, because as chip text it made a five-category project a five-line row |
 | Teams supported | `teams` | visible | `basic` | |
 | NDA/IP required | `nda` | visible | `basic` | `Badge` reading "Required", or a dash |
+| Mentorship | `mentorship` | visible | seeking first, then student proposed, `basic` | added when #75 landed during this branch: the two public flags as `MentorshipBadges` plus the resolved mentor name; never the address |
 | Contact name | `contactName` | visible | text, empties last | |
 | Contact email | `contactEmail` | hidden | text, empties last | `mailto:` link, as the detail page renders it |
 | Updated | `updatedAt` | visible | `datetime` | `LocalTime dateOnly` |

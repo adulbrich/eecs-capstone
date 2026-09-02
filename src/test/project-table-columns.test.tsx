@@ -54,6 +54,7 @@ const ROWS: ProjectListRow[] = [
     id: "p1",
     imageUrl: "projects/p1/a.webp",
     licenseRestrictions: "OSU owns it",
+    mentorName: "Sam Mentor",
     minQualifications: null,
     objectives: null,
     prefQualifications: null,
@@ -61,7 +62,9 @@ const ROWS: ProjectListRow[] = [
     programCourseId: "CS 461",
     programCourseName: "Capstone",
     requiresNdaIp: true,
+    seekingMentor: false,
     status: "published",
+    studentProposed: true,
     teamsSupported: 3,
     title: "Rover Telemetry",
     updatedAt: new Date("2026-07-01T00:00:00.000Z"),
@@ -75,6 +78,7 @@ const ROWS: ProjectListRow[] = [
     id: "p2",
     imageUrl: null,
     licenseRestrictions: null,
+    mentorName: null,
     minQualifications: null,
     objectives: null,
     prefQualifications: null,
@@ -82,7 +86,9 @@ const ROWS: ProjectListRow[] = [
     programCourseId: null,
     programCourseName: null,
     requiresNdaIp: false,
+    seekingMentor: false,
     status: "published",
+    studentProposed: false,
     teamsSupported: 1,
     title: "Bare Minimum",
     updatedAt: new Date("2026-06-01T00:00:00.000Z"),
@@ -150,9 +156,21 @@ describe("the public project table", () => {
       "Categories",
       "Teams supported",
       "NDA/IP required",
+      "Mentorship",
       "Contact name",
       "Updated",
     ]);
+  });
+
+  it("shows the mentorship state and the mentor's name, and a dash for neither", () => {
+    // #75 landed while this table was built: the two public flags and the
+    // resolved name join the table, per #78. The address never does.
+    renderTable(DEFAULT_HIDDEN);
+    const row = rowFor("Rover Telemetry");
+    expect(row.getByText("Student proposed")).toBeTruthy();
+    expect(row.getByText("Sam Mentor")).toBeTruthy();
+    expect(row.queryByText(/@/)).toBeNull();
+    expect(rowFor("Bare Minimum").getAllByText("-").length).toBeGreaterThan(0);
   });
 
   it("renders categories as name-only chips with the facet on hover, and a dash for none", () => {

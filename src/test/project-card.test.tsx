@@ -43,6 +43,8 @@ const base: ProjectSummary = {
   title: "Smart Greenhouse",
   description: "A long description that should be clamped to three lines.",
   status: "published",
+  seekingMentor: false,
+  studentProposed: false,
   imageUrl: null,
   contactName: "Jane Doe",
   updatedAt: "2026-05-28T00:00:00.000Z",
@@ -110,5 +112,24 @@ describe("ProjectCard", () => {
     expect(root?.tagName).not.toBe("A");
     expect(root?.querySelector("a")?.getAttribute("href")).toBeTruthy();
     expect(container.querySelector("button")).toBeNull();
+  });
+});
+
+describe("ProjectCard mentorship", () => {
+  it("shows the badges when the summary carries them, and never an address", () => {
+    const { getByText, queryByText } = render(
+      <ProjectCard
+        project={{ ...base, seekingMentor: true, studentProposed: true }}
+      />
+    );
+    expect(getByText("Student proposed")).toBeTruthy();
+    expect(getByText("Seeking mentor")).toBeTruthy();
+    expect(queryByText(/@/)).toBeNull();
+  });
+
+  it("shows nothing when the summary omits them", () => {
+    const { queryByText } = render(<ProjectCard project={base} />);
+    expect(queryByText("Student proposed")).toBeNull();
+    expect(queryByText("Seeking mentor")).toBeNull();
   });
 });
