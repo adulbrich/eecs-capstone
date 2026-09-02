@@ -24,7 +24,10 @@ interface ProjectSummary {
   updatedAt?: Date | string | null;
 }
 
-function programLabel(project: ProjectSummary): string | null {
+function programLabel(project: {
+  programCourseId?: string | null;
+  programCourseName?: string | null;
+}): string | null {
   const parts = [project.programCourseId, project.programCourseName].filter(
     Boolean
   ) as string[];

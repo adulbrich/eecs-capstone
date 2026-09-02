@@ -89,6 +89,12 @@ export async function isBookmarkedAs(
  * rule in one place, not two that drift.
  *
  * The bookmark row survives, so a project that is republished comes back.
+ *
+ * `unavailableCount` is how many the filter removed. The page shows it as one
+ * quiet line, because a list that silently got shorter reads as a lost
+ * bookmark; the number reveals nothing the viewer did not save themselves.
+ * Soft-deleted projects are not in it: the SQL above drops those for every
+ * viewer, and a project that is gone is not "not currently available".
  */
 export async function listMyBookmarksAs(viewer: BookmarkViewer) {
   const rows = await db
@@ -115,12 +121,12 @@ export async function listMyBookmarksAs(viewer: BookmarkViewer) {
     )
     .orderBy(desc(projectBookmarks.createdAt));
 
+  const visible = rows.filter((row) =>
+    canSeeProject(row, { id: viewer.id, role: viewer.role ?? null })
+  );
   return {
-    rows: rows
-      .filter((row) =>
-        canSeeProject(row, { id: viewer.id, role: viewer.role ?? null })
-      )
-      .map(({ deletedAt, proposerId, ...row }) => row),
+    rows: visible.map(({ deletedAt, proposerId, ...row }) => row),
+    unavailableCount: rows.length - visible.length,
   };
 }
 

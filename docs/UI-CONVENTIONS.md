@@ -203,11 +203,12 @@ this `px-4 py-6 md:p-8` signature: `max-w-2xl` on the 8 form, dashboard and pros
 pages that hold a list or a two-column detail layout, `max-w-3xl` on the one
 long-form page (`projects/$projectId.tsx`), and `max-w-md` on two narrow-content
 pages (`profile.tsx`, `admin/categories/$categoryId.tsx`) plus `max-w-sm` on
-`verify-email.tsx`. Of the six `max-w-4xl` pages, five hold a single-column
-card list (`projects/index.tsx`, `inventory/index.tsx`, `my/bookmarks.tsx`,
-`my/projects.tsx`, `my/items.tsx`) and `inventory/$itemId.tsx` holds a
-two-column detail layout. `projects/index.tsx` in table mode lets the table run
-full width below the bounded title and filter bar, the way the admin tables do. The sign-in/sign-up/forgot/reset-password cards
+`verify-email.tsx`. Of the six `max-w-4xl` pages, four hold a single-column
+card list (`projects/index.tsx`, `inventory/index.tsx`, `my/projects.tsx`,
+`my/items.tsx`), `my/bookmarks.tsx` bounds only its title, and
+`inventory/$itemId.tsx` holds a two-column detail layout. `projects/index.tsx` in
+table mode and `my/bookmarks.tsx` let the table run full width below the bounded
+title (and filter bar), the way the admin tables do. The sign-in/sign-up/forgot/reset-password cards
 are narrower still but live inside the separate `island-shell` container below, not
 this padding pattern.
 

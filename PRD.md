@@ -106,6 +106,12 @@ Each project carries:
   proposed" badge, a "Seeking mentor" badge while no address is on file, and the
   mentor's name once that address has an account. The address itself never
   leaves staff reads. (#75)
+- ✅ `/my/bookmarks` is a small decision table: title with thumbnail, program,
+  status, accepting applicants, teams supported, NDA/IP, origin (student
+  proposed and mentor state in one cell), saved-on date, and a remove button.
+  Sorted newest save first, no view toggle and no column picker. Visibility is
+  re-checked on read, and one line says how many saved projects dropped out
+  rather than letting the list shrink silently. (#106)
 - ✅ Accepting applicants flag: a published project with a full roster stays
   listed, marked "Not accepting applicants" on its page, its card and its
   table row, with a listing filter to hide such projects. Staff and the

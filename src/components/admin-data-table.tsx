@@ -457,44 +457,51 @@ export function AdminDataTable<T>({
             behavior is the right fix here rather than living with the
             violation or fighting Radix's internals.
           */}
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              {/*
+          {/*
+            No menu when nothing can be hidden: a table whose columns are all
+            `enableHiding: false` (the bookmarks shortlist) would otherwise
+            offer an empty picker, a control that exists to be ignored.
+          */}
+          {hideable.length > 0 && (
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                {/*
                 Default size, not sm: this button sits on the same row as
                 the page's search input and filter selects, which are all
                 h-9. An h-8 button beside them reads as misaligned rather
                 than compact.
               */}
-              <Button variant="outline">
-                <Columns3 aria-hidden className="size-4" />
-                Columns
-              </Button>
-            </DropdownMenuTrigger>
-            {/*
+                <Button variant="outline">
+                  <Columns3 aria-hidden className="size-4" />
+                  Columns
+                </Button>
+              </DropdownMenuTrigger>
+              {/*
               tabIndex 0, not Radix's -1: a menu with enough columns to
               scroll (the public projects table has fifteen) fails axe's
               scrollable-region-focusable otherwise. See docs/QUIRKS.md,
               "A Columns menu that scrolls must be focusable itself".
             */}
-            <DropdownMenuContent align="end" tabIndex={0}>
-              <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {hideable.map((column) => (
-                <DropdownMenuCheckboxItem
-                  checked={column.getIsVisible()}
-                  key={column.id}
-                  onCheckedChange={(value) => column.toggleVisibility(value)}
-                  onSelect={(event) => event.preventDefault()}
-                >
-                  {labels.get(column.id) ?? column.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={resetColumns}>
-                Reset columns
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <DropdownMenuContent align="end" tabIndex={0}>
+                <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {hideable.map((column) => (
+                  <DropdownMenuCheckboxItem
+                    checked={column.getIsVisible()}
+                    key={column.id}
+                    onCheckedChange={(value) => column.toggleVisibility(value)}
+                    onSelect={(event) => event.preventDefault()}
+                  >
+                    {labels.get(column.id) ?? column.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={resetColumns}>
+                  Reset columns
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 

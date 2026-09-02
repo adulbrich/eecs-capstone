@@ -829,7 +829,7 @@ const NAME_COLUMN = {
 
 `id` needs the `as const` or it widens to `string`, and the diagnostic then says `string` instead of naming the column that broke the rule. That is the difference between an error someone can act on and one they have to bisect. Only the const is affected: annotating the array `defineAdminColumns` returns is redundant but harmless, because that return type mentions no inference variable for the annotation to feed back into.
 
-`/admin/categories` is the only route that shares column consts between two tables (a project tab and an inventory tab), so it is the only place this comes up today.
+`/admin/categories` shares column consts between two tables (a project tab and an inventory tab). `/projects` and `/my/bookmarks` share five columns through `projectSummaryColumns<Row>()` in `src/components/project-summary-columns.tsx`, a factory rather than consts because each table's row type differs and a column's `cell` is typed on it; the `satisfies` rule is the same inside the factory.
 
 ### Path-by-path convention summary
 

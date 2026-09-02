@@ -10,8 +10,9 @@ import { Badge } from "./ui/badge";
  * whose mentor has not signed up yet show nothing rather than a false
  * "Seeking mentor". See #75.
  *
- * Rendered by the card, the table and the detail page, so the three cannot
- * compute the badges three ways.
+ * Rendered by the card, the detail page and the shared table column in
+ * `project-summary-columns.tsx`, so no surface computes the badges its own
+ * way.
  */
 export function MentorshipBadges({
   className,

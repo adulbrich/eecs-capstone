@@ -5,14 +5,11 @@ import { projectImageSrc } from "#/lib/project-image";
 import { stripMarkdown } from "#/lib/strip-markdown";
 import type { SortState } from "#/lib/table-state";
 import type { searchProjects } from "#/server/search";
-import { ApplicantsBadge } from "./applicants-badge";
 import { BookmarkToggle } from "./bookmark-set";
 import { CategoryChip } from "./category-chip";
 import { ImageOrFallback } from "./image-or-fallback";
 import { LocalTime } from "./local-time";
-import { MentorshipBadges } from "./mentorship-badges";
-import { programLabel } from "./project-card";
-import { Badge } from "./ui/badge";
+import { projectSummaryColumns } from "./project-summary-columns";
 
 /**
  * One row of the public listing, as `searchProjects` returns it. Both modes
@@ -65,6 +62,8 @@ function proseColumn(field: TextField, header: string) {
   };
 }
 
+const shared = projectSummaryColumns<ProjectListRow>();
+
 /**
  * The public listing's table mode. Every column is a field
  * `projectDetailView` returns to an anonymous viewer; nothing here makes a
@@ -100,13 +99,7 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     header: "Title",
     id: "title",
   },
-  {
-    accessorFn: (row) => programLabel(row) ?? undefined,
-    cell: ({ row }) => programLabel(row.original) ?? "-",
-    header: "Program",
-    id: "program",
-    sortUndefined: "last",
-  },
+  shared.program,
   {
     cell: ({ row }) =>
       row.original.categories.length === 0 ? (
@@ -122,72 +115,10 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     header: "Categories",
     id: "categories",
   },
-  {
-    accessorFn: (row) => row.teamsSupported,
-    cell: ({ row }) => row.original.teamsSupported,
-    header: "Teams supported",
-    id: "teams",
-    // Numeric, not text: the locale-compare default would compare String(n),
-    // where "10" sorts before "2".
-    sortingFn: "basic",
-  },
-  {
-    accessorFn: (row) => row.acceptingApplicants,
-    // "Yes" rather than the dash the NDA column uses for its ordinary case:
-    // under this header a dash would read as "no", the opposite of the truth.
-    cell: ({ row }) =>
-      row.original.acceptingApplicants ? (
-        "Yes"
-      ) : (
-        <ApplicantsBadge acceptingApplicants={false} />
-      ),
-    header: "Accepting applicants",
-    id: "accepting",
-    // Boolean, not text: see the Teams column.
-    sortingFn: "basic",
-  },
-  {
-    accessorFn: (row) => row.requiresNdaIp,
-    cell: ({ row }) =>
-      row.original.requiresNdaIp ? (
-        <Badge variant="outline">Required</Badge>
-      ) : (
-        "-"
-      ),
-    header: "NDA/IP required",
-    id: "nda",
-    sortingFn: "basic",
-  },
-  {
-    // Seeking a mentor ranks highest, then student proposed, then the rest.
-    // TanStack starts a numeric column descending, so the first header click
-    // puts the projects a prospective mentor is looking for at the top.
-    accessorFn: (row) => {
-      if (row.seekingMentor) {
-        return 2;
-      }
-      return row.studentProposed ? 1 : 0;
-    },
-    cell: ({ row }) => {
-      const { mentorName, seekingMentor, studentProposed } = row.original;
-      if (!(studentProposed || seekingMentor || mentorName)) {
-        return "-";
-      }
-      return (
-        <div className="flex flex-col gap-1">
-          <MentorshipBadges
-            seekingMentor={seekingMentor}
-            studentProposed={studentProposed}
-          />
-          {mentorName && <span className="text-sm">{mentorName}</span>}
-        </div>
-      );
-    },
-    header: "Mentorship",
-    id: "mentorship",
-    // Numeric, not text, for the same reason as the Teams column.
-    sortingFn: "basic",
-  },
+  shared.teams,
+  shared.accepting,
+  shared.nda,
+  shared.mentorship,
   {
     accessorFn: (row) => row.contactName ?? undefined,
     cell: ({ row }) => row.original.contactName ?? "-",
