@@ -19,6 +19,14 @@ test.describe("@smoke public shell", () => {
     await page.goto("/");
     await expect(page.getByRole("banner")).toBeVisible();
 
+    // The one page a prospective student reads before deciding to sign up.
+    // The accessibility scan of /privacy proves nothing here: a redirect to
+    // /sign-in is axe-clean too. Only the heading says the route is public.
+    await page.goto("/privacy");
+    await expect(
+      page.getByRole("heading", { name: "Privacy", exact: true })
+    ).toBeVisible();
+
     // TanStack Router normalizes search params with a 307 before rendering, so
     // /projects lands on /projects?q=&categories=%5B%5D&... Match the path and
     // let the query string be whatever the route's defaults are.

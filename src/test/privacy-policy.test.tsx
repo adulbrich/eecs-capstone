@@ -23,9 +23,10 @@ describe("PrivacyPolicy", () => {
     );
   });
 
-  it("links the support address from the brand, which is the EECS one", () => {
+  it("links the support address from the brand", () => {
     render(<PrivacyPolicy />);
-    expect(brand.supportEmail).toBe("eecs-capstone@oregonstate.edu");
+    // The address itself is brand config, not this component's business: a
+    // rebrand must not red a component test. The href is what this owns.
     const link = screen.getByRole("link", { name: brand.supportEmail });
     expect(link.getAttribute("href")).toBe(`mailto:${brand.supportEmail}`);
   });

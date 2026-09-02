@@ -256,10 +256,6 @@ Two facts collide. Tenant-custom claims ride in the ID token and are absent from
 
 GitHub sits at `/api/auth/callback/github`; ONID sits at `/api/auth/oauth2/callback/onid`. Better Auth 1.6 mounts generic OAuth on the `oauth2` path, 1.7 converges the two, and Entra matches redirect URIs exactly against what UIT allowlisted. `package.json` therefore pins `better-auth` to `~1.6.13`. Under the old caret range a routine `npm update` would break ONID sign-in with no code change and no failing test. Upgrading to 1.7 means getting a new URI allowlisted first, and removing `genericOAuthClient()` from `src/lib/auth-client.ts`, which 1.7 deletes. See `docs/ONID-SSO.md`.
 
-### `/privacy` is a promise the deletion flow makes, so its copy and #84 move together
-
-`src/routes/privacy.tsx` is public, outside `_authed`, and static: the body lives in `src/components/privacy-policy.tsx` and only a developer changes it. Its account-closure paragraph names what deletion removes (name, email, affiliation, interests) and what it keeps (projects, re-attributed to "Deleted user"; equipment records, as institutional property), because the confirmation dialog in #84 makes exactly those promises and a policy that said less would leave them backed by nothing. Change one and change the other. The sign-up line pointing here is a notice, not a checkbox; nothing writes to `user`, and a recorded acceptance would be a schema change plus a policy version, which is its own issue. `brand.supportEmail` has this page as its first and only consumer. See #91.
-
 ---
 
 ## Drizzle ORM + Postgres
@@ -846,6 +842,10 @@ const NAME_COLUMN = {
 | `docs/superpowers/plans/*` | Implementation plans per spec. One per "spec". |
 | `docs/QUIRKS.md` | This file. |
 | `docs/UI-CONVENTIONS.md` | Design system rules: components, tokens, responsive layout. |
+
+### `/privacy` is a promise the deletion flow makes, so its copy and #84 move together
+
+`src/routes/privacy.tsx` is public, outside `_authed`, and static: the body lives in `src/components/privacy-policy.tsx` and only a developer changes it. Its account-closure paragraph names what deletion removes (name, email, affiliation, interests) and what it keeps (projects, re-attributed to "Deleted user"; equipment records, as institutional property), because the confirmation dialog in #84 makes exactly those promises and a policy that said less would leave them backed by nothing. Change one and change the other. The sign-up line pointing here is a notice, not a checkbox; nothing writes to `user`, and a recorded acceptance would be a schema change plus a policy version, which is its own issue. `brand.supportEmail` has this page as its first and only consumer. `public.e2e.test.ts` loads it with no cookie, which is the only proof a route outside `_authed` stays outside it. See #91.
 
 ### Workflow conventions
 

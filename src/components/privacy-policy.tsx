@@ -2,13 +2,8 @@ import { brand } from "#/lib/brand";
 
 /**
  * The privacy page's body. Static, in the repo, and only a developer changes
- * it: there is no CMS, no versioning and no recorded acceptance. The sign-up
- * line that points here is a notice, not a checkbox.
- *
- * The account-closure paragraph is deliberately longer than "you can close
- * your account". It names what deletion keeps as well as what it removes,
- * because the confirmation dialog in #84 makes those promises and they need
- * something durable behind them. Keep the two in step. See #91.
+ * it. The account-closure paragraph and the deletion dialog in #84 promise
+ * the same things and move together; docs/QUIRKS.md says why.
  */
 export function PrivacyPolicy() {
   return (
