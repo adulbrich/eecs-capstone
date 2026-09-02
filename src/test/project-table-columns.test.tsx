@@ -155,12 +155,16 @@ describe("the public project table", () => {
     ]);
   });
 
-  it("renders categories as chips, and a dash for none", () => {
+  it("renders categories as name-only chips with the facet on hover, and a dash for none", () => {
+    // The facet ("field", "technology") stays off the chip text in a table:
+    // it made every chip a full line and a five-category project a five-line
+    // row. The chips are already ordered by facet; the title carries it.
     renderTable(DEFAULT_HIDDEN);
     const row = rowFor("Rover Telemetry");
-    expect(
-      row.getByText("Robotics").closest('[data-slot="badge"]')
-    ).not.toBeNull();
+    const chip = row.getByText("Robotics").closest('[data-slot="badge"]');
+    expect(chip).not.toBeNull();
+    expect(chip?.textContent).toBe("Robotics");
+    expect(chip?.getAttribute("title")).toBe("field");
     expect(row.getByText("Web").closest('[data-slot="badge"]')).not.toBeNull();
     expect(rowFor("Bare Minimum").getAllByText("-").length).toBeGreaterThan(0);
   });

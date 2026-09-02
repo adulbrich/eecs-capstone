@@ -110,9 +110,9 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
       row.original.categories.length === 0 ? (
         "-"
       ) : (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex min-w-64 flex-wrap gap-1">
           {row.original.categories.map((category) => (
-            <CategoryChip category={category} key={category.id} />
+            <CategoryChip category={category} compact key={category.id} />
           ))}
         </div>
       ),

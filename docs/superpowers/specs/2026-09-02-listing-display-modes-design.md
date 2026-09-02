@@ -101,7 +101,7 @@ public.
 | --- | --- | --- | --- | --- |
 | Title | `title` | visible, not hideable | text | `cardHeader`. Thumbnail and bookmark control render inside this cell beside the link, as `/admin/projects` does for the thumbnail. Neither is its own column. |
 | Program | `program` | visible | text, empties last | `programLabel`, course id and name |
-| Categories | `categories` | visible | none | chips from a correlated `json_agg` of `{ id, name, type }`, ordered by type then name |
+| Categories | `categories` | visible | none | name-only chips from a correlated `json_agg` of `{ id, name, type }`, ordered by type then name; the type is the chip's `title`, because as chip text it made a five-category project a five-line row |
 | Teams supported | `teams` | visible | `basic` | |
 | NDA/IP required | `nda` | visible | `basic` | `Badge` reading "Required", or a dash |
 | Contact name | `contactName` | visible | text, empties last | |

@@ -80,7 +80,7 @@ export const INVENTORY_TABLE_COLUMNS = defineAdminColumns<InventoryListRow>()([
       row.original.categories.length === 0 ? (
         "-"
       ) : (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex min-w-64 flex-wrap gap-1">
           {row.original.categories.map((category) => (
             <CategoryChip category={category} key={category.id} />
           ))}
