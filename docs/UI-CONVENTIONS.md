@@ -571,8 +571,9 @@ The inventory hard delete in `inventory-lifecycle-panel.tsx` uses a shadcn
 `delete-account-dialog.tsx` uses `AlertDialog` and asks for the person's own
 email, compared case-insensitively. A single confirm click is an easy reflex
 to fire without reading; typing the exact value is a deliberate extra brake.
-Both reset the typed value on open and close, so a Cancel never leaves the
-next opening pre-armed. Reach for this shape only when a single confirmation
+Both reset the typed value before the dialog shows again (the inventory panel
+when its trigger opens it, the account dialog on every open and close), so a
+Cancel never leaves the next opening pre-armed. Reach for this shape only when a single confirmation
 is not enough friction for the action at hand, not as the default: the project
 hard delete in `staff-project-panel.tsx` is equally permanent and still
 confirms through plain `ConfirmDialog`.

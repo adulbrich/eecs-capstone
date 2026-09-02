@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
@@ -103,8 +103,20 @@ describe("getAccountDeletionPreviewAs", () => {
       .where(eq(inventoryItems.id, byId.id));
     await db
       .update(inventoryItems)
-      .set({ status: "reserved", currentHolderEmail: u.email.toUpperCase() })
+      .set({ status: "reserved", currentHolderEmail: u.email })
       .where(eq(inventoryItems.id, byEmail.id));
+    // Assigned to another account but carrying this address: the account
+    // wins, on /my/items and here alike.
+    const other = await makeUser(`pvo-${Date.now()}@x.com`, "user");
+    const byOther = await makeItem("Held by someone else");
+    await db
+      .update(inventoryItems)
+      .set({
+        status: "checked_out",
+        currentHolderId: other.id,
+        currentHolderEmail: u.email,
+      })
+      .where(eq(inventoryItems.id, byOther.id));
 
     let preview = await getAccountDeletionPreviewAs(u);
     expect(preview.blockers.items.map((i) => i.name).sort()).toEqual([
@@ -123,6 +135,9 @@ describe("getAccountDeletionPreviewAs", () => {
       .where(sql`${inventoryItems.id} in (${byId.id}, ${byEmail.id})`);
     preview = await getAccountDeletionPreviewAs(u);
     expect(preview.blockers.items).toEqual([]);
+    expect((await getAccountDeletionPreviewAs(other)).blockers.items).toEqual([
+      { id: byOther.id, name: "Held by someone else" },
+    ]);
 
     // An address hold claims only a verified address, the same rule /my/items
     // applies: an unverified account must not be blocked by an item that page
@@ -296,11 +311,14 @@ describe("deleteAccountAs", () => {
     const cascadeEdges: string[] = [];
     let tablesSeen = 0;
     let tablesDeclared = 0;
-    for (const file of ["schema.ts", "auth-schema.ts"]) {
-      const source = readFileSync(
-        join(process.cwd(), "src", "db", file),
-        "utf-8"
-      );
+    // Every schema module, not a list that a third file would silently miss.
+    const schemaDir = join(process.cwd(), "src", "db");
+    const schemaFiles = readdirSync(schemaDir).filter(
+      (f) => f.endsWith(".ts") && f !== "index.ts"
+    );
+    expect(schemaFiles.sort()).toEqual(["auth-schema.ts", "schema.ts"]);
+    for (const file of schemaFiles) {
+      const source = readFileSync(join(schemaDir, file), "utf-8");
       tablesDeclared += source.match(/pgTable\(/g)?.length ?? 0;
       const blocks = source.split(/(?=pgTable\(\s*")/);
       for (const block of blocks) {

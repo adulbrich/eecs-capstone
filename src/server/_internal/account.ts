@@ -1,4 +1,4 @@
-import { and, eq, getTableName, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, getTableName, sql } from "drizzle-orm";
 import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { db } from "#/db";
 import {
@@ -21,6 +21,7 @@ import {
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { Viewer } from "#/lib/viewer";
 import type { DeleteAccountInput } from "../account";
+import { heldByViewer } from "./inventory-holdings";
 
 export interface DeletionPreview {
   blockers: {
@@ -83,30 +84,13 @@ export async function getAccountDeletionPreviewAs(
   if (!row) {
     throw new Error("Account not found");
   }
-  const address = row.email.toLowerCase();
   const [held, awaiting, admins, taught] = await Promise.all([
-    // A hold assigned to the account, or to its address with no account on
-    // it. The address half is exactly the rule `listMyItemsAs` applies: only
-    // a verified address claims a hold, and never over an explicit account
-    // assignment. Anything looser would block a person with an item that
-    // /my/items never shows them.
+    // The same predicate /my/items reads, so the block and the page cannot
+    // disagree about what the person is holding.
     db
       .select({ id: inventoryItems.id, name: inventoryItems.name })
       .from(inventoryItems)
-      .where(
-        and(
-          inArray(inventoryItems.status, ["reserved", "checked_out"]),
-          or(
-            eq(inventoryItems.currentHolderId, viewer.id),
-            row.emailVerified
-              ? and(
-                  isNull(inventoryItems.currentHolderId),
-                  sql`lower(${inventoryItems.currentHolderEmail}) = ${address}`
-                )
-              : sql`false`
-          )
-        )
-      ),
+      .where(heldByViewer(viewer.id, row.emailVerified ? row.email : null)),
     db
       .select({ id: inventoryItems.id, name: inventoryItems.name })
       .from(inventoryRequestItems)
