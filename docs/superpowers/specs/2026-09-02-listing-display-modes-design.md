@@ -237,6 +237,10 @@ Accessibility (`npm run test:accessibility`, public suite):
   and scanned, a sort header click writes `sort` and `dir` and flips
   `aria-sort`, a default-hidden column toggled on renders a non-empty cell.
 
+Accessibility, user suite: two signed-in scans of `/projects`, card and table
+mode, because the bookmark toggle renders for nobody the public suite signs in
+as, and those are the only scans that ever see it.
+
 Smoke (`npm run test:smoke`): the public flow already asserts a detail link on
 `/projects`; it is run, not extended.
 

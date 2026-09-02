@@ -8,7 +8,7 @@ import { ProjectCard } from "#/components/project-card";
 import {
   PROJECT_TABLE_COLUMNS,
   PROJECT_TABLE_DEFAULT_SORT,
-  type ProjectTableRow,
+  type ProjectListRow,
 } from "#/components/project-table-columns";
 import { ProjectsFilterBar } from "#/components/projects-filter-bar";
 import {
@@ -85,7 +85,7 @@ function ProjectTable({
   rows,
   search,
 }: {
-  rows: ProjectTableRow[];
+  rows: ProjectListRow[];
   search: Search;
 }) {
   const navigate = useNavigate({ from: "/projects/" });
@@ -107,7 +107,7 @@ function ProjectTable({
   );
 }
 
-function ProjectCards({ rows }: { rows: ProjectTableRow[] }) {
+function ProjectCards({ rows }: { rows: ProjectListRow[] }) {
   if (rows.length === 0) {
     return <EmptyState>No projects matched your search.</EmptyState>;
   }

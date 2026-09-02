@@ -37,12 +37,12 @@ import { BookmarkSetProvider } from "#/components/bookmark-set";
 import {
   PROJECT_TABLE_COLUMNS,
   PROJECT_TABLE_DEFAULT_SORT,
-  type ProjectTableRow,
+  type ProjectListRow,
 } from "#/components/project-table-columns";
 
 afterEach(cleanup);
 
-const ROWS: ProjectTableRow[] = [
+const ROWS: ProjectListRow[] = [
   {
     categories: "Robotics; Web",
     contactEmail: "jane@example.com",

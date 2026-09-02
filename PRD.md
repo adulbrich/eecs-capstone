@@ -73,8 +73,8 @@ Each project carries:
 - ✅ The long text fields (description, problem statement, objectives, both
   qualification fields, license/IP restrictions) accept Markdown, authored with
   a formatting toolbar and Edit/Preview tabs and rendered safely as React
-  elements (no raw HTML, no `dangerouslySetInnerHTML`). Card and row summaries
-  strip the markup back to plain text.
+  elements (no raw HTML, no `dangerouslySetInnerHTML`). Listing cards and table
+  cells strip the markup back to plain text.
 - ✅ Semantic embedding vector (pgvector), written when a project is published
   and refreshed when its indexed text changes, powering recommendations (§8).
 - ✅ Private notes (`notes`) field, labelled "Private notes" wherever it
@@ -146,7 +146,7 @@ Each project carries:
   (`/projects/$id/edit`).
 - ✅ Staff project list (`/admin/projects`) with status and program filters and
   a show-soft-deleted switch, all held in URL search params.
-- ✅ Consistent list presentation: fixed-ratio row thumbnails, boolean filters
+- ✅ Consistent list presentation: fixed-ratio thumbnails, boolean filters
   rendered as switches aligned with the adjacent inputs, status dropdowns
   (including an "All statuses" option), and a shared centered empty state across
   the list pages.

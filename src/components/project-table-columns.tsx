@@ -10,8 +10,11 @@ import { LocalTime } from "./local-time";
 import { programLabel } from "./project-card";
 import { Badge } from "./ui/badge";
 
-/** One row of the public listing, as `searchProjects` returns it. */
-export type ProjectTableRow = Awaited<
+/**
+ * One row of the public listing, as `searchProjects` returns it. Both modes
+ * render this shape: the card reads a subset of it, the table all of it.
+ */
+export type ProjectListRow = Awaited<
   ReturnType<typeof searchProjects>
 >["rows"][number];
 
@@ -31,18 +34,42 @@ function Prose({ text }: { text: string | null }) {
   return <div className="line-clamp-3 max-w-xs">{stripMarkdown(text)}</div>;
 }
 
+type ProseField = {
+  [K in keyof ProjectListRow]: ProjectListRow[K] extends string | null
+    ? K
+    : never;
+}[keyof ProjectListRow];
+
+/**
+ * A hidden-by-default prose column. No `accessorFn` and `enableSorting:
+ * false`: without an accessor TanStack already refuses to sort, but
+ * `useAdminTableState` reads the flag, and the flag is what keeps
+ * `?sort=description` out of the sortable set.
+ */
+function proseColumn<TId extends string>(
+  id: TId,
+  header: string,
+  field: ProseField
+) {
+  return {
+    cell: ({ row }: { row: { original: ProjectListRow } }) => (
+      <Prose text={row.original[field]} />
+    ),
+    defaultHidden: true,
+    enableSorting: false,
+    header,
+    id,
+  } as const;
+}
+
 /**
  * The public listing's table mode. Every column is a field
  * `projectDetailView` returns to an anonymous viewer; nothing here makes a
  * new field public. The list lives outside the route so
  * `project-table-columns.test.tsx` can render it through `AdminDataTable`.
  *
- * Prose columns carry no `accessorFn` and set `enableSorting: false`
- * explicitly. Without an accessor TanStack already refuses to sort them, but
- * `useAdminTableState` reads the flag, and the flag is what keeps
- * `?sort=description` out of the sortable set.
  */
-export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectTableRow>()([
+export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
   {
     accessorFn: (row) => row.title,
     cell: ({ row }) => (
@@ -138,48 +165,20 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectTableRow>()([
     id: "updatedAt",
     sortingFn: "datetime",
   },
-  {
-    cell: ({ row }) => <Prose text={row.original.description} />,
-    defaultHidden: true,
-    enableSorting: false,
-    header: "Description",
-    id: "description",
-  },
-  {
-    cell: ({ row }) => <Prose text={row.original.problemStatement} />,
-    defaultHidden: true,
-    enableSorting: false,
-    header: "Problem statement",
-    id: "problemStatement",
-  },
-  {
-    cell: ({ row }) => <Prose text={row.original.objectives} />,
-    defaultHidden: true,
-    enableSorting: false,
-    header: "Objectives",
-    id: "objectives",
-  },
-  {
-    cell: ({ row }) => <Prose text={row.original.minQualifications} />,
-    defaultHidden: true,
-    enableSorting: false,
-    header: "Min qualifications",
-    id: "minQualifications",
-  },
-  {
-    cell: ({ row }) => <Prose text={row.original.prefQualifications} />,
-    defaultHidden: true,
-    enableSorting: false,
-    header: "Pref qualifications",
-    id: "prefQualifications",
-  },
-  {
-    cell: ({ row }) => <Prose text={row.original.licenseRestrictions} />,
-    defaultHidden: true,
-    enableSorting: false,
-    header: "License restrictions",
-    id: "licenseRestrictions",
-  },
+  proseColumn("description", "Description", "description"),
+  proseColumn("problemStatement", "Problem statement", "problemStatement"),
+  proseColumn("objectives", "Objectives", "objectives"),
+  proseColumn("minQualifications", "Min qualifications", "minQualifications"),
+  proseColumn(
+    "prefQualifications",
+    "Pref qualifications",
+    "prefQualifications"
+  ),
+  proseColumn(
+    "licenseRestrictions",
+    "License restrictions",
+    "licenseRestrictions"
+  ),
   {
     accessorFn: (row) => row.url ?? undefined,
     cell: ({ row }) =>

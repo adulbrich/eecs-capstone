@@ -20,12 +20,9 @@ export const projectCategoriesList = sql<string | null>`(
  * Join `programs` via leftJoin before using it so the program columns
  * resolve (null for projects without a program).
  *
- * Bounded by `projectDetailView` (`src/lib/project-visibility.ts`): every
- * field here is one it returns to an anonymous viewer, minus the four the
- * listing has no use for (`notes`, `isSponsored`, `programId`, `deletedAt`).
- * `search.integration.test.ts` pins the exact key set, so a private column
- * cannot ride into the anonymous listing with nothing failing. `proposerEmail`
- * and `notes` must never appear here.
+ * What may be in here is decided by `projectDetailView` and pinned by a
+ * key-set test; `docs/QUIRKS.md` ("The listing projection is bounded by
+ * projectDetailView") is the one place that rule is written out.
  */
 export const projectSummarySelect = {
   id: projects.id,

@@ -1,8 +1,8 @@
-import { Bookmark } from "lucide-react";
 import { useEffect, useState } from "react";
 import { authClient } from "#/lib/auth-client";
 import { useHasMounted } from "#/lib/use-has-mounted";
-import { addBookmark, isBookmarked, removeBookmark } from "#/server/bookmarks";
+import { isBookmarked } from "#/server/bookmarks";
+import { BookmarkIcon, writeBookmark } from "./bookmark-set";
 import { Button } from "./ui/button";
 
 export function BookmarkButton({ projectId }: { projectId: string }) {
@@ -37,11 +37,7 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
     const next = !bookmarked;
     setBookmarked(next);
     try {
-      if (next) {
-        await addBookmark({ data: { projectId } });
-      } else {
-        await removeBookmark({ data: { projectId } });
-      }
+      await writeBookmark(projectId, next);
     } catch (err) {
       setBookmarked(!next);
       console.error(err);
@@ -60,13 +56,7 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
       type="button"
       variant="outline"
     >
-      <Bookmark
-        className="h-4 w-4"
-        style={{
-          fill: bookmarked ? "var(--status-warning)" : "none",
-          color: bookmarked ? "var(--status-warning)" : undefined,
-        }}
-      />
+      <BookmarkIcon bookmarked={bookmarked} />
       {bookmarked ? "Bookmarked" : "Bookmark"}
     </Button>
   );

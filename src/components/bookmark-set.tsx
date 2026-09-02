@@ -16,6 +16,32 @@ import {
 } from "#/server/bookmarks";
 import { Button } from "./ui/button";
 
+/**
+ * Persists one bookmark state. Shared by the listing toggle below and the
+ * detail page's `BookmarkButton`, which own their state differently but
+ * write it the same way.
+ */
+export async function writeBookmark(projectId: string, bookmarked: boolean) {
+  if (bookmarked) {
+    await addBookmark({ data: { projectId } });
+  } else {
+    await removeBookmark({ data: { projectId } });
+  }
+}
+
+/** The glyph both bookmark controls draw, filled when set. */
+export function BookmarkIcon({ bookmarked }: { bookmarked: boolean }) {
+  return (
+    <Bookmark
+      className="h-4 w-4"
+      style={{
+        fill: bookmarked ? "var(--status-warning)" : "none",
+        color: bookmarked ? "var(--status-warning)" : undefined,
+      }}
+    />
+  );
+}
+
 interface BookmarkSet {
   has: (projectId: string) => boolean;
   set: (projectId: string, bookmarked: boolean) => void;
@@ -127,11 +153,7 @@ export function BookmarkToggle({
     setLoading(true);
     set.set(projectId, next);
     try {
-      if (next) {
-        await addBookmark({ data: { projectId } });
-      } else {
-        await removeBookmark({ data: { projectId } });
-      }
+      await writeBookmark(projectId, next);
     } catch (err) {
       set.set(projectId, !next);
       console.error(err);
@@ -151,13 +173,7 @@ export function BookmarkToggle({
       type="button"
       variant="outline"
     >
-      <Bookmark
-        className="h-4 w-4"
-        style={{
-          fill: bookmarked ? "var(--status-warning)" : "none",
-          color: bookmarked ? "var(--status-warning)" : undefined,
-        }}
-      />
+      <BookmarkIcon bookmarked={bookmarked} />
     </Button>
   );
 }
