@@ -551,6 +551,24 @@ upload (the uploader shows a local blob URL, so "an image is on screen" was true
 either way), the password reset (the test then signed in with the old password
 and passed), and an item edit.
 
+### A second comment posted in one page load needs a reload first
+
+Measured on the project comment composer: after a comment posts and renders, text
+typed into the same textarea was gone by the time Post was clicked, the `required`
+attribute blocked the empty submit, and the failure read as a missing second
+comment rather than as a cleared form. Reload between the two posts.
+
+`confirmed()` in `src/test/e2e/waits.ts` is no substitute for the reload. Its
+filter is unambiguous here, since only `addComment` is a POST, but it answers when
+the write lands, and the textarea appears to lose its text later, in whatever
+`onCommentsChanged` sets off (`src/routes/projects/$projectId.tsx`). The cause was
+not established. Issue #188 carries the candidates and what rules each out. Only
+this form was measured, and this entry shrinks to the reload once #188 is fixed.
+
+This is not the reverse of the rule above: there a navigation aborted a write in
+flight, here the reload is what puts the form in a settled state before the next
+write starts.
+
 ### The header avatar is a page load behind the profile page
 
 `site-header.tsx` reads `authClient.useSession()`, Better Auth's own client
