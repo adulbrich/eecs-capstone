@@ -2,11 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PrivacyPolicy } from "#/components/privacy-policy";
 import { pageTitle } from "#/lib/page-title";
 
-/**
- * Public on purpose, and not under `_authed`: someone deciding whether to
- * sign up reads this with no session, and it is the one route the account
- * deletion flow in #84 points at as a promise. See #91.
- */
+/** Public, outside `_authed`; docs/QUIRKS.md says why and what proves it. */
 export const Route = createFileRoute("/privacy")({
   head: () => ({ meta: [{ title: pageTitle("Privacy") }] }),
   component: Privacy,

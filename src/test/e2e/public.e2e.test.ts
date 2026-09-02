@@ -13,7 +13,7 @@ import { E2E_PREFIX, openDb } from "./fixtures";
  * production build that boots but cannot render.
  */
 test.describe("@smoke public shell", () => {
-  test("renders the landing page, the project list, and a published project", async ({
+  test("renders the landing page, the privacy page, the project list, and a published project", async ({
     page,
   }) => {
     await page.goto("/");
