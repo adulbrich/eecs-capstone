@@ -497,7 +497,9 @@ carries a domain status uses `variant="status"` and supplies its own
 variants (`default`, `secondary`, `outline`) paint a fixed color and cannot
 express a status mapping. Four components wrote this box independently before
 this rule existed, and two had already drifted apart on details like
-`inline-flex` versus `inline-block`.
+`inline-flex` versus `inline-block`. `CountBadge` is the one non-status use of
+`variant="status"`: it wants the blank canvas, and paints it with the
+`bg-primary text-primary-foreground` tokens rather than a status pair.
 
 ### Surfaces are not all cards
 

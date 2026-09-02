@@ -16,10 +16,9 @@ import {
   PaginationButton,
   PaginationStatus,
 } from "#/components/ui/pagination";
-import { authClient } from "#/lib/auth-client";
 import { useAdminTable } from "#/lib/use-admin-table";
-import { useHasMounted } from "#/lib/use-has-mounted";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
+import { useSignedIn } from "#/lib/use-signed-in";
 import type { ViewMode } from "#/lib/view-preference";
 import { listInventory, listInventoryCategories } from "#/server/inventory";
 
@@ -156,14 +155,10 @@ function InventoryIndex() {
     },
     [navigate]
   );
-  const { data: session } = authClient.useSession();
-  const hasMounted = useHasMounted();
+  const signedIn = useSignedIn();
   const data = Route.useLoaderData();
 
   const totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
-  // Gated on mount so the server's signed-out render and the client's first
-  // render agree; see useHasMounted.
-  const signedIn = hasMounted && !!session?.user;
   return (
     <div className="px-4 py-6 md:p-8">
       <div className="mx-auto max-w-4xl">

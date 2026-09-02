@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Bookmark } from "lucide-react";
-import { authClient } from "#/lib/auth-client";
-import { useHasMounted } from "#/lib/use-has-mounted";
+import { useSignedIn } from "#/lib/use-signed-in";
 import { listMyBookmarks } from "#/server/bookmarks";
 import { CountBadge } from "./count-badge";
 import { Button } from "./ui/button";
@@ -17,9 +16,7 @@ import { Button } from "./ui/button";
  * that check would overstate a list that got shorter.
  */
 export function BookmarksButton() {
-  const { data: session } = authClient.useSession();
-  const hasMounted = useHasMounted();
-  const signedIn = hasMounted && !!session?.user;
+  const signedIn = useSignedIn();
   const { data } = useQuery({
     queryKey: ["bookmarks"],
     queryFn: () => listMyBookmarks(),

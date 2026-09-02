@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ClipboardList } from "lucide-react";
-import { authClient } from "#/lib/auth-client";
-import { useHasMounted } from "#/lib/use-has-mounted";
+import { useSignedIn } from "#/lib/use-signed-in";
 import { getCart } from "#/server/inventory";
 import { CountBadge } from "./count-badge";
 import { Button } from "./ui/button";
@@ -15,13 +14,11 @@ import { Button } from "./ui/button";
  *
  * Gates itself on the session rather than taking a prop, so the page that
  * mounts it cannot render it for an anonymous visitor by mistake: `getCart`
- * requires a session and would throw. Gated on mount as well, so the server's
- * signed-out render and the client's first render agree.
+ * requires a session and would throw. `useSignedIn` holds the first client
+ * render to the server's signed-out answer.
  */
 export function BorrowListButton() {
-  const { data: session } = authClient.useSession();
-  const hasMounted = useHasMounted();
-  const signedIn = hasMounted && !!session?.user;
+  const signedIn = useSignedIn();
   const { data } = useQuery({
     queryKey: ["cart"],
     queryFn: () => getCart(),
