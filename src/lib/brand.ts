@@ -17,6 +17,9 @@ export const brand = {
   // different subdomain, so changing this cannot affect outbound mail.
   supportEmail: "eecs-capstone@oregonstate.edu",
   institutionUrl: "https://oregonstate.edu",
+  // The header's source link. Here rather than in the component because it
+  // is one of the values a fork changes, like every other field in this file.
+  repositoryUrl: "https://github.com/adulbrich/eecs-capstone",
 
   // Color tokens: must match the :root defaults in styles.css exactly.
   // BrandProvider writes these to :root at runtime via element.style.setProperty().
@@ -45,5 +48,6 @@ export interface Brand {
   logoUrl: string;
   logoUrlLight: string | undefined;
   programName: string;
+  repositoryUrl: string;
   supportEmail: string;
 }
