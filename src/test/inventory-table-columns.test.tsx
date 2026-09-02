@@ -154,7 +154,7 @@ describe("the public inventory table", () => {
       "inventory/i1/a.webp"
     );
     const add = await within(name).findByRole("button", {
-      name: "Add to cart",
+      name: "Add to borrow list",
     });
     expect(add.closest("a")).toBeNull();
     expect(rowFor("Drill").queryByRole("button")).toBeNull();
@@ -164,6 +164,8 @@ describe("the public inventory table", () => {
     session.data = null;
     renderTable(DEFAULT_HIDDEN);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(screen.queryByRole("button", { name: "Add to cart" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Add to borrow list" })
+    ).toBeNull();
   });
 });

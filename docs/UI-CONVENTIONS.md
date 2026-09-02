@@ -15,10 +15,11 @@ Companion docs: [`QUIRKS.md`](./QUIRKS.md) for framework gotchas and code style,
 4. [Color tokens](#color-tokens)
 5. [Border radius](#border-radius)
 6. [Mobile-first layout](#mobile-first-layout)
-7. [Mobile navigation](#mobile-navigation)
-8. [Admin tables](#admin-tables)
-9. [Component patterns](#component-patterns)
-10. [Destructive actions](#destructive-actions)
+7. [Site header](#site-header)
+8. [Mobile navigation](#mobile-navigation)
+9. [Admin tables](#admin-tables)
+10. [Component patterns](#component-patterns)
+11. [Destructive actions](#destructive-actions)
 
 ---
 
@@ -213,6 +214,23 @@ Inline form controls all share `h-9` (36px) so adjacent elements align without m
 numbers. `Input`, `SelectTrigger` (at `data-size=default`), `Button size="default"`,
 and `ViewToggle` are already `h-9`. Set `h-9` explicitly on any new control that
 sits inline beside them.
+
+---
+
+## Site header
+
+The header carries site-wide chrome: navigation, the source link, notifications,
+and the account menu. Anything scoped to one page's contents, such as a
+collection count, lives on that page. The borrow list count sits on the
+`/inventory` title row (`BorrowListButton`) and the bookmark count on the
+`/projects` title row (`BookmarksButton`), opposite the `h1` and above the
+filter bar. The header used to carry the borrow list as a shopping cart icon,
+which both claimed something was being bought and reminded you of a list scoped
+to one page from every other one.
+
+Site-wide versus page-scoped is the distinction, not global state versus
+static: a static link to the source repository belongs in the header, and a
+live count of a page's own collection does not.
 
 ---
 

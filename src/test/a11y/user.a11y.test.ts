@@ -14,9 +14,9 @@ const { projectId, draftProjectId } = JSON.parse(
 
 test.use({ storageState: join(__dirname, ".user-auth.json") });
 
-// The listing renders a bookmark toggle per row for a signed-in viewer and
-// nothing for anyone else, so the public suite's scans never see the control.
-// These two are the only scans that do.
+// The listing renders a bookmark toggle per row and a count on the title row
+// for a signed-in viewer and nothing for anyone else, so the public suite's
+// scans never see either control. These are the only scans that do.
 
 test("projects list, signed in, with bookmark controls", async ({ page }) => {
   await page.goto("/projects");
@@ -24,6 +24,7 @@ test("projects list, signed in, with bookmark controls", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: /^(Bookmark|Remove bookmark)$/ }).first()
   ).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Bookmarks/ })).toBeVisible();
   await checkA11y(page);
 });
 
@@ -36,14 +37,17 @@ test("projects table, signed in, with bookmark controls", async ({ page }) => {
   await checkA11y(page);
 });
 
-test("inventory table, signed in, with add-to-cart controls", async ({
+test("inventory table, signed in, with borrow list controls", async ({
   page,
 }) => {
   await page.goto("/inventory?view=table");
   await waitForHydration(page);
   await expect(
-    page.getByRole("button", { name: /^(Add to cart|In cart)$/ }).first()
+    page
+      .getByRole("button", { name: /^(Add to borrow list|In borrow list)$/ })
+      .first()
   ).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Borrow list/ })).toBeVisible();
   await checkA11y(page);
 });
 
@@ -69,7 +73,7 @@ test("@smoke my items, each tab panel", async ({ page }) => {
   // The tab strip was three loose buttons until 2026-08-22 and this suite
   // could not tell, because a labelled button is valid markup on its own. The
   // scan that matters is of the selected state and each panel's content.
-  for (const name of [/^Cart/, /^Active/, /^History/]) {
+  for (const name of [/^Borrow list/, /^Active/, /^History/]) {
     await page.getByRole("tab", { name }).click();
     await expect(page.getByRole("tab", { name, selected: true })).toBeVisible();
     await checkA11y(page);

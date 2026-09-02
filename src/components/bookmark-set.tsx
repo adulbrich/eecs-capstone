@@ -1,7 +1,9 @@
+import { QueryClientContext } from "@tanstack/react-query";
 import { Bookmark } from "lucide-react";
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -20,13 +22,30 @@ import { Button } from "./ui/button";
  * Persists one bookmark state. Shared by the listing toggle below and the
  * detail page's `BookmarkButton`, which own their state differently but
  * write it the same way.
+ *
+ * A hook rather than a bare function because the write has a second reader:
+ * the count on the `/projects` title row (`BookmarksButton`) holds the
+ * bookmark list under the `["bookmarks"]` query key, and on the listing it
+ * sits on the same page as the toggles, so a click has to reach it without a
+ * remount. Invalidating here, once, is what keeps every writer honest.
+ *
+ * The context rather than `useQueryClient`, which throws with no provider:
+ * the app always has one, but a component test that renders a card on its
+ * own does not, and there is nothing to invalidate there anyway.
  */
-export async function writeBookmark(projectId: string, bookmarked: boolean) {
-  if (bookmarked) {
-    await addBookmark({ data: { projectId } });
-  } else {
-    await removeBookmark({ data: { projectId } });
-  }
+export function useWriteBookmark() {
+  const qc = useContext(QueryClientContext);
+  return useCallback(
+    async (projectId: string, bookmarked: boolean) => {
+      if (bookmarked) {
+        await addBookmark({ data: { projectId } });
+      } else {
+        await removeBookmark({ data: { projectId } });
+      }
+      await qc?.invalidateQueries({ queryKey: ["bookmarks"] });
+    },
+    [qc]
+  );
 }
 
 /** The glyph both bookmark controls draw, filled when set. */
@@ -138,6 +157,7 @@ export function BookmarkToggle({
   projectId: string;
 }) {
   const set = useContext(BookmarkSetContext);
+  const writeBookmark = useWriteBookmark();
   const [loading, setLoading] = useState(false);
   if (!set) {
     return null;

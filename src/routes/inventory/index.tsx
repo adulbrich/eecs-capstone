@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { z } from "zod";
 import { AdminDataTable } from "#/components/admin-data-table";
+import { BorrowListButton } from "#/components/borrow-list-button";
 import { EmptyState } from "#/components/empty-state";
 import { InventoryCard } from "#/components/inventory-card";
 import { InventoryFilterBar } from "#/components/inventory-filter-bar";
@@ -166,7 +167,10 @@ function InventoryIndex() {
   return (
     <div className="px-4 py-6 md:p-8">
       <div className="mx-auto max-w-4xl">
-        <h1 className="font-semibold text-2xl">Inventory</h1>
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="font-semibold text-2xl">Inventory</h1>
+          <BorrowListButton />
+        </div>
         <div className="mt-4">
           <InventoryFilterBar
             categories={data.categories}
