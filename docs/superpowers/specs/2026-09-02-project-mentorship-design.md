@@ -54,21 +54,29 @@ No embedding refresh: neither column feeds the embedding source text.
 
 ## Read path
 
-`src/server/_internal/project-summary.ts` gains a `mentorNameSql` correlated subquery:
+`src/server/_internal/project-summary.ts` gains two SQL fragments:
 
 ```sql
-(select u.name from "user" u where lower(u.email) = lower(projects.mentor_email) limit 1)
+-- mentorNameSql
+(select "user"."name" from "user" where lower("user"."email") = lower("projects"."mentor_email") limit 1)
+-- seekingMentorSql
+("projects"."student_proposed" and "projects"."mentor_email" is null)
 ```
 
-and `projectSummarySelect` gains `studentProposed` and `mentorName`. That is the one
-projection the public listing, search, bookmarks and my-projects share, so all four pick up
-both fields with no change to their joins. Same shape as the `categories` subquery in the
-admin export.
+and `projectSummarySelect` gains `studentProposed`, `seekingMentor` and `mentorName`. That
+is the one projection the public listing, search, bookmarks and my-projects share, so all
+four pick up the fields with no change to their joins. Same shape as the `categories`
+subquery in the admin export.
 
-`getProjectAs` selects the row plus `mentorName` through the same SQL, and
-`projectDetailView` names `studentProposed` and `mentorName`. `mentorEmail` is not named in
-either view, so it cannot reach an anonymous or proposer payload. The `PUBLIC_KEYS` pin in
-`projects.integration.test.ts` grows by exactly those two keys.
+`seekingMentor` is computed in SQL rather than in the client because the public payload
+does not carry `mentorEmail`, so a client cannot tell "no mentor" from "a mentor is lined
+up who has not signed up yet". The middle row of the table above depends on that
+distinction, and the flag is the only way to carry it without carrying the address.
+
+`getProjectAs` selects the row plus the two fragments, and `projectDetailView` names
+`studentProposed`, `seekingMentor` and `mentorName`. `mentorEmail` is not named in either
+view, so it cannot reach an anonymous or proposer payload. The `PUBLIC_KEYS` pin in
+`projects.integration.test.ts` grows by exactly those three keys.
 
 A staff-gated read, `getProjectMentorship({ projectId })` in `projects-queries.ts`, returns
 `{ studentProposed, mentorEmail, mentorName }` to prefill the panel. Same gate and shape as
@@ -76,26 +84,21 @@ A staff-gated read, `getProjectMentorship({ projectId })` in `projects-queries.t
 
 ## Derived state
 
-`src/lib/mentorship.ts` exports one pure function:
+One component, `MentorshipBadges` in `src/components/mentorship-badges.tsx`, takes
+`{ seekingMentor, studentProposed }` and renders the "Student proposed" and "Seeking
+mentor" badges. Card, row and detail page all render it, so the badges cannot be computed
+three ways. The rule itself lives in `seekingMentorSql`, in one place, on the server.
 
-```ts
-export type MentorDisplay = "seeking" | { name: string } | null;
-export function mentorDisplay(p: {
-  mentorName: string | null;
-  studentProposed: boolean;
-}): MentorDisplay;
-```
-
-Card, row and detail page all call it, so the three states cannot be computed three ways.
-The middle row of the table above is the one it exists for: an address with no account
+The middle row of the table above is the one this exists for: an address with no account
 shows nothing, because "Seeking mentor" would be false and the email would publish a person
 who has not signed up.
 
 ## Surfaces
 
-- `ProjectCard` and `ProjectRow`: a "Student proposed" badge (`outline` variant) and a
-  "Seeking mentor" badge (`status` variant, warning tokens) beside the status badge. A
-  resolved mentor name is not shown on the listing; it is a detail-page fact.
+- `ProjectCard` and `ProjectRow`: `MentorshipBadges` under the title, a "Student
+  proposed" badge (`outline` variant) and a "Seeking mentor" badge (`status` variant,
+  warning tokens). A resolved mentor name is not shown on the listing; it is a
+  detail-page fact.
 - `/projects/$projectId`: the same badges under the title, and a "Mentor" section showing
   the resolved name when there is one.
 - `StaffProjectPanel`: a "Mentorship" `PanelSection` between Proposer and Status, with the
@@ -122,7 +125,7 @@ nothing else.
 | `student_proposed` | yes | yes | yes | staff |
 | `mentor_email` | no | no | yes | staff |
 | resolved mentor name | yes | yes | yes | derived |
-| "Seeking mentor" | yes | yes | yes | derived |
+| `seekingMentor` | yes | yes | yes | derived |
 
 ## Tests
 
@@ -138,13 +141,13 @@ Integration, `src/server/__tests__/projects.integration.test.ts` or a new
   `updateProjectAs` with the two keys in its input leaves both columns untouched.
 - A save writes a `project_edit_log` row naming the changed fields; an unchanged save
   writes none.
-- The listing projection carries `studentProposed` and `mentorName`.
+- The listing projection carries `studentProposed`, `seekingMentor` and `mentorName`.
 
 Unit:
 
-- `mentorDisplay` covers the three states plus the "student proposed with a mentor" case.
-- `projectDetailView` key set in `project-visibility.test.ts` includes the two new keys and
-  excludes `mentorEmail`.
+- `MentorshipBadges` renders nothing, one badge, or both, and never the name.
+- `projectDetailView` key set in `project-visibility.test.ts` includes the three new keys
+  and excludes `mentorEmail`.
 
 Deferred to #84: deleting the mentor's account nulls `mentor_email`. Nothing can be
 deleted until that issue lands.
