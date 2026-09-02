@@ -24,12 +24,14 @@ const {
   hardDeleteProject,
   restoreProject,
   softDeleteProject,
+  updateProjectMentorship,
 } = vi.hoisted(() => ({
   performTransition: vi.fn(),
   forceSetProjectStatus: vi.fn(),
   hardDeleteProject: vi.fn(),
   restoreProject: vi.fn(),
   softDeleteProject: vi.fn(),
+  updateProjectMentorship: vi.fn(),
 }));
 vi.mock("#/server/projects", () => ({
   performTransition,
@@ -37,15 +39,19 @@ vi.mock("#/server/projects", () => ({
   hardDeleteProject,
   restoreProject,
   softDeleteProject,
+  updateProjectMentorship,
 }));
 
-const { listProjectEditLog, getProposerForEdit } = vi.hoisted(() => ({
-  listProjectEditLog: vi.fn(),
-  getProposerForEdit: vi.fn(),
-}));
+const { listProjectEditLog, getProposerForEdit, getProjectMentorship } =
+  vi.hoisted(() => ({
+    listProjectEditLog: vi.fn(),
+    getProposerForEdit: vi.fn(),
+    getProjectMentorship: vi.fn(),
+  }));
 vi.mock("#/server/projects-queries", () => ({
   listProjectEditLog,
   getProposerForEdit,
+  getProjectMentorship,
 }));
 
 // Radix's Checkbox measures itself on mount; jsdom ships no ResizeObserver.
@@ -74,10 +80,18 @@ beforeEach(() => {
   softDeleteProject.mockReset();
   listProjectEditLog.mockReset();
   getProposerForEdit.mockReset();
+  getProjectMentorship.mockReset();
+  updateProjectMentorship.mockReset();
 
   performTransition.mockResolvedValue({});
   forceSetProjectStatus.mockResolvedValue({});
+  updateProjectMentorship.mockResolvedValue({ id: PROJECT_ID, updated: true });
   listProjectEditLog.mockResolvedValue({ rows: [] });
+  getProjectMentorship.mockResolvedValue({
+    mentorEmail: "",
+    mentorName: null,
+    studentProposed: false,
+  });
   getProposerForEdit.mockResolvedValue({
     accountLinked: true,
     accountName: "proposer@example.com",
@@ -252,5 +266,63 @@ describe("StaffProjectPanel review-email control", () => {
         sendEmail: true,
       },
     });
+  });
+});
+
+describe("StaffProjectPanel mentorship block", () => {
+  it("prefills the saved record and says which account the address matches", async () => {
+    getProjectMentorship.mockResolvedValue({
+      mentorEmail: "mentor@x.test",
+      mentorName: "Dana Lee",
+      studentProposed: true,
+    });
+    renderPanel("submitted");
+
+    const input = (await screen.findByLabelText(
+      "Mentor email"
+    )) as HTMLInputElement;
+    expect(input.value).toBe("mentor@x.test");
+    expect(await screen.findByText("Account: Dana Lee")).toBeTruthy();
+    expect(
+      (
+        screen.getByRole("checkbox", {
+          name: "Student proposed",
+        }) as HTMLElement
+      ).getAttribute("aria-checked")
+    ).toBe("true");
+  });
+
+  it("says the catalog shows seeking when a student project has no address", async () => {
+    getProjectMentorship.mockResolvedValue({
+      mentorEmail: "",
+      mentorName: null,
+      studentProposed: true,
+    });
+    renderPanel("submitted");
+    expect(
+      await screen.findByText(/shows this project as seeking a mentor/)
+    ).toBeTruthy();
+  });
+
+  it("saves the draft through the server function and reloads the record", async () => {
+    renderPanel("submitted");
+    const input = (await screen.findByLabelText(
+      "Mentor email"
+    )) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: " other@x.test " } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Student proposed" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save mentorship" }));
+
+    await waitFor(() =>
+      expect(updateProjectMentorship).toHaveBeenCalledWith({
+        data: {
+          id: PROJECT_ID,
+          mentorEmail: "other@x.test",
+          studentProposed: true,
+        },
+      })
+    );
+    // Once on mount, once after the save.
+    await waitFor(() => expect(getProjectMentorship).toHaveBeenCalledTimes(2));
   });
 });
