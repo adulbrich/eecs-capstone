@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { z } from "zod";
 import { AdminDataTable } from "#/components/admin-data-table";
 import { BookmarkSetProvider } from "#/components/bookmark-set";
+import { BookmarksButton } from "#/components/bookmarks-button";
 import { EmptyState } from "#/components/empty-state";
 import { ProjectCard } from "#/components/project-card";
 import {
@@ -135,7 +136,10 @@ function ProjectsList() {
   return (
     <div className="px-4 py-6 md:p-8">
       <div className="mx-auto max-w-4xl">
-        <h1 className="font-semibold text-2xl">Projects</h1>
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="font-semibold text-2xl">Projects</h1>
+          <BookmarksButton />
+        </div>
         <div className="mt-4">
           <ProjectsFilterBar
             archivedOnly={search.archivedOnly}

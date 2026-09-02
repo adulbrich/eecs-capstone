@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { authClient } from "#/lib/auth-client";
 import { useHasMounted } from "#/lib/use-has-mounted";
 import { isBookmarked } from "#/server/bookmarks";
-import { BookmarkIcon, writeBookmark } from "./bookmark-set";
+import { BookmarkIcon, useWriteBookmark } from "./bookmark-set";
 import { Button } from "./ui/button";
 
 export function BookmarkButton({ projectId }: { projectId: string }) {
   const { data: session } = authClient.useSession();
   const hasMounted = useHasMounted();
+  const writeBookmark = useWriteBookmark();
   const [bookmarked, setBookmarked] = useState(false);
   const [loading, setLoading] = useState(false);
 

@@ -13,12 +13,17 @@ interface Props {
 }
 
 /**
- * Add to cart, with the three states the action actually has.
+ * Add to the borrow list, with the three states the action actually has.
  *
- * The "already in cart" state is read from the cart itself rather than kept as
- * local UI state, so it survives a reload and is right on first paint for an
- * item added from another page. The query key is shared with `CartButton`, so
- * however many of these are on screen there is one request.
+ * "Borrow list" is the user-facing name; the code keeps "cart" for the thing
+ * assembled before submission, since renaming the table and the server
+ * functions would be a migration for zero user benefit.
+ *
+ * The "already in the list" state is read from the cart itself rather than
+ * kept as local UI state, so it survives a reload and is right on first paint
+ * for an item added from another page. The query key is shared with
+ * `BorrowListButton`, so however many of these are on screen there is one
+ * request.
  *
  * Only rendered for a signed-in viewer looking at an available item, which is
  * what keeps the cart query off the public listing: `getCart` requires a
@@ -39,14 +44,14 @@ export function AddToCartButton({
     mutationFn: () => addToCart({ data: { itemId } }),
     // Only the cart. The previous call sites invalidated every query, but
     // adding to a cart changes no item's status, and the cart is the only
-    // React Query consumer that cares. The header count shares this key, so
-    // it updates from the same refetch.
+    // React Query consumer that cares. The title-row count on /inventory
+    // shares this key, so it updates from the same refetch.
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cart"] }),
   });
 
   // isSuccess as well as the cart, so the label flips the moment the write
   // lands rather than waiting for the refetch that follows it. Without it the
-  // button reads "Add to cart" again for as long as the invalidation takes,
+  // button reads "Add to borrow list" again for as long as the invalidation takes,
   // which is exactly the moment the user is looking for confirmation.
   const inCart = isSuccess || (cart ?? []).some((row) => row.itemId === itemId);
 
@@ -57,11 +62,11 @@ export function AddToCartButton({
         disabled
         size={size}
         // aria-disabled would keep it focusable, but there is nothing left to
-        // do here and the cart link in the header is the next step.
+        // do here and the borrow list count on the page is the next step.
         variant={variant}
       >
         <Check aria-hidden="true" className="h-4 w-4" />
-        In cart
+        In borrow list
       </Button>
     );
   }
@@ -89,7 +94,7 @@ function addToCartLabel(isPending: boolean, isError: boolean): string {
   if (isError) {
     return "Could not add, try again";
   }
-  return "Add to cart";
+  return "Add to borrow list";
 }
 
 /**

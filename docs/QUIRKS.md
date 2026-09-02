@@ -452,8 +452,8 @@ and a mismatch fails sign-in for a reason that looks nothing like a port problem
 only sweeps `E2E-` orphans. A retry has to mean something: the inventory flow
 walks an item through `available -> requested -> reserved -> checked_out ->
 available`, so an attempt dying at check-out leaves it `reserved`, and a retry
-then fails at "Add to cart" for an unrelated reason. Global setup cannot repair
-that, having run before the first attempt.
+then fails at "Add to borrow list" for an unrelated reason. Global setup cannot
+repair that, having run before the first attempt.
 
 Sweep order matters. `inventory_request_items.item_id` is the one FK in that
 graph declared `onDelete: "restrict"`; the others cascade. Request lines, and the

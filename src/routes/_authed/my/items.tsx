@@ -71,7 +71,9 @@ function MyItems() {
         value={tab}
       >
         <TabsList>
-          <TabsTrigger value="cart">Cart ({data.cart.length})</TabsTrigger>
+          <TabsTrigger value="cart">
+            Borrow list ({data.cart.length})
+          </TabsTrigger>
           <TabsTrigger value="active">
             Active ({data.active.length})
           </TabsTrigger>
@@ -81,7 +83,7 @@ function MyItems() {
         <TabsContent value="cart">
           <div className="space-y-2">
             {data.cart.length === 0 && (
-              <EmptyState>Your cart is empty.</EmptyState>
+              <EmptyState>Your borrow list is empty.</EmptyState>
             )}
             {data.cart.map((row) => (
               <div

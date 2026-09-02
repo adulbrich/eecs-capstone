@@ -41,7 +41,7 @@ export async function addToCartAs(viewer: Viewer, data: { itemId: string }) {
     throw new Error("Item not found");
   }
   if (item.status !== "available") {
-    throw new Error("Only available items can be added to the cart");
+    throw new Error("Only available items can be added to the borrow list");
   }
   await db
     .insert(inventoryCartItems)
@@ -85,7 +85,7 @@ export async function submitCartAs(
       .where(eq(inventoryCartItems.userId, viewer.id));
 
     if (cartRows.length === 0) {
-      throw new Error("Cart is empty");
+      throw new Error("Borrow list is empty");
     }
 
     // Phase 1: lock each cart item row and confirm it is still available.

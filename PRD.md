@@ -267,14 +267,16 @@ Each project carries:
   request queue. This mirrors how projects are laid out.
 - ✅ One item detail page for everyone: every viewer sees image, name,
   status, category, and description; signed-in users additionally see
-  Add to cart when the item is available; staff additionally render two
+  Add to borrow list when the item is available; staff additionally render two
   panels, splitting what the item is from what is happening to it. A
   "Private" panel holds its serial, label, location and private notes with
   the Edit link beside them, mirroring the project page's private panel; a
   staff panel holds the lifecycle controls, the status history and the
   danger zone.
-- ✅ Cart-style requests: users request several items at once (`/my/items`
-  cart, request items table).
+- ✅ Borrow-list requests: users assemble a borrow list and submit several
+  items at once (`/my/items` borrow list tab, request items table). The list
+  is called a cart in code (`inventory_cart_items`, `getCart`) and a borrow
+  list in every user-facing string.
 - ✅ Staff approve or reject inventory requests (`/admin/inventory/requests`).
 - ✅ Rejection requires a reason that is shown to the user; rejected/returned
   items go back to `available`.

@@ -49,7 +49,7 @@ test.describe("@smoke authorization", () => {
       // Prove the page rendered before asserting on what is missing: an error
       // boundary also has no staff panel and would pass the checks below.
       //
-      // The heading, not a cart button. Whether "Add to cart" renders depends
+      // The heading, not an add button. Whether "Add to borrow list" renders depends
       // on the item's status, and the seed leaves its alphabetically first item
       // `requested`, which shows "This item is not available right now" and no
       // button at all. A sentinel for "did this page render" must not itself be

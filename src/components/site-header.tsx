@@ -3,7 +3,6 @@ import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { authClient } from "#/lib/auth-client";
 import { getPublicUrl } from "#/lib/storage";
-import { CartButton } from "./cart-button";
 import { InstitutionLogo } from "./institution-logo";
 import { NotificationBell } from "./notification-bell";
 import { Button } from "./ui/button";
@@ -76,12 +75,7 @@ export function SiteHeader() {
           <InstitutionLogo />
         </Link>
         <div className="flex items-center gap-2">
-          {signedIn && (
-            <>
-              <NotificationBell />
-              <CartButton />
-            </>
-          )}
+          {signedIn && <NotificationBell />}
           <MobileMenu
             isPending={isPending}
             isStaff={isStaff}
@@ -297,7 +291,6 @@ function SignedIn({
   return (
     <>
       <NotificationBell />
-      <CartButton />
       <UserMenu user={{ name, email, image }} />
     </>
   );
