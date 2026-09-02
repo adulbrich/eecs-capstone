@@ -67,8 +67,8 @@ jobs:
   #
   # Advisory until it is registered. The check to add to the `main` ruleset
   # is `accessibility-smoke / suite`, for the same `<caller job> / <called job>`
-  # reason as smoke above, and only after it has reported on main once: a
-  # required context that has never reported blocks every pull request.
+  # reason as smoke above. Register it after this job has reported on a pull
+  # request, which the ruleset picker needs before it offers the name.
   accessibility-smoke:
     uses: ./.github/workflows/stack-suite.yml
     with:

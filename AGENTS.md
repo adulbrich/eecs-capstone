@@ -38,11 +38,11 @@ global setup signs in as the seeded users) and `npx playwright install chromium`
 Only the scans tagged `@smoke` run on a pull request, through
 `npm run test:accessibility:smoke`, listed in the `accessibility-smoke` job comment in
 `ci.yml`; the rest run from the dispatch-only `full-accessibility.yml`, so a change to
-a page outside that subset needs the full run locally. `npm run test:smoke` wants that same setup and builds the production
-output itself, which is the point of it: the dev server cannot show SSR-only
-breakage. Run it when you touch one of the flows it covers, listed in the job
-comment in `ci.yml`, because unlike the integration suite a red one blocks the
-merge. Other scripts live in `package.json`.
+a page outside that subset needs the full run locally. `npm run test:smoke` wants
+that same setup and builds the production output itself, which is the point of it:
+the dev server cannot show SSR-only breakage. Run it when you touch one of the flows
+it covers, listed in the job comment in `ci.yml`, because unlike the integration
+suite a red one blocks the merge. Other scripts live in `package.json`.
 
 `verify` and `smoke / suite` can block a merge today. `accessibility-smoke / suite`
 is meant to join them once it is registered on the ruleset (its job comment in
