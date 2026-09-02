@@ -1,4 +1,3 @@
-import { cn } from "#/lib/utils.ts";
 import { Badge } from "./ui/badge";
 
 /**
@@ -22,7 +21,7 @@ export function ApplicantsBadge({
   }
   return (
     <Badge
-      className={cn(className)}
+      className={className}
       style={{
         backgroundColor: "var(--status-error-bg)",
         color: "var(--status-error)",

@@ -54,6 +54,19 @@ async function publish(
   return id;
 }
 
+// Every input the impl requires, so a new filter lands here once rather than
+// in every call below. `recommended-sort.integration.test.ts` has its own.
+const SEARCH_DEFAULTS = {
+  query: "",
+  categoryIds: [] as string[],
+  programId: null,
+  archivedOnly: false,
+  acceptingOnly: false,
+  page: 1,
+  pageSize: 20,
+  sort: "relevance" as const,
+};
+
 describe("searchProjects", () => {
   it("ranks title hit above description hit for the same query", async () => {
     const admin = await makeAdmin(`a-${Date.now()}@x.com`);
@@ -63,14 +76,8 @@ describe("searchProjects", () => {
     });
 
     const { rows } = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
       query: "react",
-      categoryIds: [],
-      programId: null,
-      archivedOnly: false,
-      acceptingOnly: false,
-      page: 1,
-      pageSize: 20,
-      sort: "relevance",
     });
     expect(rows[0].id).toBe(titleId);
     const order = rows.map((r) => r.id);
@@ -83,15 +90,7 @@ describe("searchProjects", () => {
     const closedId = await publish(admin, "Closed roster", {
       acceptingApplicants: false,
     });
-    const input = {
-      query: "",
-      categoryIds: [],
-      programId: null,
-      archivedOnly: false,
-      page: 1,
-      pageSize: 50,
-      sort: "relevance" as const,
-    };
+    const input = { ...SEARCH_DEFAULTS, pageSize: 50 };
 
     // Off by default: the catalog stays browsable and a closed project is
     // still worth reading about.
@@ -112,14 +111,8 @@ describe("searchProjects", () => {
     const admin = await makeAdmin(`a2-${Date.now()}@x.com`);
     const { id } = await createProjectAs(admin, baseProject("Draft project"));
     const { rows } = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
       query: "",
-      categoryIds: [],
-      programId: null,
-      archivedOnly: false,
-      acceptingOnly: false,
-      page: 1,
-      pageSize: 20,
-      sort: "relevance",
     });
     expect(rows.find((r) => r.id === id)).toBeUndefined();
   });
@@ -129,14 +122,8 @@ describe("searchProjects", () => {
     const first = await publish(admin, "First");
     const second = await publish(admin, "Second");
     const { rows } = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
       query: "",
-      categoryIds: [],
-      programId: null,
-      archivedOnly: false,
-      acceptingOnly: false,
-      page: 1,
-      pageSize: 20,
-      sort: "relevance",
     });
     const order = rows.map((r) => r.id);
     expect(order.indexOf(second)).toBeLessThan(order.indexOf(first));
@@ -146,14 +133,8 @@ describe("searchProjects", () => {
     const admin = await makeAdmin(`a4-${Date.now()}@x.com`);
     await publish(admin, "Anything");
     const { rows } = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
       query: "   ",
-      categoryIds: [],
-      programId: null,
-      archivedOnly: false,
-      acceptingOnly: false,
-      page: 1,
-      pageSize: 20,
-      sort: "relevance",
     });
     expect(rows.length).toBeGreaterThan(0);
   });
@@ -168,14 +149,8 @@ describe("searchProjects", () => {
     await publish(admin, "Key set");
 
     const { rows } = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
       query: "",
-      categoryIds: [],
-      programId: null,
-      archivedOnly: false,
-      acceptingOnly: false,
-      page: 1,
-      pageSize: 20,
-      sort: "relevance",
     });
     expect(Object.keys(rows[0]).sort()).toEqual([
       "acceptingApplicants",

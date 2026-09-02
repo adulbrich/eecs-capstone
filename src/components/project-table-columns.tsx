@@ -133,15 +133,17 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
   },
   {
     accessorFn: (row) => row.acceptingApplicants,
+    // Badge or dash, the same shape as the NDA column beside it: the row
+    // that needs a second look carries the mark, the ordinary one is quiet.
     cell: ({ row }) =>
       row.original.acceptingApplicants ? (
-        "Yes"
+        "-"
       ) : (
         <ApplicantsBadge acceptingApplicants={false} />
       ),
     header: "Accepting applicants",
     id: "accepting",
-    // Boolean, not text, for the same reason as the Teams column.
+    // Boolean, not text: see the Teams column.
     sortingFn: "basic",
   },
   {
