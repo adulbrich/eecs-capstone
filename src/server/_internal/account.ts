@@ -1,4 +1,4 @@
-import { and, eq, getTableName, inArray, or, sql } from "drizzle-orm";
+import { and, eq, getTableName, inArray, isNull, or, sql } from "drizzle-orm";
 import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { db } from "#/db";
 import {
@@ -19,14 +19,8 @@ import {
   userInterests,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
+import type { Viewer } from "#/lib/viewer";
 import type { DeleteAccountInput } from "../account";
-
-export interface AccountViewer {
-  email: string;
-  id: string;
-  image?: string | null | undefined;
-  role?: string | null | undefined;
-}
 
 export interface DeletionPreview {
   blockers: {
@@ -76,10 +70,14 @@ export const CASCADE_TABLES: readonly string[] = CASCADE_EDGES.map((t) =>
  * session for role and address: both can be stale by a request.
  */
 export async function getAccountDeletionPreviewAs(
-  viewer: AccountViewer
+  viewer: NonNullable<Viewer>
 ): Promise<DeletionPreview> {
   const [row] = await db
-    .select({ email: user.email, role: user.role })
+    .select({
+      email: user.email,
+      emailVerified: user.emailVerified,
+      role: user.role,
+    })
     .from(user)
     .where(eq(user.id, viewer.id));
   if (!row) {
@@ -87,8 +85,11 @@ export async function getAccountDeletionPreviewAs(
   }
   const address = row.email.toLowerCase();
   const [held, awaiting, admins, taught] = await Promise.all([
-    // A hold assigned to the account, or to its address before the account
-    // existed: `listMyItemsAs` resolves both, so both have to block.
+    // A hold assigned to the account, or to its address with no account on
+    // it. The address half is exactly the rule `listMyItemsAs` applies: only
+    // a verified address claims a hold, and never over an explicit account
+    // assignment. Anything looser would block a person with an item that
+    // /my/items never shows them.
     db
       .select({ id: inventoryItems.id, name: inventoryItems.name })
       .from(inventoryItems)
@@ -97,7 +98,12 @@ export async function getAccountDeletionPreviewAs(
           inArray(inventoryItems.status, ["reserved", "checked_out"]),
           or(
             eq(inventoryItems.currentHolderId, viewer.id),
-            sql`lower(${inventoryItems.currentHolderEmail}) = ${address}`
+            row.emailVerified
+              ? and(
+                  isNull(inventoryItems.currentHolderId),
+                  sql`lower(${inventoryItems.currentHolderEmail}) = ${address}`
+                )
+              : sql`false`
           )
         )
       ),
@@ -172,7 +178,7 @@ export async function getAccountDeletionPreviewForCurrentUser() {
  * a sweep problem, a half-deleted account is a broken promise.
  */
 export async function deleteAccountAs(
-  viewer: AccountViewer,
+  viewer: NonNullable<Viewer>,
   data: DeleteAccountInput
 ): Promise<{ ok: true }> {
   const preview = await getAccountDeletionPreviewAs(viewer);

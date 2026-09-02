@@ -38,10 +38,7 @@ describe("deleteAccountAs when the avatar object cannot be deleted", () => {
     await db.update(user).set({ image }).where(eq(user.id, u.id));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-    await deleteAccountAs(
-      { id: u.id, email, image, role: u.role },
-      { confirmEmail: email }
-    );
+    await deleteAccountAs({ id: u.id, role: u.role }, { confirmEmail: email });
 
     const [row] = await db.select().from(user).where(eq(user.id, u.id));
     expect(row.name).toBe("Deleted user");

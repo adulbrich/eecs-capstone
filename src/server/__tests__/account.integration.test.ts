@@ -32,7 +32,10 @@ import {
   createProjectAs,
   forceTransitionAs,
 } from "#/server/_internal/projects";
-import { getProjectAs } from "#/server/_internal/projects-queries";
+import {
+  getProjectAs,
+  listAdminProjectsAs,
+} from "#/server/_internal/projects-queries";
 
 async function makeUser(email: string, role: "user" | "instructor" | "admin") {
   await auth.api.signUpEmail({
@@ -120,6 +123,19 @@ describe("getAccountDeletionPreviewAs", () => {
       .where(sql`${inventoryItems.id} in (${byId.id}, ${byEmail.id})`);
     preview = await getAccountDeletionPreviewAs(u);
     expect(preview.blockers.items).toEqual([]);
+
+    // An address hold claims only a verified address, the same rule /my/items
+    // applies: an unverified account must not be blocked by an item that page
+    // never shows it.
+    await db
+      .update(inventoryItems)
+      .set({ status: "reserved", currentHolderEmail: u.email })
+      .where(eq(inventoryItems.id, byEmail.id));
+    await db
+      .update(user)
+      .set({ emailVerified: false })
+      .where(eq(user.id, u.id));
+    expect((await getAccountDeletionPreviewAs(u)).blockers.items).toEqual([]);
   });
 
   it("blocks with an approved request line and not with a returned one", async () => {
@@ -193,12 +209,7 @@ describe("deleteAccountAs", () => {
       .where(eq(user.id, u.id));
     const [before] = await db.select().from(user).where(eq(user.id, u.id));
 
-    await deleteAccountAs(
-      { ...u, image: before.image },
-      {
-        confirmEmail: u.email.toUpperCase(),
-      }
-    );
+    await deleteAccountAs(u, { confirmEmail: u.email.toUpperCase() });
 
     const [row] = await db.select().from(user).where(eq(user.id, u.id));
     expect(row.id).toBe(u.id);
@@ -283,19 +294,31 @@ describe("deleteAccountAs", () => {
     // cascade edge into user.id without a matching delete here is a red
     // test rather than a row that outlives the account.
     const cascadeEdges: string[] = [];
+    let tablesSeen = 0;
+    let tablesDeclared = 0;
     for (const file of ["schema.ts", "auth-schema.ts"]) {
       const source = readFileSync(
         join(process.cwd(), "src", "db", file),
         "utf-8"
       );
+      tablesDeclared += source.match(/pgTable\(/g)?.length ?? 0;
       const blocks = source.split(/(?=pgTable\(\s*")/);
       for (const block of blocks) {
-        const name = block.match(/pgTable\(\s*"([a-z_]+)"/)?.[1];
-        if (name && /user\.id,\s*\{\s*onDelete:\s*"cascade"/.test(block)) {
+        const name = block.match(/pgTable\(\s*"([a-z0-9_]+)"/)?.[1];
+        if (!name) {
+          continue;
+        }
+        tablesSeen += 1;
+        // The options object may carry other keys first, and the formatter
+        // may split it across lines; only the pair itself has to be there.
+        if (/user\.id,\s*\{[^}]*onDelete:\s*"cascade"/.test(block)) {
           cascadeEdges.push(name);
         }
       }
     }
+    // A table the parser could not name would be a silently unguarded edge,
+    // which is the one outcome this test exists to prevent.
+    expect(tablesSeen).toBe(tablesDeclared);
     expect([...CASCADE_TABLES].sort()).toEqual(cascadeEdges.sort());
   });
 
@@ -320,14 +343,24 @@ describe("deleteAccountAs", () => {
       .select({
         proposerId: projects.proposerId,
         proposerEmail: projects.proposerEmail,
-        proposerName: user.name,
       })
       .from(projects)
-      .innerJoin(user, eq(projects.proposerId, user.id))
       .where(eq(projects.id, id));
     expect(row.proposerId).toBe(u.id);
     expect(row.proposerEmail).toBeNull();
-    expect(row.proposerName).toBe("Deleted user");
+    // The one surface that shows a proposer's name is the staff listing, so
+    // "attributes to Deleted user" is asserted there rather than on a join
+    // the test wrote for itself.
+    const listed = await listAdminProjectsAs(admin, {
+      includeSoftDeleted: false,
+      program: null,
+      proposer: null,
+      q: "",
+      status: "all",
+    });
+    const mine = listed.rows.find((r) => r.id === id);
+    expect(mine?.proposerName).toBe("Deleted user");
+    expect(mine?.proposerEmail).toBe(`deleted-${u.id}@invalid`);
   });
 
   it("claims nothing for the same address registered again", async () => {

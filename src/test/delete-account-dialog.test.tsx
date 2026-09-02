@@ -165,3 +165,28 @@ describe("DeleteAccountDialog", () => {
     ).toBe(true);
   });
 });
+
+describe("DeleteAccountDialog gate reset", () => {
+  it("arrives disarmed after a cancel, even with a matching email typed before", () => {
+    open(clear());
+    fireEvent.change(screen.getByLabelText("Confirm email"), {
+      target: { value: EMAIL },
+    });
+    expect(
+      screen
+        .getByRole("button", { name: "Delete my account" })
+        .hasAttribute("disabled")
+    ).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
+    expect(
+      (screen.getByLabelText("Confirm email") as HTMLInputElement).value
+    ).toBe("");
+    expect(
+      screen
+        .getByRole("button", { name: "Delete my account" })
+        .hasAttribute("disabled")
+    ).toBe(true);
+  });
+});

@@ -65,8 +65,16 @@ export function DeleteAccountDialog({
     }
   }
 
+  // Reset on every open and close: a matching email typed before a Cancel
+  // must not arrive pre-armed the next time, or the gate is a brake once.
+  function onOpenChange(next: boolean) {
+    setTyped("");
+    setError(null);
+    setOpen(next);
+  }
+
   return (
-    <AlertDialog onOpenChange={setOpen} open={open}>
+    <AlertDialog onOpenChange={onOpenChange} open={open}>
       <AlertDialogTrigger asChild>
         <Button
           className="w-full"
