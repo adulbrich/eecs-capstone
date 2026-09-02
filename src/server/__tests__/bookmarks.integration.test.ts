@@ -239,9 +239,12 @@ describe("bookmarks", () => {
       "description",
       "id",
       "imageUrl",
+      "mentorName",
       "programCourseId",
       "programCourseName",
+      "seekingMentor",
       "status",
+      "studentProposed",
       "title",
       "updatedAt",
     ]);

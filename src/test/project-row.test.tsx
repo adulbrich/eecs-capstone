@@ -23,6 +23,8 @@ const base: ProjectSummary = {
   title: "Rover Telemetry",
   description: "Short description.",
   status: "published",
+  seekingMentor: false,
+  studentProposed: false,
   imageUrl: null,
   contactName: "Jane Doe",
   programCourseId: "CS 461",
@@ -53,5 +55,18 @@ describe("ProjectRow thumbnail", () => {
       <ProjectRow project={{ ...base, imageUrl: "projects/a/b.webp" }} />
     );
     expect(container.querySelector(".self-stretch")).toBeNull();
+  });
+});
+
+describe("ProjectRow mentorship", () => {
+  it("shows the badges when the summary carries them, and never an address", () => {
+    const { getByText, queryByText } = render(
+      <ProjectRow
+        project={{ ...base, seekingMentor: true, studentProposed: true }}
+      />
+    );
+    expect(getByText("Student proposed")).toBeTruthy();
+    expect(getByText("Seeking mentor")).toBeTruthy();
+    expect(queryByText(/@/)).toBeNull();
   });
 });

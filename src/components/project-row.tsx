@@ -3,6 +3,7 @@ import { projectImageSrc } from "#/lib/project-image";
 import { stripMarkdown } from "#/lib/strip-markdown";
 import { ImageOrFallback } from "./image-or-fallback";
 import { LocalTime } from "./local-time";
+import { MentorshipBadges } from "./mentorship-badges";
 import { type ProjectSummary, programLabel } from "./project-card";
 import { StatusBadge } from "./status-badge";
 import { Card } from "./ui/card";
@@ -30,6 +31,11 @@ export function ProjectRow({ project }: { project: ProjectSummary }) {
               <StatusBadge status={project.status} />
             )}
           </div>
+          <MentorshipBadges
+            className="mt-1"
+            seekingMentor={project.seekingMentor}
+            studentProposed={project.studentProposed}
+          />
           {project.description && (
             <p className="mt-1 line-clamp-3 text-muted-foreground text-sm">
               {stripMarkdown(project.description)}

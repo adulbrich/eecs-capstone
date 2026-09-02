@@ -2,7 +2,6 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { STAFF_PANEL_AUDIENCE_HINT } from "#/lib/private-notes";
 import { canTransition, type Status } from "#/lib/project-workflow";
-import type { ProposerForEdit } from "#/server/_internal/projects-queries";
 import {
   forceSetProjectStatus,
   hardDeleteProject,
@@ -13,11 +12,13 @@ import {
 import {
   getProposerForEdit,
   listProjectEditLog,
+  type ProposerForEdit,
 } from "#/server/projects-queries";
 import { ConfirmDialog } from "./confirm-dialog";
 import { type EditLogEntry, EditLogList } from "./edit-log-list";
 import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { ProposerSummary } from "./proposer-summary";
+import { StaffMentorshipSection } from "./staff-mentorship-section";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import {
@@ -202,6 +203,16 @@ export function StaffProjectPanel({
       <PanelSection title="Proposer">
         <ProposerSummary proposer={proposer} />
       </PanelSection>
+
+      {/* Keyed so a navigation between two project pages remounts it: the
+          route component is reused across a param change, and a section
+          holding project A's drafts with Save enabled while B loads would
+          post A's mentor onto B. */}
+      <StaffMentorshipSection
+        key={project.id}
+        onChanged={onChanged}
+        projectId={project.id}
+      />
 
       <PanelSection title="Status">
         {/* Status stepper: vertical on mobile, horizontal on md+ */}
