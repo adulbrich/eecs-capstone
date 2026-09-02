@@ -95,6 +95,17 @@ export const getInventoryItemDetail = createServerFn({ method: "GET" })
     return getInventoryItemDetailForCurrentUser(data);
   });
 
+export const listInventoryItemEditLog = createServerFn({ method: "GET" })
+  .inputValidator((d: unknown) =>
+    z.object({ itemId: z.string().uuid() }).parse(d)
+  )
+  .handler(async ({ data }) => {
+    const { listInventoryItemEditLogForCurrentUser } = await import(
+      "./_internal/inventory-catalog"
+    );
+    return listInventoryItemEditLogForCurrentUser(data);
+  });
+
 export const itemPayloadSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(5000).nullable().default(null),

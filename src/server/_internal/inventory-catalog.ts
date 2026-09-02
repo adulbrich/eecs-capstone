@@ -624,6 +624,46 @@ export async function getItemHistoryAs(
 }
 
 /**
+ * The item's edit log, staff only.
+ *
+ * The rows have been written since #126 and read by nothing, so an image
+ * change reached the log and no staff member could see it.
+ *
+ * No join to `user`, unlike `getItemHistoryAs` next door. The project panel
+ * renders `editorId.slice(0, 8)` and this matches it rather than quietly
+ * offering more; a name join belongs on both logs at once or neither.
+ *
+ * `oldValues` and `newValues` are deliberately not selected. They hold the
+ * before and after of every changed field, notes, serial and location
+ * included, and nothing renders them, so selecting them would ship
+ * staff-private strings to a browser with no reader for them.
+ */
+export async function listInventoryItemEditLogAs(
+  viewer: Viewer,
+  data: { itemId: string }
+) {
+  assertStaff(viewer);
+  const rows = await db
+    .select({
+      id: inventoryItemEditLog.id,
+      editorId: inventoryItemEditLog.editorId,
+      changedFields: inventoryItemEditLog.changedFields,
+      createdAt: inventoryItemEditLog.createdAt,
+    })
+    .from(inventoryItemEditLog)
+    .where(eq(inventoryItemEditLog.itemId, data.itemId))
+    .orderBy(desc(inventoryItemEditLog.createdAt));
+  return { rows };
+}
+
+export async function listInventoryItemEditLogForCurrentUser(data: {
+  itemId: string;
+}) {
+  const viewer = await requireUser();
+  return listInventoryItemEditLogAs(viewer, data);
+}
+
+/**
  * One call for the item detail page, so a public loader can render a staff
  * branch without touching `getItemHistoryAs`, which opens with `assertStaff`
  * and would throw for an anonymous viewer rather than degrade.
