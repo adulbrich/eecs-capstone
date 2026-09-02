@@ -567,7 +567,8 @@ which one does it was not established. The candidate a reader reaches for first,
 `setContent("")` in `comment-thread.tsx`, is eliminated by ordering: it runs
 inside a successful post, before `onChanged`, so it cannot touch text typed
 afterwards. Only this form was measured, so do not read it as a fact about every
-form in the app.
+form in the app. Filed as issue #188, which carries the above; this entry shrinks
+to the reload once that is fixed.
 
 This is not the reverse of the rule above: there a navigation aborted a write in
 flight, here the reload is what puts the form in a settled state before the next
