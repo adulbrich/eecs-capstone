@@ -563,16 +563,20 @@ as `description`; the title is what gives the dialog its accessible name.
 </ConfirmDialog>
 ```
 
-The one exception is the hard delete in `inventory-lifecycle-panel.tsx`. It
-uses a shadcn `Dialog` directly rather than `ConfirmDialog`, and adds a step
-`ConfirmDialog` does not have: the user must type the item's name into an
-`Input` before the destructive `Button` un-disables
-(`disabled={busy || delConfirm !== item.name}`). A single confirm click is an
-easy reflex to fire without reading; typing the exact name is a deliberate
-extra brake. Reach for this shape only when a single confirmation is not
-enough friction for the action at hand, not as the default: the project hard
-delete in `staff-project-panel.tsx` is equally permanent and still confirms
-through plain `ConfirmDialog`.
+Two exceptions add a step `ConfirmDialog` does not have: the user must type
+something exact into an `Input` before the destructive `Button` un-disables.
+The inventory hard delete in `inventory-lifecycle-panel.tsx` uses a shadcn
+`Dialog` and asks for the item's name
+(`disabled={busy || delConfirm !== item.name}`); the account deletion in
+`delete-account-dialog.tsx` uses `AlertDialog` and asks for the person's own
+email, compared case-insensitively. A single confirm click is an easy reflex
+to fire without reading; typing the exact value is a deliberate extra brake.
+Both reset the typed value before the dialog shows again (the inventory
+panel when its trigger opens it, the account dialog on every open and close),
+so a Cancel never leaves the next opening pre-armed. Reach for this shape only when a single confirmation
+is not enough friction for the action at hand, not as the default: the project
+hard delete in `staff-project-panel.tsx` is equally permanent and still
+confirms through plain `ConfirmDialog`.
 
 Results that need no acknowledgement use a toast: `import { toast } from "sonner"`.
 

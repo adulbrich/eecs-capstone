@@ -7,6 +7,7 @@ import {
   isNull,
   notExists,
   or,
+  type SQL,
   sql,
 } from "drizzle-orm";
 import { db } from "#/db";
@@ -58,6 +59,35 @@ export interface HistoryEntry {
   collectedBy: CollectedBy | null;
   itemName: string;
   line: MyRequestLineView;
+}
+
+/**
+ * The items a viewer is currently holding: a live hold assigned to their
+ * account, or to their address when no account holds it. The address half
+ * needs a verified address, or anyone could take an item by typing its
+ * holder's email into their profile, and it never overrides an explicit
+ * account assignment. Compared exactly, as the address was recorded.
+ *
+ * One predicate, read by /my/items and by account deletion, so the page that
+ * shows a person their items and the check that refuses to delete their
+ * account while they hold one cannot disagree about what "hold" means.
+ */
+export function heldByViewer(
+  viewerId: string,
+  verifiedEmail: string | null
+): SQL | undefined {
+  return and(
+    inArray(inventoryItems.status, ["reserved", "checked_out"]),
+    or(
+      eq(inventoryItems.currentHolderId, viewerId),
+      verifiedEmail
+        ? and(
+            isNull(inventoryItems.currentHolderId),
+            eq(inventoryItems.currentHolderEmail, verifiedEmail)
+          )
+        : undefined
+    )
+  );
 }
 
 export async function listMyItemsAs(viewer: Viewer) {
@@ -144,17 +174,7 @@ export async function listMyItemsAs(viewer: Viewer) {
                 )
               )
           ),
-          inArray(inventoryItems.status, ["reserved", "checked_out"]),
-          or(
-            eq(inventoryItems.currentHolderId, viewer.id),
-            verifiedEmail
-              ? and(
-                  // Never override an explicit account assignment.
-                  isNull(inventoryItems.currentHolderId),
-                  eq(inventoryItems.currentHolderEmail, verifiedEmail)
-                )
-              : undefined
-          )
+          heldByViewer(viewer.id, verifiedEmail)
         )
       ),
     db

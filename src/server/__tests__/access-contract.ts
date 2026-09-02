@@ -62,6 +62,14 @@ const PUBLIC_ITEM_VIEW_NOTE =
   "The projection branches on isStaff, not on having a session, so anonymous and signed-in non-staff callers get the same public view and only staff see more. publicItemView omits holder identity, serial, label, location and notes. getInventoryItemDetail withholds two things more: the staff branch returns the status history, joined to user.name, where the public branch returns an empty array, and a hasRequestHistory flag that exists only on the staff branch.";
 
 export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
+  "server/account.ts:deleteAccount": {
+    level: "authenticated",
+    note: "Scoped to the session user and takes no id: a person can delete only their own account. Anonymizes the row in place and deletes only what a real DELETE would cascade; see _internal/account.ts. The admin-executed version is #29 and does not exist yet.",
+  },
+  "server/account.ts:getAccountDeletionPreview": {
+    level: "authenticated",
+    note: "Scoped to the session user. Returns the held items that block deletion and the programs it will remove the person from, for the dialog to say before it acts.",
+  },
   "server/admin.ts:getAdminStats": {
     level: "staff",
     note: "Gated inline in the handler, not in an _internal seam.",
