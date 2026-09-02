@@ -303,6 +303,11 @@ const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
     key: "requiresNdaIp",
     value: (row) => row.requiresNdaIp,
   },
+  {
+    header: "Accepting applicants",
+    key: "acceptingApplicants",
+    value: (row) => row.acceptingApplicants,
+  },
   { header: "Staff notes", key: "notes", value: (row) => row.notes },
   { header: "Categories", key: "categories", value: (row) => row.categories },
   {

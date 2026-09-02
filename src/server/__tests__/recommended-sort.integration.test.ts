@@ -65,6 +65,7 @@ const SEARCH_DEFAULTS = {
   categoryIds: [],
   programId: null,
   archivedOnly: false,
+  acceptingOnly: false,
   page: 1,
   pageSize: 20,
 };

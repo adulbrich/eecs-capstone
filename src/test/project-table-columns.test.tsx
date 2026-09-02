@@ -62,6 +62,7 @@ const ROWS: ProjectListRow[] = [
     programCourseId: "CS 461",
     programCourseName: "Capstone",
     requiresNdaIp: true,
+    acceptingApplicants: true,
     seekingMentor: false,
     status: "published",
     studentProposed: true,
@@ -86,6 +87,7 @@ const ROWS: ProjectListRow[] = [
     programCourseId: null,
     programCourseName: null,
     requiresNdaIp: false,
+    acceptingApplicants: false,
     seekingMentor: false,
     status: "published",
     studentProposed: false,
@@ -134,7 +136,7 @@ function rowFor(title: string) {
 }
 
 describe("the public project table", () => {
-  it("shows the eight scannable columns and hides the prose by default", () => {
+  it("shows the nine scannable columns and hides the prose by default", () => {
     // The literal lists come from the issue's column table, not from the
     // module, so a column added on the wrong side of the line fails here.
     expect([...DEFAULT_HIDDEN].sort()).toEqual([
@@ -155,6 +157,7 @@ describe("the public project table", () => {
       "Program",
       "Categories",
       "Teams supported",
+      "Accepting applicants",
       "NDA/IP required",
       "Mentorship",
       "Contact name",

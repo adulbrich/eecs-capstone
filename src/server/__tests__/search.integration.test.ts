@@ -42,7 +42,7 @@ function baseProject(title: string, description: string | null = null) {
 async function publish(
   admin: { id: string; role: string | null },
   title: string,
-  body: Partial<ReturnType<typeof baseProject>> = {}
+  body: Partial<Parameters<typeof createProjectAs>[1]> = {}
 ) {
   const { id } = await createProjectAs(admin, {
     ...baseProject(title),
@@ -67,6 +67,7 @@ describe("searchProjects", () => {
       categoryIds: [],
       programId: null,
       archivedOnly: false,
+      acceptingOnly: false,
       page: 1,
       pageSize: 20,
       sort: "relevance",
@@ -74,6 +75,37 @@ describe("searchProjects", () => {
     expect(rows[0].id).toBe(titleId);
     const order = rows.map((r) => r.id);
     expect(order.indexOf(titleId)).toBeLessThan(order.indexOf(descId));
+  });
+
+  it("acceptingOnly hides projects that are not accepting applicants", async () => {
+    const admin = await makeAdmin(`a-acc-${Date.now()}@x.com`);
+    const openId = await publish(admin, "Open roster");
+    const closedId = await publish(admin, "Closed roster", {
+      acceptingApplicants: false,
+    });
+    const input = {
+      query: "",
+      categoryIds: [],
+      programId: null,
+      archivedOnly: false,
+      page: 1,
+      pageSize: 50,
+      sort: "relevance" as const,
+    };
+
+    // Off by default: the catalog stays browsable and a closed project is
+    // still worth reading about.
+    const all = await searchProjectsImpl({ ...input, acceptingOnly: false });
+    expect(all.rows.map((r) => r.id)).toEqual(
+      expect.arrayContaining([openId, closedId])
+    );
+    expect(all.rows.find((r) => r.id === closedId)?.acceptingApplicants).toBe(
+      false
+    );
+
+    const open = await searchProjectsImpl({ ...input, acceptingOnly: true });
+    expect(open.rows.map((r) => r.id)).toContain(openId);
+    expect(open.rows.map((r) => r.id)).not.toContain(closedId);
   });
 
   it("does not return non-published projects", async () => {
@@ -84,6 +116,7 @@ describe("searchProjects", () => {
       categoryIds: [],
       programId: null,
       archivedOnly: false,
+      acceptingOnly: false,
       page: 1,
       pageSize: 20,
       sort: "relevance",
@@ -100,6 +133,7 @@ describe("searchProjects", () => {
       categoryIds: [],
       programId: null,
       archivedOnly: false,
+      acceptingOnly: false,
       page: 1,
       pageSize: 20,
       sort: "relevance",
@@ -116,6 +150,7 @@ describe("searchProjects", () => {
       categoryIds: [],
       programId: null,
       archivedOnly: false,
+      acceptingOnly: false,
       page: 1,
       pageSize: 20,
       sort: "relevance",
@@ -137,11 +172,13 @@ describe("searchProjects", () => {
       categoryIds: [],
       programId: null,
       archivedOnly: false,
+      acceptingOnly: false,
       page: 1,
       pageSize: 20,
       sort: "relevance",
     });
     expect(Object.keys(rows[0]).sort()).toEqual([
+      "acceptingApplicants",
       "categories",
       "contactEmail",
       "contactName",

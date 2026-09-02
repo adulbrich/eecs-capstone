@@ -108,6 +108,7 @@ export function canWritePrivateNotes(
 
 /** The columns the projection reads, named structurally rather than by import. */
 export interface ProjectRow extends VisibleProject {
+  acceptingApplicants: boolean;
   contactEmail: string | null;
   contactName: string | null;
   description: string | null;
@@ -131,6 +132,8 @@ export interface ProjectRow extends VisibleProject {
 }
 
 export interface ProjectDetailView {
+  /** Public. False marks a full roster; the project still lists. See #72. */
+  acceptingApplicants: boolean;
   contactEmail: string | null;
   contactName: string | null;
   deletedAt: Date | null;
@@ -194,6 +197,7 @@ export function projectDetailView(
     // before bidding, and this is what a catalog filter would key on.
     requiresNdaIp: project.requiresNdaIp,
     teamsSupported: project.teamsSupported,
+    acceptingApplicants: project.acceptingApplicants,
     programId: project.programId,
     status: project.status as Status,
     deletedAt: project.deletedAt,

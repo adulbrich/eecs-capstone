@@ -80,6 +80,9 @@ export const projectSummarySelect = {
   // agreement is involved before bidding.
   requiresNdaIp: projects.requiresNdaIp,
   teamsSupported: projects.teamsSupported,
+  // Public by design: a student needs to see a closed roster before they
+  // invest in an application. See #72.
+  acceptingApplicants: projects.acceptingApplicants,
   status: projects.status,
   imageUrl: projects.imageUrl,
   // Manually entered and publicly visible, unlike proposerEmail.

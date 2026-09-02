@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "accepting_applicants" boolean DEFAULT true NOT NULL;

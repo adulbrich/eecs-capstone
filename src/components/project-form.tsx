@@ -72,6 +72,7 @@ export const projectFormSchema = z.object({
   notes: z.string().max(5000),
   proposerEmail: optionalEmail,
   teamsSupported: z.number().int().min(1).max(5),
+  acceptingApplicants: z.boolean(),
 });
 
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
@@ -152,6 +153,7 @@ export function ProjectForm({
       notes: initial?.notes ?? "",
       proposerEmail: initial?.proposerEmail ?? "",
       teamsSupported: initial?.teamsSupported ?? 1,
+      acceptingApplicants: initial?.acceptingApplicants ?? true,
     } satisfies ProjectFormValues,
     validators: {
       // The schema itself. react-form takes a Standard Schema and Zod 4
@@ -633,6 +635,26 @@ export function ProjectForm({
               value={field.state.value as number}
             />
             <FieldError errors={field.state.meta.errors} />
+          </div>
+        )}
+      </form.Field>
+      <form.Field name="acceptingApplicants">
+        {(field: AnyForm) => (
+          <div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={field.state.value as boolean}
+                id="acceptingApplicants"
+                onCheckedChange={(next) => field.handleChange(next === true)}
+              />
+              <Label className="font-normal" htmlFor="acceptingApplicants">
+                Accepting applicants
+              </Label>
+            </div>
+            <p className="mt-1 text-muted-foreground text-xs">
+              Uncheck once the roster is full. The project stays listed, marked
+              as not accepting applicants, so students know before they apply.
+            </p>
           </div>
         )}
       </form.Field>

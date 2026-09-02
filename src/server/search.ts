@@ -6,6 +6,9 @@ const searchInputSchema = z.object({
   categoryIds: z.array(z.string().uuid()).max(20).default([]),
   programId: z.string().uuid().nullable().default(null),
   archivedOnly: z.boolean().default(false),
+  // Off by default: hiding closed projects would make them vanish from a
+  // catalog that is meant to be browsable. See #72.
+  acceptingOnly: z.boolean().default(false),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(50).default(20),
   sort: z.enum(["relevance", "newest", "recommended"]).default("relevance"),

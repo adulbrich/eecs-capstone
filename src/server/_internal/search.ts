@@ -37,6 +37,9 @@ export async function searchProjectsImpl(
   if (data.programId) {
     conditions.push(eq(projects.programId, data.programId));
   }
+  if (data.acceptingOnly) {
+    conditions.push(eq(projects.acceptingApplicants, true));
+  }
   if (data.categoryIds.length > 0) {
     const matchingProjectIds = db
       .select({ projectId: projectCategories.projectId })

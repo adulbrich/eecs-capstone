@@ -128,6 +128,7 @@ describe("BookmarkToggle", () => {
       id: "p1",
       title: "Rover",
       description: null,
+      acceptingApplicants: true,
       seekingMentor: false,
       status: "published",
       studentProposed: false,

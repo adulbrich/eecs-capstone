@@ -43,6 +43,7 @@ const base: ProjectSummary = {
   title: "Smart Greenhouse",
   description: "A long description that should be clamped to three lines.",
   status: "published",
+  acceptingApplicants: true,
   seekingMentor: false,
   studentProposed: false,
   imageUrl: null,

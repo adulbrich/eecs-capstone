@@ -75,6 +75,7 @@ function EditProject() {
             notes: project.notes ?? "",
             proposerEmail: proposer.email,
             teamsSupported: project.teamsSupported ?? 1,
+            acceptingApplicants: project.acceptingApplicants,
           }}
           initialCategoryIds={categoryIds}
           isStaff={viewerIsStaff}

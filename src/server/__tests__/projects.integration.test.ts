@@ -276,6 +276,7 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
     // projection cannot widen on its own; what this catches is a future caller
     // reintroducing a whole-row select above it.
     const PUBLIC_KEYS = [
+      "acceptingApplicants",
       "contactEmail",
       "contactName",
       "deletedAt",
@@ -1015,6 +1016,68 @@ describe("sponsorship flag", () => {
     // A student needs this before bidding, so it is public by design.
     const anonView = await getProjectAs(null, { id });
     expect(anonView.project?.requiresNdaIp).toBe(true);
+  });
+});
+
+describe("acceptingApplicants", () => {
+  it("round-trips through create and update, and the update is logged", async () => {
+    const owner = await makeUser(`acc-o-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      acceptingApplicants: false,
+    });
+    const [created] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, id));
+    expect(created.acceptingApplicants).toBe(false);
+
+    await updateProjectAs(owner, {
+      id,
+      ...baseProject(),
+      acceptingApplicants: true,
+    });
+    const [updated] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, id));
+    expect(updated.acceptingApplicants).toBe(true);
+
+    // An ordinary form field, so the edit log picks it up with no extra work.
+    const log = await db
+      .select()
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
+    expect(log).toHaveLength(1);
+    expect(log[0].changedFields).toEqual(["acceptingApplicants"]);
+  });
+
+  it("defaults to accepting when the caller says nothing", async () => {
+    const owner = await makeUser(`acc-d-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, baseProject());
+    const [created] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, id));
+    expect(created.acceptingApplicants).toBe(true);
+  });
+
+  it("reaches anonymous viewers in the public payload", async () => {
+    const owner = await makeUser(`acc-p-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`acc-q-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      acceptingApplicants: false,
+    });
+    await performTransitionAs(owner, id, "submitted");
+    await forceTransitionAs(admin, id, "published", undefined, {
+      embed: vi.fn().mockResolvedValue(new Array(1024).fill(0.1)),
+      sendEmail: false,
+    });
+
+    // The whole point: a student sees a closed roster before applying.
+    const anonView = await getProjectAs(null, { id });
+    expect(anonView.project?.acceptingApplicants).toBe(false);
   });
 });
 

@@ -5,6 +5,7 @@ import { projectImageSrc } from "#/lib/project-image";
 import { stripMarkdown } from "#/lib/strip-markdown";
 import type { SortState } from "#/lib/table-state";
 import type { searchProjects } from "#/server/search";
+import { ApplicantsBadge } from "./applicants-badge";
 import { BookmarkToggle } from "./bookmark-set";
 import { CategoryChip } from "./category-chip";
 import { ImageOrFallback } from "./image-or-fallback";
@@ -128,6 +129,19 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     id: "teams",
     // Numeric, not text: the locale-compare default would compare String(n),
     // where "10" sorts before "2".
+    sortingFn: "basic",
+  },
+  {
+    accessorFn: (row) => row.acceptingApplicants,
+    cell: ({ row }) =>
+      row.original.acceptingApplicants ? (
+        "Yes"
+      ) : (
+        <ApplicantsBadge acceptingApplicants={false} />
+      ),
+    header: "Accepting applicants",
+    id: "accepting",
+    // Boolean, not text, for the same reason as the Teams column.
     sortingFn: "basic",
   },
   {
