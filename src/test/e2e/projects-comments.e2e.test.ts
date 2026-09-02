@@ -68,8 +68,14 @@ function captureBodies(page: Page): {
 
   return {
     bodies,
+    // Drained, not snapshotted. Awaiting the batch that exists at call time
+    // gives later responses a window to arrive uncollected, and an uncollected
+    // body is one the assertion below cannot fail on: the gap runs in the
+    // direction that reports a leak as clean.
     settled: async () => {
-      await Promise.all(pending);
+      while (pending.length > 0) {
+        await Promise.all(pending.splice(0, pending.length));
+      }
     },
   };
 }

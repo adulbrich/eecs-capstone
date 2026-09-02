@@ -556,14 +556,22 @@ and passed), and an item edit.
 Measured on the project comment composer: after a comment posts and renders,
 text typed into the same textarea was gone by the time Post was clicked, the
 `required` attribute blocked the empty submit, and the failure read as a missing
-second comment rather than as a cleared form. The cause was not established, only
-the behavior, and only on this one form, so do not read it as a fact about every
-form in the app. Reload between the two posts. `confirmed()` in
-`src/test/e2e/waits.ts` does not cover this: posting fires `addComment` and then
-the `refreshComments` its `onChanged` runs, so the one-request precondition in
-its docstring does not hold. This is not the reverse of the rule above: there a
-navigation aborted a write in flight, here the reload is what puts the form in a
-settled state before the next write starts.
+second comment rather than as a cleared form. Reload between the two posts.
+
+One post is three sources of traffic, which is why `confirmed()` in
+`src/test/e2e/waits.ts` cannot be used here: `addComment`, then the
+`refreshComments()` and `router.invalidate()` that `onCommentsChanged` fires
+together (`src/routes/projects/$projectId.tsx`), the second of which re-runs the
+loader. Those two are also the surviving candidates for the wiped textarea, and
+which one does it was not established. The candidate a reader reaches for first,
+`setContent("")` in `comment-thread.tsx`, is eliminated by ordering: it runs
+inside a successful post, before `onChanged`, so it cannot touch text typed
+afterwards. Only this form was measured, so do not read it as a fact about every
+form in the app.
+
+This is not the reverse of the rule above: there a navigation aborted a write in
+flight, here the reload is what puts the form in a settled state before the next
+write starts.
 
 ### The header avatar is a page load behind the profile page
 
