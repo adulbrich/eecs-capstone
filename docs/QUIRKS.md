@@ -1031,6 +1031,12 @@ There are **seven** `AuthUser` interfaces in `_internal/` (`comments`, `uploads`
 
 `assertStaff` carries `asserts viewer is NonNullable<Viewer>`, and the narrowing is load-bearing: call sites read `viewer.id` immediately afterwards with no second null check.
 
+`assertStaff` is the gate on the write seams of both domains: `inventory-catalog.ts` and `_internal/projects.ts` both open a staff-only write with it, rather than one asserting and the other hand-rolling `isStaff` plus a throw. Say **write** rather than "every staff-only seam", because the read side has not been converted: `_internal/projects-queries.ts` still refuses with `if (!isStaff(viewer)) throw` in `listAdminProjectsAs`, `exportAdminProjectsAs`, `getProposerForEditAs` and `listProjectEditLogImpl`, and the `{ id, role: role ?? null }` reshape this file's entry above calls unnecessary is still written seven times: once as a named `viewerToVisibility` in `_internal/categories.ts`, and inline at `admin.ts`, `_internal/comments.ts`, `_internal/uploads.ts`, `_internal/project-review.ts` and twice in `_internal/bookmarks.ts`. A missing `assertStaff` is therefore not evidence a seam is unguarded; read the gate. Count the sites before citing a number here, and grep for the reshape rather than for the function name.
+
+The narrowing above is not what buys that consistency, and `projects.ts` is where the difference shows. Its `AuthUser` is already non-nullable, so `asserts viewer is NonNullable<Viewer>` narrows nothing at any of its call sites. The gate is worth having anyway, for the same reason the predicate module is: one spelling of one question.
+
+A gate that admits the **owner as well as** staff cannot use it, because `assertStaff` refuses unconditionally. Those keep reading `isStaff`, and they are not all obvious from a grep: `performTransitionAs` and `hardDeleteProjectAs` call it directly, and `updateProjectAs` reaches it twice over, through `canEditProject` and again through `canWritePrivateNotes` inside `buildProjectValues`, both of which return true for the proposer. Treat that list as non-exhaustive and check `project-visibility.ts` before concluding a seam is staff-only.
+
 ### A Hold is a union, and `src/lib/hold.ts` owns it
 
 **Hold** is the domain term for who is holding an item. A hold is on a person or on a thing, never both and never neither, and `src/lib/hold.ts` is the one place that rule lives. It is a pure, client-safe module in the same shape as `src/lib/project-visibility.ts`, unit tested in `npm test` with no docker.

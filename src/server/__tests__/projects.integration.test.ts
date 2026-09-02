@@ -14,6 +14,7 @@ import {
   forceTransitionAs,
   hardDeleteProjectAs,
   performTransitionAs,
+  restoreProjectAs,
   softDeleteProjectAs,
   updateProjectAs,
 } from "#/server/_internal/projects";
@@ -352,6 +353,13 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
     await expect(hardDeleteProjectAs(intruder, id)).rejects.toThrow(
       /Forbidden/
     );
+    // These two refuse before they load the project, so a draft refuses with
+    // Forbidden rather than with the "Cannot soft-delete a draft" state check
+    // one line further down. That ordering is the assertion.
+    await expect(softDeleteProjectAs(intruder, id)).rejects.toThrow(
+      /Forbidden/
+    );
+    await expect(restoreProjectAs(intruder, id)).rejects.toThrow(/Forbidden/);
   });
 });
 
