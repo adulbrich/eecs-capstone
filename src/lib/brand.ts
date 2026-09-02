@@ -13,7 +13,11 @@ export const brand = {
   // When undefined, InstitutionLogo uses CSS filter inversion instead.
   logoUrlLight: undefined as string | undefined,
   faviconUrl: "/favicon.ico",
-  supportEmail: "capstone@oregonstate.edu",
+  // The address README, DEPLOYMENT.md, .env.example and infra/variables.tf
+  // all carry. The short form this used to hold was the outlier; nothing
+  // read it until the privacy page did. Not the SES sender, which is
+  // EMAIL_FROM on a different subdomain.
+  supportEmail: "eecs-capstone@oregonstate.edu",
   institutionUrl: "https://oregonstate.edu",
 
   // Color tokens: must match the :root defaults in styles.css exactly.

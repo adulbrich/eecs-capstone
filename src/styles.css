@@ -432,11 +432,6 @@ a {
   }
 }
 
-.site-footer {
-  border-top: 1px solid var(--line);
-  background: color-mix(in oklab, var(--header-bg) 84%, transparent 16%);
-}
-
 /* Admin table: card layout on mobile */
 @media (max-width: 767px) {
   .admin-table {
