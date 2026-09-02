@@ -248,7 +248,7 @@ live count of a page's own collection does not.
 
 The mobile drawer is a shadcn `Sheet` with `side="left"`, opened by a hamburger
 `<Button variant="ghost">`. It is a Radix Dialog underneath, so it is focus-trapped
-and escape-dismissible for free. Three rules keep it correct:
+and escape-dismissible for free. Four rules keep it correct:
 
 - Call `setOpen(false)` in every `<Link>` click handler, so the drawer closes once
   navigation completes.
