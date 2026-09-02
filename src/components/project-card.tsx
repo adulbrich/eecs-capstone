@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { projectImageSrc } from "#/lib/project-image";
 import { stripMarkdown } from "#/lib/strip-markdown";
+import { ApplicantsBadge } from "./applicants-badge";
 import { BookmarkToggle } from "./bookmark-set";
 import { ImageOrFallback } from "./image-or-fallback";
 import { LocalTime } from "./local-time";
@@ -9,6 +10,7 @@ import { StatusBadge } from "./status-badge";
 import { Card } from "./ui/card";
 
 interface ProjectSummary {
+  acceptingApplicants: boolean;
   contactName?: string | null;
   description: string | null;
   id: string;
@@ -85,6 +87,10 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
             className="mt-2"
             seekingMentor={project.seekingMentor}
             studentProposed={project.studentProposed}
+          />
+          <ApplicantsBadge
+            acceptingApplicants={project.acceptingApplicants}
+            className="mt-2"
           />
           {project.description && (
             <p className="mt-2 line-clamp-3 text-muted-foreground text-sm md:mt-1">

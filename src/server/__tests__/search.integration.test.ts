@@ -42,7 +42,7 @@ function baseProject(title: string, description: string | null = null) {
 async function publish(
   admin: { id: string; role: string | null },
   title: string,
-  body: Partial<ReturnType<typeof baseProject>> = {}
+  body: Partial<Parameters<typeof createProjectAs>[1]> = {}
 ) {
   const { id } = await createProjectAs(admin, {
     ...baseProject(title),
@@ -54,6 +54,19 @@ async function publish(
   return id;
 }
 
+// Every input the impl requires, so a new filter lands here once rather than
+// in every call below. `recommended-sort.integration.test.ts` has its own.
+const SEARCH_DEFAULTS = {
+  query: "",
+  categoryIds: [] as string[],
+  programId: null,
+  archivedOnly: false,
+  acceptingOnly: false,
+  page: 1,
+  pageSize: 20,
+  sort: "relevance" as const,
+};
+
 describe("searchProjects", () => {
   it("ranks title hit above description hit for the same query", async () => {
     const admin = await makeAdmin(`a-${Date.now()}@x.com`);
@@ -63,30 +76,42 @@ describe("searchProjects", () => {
     });
 
     const { rows } = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
       query: "react",
-      categoryIds: [],
-      programId: null,
-      archivedOnly: false,
-      page: 1,
-      pageSize: 20,
-      sort: "relevance",
     });
     expect(rows[0].id).toBe(titleId);
     const order = rows.map((r) => r.id);
     expect(order.indexOf(titleId)).toBeLessThan(order.indexOf(descId));
   });
 
+  it("acceptingOnly hides projects that are not accepting applicants", async () => {
+    const admin = await makeAdmin(`a-acc-${Date.now()}@x.com`);
+    const openId = await publish(admin, "Open roster");
+    const closedId = await publish(admin, "Closed roster", {
+      acceptingApplicants: false,
+    });
+    const input = { ...SEARCH_DEFAULTS, pageSize: 50 };
+
+    // Off by default: the catalog stays browsable and a closed project is
+    // still worth reading about.
+    const all = await searchProjectsImpl({ ...input, acceptingOnly: false });
+    expect(all.rows.map((r) => r.id)).toEqual(
+      expect.arrayContaining([openId, closedId])
+    );
+    expect(all.rows.find((r) => r.id === closedId)?.acceptingApplicants).toBe(
+      false
+    );
+
+    const open = await searchProjectsImpl({ ...input, acceptingOnly: true });
+    expect(open.rows.map((r) => r.id)).toContain(openId);
+    expect(open.rows.map((r) => r.id)).not.toContain(closedId);
+  });
+
   it("does not return non-published projects", async () => {
     const admin = await makeAdmin(`a2-${Date.now()}@x.com`);
     const { id } = await createProjectAs(admin, baseProject("Draft project"));
     const { rows } = await searchProjectsImpl({
-      query: "",
-      categoryIds: [],
-      programId: null,
-      archivedOnly: false,
-      page: 1,
-      pageSize: 20,
-      sort: "relevance",
+      ...SEARCH_DEFAULTS,
     });
     expect(rows.find((r) => r.id === id)).toBeUndefined();
   });
@@ -96,13 +121,7 @@ describe("searchProjects", () => {
     const first = await publish(admin, "First");
     const second = await publish(admin, "Second");
     const { rows } = await searchProjectsImpl({
-      query: "",
-      categoryIds: [],
-      programId: null,
-      archivedOnly: false,
-      page: 1,
-      pageSize: 20,
-      sort: "relevance",
+      ...SEARCH_DEFAULTS,
     });
     const order = rows.map((r) => r.id);
     expect(order.indexOf(second)).toBeLessThan(order.indexOf(first));
@@ -112,13 +131,8 @@ describe("searchProjects", () => {
     const admin = await makeAdmin(`a4-${Date.now()}@x.com`);
     await publish(admin, "Anything");
     const { rows } = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
       query: "   ",
-      categoryIds: [],
-      programId: null,
-      archivedOnly: false,
-      page: 1,
-      pageSize: 20,
-      sort: "relevance",
     });
     expect(rows.length).toBeGreaterThan(0);
   });
@@ -133,15 +147,10 @@ describe("searchProjects", () => {
     await publish(admin, "Key set");
 
     const { rows } = await searchProjectsImpl({
-      query: "",
-      categoryIds: [],
-      programId: null,
-      archivedOnly: false,
-      page: 1,
-      pageSize: 20,
-      sort: "relevance",
+      ...SEARCH_DEFAULTS,
     });
     expect(Object.keys(rows[0]).sort()).toEqual([
+      "acceptingApplicants",
       "categories",
       "contactEmail",
       "contactName",

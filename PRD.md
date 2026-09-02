@@ -106,6 +106,11 @@ Each project carries:
   proposed" badge, a "Seeking mentor" badge while no address is on file, and the
   mentor's name once that address has an account. The address itself never
   leaves staff reads. (#75)
+- ✅ Accepting applicants flag: a published project with a full roster stays
+  listed, marked "Not accepting applicants" on its page, its card and its
+  table row, with a listing filter to hide such projects. Staff and the
+  proposer edit it as an ordinary form field, so the edit log records it.
+  A boolean, not a status, so it stays orthogonal to the review workflow. (#72)
 - ✅ Collaborators table (schema present for multi-user project membership).
 - ✅ Full-text search vector (Postgres generated `tsvector`, weighted across
   title, description, problem statement, objectives, and qualifications).

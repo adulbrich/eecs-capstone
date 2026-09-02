@@ -235,6 +235,7 @@ describe("bookmarks", () => {
     const { rows } = await listMyBookmarksAs(student);
 
     expect(Object.keys(rows[0]).sort()).toEqual([
+      "acceptingApplicants",
       "bookmarkedAt",
       "categories",
       "contactEmail",

@@ -32,6 +32,7 @@ interface Program {
 }
 
 interface Props {
+  acceptingOnly: boolean;
   archivedOnly: boolean;
   categories: string[];
   order: "relevance" | "newest" | "recommended";
@@ -44,6 +45,7 @@ export function ProjectsFilterBar({
   q,
   categories,
   program,
+  acceptingOnly,
   archivedOnly,
   order,
   view,
@@ -113,6 +115,7 @@ export function ProjectsFilterBar({
         q: "",
         categories: [],
         program: null,
+        acceptingOnly: false,
         archivedOnly: false,
         order: "relevance",
         page: 1,
@@ -123,6 +126,12 @@ export function ProjectsFilterBar({
   function setArchivedOnly(value: boolean) {
     void navigate({
       search: (prev) => ({ ...prev, archivedOnly: value, page: 1 }),
+    });
+  }
+
+  function setAcceptingOnly(value: boolean) {
+    void navigate({
+      search: (prev) => ({ ...prev, acceptingOnly: value, page: 1 }),
     });
   }
 
@@ -137,6 +146,7 @@ export function ProjectsFilterBar({
     q ||
     categories.length > 0 ||
     program ||
+    acceptingOnly ||
     archivedOnly ||
     order !== "relevance";
 
@@ -199,7 +209,13 @@ export function ProjectsFilterBar({
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-end">
+        <div className="flex flex-col justify-end gap-2">
+          <FilterSwitch
+            checked={acceptingOnly}
+            id="filter-accepting-only"
+            label="Only projects accepting applicants"
+            onCheckedChange={setAcceptingOnly}
+          />
           <FilterSwitch
             checked={archivedOnly}
             id="filter-archived-only"

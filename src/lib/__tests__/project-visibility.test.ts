@@ -147,6 +147,7 @@ describe("canWritePrivateNotes", () => {
 });
 
 const DETAIL_KEYS = [
+  "acceptingApplicants",
   "contactEmail",
   "contactName",
   "deletedAt",
@@ -191,6 +192,7 @@ function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
     mentorName: null,
     seekingMentor: false,
     studentProposed: false,
+    acceptingApplicants: true,
     ...overrides,
   } as ProjectRow;
 }

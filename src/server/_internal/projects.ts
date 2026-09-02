@@ -125,6 +125,7 @@ export async function createProjectAs(
       proposerEmail,
       status: "draft",
       teamsSupported: data.teamsSupported ?? 1,
+      acceptingApplicants: data.acceptingApplicants ?? true,
     })
     .returning();
   return { id: created.id };
@@ -162,6 +163,7 @@ async function buildProjectValues(
     isSponsored: data.isSponsored ?? false,
     programId: data.programId ?? null,
     teamsSupported: data.teamsSupported ?? 1,
+    acceptingApplicants: data.acceptingApplicants ?? true,
   };
   if (canWritePrivateNotes(existing, viewer)) {
     newValues.notes = data.notes ?? null;

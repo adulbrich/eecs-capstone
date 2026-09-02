@@ -5,6 +5,7 @@ import { projectImageSrc } from "#/lib/project-image";
 import { stripMarkdown } from "#/lib/strip-markdown";
 import type { SortState } from "#/lib/table-state";
 import type { searchProjects } from "#/server/search";
+import { ApplicantsBadge } from "./applicants-badge";
 import { BookmarkToggle } from "./bookmark-set";
 import { CategoryChip } from "./category-chip";
 import { ImageOrFallback } from "./image-or-fallback";
@@ -131,6 +132,21 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     sortingFn: "basic",
   },
   {
+    accessorFn: (row) => row.acceptingApplicants,
+    // "Yes" rather than the dash the NDA column uses for its ordinary case:
+    // under this header a dash would read as "no", the opposite of the truth.
+    cell: ({ row }) =>
+      row.original.acceptingApplicants ? (
+        "Yes"
+      ) : (
+        <ApplicantsBadge acceptingApplicants={false} />
+      ),
+    header: "Accepting applicants",
+    id: "accepting",
+    // Boolean, not text: see the Teams column.
+    sortingFn: "basic",
+  },
+  {
     accessorFn: (row) => row.requiresNdaIp,
     cell: ({ row }) =>
       row.original.requiresNdaIp ? (
@@ -140,7 +156,6 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
       ),
     header: "NDA/IP required",
     id: "nda",
-    // Boolean, not text, for the same reason as the Teams column.
     sortingFn: "basic",
   },
   {

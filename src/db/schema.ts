@@ -156,6 +156,13 @@ export const projects = pgTable(
     // mentorship grants no permission, so an id would be a denormalization
     // with nothing to trust it for. #84 nulls it when that account is deleted.
     mentorEmail: text("mentor_email"),
+    // Public. A boolean rather than a status: "published and closed" is a
+    // valid state, and a new enum value would force every transition guard
+    // and email to decide what it means. Staff and the proposer edit it as an
+    // ordinary form field. If bidding (#33) is ever built, it keys on this.
+    acceptingApplicants: boolean("accepting_applicants")
+      .notNull()
+      .default(true),
     teamsSupported: integer("teams_supported").notNull().default(1),
     /** Staff-visible only; never returned in public queries. */
     notes: text("notes"),

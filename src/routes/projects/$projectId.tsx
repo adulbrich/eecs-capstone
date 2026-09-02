@@ -5,6 +5,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
+import { ApplicantsBadge } from "#/components/applicants-badge";
 import { BookmarkButton } from "#/components/bookmark-button";
 import { CategoryChip } from "#/components/category-chip";
 import { Markdown } from "#/components/markdown";
@@ -117,7 +118,10 @@ function ProjectDetail() {
     <div className="mx-auto max-w-3xl px-4 py-6 md:p-8">
       <div className="flex items-center justify-between gap-3">
         <h1 className="font-semibold text-2xl">{project.title}</h1>
-        <StatusBadge status={project.status} />
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <ApplicantsBadge acceptingApplicants={project.acceptingApplicants} />
+          <StatusBadge status={project.status} />
+        </div>
       </div>
       <MentorshipBadges
         className="mt-3"

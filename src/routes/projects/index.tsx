@@ -28,6 +28,7 @@ const searchSchema = z.object({
   categories: z.array(z.string().uuid()).default([]),
   program: z.string().uuid().nullable().default(null),
   archivedOnly: z.boolean().default(false),
+  acceptingOnly: z.boolean().default(false),
   page: z.number().int().min(1).default(1),
   // The server's ordering, which also decides which twenty rows make up the
   // page. Named `order` because `sort` and `dir` are the table's, below.
@@ -49,6 +50,7 @@ export const Route = createFileRoute("/projects/")({
   // Only the filter fields: the view mode, the column sort and the column
   // visibility are client state and must not re-run the loader.
   loaderDeps: ({ search }) => ({
+    acceptingOnly: search.acceptingOnly,
     archivedOnly: search.archivedOnly,
     categories: search.categories,
     order: search.order,
@@ -63,6 +65,7 @@ export const Route = createFileRoute("/projects/")({
         categoryIds: deps.categories,
         programId: deps.program,
         archivedOnly: deps.archivedOnly,
+        acceptingOnly: deps.acceptingOnly,
         page: deps.page,
         pageSize: 20,
         sort: deps.order,
@@ -142,6 +145,7 @@ function ProjectsList() {
         </div>
         <div className="mt-4">
           <ProjectsFilterBar
+            acceptingOnly={search.acceptingOnly}
             archivedOnly={search.archivedOnly}
             categories={search.categories}
             order={search.order}
