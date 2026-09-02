@@ -30,7 +30,9 @@ import {
 import { isStaff, type Viewer } from "#/lib/viewer";
 import {
   adminProjectSummarySelect,
+  mentorNameSql,
   projectSummarySelect,
+  seekingMentorSql,
 } from "./project-summary";
 
 type JsonValue =
@@ -255,10 +257,24 @@ export async function exportAdminProjectsImpl(data: AdminProjectsFilter) {
  * convention used by the mutation helpers.
  */
 export async function getProjectAs(viewer: Viewer, data: { id: string }) {
-  const [project] = await db
-    .select()
+  // The row plus the two read-time mentor fields. Selected here rather than
+  // joined by the view, because the view is pure and this is the only place
+  // a project row is read for the detail page.
+  const [row] = await db
+    .select({
+      project: projects,
+      mentorName: mentorNameSql,
+      seekingMentor: seekingMentorSql,
+    })
     .from(projects)
     .where(eq(projects.id, data.id));
+  const project = row
+    ? {
+        ...row.project,
+        mentorName: row.mentorName,
+        seekingMentor: row.seekingMentor,
+      }
+    : undefined;
   if (!project) {
     return {
       project: null,

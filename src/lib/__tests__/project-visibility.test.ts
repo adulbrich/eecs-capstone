@@ -155,6 +155,7 @@ const DETAIL_KEYS = [
   "imageUrl",
   "isSponsored",
   "licenseRestrictions",
+  "mentorName",
   "minQualifications",
   "notes",
   "objectives",
@@ -162,7 +163,9 @@ const DETAIL_KEYS = [
   "problemStatement",
   "programId",
   "requiresNdaIp",
+  "seekingMentor",
   "status",
+  "studentProposed",
   "teamsSupported",
   "title",
   "url",
@@ -184,6 +187,10 @@ function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
     licenseRestrictions: "none",
     teamsSupported: 2,
     programId: "prog-1",
+    mentorEmail: "mentor@x.test",
+    mentorName: null,
+    seekingMentor: false,
+    studentProposed: false,
     ...overrides,
   } as ProjectRow;
 }
@@ -216,10 +223,28 @@ describe("projectDetailView", () => {
     );
   });
 
+  it("carries the mentor name and the seeking flag for every viewer, never the address", () => {
+    const seeking = row({
+      mentorEmail: null,
+      seekingMentor: true,
+      studentProposed: true,
+    });
+    for (const viewer of [anon, other, owner, admin]) {
+      const view = projectDetailView(seeking, viewer);
+      expect(view.studentProposed).toBe(true);
+      expect(view.seekingMentor).toBe(true);
+      expect(view.mentorName).toBeNull();
+      expect("mentorEmail" in view).toBe(false);
+    }
+    const named = row({ mentorName: "Dana Lee" });
+    expect(projectDetailView(named, anon).mentorName).toBe("Dana Lee");
+  });
+
   it("omits the private link key and the machine columns, staff included", () => {
     const view = projectDetailView(withPrivate, admin);
     for (const key of [
       "proposerEmail",
+      "mentorEmail",
       "proposerId",
       "publishedAt",
       "archivedAt",

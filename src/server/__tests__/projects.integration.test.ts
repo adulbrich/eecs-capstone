@@ -284,6 +284,7 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
       "imageUrl",
       "isSponsored",
       "licenseRestrictions",
+      "mentorName",
       "minQualifications",
       "notes",
       "objectives",
@@ -291,7 +292,9 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
       "problemStatement",
       "programId",
       "requiresNdaIp",
+      "seekingMentor",
       "status",
+      "studentProposed",
       "teamsSupported",
       "title",
       "url",
@@ -308,6 +311,7 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
     const { project: forAnon } = await getProjectAs(null, { id });
     expect(Object.keys(forAnon ?? {}).sort()).toEqual(PUBLIC_KEYS);
     expect(forAnon?.notes).toBeNull();
+    expect("mentorEmail" in (forAnon ?? {})).toBe(false);
 
     const { project: forAdmin } = await getProjectAs(admin, { id });
     // Same key set for both. Only the value of `notes` differs, which is the
