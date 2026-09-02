@@ -1,6 +1,10 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AvatarUploader } from "#/components/avatar-uploader";
+import {
+  DeleteAccountDialog,
+  type DeletionPreview,
+} from "#/components/delete-account-dialog";
 import { MentorFields } from "#/components/mentor-fields";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
@@ -8,6 +12,7 @@ import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
 import { authClient } from "#/lib/auth-client";
 import { pageTitle } from "#/lib/page-title";
+import { getAccountDeletionPreview } from "#/server/account";
 import { getMyInterests, saveMyInterests } from "#/server/interests";
 import { updateProfile } from "#/server/profile";
 
@@ -84,6 +89,21 @@ function Profile() {
         setInterests(result.interestsText);
       } catch {
         // Section stays empty; saving still works.
+      }
+    })();
+  }, []);
+
+  // The delete dialog's contents are this preview, so the trigger stays
+  // disabled until it has arrived; a failed load leaves it disabled, which
+  // is the safe direction for the most irreversible action on the page.
+  const [deletionPreview, setDeletionPreview] =
+    useState<DeletionPreview | null>(null);
+  useEffect(() => {
+    void (async () => {
+      try {
+        setDeletionPreview(await getAccountDeletionPreview());
+      } catch {
+        // Trigger stays disabled.
       }
     })();
   }, []);
@@ -307,6 +327,27 @@ function Profile() {
             Privacy policy
           </Link>
         </p>
+      </div>
+
+      <div className="mt-8 border-destructive/30 border-t pt-8">
+        <h2 className="font-semibold text-destructive text-lg">Danger zone</h2>
+        <p className="mt-1 text-muted-foreground text-sm">
+          Closing your account is immediate and cannot be undone. The{" "}
+          <Link className="underline" to="/privacy">
+            privacy policy
+          </Link>{" "}
+          says what stays.
+        </p>
+        <div className="mt-3">
+          <DeleteAccountDialog
+            onDeleted={() => {
+              // The sessions are gone server-side, so the cookie is dead; a
+              // full load is what makes the header agree.
+              window.location.href = "/";
+            }}
+            preview={deletionPreview}
+          />
+        </div>
       </div>
     </div>
   );
