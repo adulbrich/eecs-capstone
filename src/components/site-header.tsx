@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { Menu, X } from "lucide-react";
+import { Github, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { authClient } from "#/lib/auth-client";
+import { brand } from "#/lib/brand";
 import { getPublicUrl } from "#/lib/storage";
 import { InstitutionLogo } from "./institution-logo";
 import { NotificationBell } from "./notification-bell";
@@ -49,6 +50,8 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-3 text-sm">
+          {/* Ahead of both session branches: public, signed in or not. */}
+          <SourceLink />
           {(() => {
             if (isPending) {
               return (
@@ -136,7 +139,7 @@ function MobileMenu({
           </SheetClose>
         </SheetHeader>
 
-        <div className="flex flex-col gap-0 py-2">
+        <nav className="flex flex-col gap-0 py-2">
           <NavItem onClick={close} to="/projects">
             Projects
           </NavItem>
@@ -148,7 +151,11 @@ function MobileMenu({
               Admin
             </NavItem>
           )}
-        </div>
+          {/* Placement and naming: docs/UI-CONVENTIONS.md, Mobile navigation. */}
+          <NavItem aria-label={SOURCE_LINK_LABEL} href={brand.repositoryUrl}>
+            Source code
+          </NavItem>
+        </nav>
 
         <div className="border-border border-t px-4 py-4">
           {(() => {
@@ -168,23 +175,56 @@ function MobileMenu({
   );
 }
 
-function NavItem({
-  to,
-  children,
-  onClick,
-}: {
-  to: string;
-  children: React.ReactNode;
-  onClick: () => void;
-}) {
+const NAV_ITEM_CLASS =
+  "px-4 py-3 font-medium text-[var(--text-secondary)] text-sm transition-colors hover:bg-secondary hover:text-[var(--text-primary)] active:bg-secondary";
+
+/**
+ * A row in the mobile Sheet. `to` is a router link and closes the Sheet;
+ * `href` is an external URL in a new tab, which leaves the Sheet as it was.
+ * One component with two shapes rather than a copied class string, because
+ * the styling is the point and a copy is what drifts.
+ */
+function NavItem(
+  props: { children: React.ReactNode } & (
+    | { to: string; onClick: () => void; href?: never }
+    | { href: string; "aria-label"?: string; to?: never }
+  )
+) {
+  if (props.href !== undefined) {
+    return (
+      <a
+        aria-label={props["aria-label"]}
+        className={NAV_ITEM_CLASS}
+        href={props.href}
+        rel="noopener noreferrer"
+        target="_blank"
+      >
+        {props.children}
+      </a>
+    );
+  }
   return (
-    <Link
-      className="px-4 py-3 font-medium text-[var(--text-secondary)] text-sm transition-colors hover:bg-secondary hover:text-[var(--text-primary)] active:bg-secondary"
-      onClick={onClick}
-      to={to}
-    >
-      {children}
+    <Link className={NAV_ITEM_CLASS} onClick={props.onClick} to={props.to}>
+      {props.children}
     </Link>
+  );
+}
+
+// Not "GitHub", which /sign-in's "Continue with GitHub" button already means.
+const SOURCE_LINK_LABEL = "Source code on GitHub";
+
+function SourceLink() {
+  return (
+    <Button
+      aria-label={SOURCE_LINK_LABEL}
+      asChild
+      size="icon-sm"
+      variant="ghost"
+    >
+      <a href={brand.repositoryUrl} rel="noopener noreferrer" target="_blank">
+        <Github aria-hidden="true" className="h-5 w-5" />
+      </a>
+    </Button>
   );
 }
 
