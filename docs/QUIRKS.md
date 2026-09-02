@@ -551,6 +551,18 @@ upload (the uploader shows a local blob URL, so "an image is on screen" was true
 either way), the password reset (the test then signed in with the old password
 and passed), and an item edit.
 
+### A second comment posted in one page load needs a reload first
+
+Posting a project comment runs `refreshComments()` and `router.invalidate()`. The
+new comment appearing means only the first of those has returned. Measured on the
+comment composer: text typed after that point was gone from the textarea by the
+time Post was clicked, the `required` attribute blocked the empty submit, and the
+failure read as a missing second comment rather than as a cleared form. Reload
+between the two posts. Only the comment composer was measured, so treat this as a
+fact about that form rather than about every form in the app. This is not the
+reverse of the rule above: there a navigation aborted a write in flight, here the
+reload is what puts the form in a settled state before the next write starts.
+
 ### The header avatar is a page load behind the profile page
 
 `site-header.tsx` reads `authClient.useSession()`, Better Auth's own client

@@ -1,0 +1,167 @@
+import type { Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { waitForHydration } from "../shared/playwright";
+import { ADMIN_AUTH, USER_AUTH } from "./constants";
+import {
+  createFixtureProject,
+  fixtureName,
+  openDb,
+  userIdByEmail,
+} from "./fixtures";
+
+/**
+ * Internal comments, which are the one thing on the project page whose
+ * audience is narrower than the panel containing it: the private panel is
+ * proposer-and-staff, and an internal comment inside it is staff only.
+ *
+ * The reason this is worth a browser rather than only the integration test in
+ * `src/server/__tests__/comments.integration.test.ts`: that test calls
+ * `listProjectCommentsAs` and reads its return value, and the unit test in
+ * `src/test/comment-thread.test.tsx` hands `CommentThread` a list it wrote
+ * itself. Neither one can see a second path to the same rows. This test asserts
+ * on what the proposer's browser actually received, so a staff-only comment
+ * arriving through some other fetch fails here and nowhere else.
+ *
+ * Not `@smoke`. It costs three page loads and two round trips through the
+ * comment form, and the pull-request suite has a five-minute job to answer to.
+ */
+
+/**
+ * Every text-ish response body the page took delivery of.
+ *
+ * Bodies rather than the DOM, because the DOM only proves `CommentThread` did
+ * not render the text, and that component renders whatever it is handed: a
+ * regression in `filterCommentsForViewer` would put the internal comment in
+ * this browser's memory whether or not a `<p>` ever showed it. Collected from
+ * every response rather than matched against the server-function URL, which is
+ * a TanStack Start implementation detail this test should not be pinned to.
+ *
+ * Comments are fetched after hydration, not in the loader, so nothing here is
+ * in the server-rendered HTML: the call this is watching for is the client's
+ * own `listProjectComments`.
+ */
+function captureBodies(page: Page): {
+  bodies: string[];
+  settled: () => Promise<void>;
+} {
+  const bodies: string[] = [];
+  const pending: Promise<void>[] = [];
+
+  page.on("response", (response) => {
+    const type = response.headers()["content-type"] ?? "";
+    if (!(type.includes("json") || type.includes("text"))) {
+      return;
+    }
+    pending.push(
+      response.text().then(
+        (body) => {
+          bodies.push(body);
+        },
+        () => {
+          // A body Playwright can no longer read (redirect, aborted request).
+          // Nothing to assert on, and throwing here would fail the test for a
+          // response it was never interested in.
+        }
+      )
+    );
+  });
+
+  return {
+    bodies,
+    settled: async () => {
+      await Promise.all(pending);
+    },
+  };
+}
+
+test.describe("project internal comments", () => {
+  test("staff internal comment never reaches the proposer", async ({
+    browser,
+  }) => {
+    const title = fixtureName("Project");
+    const publicText = `Staff note the proposer should read. ${fixtureName("Public")}`;
+    const internalText = `Staff note the proposer must not read. ${fixtureName("Internal")}`;
+
+    const { db, close } = openDb();
+    let projectId: string;
+    try {
+      const proposerId = await userIdByEmail(db, "user@example.com");
+      ({ id: projectId } = await createFixtureProject(db, {
+        title,
+        proposerId,
+        status: "submitted",
+      }));
+    } finally {
+      await close();
+    }
+
+    const staffContext = await browser.newContext({ storageState: ADMIN_AUTH });
+    const ownerContext = await browser.newContext({ storageState: USER_AUTH });
+
+    try {
+      const staff = await staffContext.newPage();
+      await staff.goto(`/projects/${projectId}`);
+      await waitForHydration(staff);
+
+      await staff.getByLabel("Comment").fill(publicText);
+      await staff.getByRole("button", { name: "Post comment" }).click();
+
+      await expect(staff.getByText(publicText)).toBeVisible();
+
+      // Reloaded rather than typed straight into. Posting runs both
+      // `refreshComments()` and `router.invalidate()`, and the comment
+      // appearing only means the first of those came back. Measured, not
+      // guessed: typed into the live page, the second comment's text was gone
+      // from the textarea by the time Post was clicked, the `required`
+      // attribute blocked the empty submit, and the failure read as a missing
+      // comment rather than as a cleared form. The reload also proves the
+      // first comment was stored rather than only rendered.
+      await staff.reload();
+      await waitForHydration(staff);
+      await expect(staff.getByText(publicText)).toBeVisible();
+
+      await staff.getByLabel("Comment").fill(internalText);
+      await staff
+        .getByRole("checkbox", { name: "Internal (staff only)" })
+        .click();
+      await staff.getByRole("button", { name: "Post comment" }).click();
+
+      // Staff see both, and the badge is what tells them the second one is not
+      // going to the proposer. Exact, because the badge is the bare word and a
+      // substring match would also find it inside "Internal (staff only)".
+      await expect(staff.getByText(internalText)).toBeVisible();
+      await expect(staff.getByText("internal", { exact: true })).toBeVisible();
+
+      const owner = await ownerContext.newPage();
+      const { bodies, settled } = captureBodies(owner);
+      await owner.goto(`/projects/${projectId}`);
+      await waitForHydration(owner);
+
+      // The public comment first. Every absence below is vacuous until this
+      // passes: the comment list starts as an empty `useState([])`, so a page
+      // whose fetch never resolved contains neither comment.
+      await expect(owner.getByText(publicText)).toBeVisible();
+
+      await expect(owner.getByText(internalText)).toHaveCount(0);
+      await expect(owner.getByText("internal", { exact: true })).toHaveCount(0);
+
+      // No way to write one either. The proposer is inside the private panel,
+      // which is what makes the missing control a permission rather than a
+      // missing panel.
+      await expect(
+        owner.getByRole("checkbox", { name: "Internal (staff only)" })
+      ).toHaveCount(0);
+
+      await settled();
+
+      // The guard that keeps the next assertion honest: if nothing was
+      // captured, or the comment fetch was missed, "no body contains the
+      // internal text" would pass on an empty list.
+      expect(bodies.some((body) => body.includes(publicText))).toBe(true);
+      expect(bodies.some((body) => body.includes(internalText))).toBe(false);
+    } finally {
+      await staffContext.close();
+      await ownerContext.close();
+    }
+  });
+});
