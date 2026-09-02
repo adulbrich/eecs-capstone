@@ -16,6 +16,7 @@
     "preview": "vite preview",
     "test": "vitest run --exclude '**/*.integration.test.ts' --exclude '**/*.a11y.test.ts' --exclude '**/*.e2e.test.ts'",
     "test:accessibility": "playwright test --config playwright.a11y.config.ts",
+    "test:accessibility:smoke": "playwright test --config playwright.a11y.config.ts --grep @smoke",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test --config playwright.e2e.config.ts --global-timeout 1800000",
     "test:smoke": "playwright test --config playwright.e2e.config.ts --grep @smoke",

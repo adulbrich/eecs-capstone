@@ -29,7 +29,7 @@ test("my items", async ({ page }) => {
   await checkA11y(page);
 });
 
-test("my items, each tab panel", async ({ page }) => {
+test("@smoke my items, each tab panel", async ({ page }) => {
   await page.goto("/my/items");
   await waitForHydration(page);
 

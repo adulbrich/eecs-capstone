@@ -13,42 +13,42 @@ const { projectId, itemId } = JSON.parse(
   )
 ) as { projectId: string; itemId: string };
 
-test("home page", async ({ page }) => {
+test("@smoke home page", async ({ page }) => {
   await page.goto("/");
   await checkA11y(page);
 });
 
-test("sign-in page", async ({ page }) => {
+test("@smoke sign-in page", async ({ page }) => {
   await page.goto("/sign-in");
   await checkA11y(page);
 });
 
-test("sign-up page", async ({ page }) => {
+test("@smoke sign-up page", async ({ page }) => {
   await page.goto("/sign-up");
   await checkA11y(page);
 });
 
-test("verify-email page", async ({ page }) => {
+test("@smoke verify-email page", async ({ page }) => {
   await page.goto("/verify-email");
   await checkA11y(page);
 });
 
-test("forgot-password page", async ({ page }) => {
+test("@smoke forgot-password page", async ({ page }) => {
   await page.goto("/forgot-password");
   await checkA11y(page);
 });
 
-test("reset-password page", async ({ page }) => {
+test("@smoke reset-password page", async ({ page }) => {
   await page.goto("/reset-password?token=a11y-test-token");
   await checkA11y(page);
 });
 
-test("projects list", async ({ page }) => {
+test("@smoke projects list", async ({ page }) => {
   await page.goto("/projects");
   await checkA11y(page);
 });
 
-test("projects list, paginated", async ({ page }) => {
+test("@smoke projects list, paginated", async ({ page }) => {
   await page.goto("/projects");
   await waitForHydration(page);
 
@@ -67,17 +67,17 @@ test("projects list, paginated", async ({ page }) => {
   await checkA11y(page);
 });
 
-test("project detail", async ({ page }) => {
+test("@smoke project detail", async ({ page }) => {
   await page.goto(`/projects/${projectId}`);
   await checkA11y(page);
 });
 
-test("inventory list", async ({ page }) => {
+test("@smoke inventory list", async ({ page }) => {
   await page.goto("/inventory");
   await checkA11y(page);
 });
 
-test("inventory item detail", async ({ page }) => {
+test("@smoke inventory item detail", async ({ page }) => {
   await page.goto(`/inventory/${itemId}`);
   // One page now serves both audiences, so prove the staff half is absent
   // for an anonymous viewer rather than trusting the conditional.

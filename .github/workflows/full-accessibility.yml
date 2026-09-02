@@ -1,0 +1,28 @@
+# The full accessibility suite: every axe scan in src/test/a11y, in light and
+# dark, about a hundred tests and four minutes on a runner.
+#
+# `workflow_dispatch` only, with no schedule, for the same reason as
+# full-e2e.yml: the trigger is "run it before a release", and a schedule is a
+# follow-up once somebody wants one. It left the pull-request path on
+# 2026-09-02; `ci.yml` runs the `@smoke` subset there as a required check.
+# Anything here that catches a real regression and runs in seconds belongs in
+# that subset instead.
+name: Full Accessibility
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  accessibility:
+    uses: ./.github/workflows/stack-suite.yml
+    with:
+      script: test:accessibility
+      # global-setup.ts signs in as the seeded users to mint their storage
+      # states, so the suite needs the dev seed on top of the shared stack.
+      seed: true
+      browser: true
+      report-path: playwright-report/a11y
+      report-name: full-a11y-report
