@@ -558,17 +558,22 @@ text typed into the same textarea was gone by the time Post was clicked, the
 `required` attribute blocked the empty submit, and the failure read as a missing
 second comment rather than as a cleared form. Reload between the two posts.
 
-One post is three sources of traffic, which is why `confirmed()` in
-`src/test/e2e/waits.ts` cannot be used here: `addComment`, then the
+One post is three sources of traffic: `addComment`, then the
 `refreshComments()` and `router.invalidate()` that `onCommentsChanged` fires
 together (`src/routes/projects/$projectId.tsx`), the second of which re-runs the
-loader. Those two are also the surviving candidates for the wiped textarea, and
-which one does it was not established. The candidate a reader reaches for first,
-`setContent("")` in `comment-thread.tsx`, is eliminated by ordering: it runs
-inside a successful post, before `onChanged`, so it cannot touch text typed
-afterwards. Only this form was measured, so do not read it as a fact about every
-form in the app. Filed as issue #188, which carries the above; this entry shrinks
-to the reload once that is fixed.
+loader. `confirmed()` in `src/test/e2e/waits.ts` is still usable on the post,
+since only `addComment` is a POST and the other two are GET, but it does not
+help: it answers when the write lands, and the clearing happens after that, in
+what `onChanged` sets off.
+
+Which of the two clears the textarea was not established, but two candidates are
+out by reasoning rather than measurement. `setContent("")` in `comment-thread.tsx` runs inside a successful post,
+before `onChanged`, so it cannot touch text typed afterwards. `refreshComments()`
+on its own only re-renders, and a re-render does not reset a child's `useState`,
+which leaves the invalidation as the one to look at first. Only this form was
+measured, so do not read it as a fact about every form in the app. Filed as issue
+#188, which carries the above; this entry shrinks to the reload once that is
+fixed.
 
 This is not the reverse of the rule above: there a navigation aborted a write in
 flight, here the reload is what puts the form in a settled state before the next
