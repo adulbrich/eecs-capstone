@@ -57,6 +57,22 @@ export async function closeMenu(page: Page): Promise<void> {
 }
 
 /**
+ * Toggles a column's checkbox in an `AdminDataTable` Columns menu and waits
+ * for its columnheader to actually appear before moving on.
+ * `onColumnVisibilityChange` derives its next state from the current
+ * `hidden` prop, which only updates after the URL round-trip commits, so
+ * firing the clicks back-to-back with nothing awaited between them drops all
+ * but the last one. Confirming each toggle lands is what a real user waiting
+ * to see the column would also, incidentally, do.
+ */
+export async function toggleColumnOn(page: Page, label: string): Promise<void> {
+  await page.getByRole("menuitemcheckbox", { name: label }).click();
+  await expect(
+    page.getByRole("columnheader", { name: label, exact: true })
+  ).toBeVisible();
+}
+
+/**
  * Signs in through the real form and writes the resulting cookies to
  * `outputPath`, so tests can start already authenticated instead of paying
  * for a sign-in each time. Driving the real form rather than seeding a

@@ -1,32 +1,20 @@
 import { useNavigate } from "@tanstack/react-router";
-import { LayoutGrid, List } from "lucide-react";
-import { writeStoredView } from "#/lib/view-preference";
+import { LayoutGrid, Table } from "lucide-react";
+import { type ViewMode, writeStoredView } from "#/lib/view-preference";
 
-type Props =
-  | {
-      current: "card" | "row";
-      value?: undefined;
-      onChange?: undefined;
-    }
-  | {
-      value: "card" | "row";
-      onChange: (view: "card" | "row") => void;
-      current?: undefined;
-    };
-
-export function ViewToggle(props: Props) {
+/**
+ * The card/table switch on the public project listing. It writes the choice
+ * to storage and into `?view=`, and the route reads the URL back; there is no
+ * callback because the URL is the state.
+ */
+export function ViewToggle({ current }: { current: ViewMode }) {
   const navigate = useNavigate({ from: "/projects/" });
-  const current = props.value ?? props.current ?? "card";
 
-  function setMode(view: "card" | "row") {
+  function setMode(view: ViewMode) {
     if (view === current) {
       return;
     }
     writeStoredView(view);
-    if (props.onChange) {
-      props.onChange(view);
-      return;
-    }
     void navigate({
       search: (prev) => ({ ...prev, view }),
     });
@@ -50,13 +38,13 @@ export function ViewToggle(props: Props) {
         <LayoutGrid className="h-4 w-4" />
       </button>
       <button
-        aria-label="Row view"
-        aria-pressed={current === "row"}
-        className={`${base} -ml-px rounded-r-md ${current === "row" ? active : inactive}`}
-        onClick={() => setMode("row")}
+        aria-label="Table view"
+        aria-pressed={current === "table"}
+        className={`${base} -ml-px rounded-r-md ${current === "table" ? active : inactive}`}
+        onClick={() => setMode("table")}
         type="button"
       >
-        <List className="h-4 w-4" />
+        <Table className="h-4 w-4" />
       </button>
     </div>
   );

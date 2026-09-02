@@ -6,6 +6,7 @@ import { auth } from "#/lib/auth";
 import {
   addBookmarkAs,
   isBookmarkedAs,
+  listMyBookmarkIdsAs,
   listMyBookmarksAs,
   removeBookmarkAs,
 } from "#/server/_internal/bookmarks";
@@ -235,16 +236,42 @@ describe("bookmarks", () => {
 
     expect(Object.keys(rows[0]).sort()).toEqual([
       "bookmarkedAt",
+      "categories",
+      "contactEmail",
       "contactName",
       "description",
       "id",
       "imageUrl",
+      "licenseRestrictions",
+      "minQualifications",
+      "objectives",
+      "prefQualifications",
+      "problemStatement",
       "programCourseId",
       "programCourseName",
+      "requiresNdaIp",
       "status",
+      "teamsSupported",
       "title",
       "updatedAt",
+      "url",
     ]);
+  });
+
+  it("lists the ids of the viewer's own bookmarks, and nobody else's", async () => {
+    // The listing pages fetch this once and match it against the rows they
+    // already show, which is why it needs no visibility filter: an id that
+    // matches no visible row decides nothing.
+    const admin = await makeUser(`ci-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`cj-${Date.now()}@x.com`, "user");
+    const other = await makeUser(`ck-${Date.now()}@x.com`, "user");
+    const mine = await publishedProject(admin);
+    const theirs = await publishedProject(admin);
+    await addBookmarkAs(student, { projectId: mine });
+    await addBookmarkAs(other, { projectId: theirs });
+
+    expect(await listMyBookmarkIdsAs(student)).toEqual({ ids: [mine] });
+    expect(await listMyBookmarkIdsAs(other)).toEqual({ ids: [theirs] });
   });
 
   it("lists newest first, and only the viewer's own", async () => {

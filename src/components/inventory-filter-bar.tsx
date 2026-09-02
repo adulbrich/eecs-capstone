@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { ViewToggle } from "./view-toggle";
 
 type StatusFilter =
   | "available"
@@ -25,11 +24,9 @@ interface Props {
   onCategoriesChange: (next: string[]) => void;
   onQChange: (q: string) => void;
   onStatusChange: (s: StatusFilter) => void;
-  onViewChange: (v: "card" | "row") => void;
   q: string;
   selectedCategories: string[];
   status: StatusFilter;
-  view: "card" | "row";
 }
 
 const STATUS_OPTIONS: { value: NonNullable<StatusFilter>; label: string }[] = [
@@ -52,16 +49,12 @@ export function InventoryFilterBar(props: Props) {
 
   return (
     <Card className="bg-transparent p-4">
-      <div className="flex items-center gap-3">
-        <Input
-          aria-label="Search inventory"
-          className="flex-1"
-          onChange={(e) => setLocalQ(e.target.value)}
-          placeholder="Search inventory"
-          value={localQ}
-        />
-        <ViewToggle onChange={props.onViewChange} value={props.view} />
-      </div>
+      <Input
+        aria-label="Search inventory"
+        onChange={(e) => setLocalQ(e.target.value)}
+        placeholder="Search inventory"
+        value={localQ}
+      />
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         <div className="flex flex-col gap-1">

@@ -72,6 +72,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     note: "Also runs canSeeProject on the target, so a guessed draft id cannot be bookmarked.",
   },
   "server/bookmarks.ts:isBookmarked": { level: "authenticated" },
+  "server/bookmarks.ts:listMyBookmarkIds": {
+    level: "authenticated",
+    note: "Scoped to the viewer. Returns project ids only, so the listing that renders a bookmark toggle per row makes one request instead of twenty.",
+  },
   "server/bookmarks.ts:listMyBookmarks": {
     level: "authenticated",
     note: "Scoped to the viewer's own rows. Soft-deleted projects are dropped in SQL, and every remaining row is then filtered through canSeeProject, so the write-time gate cannot become a permanent capability. proposerId and deletedAt are selected for that check and dropped before the payload.",

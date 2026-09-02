@@ -220,22 +220,8 @@ export async function exportAdminProjectsAs(
   const rows = await db
     .select({
       ...adminProjectSummarySelect,
-      problemStatement: projects.problemStatement,
-      objectives: projects.objectives,
-      minQualifications: projects.minQualifications,
-      prefQualifications: projects.prefQualifications,
-      url: projects.url,
-      licenseRestrictions: projects.licenseRestrictions,
       notes: projects.notes,
       archivedAt: projects.archivedAt,
-      // Correlated rather than joined: a join would multiply project rows by
-      // their category count and need a GROUP BY over the whole projection.
-      categories: sql<string | null>`(
-        SELECT string_agg(c.name, '; ' ORDER BY c.type, c.name)
-        FROM project_categories pc
-        JOIN categories c ON c.id = pc.category_id
-        WHERE pc.project_id = ${projects.id}
-      )`,
     })
     .from(projects)
     .leftJoin(programs, eq(projects.programId, programs.id))

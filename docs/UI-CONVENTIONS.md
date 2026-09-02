@@ -170,16 +170,12 @@ Write the small-screen styles first, then add `md:` (768px and up) overrides. Th
 a deliberate two-tier system, mobile and desktop, so `sm:`, `lg:`, and `xl:` overrides
 are reserved for the rare case that genuinely needs a third tier.
 
-The one sanctioned exception is the responsive card grid, which needs more tiers
-because column count should track available width continuously. All three card
-grids in the app use the same ladder, and a new one must match it rather than
-invent a variant:
-
-```tsx
-<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-```
-
-Everything else stays two-tier.
+There is no card grid any more. The listing cards (`project-card.tsx`,
+`inventory-card.tsx`) are one component at both widths: image on top at 16:9
+below `md`, image on the left at 3:2 and `w-40` from `md` up, in a single column
+bounded to `max-w-4xl`. A five-tier grid ladder used to hold the mobile-shaped
+card at every width; it left with the two display modes on 2026-09-02, because a
+card that turns into a row at `md` cannot sit in a three-column grid.
 
 ### Page wrapper padding
 
@@ -200,10 +196,11 @@ this `px-4 py-6 md:p-8` signature: `max-w-2xl` on the 7 form and dashboard pages
 pages that hold a list or a two-column detail layout, `max-w-3xl` on the one
 long-form page (`projects/$projectId.tsx`), and `max-w-md` on two narrow-content
 pages (`profile.tsx`, `admin/categories/$categoryId.tsx`) plus `max-w-sm` on
-`verify-email.tsx`. Of the six `max-w-4xl` pages, three hold the card grid
-(`projects/index.tsx`, `inventory/index.tsx`, `my/bookmarks.tsx`); the other three
-(`my/projects.tsx`, `my/items.tsx`, `inventory/$itemId.tsx`) hold a row list or a
-two-column detail layout instead. The sign-in/sign-up/forgot/reset-password cards
+`verify-email.tsx`. Of the six `max-w-4xl` pages, five hold a single-column
+card list (`projects/index.tsx`, `inventory/index.tsx`, `my/bookmarks.tsx`,
+`my/projects.tsx`, `my/items.tsx`) and `inventory/$itemId.tsx` holds a
+two-column detail layout. `projects/index.tsx` in table mode lets the table run
+full width below the bounded title and filter bar, the way the admin tables do. The sign-in/sign-up/forgot/reset-password cards
 are narrower still but live inside the separate `island-shell` container below, not
 this padding pattern.
 
@@ -494,20 +491,24 @@ deliberately separate and must not be folded into it:
 - `.island-shell` for the auth cards
 - `.feature-card` for the landing page tiles
 
-`Card` also takes an `asChild` prop. `project-card.tsx`, `project-row.tsx`, and
-admin's `NavCard` (in `admin/index.tsx`) each have a `<Link>` as their root
-element; wrapping one of those in a plain `<Card>` would nest a `<div>` around
-the `<a>` instead of merging onto it, which silently breaks the click target.
-Reach for `asChild` any time the thing a card wraps is itself the navigable
-element:
+`Card` also takes an `asChild` prop. Admin's `NavCard` (in `admin/index.tsx`)
+has a `<Link>` as its root element; wrapping it in a plain `<Card>` would nest a
+`<div>` around the `<a>` instead of merging onto it, which silently breaks the
+click target. Reach for `asChild` any time the thing a card wraps is itself the
+navigable element and nothing else:
 
 ```tsx
 <Card asChild className="flex flex-col overflow-hidden" interactive>
-  <Link to="/projects/$projectId" params={{ projectId: project.id }}>
-    ...
-  </Link>
+  <Link to="/admin/projects">...</Link>
 </Card>
 ```
+
+`project-card.tsx` and `inventory-card.tsx` used to be `asChild` too and no
+longer are: each carries a control beside its link (the bookmark toggle, the
+add-to-cart button), and a button inside an anchor is invalid HTML that axe
+reports as a nested interactive. There the `Card` is a `div`, the `Link` is its
+first child and takes the whole image-and-text area, and the control is a
+sibling.
 
 ### Select with an "All" option
 

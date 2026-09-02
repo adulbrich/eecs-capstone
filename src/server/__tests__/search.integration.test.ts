@@ -122,4 +122,45 @@ describe("searchProjects", () => {
     });
     expect(rows.length).toBeGreaterThan(0);
   });
+
+  it("returns exactly the public field set", async () => {
+    // Pinned so a private column cannot ride into the anonymous listing with
+    // nothing failing. The list is projectDetailView's public fields minus the
+    // four the listing has no use for (notes, isSponsored, programId,
+    // deletedAt) plus the correlated categories string. proposerEmail and
+    // notes must never appear here.
+    const admin = await makeAdmin(`k-${Date.now()}@x.com`);
+    await publish(admin, "Key set");
+
+    const { rows } = await searchProjectsImpl({
+      query: "",
+      categoryIds: [],
+      programId: null,
+      archivedOnly: false,
+      page: 1,
+      pageSize: 20,
+      sort: "relevance",
+    });
+    expect(Object.keys(rows[0]).sort()).toEqual([
+      "categories",
+      "contactEmail",
+      "contactName",
+      "description",
+      "id",
+      "imageUrl",
+      "licenseRestrictions",
+      "minQualifications",
+      "objectives",
+      "prefQualifications",
+      "problemStatement",
+      "programCourseId",
+      "programCourseName",
+      "requiresNdaIp",
+      "status",
+      "teamsSupported",
+      "title",
+      "updatedAt",
+      "url",
+    ]);
+  });
 });

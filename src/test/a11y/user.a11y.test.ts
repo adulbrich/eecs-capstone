@@ -14,6 +14,28 @@ const { projectId, draftProjectId } = JSON.parse(
 
 test.use({ storageState: join(__dirname, ".user-auth.json") });
 
+// The listing renders a bookmark toggle per row for a signed-in viewer and
+// nothing for anyone else, so the public suite's scans never see the control.
+// These two are the only scans that do.
+
+test("projects list, signed in, with bookmark controls", async ({ page }) => {
+  await page.goto("/projects");
+  await waitForHydration(page);
+  await expect(
+    page.getByRole("button", { name: /^(Bookmark|Remove bookmark)$/ }).first()
+  ).toBeVisible();
+  await checkA11y(page);
+});
+
+test("projects table, signed in, with bookmark controls", async ({ page }) => {
+  await page.goto("/projects?view=table");
+  await waitForHydration(page);
+  await expect(
+    page.getByRole("button", { name: /^(Bookmark|Remove bookmark)$/ }).first()
+  ).toBeVisible();
+  await checkA11y(page);
+});
+
 test("my projects", async ({ page }) => {
   await page.goto("/my/projects");
   await checkA11y(page);

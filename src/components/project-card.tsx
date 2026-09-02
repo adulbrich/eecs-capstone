@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { projectImageSrc } from "#/lib/project-image";
 import { stripMarkdown } from "#/lib/strip-markdown";
+import { BookmarkToggle } from "./bookmark-set";
 import { ImageOrFallback } from "./image-or-fallback";
 import { LocalTime } from "./local-time";
 import { StatusBadge } from "./status-badge";
@@ -30,7 +31,7 @@ function ProjectMeta({ project }: { project: ProjectSummary }) {
     Boolean
   ) as string[];
   return (
-    <div className="mt-2">
+    <div className="mt-2 md:mt-1">
       {meta.length > 0 && (
         <p className="text-muted-foreground text-xs">{meta.join(" · ")}</p>
       )}
@@ -43,16 +44,34 @@ function ProjectMeta({ project }: { project: ProjectSummary }) {
   );
 }
 
+/**
+ * One project in a listing, at both widths: image on top below `md`, image
+ * on the left from `md` up. Two components used to render these shapes and
+ * the mode picked between them, so a phone in row mode got a thumbnail beside
+ * a truncated title; now the viewport picks.
+ *
+ * The `Card` is not `asChild` around the `Link`: the bookmark control is a
+ * button, a button inside an anchor is invalid HTML and a nested interactive
+ * to axe, so the link and the control are siblings. The control renders
+ * nothing outside a `BookmarkSetProvider`, and its wrapper hides itself then.
+ */
 export function ProjectCard({ project }: { project: ProjectSummary }) {
   const src = projectImageSrc(project.imageUrl);
   return (
-    <Card asChild className="flex flex-col overflow-hidden" interactive>
-      <Link params={{ projectId: project.id }} to="/projects/$projectId">
+    <Card
+      className="flex flex-col overflow-hidden md:flex-row md:items-center md:gap-3 md:p-3"
+      interactive
+    >
+      <Link
+        className="flex min-w-0 flex-1 flex-col md:flex-row md:items-center md:gap-3"
+        params={{ projectId: project.id }}
+        to="/projects/$projectId"
+      >
         <ImageOrFallback
-          className="aspect-[16/9] w-full object-cover"
+          className="aspect-[16/9] w-full object-cover md:aspect-[3/2] md:w-40 md:shrink-0 md:rounded-md"
           src={src}
         />
-        <div className="flex flex-1 flex-col p-4">
+        <div className="flex min-w-0 flex-1 flex-col p-4 md:p-0">
           <div className="flex items-start justify-between gap-3">
             <h3 className="font-semibold leading-tight">{project.title}</h3>
             {project.status !== "published" && (
@@ -60,16 +79,19 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
             )}
           </div>
           {project.description && (
-            <p className="mt-2 line-clamp-3 text-muted-foreground text-sm">
+            <p className="mt-2 line-clamp-3 text-muted-foreground text-sm md:mt-1">
               {stripMarkdown(project.description)}
             </p>
           )}
           <ProjectMeta project={project} />
         </div>
       </Link>
+      <div className="px-4 pb-4 empty:hidden md:shrink-0 md:px-0 md:pb-0">
+        <BookmarkToggle projectId={project.id} />
+      </div>
     </Card>
   );
 }
 
 export type { ProjectSummary };
-export { ProjectMeta, programLabel };
+export { programLabel };

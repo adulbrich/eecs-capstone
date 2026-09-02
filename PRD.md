@@ -158,8 +158,10 @@ Each project carries:
 - ✅ Filter by program.
 - ✅ Filter by category.
 - ✅ All filter/search state lives in URL search params (shareable links).
-- ✅ Card / row listing toggle (`?view=card|row`); filters and search apply
-  identically in both modes.
+- ✅ Card / table listing toggle (`?view=card|table`); filters and search apply
+  identically in both modes. The card is responsive (image on top below `md`,
+  beside the text from `md` up); the table is the same `AdminDataTable` the
+  admin pages use, with column visibility and a client-side column sort.
 - ✅ Sort control on the public listing: most relevant (default), newest, and
   "recommended for you".
 - ✅ Personalized recommendations: signed-in users write an interests statement
@@ -168,8 +170,8 @@ Each project carries:
   by cosine similarity to the interests vector. Falls back to relevance ordering
   when a viewer has no interest vector yet; interest vectors never leave the
   server, and projects are embedded only on publish.
-- ✅ Bookmarks: bookmark button on project detail (authed) and a
-  `/my/bookmarks` view.
+- ✅ Bookmarks: bookmark button on project detail and a toggle on every row of
+  the public listing (authed), and a `/my/bookmarks` view.
 
 ## 9. Categories & Programs
 

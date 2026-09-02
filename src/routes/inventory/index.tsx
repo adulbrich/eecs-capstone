@@ -4,7 +4,6 @@ import { z } from "zod";
 import { EmptyState } from "#/components/empty-state";
 import { InventoryCard } from "#/components/inventory-card";
 import { InventoryFilterBar } from "#/components/inventory-filter-bar";
-import { InventoryRow } from "#/components/inventory-row";
 import {
   Pagination,
   PaginationButton,
@@ -12,8 +11,6 @@ import {
 } from "#/components/ui/pagination";
 import { authClient } from "#/lib/auth-client";
 import { useHasMounted } from "#/lib/use-has-mounted";
-import { useSeedViewFromStorage } from "#/lib/use-seed-view";
-import type { ViewMode } from "#/lib/view-preference";
 import { listInventory, listInventoryCategories } from "#/server/inventory";
 
 type PublicStatus =
@@ -34,9 +31,6 @@ const searchSchema = z.object({
   // router error, per the brief: old links intentionally break as filters
   // but should not 500 the page.
   categories: z.array(z.string().uuid()).max(20).catch([]).default([]),
-  // Optional so a param-less visit is detectable; the stored preference then
-  // seeds it. Absent from the URL defaults to "card" at render.
-  view: z.enum(["card", "row"]).optional(),
   page: z.number().int().positive().default(1),
 });
 
@@ -64,13 +58,6 @@ export const Route = createFileRoute("/inventory/")({
 function InventoryIndex() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/inventory/" });
-  const view = search.view ?? "card";
-  const seedView = useCallback(
-    (next: ViewMode) =>
-      navigate({ replace: true, search: (s) => ({ ...s, view: next }) }),
-    [navigate]
-  );
-  useSeedViewFromStorage(search.view, seedView);
   // Stable, because useDebouncedDraft inside the filter bar keys its timer on
   // this callback: an inline arrow would re-arm the debounce on every render
   // of this page rather than on every keystroke.
@@ -102,45 +89,25 @@ function InventoryIndex() {
             onStatusChange={(status) =>
               navigate({ search: (s) => ({ ...s, status, page: 1 }) })
             }
-            onViewChange={(view) =>
-              navigate({ search: (s) => ({ ...s, view }) })
-            }
             q={search.q}
             selectedCategories={search.categories}
             status={search.status}
-            view={view}
           />
         </div>
       </div>
-      {(() => {
-        if (data.rows.length === 0) {
-          return <EmptyState>No items match.</EmptyState>;
-        }
-        if (view === "row") {
-          return (
-            <div className="mx-auto mt-6 flex max-w-4xl flex-col gap-3">
-              {data.rows.map((it) => (
-                <InventoryRow
-                  item={{ ...it, status: it.status as PublicStatus }}
-                  key={it.id}
-                  signedIn={signedIn}
-                />
-              ))}
-            </div>
-          );
-        }
-        return (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            {data.rows.map((it) => (
-              <InventoryCard
-                item={{ ...it, status: it.status as PublicStatus }}
-                key={it.id}
-                signedIn={signedIn}
-              />
-            ))}
-          </div>
-        );
-      })()}
+      {data.rows.length === 0 ? (
+        <EmptyState>No items match.</EmptyState>
+      ) : (
+        <div className="mx-auto mt-6 flex max-w-4xl flex-col gap-3">
+          {data.rows.map((it) => (
+            <InventoryCard
+              item={{ ...it, status: it.status as PublicStatus }}
+              key={it.id}
+              signedIn={signedIn}
+            />
+          ))}
+        </div>
+      )}
       <Pagination className="mx-auto max-w-4xl">
         <PaginationButton
           disabled={data.page <= 1}

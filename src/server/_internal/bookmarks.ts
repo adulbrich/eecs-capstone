@@ -124,6 +124,23 @@ export async function listMyBookmarksAs(viewer: BookmarkViewer) {
   };
 }
 
+/**
+ * The project ids the viewer has bookmarked, for a listing that renders a
+ * toggle per row and wants one request rather than one per row.
+ *
+ * No `canSeeProject` pass, unlike `listMyBookmarksAs`: nothing about the
+ * project is returned, and a listing only ever matches these ids against rows
+ * it already showed, so an id for a project the viewer can no longer see
+ * matches nothing and decides nothing.
+ */
+export async function listMyBookmarkIdsAs(viewer: BookmarkViewer) {
+  const rows = await db
+    .select({ projectId: projectBookmarks.projectId })
+    .from(projectBookmarks)
+    .where(eq(projectBookmarks.userId, viewer.id));
+  return { ids: rows.map((row) => row.projectId) };
+}
+
 export async function addBookmarkForCurrentUser(data: { projectId: string }) {
   const viewer = await requireUser();
   return addBookmarkAs(viewer, data);
@@ -144,4 +161,9 @@ export async function isBookmarkedForCurrentUser(data: { projectId: string }) {
 export async function listMyBookmarksForCurrentUser() {
   const viewer = await requireUser();
   return listMyBookmarksAs(viewer);
+}
+
+export async function listMyBookmarkIdsForCurrentUser() {
+  const viewer = await requireUser();
+  return listMyBookmarkIdsAs(viewer);
 }

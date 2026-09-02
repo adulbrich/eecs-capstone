@@ -1,8 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { z } from "zod";
+import { AdminDataTable } from "#/components/admin-data-table";
+import { BookmarkSetProvider } from "#/components/bookmark-set";
 import { EmptyState } from "#/components/empty-state";
-import { ProjectListItem } from "#/components/project-list-item";
+import { ProjectCard } from "#/components/project-card";
+import {
+  PROJECT_TABLE_COLUMNS,
+  PROJECT_TABLE_DEFAULT_SORT,
+  type ProjectTableRow,
+} from "#/components/project-table-columns";
 import { ProjectsFilterBar } from "#/components/projects-filter-bar";
 import {
   Pagination,
@@ -10,6 +17,7 @@ import {
   PaginationStatus,
 } from "#/components/ui/pagination";
 import { pageTitle } from "#/lib/page-title";
+import { useAdminTable } from "#/lib/use-admin-table";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
 import type { ViewMode } from "#/lib/view-preference";
 import { searchProjects } from "#/server/search";
@@ -20,16 +28,33 @@ const searchSchema = z.object({
   program: z.string().uuid().nullable().default(null),
   archivedOnly: z.boolean().default(false),
   page: z.number().int().min(1).default(1),
-  sort: z.enum(["relevance", "newest", "recommended"]).default("relevance"),
+  // The server's ordering, which also decides which twenty rows make up the
+  // page. Named `order` because `sort` and `dir` are the table's, below.
+  order: z.enum(["relevance", "newest", "recommended"]).default("relevance"),
   // Optional so a param-less visit is detectable; the stored preference then
-  // seeds it. Absent from the URL defaults to "card" at render.
-  view: z.enum(["card", "row"]).optional(),
+  // seeds it. Absent from the URL defaults to "card" at render. A value the
+  // enum no longer knows (`row`, until 2026-09-02) reads as absent rather than
+  // as a router error, so a stale link renders the default.
+  view: z.enum(["card", "table"]).optional().catch(undefined),
+  // Table mode's column sort and visibility, owned by useAdminTable.
+  cols: z.string().optional(),
+  dir: z.enum(["asc", "desc"]).optional(),
+  sort: z.string().optional(),
 });
 
 export const Route = createFileRoute("/projects/")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("Projects") }] }),
-  loaderDeps: ({ search }) => search,
+  // Only the filter fields: the view mode, the column sort and the column
+  // visibility are client state and must not re-run the loader.
+  loaderDeps: ({ search }) => ({
+    archivedOnly: search.archivedOnly,
+    categories: search.categories,
+    order: search.order,
+    page: search.page,
+    program: search.program,
+    q: search.q,
+  }),
   loader: async ({ deps }) =>
     await searchProjects({
       data: {
@@ -39,11 +64,61 @@ export const Route = createFileRoute("/projects/")({
         archivedOnly: deps.archivedOnly,
         page: deps.page,
         pageSize: 20,
-        sort: deps.sort,
+        sort: deps.order,
       },
     }),
   component: ProjectsList,
 });
+
+type Search = z.infer<typeof searchSchema>;
+
+/**
+ * Table mode. Its own component so `useAdminTable`, and the column seed
+ * effect it runs, only exist while the table is on screen: in card mode a
+ * stored column layout has nothing to seed into.
+ *
+ * Sorting is local to the page. The server's `order` decides which rows are
+ * here; the column sort decides their order on it, and clicking a header does
+ * not send the reader back to page one because the page's rows do not change.
+ */
+function ProjectTable({
+  rows,
+  search,
+}: {
+  rows: ProjectTableRow[];
+  search: Search;
+}) {
+  const navigate = useNavigate({ from: "/projects/" });
+  const { tableProps } = useAdminTable({
+    columns: PROJECT_TABLE_COLUMNS,
+    defaultSort: PROJECT_TABLE_DEFAULT_SORT,
+    navigate,
+    search,
+    storageKey: "public-projects",
+  });
+  return (
+    <AdminDataTable
+      caption="Projects"
+      data={rows}
+      emptyMessage="No projects matched your search."
+      getRowId={(row) => row.id}
+      {...tableProps}
+    />
+  );
+}
+
+function ProjectCards({ rows }: { rows: ProjectTableRow[] }) {
+  if (rows.length === 0) {
+    return <EmptyState>No projects matched your search.</EmptyState>;
+  }
+  return (
+    <div className="mx-auto mt-6 flex max-w-4xl flex-col gap-3">
+      {rows.map((project) => (
+        <ProjectCard key={project.id} project={project} />
+      ))}
+    </div>
+  );
+}
 
 function ProjectsList() {
   const { rows, total, page, pageSize } = Route.useLoaderData();
@@ -65,28 +140,20 @@ function ProjectsList() {
           <ProjectsFilterBar
             archivedOnly={search.archivedOnly}
             categories={search.categories}
+            order={search.order}
             program={search.program}
             q={search.q}
-            sort={search.sort}
             view={view}
           />
         </div>
       </div>
-      {rows.length === 0 ? (
-        <EmptyState>No projects matched your search.</EmptyState>
-      ) : (
-        <div
-          className={
-            view === "card"
-              ? "mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
-              : "mx-auto mt-6 flex max-w-4xl flex-col gap-3"
-          }
-        >
-          {rows.map((p) => (
-            <ProjectListItem key={p.id} mode={view} project={p} />
-          ))}
-        </div>
-      )}
+      <BookmarkSetProvider>
+        {view === "table" ? (
+          <ProjectTable rows={rows} search={search} />
+        ) : (
+          <ProjectCards rows={rows} />
+        )}
+      </BookmarkSetProvider>
       <Pagination className="mx-auto max-w-4xl">
         {page <= 1 ? (
           <PaginationLink disabled>Previous</PaginationLink>

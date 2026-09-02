@@ -1,13 +1,18 @@
-export type ViewMode = "card" | "row";
+export type ViewMode = "card" | "table";
 
 /**
- * Shared localStorage key for the card/row list view. One preference is applied
- * across the Projects and public Inventory pages by design.
+ * localStorage key for the listing view mode. Read by `/projects` today; the
+ * public inventory listing will read the same key once it has a table mode.
  */
 export const VIEW_STORAGE_KEY = "cs-capstone:view-mode";
 
+/**
+ * `row` was a valid value until 2026-09-02, when the table mode replaced it.
+ * It is dropped, not aliased: a browser still holding it reads as "no
+ * preference" and falls back to the default once.
+ */
 function isViewMode(value: unknown): value is ViewMode {
-  return value === "card" || value === "row";
+  return value === "card" || value === "table";
 }
 
 /**

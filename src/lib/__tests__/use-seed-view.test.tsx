@@ -10,14 +10,14 @@ afterEach(() => {
 
 describe("useSeedViewFromStorage", () => {
   it("seeds from storage when the current view is unset", () => {
-    writeStoredView("row");
+    writeStoredView("table");
     const seed = vi.fn();
     renderHook(() => useSeedViewFromStorage(undefined, seed));
-    expect(seed).toHaveBeenCalledWith("row");
+    expect(seed).toHaveBeenCalledWith("table");
   });
 
   it("does not seed when the current view is already set", () => {
-    writeStoredView("row");
+    writeStoredView("table");
     const seed = vi.fn();
     renderHook(() => useSeedViewFromStorage("card", seed));
     expect(seed).not.toHaveBeenCalled();

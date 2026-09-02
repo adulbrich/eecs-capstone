@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { config as loadDotenv } from "dotenv";
 import { eq } from "drizzle-orm";
@@ -9,7 +8,11 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
-import { closeMenu, waitForHydration } from "../shared/playwright";
+import {
+  closeMenu,
+  toggleColumnOn,
+  waitForHydration,
+} from "../shared/playwright";
 import { checkA11y } from "./helpers";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -150,21 +153,6 @@ test("admin mentors list", async ({ page }) => {
 // The rest of this file exercises behavior that only a browser can prove:
 // static SSR checks confirm markup is present or absent, but never actually
 // click a sort header, toggle a column, resize the viewport, or scroll.
-
-/**
- * Toggles a column's checkbox and waits for its columnheader to actually
- * appear before moving on. `onColumnVisibilityChange` derives its next state
- * from the current `hidden` prop, which only updates after the URL
- * round-trip commits, so firing the clicks back-to-back with nothing awaited
- * between them drops all but the last one. Confirming each toggle lands is
- * what a real user waiting to see the column would also, incidentally, do.
- */
-async function toggleColumnOn(page: Page, label: string): Promise<void> {
-  await page.getByRole("menuitemcheckbox", { name: label }).click();
-  await expect(
-    page.getByRole("columnheader", { name: label, exact: true })
-  ).toBeVisible();
-}
 
 test("admin inventory table shows its default-hidden columns when toggled on", async ({
   page,
