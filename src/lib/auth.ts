@@ -119,6 +119,9 @@ export const auth = betterAuth({
       linkedin: { type: "string", required: false },
       wantsToMentor: { type: "boolean", required: false, defaultValue: false },
       mentorTeamCount: { type: "number", required: false, defaultValue: 1 },
+      // Server-written only: `input: false` keeps it off every sign-up and
+      // update body. Mirrors the column in auth-schema.ts. See #84.
+      deletedAt: { type: "date", required: false, input: false },
     },
   },
   plugins: [

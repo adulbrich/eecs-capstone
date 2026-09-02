@@ -127,6 +127,13 @@
       "when": 1788350161855,
       "tag": "0017_project_mentorship",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788356545132,
+      "tag": "0018_user_deleted_at",
+      "breakpoints": true
     }
   ]
 }

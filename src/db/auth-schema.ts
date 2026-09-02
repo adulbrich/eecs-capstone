@@ -36,6 +36,9 @@ export const user = pgTable("user", {
   linkedin: text("linkedin"),
   wantsToMentor: boolean("wants_to_mentor").notNull().default(false),
   mentorTeamCount: integer("mentor_team_count").notNull().default(1),
+  // Set by self-service deletion. The row survives because nine restrict
+  // edges depend on it; this is what says its contents were scrubbed. See #84.
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 export const session = pgTable(
