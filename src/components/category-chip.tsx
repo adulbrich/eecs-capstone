@@ -1,9 +1,14 @@
 import { Badge } from "./ui/badge";
 
+/**
+ * `type` is the project facet (`docs/QUIRKS.md`, "Categories: domain is
+ * closed, type is an open project-only facet"); inventory categories have
+ * none, so they pass their `{ id, name }` straight through.
+ */
 interface Category {
   id: string;
   name: string;
-  type: string | null;
+  type?: string | null;
 }
 
 export function CategoryChip({ category }: { category: Category }) {

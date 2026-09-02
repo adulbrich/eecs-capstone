@@ -55,10 +55,7 @@ export function InventoryCard({ item, signedIn }: Props) {
           <div className="mt-2 flex flex-wrap items-center gap-2 md:mt-1">
             <InventoryStatusBadge status={item.status} />
             {item.categories.map((category) => (
-              <CategoryChip
-                category={{ ...category, type: null }}
-                key={category.id}
-              />
+              <CategoryChip category={category} key={category.id} />
             ))}
           </div>
         </div>

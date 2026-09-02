@@ -37,6 +37,7 @@ import {
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { formatHoldShort, holdFromStoredRow } from "#/lib/hold";
+import { statusRank } from "#/lib/inventory-visibility";
 import { pageTitle } from "#/lib/page-title";
 import { getPublicUrl } from "#/lib/storage";
 import type { SortState } from "#/lib/table-state";
@@ -103,14 +104,6 @@ export const Route = createFileRoute("/_authed/admin/inventory/")({
 });
 
 type Row = Awaited<ReturnType<typeof listAdminInventory>>["rows"][number];
-
-const STATUS_ORDER: Record<string, number> = {
-  available: 0,
-  requested: 1,
-  reserved: 2,
-  checked_out: 3,
-  maintenance: 4,
-};
 
 const DEFAULT_SORT: SortState = { desc: true, id: "updatedAt" };
 
@@ -186,9 +179,7 @@ const COLUMNS = defineAdminColumns<Row>()([
     id: "name",
   },
   {
-    // Alphabetical status order means nothing to a reader; this is the order
-    // an item actually moves through.
-    accessorFn: (row) => STATUS_ORDER[row.status] ?? 99,
+    accessorFn: (row) => statusRank(row.status),
     cell: ({ row }) => (
       <InventoryStatusBadge
         showRetired
@@ -261,10 +252,7 @@ const COLUMNS = defineAdminColumns<Row>()([
       row.original.categories.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {row.original.categories.map((category) => (
-            <CategoryChip
-              category={{ ...category, type: null }}
-              key={category.id}
-            />
+            <CategoryChip category={category} key={category.id} />
           ))}
         </div>
       ) : (

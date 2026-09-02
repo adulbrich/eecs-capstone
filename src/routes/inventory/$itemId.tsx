@@ -77,10 +77,7 @@ function ItemDetail() {
               }
             />
             {item.categories.map((category) => (
-              <CategoryChip
-                category={{ ...category, type: null }}
-                key={category.id}
-              />
+              <CategoryChip category={category} key={category.id} />
             ))}
           </div>
           {item.description && (

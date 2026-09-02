@@ -4,7 +4,8 @@ import { programs, projects, user } from "#/db/schema";
 export interface ProjectCategory {
   id: string;
   name: string;
-  type: string;
+  /** Nullable in the schema; `json_build_object` passes the null through. */
+  type: string | null;
 }
 
 /**

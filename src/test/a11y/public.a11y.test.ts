@@ -191,6 +191,14 @@ test("inventory list: the view toggle writes the mode into the URL", async ({
   await page.getByRole("button", { name: "Card view" }).click();
   await expect(page).toHaveURL(/[?&]view=card(&|$)/);
   await expect(page.locator(".admin-table")).toHaveCount(0);
+
+  // One stored preference for both listings: a bare revisit of /inventory is
+  // seeded from what the toggle on either page last wrote.
+  await page.getByRole("button", { name: "Table view" }).click();
+  await expect(page).toHaveURL(/[?&]view=table(&|$)/);
+  await page.goto("/inventory");
+  await expect(page).toHaveURL(/[?&]view=table(&|$)/);
+  await expect(page.locator(".admin-table")).toBeVisible();
 });
 
 test("inventory table interactions", async ({ page }) => {

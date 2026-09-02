@@ -1,8 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { defineAdminColumns } from "#/components/admin-data-table";
-import type {
-  InventoryItemPublic,
-  ItemStatus,
+import {
+  type InventoryItemPublic,
+  type ItemStatus,
+  statusRank,
 } from "#/lib/inventory-visibility";
 import { getPublicUrl } from "#/lib/storage";
 import type { SortState } from "#/lib/table-state";
@@ -25,15 +26,6 @@ export type InventoryListRow = InventoryItemPublic;
 export const INVENTORY_TABLE_DEFAULT_SORT: SortState = {
   desc: false,
   id: "name",
-};
-
-/** The order an item actually moves through, as `/admin/inventory` sorts it. */
-const STATUS_ORDER: Record<string, number> = {
-  available: 0,
-  requested: 1,
-  reserved: 2,
-  checked_out: 3,
-  maintenance: 4,
 };
 
 /**
@@ -74,7 +66,7 @@ export const INVENTORY_TABLE_COLUMNS = defineAdminColumns<InventoryListRow>()([
     id: "name",
   },
   {
-    accessorFn: (row) => STATUS_ORDER[row.status] ?? 99,
+    accessorFn: (row) => statusRank(row.status),
     cell: ({ row }) => (
       <InventoryStatusBadge status={row.original.status as ItemStatus} />
     ),
@@ -90,10 +82,7 @@ export const INVENTORY_TABLE_COLUMNS = defineAdminColumns<InventoryListRow>()([
       ) : (
         <div className="flex flex-wrap gap-1">
           {row.original.categories.map((category) => (
-            <CategoryChip
-              category={{ ...category, type: null }}
-              key={category.id}
-            />
+            <CategoryChip category={category} key={category.id} />
           ))}
         </div>
       ),

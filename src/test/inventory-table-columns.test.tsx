@@ -110,7 +110,9 @@ describe("the public inventory table", () => {
       screen.getAllByRole("columnheader").map((h) => h.textContent?.trim())
     ).toEqual(["Name", "Status", "Categories"]);
     // The hold dates are in publicItemView and deliberately not here.
-    expect(INVENTORY_TABLE_COLUMNS.map((c) => c.id)).not.toContain("dueAt");
+    const ids = INVENTORY_TABLE_COLUMNS.map((c) => c.id);
+    expect(ids).not.toContain("dueAt");
+    expect(ids).not.toContain("pickupBy");
   });
 
   it("sorts by name by default, since updatedAt is a staff column", () => {
