@@ -48,13 +48,25 @@ function SignIn() {
     setError(null);
     setLoading(true);
     const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") ?? "");
     const { error: signInError } = await authClient.signIn.email({
-      email: String(form.get("email") ?? ""),
+      email,
       password: String(form.get("password") ?? ""),
+      // Where the verification link lands when an unverified account is
+      // refused and re-mailed (`sendOnSignIn` in auth.ts). Better Auth reads
+      // it from this request body and defaults to "/", same as sign-up.
+      callbackURL: "/verify-email",
     });
     setLoading(false);
     if (signInError) {
-      setError(signInError.message ?? "Sign-in failed");
+      // Better Auth's own message says only that the address is unverified.
+      // The refusal is also what mailed the new link, so say so, or the
+      // person has no reason to look in their inbox.
+      setError(
+        signInError.code === "EMAIL_NOT_VERIFIED"
+          ? `This account has not verified its email yet. A new verification link was just sent to ${email}; it expires in an hour.`
+          : (signInError.message ?? "Sign-in failed")
+      );
       return;
     }
     navigate({ to: redirect ?? "/" });
