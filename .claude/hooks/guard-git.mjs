@@ -170,11 +170,14 @@ function branches(sub, args) {
  * The message a `git commit` would record, or null when it cannot be read
  * here: a file, an editor, or a substitution that is not the one shape the
  * harness writes, `-m "$(cat <<'EOF' ... EOF)"`, whose heredoc body is the
- * message. A heredoc elsewhere on the line is not a message.
+ * message. The heredoc is searched from that `-m`, so a heredoc earlier on
+ * the line is not a message. A second `-m` beside the harness shape is not
+ * read; the harness never writes one.
  */
 function extractCommitMessage(text) {
-  if (CAT_HEREDOC.test(text)) {
-    return HEREDOC.exec(text)?.[3] ?? null;
+  const shape = CAT_HEREDOC.exec(text);
+  if (shape) {
+    return HEREDOC.exec(text.slice(shape.index))?.[3] ?? null;
   }
   const parts = [];
   for (const match of text.matchAll(MESSAGE_FLAG)) {
