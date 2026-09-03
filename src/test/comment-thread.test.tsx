@@ -224,9 +224,7 @@ describe("CommentThread forms while a post is in flight", () => {
 
     await waitFor(() => expect(box.disabled).toBe(true));
     expect(
-      replyForm()
-        .getByRole("button", { name: "Cancel" })
-        .hasAttribute("disabled")
+      replyForm().getByRole("button", { name: "Post" }).hasAttribute("disabled")
     ).toBe(true);
 
     land();
@@ -234,5 +232,46 @@ describe("CommentThread forms while a post is in flight", () => {
       expect(screen.queryByPlaceholderText("Reply")).toBeNull()
     );
     expect(addComment).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a reply draft when another post lands and the thread refreshes", async () => {
+    // Step 3 of #188's triage: onChanged is shared, so a post from the
+    // new-comment form must not disturb a reply being drafted at the same
+    // time. The refresh it triggers is a rerender with a longer comments
+    // array; the reply form is keyed under its comment and keeps its state.
+    const land = pendingPost();
+    const first = comment({});
+    const view = renderThread([first]);
+    openReplyAndType("reply in progress");
+
+    fireEvent.change(screen.getByLabelText("Comment"), {
+      target: { value: "unrelated post" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText("Comment") as HTMLTextAreaElement).disabled
+      ).toBe(true)
+    );
+    land();
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText("Comment") as HTMLTextAreaElement).disabled
+      ).toBe(false)
+    );
+    view.rerender(
+      <CommentThread
+        comments={[first, comment({ id: "c2", content: "unrelated post" })]}
+        onChanged={() => {
+          // no-op
+        }}
+        projectId={PROJECT_ID}
+        viewerIsStaff={true}
+      />
+    );
+
+    const reply = screen.getByPlaceholderText("Reply") as HTMLTextAreaElement;
+    expect(reply.value).toBe("reply in progress");
+    expect(reply.disabled).toBe(false);
   });
 });

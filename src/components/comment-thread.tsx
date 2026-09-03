@@ -317,7 +317,6 @@ function ReplyForm({
           Post
         </Button>
         <Button
-          disabled={busy}
           onClick={() => setOpen(false)}
           size="xs"
           type="button"
