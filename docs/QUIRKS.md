@@ -384,6 +384,31 @@ does any wrapper that execs a binary directly. `npx vitest` passes and
 other difference. Check `node --version` from inside the same invocation before
 believing a strange test failure.
 
+A git hook is that case exactly: lefthook runs its commands under `sh`, which
+has no shell function, so `pre-push` saw Node 26 and 79 failures on the first
+push after it was added while `npm test` from zsh passed. `scripts/nvmrc-node.sh`
+is the answer: it sources nvm or fnm to switch to the `.nvmrc` major and, when
+it cannot, fails on the version with the reason rather than on the tests. The
+`pre-push` commands in `lefthook.yml` go through it.
+
+### A test that spawns git under a hook must drop `GIT_DIR` first
+
+A git hook exports `GIT_DIR` (and under some commands `GIT_WORK_TREE` and
+`GIT_INDEX_FILE`) to everything it runs, and `pre-push` runs the unit suite.
+`src/test/claude-hooks.test.ts` builds a throwaway repository with `git init`
+to test the commit-on-main refusal. Under the hook that `git init` did not
+create a repository in the temp directory: with `GIT_DIR` pointing at this
+checkout's gitdir and no work tree named, it re-initialized this repository as
+bare, and every git command afterwards, in the worktree and the main checkout
+alike, failed with `fatal: this operation must be run in a work tree`. The fix
+was `git config core.bare false`; the cause took three pushes to find, because
+the first symptom was the push being refused.
+
+Any test that spawns git builds its environment from `process.env` with every
+`GIT_*` key removed, as that file does. The same applies to a hook script that
+runs git on the session's `cwd`: strip the variables, or the answer is about
+the wrong repository.
+
 ESM imports hoist above all statements. Writing `import { config } from "dotenv"; config({ path: ".env.local" }); import { db } from "..."` looks correct but is wrong: the `db` import runs at module-load time BEFORE the `config()` call ever fires, so `DATABASE_URL` is unset when `src/db/index.ts` evaluates and the script crashes.
 
 Pattern that works: pass `--env-file=.env.local` to `tsx` at the command line.
@@ -402,6 +427,11 @@ files`, and raising the limit does not help: it still fails with
 `ulimit -n 8192`. Vite's watcher opens more descriptors than the sandbox
 allows, and the failure looks like a broken test rather than a broken
 environment, so it costs time to place. Run the suites with the sandbox off.
+
+Two more things the sandbox refuses, both of which look like the tool being
+broken: `gh` fails TLS inside it, and anything that writes `.git/config`, such
+as `git branch -d`, `git worktree add` and `git remote`, half-completes. Run
+those with the sandbox off too.
 
 Two harmless things it prints on every run in this repo, which are not signs
 of a problem and are worth recognising so you stop chasing them:
@@ -765,11 +795,13 @@ Linting and formatting run through **Ultracite** (a strict Biome preset). `biome
 - Everything is checked except generated / tool-managed paths excluded in `biome.json`: `src/routeTree.gen.ts`, `src/styles.css`, `scripts/`, and `drizzle/`. (Biome respects `.gitignore` via `vcs.useIgnoreFile`, so `playwright-report/` etc. are skipped too.)
 - `npm run check` must be clean before committing. Run `npm run format` (or `npx ultracite fix`) to auto-fix.
 
-### The pre-commit hook
+### The git hooks
 
 `lefthook.yml` runs `npx ultracite check` on the staged files at pre-commit, so the
-rule above is enforced rather than remembered. `npm install` installs the hook via
-the `prepare` script; nobody runs anything by hand.
+rule above is enforced rather than remembered, and beside it the prose check, a
+refusal to commit on `main`, the commit-message check at `commit-msg`, and typecheck
+plus the unit suite at `pre-push`. `CONTRIBUTING.md` has the table. `npm install`
+installs the hooks via the `prepare` script; nobody runs anything by hand.
 
 - **`prepare` is `lefthook install || true`, and the guard is load-bearing.**
   `.dockerignore` excludes `.git`, and the Dockerfile's runtime stage runs
@@ -780,8 +812,13 @@ the `prepare` script; nobody runs anything by hand.
   and exits 0, so committing before `npm install` warns instead of failing.
 - **To skip it:** `LEFTHOOK=0 git commit ...`, or `git commit --no-verify`.
 
-The hook covers Biome only. `npm run typecheck` and `npm test` are still on you,
-and CI still enforces all three.
+The message and prose checks are `scripts/check-commit-message.mjs` and
+`scripts/check-prose.mjs`, the same files CI's `verify` and `pr-text` jobs and the
+Claude Code hooks under `.claude/hooks/` run, so a rule has one implementation.
+`src/test/check-scripts.test.ts` drives them as processes, exit code and all,
+because the exit code is the contract every caller reads. They are written with
+`\u` escapes for the characters they reject, which is not decoration: the
+scripts are tracked, so a literal emdash in them fails `--all`.
 
 ### Rules deliberately relaxed or deferred
 
@@ -859,8 +896,11 @@ const NAME_COLUMN = {
 | `src/db/auth-schema.ts` | Better Auth CLI-generated tables. Do not hand-edit; preserved through regen via `additionalFields`. |
 | `drizzle/*.sql` | Generated migrations. New tsvector / FK-rule changes are HAND-AUTHORED (see Drizzle section). |
 | `scripts/*.ts` | Operational scripts (seeding, one-shot fixes). Not Biome-checked. |
-| `docs/superpowers/specs/*` | Design docs per feature. One per "spec". |
-| `docs/superpowers/plans/*` | Implementation plans per spec. One per "spec". |
+| `scripts/check-*.mjs` | The rule checks (`check-prose`, `check-commit-message`, `check-compression`) that lefthook, CI and the Claude Code hooks share. Not Biome-checked; tested from `src/test/`. |
+| `.claude/hooks/*.mjs` | Claude Code hooks: refuse the git and `gh` commands and the edits the rules forbid, report Biome and prose on each edit, print session context. Biome-checked; tested from `src/test/claude-hooks.test.ts`. |
+| `docs/agents/*.md` | What the mattpocock engineering skills read about this repo: issue tracker, triage labels, domain docs. |
+| `docs/superpowers/specs/*` | Design docs for the large features that went through the superpowers workflow. Ordinary work is specified in its GitHub issue instead. |
+| `docs/superpowers/plans/*` | Implementation plans for those same specs. |
 | `docs/QUIRKS.md` | This file. |
 | `docs/UI-CONVENTIONS.md` | Design system rules: components, tokens, responsive layout. |
 
@@ -870,8 +910,8 @@ const NAME_COLUMN = {
 
 ### Workflow conventions
 
-- **Brainstorm before writing code** for any new feature. The brainstorming skill is the entry point. Output is a spec doc.
-- **Spec then plan then implement.** The plan is the bite-sized task list. The implementation is dispatched per phase via subagent-driven-development.
+- **The issue is the spec, the pull request is the plan, the review loop is the gate.** Ordinary work starts from a `ready-for-agent` issue carrying an agent brief and ends in a PR that goes through `mattpocock-skills:code-review` until a pass raises nothing unanswered. `CONTRIBUTING.md` maps it; `docs/agents/` is what the skills read.
+- **The superpowers workflow is for a few large new features.** Brainstorm, then spec, then plan, then subagent-driven implementation, with the spec and plan under `docs/superpowers/`. Everything before 2026-09 went that way; it is not the path for a bug or a bounded enhancement.
 - **`*As` first, `*ForCurrentUser` second.** Always design the impl helper to accept an explicit viewer so integration tests can call it directly. The wrapper that resolves the viewer is layered on top. An implementation that needs no viewer at all takes the `*Impl` name instead (`getProjectImpl`, `searchProjectsImpl`, `listUsersImpl`), with the authorization done in the wrapper above it. "Needs no viewer" means no viewer *object*: every `*As` takes `viewer: AuthUser`, `viewer: Viewer` or `viewer: BookmarkViewer` as its first parameter, because deciding is what it is for. The test is the parameter type, not whether an identity reaches the function at all, so an `*Impl` may still take a bare `userId: string` where the id only scopes the query: `searchProjectsImpl(data, viewerId)` on a public path whose wrapper decides nothing, and `getMyInterestsImpl(userId)` under a wrapper that calls `requireUser()`. A `My` stem names whose rows are read, not who resolved the identity, so keep it on both halves of a pair and let the seam and its wrapper share a stem.
 
   Every wrapper has a seam under it, one of those two shapes, and `src/server/__tests__/seam-convention.test.ts` is what keeps it that way. It pairs each `*ForCurrentUser` against an `*As` or `*Impl` sharing its stem in the same file, and fails naming the wrappers that have none. It runs in `npm test`, so a wrapper added without a seam is a red check rather than a convention someone remembers to apply.
