@@ -24,4 +24,19 @@ test.describe("@smoke authentication", () => {
     await page.goto("/my/projects");
     await expect(page).toHaveURL(/\/my\/projects/);
   });
+
+  test("returns to the page that sent it here", async ({ page }) => {
+    // The guard sends an anonymous visitor to /sign-in?redirect=<path>, and
+    // signing in has to honour it. A callbackURL in the sign-in body used to
+    // come back as a redirect on the success path and win this race, landing
+    // a verified person on /verify-email instead (#254).
+    await page.goto("/sign-in?redirect=%2Fmy%2Fprojects");
+    await waitForHydration(page, "form");
+
+    await page.getByLabel("Email").fill("user@example.com");
+    await page.getByLabel("Password").fill(SEED_PASSWORD);
+    await page.getByRole("button", { name: /sign in/i }).click();
+
+    await expect(page).toHaveURL(/\/my\/projects/, { timeout: 15_000 });
+  });
 });
