@@ -120,7 +120,7 @@ function MobileMenu({
     <Sheet onOpenChange={setOpen} open={open}>
       <SheetTrigger asChild>
         <Button aria-label="Open navigation" size="icon-sm" variant="ghost">
-          <Menu className="h-5 w-5" />
+          <Menu />
         </Button>
       </SheetTrigger>
       <SheetContent
@@ -226,7 +226,7 @@ function SourceLink() {
       variant="ghost"
     >
       <a href={brand.repositoryUrl} rel="noopener noreferrer" target="_blank">
-        <Github aria-hidden="true" className="h-5 w-5" />
+        <Github aria-hidden="true" />
       </a>
     </Button>
   );
