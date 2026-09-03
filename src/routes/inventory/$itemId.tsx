@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { AddToCartButton } from "#/components/add-to-cart-button";
 import { CategoryChip } from "#/components/category-chip";
+import { ExpectedBack } from "#/components/expected-back";
 import { InventoryPrivatePanel } from "#/components/inventory-private-panel";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { StaffInventoryPanel } from "#/components/staff-inventory-panel";
@@ -93,6 +94,10 @@ function ItemDetail() {
               />
             ) : null}
           </div>
+          {/* Outside the mount gate: it depends on nothing about the session,
+              and LocalTime is hydration-safe, so it can render on the server
+              for the signed-out reader too. */}
+          <ExpectedBack dueAt={item.dueAt} status={item.status} />
         </div>
       </div>
 

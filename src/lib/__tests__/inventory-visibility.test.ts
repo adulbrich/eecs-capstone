@@ -129,7 +129,6 @@ describe("publicItemView", () => {
       categories,
       imageUrl: "inventory/pi.webp",
       status: "checked_out",
-      pickupBy: null,
       dueAt: new Date("2026-03-01"),
     });
   });
@@ -137,7 +136,10 @@ describe("publicItemView", () => {
   it("omits every staff-only field", () => {
     // Built field by field rather than by nulling a copy of the row, which is
     // why a new staff-only column cannot ride the public payload by default.
+    // `pickupBy` is a deadline in an arrangement between the requester and
+    // staff; `dueAt` stays because it answers when an item might be back.
     for (const key of [
+      "pickupBy",
       "serial",
       "label",
       "location",
@@ -231,6 +233,15 @@ describe("staffItemView", () => {
     expect(view.serial).toBe("SN-1");
     expect(view.notes).toBe("Staff only note");
     expect(view.location).toBe("Cabinet A");
+  });
+
+  it("keeps the pickup deadline the public view leaves out", () => {
+    const reserved = staffItemView(
+      { ...row, currentPickupBy: new Date("2026-02-10") },
+      categories,
+      hold
+    );
+    expect(reserved.pickupBy).toEqual(new Date("2026-02-10"));
   });
 
   it("reads the holder's address and name from the hold, not the row", () => {

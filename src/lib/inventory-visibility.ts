@@ -135,11 +135,17 @@ export interface InventoryItemRow {
 export interface InventoryItemPublic {
   categories: ItemCategory[];
   description: string | null;
+  /**
+   * When an unavailable item might be back. Public, and rendered on the item
+   * page as the expected return date, because it is the one thing a
+   * prospective borrower wants to know about an item they cannot request.
+   * The pickup deadline is not here: that is an arrangement between the
+   * requester and staff, and nobody else has a use for it (#193).
+   */
   dueAt: Date | null;
   id: string;
   imageUrl: string | null;
   name: string;
-  pickupBy: Date | null;
   status: string;
 }
 
@@ -154,6 +160,7 @@ export type InventoryItemStaff = InventoryItemPublic & {
   label: string | null;
   location: string | null;
   notes: string | null;
+  pickupBy: Date | null;
   serial: string | null;
   updatedAt: Date;
 };
@@ -225,9 +232,8 @@ export function publicItemView(
     categories,
     imageUrl: row.imageUrl,
     status: row.status,
-    // The hold's dates live on the item itself, so they are the same whether
+    // The hold's date lives on the item itself, so it is the same whether
     // the hold came from a cart request or from staff assigning it directly.
-    pickupBy: row.currentPickupBy,
     dueAt: row.currentDueAt,
   };
 }
@@ -246,6 +252,8 @@ export function staffItemView(
 ): InventoryItemStaff {
   return {
     ...publicItemView(row, categories),
+    // Staff keep the pickup deadline the public view leaves out.
+    pickupBy: row.currentPickupBy,
     createdAt: row.createdAt,
     serial: row.serial,
     label: row.label,
