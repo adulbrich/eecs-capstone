@@ -11,14 +11,14 @@ describe("FilterSwitch", () => {
       <FilterSwitch
         checked={false}
         id="archived-only"
-        label="Show only archived projects"
+        label="Only show archived projects"
         onCheckedChange={() => {
           // no-op
         }}
       />
     );
     const control = screen.getByRole("switch", {
-      name: "Show only archived projects",
+      name: "Only show archived projects",
     });
     expect(control).toBeTruthy();
   });
@@ -28,7 +28,7 @@ describe("FilterSwitch", () => {
       <FilterSwitch
         checked
         id="archived-only"
-        label="Show only archived projects"
+        label="Only show archived projects"
         onCheckedChange={() => {
           // no-op
         }}
@@ -45,7 +45,7 @@ describe("FilterSwitch", () => {
       <FilterSwitch
         checked={false}
         id="archived-only"
-        label="Show only archived projects"
+        label="Only show archived projects"
         onCheckedChange={onCheckedChange}
       />
     );
@@ -58,7 +58,7 @@ describe("FilterSwitch", () => {
       <FilterSwitch
         checked={false}
         id="archived-only"
-        label="Show only archived projects"
+        label="Only show archived projects"
         onCheckedChange={() => {
           // no-op
         }}

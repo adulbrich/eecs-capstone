@@ -169,7 +169,7 @@ export function ProjectsFilterBar({
         />
       </div>
 
-      <div className="mt-3 grid gap-3 md:grid-cols-3">
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
         <div>
           <Label htmlFor="filter-program">Program</Label>
           <Select
@@ -209,20 +209,18 @@ export function ProjectsFilterBar({
             </SelectContent>
           </Select>
         </div>
-        <div className="flex flex-col justify-end gap-2">
-          <FilterSwitch
-            checked={acceptingOnly}
-            id="filter-accepting-only"
-            label="Only projects accepting applicants"
-            onCheckedChange={setAcceptingOnly}
-          />
-          <FilterSwitch
-            checked={archivedOnly}
-            id="filter-archived-only"
-            label="Show only archived projects"
-            onCheckedChange={setArchivedOnly}
-          />
-        </div>
+        <FilterSwitch
+          checked={acceptingOnly}
+          id="filter-accepting-only"
+          label="Only show projects accepting applicants"
+          onCheckedChange={setAcceptingOnly}
+        />
+        <FilterSwitch
+          checked={archivedOnly}
+          id="filter-archived-only"
+          label="Only show archived projects"
+          onCheckedChange={setArchivedOnly}
+        />
       </div>
 
       {order === "recommended" && canRecommend && (
