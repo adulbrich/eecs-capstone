@@ -2,18 +2,6 @@ import type { ReactNode } from "react";
 import { SupportEmailLink } from "./support-email-link";
 
 /**
- * The banner `/sign-in` shows when an OAuth callback comes back with an error
- * code. Better Auth redirects a failed callback to `errorCallbackURL` with
- * the reason in `?error=`, and every refusal reaches the browser this way, so
- * this copy is the whole explanation a refused user gets.
- *
- * The office is named as a `mailto:` link inside the alert, not in prose, so
- * the one instruction the message gives is one the reader can act on. Only
- * the codes with no self-service remedy carry it: `account_not_linked` already
- * describes the fix the user performs themselves, and a contact route there
- * invites a support request for something a verification link resolves.
- */
-/**
  * Copy for the OAuth failures a user can actually do something about.
  *
  * `account_not_linked` is the one that matters. A student who signed up with a
@@ -52,6 +40,19 @@ function oauthErrorMessage(code: string): ReactNode {
   );
 }
 
+/**
+ * The banner `/sign-in` shows when an OAuth callback comes back with an error
+ * code. Better Auth redirects a failed callback to `errorCallbackURL` with
+ * the reason in `?error=`, and every refusal reaches the browser this way, so
+ * this copy is the whole explanation a refused user gets.
+ *
+ * The office is named as a `mailto:` link inside the alert, not in prose, so
+ * the one instruction the message gives is one the reader can act on. Only
+ * the codes with no self-service remedy carry it: `account_not_linked` already
+ * describes the fix the user performs themselves, and a contact route there
+ * invites a support request for something a verification link resolves, and
+ * `signup_disabled` is unreachable in the current configuration.
+ */
 export function OAuthErrorBanner({ code }: { code: string }) {
   return (
     <p
