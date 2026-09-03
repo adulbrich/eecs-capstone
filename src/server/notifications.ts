@@ -5,30 +5,36 @@ const idSchema = z.object({ id: z.string().uuid() });
 
 export const listMyNotifications = createServerFn({ method: "GET" }).handler(
   async () => {
-    const { listMyNotificationsImpl } = await import(
+    const { listMyNotificationsForCurrentUser } = await import(
       "./_internal/notifications"
     );
-    return listMyNotificationsImpl();
+    return listMyNotificationsForCurrentUser();
   }
 );
 
 export const unreadCount = createServerFn({ method: "GET" }).handler(
   async () => {
-    const { unreadCountImpl } = await import("./_internal/notifications");
-    return unreadCountImpl();
+    const { unreadCountForCurrentUser } = await import(
+      "./_internal/notifications"
+    );
+    return unreadCountForCurrentUser();
   }
 );
 
 export const markRead = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data }) => {
-    const { markReadImpl } = await import("./_internal/notifications");
-    return markReadImpl(data);
+    const { markReadForCurrentUser } = await import(
+      "./_internal/notifications"
+    );
+    return markReadForCurrentUser(data);
   });
 
 export const markAllRead = createServerFn({ method: "POST" }).handler(
   async () => {
-    const { markAllReadImpl } = await import("./_internal/notifications");
-    return markAllReadImpl();
+    const { markAllReadForCurrentUser } = await import(
+      "./_internal/notifications"
+    );
+    return markAllReadForCurrentUser();
   }
 );
