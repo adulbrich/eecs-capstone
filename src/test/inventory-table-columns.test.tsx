@@ -51,7 +51,6 @@ const ROWS: InventoryListRow[] = [
     id: "i1",
     imageUrl: "inventory/i1/a.webp",
     name: "Oscilloscope",
-    pickupBy: null,
     status: "available",
   },
   {
@@ -61,7 +60,6 @@ const ROWS: InventoryListRow[] = [
     id: "i2",
     imageUrl: null,
     name: "Drill",
-    pickupBy: null,
     status: "checked_out",
   },
 ];
