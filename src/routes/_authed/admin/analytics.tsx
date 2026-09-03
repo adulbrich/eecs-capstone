@@ -19,14 +19,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
+import { slotsHint } from "#/lib/analytics-copy";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
-import type { Bucket, Flow } from "#/server/_internal/analytics";
 import { getAnalytics } from "#/server/analytics";
 import { listPrograms } from "#/server/programs";
 
 const DAY_MS = 86_400_000;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The wrapper's return type, so the route never reaches into `_internal`. */
+type AnalyticsView = Awaited<ReturnType<typeof getAnalytics>>;
+type Flow = AnalyticsView["flows"]["submitted"];
+type Bucket = AnalyticsView["breakdowns"]["projectsByStatus"][number];
 
 function isoDay(offset: number): string {
   return new Date(Date.now() + offset * DAY_MS).toISOString().slice(0, 10);
@@ -37,8 +42,10 @@ function isoDay(offset: number): string {
  * can share. Defaults: the last thirty days, every program.
  */
 const searchSchema = z.object({
-  from: z.string().regex(DATE).optional(),
-  to: z.string().regex(DATE).optional(),
+  // `.catch` on all three, so a stale or hand-edited link degrades to the
+  // default rather than a route error.
+  from: z.string().regex(DATE).optional().catch(undefined),
+  to: z.string().regex(DATE).optional().catch(undefined),
   program: z.string().uuid().nullable().catch(null).default(null),
 });
 
@@ -236,16 +243,6 @@ function AnalyticsPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const h = view.headline;
-  const slotsHint = (() => {
-    if (h.expectedTeams === null) {
-      return "Expected teams not set on the program";
-    }
-    const gap = h.expectedTeams - h.publishedTeamSlots;
-    if (gap > 0) {
-      return `${h.expectedTeams} expected, ${gap} short`;
-    }
-    return `${h.expectedTeams} expected, covered`;
-  })();
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
@@ -326,7 +323,7 @@ function AnalyticsPage() {
       </SectionHeading>
       <div className="mt-2 grid gap-3 sm:grid-cols-2">
         <Figure
-          hint={slotsHint}
+          hint={slotsHint(h)}
           label="Published team slots"
           scope="program"
           value={h.publishedTeamSlots}
@@ -370,10 +367,20 @@ function AnalyticsPage() {
           value={h.overdueItems}
         />
         <Figure
-          hint={`${h.requestsWithPending} ${h.requestsWithPending === 1 ? "request" : "requests"} with a pending line${h.oldestPendingRequestAt ? `, oldest ${daysSince(h.oldestPendingRequestAt)}` : ""}`}
+          hint={
+            h.oldestPendingRequestAt
+              ? `Oldest request ${daysSince(h.oldestPendingRequestAt)}`
+              : "Nothing pending"
+          }
           label="Pending request lines"
           scope="global"
           value={h.pendingLines}
+        />
+        <Figure
+          hint="The number the admin hub shows"
+          label="Requests with a pending line"
+          scope="global"
+          value={h.requestsWithPending}
         />
         <Figure
           hint="No bookmark since publication"

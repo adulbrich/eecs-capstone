@@ -14,14 +14,9 @@ import {
   user,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import { assertStaff } from "#/lib/viewer";
+import { assertStaff, type Viewer } from "#/lib/viewer";
 import type { AnalyticsInput } from "../analytics";
-import { countPendingRequests, countSubmitted } from "./admin";
-
-interface AuthUser {
-  id: string;
-  role?: string | null | undefined;
-}
+import { countPendingRequests, countRows, countSubmitted } from "./admin";
 
 export interface Flow {
   current: number;
@@ -94,6 +89,12 @@ export interface AnalyticsView {
   headline: {
     /** Null when no selected program has a value set: "not set", not zero. */
     expectedTeams: number | null;
+    /**
+     * How many of the programs in scope have a value, out of how many. With
+     * every program selected the expectation is a sum over the programs that
+     * set one, and the page says when that denominator is partial.
+     */
+    expectedTeamsPrograms: { set: number; total: number };
     mentors: {
       /** Published projects whose mentor address matches no mentor account. */
       assignedWithoutCapacity: number;
@@ -119,10 +120,6 @@ export interface AnalyticsView {
 }
 
 const DAY_MS = 86_400_000;
-
-function count() {
-  return sql<number>`count(*)::int`;
-}
 
 function isoDay(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -200,6 +197,7 @@ async function headline(programId: string | null) {
       .select({
         total: sql<number>`coalesce(sum(${programs.expectedTeams}), 0)::int`,
         set: sql<number>`count(${programs.expectedTeams})::int`,
+        programs: countRows(),
       })
       .from(programs)
       .where(programId ? eq(programs.id, programId) : undefined),
@@ -221,7 +219,7 @@ async function headline(programId: string | null) {
         ${programId ? sql`and p.program_id = ${programId}` : sql``}
     `),
     db
-      .select({ seeking: count() })
+      .select({ seeking: countRows() })
       .from(projects)
       .where(
         and(
@@ -231,11 +229,11 @@ async function headline(programId: string | null) {
         )
       ),
     db
-      .select({ mentored: count() })
+      .select({ mentored: countRows() })
       .from(projects)
       .where(and(published, isNotNull(projects.mentorEmail))),
     db
-      .select({ unmentored: count() })
+      .select({ unmentored: countRows() })
       .from(projects)
       .where(and(published, isNull(projects.mentorEmail))),
     mentorFigures(),
@@ -243,7 +241,7 @@ async function headline(programId: string | null) {
     // checkout past its due date, or a reservation past its pickup date.
     db
       .select({
-        overdue: count(),
+        overdue: countRows(),
         oldest: sql<
           string | null
         >`min(case when ${inventoryItems.status} = 'checked_out' then ${inventoryItems.currentDueAt} else ${inventoryItems.currentPickupBy} end)`,
@@ -255,7 +253,7 @@ async function headline(programId: string | null) {
       ),
     db
       .select({
-        lines: count(),
+        lines: countRows(),
         oldest: sql<string | null>`min(${inventoryRequests.createdAt})`,
       })
       .from(inventoryRequestItems)
@@ -268,7 +266,7 @@ async function headline(programId: string | null) {
     // Since publication, not absolute, or every project looks doomed in its
     // first week. A project with no published_at counts every bookmark.
     db
-      .select({ unbookmarked: count() })
+      .select({ unbookmarked: countRows() })
       .from(projects)
       .where(
         and(
@@ -287,6 +285,10 @@ async function headline(programId: string | null) {
     publishedTeamSlots: slots?.slots ?? 0,
     expectedTeams:
       expectedRow && expectedRow.set > 0 ? expectedRow.total : null,
+    expectedTeamsPrograms: {
+      set: expectedRow?.set ?? 0,
+      total: expectedRow?.programs ?? 0,
+    },
     submittedAwaiting,
     oldestSubmittedAt: toDate(oldestSubmitted.rows[0]?.oldest),
     seekingMentor: seeking?.seeking ?? 0,
@@ -320,7 +322,7 @@ async function mentorFigures() {
     db
       .select({
         email: sql<string>`lower(${projects.mentorEmail})`,
-        assigned: count(),
+        assigned: countRows(),
       })
       .from(projects)
       .where(
@@ -369,7 +371,7 @@ async function transitionsIn(
   programId: string | null
 ): Promise<number> {
   const [row] = await db
-    .select({ n: count() })
+    .select({ n: countRows() })
     .from(projectStatusHistory)
     .innerJoin(projects, eq(projectStatusHistory.projectId, projects.id))
     .where(
@@ -377,6 +379,9 @@ async function transitionsIn(
         eq(projectStatusHistory.newStatus, status),
         gte(projectStatusHistory.createdAt, start),
         lt(projectStatusHistory.createdAt, end),
+        // Same population as the stocks: a soft-deleted project's history
+        // does not count as a submission that happened.
+        isNull(projects.deletedAt),
         programId ? eq(projects.programId, programId) : undefined
       )
     );
@@ -385,15 +390,22 @@ async function transitionsIn(
 
 async function usersIn(start: Date, end: Date): Promise<number> {
   const [row] = await db
-    .select({ n: count() })
+    .select({ n: countRows() })
     .from(user)
-    .where(and(gte(user.createdAt, start), lt(user.createdAt, end)));
+    // Scrubbed accounts stay out, as they do from the by-role breakdown.
+    .where(
+      and(
+        isNull(user.deletedAt),
+        gte(user.createdAt, start),
+        lt(user.createdAt, end)
+      )
+    );
   return row?.n ?? 0;
 }
 
 async function requestsIn(start: Date, end: Date): Promise<number> {
   const [row] = await db
-    .select({ n: count() })
+    .select({ n: countRows() })
     .from(inventoryRequests)
     .where(
       and(
@@ -430,7 +442,7 @@ async function breakdowns(programId: string | null, isAdmin: boolean) {
     byRole,
   ] = await Promise.all([
     db
-      .select({ key: projects.status, count: count() })
+      .select({ key: projects.status, count: countRows() })
       .from(projects)
       .where(live)
       .groupBy(projects.status),
@@ -441,14 +453,14 @@ async function breakdowns(programId: string | null, isAdmin: boolean) {
             id: programs.id,
             courseId: programs.courseId,
             courseName: programs.courseName,
-            count: count(),
+            count: countRows(),
           })
           .from(projects)
           .leftJoin(programs, eq(projects.programId, programs.id))
           .where(isNull(projects.deletedAt))
           .groupBy(programs.id, programs.courseId, programs.courseName),
     db
-      .select({ key: categories.name, count: count() })
+      .select({ key: categories.name, count: countRows() })
       .from(projectCategories)
       .innerJoin(projects, eq(projectCategories.projectId, projects.id))
       .innerJoin(categories, eq(projectCategories.categoryId, categories.id))
@@ -456,11 +468,11 @@ async function breakdowns(programId: string | null, isAdmin: boolean) {
       .groupBy(categories.name)
       .orderBy(sql`count(*) desc`, categories.name),
     db
-      .select({ key: inventoryItems.status, count: count() })
+      .select({ key: inventoryItems.status, count: countRows() })
       .from(inventoryItems)
       .groupBy(inventoryItems.status),
     db
-      .select({ key: categories.name, count: count() })
+      .select({ key: categories.name, count: countRows() })
       .from(inventoryItemCategories)
       .innerJoin(
         categories,
@@ -469,12 +481,12 @@ async function breakdowns(programId: string | null, isAdmin: boolean) {
       .groupBy(categories.name)
       .orderBy(sql`count(*) desc`, categories.name),
     db
-      .select({ key: inventoryRequestItems.status, count: count() })
+      .select({ key: inventoryRequestItems.status, count: countRows() })
       .from(inventoryRequestItems)
       .groupBy(inventoryRequestItems.status),
     isAdmin
       ? db
-          .select({ key: user.role, count: count() })
+          .select({ key: user.role, count: countRows() })
           .from(user)
           .where(isNull(user.deletedAt))
           .groupBy(user.role)
@@ -505,7 +517,7 @@ async function breakdowns(programId: string | null, isAdmin: boolean) {
  * absent for an instructor so the page renders one shape.
  */
 export async function getAnalyticsAs(
-  viewer: AuthUser,
+  viewer: NonNullable<Viewer>,
   input: AnalyticsInput
 ): Promise<AnalyticsView> {
   assertStaff(viewer);

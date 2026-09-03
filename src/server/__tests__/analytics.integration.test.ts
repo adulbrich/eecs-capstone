@@ -149,6 +149,43 @@ describe("the program selector", () => {
     // nothing set anywhere it is null too.
     const all = await getAnalyticsAs(admin, { ...RANGE, programId: null });
     expect(all.headline.expectedTeams).toBe(8);
+    // And it says the denominator is partial: one of the two set a value.
+    expect(all.headline.expectedTeamsPrograms).toEqual({ set: 1, total: 2 });
+    expect(withUnset.headline.expectedTeamsPrograms).toEqual({
+      set: 0,
+      total: 1,
+    });
+  });
+});
+
+describe("overdue inventory", () => {
+  it("counts a late return and a missed pickup, and nothing healthy, as overdueFlags would", async () => {
+    const admin = await makeUser(`an-ov-${Date.now()}@x.com`, "admin");
+    const past = new Date(Date.now() - 3 * 86_400_000);
+    const future = new Date(Date.now() + 3 * 86_400_000);
+    await db.insert(inventoryItems).values([
+      {
+        name: `AN late ${Date.now()}`,
+        description: null,
+        status: "checked_out",
+        currentDueAt: past,
+      },
+      {
+        name: `AN missed ${Date.now()}`,
+        description: null,
+        status: "reserved",
+        currentPickupBy: past,
+      },
+      {
+        name: `AN fine ${Date.now()}`,
+        description: null,
+        status: "checked_out",
+        currentDueAt: future,
+      },
+    ]);
+    const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
+    expect(view.headline.overdueItems).toBe(2);
+    expect(view.headline.oldestOverdueAt?.getTime()).toBe(past.getTime());
   });
 });
 

@@ -2,14 +2,10 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { inventoryRequestItems, projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import { assertStaff } from "#/lib/viewer";
+import { assertStaff, type Viewer } from "#/lib/viewer";
 
-interface AuthUser {
-  id: string;
-  role?: string | null | undefined;
-}
-
-function count() {
+/** `count(*)` as a number, for every figure here and on the dashboard. */
+export function countRows() {
   return sql<number>`count(*)::int`;
 }
 
@@ -31,7 +27,7 @@ export async function countPendingRequests(): Promise<number> {
 /** Projects awaiting review. Shared with the dashboard for the same reason. */
 export async function countSubmitted(programId: string | null = null) {
   const [row] = await db
-    .select({ submitted: count() })
+    .select({ submitted: countRows() })
     .from(projects)
     .where(
       and(
@@ -48,7 +44,7 @@ export async function countSubmitted(programId: string | null = null) {
  * The overview counts it used to carry moved to `/admin/analytics`, where a
  * date range and a program selector make them mean something (#34).
  */
-export async function getAdminStatsAs(viewer: AuthUser) {
+export async function getAdminStatsAs(viewer: NonNullable<Viewer>) {
   assertStaff(viewer);
   const [submitted, pendingRequests] = await Promise.all([
     countSubmitted(),
