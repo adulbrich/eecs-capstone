@@ -206,11 +206,13 @@ async function headline(programId: string | null) {
     countSubmitted(programId),
     // The age of the oldest wait is the point: twelve waiting says nothing,
     // "oldest 23 days" says whether to act today. The wait starts at the
-    // project's most recent move into submitted.
+    // project's most recent move into submitted; a row with no history
+    // (seeded, or imported) falls back to its own updated_at rather than
+    // dropping out of the minimum.
     db.execute<{ oldest: string | null }>(sql`
-      select min(h.created_at) as oldest
+      select min(coalesce(h.created_at, p.updated_at)) as oldest
       from ${projects} p
-      join lateral (
+      left join lateral (
         select created_at from ${projectStatusHistory}
         where project_id = p.id and new_status = 'submitted'
         order by created_at desc limit 1
