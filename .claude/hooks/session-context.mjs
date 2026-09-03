@@ -10,15 +10,17 @@ import { cleanEnv, currentBranch, readInput, repoRoot } from "./lib.mjs";
 /**
  * A probe worth waiting on, and one that is not.
  *
- * git answers from local files. The compose probe talks to a daemon that can
- * be busy, wedged, or absent, and every second it takes is a second before a
- * session starts. Its answer is a convenience (which services are up), so it
- * is capped short: a slow "nothing running" line costs less than a hung one.
+ * The git ones read local files. The compose probe talks to a daemon that can
+ * be busy, wedged or absent, and every second it takes is a second before a
+ * session starts, for an answer that is a convenience. So it is capped short,
+ * and every caller passes its own number: a default here would be named after
+ * whichever probe was written first.
  */
 const GIT_TIMEOUT = 5000;
 const COMPOSE_TIMEOUT = 1500;
 
-function run(file, args, cwd, timeout = GIT_TIMEOUT) {
+/** The output, or "" for anything that went wrong, timeouts included. */
+function run(file, args, cwd, timeout) {
   try {
     return execFileSync(file, args, {
       cwd,
@@ -32,6 +34,43 @@ function run(file, args, cwd, timeout = GIT_TIMEOUT) {
   }
 }
 
+/**
+ * Which compose services are up, as a line.
+ *
+ * Separate from `run` because a timeout has to stay distinguishable here. An
+ * empty answer and an answer that never came look identical to `run` and mean
+ * opposite things, and with the cap this short the timeout is reachable on a
+ * cold daemon. Telling a session to `docker compose up -d` when the stack is
+ * already running is worse advice than admitting the check did not finish.
+ */
+function composeLine(cwd) {
+  const NOTHING =
+    "Compose: nothing running. `docker compose up -d` before the integration, smoke or accessibility suites.";
+  let out = "";
+  try {
+    out = execFileSync(
+      "docker",
+      ["compose", "ps", "--status", "running", "--format", "{{.Service}}"],
+      {
+        cwd,
+        encoding: "utf8",
+        env: cleanEnv,
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: COMPOSE_TIMEOUT,
+      }
+    ).trim();
+  } catch (error) {
+    // Anything else (no docker on PATH, no daemon) really is nothing running.
+    return error?.code === "ETIMEDOUT"
+      ? `Compose: no answer in ${COMPOSE_TIMEOUT}ms. Check with \`docker compose ps\` before the integration, smoke or accessibility suites.`
+      : NOTHING;
+  }
+  const services = out.split("\n").filter(Boolean);
+  return services.length === 0
+    ? NOTHING
+    : `Compose: ${services.join(", ")} running.`;
+}
+
 const input = readInput();
 const cwd = input.cwd ?? process.cwd();
 const lines = [];
@@ -43,7 +82,7 @@ lines.push(
     : `Branch: ${branch}.`
 );
 
-const dirty = run("git", ["status", "--porcelain"], cwd)
+const dirty = run("git", ["status", "--porcelain"], cwd, GIT_TIMEOUT)
   .split("\n")
   .filter(Boolean).length;
 lines.push(
@@ -67,19 +106,7 @@ if (wanted && !node.startsWith(wanted.replace(/^v/, ""))) {
   lines.push(`Node: ${node}.`);
 }
 
-const services = run(
-  "docker",
-  ["compose", "ps", "--status", "running", "--format", "{{.Service}}"],
-  cwd,
-  COMPOSE_TIMEOUT
-)
-  .split("\n")
-  .filter(Boolean);
-lines.push(
-  services.length === 0
-    ? "Compose: nothing running. `docker compose up -d` before the integration, smoke or accessibility suites."
-    : `Compose: ${services.join(", ")} running.`
-);
+lines.push(composeLine(cwd));
 
 lines.push(
   "Gates: lefthook.yml at commit and push, the hooks under .claude/hooks in this session. CONTRIBUTING.md has the table."
