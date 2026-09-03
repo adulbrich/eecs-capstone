@@ -1,4 +1,5 @@
 import { brand } from "#/lib/brand";
+import { SupportEmailLink } from "./support-email-link";
 
 /**
  * The privacy page's body. Static, in the repo, and only a developer changes
@@ -32,14 +33,7 @@ export function PrivacyPolicy() {
         a new account cannot be linked back to old projects.
       </p>
       <p>
-        Questions about any of this go to{" "}
-        <a
-          className="text-brand hover:underline"
-          href={`mailto:${brand.supportEmail}`}
-        >
-          {brand.supportEmail}
-        </a>
-        .
+        Questions about any of this go to <SupportEmailLink />.
       </p>
     </article>
   );
