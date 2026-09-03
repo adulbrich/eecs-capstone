@@ -47,9 +47,15 @@ describe("buildBedrockConfig", () => {
 });
 
 describe("buildStorageConfig", () => {
-  it("defaults the bucket, so a bare checkout still names one", () => {
-    const config = buildStorageConfig({} as NodeJS.ProcessEnv);
-    expect(config.bucket).toBe("cs-capstone");
+  it("refuses a missing or blank bucket rather than defaulting one", () => {
+    // A default named the local bucket, so a production task that forgot the
+    // variable would have used it silently. See #137.
+    expect(() => buildStorageConfig({} as NodeJS.ProcessEnv)).toThrow(
+      /S3_BUCKET is not set/
+    );
+    expect(() =>
+      buildStorageConfig({ S3_BUCKET: "  " } as NodeJS.ProcessEnv)
+    ).toThrow(/S3_BUCKET is not set/);
   });
 
   it("pairs the bucket with the client config the SDK type cannot carry", () => {

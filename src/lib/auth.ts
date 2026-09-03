@@ -16,8 +16,10 @@ const emailSender = getEmailSender();
 
 const authConfig = buildAuthConfig();
 
-// Said once, at boot, rather than once per failed sign-in. Both providers are
-// optional, so this is the only signal that one of them is off by accident.
+// Said once, at boot, rather than once per failed sign-in. GitHub is optional
+// everywhere and ONID outside production, so this is the only signal that one
+// of them is off by accident; `src/nitro/config-check.ts` refuses to boot a
+// production task without ONID before this line runs.
 warnUnconfiguredProviders(authConfig.unconfigured);
 
 /**

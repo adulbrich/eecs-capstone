@@ -47,8 +47,18 @@ export interface StorageConfig {
 export function buildStorageConfig(
   env: NodeJS.ProcessEnv = process.env
 ): StorageConfig {
+  // No default. One used to name the local bucket, which meant a production
+  // task with the variable missing from its definition would quietly read and
+  // write a bucket of that name, and a wrong bucket is a worse failure than a
+  // missing one. Production refuses to boot without it (see
+  // `src/nitro/config-check.ts`); everywhere else the first upload fails with
+  // the variable's name.
+  const bucket = env.S3_BUCKET?.trim();
+  if (!bucket) {
+    throw new Error("S3_BUCKET is not set, so there is no bucket to store to");
+  }
   return {
-    bucket: env.S3_BUCKET ?? "cs-capstone",
+    bucket,
     clientConfig: buildS3Config(env),
   };
 }

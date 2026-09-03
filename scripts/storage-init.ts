@@ -7,7 +7,13 @@ import {
 } from "@aws-sdk/client-s3";
 
 const endpoint = process.env.S3_ENDPOINT;
-const bucket = process.env.S3_BUCKET ?? "cs-capstone";
+// No default, and blank counts as unset, same as buildStorageConfig: a bucket
+// named by a fallback is a bucket nobody chose. .env.example sets it for the
+// local stack.
+const bucket = process.env.S3_BUCKET?.trim();
+if (!bucket) {
+  throw new Error("S3_BUCKET environment variable is not set");
+}
 
 const client = new S3Client({
   region: process.env.S3_REGION ?? "us-east-1",

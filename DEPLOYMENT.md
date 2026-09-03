@@ -780,6 +780,15 @@ this config; delete it manually if you are done with the project.
 access keys and no `S3_ENDPOINT` are set; `BEDROCK_EMBEDDINGS_ENABLED` is
 deliberately not plumbed either.
 
+Seven of these are fatal. A task with `NODE_ENV=production` refuses to start,
+exit code 1 and one message naming every missing one, without `DATABASE_URL`,
+`BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `ONID_DISCOVERY_URL`,
+`ONID_CLIENT_ID`, `ONID_CLIENT_SECRET` or `S3_BUCKET`; a blank value counts as
+missing. `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` only warn, because
+GitHub sign-in is optional (`var.github_client_id` defaults to empty). The check
+is `src/nitro/config-check.ts`, a Nitro plugin, and the list is in
+`src/lib/_internal/startup-config.ts`; nothing is fatal outside production.
+
 This list is written by hand and `infra/ecs.tf` is the source of truth. The
 test in `src/lib/__tests__/env-contract.test.ts` checks the task definition
 against what the code reads, which is the part that can be automated; prose
