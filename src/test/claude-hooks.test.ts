@@ -369,6 +369,11 @@ describe("after-edit", () => {
 });
 
 describe("session-context", () => {
+  // Vitest's default 5000ms is the same number as the hook's own cap on one
+  // subprocess, so a single slow `docker compose ps` on a loaded runner spent
+  // the whole test budget before the hook printed a line. This is the only
+  // test here that shells out to anything but git, so it gets its own ceiling
+  // rather than the global testTimeout moving for everything.
   it("prints the branch, tree, node and compose lines", () => {
     const result = hook("session-context", {});
     expect(result.status).toBe(0);
@@ -376,5 +381,5 @@ describe("session-context", () => {
     expect(result.stdout).toContain("Working tree:");
     expect(result.stdout).toContain("Node:");
     expect(result.stdout).toContain("Compose:");
-  });
+  }, 30_000);
 });

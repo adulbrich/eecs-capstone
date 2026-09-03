@@ -7,14 +7,25 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { cleanEnv, currentBranch, readInput, repoRoot } from "./lib.mjs";
 
-function run(file, args, cwd) {
+/**
+ * A probe worth waiting on, and one that is not.
+ *
+ * git answers from local files. The compose probe talks to a daemon that can
+ * be busy, wedged, or absent, and every second it takes is a second before a
+ * session starts. Its answer is a convenience (which services are up), so it
+ * is capped short: a slow "nothing running" line costs less than a hung one.
+ */
+const GIT_TIMEOUT = 5000;
+const COMPOSE_TIMEOUT = 1500;
+
+function run(file, args, cwd, timeout = GIT_TIMEOUT) {
   try {
     return execFileSync(file, args, {
       cwd,
       encoding: "utf8",
       env: cleanEnv,
       stdio: ["ignore", "pipe", "ignore"],
-      timeout: 5000,
+      timeout,
     }).trim();
   } catch {
     return "";
@@ -59,7 +70,8 @@ if (wanted && !node.startsWith(wanted.replace(/^v/, ""))) {
 const services = run(
   "docker",
   ["compose", "ps", "--status", "running", "--format", "{{.Service}}"],
-  cwd
+  cwd,
+  COMPOSE_TIMEOUT
 )
   .split("\n")
   .filter(Boolean);
