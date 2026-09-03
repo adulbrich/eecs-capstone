@@ -204,7 +204,13 @@ The password-reset trigger method is `authClient.requestPasswordReset({ email, r
 
 ### `betterAuth()` does not reject an option it does not know
 
-`betterAuth` is declared `<Options extends BetterAuthOptions>(options: Options)`, so the config literal is inferred as `Options` and TypeScript's excess-property check never runs on it. A misspelled or invented key compiles and does nothing. `emailVerification.callbackURL` sat in `src/lib/auth.ts` that way until 2026-09-01 (#149): the landing page after verification is read from the request body of the call that mails the link, and there is no server option for it. When an option seems to have no effect, check the key against `@better-auth/core/dist/types/init-options.d.mts` before looking anywhere else.
+`betterAuth` is declared `<Options extends BetterAuthOptions>(options: Options)`, so the config literal is inferred as `Options` and TypeScript's excess-property check never runs on it. A misspelled or invented key compiles and does nothing. `emailVerification.callbackURL` sat in `src/lib/auth.ts` that way until 2026-09-01 (#149): there is no such option, and Better Auth reads the landing page from the request body of the call that mails the link. When an option seems to have no effect, check the key against `@better-auth/core/dist/types/init-options.d.mts` before looking anywhere else.
+
+### The sign-in body's `callbackURL` also steers a successful sign-in
+
+Passing `callbackURL` to `authClient.signIn.email` is how the caller used to say where a mailed verification link should land. It has a second effect nothing warns you about: `signInEmail` echoes it back as `redirect: true` with that `url` on the **success** path too, and the client's `redirectPlugin` acts on that with `window.location.href`. A verified person signing in therefore got a full-page navigation to the verification page, racing whatever the sign-in route navigated to itself, and their `?redirect=` return path with it (#254). `signIn.social` has a `disableRedirect` flag for this; `signIn.email` does not.
+
+So the landing page is set in `sendVerificationEmail` (`withVerificationLanding` in `src/lib/auth.ts`), which rewrites the `callbackURL` on the built link. That hook is the last word for every verification email, so no caller passes `callbackURL` to `signIn.email` or `signUp.email` any more, and adding one back reintroduces the race. It also means the landing page is the same for every flow that mails a verification link: `user.changeEmail` is not configured today, and enabling it would want this function to look at which flow it is serving.
 
 ### `user.id` is `text`, not `uuid`
 

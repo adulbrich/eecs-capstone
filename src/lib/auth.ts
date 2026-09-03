@@ -39,6 +39,32 @@ async function claimProjectsFor(userId: string, email: string): Promise<void> {
   }
 }
 
+/** Where a mailed verification link lands once its token checks out. */
+const VERIFICATION_LANDING = "/verify-email";
+
+/**
+ * Rewrites the `callbackURL` Better Auth put in a verification link.
+ *
+ * It builds `url` from the body of whichever call mailed the link, defaulting
+ * to "/", so the obvious place to ask for `/verify-email` is the two callers,
+ * and that is where it used to be. It cannot go there: `signIn.email` returns
+ * `redirect: true` with the same `callbackURL` on a SUCCESSFUL sign-in, and
+ * the client's redirect plugin turns that into a `window.location.href`, which
+ * raced sign-in.tsx's own `navigate` and could strand a verified person on
+ * /verify-email or drop their `?redirect=` return path (#254). Setting it here
+ * keeps the link right without the request body deciding where a sign-in goes.
+ *
+ * The cost of the hook being the last word is that it is the last word for
+ * every flow that mails a verification link. `user.changeEmail` is not
+ * configured, so today that is sign-up and the refused sign-in only; enabling
+ * it would want this to ask which flow it is serving before overwriting.
+ */
+function withVerificationLanding(url: string): string {
+  const link = new URL(url);
+  link.searchParams.set("callbackURL", VERIFICATION_LANDING);
+  return link.toString();
+}
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
   trustHost: authConfig.trustHost,
@@ -62,11 +88,11 @@ export const auth = betterAuth({
     // and its rate limiter covers the route.
     sendOnSignIn: true,
     autoSignInAfterVerification: true,
-    // The page the link lands on is not configured here: Better Auth takes it
-    // from the request body of whichever call mails the link, and defaults to
-    // "/". Both callers, sign-up.tsx and sign-in.tsx, pass `/verify-email`.
     sendVerificationEmail: async ({ user, url }) => {
-      await emailSender.send(user.email, verificationEmail({ url }));
+      await emailSender.send(
+        user.email,
+        verificationEmail({ url: withVerificationLanding(url) })
+      );
     },
     // The address is proven at exactly this moment, so this is where a project
     // may be linked to its proposer.

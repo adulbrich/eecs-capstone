@@ -61,6 +61,11 @@ describe("auth integration", () => {
 
     const token = new URL(verifyUrl).searchParams.get("token");
     expect(token).toBeTruthy();
+    // Set by `sendVerificationEmail`, not by the caller: sign-up.tsx sends no
+    // callbackURL, and Better Auth's own default would be "/".
+    expect(new URL(verifyUrl).searchParams.get("callbackURL")).toBe(
+      "/verify-email"
+    );
 
     await auth.api.verifyEmail({ query: { token: token as string } });
 
@@ -88,16 +93,15 @@ describe("auth integration", () => {
       });
     });
 
-    // Refused, and the refusal is what mails the second link. The callbackURL
-    // in the body is what the link carries, and sign-in.tsx passes the same
-    // value sign-up does, so the link lands on /verify-email rather than "/".
+    // Refused, and the refusal is what mails the second link. No callbackURL
+    // in the body, exactly as sign-in.tsx sends it: the link still has to land
+    // on /verify-email, because `sendVerificationEmail` sets that rather than
+    // the caller (#254).
     const resendUrl = await captureConsoleEmail(
       "Verify your email",
       async () => {
         await expect(
-          auth.api.signInEmail({
-            body: { email, password, callbackURL: "/verify-email" },
-          })
+          auth.api.signInEmail({ body: { email, password } })
         ).rejects.toMatchObject({ body: { code: "EMAIL_NOT_VERIFIED" } });
       }
     );
@@ -105,6 +109,33 @@ describe("auth integration", () => {
       "/verify-email"
     );
     expect(new URL(resendUrl).searchParams.get("token")).toBeTruthy();
+  });
+
+  it("does not turn a successful sign-in into a redirect", async () => {
+    // #254: a callbackURL in the sign-in body comes back as `redirect: true`
+    // on the success path too, and the client's redirect plugin follows it,
+    // racing the sign-in route's own navigate. Nothing may set it now, so the
+    // answer to a plain sign-in has to carry no redirect at all.
+    const email = `it-noredirect-${Date.now()}@example.com`;
+    const password = "Password1!";
+    const verifyUrl = await captureConsoleEmail(
+      "Verify your email",
+      async () => {
+        await auth.api.signUpEmail({
+          body: { email, password, name: "It Redirect" },
+        });
+      }
+    );
+    const token = new URL(verifyUrl).searchParams.get("token");
+    await auth.api.verifyEmail({ query: { token: token as string } });
+
+    const response = await auth.api.signInEmail({
+      body: { email, password },
+      asResponse: true,
+    });
+    const body = (await response.json()) as { redirect?: boolean };
+    expect(body.redirect).toBe(false);
+    expect(response.headers.get("location")).toBeNull();
   });
 
   it("mails nothing when the password is wrong, verified or not", async () => {
