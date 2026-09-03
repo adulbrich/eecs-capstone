@@ -698,17 +698,10 @@ export function InventoryLifecyclePanel({
         </DialogContent>
       </Dialog>
 
-      {/* `AlertDialog`, not `Dialog`: an irreversible action wants
-          `role="alertdialog"`, which screen readers announce assertively and
-          which does not dismiss on an outside click (Escape still closes it).
-          Radix puts initial focus on Cancel, which is right for a one-click
-          prompt and wrong here, where the gate is a typed name: focus goes to
-          the input. The destructive button is a plain `Button`, as in
-          `delete-account-dialog.tsx`: `AlertDialogAction` closes on click
-          unless the handler calls `preventDefault`, and the failure branch of
-          `onHardDelete` needs the dialog open to show its error, so the
-          explicit `setDelOpen` calls are clearer than leaning on that. See
-          docs/UI-CONVENTIONS.md, Destructive actions. */}
+      {/* The primitive, the focus rule and the plain `Button` in the footer
+          are all explained in docs/UI-CONVENTIONS.md, Destructive actions.
+          Local to this dialog: the failure branch of `onHardDelete` needs it
+          open to show the server's refusal, hence the explicit `setDelOpen`. */}
       <AlertDialog onOpenChange={setDelOpen} open={delOpen}>
         <AlertDialogContent
           onOpenAutoFocus={(e) => {

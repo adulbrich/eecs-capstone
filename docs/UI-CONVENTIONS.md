@@ -626,9 +626,10 @@ clearer than an opt-out.
 Radix moves initial focus to the cancel action. That is right for a one-click
 prompt and for the account dialog, whose input sits under a list of
 consequences the reader should get through first. It is wrong for the
-inventory panel, where the input is the first thing in the body, so that one
-points `AlertDialogContent`'s `onOpenAutoFocus` at the input (#66). Decide per
-dialog by what stands between the top of the body and the input.
+inventory panel, where only a one-line reminder of the item's name stands
+before the input, so that one points `AlertDialogContent`'s `onOpenAutoFocus`
+at the input (#66). Decide per dialog by what stands between the top of the
+body and the input.
 
 Results that need no acknowledgement use a toast: `import { toast } from "sonner"`.
 
