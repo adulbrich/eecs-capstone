@@ -19,8 +19,8 @@ import { Button } from "./ui/button";
  * rather than hidden or re-run: the hash check is the server's, this only
  * renders the flag.
  *
- * Keyed on `project.id` by the panel, so a param change remounts it rather
- * than showing one project's verdict over another's record.
+ * Remounted on a param change because the route keys the whole staff panel on
+ * `project.id`, so one project's verdict is never shown over another's record.
  */
 
 const VERDICT_TONE: Record<ScopeVerdict, "success" | "warning" | "error"> = {
