@@ -28,25 +28,60 @@ function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
 }
 
 /**
- * `aria-live="polite"` because the page number is the only confirmation a
- * screen-reader user gets that activating Next did anything: the surrounding
- * list swaps its rows without moving focus.
+ * How much a list holds, in one place and one format on every list.
+ *
+ * `aria-live="polite"` because this is the only confirmation a screen-reader
+ * user gets that activating Next did anything: the surrounding list swaps its
+ * rows without moving focus. It is also the only live region that counts
+ * rows; `AdminDataTable` announces the sort order and nothing else, so a
+ * reader hears one number rather than two that could disagree.
+ *
+ * Rendered by the route, never by the table: on `/projects` the same footer
+ * serves the card view, which has no table.
+ *
+ * Nothing at all for an empty list, which the empty state above already
+ * covers.
  */
 function PaginationStatus({
   page,
+  shown,
+  total,
   totalPages,
 }: {
   page: number;
+  shown: number;
+  total: number;
   totalPages: number;
 }) {
+  if (total === 0) {
+    return null;
+  }
+  const results = total === 1 ? "1 result" : `${total} results`;
+  const text =
+    totalPages > 1
+      ? `Page ${page} of ${totalPages} \u00b7 ${shown} of ${results}`
+      : results;
   return (
     <span
       aria-live="polite"
       className="text-muted-foreground"
       data-slot="pagination-status"
     >
-      Page {page} of {totalPages}
+      {text}
     </span>
+  );
+}
+
+/**
+ * The same status under a list the server does not page: everything shown,
+ * one page. Same position and format as the paginated footer, so the eye
+ * finds the count in one place on every list.
+ */
+function ListCount({ count }: { count: number }) {
+  return (
+    <div className="mt-6 flex justify-center text-sm" data-slot="list-count">
+      <PaginationStatus page={1} shown={count} total={count} totalPages={1} />
+    </div>
   );
 }
 
@@ -95,4 +130,10 @@ function PaginationButton({
   );
 }
 
-export { Pagination, PaginationButton, PaginationLink, PaginationStatus };
+export {
+  ListCount,
+  Pagination,
+  PaginationButton,
+  PaginationLink,
+  PaginationStatus,
+};

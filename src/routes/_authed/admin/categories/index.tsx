@@ -35,6 +35,7 @@ import {
 } from "#/components/ui/dialog";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
+import { ListCount } from "#/components/ui/pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
@@ -351,6 +352,7 @@ function CategoriesAdmin() {
             getRowId={(row) => row.id}
             {...tableProps}
           />
+          <ListCount count={rows.length} />
         </TabsContent>
       </Tabs>
     </div>

@@ -416,16 +416,16 @@ export function AdminDataTable<T>({
     onSortedIdsChange?.(rows.map((row) => row.id));
   }, [rows, serverSorted, onSortedIdsChange]);
 
-  // The row count alone leaves the table's order silently unannounced: when
-  // the sorted column is hidden (its header, and the aria-sort it carries,
-  // are not in the DOM at all), nothing else tells a screen reader user which
-  // way the rows are ordered. Naming it here, from the same `labels` map the
-  // header text and each cell's `data-label` already use, keeps the announced
-  // column name in sync with what a sighted user would see if that column
-  // were visible.
-  const rowCountText = rows.length === 1 ? "1 row" : `${rows.length} rows`;
+  // When the sorted column is hidden (its header, and the aria-sort it
+  // carries, are not in the DOM at all), nothing else tells a screen reader
+  // user which way the rows are ordered. Naming it here, from the same
+  // `labels` map the header text and each cell's `data-label` already use,
+  // keeps the announced column name in sync with what a sighted user would
+  // see if that column were visible. The row count is not announced here:
+  // the route's `PaginationStatus` is the one live region that counts rows,
+  // paginated or not, so a reader hears one number (#209).
   const sortedLabel = labels.get(sort.id) ?? sort.id;
-  const orderText = `sorted by ${sortedLabel}, ${sort.desc ? "descending" : "ascending"}`;
+  const orderText = `Sorted by ${sortedLabel}, ${sort.desc ? "descending" : "ascending"}`;
 
   const resetColumns = () => {
     // Clear the stored preference rather than writing the default set into
@@ -506,7 +506,7 @@ export function AdminDataTable<T>({
       </div>
 
       <p aria-live="polite" className="sr-only">
-        {`${rowCountText}, ${orderText}`}
+        {orderText}
       </p>
 
       {/*

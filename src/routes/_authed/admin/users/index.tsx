@@ -38,6 +38,7 @@ import {
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
+import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
@@ -85,7 +86,7 @@ export const Route = createFileRoute("/_authed/admin/users/")({
         dir: deps.dir,
         includeBanned: deps.includeBanned,
         page: deps.page,
-        pageSize: 20,
+        pageSize: PAGE_SIZE_DEFAULT,
         q: deps.q,
         role: deps.role,
         sort: deps.sort,
@@ -342,7 +343,12 @@ function UsersAdmin() {
             </Link>
           </PaginationLink>
         )}
-        <PaginationStatus page={page} totalPages={totalPages} />
+        <PaginationStatus
+          page={page}
+          shown={rows.length}
+          total={total}
+          totalPages={totalPages}
+        />
         {page >= totalPages ? (
           <PaginationLink disabled>Next</PaginationLink>
         ) : (

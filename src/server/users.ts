@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX } from "#/lib/pagination";
 
 const roleEnum = z.enum(["user", "instructor", "admin"]);
 
@@ -8,7 +9,12 @@ const listUsersSchema = z.object({
   role: roleEnum.nullable().optional().default(null),
   includeBanned: z.boolean().default(true),
   page: z.number().int().min(1).default(1),
-  pageSize: z.number().int().min(1).max(100).default(20),
+  pageSize: z
+    .number()
+    .int()
+    .min(1)
+    .max(PAGE_SIZE_MAX)
+    .default(PAGE_SIZE_DEFAULT),
   sort: z.string().max(40).optional(),
   dir: z.enum(["asc", "desc"]).optional(),
 });
