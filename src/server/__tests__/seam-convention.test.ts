@@ -21,10 +21,10 @@ import { describe, expect, it } from "vitest";
  * from a comment: a wrapper whose only seam was commented out satisfied the
  * first version of this test, which is the exact shape the convention exists
  * to catch. Comments and strings contain no identifiers, so the parser gets
- * both right by construction. `access-contract.test.ts`
- * next door walks the same tree for the same reason; the walk is duplicated
- * rather than shared because the two tests skip different things, and a shared
- * scanner would be a third file to keep honest.
+ * both right by construction. `access-contract.test.ts` next door walks the
+ * same tree for the same reason; the walk is duplicated rather than shared
+ * because the two tests skip different things, and a shared scanner would be
+ * a third file to keep honest.
  */
 
 const INTERNAL_DIR = join(process.cwd(), "src/server/_internal");
@@ -125,12 +125,13 @@ describe("the *As / *Impl seam convention", () => {
   it("reads bindings, not text, so a commented-out seam is no seam", () => {
     // The defect this file was rewritten for: a regex over raw source counted
     // the seam inside the comment below as real, and the wrapper shipped with
-    // nothing under it. The string case is the other direction, a name that
-    // is prose being counted as a wrapper. Both are fed through the same
-    // function the real scan uses, so this cannot drift from it.
+    // nothing under it. The string case is the other direction, an export
+    // statement that is prose being counted as a wrapper; it carries the
+    // regex's exact shape so the old scan would have matched it. Both are fed
+    // through the same function the real scan uses, so this cannot drift.
     const source = [
       "// export async function widgetAs(viewer: unknown) {}",
-      'const label = "gadgetForCurrentUser";',
+      'const label = "export const gadgetForCurrentUser = 1";',
       "export async function widgetForCurrentUser() {",
       "  return label;",
       "}",
@@ -144,8 +145,8 @@ describe("the *As / *Impl seam convention", () => {
 
   it("finds wrappers to check, so a walk that stops seeing them fails loudly", () => {
     // Without this, deleting the convention or breaking the walk above leaves
-    // a test that passes because it examined nothing. That is the failure
-    // mode this file exists to remove, so it is asserted first.
+    // a test that passes because it examined nothing, which is the failure
+    // mode this file exists to remove.
     expect(pairWrappersToSeams().wrappers.length).toBeGreaterThan(50);
   });
 
