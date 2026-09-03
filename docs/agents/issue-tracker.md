@@ -1,8 +1,8 @@
 # Issue tracker: GitHub
 
 Issues and specs for this repo live as GitHub issues on `adulbrich/eecs-capstone`.
-Use the `gh` CLI for all operations. Inside an agent tool sandbox `gh` fails TLS;
-run it with the sandbox off.
+Use the `gh` CLI for all operations, with the agent tool sandbox off (the Vitest
+section of `docs/QUIRKS.md` says why).
 
 ## What an issue is here
 

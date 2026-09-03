@@ -798,10 +798,9 @@ Linting and formatting run through **Ultracite** (a strict Biome preset). `biome
 ### The git hooks
 
 `lefthook.yml` runs `npx ultracite check` on the staged files at pre-commit, so the
-rule above is enforced rather than remembered, and beside it the prose check, a
-refusal to commit on `main`, the commit-message check at `commit-msg`, and typecheck
-plus the unit suite at `pre-push`. `CONTRIBUTING.md` has the table. `npm install`
-installs the hooks via the `prepare` script; nobody runs anything by hand.
+rule above is enforced rather than remembered; `CONTRIBUTING.md` has the table of
+the other gates it runs. `npm install` installs the hooks via the `prepare` script;
+nobody runs anything by hand.
 
 - **`prepare` is `lefthook install || true`, and the guard is load-bearing.**
   `.dockerignore` excludes `.git`, and the Dockerfile's runtime stage runs

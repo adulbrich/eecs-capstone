@@ -5,31 +5,30 @@
  *
  * PostToolUse cannot block, but stderr on exit 2 is shown to the model, which
  * is the point: the same finding lefthook would make at pre-commit, a few
- * minutes earlier and one file at a time.
+ * minutes earlier and one file at a time. Biome decides for itself which
+ * files it covers (`files.includes` in biome.json); `--no-errors-on-unmatched`
+ * keeps an excluded path from reading as a failure.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { loadRuleScripts, readInput, repoRelative } from "./lib.mjs";
+import { loadRuleScripts, readInput, repoRelative, repoRoot } from "./lib.mjs";
 
 const BIOME_EXTENSIONS = /\.(?:[cm]?jsx?|tsx?|jsonc?|css)$/;
-/** Mirrors `files.includes` in biome.json. */
-const BIOME_EXCLUDED =
-  /^(?:src\/routeTree\.gen\.ts|src\/styles\.css|scripts\/|drizzle\/)/;
 
 const input = readInput();
-const cwd = input.cwd ?? process.cwd();
-const path = repoRelative(cwd, input.tool_input?.file_path ?? "");
+const root = repoRoot(input.cwd ?? process.cwd());
+const path = repoRelative(root, input.tool_input?.file_path ?? "");
 
-if (!path || path.startsWith("../") || !existsSync(`${cwd}/${path}`)) {
+if (!path || path.startsWith("../") || !existsSync(`${root}/${path}`)) {
   process.exit(0);
 }
 
 let failed = false;
-const { isCheckedPath } = await loadRuleScripts(cwd);
+const { isCheckedPath } = await loadRuleScripts(root);
 
 if (isCheckedPath(path)) {
   const prose = spawnSync(process.execPath, ["scripts/check-prose.mjs", path], {
-    cwd,
+    cwd: root,
     encoding: "utf8",
   });
   if (prose.status !== 0) {
@@ -38,13 +37,12 @@ if (isCheckedPath(path)) {
   }
 }
 
-const biome = `${cwd}/node_modules/.bin/biome`;
-if (
-  BIOME_EXTENSIONS.test(path) &&
-  !BIOME_EXCLUDED.test(path) &&
-  existsSync(biome)
-) {
-  const result = spawnSync(biome, ["check", path], { cwd, encoding: "utf8" });
+const biome = `${root}/node_modules/.bin/biome`;
+if (BIOME_EXTENSIONS.test(path) && existsSync(biome)) {
+  const result = spawnSync(biome, ["check", "--no-errors-on-unmatched", path], {
+    cwd: root,
+    encoding: "utf8",
+  });
   if (result.status !== 0) {
     failed = true;
     process.stderr.write(

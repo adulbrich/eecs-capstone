@@ -70,7 +70,7 @@ lines.push(
 );
 
 lines.push(
-  "Local gates: lefthook checks the commit message, prose and branch at commit, typecheck and unit tests at push. See CONTRIBUTING.md."
+  "Gates: lefthook.yml at commit and push, the hooks under .claude/hooks in this session. CONTRIBUTING.md has the table."
 );
 
 process.stdout.write(`${lines.join("\n")}\n`);
