@@ -151,7 +151,7 @@ describe("the admin index reads instructor names through its own staff seam", ()
   });
 });
 
-describe("term_count is staff-editable and never public", () => {
+describe("term_count and expected_teams are staff-editable and never public", () => {
   it("round-trips through create and update, and reaches only the staff detail", async () => {
     const admin = await makeUser(`tc-a-${Date.now()}@x.com`, "admin");
     const courseId = `TC-${Date.now()}`;
@@ -160,9 +160,11 @@ describe("term_count is staff-editable and never public", () => {
       courseName: "Three terms",
       description: null,
       termCount: 3,
+      expectedTeams: 12,
     });
     const detail = await getProgramAs(admin, { id: created.id });
     expect(detail.program.termCount).toBe(3);
+    expect(detail.program.expectedTeams).toBe(12);
 
     // Nullable on purpose: unset must stay visibly unset, not become zero.
     await updateProgramAs(admin, {
@@ -171,16 +173,18 @@ describe("term_count is staff-editable and never public", () => {
       courseName: "Three terms",
       description: null,
       termCount: null,
+      expectedTeams: null,
     });
     const cleared = await getProgramAs(admin, { id: created.id });
     expect(cleared.program.termCount).toBeNull();
+    expect(cleared.program.expectedTeams).toBeNull();
 
     // The public list projects its columns by name, so the new column does
     // not ride into it; the six-key pin above is the enforcement.
     const { rows } = await listProgramsImpl();
-    expect(rows.find((r) => r.id === created.id)).not.toHaveProperty(
-      "termCount"
-    );
+    const row = rows.find((r) => r.id === created.id);
+    expect(row).not.toHaveProperty("termCount");
+    expect(row).not.toHaveProperty("expectedTeams");
   });
 });
 

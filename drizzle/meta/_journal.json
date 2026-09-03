@@ -155,6 +155,13 @@
       "when": 1788438715508,
       "tag": "0021_ai_usage_feature",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1788439523166,
+      "tag": "0022_program_expected_teams",
+      "breakpoints": true
     }
   ]
 }

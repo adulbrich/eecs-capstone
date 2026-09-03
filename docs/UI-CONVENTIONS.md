@@ -196,17 +196,18 @@ carries this padding signature, with `max-w-*` chosen per page (see below):
 `px-4 py-6` gives comfortable touch margins; `md:p-8` expands to the desktop-standard
 32px. A bare `p-8` wrapper wastes a third of the width on a phone.
 
-Page width is chosen by content, not fixed. Counting the 18 route roots that carry
+Page width is chosen by content, not fixed. Counting the 19 route roots that carry
 this `px-4 py-6 md:p-8` signature: `max-w-2xl` on the 8 form, dashboard and prose pages
 (`projects/new`, `projects/$projectId/edit`, `admin/index`, `admin/programs/$programId`,
-`admin/users/$userId`, `inventory/new`, `inventory/$itemId/edit`, `privacy`), `max-w-4xl` on 6
-pages that hold a list or a two-column detail layout, `max-w-3xl` on the one
+`admin/users/$userId`, `inventory/new`, `inventory/$itemId/edit`, `privacy`), `max-w-4xl` on 7
+pages that hold a list, a two-column detail layout or a grid of figures, `max-w-3xl` on the one
 long-form page (`projects/$projectId.tsx`), and `max-w-md` on two narrow-content
 pages (`profile.tsx`, `admin/categories/$categoryId.tsx`) plus `max-w-sm` on
-`verify-email.tsx`. Of the six `max-w-4xl` pages, four hold a single-column
+`verify-email.tsx`. Of the seven `max-w-4xl` pages, four hold a single-column
 card list (`projects/index.tsx`, `inventory/index.tsx`, `my/projects.tsx`,
-`my/items.tsx`), `my/bookmarks.tsx` bounds only its title, and
-`inventory/$itemId.tsx` holds a two-column detail layout. `projects/index.tsx` in
+`my/items.tsx`), `my/bookmarks.tsx` bounds only its title,
+`inventory/$itemId.tsx` holds a two-column detail layout, and
+`admin/analytics.tsx` holds a two-column grid of figure cards. `projects/index.tsx` in
 table mode and `my/bookmarks.tsx` let the table run full width below the bounded
 title (and filter bar), the way the admin tables do. The sign-in/sign-up/forgot/reset-password cards
 are narrower still but live inside the separate `island-shell` container below, not

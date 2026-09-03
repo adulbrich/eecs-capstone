@@ -50,6 +50,9 @@ function ProgramEdit() {
   const [termCount, setTermCount] = useState(
     program.termCount === null ? "" : String(program.termCount)
   );
+  const [expectedTeams, setExpectedTeams] = useState(
+    program.expectedTeams === null ? "" : String(program.expectedTeams)
+  );
   const [error, setError] = useState<string | null>(null);
 
   async function onSave(e: React.FormEvent) {
@@ -63,6 +66,7 @@ function ProgramEdit() {
           courseName,
           description: description || null,
           termCount: termCount === "" ? null : Number(termCount),
+          expectedTeams: expectedTeams === "" ? null : Number(expectedTeams),
         },
       });
       navigate({ to: "/admin/programs" });
@@ -155,6 +159,22 @@ function ProgramEdit() {
             How many academic terms the course runs. The scope assessment judges
             proposals against it; leave it blank if unsure, and the assessment
             says so rather than guessing.
+          </p>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="course-expected-teams">Expected teams</Label>
+          <Input
+            id="course-expected-teams"
+            inputMode="numeric"
+            min={0}
+            onChange={(e) => setExpectedTeams(e.target.value)}
+            type="number"
+            value={expectedTeams}
+          />
+          <p className="text-muted-foreground text-xs">
+            How many student teams the office expects to place this cycle. The
+            analytics dashboard compares published team slots against it; leave
+            it blank and the dashboard says "not set".
           </p>
         </div>
         <div className="flex gap-2">

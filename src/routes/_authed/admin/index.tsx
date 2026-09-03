@@ -1,6 +1,7 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import {
   ArrowRight,
+  BarChart3,
   BookOpen,
   FolderKanban,
   Handshake,
@@ -29,20 +30,11 @@ export const Route = createFileRoute("/_authed/admin/")({
   component: AdminHome,
 });
 
-function StatCard({
-  hint,
-  label,
-  value,
-}: {
-  hint?: string;
-  label: string;
-  value: number;
-}) {
+function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <Card className="p-4">
       <p className="text-muted-foreground text-sm">{label}</p>
       <p className="mt-1 font-semibold text-2xl tabular-nums">{value}</p>
-      {hint && <p className="mt-0.5 text-muted-foreground text-xs">{hint}</p>}
     </Card>
   );
 }
@@ -101,16 +93,7 @@ function NavCard({ to, icon: Icon, label, description }: NavCard) {
 }
 
 function AdminHome() {
-  const {
-    total,
-    published,
-    publishedTeamCapacity,
-    mentorTotal,
-    mentorTeamCapacity,
-    submitted,
-    userTotal,
-    pendingRequests,
-  } = Route.useLoaderData();
+  const { submitted, pendingRequests } = Route.useLoaderData();
   const { role } = Route.useRouteContext();
   const isAdmin = role === "admin";
 
@@ -118,26 +101,15 @@ function AdminHome() {
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
       <h1 className="font-semibold text-2xl">Admin</h1>
 
+      {/* A work queue, not a statistic: the two cards turn coloured and link
+          into a pre-filtered list when non-zero. The overview counts that
+          used to sit above them moved to /admin/analytics, where a date
+          range and a program selector make them mean something (#34). */}
       <section className="mt-6">
         <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-          Overview
+          Needs attention
         </h2>
-        <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <StatCard label="Total projects" value={total} />
-          <StatCard
-            hint={`${publishedTeamCapacity} team ${publishedTeamCapacity === 1 ? "slot" : "slots"}`}
-            label="Published"
-            value={published}
-          />
-          {/* Supply side, next to the published-projects demand figure. */}
-          <StatCard
-            hint={`${mentorTeamCapacity} team ${mentorTeamCapacity === 1 ? "slot" : "slots"}`}
-            label="Mentors"
-            value={mentorTotal}
-          />
-          {isAdmin && <StatCard label="Users" value={userTotal} />}
-        </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
           {submitted > 0 ? (
             <Link
               className={ALERT_CARD_CLASS}
@@ -177,6 +149,12 @@ function AdminHome() {
           Manage
         </h2>
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <NavCard
+            description="Counts, waits and flows over the app's own data"
+            icon={BarChart3}
+            label="Analytics"
+            to="/admin/analytics"
+          />
           <NavCard
             description="Review, approve, and manage all projects"
             icon={FolderKanban}
