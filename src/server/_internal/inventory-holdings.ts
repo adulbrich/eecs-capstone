@@ -66,7 +66,10 @@ export interface HistoryEntry {
  * account, or to their address when no account holds it. The address half
  * needs a verified address, or anyone could take an item by typing its
  * holder's email into their profile, and it never overrides an explicit
- * account assignment. Compared exactly, as the address was recorded.
+ * account assignment. The address is compared case-insensitively, like every
+ * other address comparison in the app (claimProjectsForVerifiedUser,
+ * mentorNameSql): a walk-in hold that staff typed as Student@Oregonstate.edu
+ * belongs to the account at student@oregonstate.edu.
  *
  * One predicate, read by /my/items and by account deletion, so the page that
  * shows a person their items and the check that refuses to delete their
@@ -83,7 +86,7 @@ export function heldByViewer(
       verifiedEmail
         ? and(
             isNull(inventoryItems.currentHolderId),
-            eq(inventoryItems.currentHolderEmail, verifiedEmail)
+            sql`lower(${inventoryItems.currentHolderEmail}) = ${verifiedEmail.toLowerCase()}`
           )
         : undefined
     )
