@@ -6,8 +6,9 @@
 # the title or body is edited, and `edited` on ci.yml would re-run the
 # five-minute smoke job for a typo fix in the description.
 #
-# Register `pr-text` on the `main` ruleset after it has reported once; the
-# ruleset picker needs a check to have run before it offers the name.
+# Required: registered on the `main` ruleset as `pr-text` on 2026-09-03, after
+# its first report on #215 (the ruleset picker needs a check to have run once
+# before it offers the name).
 name: pr-text
 
 on:

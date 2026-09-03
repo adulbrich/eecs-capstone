@@ -35,7 +35,8 @@ function run(
 }
 
 /**
- * A throwaway repository with the given commit subjects, oldest first.
+ * A throwaway repository with the given commit subjects, oldest first, and
+ * a `git` bound to it. Remove `dir` when done.
  */
 function repoWith(subjects: string[]) {
   const dir = mkdtempSync(join(tmpdir(), "range-"));
@@ -49,7 +50,7 @@ function repoWith(subjects: string[]) {
     git("add", `f${index}`);
     git("commit", "-q", "-m", subject);
   }
-  return dir;
+  return { dir, git };
 }
 
 const commit = (message: string) =>
@@ -126,7 +127,11 @@ describe("check-commit-message", () => {
         "+ \u2014 in the diff",
       ].join("\n")
     );
-    expect(run("check-commit-message.mjs", [file]).status).toBe(0);
+    try {
+      expect(run("check-commit-message.mjs", [file]).status).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("checks a markdown heading in a PR body, which is not a comment", () => {
@@ -135,8 +140,8 @@ describe("check-commit-message", () => {
   });
 
   it("checks every commit in a range and names the one that fails", () => {
-    const bad = repoWith(["chore: seed", "Add the thing", "fix(x): fine"]);
-    const good = repoWith(["chore: seed", "fix(x): fine"]);
+    const bad = repoWith(["chore: seed", "Add the thing", "fix(x): fine"]).dir;
+    const good = repoWith(["chore: seed", "fix(x): fine"]).dir;
     try {
       const result = run(
         "check-commit-message.mjs",
@@ -162,9 +167,7 @@ describe("check-commit-message", () => {
   });
 
   it("still checks the body of a merge commit in a range", () => {
-    const dir = repoWith(["chore: seed"]);
-    const git = (...args: string[]) =>
-      spawnSync("git", ["-C", dir, ...args], { encoding: "utf8", env });
+    const { dir, git } = repoWith(["chore: seed"]);
     try {
       git("checkout", "-q", "-b", "topic");
       writeFileSync(join(dir, "t"), "t");
@@ -220,12 +223,16 @@ describe("nvmrc-node", () => {
       join(process.cwd(), "scripts"),
       join(dir, "scripts"),
     ]);
-    const result = wrapper(["node", "--version"], {
-      cwd: dir,
-      env: { ...process.env, HOME: dir, NVM_DIR: join(dir, "none") },
-    });
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain(".nvmrc wants 99.0.0");
+    try {
+      const result = wrapper(["node", "--version"], {
+        cwd: dir,
+        env: { ...process.env, HOME: dir, NVM_DIR: join(dir, "none") },
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(".nvmrc wants 99.0.0");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

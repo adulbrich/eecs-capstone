@@ -28,8 +28,10 @@ jobs:
       # `--no-verify` could have let through. A merge commit's subject is
       # exempt and its body is still checked, so the PR merge ref passes.
       # Dependabot is skipped: its bodies embed upstream release notes, which
-      # carry whatever characters the upstream maintainers typed.
-      - if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+      # carry whatever characters the upstream maintainers typed. Keyed on who
+      # opened the PR, not `github.actor`, which becomes the maintainer the
+      # moment they push a fix-up onto the Dependabot branch.
+      - if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
         env:
           BASE_REF: ${{ github.base_ref }}
         run: node scripts/check-commit-message.mjs --range "origin/$BASE_REF..HEAD"
