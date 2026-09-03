@@ -3,7 +3,7 @@ import type {
   MantleResponse,
   ResponsesFn,
 } from "#/lib/_internal/bedrock-mantle";
-import { PROPOSAL_SCOPE_RULE } from "#/lib/proposal-guidance";
+import { PROPOSAL_SCOPE_RULE, TERM_CALIBRATION } from "#/lib/proposal-guidance";
 import { SCOPE_RATIONALE_MAX_LENGTH } from "#/lib/scope-assessment";
 import {
   buildScopeConfig,
@@ -72,6 +72,7 @@ describe("the tool schema", () => {
 
   it("embeds the one scope rule verbatim", () => {
     expect(SCOPE_SYSTEM_PROMPT).toContain(PROPOSAL_SCOPE_RULE);
+    expect(SCOPE_SYSTEM_PROMPT).toContain(TERM_CALIBRATION);
   });
 });
 
@@ -124,7 +125,11 @@ describe("runScopeAssessment", () => {
     });
     const body = invoke.mock.calls[0]?.[0] ?? {};
     expect(body.store).toBe(false);
-    expect(body.reasoning).toEqual({ effort: "high" });
+    // Through the builder, not a literal: .env.example ships the variable,
+    // so a literal would red on any machine that set it (docs/QUIRKS.md).
+    expect(body.reasoning).toEqual({
+      effort: buildScopeConfig(process.env).reasoningEffort,
+    });
     expect(body.max_output_tokens).toBe(SCOPE_MAX_OUTPUT_TOKENS);
   });
 

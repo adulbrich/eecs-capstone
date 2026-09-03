@@ -5,7 +5,7 @@ import { aiReviewUsage, programs, projects, user } from "#/db/schema";
 import type { MantleResponse } from "#/lib/_internal/bedrock-mantle";
 import { auth } from "#/lib/auth";
 import {
-  assertReviewWithinLimit,
+  assertWithinLimit,
   recordReviewUsage,
 } from "#/server/_internal/ai-review-usage";
 import { createProgramAs } from "#/server/_internal/programs";
@@ -192,13 +192,14 @@ describe("the scope limit is its own", () => {
 
     // Exhaust the review's hour with a recorded review call.
     await recordReviewUsage({
+      feature: "review",
       userId: admin.id,
       model: "m",
       reasoningEffort: "medium",
       reviewedFieldCount: 1,
       outcome: "ok",
     });
-    await expect(assertReviewWithinLimit(admin.id)).rejects.toThrow(
+    await expect(assertWithinLimit(admin.id, "review")).rejects.toThrow(
       /AI reviews/
     );
     // The scope assessment still runs.

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { limitVerdict, reviewLimits } from "#/lib/ai-review-limits";
+import {
+  AI_FEATURE_NOUN,
+  limitVerdict,
+  reviewLimits,
+} from "#/lib/ai-review-limits";
 
 const LIMITS = { perHour: 10, perDay: 40 };
 
@@ -29,27 +33,36 @@ describe("reviewLimits", () => {
 
 describe("limitVerdict", () => {
   it("allows a call below both limits", () => {
-    expect(limitVerdict(counts(9, 39), LIMITS)).toBeNull();
+    expect(
+      limitVerdict(counts(9, 39), LIMITS, AI_FEATURE_NOUN.review)
+    ).toBeNull();
   });
 
   it("blocks at the hourly limit, not one past it", () => {
     // The count is of calls already made, so reaching the limit means the next
     // one would be the eleventh.
-    expect(limitVerdict(counts(10, 20), LIMITS)).toMatch(/for this hour/);
+    expect(
+      limitVerdict(counts(10, 20), LIMITS, AI_FEATURE_NOUN.review)
+    ).toMatch(/for this hour/);
   });
 
   it("blocks on the daily limit even when the hour has room", () => {
-    expect(limitVerdict(counts(0, 40), LIMITS)).toMatch(/for today/);
+    expect(limitVerdict(counts(0, 40), LIMITS, AI_FEATURE_NOUN.review)).toMatch(
+      /for today/
+    );
   });
 
   it("tells the user when the window reopens", () => {
-    expect(limitVerdict(counts(10, 20), LIMITS)).toContain("about 12 minutes");
+    expect(
+      limitVerdict(counts(10, 20), LIMITS, AI_FEATURE_NOUN.review)
+    ).toContain("about 12 minutes");
   });
 
   it("rounds a long wait to hours rather than reporting 300 minutes", () => {
     const verdict = limitVerdict(
       { inHour: 0, inDay: 40, hourResetsInMinutes: 0, dayResetsInMinutes: 300 },
-      LIMITS
+      LIMITS,
+      AI_FEATURE_NOUN.review
     );
     expect(verdict).toContain("about 5 hours");
   });
@@ -57,7 +70,8 @@ describe("limitVerdict", () => {
   it("does not say zero minutes when the window is about to reopen", () => {
     const verdict = limitVerdict(
       { inHour: 10, inDay: 20, hourResetsInMinutes: 0, dayResetsInMinutes: 0 },
-      LIMITS
+      LIMITS,
+      AI_FEATURE_NOUN.review
     );
     expect(verdict).toContain("in a minute");
   });

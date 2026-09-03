@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  type MantleOutputItem,
+  findToolCall,
   type MantleResponse,
   mantleResponses,
   type ResponsesFn,
@@ -150,24 +150,6 @@ export function buildUserMessage(
   return parts.join("\n\n");
 }
 
-/**
- * The docs disagree about where a function call lands: the Responses API spec
- * puts it at the top level of `output`, while the Bedrock tool-use guide reads
- * it out of an item's `content`. Look in both rather than pick a side.
- */
-function findToolCall(items: MantleOutputItem[]): MantleOutputItem | undefined {
-  for (const item of items) {
-    if (item.type === "function_call" && item.name === TOOL_NAME) {
-      return item;
-    }
-    const nested = item.content && findToolCall(item.content);
-    if (nested) {
-      return nested;
-    }
-  }
-  return;
-}
-
 export function parseReviewResponse(
   response: MantleResponse,
   model: string
@@ -179,7 +161,7 @@ export function parseReviewResponse(
       "The review ran out of room before it finished. Try again, or shorten the longest fields first."
     );
   }
-  const toolCall = findToolCall(response.output ?? []);
+  const toolCall = findToolCall(response.output ?? [], TOOL_NAME);
   if (!toolCall?.arguments) {
     throw new Error("Couldn't generate suggestions, please try again.");
   }

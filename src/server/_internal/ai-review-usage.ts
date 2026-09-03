@@ -11,8 +11,7 @@ import {
 } from "#/lib/ai-review-limits";
 
 export interface ReviewUsageRow {
-  /** Absent means the proposal review, which was the only feature until #61. */
-  feature?: AiFeature | undefined;
+  feature: AiFeature;
   inputTokens?: number | undefined;
   model: string;
   outcome: ReviewOutcome;
@@ -30,7 +29,7 @@ export interface ReviewUsageRow {
  */
 export async function countReviewsInWindows(
   userId: string,
-  feature: AiFeature = "review"
+  feature: AiFeature
 ): Promise<ReviewWindowCounts> {
   const hourWindow = sql`${aiReviewUsage.createdAt} > now() - interval '1 hour'`;
   const [row] = await db
@@ -83,14 +82,6 @@ export async function assertWithinLimit(
   }
 }
 
-export async function assertReviewWithinLimit(userId: string): Promise<void> {
-  await assertWithinLimit(userId, "review");
-}
-
-export async function assertScopeWithinLimit(userId: string): Promise<void> {
-  await assertWithinLimit(userId, "scope");
-}
-
 /**
  * Never throws into the caller. Losing a usage row degrades the limiter
  * slightly; failing the review over it degrades the product.
@@ -99,7 +90,7 @@ export async function recordReviewUsage(row: ReviewUsageRow): Promise<void> {
   try {
     await db.insert(aiReviewUsage).values({
       userId: row.userId,
-      feature: row.feature ?? "review",
+      feature: row.feature,
       projectId: row.projectId ?? null,
       model: row.model,
       reasoningEffort: row.reasoningEffort,

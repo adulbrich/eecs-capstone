@@ -84,7 +84,7 @@ function waitPhrase(minutes: number): string {
 export function limitVerdict(
   counts: ReviewWindowCounts,
   limits: ReviewLimits,
-  noun: string = AI_FEATURE_NOUN.review
+  noun: string
 ): string | null {
   if (counts.inHour >= limits.perHour) {
     return `You have used all ${limits.perHour} ${noun} for this hour. Try again ${waitPhrase(counts.hourResetsInMinutes)}.`;

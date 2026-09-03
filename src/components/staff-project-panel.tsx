@@ -392,8 +392,8 @@ export function StaffProjectPanel({
           they are visible to the proposer as well, so they are not staff-only
           content and would be duplicated here. */}
 
-      {/* Staff only, and staff only: the verdict never enters the project
-          payload, so it is loaded here by a staff-gated read (#61). */}
+      {/* Only staff: the verdict never enters the project payload, so it is
+          loaded here by a staff-gated read (#61). */}
       <PanelSection title="Scope assessment">
         <ScopeAssessmentSection key={project.id} projectId={project.id} />
       </PanelSection>

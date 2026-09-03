@@ -209,17 +209,17 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/programs.ts:removeProgramInstructor": { level: "staff" },
   "server/scope-assessment.ts:assessProjectScope": {
     level: "staff",
-    note: "A paid Bedrock call that writes the verdict onto the project. Staff only, and staff only: the assessment never reaches the proposer or the public payload, and it is metered under its own limit pair (#61).",
+    note: "A paid Bedrock call that writes the verdict onto the project and returns it. Only staff: the assessment never reaches the proposer or the public payload, and it is metered under its own limit pair (#61).",
   },
   "server/scope-assessment.ts:getScopeAssessment": {
     level: "staff",
-    note: "Reads the stored verdict and whether the project's text has moved since. The three columns are absent from projectDetailView, so this is the only way they leave the server.",
+    note: "Reads the stored verdict and whether the project's text has moved since. The three columns are absent from projectDetailView, so this and assessProjectScope are the only reads that return them.",
   },
   "server/programs.ts:updateProgram": { level: "staff" },
 
   "server/project-review.ts:reviewProject": {
     level: "authenticated",
-    note: "Narrows to owner-or-staff only when a project id is supplied: reviewProjectAs runs canEditProject inside `if (input.projectId)`, and the id is optional because the submission page reviews a proposal with no row yet. With no id the gate is requireUser() plus assertReviewWithinLimit, which is what bounds spend on a paid endpoint now that ownership no longer does.",
+    note: "Narrows to owner-or-staff only when a project id is supplied: reviewProjectAs runs canEditProject inside `if (input.projectId)`, and the id is optional because the submission page reviews a proposal with no row yet. With no id the gate is requireUser() plus assertWithinLimit under the review feature, which is what bounds spend on a paid endpoint now that ownership no longer does.",
   },
 
   "server/projects-queries.ts:exportAdminProjects": {

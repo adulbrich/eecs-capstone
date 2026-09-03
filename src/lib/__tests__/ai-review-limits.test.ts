@@ -39,9 +39,8 @@ describe("the two features read their own limit pair", () => {
     expect(
       limitVerdict(counts, scopeLimits(env), AI_FEATURE_NOUN.scope)
     ).toContain("all 5 scope assessments for this hour");
-    // The default noun is the review's, so existing callers read unchanged.
-    expect(limitVerdict(counts, { perHour: 5, perDay: 7 })).toContain(
-      "AI reviews"
-    );
+    expect(
+      limitVerdict(counts, { perHour: 5, perDay: 7 }, AI_FEATURE_NOUN.review)
+    ).toContain("AI reviews");
   });
 });

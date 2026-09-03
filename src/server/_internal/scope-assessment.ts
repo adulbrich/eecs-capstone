@@ -18,7 +18,7 @@ import {
 } from "#/lib/scope-assessment-source";
 import { assertStaff } from "#/lib/viewer";
 import type { ScopeAssessmentInput } from "../scope-assessment";
-import { assertScopeWithinLimit, recordReviewUsage } from "./ai-review-usage";
+import { assertWithinLimit, recordReviewUsage } from "./ai-review-usage";
 import { buildScopeConfig, runScopeAssessment } from "./scope-assessment-core";
 
 interface AuthUser {
@@ -73,6 +73,14 @@ function toView(
 ): ScopeAssessmentView | null {
   const stored = storedSchema.safeParse(project.scopeAssessment);
   if (!(stored.success && project.scopeAssessmentUpdatedAt)) {
+    if (project.scopeAssessment !== null) {
+      // A stored verdict the current schema no longer accepts (an enum or
+      // cap changed under it). Nothing renders, so say so where an operator
+      // looks, rather than throwing away a verdict silently.
+      console.error(
+        `Stored scope assessment for project ${project.id} does not parse; reassess it`
+      );
+    }
     return null;
   }
   return {
@@ -99,7 +107,7 @@ export async function getScopeAssessmentForCurrentUser(
 }
 
 /**
- * Staff only, and the seam is where that is enforced: the button in the panel
+ * Only staff, and the seam is where that is enforced: the button in the panel
  * is hidden from everyone else, and a hidden button is not a gate. The limit
  * check runs before the paid call and under the scope feature's own pair.
  */
@@ -110,7 +118,7 @@ export async function assessProjectScopeAs(
 ): Promise<ScopeAssessmentView> {
   assertStaff(viewer);
   const { project, source, hash } = await loadScopeInput(data.projectId);
-  await assertScopeWithinLimit(viewer.id);
+  await assertWithinLimit(viewer.id, "scope");
 
   const run = await runScopeAssessment(source, invoke);
   // Metered on whether a paid call happened, as the review is: a failed or
