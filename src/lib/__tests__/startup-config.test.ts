@@ -46,7 +46,7 @@ describe("missingProductionConfig", () => {
     ).toEqual(["DATABASE_URL", "ONID_CLIENT_SECRET", "S3_BUCKET"]);
   });
 
-  it("treats whitespace as unset, the way warnUnconfiguredProviders does", () => {
+  it("treats whitespace as unset, the way buildAuthConfig's unconfigured list does", () => {
     expect(
       missingProductionConfig({
         ...complete,

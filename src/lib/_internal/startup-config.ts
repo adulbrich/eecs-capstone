@@ -1,24 +1,12 @@
 /**
  * Which configuration is fatal at boot, and only at boot.
  *
- * The check runs from `src/nitro/config-check.ts`, a Nitro plugin, and from
- * nowhere else. Module-level code in `src/lib/auth.ts` or `src/db/index.ts`
- * would run on import, and roughly twenty integration tests import those
- * against a CI `.env.local` that carries no provider credentials; a throw
- * there reds the whole suite, and the tempting fix, faking the credentials in
- * the heredoc, makes the check assert nothing. A TanStack Start server entry
- * (`src/server.ts`) is no better a home: Nitro loads it on the first request,
- * not at boot, so a throw there keeps the port bound and answers 500. A Nitro
- * plugin runs before the listener binds, so a throw there is exit code 1 and
- * no port. Both were measured on the built output; see the TanStack Start
- * section of docs/QUIRKS.md.
- *
- * Production only. A dev machine with no ONID registration is a normal state,
- * and every variable here fails closed or at first use outside production, as
- * it always has.
- *
- * Names, never values: three of these are secrets, and the message reaches a
- * log group.
+ * Called from `src/nitro/config-check.ts` and nowhere else; the TanStack Start
+ * section of docs/QUIRKS.md says why a Nitro plugin is the one home that
+ * refuses to boot and why `auth.ts` and the server entry are not. Production
+ * only: outside it every variable here fails closed or at first use, as it
+ * always has. Names, never values: three of these are secrets, and the message
+ * reaches a log group.
  */
 
 /**

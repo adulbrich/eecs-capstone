@@ -781,7 +781,7 @@ access keys and no `S3_ENDPOINT` are set; `BEDROCK_EMBEDDINGS_ENABLED` is
 deliberately not plumbed either.
 
 Seven of these are fatal. A task with `NODE_ENV=production` refuses to start,
-exit code 1 and one log line naming every missing one, without `DATABASE_URL`,
+exit code 1 and one message naming every missing one, without `DATABASE_URL`,
 `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `ONID_DISCOVERY_URL`,
 `ONID_CLIENT_ID`, `ONID_CLIENT_SECRET` or `S3_BUCKET`; a blank value counts as
 missing. `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` only warn, because

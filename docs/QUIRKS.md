@@ -99,11 +99,7 @@ Add `defaultNotFoundComponent` in `getRouter()` (see `src/router.tsx`). Without 
 
 ### Code that must run at boot goes in a Nitro plugin, not `src/server.ts`
 
-TanStack Start's optional server entry (`src/server.ts`, `createServerEntry`) reads like the place for a startup check, and it is not one: Nitro loads that module on the first request, not when the process starts, and ESM evaluates its imports before its body. Measured on the built output with `NODE_ENV=production` and a variable missing, a throw at the top of the entry left the process up with the port bound, answering 500 on every route including `/api/healthz`; with nothing set at all, `src/db/index.ts` threw first and the entry's check never ran.
-
-A Nitro plugin is the thing that runs at boot. `vite.config.ts` names `src/nitro/config-check.ts` in the `nitro({ plugins })` option; Nitro calls it synchronously inside `useNitroApp` before the listener binds, so a throw there is exit code 1, the message on stderr, and no port. The plugin only calls `assertProductionConfig` from `src/lib/_internal/startup-config.ts`, which is where the decision of what is fatal lives and what the unit test imports. The list and the gate are there, not here: the entry below says why some variables are fatal and some only warn.
-
-Why not module-level code in `src/lib/auth.ts` or `src/db/index.ts`: it runs on import, roughly twenty integration tests import those against a CI `.env.local` with no provider credentials, and the tempting fix, faking the credentials in that heredoc, makes the check assert nothing. #137.
+Nitro loads TanStack Start's optional server entry (`src/server.ts`, `createServerEntry`) on the first request, not when the process starts, and ESM evaluates its imports before its body. Measured on the built output with `NODE_ENV=production` and a variable missing: a throw at the top of the entry left the process up with the port bound, answering 500 on every route including `/api/healthz`, and with nothing set `src/db/index.ts` threw first so the check never ran. A Nitro plugin named in `nitro({ plugins })` in `vite.config.ts` runs synchronously inside `useNitroApp` before the listener binds, so a throw there is exit code 1, the message on stderr, and no port. `src/nitro/config-check.ts` is that plugin; it only calls `assertProductionConfig` from `src/lib/_internal/startup-config.ts`, which holds the fatal list and the production gate and is what the unit test imports. Module-level code in `src/lib/auth.ts` or `src/db/index.ts` is not a home either: tests import both, against a CI `.env.local` with no provider credentials. #137.
 
 ### Generated route tree
 
@@ -428,10 +424,11 @@ missing `DATABASE_URL` fails the whole SSR graph: the process starts, binds the
 port, stays up, and answers 500 on every route, healthz included. Measured
 directly, both `/` and `/api/healthz` return 500.
 
-That is the behaviour outside production. With `NODE_ENV=production` the Nitro
-plugin above stops the process first, exit code 1 and one line naming every
-missing variable, `DATABASE_URL` included, so a deployed task never reaches
-the bound-port-answering-500 state for a variable on that list.
+That is the behaviour outside production. With `NODE_ENV=production`,
+`src/nitro/config-check.ts` stops the process first, exit code 1 and one
+message naming every missing variable, `DATABASE_URL` included, so a deployed
+task never reaches the bound-port-answering-500 state for a variable on that
+list.
 
 This is why `playwright.e2e.config.ts` uses healthz as its `webServer.url`.
 Playwright waits for 2xx or 3xx, so a misconfigured server never goes ready and
@@ -851,6 +848,7 @@ const NAME_COLUMN = {
 | `src/lib/*.ts` | Pure modules, client-safe wrappers. |
 | `src/lib/_internal/*.ts` | Server-only helpers (auth-guards). |
 | `src/lib/__tests__/*.test.ts` | Pure-module unit tests, plus two integration suites (`auth`, `role-gate`) that need a database, plus two suites that also read source off disk (`env-contract`, which reads `src`, `scripts`, `.env.example` and `infra/`, and `image-upload-policy`, whose other cases import the module normally). |
+| `src/nitro/*.ts` | Nitro runtime plugins, named in `vite.config.ts`; the only code that runs at boot. |
 | `src/server/*.ts` | createServerFn wrappers (Zod schemas + dynamic-import handlers). Client-importable. |
 | `src/server/_internal/*.ts` | Impl + `*As(viewer, ...)` + `*ForCurrentUser(...)` helpers. Server-only. |
 | `src/server/__tests__/*.integration.test.ts` | Integration tests against docker Postgres. |
