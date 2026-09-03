@@ -1,9 +1,39 @@
-# Biome, via ultracite, on every commit. Same check CI runs (`npm run check`),
-# narrowed to the staged files. Run `npm run format` to auto-fix what it reports.
+# The local gates, one per rule, each the same script CI runs. Set LEFTHOOK=0
+# or pass `git commit --no-verify` to skip; the Claude Code hooks in
+# `.claude/hooks/` and the `verify` and `pr-text` jobs catch the skip.
 #
-# Set LEFTHOOK=0 to skip, or `git commit --no-verify`.
+# `npm install` installs these through the `prepare` script.
 pre-commit:
   commands:
+    # Biome, via ultracite, narrowed to the staged files. Same check CI runs
+    # (`npm run check`); run `npm run format` to auto-fix what it reports.
     biome:
       glob: "*.{js,jsx,mjs,ts,tsx,json,jsonc,css}"
       run: npx ultracite check {staged_files}
+    # No emdash, no emoji, in prose, comments and string literals alike.
+    prose:
+      glob: "*.{md,ts,tsx,js,mjs,cjs,json,yml,yaml,css,tf,sh,sql}"
+      run: node scripts/check-prose.mjs {staged_files}
+    # The ruleset rejects a push to main; this stops the commit that would
+    # need untangling first.
+    branch:
+      run: test "$(git branch --show-current)" != main
+      fail_text: "never commit on main; branch first (AGENTS.md)"
+
+commit-msg:
+  commands:
+    # Conventional subject, lowercase imperative, no emdash, no emoji, and
+    # never a claude.ai/code/session link.
+    message:
+      run: node scripts/check-commit-message.mjs {1}
+
+pre-push:
+  commands:
+    # The two checks a red PR is usually red for, run once per push rather
+    # than once per commit so small commits stay cheap. About 40 seconds.
+    # Through the wrapper because `sh` has no nvm function and would run the
+    # suite on whatever Node is first on PATH; see the wrapper's header.
+    typecheck:
+      run: sh scripts/nvmrc-node.sh npm run typecheck
+    unit:
+      run: sh scripts/nvmrc-node.sh npm test

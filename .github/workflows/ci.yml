@@ -13,12 +13,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The commit-message check below walks every commit the pull
+          # request adds, which needs the base branch reachable.
+          fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.16.0
           cache: npm
       - run: npm ci
       - run: npm run check
+      - run: npm run check:prose
+      # The same script lefthook runs at commit-msg, over the commits a
+      # `--no-verify` could have let through. A merge commit's subject is
+      # exempt and its body is still checked, so the PR merge ref passes.
+      # Dependabot is skipped: its bodies embed upstream release notes, which
+      # carry whatever characters the upstream maintainers typed. Keyed on who
+      # opened the PR, not `github.actor`, which becomes the maintainer the
+      # moment they push a fix-up onto the Dependabot branch.
+      - if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: node scripts/check-commit-message.mjs --range "origin/$BASE_REF..HEAD"
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
@@ -65,10 +81,8 @@ jobs:
   # shared stack, because global-setup.ts signs in as the seeded users to
   # capture their storage state.
   #
-  # Advisory until it is registered. The check to add to the `main` ruleset
-  # is `accessibility-smoke / suite`, for the same `<caller job> / <called job>`
-  # reason as smoke above. Register it after this job has reported on a pull
-  # request, which the ruleset picker needs before it offers the name.
+  # Required. Registered on the `main` ruleset as `accessibility-smoke / suite`,
+  # for the same `<caller job> / <called job>` reason as smoke above.
   accessibility-smoke:
     uses: ./.github/workflows/stack-suite.yml
     with:

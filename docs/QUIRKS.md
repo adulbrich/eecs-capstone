@@ -29,12 +29,12 @@ The stack is fast-moving. TanStack Start, TanStack Router, Better Auth and Drizz
 TanStack Start's bundler transform recognizes `createServerFn(...).handler(fn)` ONLY when it appears as the direct initializer of a top-level exported const. Calls wrapped in factory functions are not recognized, the handler body is shipped to the browser intact, and any imports it references (like `db`, `pg`, `drizzle`) end up in the client bundle. Symptom: `ReferenceError: Buffer is not defined`.
 
 ```ts
-// ✅ Recognized: stripped on client, RPC stub remains.
+// Recognized: stripped on client, RPC stub remains.
 export const createProject = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => schema.parse(d))
   .handler(async ({ data }) => { /* server work */ });
 
-// ❌ NOT recognized: ships to the browser, drags db into the client bundle.
+// NOT recognized: ships to the browser, drags db into the client bundle.
 function makeTransition(target: Status) {
   return createServerFn({ method: "POST" })
     .handler(async ({ data }) => { /* never stripped */ });

@@ -44,7 +44,7 @@ type SeedUser = {
 };
 
 const USERS = {
-  // Original dev accounts — kept for backwards compatibility.
+  // Original dev accounts, kept for backwards compatibility.
   student: {
     email: "user@example.com",
     name: "Dev User",
@@ -68,14 +68,14 @@ const USERS = {
     email: "grace.kim@oregonstate.edu",
     name: "Dr. Grace Kim",
     role: "instructor",
-    affiliation: "OSU School of EECS — Robotics & Vision Lab",
+    affiliation: "OSU School of EECS, Robotics & Vision Lab",
     linkedin: "https://www.linkedin.com/in/grace-kim-eecs",
   },
   facultyAlvarez: {
     email: "miguel.alvarez@oregonstate.edu",
     name: "Dr. Miguel Alvarez",
     role: "instructor",
-    affiliation: "OSU School of EECS — Human-Computer Interaction",
+    affiliation: "OSU School of EECS, Human-Computer Interaction",
     linkedin: "https://www.linkedin.com/in/miguel-alvarez-hci",
   },
   // Industry sponsors (external proposers, plain users).
@@ -83,21 +83,21 @@ const USERS = {
     email: "dana.whitfield@acmerobotics.com",
     name: "Dana Whitfield",
     role: "user",
-    affiliation: "Acme Robotics — Warehouse Automation",
+    affiliation: "Acme Robotics, Warehouse Automation",
     linkedin: "https://www.linkedin.com/in/dana-whitfield",
   },
   sponsorNorthstar: {
     email: "priya.natarajan@northstar.io",
     name: "Priya Natarajan",
     role: "user",
-    affiliation: "NorthStar Analytics — Platform Engineering",
+    affiliation: "NorthStar Analytics, Platform Engineering",
     linkedin: "https://www.linkedin.com/in/priya-natarajan",
   },
   sponsorVitalink: {
     email: "evan.cho@vitalink.health",
     name: "Evan Cho",
     role: "user",
-    affiliation: "VitaLink Health — Connected Devices",
+    affiliation: "VitaLink Health, Connected Devices",
     linkedin: "https://www.linkedin.com/in/evan-cho-vitalink",
   },
   // Student-led proposers.
@@ -641,7 +641,7 @@ async function main() {
         "Quad-core Arm Cortex-A76 single-board computer with 8GB RAM. Includes official 27W USB-C PSU, active cooler, and a 64GB microSD card preloaded with Raspberry Pi OS.",
       categoryNames: ["Single-Board Computer"],
       serial: "RPI5-8G-0001",
-      location: "Kelley Engineering — Capstone Lab, Cabinet A, Bin 1",
+      location: "Kelley Engineering, Capstone Lab, Cabinet A, Bin 1",
       notes:
         "Heavily requested. Return with the original PSU and cooler attached.",
       imageUrl:
@@ -656,7 +656,7 @@ async function main() {
         "Edge-AI dev kit delivering up to 40 TOPS for on-device inference. Includes carrier board, power supply, and a preimaged microSD with JetPack.",
       categoryNames: ["Single-Board Computer", "AI Accelerator"],
       serial: "JETSON-ORIN-N-0001",
-      location: "Kelley Engineering — Capstone Lab, Cabinet A, Bin 2",
+      location: "Kelley Engineering, Capstone Lab, Cabinet A, Bin 2",
       notes:
         "Reserved for edge-AI capstones. Pair with the Coral accelerator for comparison benchmarks.",
       imageUrl:
@@ -671,7 +671,7 @@ async function main() {
         "Standalone mixed-reality headset with color passthrough, two Touch Plus controllers, charging cable, and head strap. Developer mode enabled.",
       categoryNames: ["VR / AR Headset"],
       serial: "QUEST3-128-0007",
-      location: "Kelley Engineering — HCI Lab, Locked Cabinet",
+      location: "Kelley Engineering, HCI Lab, Locked Cabinet",
       notes:
         "Wipe guest data and sanitize the facial interface before returning.",
       imageUrl:
@@ -689,7 +689,7 @@ async function main() {
         "Tethered PC-VR headset with 5K combined resolution, two base stations, and two controllers. Requires a VR-capable workstation.",
       categoryNames: ["VR / AR Headset"],
       serial: "VIVEPRO2-0002",
-      location: "Kelley Engineering — HCI Lab, Shelf 3",
+      location: "Kelley Engineering, HCI Lab, Shelf 3",
       notes:
         "Left controller tracking is intermittent; out for repair evaluation.",
       imageUrl:
@@ -704,7 +704,7 @@ async function main() {
         "Renesas RA4M1 microcontroller board with onboard ESP32-S3 Wi-Fi/Bluetooth and a 12x8 LED matrix. Includes USB-C cable.",
       categoryNames: ["Microcontroller"],
       serial: "ARD-UNOR4W-0014",
-      location: "Kelley Engineering — Capstone Lab, Parts Drawer 4",
+      location: "Kelley Engineering, Capstone Lab, Parts Drawer 4",
       notes: "Several units available; good for IoT prototyping.",
       imageUrl:
         "https://images.unsplash.com/photo-1553406830-ef2513450d76?auto=format&fit=crop&w=1200&q=60",
@@ -718,7 +718,7 @@ async function main() {
         "Dual-core Xtensa LX7 dev board with Wi-Fi and Bluetooth LE, USB-C, and 8MB flash. Ideal for low-cost connected sensors.",
       categoryNames: ["Microcontroller"],
       serial: "ESP32S3-DK-0031",
-      location: "Kelley Engineering — Capstone Lab, Parts Drawer 5",
+      location: "Kelley Engineering, Capstone Lab, Parts Drawer 5",
       notes: "Bulk stock; no need to reserve more than two per team.",
       imageUrl:
         "https://images.unsplash.com/photo-1608564697071-ddf911d81370?auto=format&fit=crop&w=1200&q=60",
@@ -732,7 +732,7 @@ async function main() {
         "Stereo depth camera with an integrated IMU for robotics and 3D scanning. Includes USB-C cable and mounting tripod adapter.",
       categoryNames: ["Sensor"],
       serial: "RS-D435I-0005",
-      location: "Kelley Engineering — Robotics & Vision Lab, Bin 7",
+      location: "Kelley Engineering, Robotics & Vision Lab, Bin 7",
       notes: "Reserved for the warehouse robot fleet team's perception work.",
       imageUrl:
         "https://images.unsplash.com/photo-1527430253228-e93688616381?auto=format&fit=crop&w=1200&q=60",
@@ -746,7 +746,7 @@ async function main() {
         "Edge TPU coprocessor over USB-C providing fast, low-power TensorFlow Lite inference. Pairs with SBCs for accelerated on-device ML.",
       categoryNames: ["AI Accelerator", "Peripheral"],
       serial: "CORAL-USB-0009",
-      location: "Kelley Engineering — Capstone Lab, Cabinet A, Bin 3",
+      location: "Kelley Engineering, Capstone Lab, Cabinet A, Bin 3",
       notes: "Use with the Edge AI benchmarking project.",
       imageUrl:
         "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=60",
@@ -760,7 +760,7 @@ async function main() {
         "Lightweight programmable quadcopter with a Python/Scratch SDK, 720p camera, and swarm support. Includes three batteries and a charging hub.",
       categoryNames: ["Drone"],
       serial: "TELLO-EDU-0003",
-      location: "Kelley Engineering — Capstone Lab, Cabinet B (foam case)",
+      location: "Kelley Engineering, Capstone Lab, Cabinet B (foam case)",
       notes:
         "Indoor flight only without instructor approval. Inspect props before each checkout.",
       imageUrl:
@@ -775,7 +775,7 @@ async function main() {
         "4K UHD webcam with HDR and a wide field of view. Useful for computer-vision capture, demos, and remote Expo presentations. Includes clip mount and USB-C cable.",
       categoryNames: ["Peripheral"],
       serial: "BRIO-4K-0021",
-      location: "Kelley Engineering — Capstone Lab, Cabinet A, Bin 4",
+      location: "Kelley Engineering, Capstone Lab, Cabinet A, Bin 4",
       notes: "Checked out for the camera-trap classifier team's demo rig.",
       imageUrl:
         "https://images.unsplash.com/photo-1587826080692-f439cd0b70da?auto=format&fit=crop&w=1200&q=60",

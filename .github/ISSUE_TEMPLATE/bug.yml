@@ -1,0 +1,53 @@
+name: Bug
+description: Something the app does that it should not. Written so an agent can take it without a triage session.
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Describe behavior, not implementation. File paths are welcome where
+        they are the grep target (this repo is organized around them), line
+        numbers are not. See `docs/agents/issue-tracker.md`.
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior
+      description: What happens, and the steps that get there. Who was signed in, and as which role.
+    validations:
+      required: true
+  - type: textarea
+    id: desired
+    attributes:
+      label: Desired behavior
+      description: What should happen instead, including the edge cases and error states.
+    validations:
+      required: true
+  - type: textarea
+    id: interfaces
+    attributes:
+      label: Key interfaces
+      description: The types, server functions, seams or config shapes involved, and what changes about each. Names, not line numbers.
+  - type: textarea
+    id: fields
+    attributes:
+      label: Fields and who sees them
+      description: >-
+        Every issue that touches data says which fields are public, who may
+        see the rest, and who may edit them. Leave empty only when no field
+        changes hands.
+      value: |
+        | Field | Visible to | Editable by |
+        | --- | --- | --- |
+        |  |  |  |
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Each one independently checkable.
+      value: |
+        - [ ]
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: The adjacent thing that is not this issue.

@@ -44,14 +44,14 @@ Give this stack its own host ports in `.env` (docker compose reads `.env`, and
 **not** `.env.local`), then mirror them in `.env.local`:
 
 ```bash
-# .env — read by docker compose
+# .env, read by docker compose
 POSTGRES_PORT=5433
 STORAGE_PORT=9100
 STORAGE_CONSOLE_PORT=9101
 ```
 
 ```bash
-# .env.local — read by the app and the scripts
+# .env.local, read by the app and the scripts
 DATABASE_URL="postgresql://postgres:postgres@localhost:5433/eecs_capstone"
 S3_ENDPOINT=http://localhost:9100
 VITE_STORAGE_PUBLIC_BASE=http://localhost:9100/cs-capstone
