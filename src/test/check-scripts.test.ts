@@ -11,12 +11,45 @@ import { describe, expect, it } from "vitest";
  * contract every caller reads, and `scripts/` sits outside Biome and the
  * TypeScript project.
  */
-function run(script: string, args: string[], stdin?: string) {
-  const result = spawnSync(process.execPath, [`scripts/${script}`, ...args], {
-    encoding: "utf8",
-    input: stdin,
-  });
+/**
+ * A git hook exports GIT_DIR to everything it runs, and pre-push runs this
+ * suite, so every spawn here gets an environment without the GIT_* keys
+ * (docs/QUIRKS.md, "A test that spawns git under a hook").
+ */
+const env = Object.fromEntries(
+  Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_"))
+);
+
+function run(
+  script: string,
+  args: string[],
+  stdin?: string,
+  cwd = process.cwd()
+) {
+  const result = spawnSync(
+    process.execPath,
+    [`${process.cwd()}/scripts/${script}`, ...args],
+    { cwd, encoding: "utf8", env, input: stdin }
+  );
   return { status: result.status, stderr: result.stderr };
+}
+
+/**
+ * A throwaway repository with the given commit subjects, oldest first.
+ */
+function repoWith(subjects: string[]) {
+  const dir = mkdtempSync(join(tmpdir(), "range-"));
+  const git = (...args: string[]) =>
+    spawnSync("git", ["-C", dir, ...args], { encoding: "utf8", env });
+  git("init", "-q", "-b", "main");
+  git("config", "user.email", "t@example.com");
+  git("config", "user.name", "t");
+  for (const [index, subject] of subjects.entries()) {
+    writeFileSync(join(dir, `f${index}`), subject);
+    git("add", `f${index}`);
+    git("commit", "-q", "-m", subject);
+  }
+  return dir;
 }
 
 const commit = (message: string) =>
@@ -52,8 +85,18 @@ describe("check-commit-message", () => {
     expect(commit("wip(x): thing").status).toBe(1);
   });
 
-  it("rejects an uppercase subject after the colon", () => {
+  it("rejects an uppercase subject after the colon, and only that", () => {
     expect(commit("fix(x): Stop it").status).toBe(1);
+    expect(commit("fix(x): 404 page gets a body").status).toBe(0);
+    expect(commit('fix(x): "foo" is not a status').status).toBe(0);
+  });
+
+  it("accepts Dependabot's capitalized Bump on a deps scope", () => {
+    expect(
+      commit("chore(deps): Bump actions/checkout from 6 to 7").status
+    ).toBe(0);
+    expect(commit("build(deps-dev): Bump vitest from 3 to 4").status).toBe(0);
+    expect(commit("fix(x): Bump nothing").status).toBe(1);
   });
 
   it("rejects a session link anywhere, and names it first", () => {
@@ -69,22 +112,48 @@ describe("check-commit-message", () => {
     expect(commit("fix(x): y \u2705\n").status).toBe(1);
   });
 
-  it("ignores git's comment lines and everything after the scissors", () => {
-    const message = [
-      "fix(x): y",
-      "# Please enter the commit message \u2014 lines starting with # are ignored",
-      "# ------------------------ >8 ------------------------",
-      "diff --git a/x b/x",
-      "+ \u2014 in the diff",
-    ].join("\n");
-    expect(commit(message).status).toBe(0);
+  it("ignores git's comment lines and the scissors block in a message file", () => {
+    const dir = mkdtempSync(join(tmpdir(), "msg-"));
+    const file = join(dir, "COMMIT_EDITMSG");
+    writeFileSync(
+      file,
+      [
+        "fix(x): y",
+        "# Please enter the commit message \u2014 lines starting with # are ignored",
+        "# ------------------------ >8 ------------------------",
+        "diff --git a/x b/x",
+        "+ \u2014 in the diff",
+      ].join("\n")
+    );
+    expect(run("check-commit-message.mjs", [file]).status).toBe(0);
   });
 
-  it("checks every commit in a range", () => {
-    const result = run("check-commit-message.mjs", ["--range", "HEAD~1..HEAD"]);
-    // The most recent commit on any branch of this repo passes the rule, so
-    // this exercises the range path rather than the rule.
-    expect([0, 1]).toContain(result.status);
+  it("checks a markdown heading in a PR body, which is not a comment", () => {
+    expect(commit("fix(x): y\n\n## Docs \u2014 none\n").status).toBe(1);
+    expect(commit("fix(x): y\n\n## Docs\n\nnone\n").status).toBe(0);
+  });
+
+  it("checks every commit in a range and names the one that fails", () => {
+    const bad = repoWith(["chore: seed", "Add the thing", "fix(x): fine"]);
+    const result = run(
+      "check-commit-message.mjs",
+      ["--range", "HEAD~2..HEAD"],
+      undefined,
+      bad
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Add the thing");
+    expect(result.stderr).not.toContain("fix(x): fine");
+
+    const good = repoWith(["chore: seed", "fix(x): fine"]);
+    expect(
+      run(
+        "check-commit-message.mjs",
+        ["--range", "HEAD~1..HEAD"],
+        undefined,
+        good
+      ).status
+    ).toBe(0);
   });
 });
 
@@ -141,6 +210,8 @@ describe("check-prose", () => {
     expect(prose("\u2705 done").status).toBe(1);
     expect(prose("\u274C no").status).toBe(1);
     expect(prose("\u{1F7E1} partial").status).toBe(1);
+    expect(prose("\u{23F0} alarm").status).toBe(1);
+    expect(prose("\u{2139}\u{FE0F} info").status).toBe(1);
   });
 
   it("does not count the harness footer on a PR body", () => {

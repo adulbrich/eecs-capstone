@@ -24,6 +24,11 @@ body:
     validations:
       required: true
   - type: textarea
+    id: interfaces
+    attributes:
+      label: Key interfaces
+      description: The types, server functions, seams or config shapes involved, and what changes about each. Names, not line numbers.
+  - type: textarea
     id: fields
     attributes:
       label: Fields and who sees them

@@ -25,8 +25,8 @@ jobs:
       - run: npm run check
       - run: npm run check:prose
       # The same script lefthook runs at commit-msg, over the commits a
-      # `--no-verify` could have let through. `--range` exempts merge commits,
-      # so the PR merge ref itself passes.
+      # `--no-verify` could have let through. `--range` skips merge commits,
+      # so the PR merge ref itself is not checked.
       - if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}

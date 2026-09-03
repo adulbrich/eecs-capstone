@@ -1,6 +1,8 @@
 /**
- * The prose rule from AGENTS.md, as a check: no emdash and no emoji in
- * anything tracked, be it docs, comments, or string literals.
+ * The two characters of the prose rule in AGENTS.md, as a check: no emdash
+ * and no emoji in anything tracked, be it docs, comments, or string literals.
+ * The rule's third case, a `--` standing in for a sentence dash, is not
+ * checked here: `--no-verify` and every other flag would trip it.
  *
  * One implementation, three callers. lefthook runs it on staged files at
  * pre-commit, CI runs it over the whole tree (`--all`), and the Claude Code
@@ -14,7 +16,6 @@
  *
  * Usage:
  *   node scripts/check-prose.mjs <file>...     check the named files
- *   node scripts/check-prose.mjs --staged      check `git diff --cached`
  *   node scripts/check-prose.mjs --all         check every tracked text file
  *   node scripts/check-prose.mjs --text <str>  check a string (exit 1 on a hit)
  *   node scripts/check-prose.mjs --stdin       check stdin as one string
@@ -25,13 +26,17 @@ import { readFileSync } from "node:fs";
 const EMDASH = "\u2014";
 
 /**
- * Pictographs, symbols and dingbats, the ranges where emoji live. U+2600 to
- * U+27BF covers the check and cross marks (U+2705, U+274C) and the warning
- * sign; the astral range covers everything from the emoticons block up.
- * Arrows (U+2190 to U+21FF) and box drawing are deliberately not in here:
- * the rule is about emoji, and a diagram in a doc is not one.
+ * The blocks emoji are drawn from: the astral range from Mahjong tiles up
+ * through the extended pictographs, Miscellaneous Symbols and Dingbats (the
+ * check and cross marks, the warning sign, stars), Miscellaneous Technical
+ * (hourglass, alarm clock, the media buttons), the play and reverse
+ * triangles, the information source, and the few squares and circles from
+ * Miscellaneous Symbols and Arrows that keyboards offer as emoji. Arrows
+ * (U+2190 to U+21FF) and box drawing are deliberately not in here: the rule
+ * is about emoji, and a diagram in a doc is not one.
  */
-const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B1B}\u{2B1C}\u{2B50}\u{2B55}]/u;
+const EMOJI =
+  /[\u{1F000}-\u{1FAFF}\u{2300}-\u{23FF}\u{2600}-\u{27BF}\u{2139}\u{25B6}\u{25C0}\u{2B05}-\u{2B07}\u{2B1B}\u{2B1C}\u{2B50}\u{2B55}]/u;
 
 /**
  * Extensions that are prose or source. Anything else `git ls-files` reports
@@ -113,7 +118,7 @@ export function isCheckedPath(path) {
   return TEXT_EXTENSIONS.has(path.slice(dot + 1));
 }
 
-function gitLines(args) {
+export function gitLines(args) {
   return execFileSync("git", args, { encoding: "utf8" })
     .split("\n")
     .filter((line) => line.length > 0);
@@ -155,12 +160,6 @@ function main(argv) {
     const violations = findProseViolations(text);
     failed = violations.length > 0;
     report("text", violations);
-  } else if (mode === "--staged") {
-    failed = checkFiles(
-      gitLines(["diff", "--cached", "--name-only", "--diff-filter=ACMR"]).filter(
-        isCheckedPath
-      )
-    );
   } else if (mode === "--all") {
     failed = checkFiles(gitLines(["ls-files"]).filter(isCheckedPath));
   } else {
