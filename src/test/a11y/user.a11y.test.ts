@@ -123,10 +123,9 @@ test("@smoke my items, each tab panel", async ({ page }) => {
 test("my items opens by saying what needs attention", async ({ page }) => {
   await page.goto("/my/items");
   await waitForHydration(page);
-  // The dev seed gives this user overdue items, so the region renders with
-  // its counts and its link into Active; the fixture cart from global-setup
-  // makes the Borrow list tab show the assembled request rather than the
-  // empty state.
+  // global-setup gives this user an overdue hold, so the region renders with
+  // its counts and its link into Active, and a borrow-list item, so the
+  // Borrow list tab shows the assembled request rather than the empty state.
   const region = page.getByRole("region", { name: "Needs your attention" });
   await expect(region).toBeVisible();
   await expect(region.getByRole("link", { name: /Active/ })).toBeVisible();

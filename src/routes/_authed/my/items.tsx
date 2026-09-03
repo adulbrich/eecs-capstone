@@ -117,7 +117,10 @@ function canCancel(row: ActiveRow): boolean {
  * flat rows lacked (#64). Sorted by the deadline by default, soonest first,
  * which is the order the server already returns.
  */
-function activeColumns(onCancel: (requestItemId: string) => void) {
+function activeColumns(
+  busy: boolean,
+  onCancel: (requestItemId: string) => void
+) {
   return defineAdminColumns<ActiveRow>()([
     {
       accessorFn: (row) => activeName(row),
@@ -162,6 +165,7 @@ function activeColumns(onCancel: (requestItemId: string) => void) {
         const requestItemId = entry.line.id;
         return (
           <Button
+            disabled={busy}
             onClick={() => onCancel(requestItemId)}
             size="sm"
             variant="outline"
@@ -207,9 +211,7 @@ const HISTORY_COLUMNS = defineAdminColumns<HistoryRow>()([
   },
   {
     accessorFn: (row) =>
-      (row.collectedBy
-        ? (row.collectedBy.name ?? row.collectedBy.email)
-        : undefined) ?? undefined,
+      row.collectedBy?.name ?? row.collectedBy?.email ?? undefined,
     cell: ({ row }) =>
       row.original.collectedBy
         ? (row.original.collectedBy.name ?? row.original.collectedBy.email)
@@ -238,8 +240,8 @@ function MyItems() {
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
 
-  // Stable across renders (docs/QUIRKS.md, useEffect exhaustive deps), so the
-  // Actions column built from it below is built once rather than per render.
+  // Memoised so the Actions column below, which closes over it, is rebuilt
+  // only when `busy` flips rather than on every render.
   const run = useCallback(
     async (action: () => Promise<void>) => {
       setBusy(true);
@@ -264,12 +266,12 @@ function MyItems() {
 
   const columns = useMemo(
     () =>
-      activeColumns((requestItemId) =>
+      activeColumns(busy, (requestItemId) =>
         run(async () => {
           await cancelRequestItem({ data: { requestItemId, note: null } });
         })
       ),
-    [run]
+    [busy, run]
   );
   const active = useAdminTable({
     columns,
@@ -287,18 +289,16 @@ function MyItems() {
   });
 
   return (
-    <div className="px-4 py-6 md:p-8">
-      <div className="mx-auto max-w-4xl">
-        <h1 className="font-semibold text-2xl">My Items</h1>
-        <NeedsAttention entries={data.active} />
-      </div>
+    <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
+      <h1 className="font-semibold text-2xl">My Items</h1>
+      <NeedsAttention entries={data.active} />
       {/* Manual activation: selecting a tab pushes a navigation and rewrites
           the URL, so arrowing must only move focus. Under automatic mode,
           arrowing across the strip fires onValueChange (and a navigation) on
           every keypress. */}
       <Tabs
         activationMode="manual"
-        className="mx-auto mt-4 max-w-4xl"
+        className="mt-4"
         onValueChange={(next) =>
           navigate({ search: () => ({ tab: next as Tab }) })
         }
@@ -311,7 +311,9 @@ function MyItems() {
           <TabsTrigger value="active">
             Active ({data.active.length})
           </TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
+          <TabsTrigger value="history">
+            History ({data.history.length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="cart">
@@ -350,7 +352,7 @@ function MyItems() {
               <AdminDataTable
                 caption="Active items"
                 data={data.active}
-                emptyMessage="Nothing active."
+                emptyMessage="Nothing is requested, reserved or checked out to you right now."
                 getRowId={(row) =>
                   row.kind === "hold" ? `hold:${row.item.id}` : row.line.id
                 }
@@ -371,7 +373,7 @@ function MyItems() {
               <AdminDataTable
                 caption="History"
                 data={data.history}
-                emptyMessage="No history yet."
+                emptyMessage="Closed requests, returned, rejected or cancelled, land here."
                 getRowId={(row) => row.line.id}
                 {...history.tableProps}
               />

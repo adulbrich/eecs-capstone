@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { EmptyState } from "./empty-state";
 import { InventoryStatusBadge } from "./inventory-status-badge";
 import { Button } from "./ui/button";
 import {
@@ -38,14 +39,12 @@ export function BorrowListPanel({
   const [note, setNote] = useState("");
   if (rows.length === 0) {
     return (
-      <p className="mt-8 text-center text-muted-foreground text-sm">
+      <EmptyState>
         Your borrow list is empty. Browse the{" "}
-        <Link className="text-brand hover:underline" to="/inventory">
-          inventory
-        </Link>
-        , add the items you need, then submit them here as one request. Staff
-        approve each line and tell you when to pick it up.
-      </p>
+        <Link to="/inventory">inventory</Link>, add the items you need, then
+        submit them here as one request. Staff approve each line and tell you
+        when to pick it up.
+      </EmptyState>
     );
   }
   const count = rows.length;
