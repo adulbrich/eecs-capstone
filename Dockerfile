@@ -33,9 +33,10 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build /app/.output ./.output
 # Migration assets and ops scripts, used by one-off ECS tasks
-# (`node scripts/migrate.mjs`, `node scripts/promote-admin.mjs`).
+# (`node scripts/migrate.mjs`, `node scripts/promote-admin.mjs`,
+# `node scripts/image-url-legacy.mjs`).
 COPY drizzle ./drizzle
-COPY scripts/migrate.mjs scripts/promote-admin.mjs ./scripts/
+COPY scripts/migrate.mjs scripts/promote-admin.mjs scripts/image-url-legacy.mjs ./scripts/
 
 # RDS requires TLS (rds.force_ssl); DATABASE_URL points sslrootcert at this
 # bundle so pg can verify the server cert (sslmode=verify-full) instead of

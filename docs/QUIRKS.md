@@ -1332,7 +1332,7 @@ Three things about the shape, each of which is load-bearing:
   value unchanged by design. Checking content would make every one of those
   rows uneditable. Saving a legacy value back unchanged is not a change, so
   nothing checks it. The consequence, stated rather than discovered: a row that
-  already holds a bad value keeps it. Remediating those is a separate job.
+  already holds a bad value keeps it. Remediating those is a separate job: `scripts/image-url-legacy.mjs` reports them and nulls the ids an operator names, see "Find and clear image URLs the app did not mint" in `DEPLOYMENT.md` (#165).
 - **Both create paths refuse any `imageUrl` at all**, through
   `assertNoImageKeyOnCreate` in `src/lib/image-upload-policy.ts`, because the
   key is `<domain>/<id>/` and the id does not exist until the insert does.

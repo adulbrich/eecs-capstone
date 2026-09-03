@@ -48,11 +48,12 @@ const PLATFORM_VARS = new Map([
 ]);
 
 /**
- * Command-line arguments for one-off scripts, every one written
- * `process.env.X ?? process.argv[2]`. They parameterise an invocation rather
- * than configure the app, which is why they are not in `.env.example`.
+ * Command-line arguments for one-off scripts: what to act on, and the
+ * confirmation that turns a report into a write. They parameterise an
+ * invocation rather than configure the app, which is why they are not in
+ * `.env.example`.
  */
-const SCRIPT_ARGUMENTS = new Set(["ADMIN_EMAIL"]);
+const SCRIPT_ARGUMENTS = new Set(["ADMIN_EMAIL", "CONFIRM", "TARGET_IDS"]);
 
 /** Documented, but never read by this codebase, each for a stated reason. */
 const NOT_READ_HERE = new Map([
