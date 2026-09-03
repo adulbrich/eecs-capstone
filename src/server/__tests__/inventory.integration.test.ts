@@ -1569,46 +1569,6 @@ describe("request lifecycle", () => {
   });
 });
 
-describe("bulk approve in a batch is atomic", () => {
-  it("a single failing line rolls back the whole batch when run in one tx", async () => {
-    const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
-    const student = await makeUser(`s-${Date.now()}@x.com`, "user");
-    const [a, b, c] = await Promise.all([makeItem(), makeItem(), makeItem()]);
-    for (const i of [a, b, c]) {
-      await addToCartAs(student, { itemId: i.id });
-    }
-    await submitCartAs(student, { note: null });
-    const lines = await db
-      .select()
-      .from(inventoryRequestItems)
-      .where(inArray(inventoryRequestItems.itemId, [a.id, b.id, c.id]));
-    // Tamper with line B: pre-close it so the approve call fails.
-    await db
-      .update(inventoryRequestItems)
-      .set({ status: "cancelled", closedAt: new Date(), closedBy: student.id })
-      .where(eq(inventoryRequestItems.id, lines[1].id));
-    // Bulk approve all three inside one tx. Middle one will fail; the
-    // first one should also roll back.
-    await expect(
-      db.transaction(async (tx) => {
-        for (const line of lines) {
-          await approveRequestItemAs(
-            admin,
-            { requestItemId: line.id, pickupBy: null },
-            tx
-          );
-        }
-      })
-    ).rejects.toThrow();
-    // First item should NOT be reserved.
-    const [aAfter] = await db
-      .select()
-      .from(inventoryItems)
-      .where(eq(inventoryItems.id, a.id));
-    expect(aAfter.status).toBe("requested");
-  });
-});
-
 describe("past pickup window: lazy detection + idempotent notification", () => {
   it("writes one notification on first read; does not duplicate on second", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");

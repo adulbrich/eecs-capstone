@@ -164,8 +164,10 @@ export async function submitCartAs(
     // transaction already owns is free, which is why sharing the writer costs
     // nothing here.
     //
-    // No notification is emitted: the requested arm of maybeNotify has no
-    // case, so self-submit stays silent as it always has.
+    // No notification is emitted. `notificationFor` in
+    // `src/lib/inventory-notifications.ts` reaches its status switch with
+    // this student as the recipient, and that switch has no `requested` case,
+    // so self-submit stays silent as it always has.
     const { transitionItem } = await import("./inventory-transitions");
     for (const line of lines) {
       await transitionItem(
