@@ -9,7 +9,7 @@
  * is resolved from `cwd` rather than assumed to be it.
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { relative } from "node:path";
 
 /**
@@ -65,9 +65,13 @@ export function repoRelative(root, path) {
 
 /**
  * The repo's own rule scripts, loaded from the session's checkout so a
- * worktree checks against the code it carries.
+ * worktree checks against the code it carries. A session outside this repo
+ * has no scripts and nothing to enforce, so the hook lets the call through.
  */
 export async function loadRuleScripts(root) {
+  if (!existsSync(`${root}/scripts/check-prose.mjs`)) {
+    process.exit(0);
+  }
   const [prose, commit] = await Promise.all([
     import(`${root}/scripts/check-prose.mjs`),
     import(`${root}/scripts/check-commit-message.mjs`),

@@ -5,7 +5,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { cleanEnv, currentBranch, readInput } from "./lib.mjs";
+import { cleanEnv, currentBranch, readInput, repoRoot } from "./lib.mjs";
 
 function run(file, args, cwd) {
   try {
@@ -43,7 +43,7 @@ lines.push(
 
 let wanted = "";
 try {
-  wanted = readFileSync(`${cwd}/.nvmrc`, "utf8").trim();
+  wanted = readFileSync(`${repoRoot(cwd)}/.nvmrc`, "utf8").trim();
 } catch {
   // No .nvmrc in this checkout.
 }
