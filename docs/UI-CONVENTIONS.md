@@ -205,8 +205,9 @@ long-form page (`projects/$projectId.tsx`), and `max-w-md` on two narrow-content
 pages (`profile.tsx`, `admin/categories/$categoryId.tsx`) plus `max-w-sm` on
 `verify-email.tsx`. Of the seven `max-w-4xl` pages, three hold a single-column
 card list (`projects/index.tsx`, `inventory/index.tsx`, `my/projects.tsx`),
-`my/items.tsx` holds an attention region and three tab panels of tables, all
-bounded to the title width since a borrower's list is short, `my/bookmarks.tsx`
+`my/items.tsx` holds an attention region, a borrow-list card and two tab
+panels of tables, all bounded to the title width since a borrower's list is
+short, `my/bookmarks.tsx`
 bounds only its title, `inventory/$itemId.tsx` holds a two-column detail
 layout, and `admin/analytics.tsx` holds a two-column grid of figure cards.
 `projects/index.tsx` in

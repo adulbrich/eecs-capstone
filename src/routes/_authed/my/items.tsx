@@ -12,7 +12,6 @@ import {
   defineAdminColumns,
 } from "#/components/admin-data-table";
 import { BorrowListPanel } from "#/components/borrow-list-panel";
-import { EmptyState } from "#/components/empty-state";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { LocalTime } from "#/components/local-time";
 import { NeedsAttention } from "#/components/my-items-attention";
@@ -341,45 +340,30 @@ function MyItems() {
           />
         </TabsContent>
 
+        {/* The table renders its own EmptyState from `emptyMessage`, and
+            ListCount renders nothing at zero, so neither panel branches. */}
         <TabsContent value="active">
-          {data.active.length === 0 ? (
-            <EmptyState>
-              Nothing is requested, reserved or checked out to you right now.
-              Submit a borrow list and it shows up here.
-            </EmptyState>
-          ) : (
-            <>
-              <AdminDataTable
-                caption="Active items"
-                data={data.active}
-                emptyMessage="Nothing is requested, reserved or checked out to you right now."
-                getRowId={(row) =>
-                  row.kind === "hold" ? `hold:${row.item.id}` : row.line.id
-                }
-                {...active.tableProps}
-              />
-              <ListCount count={data.active.length} />
-            </>
-          )}
+          <AdminDataTable
+            caption="Active items"
+            data={data.active}
+            emptyMessage="Nothing is requested, reserved or checked out to you right now. Submit a borrow list and it shows up here."
+            getRowId={(row) =>
+              row.kind === "hold" ? `hold:${row.item.id}` : row.line.id
+            }
+            {...active.tableProps}
+          />
+          <ListCount count={data.active.length} />
         </TabsContent>
 
         <TabsContent value="history">
-          {data.history.length === 0 ? (
-            <EmptyState>
-              Closed requests, returned, rejected or cancelled, land here.
-            </EmptyState>
-          ) : (
-            <>
-              <AdminDataTable
-                caption="History"
-                data={data.history}
-                emptyMessage="Closed requests, returned, rejected or cancelled, land here."
-                getRowId={(row) => row.line.id}
-                {...history.tableProps}
-              />
-              <ListCount count={data.history.length} />
-            </>
-          )}
+          <AdminDataTable
+            caption="History"
+            data={data.history}
+            emptyMessage="Closed requests, returned, rejected or cancelled, land here."
+            getRowId={(row) => row.line.id}
+            {...history.tableProps}
+          />
+          <ListCount count={data.history.length} />
         </TabsContent>
       </Tabs>
     </div>
