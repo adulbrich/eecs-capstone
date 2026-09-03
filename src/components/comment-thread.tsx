@@ -249,7 +249,13 @@ function ReplyForm({
     return (
       <Button
         className="mt-2"
-        onClick={() => setOpen(true)}
+        // A fresh draft starts without the error of a cancelled one: Cancel
+        // stays usable while a reply is in flight, and a failure that lands
+        // after it would otherwise surface on the next open.
+        onClick={() => {
+          setError(null);
+          setOpen(true);
+        }}
         size="xs"
         type="button"
         variant="ghost"

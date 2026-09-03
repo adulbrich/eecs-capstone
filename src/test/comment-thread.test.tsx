@@ -223,9 +223,10 @@ describe("CommentThread forms while a post is in flight", () => {
     fireEvent.click(replyForm().getByRole("button", { name: "Post" }));
 
     await waitFor(() => expect(box.disabled).toBe(true));
-    expect(
-      replyForm().getByRole("button", { name: "Post" }).hasAttribute("disabled")
-    ).toBe(true);
+    const post = replyForm().getByRole("button", { name: "Post" });
+    expect(post.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(post);
+    expect(addComment).toHaveBeenCalledTimes(1);
 
     land();
     await waitFor(() =>
@@ -273,5 +274,25 @@ describe("CommentThread forms while a post is in flight", () => {
     const reply = screen.getByPlaceholderText("Reply") as HTMLTextAreaElement;
     expect(reply.value).toBe("reply in progress");
     expect(reply.disabled).toBe(false);
+  });
+
+  it("does not carry a cancelled reply's failure into the next draft", async () => {
+    let failPost: (reason: Error) => void = () => undefined;
+    addComment.mockReturnValue(
+      new Promise((_, reject) => {
+        failPost = reject;
+      })
+    );
+    renderThread([comment({})]);
+    openReplyAndType("doomed reply");
+    fireEvent.click(replyForm().getByRole("button", { name: "Post" }));
+    fireEvent.click(replyForm().getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByPlaceholderText("Reply")).toBeNull();
+
+    failPost(new Error("Forbidden"));
+    await waitFor(() => expect(addComment).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+    expect(screen.queryByText("Forbidden")).toBeNull();
   });
 });
