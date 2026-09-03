@@ -237,9 +237,10 @@ export function StaffProjectPanel({
                 // in styles.css explains: the vivid orange scrapes past on the
                 // card at rest (4.56 light, 4.90 dark) and drops under 4.5 on
                 // the tinted hover background in both modes. The border is
-                // decorative and keeps the vivid orange.
+                // decorative and keeps the vivid orange. The tint has no
+                // Tailwind alias, so it stays a var().
                 pillState =
-                  "cursor-pointer border-2 border-[var(--brand-primary)] text-[var(--brand-primary-dark)] hover:bg-[var(--brand-primary-tint)]";
+                  "cursor-pointer border-2 border-brand text-brand-dark hover:bg-[var(--brand-primary-tint)]";
                 pillTitle = `Move to ${STATUS_LABEL[s]}`;
               } else {
                 pillState =
