@@ -69,9 +69,9 @@ export interface HistoryEntry {
  * account assignment. The address is compared case-insensitively, the way
  * claimProjectsForVerifiedUser and mentorNameSql compare theirs: a walk-in
  * hold that staff typed as Student@Oregonstate.edu belongs to the account at
- * student@oregonstate.edu. The write-time lookup in resolveHold still matches
- * the account exactly, so such a hold stays an address hold until that is
- * folded too (see #245).
+ * student@oregonstate.edu. resolveHold folds the same way at write time, so
+ * this arm now catches holds typed before it did, and holds assigned while no
+ * account existed yet.
  *
  * One predicate, read by /my/items and by account deletion, so the page that
  * shows a person their items and the check that refuses to delete their

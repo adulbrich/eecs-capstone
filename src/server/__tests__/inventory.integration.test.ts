@@ -1957,6 +1957,35 @@ describe("staff-assigned holds in my items", () => {
     expect(active[0].kind).toBe("hold");
   });
 
+  it("links a hold to an existing account whatever case staff typed", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h7-admin-${stamp}@x.com`, "admin");
+    const holder = await makeUser(`cased-${stamp}@x.com`, "user");
+    const item = await makeItem({ name: "Micrometer" });
+
+    // The write-side half of the case above: the account already exists, so
+    // resolveHold has to find it through the capitals rather than store this
+    // as a walk-in beside it (#245).
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: `Cased-${stamp}@X.com`,
+      holderName: "Typed Name",
+      holderProgram: "CS 461",
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const [row] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, item.id));
+    expect(row.currentHolderId).toBe(holder.id);
+    // An account hold stores neither, so the typed pair is dropped instead of
+    // being recorded as a walk-in's name and program.
+    expect(row.currentHolderName).toBeNull();
+    expect(row.currentHolderProgram).toBeNull();
+  });
+
   it("does not match by email when the address is unverified", async () => {
     const stamp = Date.now();
     const admin = await makeUser(`h5-admin-${stamp}@x.com`, "admin");
