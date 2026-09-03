@@ -199,12 +199,24 @@ describe("guard-git", () => {
 
   it("reads a message only from -m or the harness heredoc shape", () => {
     const elsewhere = [
-      "cat <<'EOF' > note.txt",
+      "cat > note.txt <<'EOF'",
       "Add the thing",
       "EOF",
       "git commit -m 'fix(x): y'",
     ].join("\n");
     expect(bash("guard-git", elsewhere).status).toBe(0);
+    const noteThenHarness = [
+      "cat > note.txt <<'EOF'",
+      "fix(x): fine note",
+      "EOF",
+      "git commit -m \"$(cat <<'MSG'",
+      "fix(x): y",
+      "",
+      "Claude-Session: https://claude.ai/code/session/abc",
+      "MSG",
+      ')"',
+    ].join("\n");
+    expect(bash("guard-git", noteThenHarness).status).toBe(2);
     expect(bash("guard-git", 'git commit -m "$(printf fix)"').status).toBe(0);
     expect(
       bash("guard-git", 'git commit -m "fix(x): y" -m "then \u2014 more"')
