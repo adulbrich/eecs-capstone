@@ -4,28 +4,32 @@
  *
  * This is the one place the session-link rule can be enforced: a link in a
  * PR body or an issue comment lands on a public repo and its GitLab mirror,
- * and lefthook never sees `gh` text. A `gh pr create` title is also the
- * squash-merge subject, so it gets the Conventional Commits check.
+ * and lefthook never sees `gh` text. A PR title is also the squash-merge
+ * subject, so `pr create`, `pr edit` and `pr merge --subject` get the
+ * Conventional Commits check.
  *
  * Exit 2 blocks; stderr is the reason the model reads.
  */
-import { deny, loadRuleScripts, readInput } from "./lib.mjs";
+import { deny, loadRuleScripts, readInput, repoRoot } from "./lib.mjs";
+
+const PUBLISHES =
+  /\bgh\s+(?:(?:pr|issue)\s+(?:create|edit|comment|review|close|merge)|release\s+(?:create|edit))\b/;
+const API_WITH_BODY = /\bgh\s+api\b[\s\S]*\bbody\b/;
+const TITLED = /\bgh\s+pr\s+(?:create|edit|merge)\b/;
+const TITLE_FLAG =
+  /(?:^|\s)(?:-t|--title|--subject)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/;
 
 const input = readInput();
 const command = input.tool_input?.command ?? "";
 const cwd = input.cwd ?? process.cwd();
 
-const publishes =
-  /\bgh\s+(?:pr|issue)\s+(?:create|edit|comment|review|close|merge)\b/.test(
-    command
-  ) ||
-  (/\bgh\s+api\b/.test(command) && /\bbody\b/.test(command));
-
-if (!publishes) {
+if (!(PUBLISHES.test(command) || API_WITH_BODY.test(command))) {
   process.exit(0);
 }
 
-const { checkCommitMessage, findProseViolations } = await loadRuleScripts(cwd);
+const { checkCommitMessage, findProseViolations } = await loadRuleScripts(
+  repoRoot(cwd)
+);
 const problems = [];
 
 if (command.includes("claude.ai/code/session")) {
@@ -38,12 +42,8 @@ for (const { line, kind, snippet } of findProseViolations(command)) {
   problems.push(`line ${line} has an ${kind}: ${snippet}`);
 }
 
-const create = /\bgh\s+pr\s+create\b/.test(command);
-const title =
-  /(?:^|\s)(?:-t|--title)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/.exec(
-    command
-  );
-if (create && title) {
+const title = TITLED.test(command) ? TITLE_FLAG.exec(command) : null;
+if (title) {
   for (const problem of checkCommitMessage(title[1] ?? title[2])) {
     if (problem.startsWith("subject")) {
       problems.push(`PR title is the squash-merge subject: ${problem}`);

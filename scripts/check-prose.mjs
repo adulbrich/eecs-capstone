@@ -81,7 +81,7 @@ const EXCLUDED_FILES = new Set(["package-lock.json"]);
  * The one line the harness appends to every PR body and nothing here can
  * change. Stripped before checking so the footer is not what fails the PR.
  */
-const HARNESS_FOOTER = /^\u{1F916} Generated with \[Claude Code\]\(.*\)\s*$/mu;
+const HARNESS_FOOTER = /\u{1F916} Generated with \[Claude Code\]\([^)]*\)/gu;
 
 /**
  * Every hit in `text`, as `{ line, kind, snippet }`. `kind` is `emdash` or
@@ -90,7 +90,7 @@ const HARNESS_FOOTER = /^\u{1F916} Generated with \[Claude Code\]\(.*\)\s*$/mu;
  */
 export function findProseViolations(text) {
   const violations = [];
-  const lines = text.replace(HARNESS_FOOTER, "").split("\n");
+  const lines = text.replaceAll(HARNESS_FOOTER, "").split("\n");
   for (const [index, line] of lines.entries()) {
     if (line.includes(EMDASH)) {
       violations.push({ line: index + 1, kind: "emdash", snippet: line.trim() });

@@ -30,14 +30,10 @@ push, so most of the time a red one is caught before it leaves your machine.
 [`CONTRIBUTING.md`](./CONTRIBUTING.md) has the table of every gate, where each runs,
 and what catches a skip; `.github/workflows/ci.yml` is what CI actually does.
 
-`npm test` says nothing about the integration, smoke or accessibility suites. Run
-`npm run test:integration` when your change touches the database layer, because a
-red one in CI does not block the merge. Run `npm run test:smoke` when you touch a
-flow in the `smoke` job comment in `ci.yml`, and `npm run test:accessibility:smoke`
-when you touch a page in the `accessibility-smoke` job comment; both are required
-checks, and both need the stack, the seed and chromium as CONTRIBUTING.md describes.
-A page outside the smoke subset needs `npm run test:accessibility` locally, because
-the rest of that suite only runs on dispatch.
+`npm test` says nothing about the integration, smoke or accessibility suites, and
+CI's integration result does not block a merge. "Which suites to run yourself" in
+CONTRIBUTING.md says which one a change to the database layer, a covered flow or a
+scanned page needs before the PR, and what each needs running.
 
 ## Always
 

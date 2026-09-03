@@ -11,8 +11,8 @@ and the first thing to read if you are joining as a developer or an instructor.
 pick up         branch            commit               push              pull request        merge
 --------        ------            ------               ----              ------------        -----
 GitHub issue    fetch, then       lefthook:            lefthook:         verify, smoke,      squash, merge
-ready-for-*     branch from       message, prose,      typecheck,        a11y-smoke,         or rebase
-p0/p1/p2        origin/main       branch               unit suite        pr-text (CI)        no human
+ready-for-*     branch from       biome, prose,        typecheck,        a11y-smoke,         or rebase
+p0/p1/p2        origin/main       branch, message      unit suite        pr-text (CI)        no human
 claim it        fix/ feat/ ...                                           review loop         approval
 ```
 
@@ -43,7 +43,7 @@ first column is what stops you locally; the last is what stops the merge.
 | --- | --- | --- | --- |
 | Conventional subject; no emdash, emoji or session link in the message | `commit-msg` | `guard-git.mjs` reads the `-m` text first | `verify` walks the PR's commits; `pr-text` checks the title and body |
 | No emdash or emoji in tracked prose and code | `pre-commit`, staged files | `after-edit.mjs` on the edited file | `verify`: `npm run check:prose` |
-| No session link in PR or issue text | (never sees it) | `guard-gh.mjs` refuses the command | `pr-text` |
+| No session link in PR or issue text | (never sees it) | `guard-gh.mjs` refuses the command | `pr-text`, for the PR title and body; issue text has no CI gate |
 | Stage by name; never commit on `main` | `pre-commit` branch check | `guard-git.mjs` refuses `add -A`, `commit -a`, a commit on `main` | ruleset rejects a push to `main` |
 | No force push at `main`, `reset --hard`, `clean -f`, `branch -D` | | `guard-git.mjs` | ruleset (force push) |
 | Generated and personal files are not hand-edited | | `guard-edits.mjs` | |
@@ -92,9 +92,9 @@ hooks under `.claude/hooks/`, which is what the middle column above describes.
 `SessionStart` prints the branch, the working tree state, the Node version and the
 running compose services into every session.
 
-Two things the agent sandbox does not allow, which the session has to do with the
-sandbox off: `gh` (TLS fails inside it) and anything that writes `.git/config`, such
-as `git branch -d` and `git worktree`.
+The agent sandbox refuses `gh` and anything that writes `.git/config`; the Vitest
+section of `docs/QUIRKS.md` says which commands and why, and they run with the
+sandbox off.
 
 Working several issues at once: put a worktree outside the repo and symlink
 `node_modules` and `.env.local` into it. The smoke and accessibility suites want the

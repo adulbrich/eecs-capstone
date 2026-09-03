@@ -5,7 +5,7 @@
  * Answers with the JSON deny shape rather than exit 2 so the reason reaches
  * the model verbatim and the turn continues.
  */
-import { readInput, repoRelative } from "./lib.mjs";
+import { readInput, repoRelative, repoRoot } from "./lib.mjs";
 
 const PROTECTED = new Map([
   [
@@ -23,7 +23,7 @@ const PROTECTED = new Map([
 
 const input = readInput();
 const cwd = input.cwd ?? process.cwd();
-const path = repoRelative(cwd, input.tool_input?.file_path ?? "");
+const path = repoRelative(repoRoot(cwd), input.tool_input?.file_path ?? "");
 const reason = PROTECTED.get(path);
 
 if (reason) {

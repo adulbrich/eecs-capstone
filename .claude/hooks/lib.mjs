@@ -5,7 +5,8 @@
  * exit code: 0 lets the tool call through, 2 blocks it and hands stderr to the
  * model as the reason. The `cwd` field, not `CLAUDE_PROJECT_DIR`, is where the
  * session is: inside a worktree the project dir still points at the main
- * checkout.
+ * checkout, and a session may start in a subdirectory, so the repository root
+ * is resolved from `cwd` rather than assumed to be it.
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -32,9 +33,9 @@ export function deny(reason) {
   process.exit(2);
 }
 
-export function currentBranch(cwd) {
+function git(cwd, args) {
   try {
-    return execFileSync("git", ["-C", cwd, "branch", "--show-current"], {
+    return execFileSync("git", ["-C", cwd, ...args], {
       encoding: "utf8",
       env: cleanEnv,
       stdio: ["ignore", "pipe", "ignore"],
@@ -44,21 +45,32 @@ export function currentBranch(cwd) {
   }
 }
 
+export function currentBranch(cwd) {
+  return git(cwd, ["branch", "--show-current"]);
+}
+
 /**
- * A path as the repo scripts expect it: relative to the session's checkout.
+ * The checkout that contains `cwd`, or `cwd` itself outside a repository.
  */
-export function repoRelative(cwd, path) {
-  return relative(cwd, path).replaceAll("\\", "/");
+export function repoRoot(cwd) {
+  return git(cwd, ["rev-parse", "--show-toplevel"]) || cwd;
+}
+
+/**
+ * A path as the repo scripts expect it: relative to the checkout root.
+ */
+export function repoRelative(root, path) {
+  return relative(root, path).replaceAll("\\", "/");
 }
 
 /**
  * The repo's own rule scripts, loaded from the session's checkout so a
  * worktree checks against the code it carries.
  */
-export async function loadRuleScripts(cwd) {
+export async function loadRuleScripts(root) {
   const [prose, commit] = await Promise.all([
-    import(`${cwd}/scripts/check-prose.mjs`),
-    import(`${cwd}/scripts/check-commit-message.mjs`),
+    import(`${root}/scripts/check-prose.mjs`),
+    import(`${root}/scripts/check-commit-message.mjs`),
   ]);
   return { ...prose, ...commit };
 }
