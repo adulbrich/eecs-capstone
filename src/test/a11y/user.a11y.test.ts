@@ -99,6 +99,16 @@ test("my items", async ({ page }) => {
 test("@smoke my items, each tab panel", async ({ page }) => {
   await page.goto("/my/items");
   await waitForHydration(page);
+  // The unread badge on the bell is fetched after hydration, so a scan taken
+  // at `load` never sees it, which is how its dark-mode contrast went
+  // unchecked until #145. Waiting for the count puts the badge in every scan
+  // below. One caveat axe imposes: a single-character badge is skipped as too
+  // short to be judged as text, so only a count of ten or more ("9+") is
+  // measured. The seed leaves this user short of that, so this wait proves the
+  // badge is present, not that its colours pass.
+  await expect(
+    page.getByRole("button", { name: "Notifications" }).getByText(/^\d+\+?$/)
+  ).toBeVisible();
 
   // The tab strip was three loose buttons until 2026-08-22 and this suite
   // could not tell, because a labelled button is valid markup on its own. The
