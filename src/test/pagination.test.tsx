@@ -14,7 +14,7 @@ describe("Pagination", () => {
   it("labels itself as pagination navigation", () => {
     render(
       <Pagination>
-        <PaginationStatus page={1} totalPages={3} />
+        <PaginationStatus page={1} shown={20} total={47} totalPages={3} />
       </Pagination>
     );
     expect(screen.getByRole("navigation", { name: "Pagination" })).toBeTruthy();
@@ -47,10 +47,28 @@ describe("Pagination", () => {
     expect(next.getAttribute("tabindex")).toBeNull();
   });
 
-  it("announces the position politely", () => {
-    render(<PaginationStatus page={2} totalPages={5} />);
-    const status = screen.getByText("Page 2 of 5");
+  it("announces the position and the count politely on a multi-page list", () => {
+    render(<PaginationStatus page={2} shown={20} total={47} totalPages={3} />);
+    // The middle dot is the separator, so the two facts read as two facts.
+    const status = screen.getByText("Page 2 of 3 \u00b7 20 of 47 results");
     expect(status.getAttribute("aria-live")).toBe("polite");
+  });
+
+  it("says only the count when everything fits on one page", () => {
+    render(<PaginationStatus page={1} shown={47} total={47} totalPages={1} />);
+    expect(screen.getByText("47 results")).toBeTruthy();
+  });
+
+  it("uses the singular for one result", () => {
+    render(<PaginationStatus page={1} shown={1} total={1} totalPages={1} />);
+    expect(screen.getByText("1 result")).toBeTruthy();
+  });
+
+  it("renders nothing for an empty list, which the empty state already covers", () => {
+    const { container } = render(
+      <PaginationStatus page={1} shown={0} total={0} totalPages={1} />
+    );
+    expect(container.innerHTML).toBe("");
   });
 
   it("merges onto a child link when enabled", () => {

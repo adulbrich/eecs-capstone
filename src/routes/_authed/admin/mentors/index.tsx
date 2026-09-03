@@ -23,6 +23,7 @@ import {
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
+import { ListCount } from "#/components/ui/pagination";
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
@@ -266,6 +267,7 @@ function MentorsAdmin() {
           </div>
         }
       />
+      <ListCount count={rows.length} />
     </div>
   );
 }

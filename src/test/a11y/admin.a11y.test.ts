@@ -612,11 +612,15 @@ test("admin users list: sorting from page 2 returns to page 1", async ({
   // prove anything about the page reset. Requiring totalPages >= 2 (not just
   // \d+) matters here: "Page 2 of 1" would satisfy a bare \d+ pattern too,
   // which is exactly the broken-fixture case this control exists to catch.
-  await expect(page.getByText(/^Page 2 of [2-9]\d*$/)).toBeVisible();
+  await expect(
+    page.getByText(/^Page 2 of [2-9]\d* \u00b7 \d+ of \d+ results$/)
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Email", exact: true }).click();
 
-  await expect(page.getByText(/^Page 1 of \d+$/)).toBeVisible();
+  await expect(
+    page.getByText(/^Page 1 of \d+ \u00b7 \d+ of \d+ results$/)
+  ).toBeVisible();
   await expect(page).not.toHaveURL(/[?&]page=2(&|$)/);
 });
 

@@ -24,6 +24,7 @@ import {
 } from "#/components/ui/breadcrumb";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
+import { ListCount } from "#/components/ui/pagination";
 import {
   Select,
   SelectContent,
@@ -271,6 +272,7 @@ function AdminRequestQueue() {
           </>
         }
       />
+      <ListCount count={rows.length} />
     </div>
   );
 }

@@ -16,6 +16,7 @@ import {
   PaginationButton,
   PaginationStatus,
 } from "#/components/ui/pagination";
+import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
 import { useSignedIn } from "#/lib/use-signed-in";
@@ -72,7 +73,7 @@ export const Route = createFileRoute("/inventory/")({
           status: deps.status,
           categories: deps.categories,
           page: deps.page,
-          pageSize: 20,
+          pageSize: PAGE_SIZE_DEFAULT,
         },
       }),
       listInventoryCategories(),
@@ -200,7 +201,12 @@ function InventoryIndex() {
         >
           Previous
         </PaginationButton>
-        <PaginationStatus page={data.page} totalPages={totalPages} />
+        <PaginationStatus
+          page={data.page}
+          shown={data.rows.length}
+          total={data.total}
+          totalPages={totalPages}
+        />
         <PaginationButton
           disabled={data.page >= totalPages}
           onClick={() =>

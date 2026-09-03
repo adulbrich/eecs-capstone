@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX } from "#/lib/pagination";
 
 function expectFormData(data: unknown): FormData {
   if (!(data instanceof FormData)) {
@@ -30,7 +31,12 @@ const listInventorySchema = z.object({
   status: itemStatusEnum.nullable().default(null),
   categories: z.array(z.string().uuid()).max(20).default([]),
   page: z.number().int().positive().default(1),
-  pageSize: z.number().int().positive().max(100).default(24),
+  pageSize: z
+    .number()
+    .int()
+    .positive()
+    .max(PAGE_SIZE_MAX)
+    .default(PAGE_SIZE_DEFAULT),
 });
 
 export type ListInventoryInput = z.infer<typeof listInventorySchema>;

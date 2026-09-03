@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX } from "#/lib/pagination";
 
 const searchInputSchema = z.object({
   query: z.string().trim().max(200).default(""),
@@ -10,7 +11,12 @@ const searchInputSchema = z.object({
   // catalog that is meant to be browsable. See #72.
   acceptingOnly: z.boolean().default(false),
   page: z.number().int().min(1).default(1),
-  pageSize: z.number().int().min(1).max(50).default(20),
+  pageSize: z
+    .number()
+    .int()
+    .min(1)
+    .max(PAGE_SIZE_MAX)
+    .default(PAGE_SIZE_DEFAULT),
   sort: z.enum(["relevance", "newest", "recommended"]).default("relevance"),
 });
 

@@ -6,6 +6,7 @@ import {
   BOOKMARK_TABLE_DEFAULT_SORT,
 } from "#/components/bookmark-table-columns";
 import { EmptyState } from "#/components/empty-state";
+import { ListCount } from "#/components/ui/pagination";
 import { pageTitle } from "#/lib/page-title";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { listMyBookmarks } from "#/server/bookmarks";
@@ -76,6 +77,7 @@ function MyBookmarks() {
             getRowId={(row) => row.id}
             {...tableProps}
           />
+          <ListCount count={rows.length} />
           {/*
             One quiet line, no titles: a list that silently got shorter reads
             as a lost bookmark, and the count reveals nothing the viewer did

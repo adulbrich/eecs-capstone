@@ -18,6 +18,7 @@ import {
   PaginationStatus,
 } from "#/components/ui/pagination";
 import { pageTitle } from "#/lib/page-title";
+import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
 import type { ViewMode } from "#/lib/view-preference";
@@ -67,7 +68,7 @@ export const Route = createFileRoute("/projects/")({
         archivedOnly: deps.archivedOnly,
         acceptingOnly: deps.acceptingOnly,
         page: deps.page,
-        pageSize: 20,
+        pageSize: PAGE_SIZE_DEFAULT,
         sort: deps.order,
       },
     }),
@@ -176,7 +177,12 @@ function ProjectsList() {
             </Link>
           </PaginationLink>
         )}
-        <PaginationStatus page={page} totalPages={totalPages} />
+        <PaginationStatus
+          page={page}
+          shown={rows.length}
+          total={total}
+          totalPages={totalPages}
+        />
         {page >= totalPages ? (
           <PaginationLink disabled>Next</PaginationLink>
         ) : (

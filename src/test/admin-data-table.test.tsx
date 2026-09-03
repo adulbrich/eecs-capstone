@@ -309,11 +309,12 @@ describe("AdminDataTable", () => {
     expect(screen.getByText("Filters go here")).not.toBeNull();
   });
 
-  it("announces the row count and the current sort order in a live region", () => {
+  it("announces the current sort order in a live region, and not the row count", () => {
+    // The count is the route's job: one live region counts rows on every
+    // list, paginated or not, so a screen reader hears one number, not two.
     renderTable();
-    expect(
-      screen.getByText("3 rows, sorted by Name, ascending")
-    ).not.toBeNull();
+    expect(screen.getByText("Sorted by Name, ascending")).not.toBeNull();
+    expect(screen.queryByText(/3 rows/)).toBeNull();
   });
 
   it("announces the sort order even when the sorted column is hidden", () => {
@@ -322,9 +323,7 @@ describe("AdminDataTable", () => {
     // live region is the only surface left that can say the table is
     // ordered by it at all.
     renderTable({ sort: { desc: true, id: "location" } });
-    expect(
-      screen.getByText("3 rows, sorted by Location, descending")
-    ).not.toBeNull();
+    expect(screen.getByText("Sorted by Location, descending")).not.toBeNull();
     expect(screen.queryByRole("columnheader", { name: /Location/ })).toBeNull();
   });
 
