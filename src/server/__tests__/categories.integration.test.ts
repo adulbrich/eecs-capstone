@@ -13,6 +13,7 @@ import { auth } from "#/lib/auth";
 import {
   createCategoryAs,
   deleteCategoryAs,
+  getCategoryImpl,
   listCategoriesImpl,
   listCategoriesWithUsageAs,
   listCategoryTypesImpl,
@@ -141,6 +142,31 @@ describe("categories", () => {
 
     expect(projectOnly.rows.map((r) => r.name)).toEqual(["React"]);
     expect(inventoryOnly.rows.map((r) => r.name)).toEqual(["Electronics"]);
+  });
+
+  it("keeps the two public category reads to the catalog columns", async () => {
+    // `listCategoriesImpl` and `getCategoryImpl` back endpoints declared
+    // `public` in access-contract.ts, and both are a bare `select()` with no
+    // projection, so a column added to `categories` later would ride straight
+    // into an unauthenticated read with nothing failing. This is the
+    // enforcement, in the shape of the same pin on `listProgramsImpl`. Sorted,
+    // because the point is the key set, not Drizzle's projection order.
+    const admin = await makeUser(`pub-${Date.now()}@x.com`, "admin");
+    const name = `Public ${Date.now()}`;
+    const { id } = await createCategoryAs(admin, {
+      domain: "project",
+      name,
+      type: "technology",
+    });
+    const catalogColumns = ["createdAt", "domain", "id", "name", "type"];
+
+    const { rows } = await listCategoriesImpl({ domain: "project" });
+    const listed = rows.find((r) => r.id === id);
+    expect(listed).toBeDefined();
+    expect(Object.keys(listed ?? {}).sort()).toEqual(catalogColumns);
+
+    const { category } = await getCategoryImpl({ id });
+    expect(Object.keys(category).sort()).toEqual(catalogColumns);
   });
 
   it("requires a type for a project category", async () => {

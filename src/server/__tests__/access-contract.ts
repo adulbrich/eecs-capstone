@@ -97,11 +97,11 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/categories.ts:deleteCategory": { level: "staff" },
   "server/categories.ts:getCategory": {
     level: "public",
-    note: "Public catalog. No join to user.",
+    note: "Public catalog. No join to user. Nothing projects that: getCategoryImpl is a bare select() returning every column, so a column added to `categories` would ride into a public read. categories.integration.test.ts pins the exact key set and is the only enforcement.",
   },
   "server/categories.ts:listCategories": {
     level: "public",
-    note: "Public catalog. No join to user.",
+    note: "Public catalog. No join to user. Nothing projects that: listCategoriesImpl is a bare select() returning every column, so a column added to `categories` would ride into a public read. categories.integration.test.ts pins the exact key set and is the only enforcement.",
   },
   "server/categories.ts:listCategoriesWithUsage": { level: "staff" },
   "server/categories.ts:listCategoryTypes": {
