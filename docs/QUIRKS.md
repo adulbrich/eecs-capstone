@@ -697,9 +697,10 @@ axe-core's `color-contrast` rule does not evaluate a disabled form control, sinc
 WCAG 1.4.3 exempts inactive components. The current-status pill in
 `staff-project-panel.tsx` is a `<button disabled>`, so the `project detail (staff
 panel, scope assessment)` scan in `admin.a11y.test.ts` reports nothing about it in
-either colour scheme: measured, it passed with white on the dark brand orange
-(3.48:1, #208) and passes now. The five enabled pills beside it are measured and
-listed under `passes`. When a disabled element carries text a person still has to
+either colour scheme. The scan was green with the old white on the dark brand
+orange, which measures 3.48:1 and fails (#208), and is green with the fix, which
+measures 5.19:1. The five enabled pills beside it are measured and listed under
+`passes`. When a disabled element carries text a person still has to
 read, compute the ratio yourself (the WCAG relative-luminance formula in a node
 one-liner is enough) and say so in the PR, because the scan cannot vouch for it.
 
