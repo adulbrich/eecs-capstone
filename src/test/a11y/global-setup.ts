@@ -241,6 +241,54 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
       .returning();
   }
 
+  // An item in the fixture user's borrow list, so the Borrow list tab scans
+  // its assembled-request region rather than the empty state (#64). A second
+  // item rather than the one above: the smoke flows walk that one through the
+  // lifecycle and an item in a cart is not `available` to request twice.
+  let [cartItem] = await db
+    .select()
+    .from(schema.inventoryItems)
+    .where(eq(schema.inventoryItems.name, "A11Y Cart Item"));
+  if (!cartItem) {
+    [cartItem] = await db
+      .insert(schema.inventoryItems)
+      .values({
+        name: "A11Y Cart Item",
+        description: "An item waiting in the fixture user's borrow list.",
+      })
+      .returning();
+  }
+  await db
+    .insert(schema.inventoryCartItems)
+    .values({ userId: owner.id, itemId: cartItem.id })
+    .onConflictDoNothing();
+
+  // An overdue hold on the fixture user, so the attention region on
+  // /my/items is asserted against a fixture rather than the dev seed (#64).
+  // Written directly, as the other fixtures are: it is a row to scan, not a
+  // transition to exercise.
+  let [overdueItem] = await db
+    .select()
+    .from(schema.inventoryItems)
+    .where(eq(schema.inventoryItems.name, "A11Y Overdue Item"));
+  if (!overdueItem) {
+    [overdueItem] = await db
+      .insert(schema.inventoryItems)
+      .values({
+        name: "A11Y Overdue Item",
+        description: "Checked out to the fixture user, past its due date.",
+      })
+      .returning();
+  }
+  await db
+    .update(schema.inventoryItems)
+    .set({
+      status: "checked_out",
+      currentHolderId: owner.id,
+      currentDueAt: new Date(Date.now() - 2 * 86_400_000),
+    })
+    .where(eq(schema.inventoryItems.id, overdueItem.id));
+
   // Draft project owned by the fixture user (no unique constraint on title,
   // select-first pattern). user.a11y.test.ts needs a draft it can sign in as
   // user@example.com and see a delete trigger on: the dev seed's only draft

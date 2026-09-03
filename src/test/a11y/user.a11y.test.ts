@@ -120,6 +120,23 @@ test("@smoke my items, each tab panel", async ({ page }) => {
   }
 });
 
+test("my items opens by saying what needs attention", async ({ page }) => {
+  await page.goto("/my/items");
+  await waitForHydration(page);
+  // global-setup gives this user an overdue hold, so the region renders with
+  // its counts and its link into Active, and a borrow-list item, so the
+  // Borrow list tab shows the assembled request rather than the empty state.
+  const region = page.getByRole("region", { name: "Needs your attention" });
+  await expect(region).toBeVisible();
+  await expect(region.getByRole("link", { name: /Active/ })).toBeVisible();
+  await page.getByRole("tab", { name: /^Borrow list/ }).click();
+  await expect(
+    page.getByRole("region", { name: /Request being assembled/ })
+  ).toBeVisible();
+  await expect(page.getByLabel("Note for staff (optional)")).toBeVisible();
+  await checkA11y(page);
+});
+
 test("profile page", async ({ page }) => {
   await page.goto("/profile");
   await checkA11y(page);

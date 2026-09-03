@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  attentionSummary,
   compareByDeadline,
   type DeadlineEntry,
   deadlineOf,
   deadlinePairOf,
+  needsAttention,
   overdueFlags,
 } from "../inventory-deadlines";
 
@@ -175,5 +177,58 @@ describe("compareByDeadline", () => {
     const older = without("2026-01-01");
     const newer = without("2026-06-01");
     expect([older, newer].sort(compareByDeadline)).toEqual([newer, older]);
+  });
+});
+
+describe("attentionSummary", () => {
+  const now = new Date("2026-09-03T12:00:00Z");
+  const day = (offset: number) => new Date(now.getTime() + offset * 86_400_000);
+  const hold = (status: string, dueAt: Date | null, pickupBy: Date | null) =>
+    ({
+      kind: "hold" as const,
+      item: { status, dueAt, pickupBy, updatedAt: now },
+    }) satisfies DeadlineEntry;
+  const request = (
+    itemStatus: string,
+    dueAt: Date | null,
+    pickupBy: Date | null
+  ) =>
+    ({
+      kind: "request" as const,
+      itemStatus,
+      line: { createdAt: now, dueAt, pickupBy },
+    }) satisfies DeadlineEntry;
+
+  it("counts what is overdue and what is due within three days, from both arms", () => {
+    const summary = attentionSummary(
+      [
+        hold("checked_out", day(-2), null),
+        request("checked_out", day(2), null),
+        request("reserved", null, day(-1)),
+        hold("reserved", null, day(3)),
+        hold("checked_out", day(10), null),
+        request("requested", null, null),
+      ],
+      now
+    );
+    expect(summary).toEqual({
+      overdueReturns: 1,
+      overduePickups: 1,
+      returnsDueSoon: 1,
+      pickupsDueSoon: 1,
+    });
+  });
+
+  it("is all zeros for a quiet page, which the caller renders as nothing wrong", () => {
+    expect(attentionSummary([], now)).toEqual({
+      overdueReturns: 0,
+      overduePickups: 0,
+      returnsDueSoon: 0,
+      pickupsDueSoon: 0,
+    });
+    expect(needsAttention(attentionSummary([], now))).toBe(false);
+    expect(
+      needsAttention(attentionSummary([hold("checked_out", day(1), null)], now))
+    ).toBe(true);
   });
 });

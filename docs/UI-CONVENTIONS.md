@@ -203,11 +203,14 @@ this `px-4 py-6 md:p-8` signature: `max-w-2xl` on the 8 form, dashboard and pros
 pages that hold a list, a two-column detail layout or a grid of figures, `max-w-3xl` on the one
 long-form page (`projects/$projectId.tsx`), and `max-w-md` on two narrow-content
 pages (`profile.tsx`, `admin/categories/$categoryId.tsx`) plus `max-w-sm` on
-`verify-email.tsx`. Of the seven `max-w-4xl` pages, four hold a single-column
-card list (`projects/index.tsx`, `inventory/index.tsx`, `my/projects.tsx`,
-`my/items.tsx`), `my/bookmarks.tsx` bounds only its title,
-`inventory/$itemId.tsx` holds a two-column detail layout, and
-`admin/analytics.tsx` holds a two-column grid of figure cards. `projects/index.tsx` in
+`verify-email.tsx`. Of the seven `max-w-4xl` pages, three hold a single-column
+card list (`projects/index.tsx`, `inventory/index.tsx`, `my/projects.tsx`),
+`my/items.tsx` holds an attention region, a borrow-list card and two tab
+panels of tables, all bounded to the title width since a borrower's list is
+short, `my/bookmarks.tsx`
+bounds only its title, `inventory/$itemId.tsx` holds a two-column detail
+layout, and `admin/analytics.tsx` holds a two-column grid of figure cards.
+`projects/index.tsx` in
 table mode and `my/bookmarks.tsx` let the table run full width below the bounded
 title (and filter bar), the way the admin tables do. The sign-in/sign-up/forgot/reset-password cards
 are narrower still but live inside the separate `island-shell` container below, not
