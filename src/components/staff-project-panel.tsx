@@ -227,12 +227,19 @@ export function StaffProjectPanel({
               let pillState: string;
               let pillTitle: string;
               if (isCurrent) {
-                pillState =
-                  "cursor-default bg-[var(--brand-primary)] text-white";
+                // The semantic pair, not the decorative brand token: in dark
+                // mode --primary is pinned darker so white clears 4.5:1 on it,
+                // and white on --brand-primary measures 3.48 there.
+                pillState = "cursor-default bg-primary text-primary-foreground";
                 pillTitle = "Current status";
               } else if (isNormal) {
+                // Text in the dark/light-inverted shade, as the island kicker
+                // in styles.css explains: the vivid orange scrapes past on the
+                // card at rest (4.56 light, 4.90 dark) and drops under 4.5 on
+                // the tinted hover background in both modes. The border is
+                // decorative and keeps the vivid orange.
                 pillState =
-                  "cursor-pointer border-2 border-[var(--brand-primary)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary-tint)]";
+                  "cursor-pointer border-2 border-[var(--brand-primary)] text-[var(--brand-primary-dark)] hover:bg-[var(--brand-primary-tint)]";
                 pillTitle = `Move to ${STATUS_LABEL[s]}`;
               } else {
                 pillState =
