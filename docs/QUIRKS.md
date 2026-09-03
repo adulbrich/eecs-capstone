@@ -611,23 +611,26 @@ upload (the uploader shows a local blob URL, so "an image is on screen" was true
 either way), the password reset (the test then signed in with the old password
 and passed), and an item edit.
 
-### A second comment posted in one page load needs a reload first
+### `getByText` finds a draft typed into a controlled textarea
 
-Measured on the project comment composer: after a comment posts and renders, text
-typed into the same textarea was gone by the time Post was clicked, the `required`
-attribute blocked the empty submit, and the failure read as a missing second
-comment rather than as a cleared form. Reload between the two posts.
+React mirrors a controlled `<textarea>`'s value into its `defaultValue`, which is
+the element's text content, so `page.getByText(draft)` resolves on the composer
+the moment the draft is typed, before any post has answered. That is how #188
+looked like a remount: `projects-comments.e2e.test.ts` waited on the first
+comment's text after clicking Post, matched the textarea at once, typed the
+second comment while `addComment` was still in flight, and had it wiped when the
+post's `setContent("")` landed. The reload the test used to do between posts hid
+the race rather than the cause. `router.invalidate()` was the first suspect and
+was innocent; it is gone from `onCommentsChanged` anyway, since the loader
+carries no comments.
 
-`confirmed()` in `src/test/e2e/waits.ts` is no substitute for the reload. Its
-filter is unambiguous here, since only `addComment` is a POST, but it answers when
-the write lands, and the textarea appears to lose its text later, in whatever
-`onCommentsChanged` sets off (`src/routes/projects/$projectId.tsx`). The cause was
-not established. Issue #188 carries the candidates and what rules each out. Only
-this form was measured, and this entry shrinks to the reload once #188 is fixed.
-
-This is not the reverse of the rule above: there a navigation aborted a write in
-flight, here the reload is what puts the form in a settled state before the next
-write starts.
+Two rules follow. Assert that a comment rendered on the node that renders it,
+`page.getByRole("paragraph").filter({ hasText })` (the `posted()` helper in that
+test), and keep the broad `getByText(...).toHaveCount(0)` for absences, where
+matching the composer too is the point. And a form that clears itself after a
+write disables its fields while the write is in flight, as both comment forms in
+`src/components/comment-thread.tsx` now do: a `fill` on a disabled field waits
+for it, so the second post in one page load needs no reload.
 
 ### The header avatar is a page load behind the profile page
 

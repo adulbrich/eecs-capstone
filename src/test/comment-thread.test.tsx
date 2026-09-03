@@ -184,3 +184,55 @@ describe("CommentThread internal replies", () => {
     expect(replyForm().queryByRole("checkbox")).toBeNull();
   });
 });
+
+describe("CommentThread forms while a post is in flight", () => {
+  function pendingPost() {
+    let resolvePost: (value: unknown) => void = () => undefined;
+    addComment.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePost = resolve;
+      })
+    );
+    return () => resolvePost({ id: "new-comment" });
+  }
+
+  it("disables the new-comment form until the post lands, then clears it", async () => {
+    const land = pendingPost();
+    renderThread([]);
+    const box = screen.getByLabelText("Comment") as HTMLTextAreaElement;
+    const post = screen.getByRole("button", { name: "Post comment" });
+    fireEvent.change(box, { target: { value: "first" } });
+    fireEvent.click(post);
+
+    await waitFor(() => expect(box.disabled).toBe(true));
+    expect(post.hasAttribute("disabled")).toBe(true);
+    // A second click while busy posts nothing twice.
+    fireEvent.click(post);
+    expect(addComment).toHaveBeenCalledTimes(1);
+
+    land();
+    await waitFor(() => expect(box.disabled).toBe(false));
+    expect(box.value).toBe("");
+  });
+
+  it("disables the reply form the same way and closes it once the reply lands", async () => {
+    const land = pendingPost();
+    renderThread([comment({})]);
+    openReplyAndType("follow-up");
+    const box = screen.getByPlaceholderText("Reply") as HTMLTextAreaElement;
+    fireEvent.click(replyForm().getByRole("button", { name: "Post" }));
+
+    await waitFor(() => expect(box.disabled).toBe(true));
+    expect(
+      replyForm()
+        .getByRole("button", { name: "Cancel" })
+        .hasAttribute("disabled")
+    ).toBe(true);
+
+    land();
+    await waitFor(() =>
+      expect(screen.queryByPlaceholderText("Reply")).toBeNull()
+    );
+    expect(addComment).toHaveBeenCalledTimes(1);
+  });
+});

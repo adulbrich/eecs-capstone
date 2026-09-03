@@ -164,10 +164,20 @@ function NewCommentForm({
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
+  // The form is disabled while the post is in flight. The clear below runs
+  // when the server answers, and before this it wiped whatever had been typed
+  // into the box in the meantime, which read as a second comment that failed
+  // to post (#188). Disabling the box is what makes "typed after the post"
+  // and "typed after the clear" the same thing.
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) {
+      return;
+    }
     setError(null);
+    setBusy(true);
     try {
       await addComment({ data: { projectId, content, isInternal } });
       setContent("");
@@ -175,6 +185,8 @@ function NewCommentForm({
       onChanged();
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -184,6 +196,7 @@ function NewCommentForm({
     <form className="mt-4 space-y-2" onSubmit={onSubmit}>
       <Textarea
         aria-label="Comment"
+        disabled={busy}
         onChange={(e) => setContent(e.target.value)}
         placeholder="Add a comment"
         required
@@ -194,12 +207,13 @@ function NewCommentForm({
         <Label className="font-normal">
           <Checkbox
             checked={isInternal}
+            disabled={busy}
             onCheckedChange={(checked) => setIsInternal(checked === true)}
           />
           Internal (staff only)
         </Label>
       )}
-      <Button size="sm" type="submit">
+      <Button disabled={busy} size="sm" type="submit">
         Post comment
       </Button>
       {error && <p className="text-destructive text-sm">{error}</p>}
@@ -224,6 +238,7 @@ function ReplyForm({
   const [content, setContent] = useState("");
   const [isInternalChoice, setIsInternalChoice] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   // A reply inherits its parent's internal flag. The server enforces this too;
   // here it keeps the checkbox from promising something the server will
@@ -244,9 +259,14 @@ function ReplyForm({
     );
   }
 
+  // Disabled in flight for the same reason as the new-comment form above.
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) {
+      return;
+    }
     setError(null);
+    setBusy(true);
     try {
       await addComment({
         data: { projectId, parentId, content, isInternal },
@@ -257,6 +277,8 @@ function ReplyForm({
       onChanged();
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -264,6 +286,7 @@ function ReplyForm({
     <form className="mt-2 space-y-2 pl-4" onSubmit={onSubmit}>
       <Textarea
         aria-label="Reply"
+        disabled={busy}
         onChange={(e) => setContent(e.target.value)}
         placeholder="Reply"
         required
@@ -275,7 +298,7 @@ function ReplyForm({
           <Label className="font-normal text-xs">
             <Checkbox
               checked={isInternal}
-              disabled={parentIsInternal}
+              disabled={parentIsInternal || busy}
               onCheckedChange={(checked) =>
                 setIsInternalChoice(checked === true)
               }
@@ -290,10 +313,11 @@ function ReplyForm({
         </div>
       )}
       <div className="flex gap-2">
-        <Button size="xs" type="submit">
+        <Button disabled={busy} size="xs" type="submit">
           Post
         </Button>
         <Button
+          disabled={busy}
           onClick={() => setOpen(false)}
           size="xs"
           type="button"
