@@ -56,7 +56,6 @@ const SCRIPT_ARGUMENTS = new Set(["ADMIN_EMAIL"]);
 
 /** Documented, but never read by this codebase, each for a stated reason. */
 const NOT_READ_HERE = new Map([
-  ["BETTER_AUTH_SECRET", "read by Better Auth internally, never by this code"],
   [
     "VITE_STORAGE_PUBLIC_BASE",
     "client-side, reached through import.meta.env at build time (src/lib/storage.ts)",

@@ -13,6 +13,7 @@ const config = defineConfig({
     devtools(),
     nitro({
       compressPublicAssets: true,
+      plugins: ["./src/nitro/config-check.ts"],
       rollupConfig: { external: [/^@sentry\//] },
     }),
     tailwindcss(),
