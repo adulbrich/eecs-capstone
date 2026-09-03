@@ -10,6 +10,7 @@ import {
   getProgramAs,
   listEligibleInstructorsAs,
   listProgramsImpl,
+  listProgramsWithInstructorsAs,
   removeProgramInstructorAs,
   updateProgramAs,
 } from "#/server/_internal/programs";
@@ -89,6 +90,63 @@ describe("the instructor-bearing reads are staff-only", () => {
       "id",
       "updatedAt",
     ]);
+  });
+});
+
+describe("the admin index reads instructor names through its own staff seam", () => {
+  // The public list above must stay six columns, so the names the admin
+  // table shows come from a separate read that joins `user` and is gated
+  // like getProgram: a read is staff-only when its query reaches a column of
+  // somebody's account.
+  it("returns names per program, and an empty list rather than null", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`li-a-${stamp}@x.com`, "admin");
+    // makeUser names each account after its address.
+    const teacherEmail = `li-t-${stamp}@x.com`;
+    const otherEmail = `li-o-${stamp}@x.com`;
+    const teacher = await makeUser(teacherEmail, "instructor");
+    const other = await makeUser(otherEmail, "instructor");
+    const taught = await createProgramAs(admin, {
+      courseId: `LI-T-${stamp}`,
+      courseName: "Taught",
+      description: null,
+    });
+    const untaught = await createProgramAs(admin, {
+      courseId: `LI-U-${stamp}`,
+      courseName: "Untaught",
+      description: null,
+    });
+    await addProgramInstructorAs(admin, {
+      programId: taught.id,
+      userId: teacher.id,
+    });
+    await addProgramInstructorAs(admin, {
+      programId: taught.id,
+      userId: other.id,
+    });
+
+    const { rows } = await listProgramsWithInstructorsAs(admin);
+    const taughtRow = rows.find((r) => r.id === taught.id);
+    const untaughtRow = rows.find((r) => r.id === untaught.id);
+    // Names only, in name order, so the joined string the column sorts on
+    // does not depend on insertion order.
+    expect(taughtRow?.instructorNames).toEqual([otherEmail, teacherEmail]);
+    expect(untaughtRow?.instructorNames).toEqual([]);
+    // Names and nothing else off the account: no address, no role, no id.
+    expect(Object.keys(taughtRow ?? {}).sort()).toEqual([
+      "courseId",
+      "courseName",
+      "createdAt",
+      "description",
+      "id",
+      "instructorNames",
+      "updatedAt",
+    ]);
+  });
+
+  it("refuses a non-staff viewer", async () => {
+    const plain = await makeUser(`li-p-${Date.now()}@x.com`, "user");
+    await expect(listProgramsWithInstructorsAs(plain)).rejects.toThrow();
   });
 });
 

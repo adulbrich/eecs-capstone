@@ -16,6 +16,49 @@ export async function listProgramsImpl() {
 }
 
 /**
+ * Every program with the names of who teaches it, for the admin index.
+ *
+ * A separate read from `listProgramsImpl` rather than a widening of it: that
+ * one is public, feeds the project listing's program filter without a
+ * session, and is pinned to the six `programs` columns. This one joins
+ * `user`, and a read that reaches a column of somebody's account is
+ * staff-only. Names only: the detail read already hands out addresses, and a
+ * table listing people needs nothing more.
+ *
+ * Two queries grouped in JS rather than one `array_agg` through Drizzle, for
+ * the reason `claim-projects.ts` gives: at capstone scale the clear query
+ * wins. Membership is a directory listing and grants nothing; see #92.
+ */
+export async function listProgramsWithInstructorsAs(viewer: AuthUser) {
+  assertStaff(viewer);
+  const [{ rows }, links] = await Promise.all([
+    listProgramsImpl(),
+    db
+      .select({ programId: programInstructors.programId, name: user.name })
+      .from(programInstructors)
+      .innerJoin(user, eq(programInstructors.userId, user.id))
+      .orderBy(user.name),
+  ]);
+  const namesByProgram = new Map<string, string[]>();
+  for (const link of links) {
+    const names = namesByProgram.get(link.programId) ?? [];
+    names.push(link.name);
+    namesByProgram.set(link.programId, names);
+  }
+  return {
+    rows: rows.map((row) => ({
+      ...row,
+      instructorNames: namesByProgram.get(row.id) ?? [],
+    })),
+  };
+}
+
+export async function listProgramsWithInstructorsForCurrentUser() {
+  const viewer = await requireUser();
+  return listProgramsWithInstructorsAs(viewer);
+}
+
+/**
  * A program with its instructors, for staff.
  *
  * Staff-gated because of the join below: it returns each instructor's address

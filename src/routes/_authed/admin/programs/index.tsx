@@ -38,7 +38,7 @@ import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
-import { createProgram, listPrograms } from "#/server/programs";
+import { createProgram, listProgramsWithInstructors } from "#/server/programs";
 
 const searchSchema = z.object({
   cols: z.string().optional(),
@@ -58,11 +58,13 @@ export const Route = createFileRoute("/_authed/admin/programs/")({
       throw redirect({ to: "/" });
     }
   },
-  loader: async () => listPrograms(),
+  loader: async () => listProgramsWithInstructors(),
   component: ProgramsAdmin,
 });
 
-type Row = Awaited<ReturnType<typeof listPrograms>>["rows"][number];
+type Row = Awaited<
+  ReturnType<typeof listProgramsWithInstructors>
+>["rows"][number];
 
 const DEFAULT_SORT: SortState = { desc: false, id: "courseId" };
 
@@ -86,6 +88,21 @@ const COLUMNS = defineAdminColumns<Row>()([
     defaultHidden: true,
     header: "Description",
     id: "description",
+    sortUndefined: "last",
+  },
+  {
+    // Sorted as text on the joined string, so no custom sortingFn; a program
+    // nobody teaches sorts last rather than as an empty string first.
+    accessorFn: (row) =>
+      row.instructorNames.length > 0
+        ? row.instructorNames.join(", ")
+        : undefined,
+    cell: ({ row }) =>
+      row.original.instructorNames.length > 0
+        ? row.original.instructorNames.join(", ")
+        : "-",
+    header: "Instructors",
+    id: "instructors",
     sortUndefined: "last",
   },
   {
@@ -137,6 +154,11 @@ const EXPORT_COLUMNS = defineCsvColumns<Row>()([
     header: "Description",
     key: "description",
     value: (row) => row.description,
+  },
+  {
+    header: "Instructors",
+    key: "instructorNames",
+    value: (row) => row.instructorNames.join(", "),
   },
   { header: "Created", key: "createdAt", value: (row) => row.createdAt },
   { header: "Updated", key: "updatedAt", value: (row) => row.updatedAt },

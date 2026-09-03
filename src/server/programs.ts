@@ -29,6 +29,15 @@ export const listPrograms = createServerFn({ method: "GET" }).handler(
   }
 );
 
+export const listProgramsWithInstructors = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const { listProgramsWithInstructorsForCurrentUser } = await import(
+    "./_internal/programs"
+  );
+  return listProgramsWithInstructorsForCurrentUser();
+});
+
 export const getProgram = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data }) => {
