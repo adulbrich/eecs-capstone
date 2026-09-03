@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -294,5 +295,51 @@ describe("CommentThread forms while a post is in flight", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Reply" }));
     expect(screen.queryByText("Forbidden")).toBeNull();
+  });
+
+  it("holds the second attempt disabled when a cancelled one lands", async () => {
+    // One busy flag per form meant the cancelled attempt's answer landed on
+    // whatever replaced it: its `finally` re-enabled the fields mid-flight
+    // (#247). Its `catch` could write an error there too, which is the same
+    // bug from the other side.
+    const settlers: ((value: unknown) => void)[] = [];
+    addComment.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          settlers.push(resolve);
+        })
+    );
+
+    renderThread([comment({})]);
+    openReplyAndType("first try");
+    fireEvent.click(replyForm().getByRole("button", { name: "Post" }));
+    fireEvent.click(replyForm().getByRole("button", { name: "Cancel" }));
+
+    // Reopening has to give back a form that can be typed into: the first
+    // request is still out, and the person cancelled it precisely to start
+    // again.
+    fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+    const box = screen.getByPlaceholderText("Reply") as HTMLTextAreaElement;
+    expect(box.disabled).toBe(false);
+
+    fireEvent.change(box, { target: { value: "second try" } });
+    fireEvent.click(replyForm().getByRole("button", { name: "Post" }));
+    expect(addComment).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(box.disabled).toBe(true));
+
+    // The cancelled attempt answers. Its continuation runs on the next
+    // microtasks, and must leave the second attempt's form alone.
+    settlers[0]({ id: "first" });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(box.disabled).toBe(true);
+    expect(screen.getByPlaceholderText("Reply")).toBe(box);
+
+    settlers[1]({ id: "second" });
+    await waitFor(() =>
+      expect(screen.queryByPlaceholderText("Reply")).toBeNull()
+    );
   });
 });
