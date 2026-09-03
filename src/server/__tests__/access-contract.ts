@@ -202,6 +202,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "public",
     note: "Public because `programs` holds no personal data and this does not join `user`, which is what separates it from getProgram. Nothing projects that: listProgramsImpl is a bare select() returning all six columns, so a personal column added to the table would ride into a public read. programs.integration.test.ts pins the exact key set and is the only enforcement.",
   },
+  "server/programs.ts:listProgramsWithInstructors": {
+    level: "staff",
+    note: "The admin index's read. Joins `user` for instructor names, which is what listPrograms must never do, so it is a separate endpoint gated like getProgram rather than a widening of the public one.",
+  },
   "server/programs.ts:removeProgramInstructor": { level: "staff" },
   "server/programs.ts:updateProgram": { level: "staff" },
 
