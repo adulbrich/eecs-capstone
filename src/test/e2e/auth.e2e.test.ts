@@ -44,8 +44,13 @@ test.describe("@smoke authentication", () => {
     // can sample the right address on the way to the wrong one. Waiting for
     // the navigation that must not happen is what makes this test fail on the
     // code it was written against.
+    //
+    // The window is spent on every passing run and only buys detection on a
+    // failing one, so it is the shortest that still clears a loaded CI runner:
+    // a regression's redirect fires as the sign-in response resolves, not
+    // after a page load.
     await expect(
-      page.waitForURL(/\/verify-email/, { timeout: 3000 })
+      page.waitForURL(/\/verify-email/, { timeout: 5000 })
     ).rejects.toThrow();
     await expect(page).toHaveURL(/\/my\/projects/);
   });
