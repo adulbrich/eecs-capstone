@@ -213,7 +213,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/scope-assessment.ts:getScopeAssessment": {
     level: "staff",
-    note: "Reads the stored verdict and whether the project's text has moved since. The three columns are absent from projectDetailView, so this and assessProjectScope are the only reads that return them.",
+    note: "Reads the stored verdict and whether the project's text has moved since. The three columns are absent from projectDetailView, so this and assessProjectScope are the only endpoints that return them.",
   },
   "server/programs.ts:updateProgram": { level: "staff" },
 

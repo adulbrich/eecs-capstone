@@ -147,6 +147,10 @@ describe("the admin index reads instructor names through its own staff seam", ()
     const plain = await makeUser(`li-p-${Date.now()}@x.com`, "user");
     await expect(listProgramsWithInstructorsAs(plain)).rejects.toThrow(
       /Forbidden/
+    );
+  });
+});
+
 describe("term_count is staff-editable and never public", () => {
   it("round-trips through create and update, and reaches only the staff detail", async () => {
     const admin = await makeUser(`tc-a-${Date.now()}@x.com`, "admin");

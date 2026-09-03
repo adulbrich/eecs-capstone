@@ -51,7 +51,6 @@ export interface MantleOutputItem {
   type?: string;
 }
 
-/** Token counts as the Responses API reports them. */
 /**
  * The docs disagree about where a function call lands: the Responses API spec
  * puts it at the top level of `output`, while the Bedrock tool-use guide reads
@@ -74,6 +73,7 @@ export function findToolCall(
   return;
 }
 
+/** Token counts as the Responses API reports them. */
 export interface MantleUsage {
   input_tokens?: number;
   output_tokens?: number;
