@@ -440,6 +440,30 @@ Migrations run during deploy. To run them out of band, use the same
 `run-task` pattern as section 6 with command
 `["node","scripts/migrate.mjs"]` and no extra environment.
 
+### Find and clear image URLs the app did not mint
+
+`image_url` on `projects` and `inventory_items` is guarded on the change, not
+on what a row already holds (see the Projects section of `docs/QUIRKS.md`), so
+a row written before the upload flow, or before #162, can still carry an
+absolute URL and still render it. Nothing in the column tells a stock photo
+somebody chose from a planted link, so `scripts/image-url-legacy.mjs` does not
+decide: it reports, and a person does.
+
+Run it exactly like the `promote-admin` task in section 6, with
+`["node","scripts/image-url-legacy.mjs"]` and no environment. **That run
+writes nothing.** It prints one line per row, table, id and the full value,
+and the task's CloudWatch log is the report. An empty report closes #165.
+
+To clear the rows that should go, run again with:
+
+```json
+"environment":[{"name":"CONFIRM","value":"NULL"},{"name":"TARGET_IDS","value":"<id>,<id>"}]
+```
+
+It nulls exactly those ids and prints each one. An id that is not in the
+report, whether it names a healthy row or nothing, is refused and left alone,
+and the task exits non-zero to say so. There is no flag that nulls everything.
+
 ---
 
 ## 9. Adding real email delivery
