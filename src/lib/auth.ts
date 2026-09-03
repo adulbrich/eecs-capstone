@@ -55,11 +55,16 @@ export const auth = betterAuth({
   },
   emailVerification: {
     sendOnSignUp: true,
+    // A refused sign-in on an unverified account mails a fresh link, which is
+    // the only way out for a person whose first link expired or went missing:
+    // sign-in refuses them and nothing else in the app sends one. Better Auth
+    // runs this after the password check, so a wrong password costs no mail,
+    // and its rate limiter covers the route.
+    sendOnSignIn: true,
     autoSignInAfterVerification: true,
     // The page the link lands on is not configured here: Better Auth takes it
     // from the request body of whichever call mails the link, and defaults to
-    // "/". Today that is only sign-up, see `callbackURL` in sign-up.tsx; a
-    // sign-in resend (`sendOnSignIn`) would need the same value passed there.
+    // "/". Both callers, sign-up.tsx and sign-in.tsx, pass `/verify-email`.
     sendVerificationEmail: async ({ user, url }) => {
       await emailSender.send(user.email, verificationEmail({ url }));
     },
