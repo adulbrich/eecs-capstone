@@ -289,11 +289,13 @@ describe("bookmarks since publication", () => {
     }
     // Stamped from the app clock, like `publishedAt` is: the database's
     // `now()` can lag the host by a second or two under docker, which would
-    // put a bookmark made right after publishing before it.
+    // put a bookmark made right after publishing before it. Written after
+    // the transition, so `new Date()` is at or past `publishedAt`, and the
+    // comparison is `>=`.
     await db.insert(projectBookmarks).values({
       userId: reader.id,
       projectId: loved.id,
-      createdAt: new Date(Date.now() + 1000),
+      createdAt: new Date(),
     });
     // A bookmark that predates publication does not count: staff bookmark
     // drafts they are reviewing, and that is not student interest.
