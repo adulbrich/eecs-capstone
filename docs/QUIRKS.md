@@ -691,6 +691,19 @@ intermittent bug still surfaces in the log.
 
 The scan that catches it is `projects table interactions` in `public.a11y.test.ts`, which is not `@smoke`, so a regression here shows up in the dispatch-only full run and not on a pull request. The neighbouring `modal={false}` comment in `admin-data-table.tsx` is the other Radix menu lesson: a modal menu puts the rest of the page under `aria-hidden`, which is a different rule (`aria-hidden-focus`) with a different fix.
 
+### axe skips a disabled control, so a disabled pill's colours are yours to measure
+
+axe-core's `color-contrast` rule does not evaluate a disabled form control, since
+WCAG 1.4.3 exempts inactive components. The current-status pill in
+`staff-project-panel.tsx` is a `<button disabled>`, so the `project detail (staff
+panel, scope assessment)` scan in `admin.a11y.test.ts` reports nothing about it in
+either colour scheme. The scan was green with the old white on the dark brand
+orange, which measures 3.48:1 and fails (#208), and is green with the fix, which
+measures 5.19:1. The five enabled pills beside it are measured and listed under
+`passes`. When a disabled element carries text a person still has to
+read, compute the ratio yourself (the WCAG relative-luminance formula in a node
+one-liner is enough) and say so in the PR, because the scan cannot vouch for it.
+
 ### The unit suite sees your dotenv files, so an env-dependent test is machine-dependent
 
 `vite.config.ts` declares no `test` block, which makes it easy to assume the
