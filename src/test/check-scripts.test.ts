@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -87,6 +87,7 @@ describe("check-commit-message", () => {
 
   it("rejects an uppercase subject after the colon, and only that", () => {
     expect(commit("fix(x): Stop it").status).toBe(1);
+    expect(commit("fix(x): \u00dcber alles").status).toBe(1);
     expect(commit("fix(x): 404 page gets a body").status).toBe(0);
     expect(commit('fix(x): "foo" is not a status').status).toBe(0);
   });
@@ -135,25 +136,60 @@ describe("check-commit-message", () => {
 
   it("checks every commit in a range and names the one that fails", () => {
     const bad = repoWith(["chore: seed", "Add the thing", "fix(x): fine"]);
-    const result = run(
-      "check-commit-message.mjs",
-      ["--range", "HEAD~2..HEAD"],
-      undefined,
-      bad
-    );
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("Add the thing");
-    expect(result.stderr).not.toContain("fix(x): fine");
-
     const good = repoWith(["chore: seed", "fix(x): fine"]);
-    expect(
-      run(
+    try {
+      const result = run(
+        "check-commit-message.mjs",
+        ["--range", "HEAD~2..HEAD"],
+        undefined,
+        bad
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("Add the thing");
+      expect(result.stderr).not.toContain("fix(x): fine");
+      expect(
+        run(
+          "check-commit-message.mjs",
+          ["--range", "HEAD~1..HEAD"],
+          undefined,
+          good
+        ).status
+      ).toBe(0);
+    } finally {
+      rmSync(bad, { recursive: true, force: true });
+      rmSync(good, { recursive: true, force: true });
+    }
+  });
+
+  it("still checks the body of a merge commit in a range", () => {
+    const dir = repoWith(["chore: seed"]);
+    const git = (...args: string[]) =>
+      spawnSync("git", ["-C", dir, ...args], { encoding: "utf8", env });
+    try {
+      git("checkout", "-q", "-b", "topic");
+      writeFileSync(join(dir, "t"), "t");
+      git("add", "t");
+      git("commit", "-q", "-m", "fix(x): topic");
+      git("checkout", "-q", "main");
+      git(
+        "merge",
+        "--no-ff",
+        "-q",
+        "-m",
+        "Merge branch 'topic'\n\nClaude-Session: https://claude.ai/code/session/abc",
+        "topic"
+      );
+      const result = run(
         "check-commit-message.mjs",
         ["--range", "HEAD~1..HEAD"],
         undefined,
-        good
-      ).status
-    ).toBe(0);
+        dir
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("claude.ai/code/session");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -212,6 +248,12 @@ describe("check-prose", () => {
     expect(prose("\u{1F7E1} partial").status).toBe(1);
     expect(prose("\u{23F0} alarm").status).toBe(1);
     expect(prose("\u{2139}\u{FE0F} info").status).toBe(1);
+  });
+
+  it("passes the keyboard and details glyphs a doc uses", () => {
+    expect(
+      prose("Press \u2318K or \u2325\u23CE\n\u25B6 Details\n").status
+    ).toBe(0);
   });
 
   it("does not count the harness footer on a PR body", () => {
