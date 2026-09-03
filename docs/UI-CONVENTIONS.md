@@ -614,13 +614,21 @@ permanent and still confirms through plain `ConfirmDialog`.
 Both are built on `AlertDialog` from `#/components/ui/alert-dialog`, never
 `Dialog`. `Dialog` renders `role="dialog"`; an irreversible action wants
 `role="alertdialog"`, which screen readers announce more assertively and which
-does not dismiss on an outside click or Escape. axe does not report a plain
-`dialog` on a destructive prompt, so the role is a rule here and asserted by
-the component tests, not something the accessibility suite would catch. Radix
-moves initial focus to the cancel action, which is right for a one-click
-prompt and wrong for a typed gate; the inventory panel points
-`AlertDialogContent`'s `onOpenAutoFocus` at the input so the thing the user
-must fill is the first thing focused (#66).
+does not dismiss on an outside click. Escape still closes it; Radix blocks
+only outside interaction. axe does not report a plain `dialog` on a
+destructive prompt, so the role is a rule here, asserted by the component
+tests and the accessibility suite rather than found by a scan. The
+destructive button is a plain `Button`, not `AlertDialogAction`: the action
+closes the dialog on click unless the handler calls `preventDefault`, and both
+dialogs keep theirs open to show a failure, so an explicit `open` state is
+clearer than an opt-out.
+
+Radix moves initial focus to the cancel action. That is right for a one-click
+prompt and for the account dialog, whose input sits under a list of
+consequences the reader should get through first. It is wrong for the
+inventory panel, where the input is the first thing in the body, so that one
+points `AlertDialogContent`'s `onOpenAutoFocus` at the input (#66). Decide per
+dialog by what stands between the top of the body and the input.
 
 Results that need no acknowledgement use a toast: `import { toast } from "sonner"`.
 

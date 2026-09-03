@@ -193,10 +193,7 @@ describe("InventoryLifecyclePanel: the hard delete confirmation", () => {
   it("is an alert dialog, and opens with focus on the name input", async () => {
     renderPanel();
     const { input } = openDeleteDialog();
-    // `role="alertdialog"` is announced more assertively than a plain dialog
-    // and does not dismiss on an outside click, which is the primitive an
-    // irreversible action wants. Radix would otherwise put initial focus on
-    // Cancel, one Tab away from the input the gate needs filled.
+    // The role and the focus rule: docs/UI-CONVENTIONS.md, Destructive actions.
     expect(screen.getByRole("alertdialog")).toBeDefined();
     await waitFor(() => expect(document.activeElement).toBe(input));
   });
