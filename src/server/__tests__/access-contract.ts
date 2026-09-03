@@ -72,7 +72,11 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/admin.ts:getAdminStats": {
     level: "staff",
-    note: "Gated inline in the handler, not in an _internal seam.",
+    note: "The two work-queue figures /admin shows. The overview counts moved to getAnalytics (#34); the pending-requests count is one query shared by both.",
+  },
+  "server/analytics.ts:getAnalytics": {
+    level: "staff",
+    note: "The staff dashboard over the app's own data. The new-users flow and the users-by-role breakdown are admin only and come back null for an instructor, matching the gate on the old userTotal.",
   },
 
   "server/bookmarks.ts:addBookmark": {

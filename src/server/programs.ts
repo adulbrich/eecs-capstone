@@ -7,6 +7,8 @@ const programSchema = z.object({
   description: z.string().max(2000).nullable().optional(),
   // Academic terms the course runs. Nullable: unset is a fact, not a zero.
   termCount: z.number().int().min(1).max(12).nullable().optional(),
+  // Teams the office expects to place. Nullable for the same reason.
+  expectedTeams: z.number().int().min(0).max(500).nullable().optional(),
 });
 
 export type ProgramInput = z.infer<typeof programSchema>;

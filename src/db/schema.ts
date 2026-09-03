@@ -55,6 +55,13 @@ export const programs = pgTable("programs", {
    * unset value is visibly unset rather than judged against a wrong bar (#61).
    */
   termCount: integer("term_count"),
+  /**
+   * How many student teams the office expects to place in this course, the
+   * denominator the analytics dashboard compares published team slots
+   * against (#34). Staff-editable, never public, and nullable so an unset
+   * value renders as "not set" rather than as a comparison against zero.
+   */
+  expectedTeams: integer("expected_teams"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -68,6 +68,25 @@ test("admin dashboard", async ({ page }) => {
   await checkA11y(page);
 });
 
+test("admin analytics dashboard", async ({ page }) => {
+  await page.goto("/admin/analytics");
+  await waitForHydration(page);
+  // Every figure names its scope, and the admin-only figures render for the
+  // admin fixture; the instructor branch is covered by the integration test.
+  await expect(page.getByText("Published team slots")).toBeVisible();
+  await expect(page.getByText("Users by role")).toBeVisible();
+  await checkA11y(page);
+});
+
+test("admin analytics dashboard, one program selected", async ({ page }) => {
+  await page.goto(`/admin/analytics?program=${programId}`);
+  await waitForHydration(page);
+  // The program dimension hides itself once one program is selected.
+  await expect(page.getByText("Published team slots")).toBeVisible();
+  await expect(page.getByText("Projects by program")).toHaveCount(0);
+  await checkA11y(page);
+});
+
 test("@smoke admin inventory list", async ({ page }) => {
   await page.goto("/admin/inventory");
   await checkA11y(page);

@@ -127,6 +127,7 @@ export async function createProgramAs(viewer: AuthUser, data: ProgramInput) {
       courseName: data.courseName,
       description: data.description ?? null,
       termCount: data.termCount ?? null,
+      expectedTeams: data.expectedTeams ?? null,
     })
     .returning();
   return { id: row.id };
@@ -149,6 +150,7 @@ export async function updateProgramAs(
       courseName: data.courseName,
       description: data.description ?? null,
       termCount: data.termCount ?? null,
+      expectedTeams: data.expectedTeams ?? null,
       updatedAt: new Date(),
     })
     .where(eq(programs.id, data.id));

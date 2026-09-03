@@ -31,6 +31,7 @@ import { Route as AuthedMyProjectsRouteImport } from './routes/_authed/my/projec
 import { Route as AuthedMyItemsRouteImport } from './routes/_authed/my/items'
 import { Route as AuthedMyBookmarksRouteImport } from './routes/_authed/my/bookmarks'
 import { Route as AuthedInventoryNewRouteImport } from './routes/_authed/inventory/new'
+import { Route as AuthedAdminAnalyticsRouteImport } from './routes/_authed/admin/analytics'
 import { Route as AuthedAdminUsersIndexRouteImport } from './routes/_authed/admin/users/index'
 import { Route as AuthedAdminProjectsIndexRouteImport } from './routes/_authed/admin/projects/index'
 import { Route as AuthedAdminProgramsIndexRouteImport } from './routes/_authed/admin/programs/index'
@@ -153,6 +154,11 @@ const AuthedInventoryNewRoute = AuthedInventoryNewRouteImport.update({
   path: '/inventory/new',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAdminAnalyticsRoute = AuthedAdminAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AuthedAdminRoute,
+} as any)
 const AuthedAdminUsersIndexRoute = AuthedAdminUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
@@ -238,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/inventory/': typeof InventoryIndexRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/admin/analytics': typeof AuthedAdminAnalyticsRoute
   '/inventory/new': typeof AuthedInventoryNewRoute
   '/my/bookmarks': typeof AuthedMyBookmarksRoute
   '/my/items': typeof AuthedMyItemsRoute
@@ -272,6 +279,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/inventory': typeof InventoryIndexRoute
   '/projects': typeof ProjectsIndexRoute
+  '/admin/analytics': typeof AuthedAdminAnalyticsRoute
   '/inventory/new': typeof AuthedInventoryNewRoute
   '/my/bookmarks': typeof AuthedMyBookmarksRoute
   '/my/items': typeof AuthedMyItemsRoute
@@ -309,6 +317,7 @@ export interface FileRoutesById {
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/inventory/': typeof InventoryIndexRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/_authed/admin/analytics': typeof AuthedAdminAnalyticsRoute
   '/_authed/inventory/new': typeof AuthedInventoryNewRoute
   '/_authed/my/bookmarks': typeof AuthedMyBookmarksRoute
   '/_authed/my/items': typeof AuthedMyItemsRoute
@@ -346,6 +355,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/inventory/'
     | '/projects/'
+    | '/admin/analytics'
     | '/inventory/new'
     | '/my/bookmarks'
     | '/my/items'
@@ -380,6 +390,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/inventory'
     | '/projects'
+    | '/admin/analytics'
     | '/inventory/new'
     | '/my/bookmarks'
     | '/my/items'
@@ -416,6 +427,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/inventory/'
     | '/projects/'
+    | '/_authed/admin/analytics'
     | '/_authed/inventory/new'
     | '/_authed/my/bookmarks'
     | '/_authed/my/items'
@@ -610,6 +622,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedInventoryNewRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/analytics': {
+      id: '/_authed/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AuthedAdminAnalyticsRouteImport
+      parentRoute: typeof AuthedAdminRoute
+    }
     '/_authed/admin/users/': {
       id: '/_authed/admin/users/'
       path: '/users'
@@ -698,6 +717,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthedAdminRouteChildren {
+  AuthedAdminAnalyticsRoute: typeof AuthedAdminAnalyticsRoute
   AuthedAdminIndexRoute: typeof AuthedAdminIndexRoute
   AuthedAdminCategoriesCategoryIdRoute: typeof AuthedAdminCategoriesCategoryIdRoute
   AuthedAdminInventoryRequestsRoute: typeof AuthedAdminInventoryRequestsRoute
@@ -712,6 +732,7 @@ interface AuthedAdminRouteChildren {
 }
 
 const AuthedAdminRouteChildren: AuthedAdminRouteChildren = {
+  AuthedAdminAnalyticsRoute: AuthedAdminAnalyticsRoute,
   AuthedAdminIndexRoute: AuthedAdminIndexRoute,
   AuthedAdminCategoriesCategoryIdRoute: AuthedAdminCategoriesCategoryIdRoute,
   AuthedAdminInventoryRequestsRoute: AuthedAdminInventoryRequestsRoute,

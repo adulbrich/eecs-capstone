@@ -403,9 +403,21 @@ Each project carries:
 - [ ] Admins assign students to projects from bids and preferences
   (automatic or manual).
 
-## 18. Analytics Dashboard (Stretch)
+## 18. Analytics Dashboard
 
-- [ ] Analytics dashboard with charts for project trends and user engagement.
+- [x] Staff dashboard at `/admin/analytics` over the app's own data (#34):
+  headline stocks as of now (published team slots against each program's
+  `expected_teams`, submitted projects and the age of the oldest wait,
+  projects needing a mentor, mentor capacity offered and unassigned, overdue
+  items and pending request lines with the age of the oldest, published
+  projects with no bookmark since publication), flows over a date range with
+  a previous-period comparison (submitted, published, inventory requests,
+  and new users for admins), and breakdowns by status, program and category.
+  A program selector governs the figures marked per program; every card
+  names its scope. No charting library: numbers and small grouped counts.
+- [ ] Second pass: conversion from submitted to published, stale drafts,
+  repeat proposers, category demand against bookmarks, median review latency.
+- [ ] Site traffic (#18) is separate: this counts what is in the database.
 - [ ] Projects published per academic year; projects submitted per period.
 - [ ] Customizable date ranges (academic year definition; recruitment starting
   before the academic year).
