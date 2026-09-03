@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { addComment } from "#/server/comments";
 import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
@@ -239,6 +239,12 @@ function ReplyForm({
   const [isInternalChoice, setIsInternalChoice] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Cancel stays usable while a reply is in flight (#188), so a form can be
+  // closed and reopened with a request still out. Each submit takes a number;
+  // a request whose number is no longer the current one writes nothing back.
+  // Closing bumps it, and so does the next submit, so one attempt's answer
+  // can never re-enable or fail the attempt that replaced it (#247).
+  const attempt = useRef(0);
 
   // A reply inherits its parent's internal flag. The server enforces this too;
   // here it keeps the checkbox from promising something the server will
@@ -265,26 +271,49 @@ function ReplyForm({
     );
   }
 
+  // Clearing busy is what makes a reopened form usable while the cancelled
+  // request is still out. Nothing is lost by it: that request is stale now,
+  // so it will not clear the flag back out from under the next attempt.
+  function close() {
+    attempt.current += 1;
+    setBusy(false);
+    setOpen(false);
+  }
+
   // Disabled in flight for the same reason as the new-comment form above.
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) {
       return;
     }
+    attempt.current += 1;
+    const mine = attempt.current;
+    const isCurrent = () => attempt.current === mine;
     setError(null);
     setBusy(true);
     try {
       await addComment({
         data: { projectId, parentId, content, isInternal },
       });
-      setContent("");
-      setIsInternalChoice(false);
-      setOpen(false);
+      if (isCurrent()) {
+        setContent("");
+        setIsInternalChoice(false);
+        setOpen(false);
+      }
+      // Outside the guard: the reply landed whichever attempt posted it, so
+      // the thread has to refetch even when this one was cancelled.
       onChanged();
     } catch (err) {
-      setError((err as Error).message);
+      if (isCurrent()) {
+        setError((err as Error).message);
+      }
     } finally {
-      setBusy(false);
+      // Only the current attempt owns the flag. A stale one skips this
+      // because close() already cleared it, or a newer submit set it for
+      // itself and is still in flight.
+      if (isCurrent()) {
+        setBusy(false);
+      }
     }
   }
 
@@ -322,12 +351,7 @@ function ReplyForm({
         <Button disabled={busy} size="xs" type="submit">
           Post
         </Button>
-        <Button
-          onClick={() => setOpen(false)}
-          size="xs"
-          type="button"
-          variant="ghost"
-        >
+        <Button onClick={close} size="xs" type="button" variant="ghost">
           Cancel
         </Button>
       </div>
