@@ -71,7 +71,7 @@ export interface HistoryEntry {
  * hold that staff typed as Student@Oregonstate.edu belongs to the account at
  * student@oregonstate.edu. The write-time lookup in resolveHold still matches
  * the account exactly, so such a hold stays an address hold until that is
- * folded too (see the issue this docblock's history points at).
+ * folded too (see #245).
  *
  * One predicate, read by /my/items and by account deletion, so the page that
  * shows a person their items and the check that refuses to delete their
