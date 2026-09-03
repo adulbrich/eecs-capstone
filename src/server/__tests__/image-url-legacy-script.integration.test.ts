@@ -43,8 +43,14 @@ const SHAPES = [
   { label: "null", value: () => null },
 ] as const;
 
+interface SeededRow {
+  id: string;
+  label: string;
+  value: string | null;
+}
+
 async function seedProjects() {
-  const rows: { id: string; label: string; value: string | null }[] = [];
+  const rows: SeededRow[] = [];
   for (const shape of SHAPES) {
     const [row] = await db
       .insert(projects)
@@ -61,7 +67,7 @@ async function seedProjects() {
 }
 
 async function seedItems() {
-  const rows: { id: string; label: string; value: string | null }[] = [];
+  const rows: SeededRow[] = [];
   for (const shape of SHAPES) {
     const [row] = await db
       .insert(inventoryItems)
@@ -95,20 +101,19 @@ describe("image-url-legacy script", () => {
     // The script restates `owns` as SQL because it cannot import it. This is
     // the assertion that keeps the two from drifting: for every seeded row,
     // "in the report" must equal "set, and not owned".
-    for (const row of seededProjects) {
-      const expected = !!row.value && !projectImageKeys(row.id).owns(row.value);
-      expect([row.label, reported.has(`projects:${row.id}`)]).toEqual([
-        row.label,
-        expected,
-      ]);
-    }
-    for (const row of seededItems) {
-      const expected =
-        !!row.value && !inventoryImageKeys(row.id).owns(row.value);
-      expect([row.label, reported.has(`inventory_items:${row.id}`)]).toEqual([
-        row.label,
-        expected,
-      ]);
+    const tables = [
+      { table: "projects", rows: seededProjects, keys: projectImageKeys },
+      { table: "inventory_items", rows: seededItems, keys: inventoryImageKeys },
+    ];
+    for (const { table, rows, keys } of tables) {
+      for (const row of rows) {
+        const expected = !!row.value && !keys(row.id).owns(row.value);
+        expect([table, row.label, reported.has(`${table}:${row.id}`)]).toEqual([
+          table,
+          row.label,
+          expected,
+        ]);
+      }
     }
 
     // The report carries the full value, because a reader classifies by eye.
@@ -123,10 +128,7 @@ describe("image-url-legacy script", () => {
   it("nulls only the named rows, and refuses an id the report does not carry", async () => {
     const seeded = await seedProjects();
     const byLabel = (label: string) =>
-      seeded.find((r) => r.label === label) as {
-        id: string;
-        value: string | null;
-      };
+      seeded.find((r) => r.label === label) as SeededRow;
     const absolute = byLabel("absolute URL");
     const traversal = byLabel("traversal under the prefix");
     const owned = byLabel("owned key");
