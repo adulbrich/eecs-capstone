@@ -443,7 +443,8 @@ Migrations run during deploy. To run them out of band, use the same
 ### Find and clear image URLs the app did not mint
 
 `image_url` on `projects` and `inventory_items` is guarded on the change, not
-on what a row already holds (see the Projects section of `docs/QUIRKS.md`), so
+on what a row already holds (see "What `image_url` may contain, and why the
+check is on the change" in `docs/QUIRKS.md`), so
 a row written before the upload flow, or before #162, can still carry an
 absolute URL and still render it. Nothing in the column tells a stock photo
 somebody chose from a planted link, so `scripts/image-url-legacy.mjs` does not
@@ -463,6 +464,9 @@ To clear the rows that should go, run again with:
 It nulls exactly those ids and prints each one. An id that is not in the
 report, whether it names a healthy row or nothing, is refused and left alone,
 and the task exits non-zero to say so. There is no flag that nulls everything.
+The null is an operator write: it sets `updated_at` and leaves no
+`project_edit_log` or `inventory_item_edit_log` row, since there is no editor
+to attribute one to.
 
 ---
 
@@ -817,3 +821,5 @@ cannot be, so read it as a summary and not as the contract.
 - `.github/workflows/deploy.yml` manual deploy workflow.
 - `scripts/migrate.mjs` production migration runner.
 - `scripts/promote-admin.mjs` first-admin bootstrap.
+- `scripts/image-url-legacy.mjs` report, and null on request, `image_url` values
+  the app did not mint.
