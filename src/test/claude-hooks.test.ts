@@ -1,5 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -29,10 +35,14 @@ afterAll(() => {
   }
 });
 
-function hook(name: string, input: Record<string, unknown>) {
+function hook(
+  name: string,
+  input: Record<string, unknown>,
+  envOverrides: Record<string, string> = {}
+) {
   const result = spawnSync(process.execPath, [`.claude/hooks/${name}.mjs`], {
     encoding: "utf8",
-    env,
+    env: { ...env, ...envOverrides },
     input: JSON.stringify({ cwd, ...input }),
   });
   return {
@@ -369,6 +379,11 @@ describe("after-edit", () => {
 });
 
 describe("session-context", () => {
+  // Vitest's default 5000ms is the same number as the hook's own cap on one
+  // subprocess, so a single slow `docker compose ps` on a loaded runner spent
+  // the whole test budget before the hook printed a line. This is the only
+  // test here that shells out to anything but git, so it gets its own ceiling
+  // rather than the global testTimeout moving for everything.
   it("prints the branch, tree, node and compose lines", () => {
     const result = hook("session-context", {});
     expect(result.status).toBe(0);
@@ -376,5 +391,25 @@ describe("session-context", () => {
     expect(result.stdout).toContain("Working tree:");
     expect(result.stdout).toContain("Node:");
     expect(result.stdout).toContain("Compose:");
-  });
+  }, 30_000);
+
+  it("says the compose check did not finish rather than that nothing runs", () => {
+    // The cap is short enough to be reachable on a cold daemon, and an answer
+    // that never came must not read as "nothing running": that would tell a
+    // session to start a stack that is already up.
+    const dir = mkdtempSync(join(tmpdir(), "slow-docker-"));
+    temp.push(dir);
+    const fake = join(dir, "docker");
+    writeFileSync(fake, "#!/bin/sh\nsleep 30\n");
+    chmodSync(fake, 0o755);
+
+    const result = hook(
+      "session-context",
+      {},
+      { PATH: `${dir}:${process.env.PATH}` }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Compose: no answer in");
+    expect(result.stdout).not.toContain("nothing running");
+  }, 30_000);
 });

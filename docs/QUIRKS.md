@@ -463,6 +463,27 @@ Tests closed successfully but something prevents Vite server from exiting
 The test results above those lines are still authoritative. The exit code is
 still correct.
 
+### A test that spawns a subprocess needs a budget above the subprocess's own
+
+Vitest's default `testTimeout` is 5000ms, which was also the cap
+`.claude/hooks/session-context.mjs` put on each thing it shells out to. One
+slow `docker compose ps` therefore spent the entire test budget before the
+hook printed a line, and the test failed on CI twice, once on `main`, while
+passing on every developer machine where the daemon answers instantly (#252).
+Neither number was wrong on its own; they were the same number, so there was
+no headroom by construction.
+
+When a test drives a process that has its own timeouts, give that test an
+explicit ceiling above their sum, as the third argument to `it`. Do not raise
+the global `testTimeout`: that hides slow tests everywhere else. The Playwright
+`globalTimeout` and `actionTimeout` entries further down are the same shape,
+one layer up.
+
+The other half is worth copying too: a probe whose answer is a convenience
+should fail visibly rather than silently. `session-context.mjs` reports a
+compose check that timed out as a timeout, because folding it into "nothing
+running" would tell a session to start a stack that is already up.
+
 ### A missing DATABASE_URL fails every route, including `/api/healthz`
 
 `src/routes/api/healthz.ts` returns a hardcoded 200 and its comment says it
