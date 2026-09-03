@@ -1980,6 +1980,9 @@ describe("staff-assigned holds in my items", () => {
       .from(inventoryItems)
       .where(eq(inventoryItems.id, item.id));
     expect(row.currentHolderId).toBe(holder.id);
+    // Matching does not normalize: the address is stored as staff typed it,
+    // which is #249's question rather than this one's.
+    expect(row.currentHolderEmail).toBe(`Cased-${stamp}@X.com`);
     // An account hold stores neither, so the typed pair is dropped instead of
     // being recorded as a walk-in's name and program.
     expect(row.currentHolderName).toBeNull();
