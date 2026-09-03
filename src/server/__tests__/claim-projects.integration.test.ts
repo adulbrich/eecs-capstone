@@ -4,41 +4,7 @@ import { db } from "#/db";
 import { projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
-
-const CONSOLE_EMAIL_URL = /^\s*\S[^\n]*?: (https?:\/\/\S+)$/m;
-
-/**
- * Runs `fn` and pulls the link out of whatever the console transport printed.
- * Mirrors the helper in `src/lib/__tests__/auth.integration.test.ts`.
- */
-async function captureConsoleEmail(
-  subject: string,
-  fn: () => Promise<unknown>
-): Promise<string> {
-  let captured = "";
-  const orig = process.stderr.write.bind(process.stderr);
-  process.stderr.write = ((chunk: unknown) => {
-    captured += String(chunk);
-    return true;
-  }) as typeof process.stderr.write;
-  try {
-    await fn();
-  } finally {
-    process.stderr.write = orig;
-  }
-  if (!captured.includes(`subject: ${subject}`)) {
-    throw new Error(
-      `No console email with subject "${subject}". Got:\n${captured}`
-    );
-  }
-  const match = captured.match(CONSOLE_EMAIL_URL);
-  if (!match) {
-    throw new Error(
-      `Console email "${subject}" carried no link. Got:\n${captured}`
-    );
-  }
-  return match[1];
-}
+import { captureConsoleEmail } from "#/test/shared/console-email";
 
 async function makeProject(fields: {
   proposerEmail: string | null;
