@@ -100,6 +100,22 @@ test("inventory item detail (staff)", async ({ page }) => {
   await checkA11y(page);
 });
 
+test("inventory hard delete confirmation", async ({ page }) => {
+  await page.goto(`/inventory/${itemId}`);
+  await waitForHydration(page);
+
+  await page.getByRole("button", { name: "Hard delete item" }).click();
+  // axe does not flag a plain dialog on a destructive prompt, so the role and
+  // the focus rule (docs/UI-CONVENTIONS.md, Destructive actions) are asserted.
+  const dialog = page.getByRole("alertdialog", { name: "Hard delete item" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel("Confirm item name")).toBeFocused();
+  await checkA11y(page);
+
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
 test("inventory item edit (staff)", async ({ page }) => {
   await page.goto(`/inventory/${itemId}/edit`);
   await checkA11y(page);

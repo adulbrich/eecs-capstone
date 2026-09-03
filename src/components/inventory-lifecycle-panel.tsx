@@ -20,6 +20,15 @@ import { HolderField } from "./holder-field";
 import { InventoryStatusBadge } from "./inventory-status-badge";
 import { LocalTime } from "./local-time";
 import { PanelSection } from "./panel";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -363,6 +372,7 @@ export function InventoryLifecyclePanel({
   // Delete dialog state
   const [delOpen, setDelOpen] = useState(false);
   const [delConfirm, setDelConfirm] = useState("");
+  const delInputRef = useRef<HTMLInputElement>(null);
 
   // Override "change status to" select
   const [overrideStatus, setOverrideStatus] = useState<Status | "">("");
@@ -688,15 +698,24 @@ export function InventoryLifecyclePanel({
         </DialogContent>
       </Dialog>
 
-      <Dialog onOpenChange={setDelOpen} open={delOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Hard delete item</DialogTitle>
-            <DialogDescription>
+      {/* The primitive, the focus rule and the plain `Button` in the footer
+          are all explained in docs/UI-CONVENTIONS.md, Destructive actions.
+          Local to this dialog: the failure branch of `onHardDelete` needs it
+          open to show the server's refusal, hence the explicit `setDelOpen`. */}
+      <AlertDialog onOpenChange={setDelOpen} open={delOpen}>
+        <AlertDialogContent
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            delInputRef.current?.focus();
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hard delete item</AlertDialogTitle>
+            <AlertDialogDescription>
               This permanently removes the item. Type the item name exactly to
               confirm.
-            </DialogDescription>
-          </DialogHeader>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           <div className="space-y-3">
             <p className="text-sm">
               Item name: <span className="font-mono">{item.name}</span>
@@ -705,18 +724,13 @@ export function InventoryLifecyclePanel({
               aria-label="Confirm item name"
               onChange={(e) => setDelConfirm(e.target.value)}
               placeholder="Type item name to confirm"
+              ref={delInputRef}
               value={delConfirm}
             />
             {error && <p className="text-destructive text-sm">{error}</p>}
           </div>
-          <DialogFooter>
-            <Button
-              disabled={busy}
-              onClick={() => setDelOpen(false)}
-              variant="outline"
-            >
-              Cancel
-            </Button>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <Button
               disabled={busy || delConfirm !== item.name}
               onClick={() => void onHardDelete()}
@@ -724,9 +738,9 @@ export function InventoryLifecyclePanel({
             >
               {busy ? "Deleting..." : "Hard delete"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
