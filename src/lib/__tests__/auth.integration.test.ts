@@ -11,10 +11,7 @@ const CONSOLE_EMAIL_URL = /^\s*\S[^\n]*?: (https?:\/\/\S+)$/m;
  * subject and body instead of a per-message tag and a `url:` field. The link
  * arrives inside the body as "<call to action>: <url>".
  */
-async function captureConsoleEmail(
-  subject: string,
-  fn: () => Promise<unknown>
-): Promise<string> {
+async function captureStderr(fn: () => Promise<unknown>): Promise<string> {
   let captured = "";
   const orig = process.stderr.write.bind(process.stderr);
   process.stderr.write = ((chunk: unknown) => {
@@ -26,6 +23,14 @@ async function captureConsoleEmail(
   } finally {
     process.stderr.write = orig;
   }
+  return captured;
+}
+
+async function captureConsoleEmail(
+  subject: string,
+  fn: () => Promise<unknown>
+): Promise<string> {
+  const captured = await captureStderr(fn);
   if (!captured.includes(`subject: ${subject}`)) {
     throw new Error(
       `No console email with subject "${subject}". Got:\n${captured}`
@@ -110,21 +115,13 @@ describe("auth integration", () => {
       });
     });
 
-    let captured = "";
-    const orig = process.stderr.write.bind(process.stderr);
-    process.stderr.write = ((chunk: unknown) => {
-      captured += String(chunk);
-      return true;
-    }) as typeof process.stderr.write;
-    try {
+    const captured = await captureStderr(async () => {
       await expect(
         auth.api.signInEmail({
           body: { email, password: "Wrong1!", callbackURL: "/verify-email" },
         })
       ).rejects.toMatchObject({ body: { code: "INVALID_EMAIL_OR_PASSWORD" } });
-    } finally {
-      process.stderr.write = orig;
-    }
+    });
     expect(captured).not.toContain("subject: Verify your email");
   });
 });
