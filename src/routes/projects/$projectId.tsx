@@ -206,7 +206,12 @@ function ProjectDetail() {
       )}
 
       {viewerIsStaff && (
+        // Keyed so a navigation between two project pages remounts it: the
+        // route component is reused across a param change (see QUIRKS), and
+        // the panel holds the transition dialog's target and comment, which
+        // would otherwise be posted onto the next project.
         <StaffProjectPanel
+          key={project.id}
           onChanged={() => {
             void router.invalidate();
           }}

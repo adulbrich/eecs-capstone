@@ -109,9 +109,12 @@ function project(status: string, id = PROJECT_ID) {
   return { id, status, deletedAt: null };
 }
 
+// Keyed on the id, as the route renders it: a rerender with a new id is the
+// remount the route relies on to drop the previous project's drafts.
 function panel(status: string, id = PROJECT_ID) {
   return (
     <StaffProjectPanel
+      key={id}
       onChanged={() => {
         // no-op
       }}
@@ -373,6 +376,37 @@ describe("StaffProjectPanel mentorship save gate", () => {
         .getByRole("button", { name: "Save mentorship" })
         .hasAttribute("disabled")
     ).toBe(true);
+  });
+});
+
+describe("StaffProjectPanel transition dialog across a project change", () => {
+  it("closes the dialog and posts nothing stale when the project id changes", async () => {
+    // Without the key the dialog opened for the first project stays open
+    // across the rerender, and Confirm posts its target status with the
+    // second project's id.
+    const view = renderPanel("submitted");
+    fireEvent.click(screen.getByTitle("Move to Approved"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy()
+    );
+    fireEvent.change(screen.getByLabelText("Comment (optional)"), {
+      target: { value: "Looks good" },
+    });
+
+    view.rerender(panel("draft", "00000000-0000-0000-0000-0000000000p2"));
+
+    expect(screen.queryByRole("button", { name: "Confirm" })).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(performTransition).not.toHaveBeenCalled();
+    // The stepper now reflects the second project, so its dialog opens on a
+    // fresh draft.
+    fireEvent.click(screen.getByTitle("Move to Submitted"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy()
+    );
+    expect(
+      (screen.getByLabelText("Comment (optional)") as HTMLTextAreaElement).value
+    ).toBe("");
   });
 });
 
