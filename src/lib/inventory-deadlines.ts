@@ -143,3 +143,62 @@ export function compareByDeadline(a: DeadlineEntry, b: DeadlineEntry): number {
   }
   return recencyOf(b).getTime() - recencyOf(a).getTime();
 }
+
+/** Within this many days counts as due soon on the borrower's own page. */
+export const SOON_DAYS = 3;
+
+export interface AttentionSummary {
+  overduePickups: number;
+  overdueReturns: number;
+  pickupsDueSoon: number;
+  returnsDueSoon: number;
+}
+
+/**
+ * What on the Active tab is being asked of the borrower right now, so the
+ * page can open by answering "is anything wrong" instead of leaving seven
+ * near-identical rows to be read (#64). Overdue comes from `overdueFlags`,
+ * the same predicate the badge and the bell use; "soon" is the same deadline
+ * pair looked at from the other side of now.
+ */
+export function attentionSummary(
+  entries: readonly DeadlineEntry[],
+  now: Date
+): AttentionSummary {
+  const summary: AttentionSummary = {
+    overdueReturns: 0,
+    overduePickups: 0,
+    returnsDueSoon: 0,
+    pickupsDueSoon: 0,
+  };
+  const horizon = now.getTime() + SOON_DAYS * 86_400_000;
+  const soon = (date: Date | null) =>
+    date !== null &&
+    date.getTime() >= now.getTime() &&
+    date.getTime() <= horizon;
+  for (const entry of entries) {
+    const pair = deadlinePairOf(entry);
+    const flags = overdueFlags(pair, now.getTime());
+    if (flags.checkoutOverdue) {
+      summary.overdueReturns += 1;
+    } else if (pair.status === "checked_out" && soon(pair.dueAt)) {
+      summary.returnsDueSoon += 1;
+    }
+    if (flags.pickupOverdue) {
+      summary.overduePickups += 1;
+    } else if (pair.status === "reserved" && soon(pair.pickupBy)) {
+      summary.pickupsDueSoon += 1;
+    }
+  }
+  return summary;
+}
+
+export function needsAttention(summary: AttentionSummary): boolean {
+  return (
+    summary.overdueReturns +
+      summary.overduePickups +
+      summary.returnsDueSoon +
+      summary.pickupsDueSoon >
+    0
+  );
+}

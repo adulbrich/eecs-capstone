@@ -241,6 +241,28 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
       .returning();
   }
 
+  // An item in the fixture user's borrow list, so the Borrow list tab scans
+  // its assembled-request region rather than the empty state (#64). A second
+  // item rather than the one above: the smoke flows walk that one through the
+  // lifecycle and an item in a cart is not `available` to request twice.
+  let [cartItem] = await db
+    .select()
+    .from(schema.inventoryItems)
+    .where(eq(schema.inventoryItems.name, "A11Y Cart Item"));
+  if (!cartItem) {
+    [cartItem] = await db
+      .insert(schema.inventoryItems)
+      .values({
+        name: "A11Y Cart Item",
+        description: "An item waiting in the fixture user's borrow list.",
+      })
+      .returning();
+  }
+  await db
+    .insert(schema.inventoryCartItems)
+    .values({ userId: owner.id, itemId: cartItem.id })
+    .onConflictDoNothing();
+
   // Draft project owned by the fixture user (no unique constraint on title,
   // select-first pattern). user.a11y.test.ts needs a draft it can sign in as
   // user@example.com and see a delete trigger on: the dev seed's only draft
