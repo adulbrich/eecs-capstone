@@ -22,11 +22,11 @@ const { router, server } = vi.hoisted(() => ({
 }));
 
 vi.mock("#/server/inventory", () => server);
-// HolderField's account lookup. The dialog it lives in is opened below but
-// never filled in, so these only have to exist.
+// HolderField's account lookup, answering "nobody" in the shapes the real
+// functions use. The dialog it lives in is opened below but never filled in.
 vi.mock("#/server/users", () => ({
-  lookupUserByEmail: vi.fn(() => Promise.resolve({ user: null })),
-  searchUsers: vi.fn(() => Promise.resolve({ users: [] })),
+  lookupUserByEmail: vi.fn(() => Promise.resolve(null)),
+  searchUsers: vi.fn(() => Promise.resolve([])),
 }));
 vi.mock("@tanstack/react-router", () => ({ useRouter: () => router }));
 
@@ -128,10 +128,10 @@ describe("InventoryLifecyclePanel: the recommended transition per status", () =>
   });
 
   it.each(
-    STATUSES.filter((s) => recommended[s] !== null).map((status) => ({
-      status,
-      ...(recommended[status] as { label: string; next: ItemStatus }),
-    }))
+    STATUSES.flatMap((status) => {
+      const entry = recommended[status];
+      return entry ? [{ status, ...entry }] : [];
+    })
   )("$status offers $label, and asks who holds the item exactly when the rules say the target needs a holder", async ({
     status,
     label,
