@@ -29,13 +29,15 @@ import {
 } from "./lib.mjs";
 
 const HEREDOC = /<<-?\s*(["']?)([A-Za-z_][A-Za-z0-9_]*)\1\n([\s\S]*?)\n\2\b/;
+const CAT_HEREDOC =
+  /(?:-m|--message)(?:=|\s+)"?\$\(\s*cat\s*<<-?\s*["']?[A-Za-z_]/;
 const QUOTED = /"(?:[^"\\]|\\.)*"|'[^']*'/g;
 const MESSAGE_FLAG =
   /(?:^|\s)(?:-m|--message)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/g;
 const SEGMENT = /\s*(?:&&|\|\||;|\|)\s*|\n/;
 const SHORT_CLUSTER = /^-[A-Za-z]+$/;
 const WHITESPACE = /\s+/;
-const MAIN_REF = /(?:^|[:+])main$/;
+const MAIN_REF = /(?:^|[:+])(?:refs\/heads\/)?main$/;
 /** Global options that take a separate argument. */
 const GLOBAL_WITH_ARG = new Set([
   "-C",
@@ -74,6 +76,9 @@ const isDot = (t) => t === "." || t === "./";
 /** A short flag cluster carrying `letter`, as `-f` or `-fd` carry `f`. */
 const shortFlag = (t, letter) =>
   SHORT_CLUSTER.test(t) && t.slice(1).includes(letter);
+/** `--long` or the short `letter` in any cluster, as `--force` or `-fd`. */
+const hasFlag = (args, long, letter) =>
+  args.some((t) => t === long || shortFlag(t, letter));
 
 function stagingRule(sub, args) {
   if (
@@ -82,24 +87,21 @@ function stagingRule(sub, args) {
   ) {
     return "Stage files by name (AGENTS.md): `git add -A` and `git add .` sweep up unrelated work in progress. Name the paths.";
   }
-  if (
-    sub === "commit" &&
-    args.some((t) => t === "--all" || shortFlag(t, "a"))
-  ) {
+  if (sub === "commit" && hasFlag(args, "--all", "a")) {
     return "Stage files by name (AGENTS.md): `git commit -a` commits every modified file. Stage the paths, then commit.";
   }
   return null;
 }
 
 function pushRule(args) {
-  const forced = args.some(
-    (t) =>
-      t === "--force" ||
-      t.startsWith("--force-with-lease") ||
-      t === "--force-if-includes" ||
-      shortFlag(t, "f") ||
-      t.startsWith("+")
-  );
+  const forced =
+    hasFlag(args, "--force", "f") ||
+    args.some(
+      (t) =>
+        t.startsWith("--force-with-lease") ||
+        t === "--force-if-includes" ||
+        t.startsWith("+")
+    );
   if (!forced) {
     return null;
   }
@@ -117,13 +119,14 @@ function destructiveRule(sub, args) {
         ? "No `git reset --hard` from an agent: it discards uncommitted work the user may want. Ask them to run it."
         : null;
     case "clean":
-      return args.some((t) => t === "--force" || shortFlag(t, "f"))
+      return hasFlag(args, "--force", "f")
         ? "No `git clean -f` from an agent. Ask the user to run it."
         : null;
     case "branch": {
-      const deleting = args.some((t) => t === "--delete" || shortFlag(t, "d"));
-      const forcing = args.some((t) => t === "--force" || shortFlag(t, "f"));
-      return args.some((t) => shortFlag(t, "D")) || (deleting && forcing)
+      const forceDelete =
+        args.some((t) => shortFlag(t, "D")) ||
+        (hasFlag(args, "--delete", "d") && hasFlag(args, "--force", "f"));
+      return forceDelete
         ? "No `git branch -D` from an agent. Use `-d`, or ask the user to force-delete."
         : null;
     }
@@ -133,8 +136,7 @@ function destructiveRule(sub, args) {
         : null;
     case "restore": {
       const indexOnly =
-        args.includes("--staged") &&
-        !args.some((t) => t === "--worktree" || shortFlag(t, "W"));
+        hasFlag(args, "--staged", "S") && !hasFlag(args, "--worktree", "W");
       return args.some(isDot) && !indexOnly
         ? "No working-tree wipe (`git restore .`) from an agent. Name the paths to restore."
         : null;
@@ -145,17 +147,15 @@ function destructiveRule(sub, args) {
 }
 
 function ruleBroken(sub, args, branched) {
-  if (sub === "commit" && !branched && currentBranch(cwd) === "main") {
-    const staging = stagingRule(sub, args);
-    return (
-      staging ??
-      "Never commit on main (AGENTS.md). Fetch, branch from origin/main, then commit."
-    );
-  }
-  if (sub === "push") {
-    return pushRule(args);
-  }
-  return stagingRule(sub, args) ?? destructiveRule(sub, args);
+  const onMain =
+    sub === "commit" && !branched && currentBranch(cwd) === "main"
+      ? "Never commit on main (AGENTS.md). Fetch, branch from origin/main, then commit."
+      : null;
+  return (
+    stagingRule(sub, args) ??
+    onMain ??
+    (sub === "push" ? pushRule(args) : destructiveRule(sub, args))
+  );
 }
 
 function branches(sub, args) {
@@ -167,22 +167,23 @@ function branches(sub, args) {
 }
 
 /**
- * The message a `git commit` would record, from its heredoc body or `-m`
- * strings, or null when it comes from a file or an editor and cannot be read
- * here. `git commit -m "$(cat <<'EOF' ... EOF)"` is the shape the harness
- * writes, so the heredoc is read before the quoted `-m` argument, which for
- * that shape holds only the substitution.
+ * The message a `git commit` would record, or null when it cannot be read
+ * here: a file, an editor, or a substitution that is not the one shape the
+ * harness writes, `-m "$(cat <<'EOF' ... EOF)"`, whose heredoc body is the
+ * message. A heredoc elsewhere on the line is not a message.
  */
 function extractCommitMessage(text) {
-  const heredoc = HEREDOC.exec(text);
-  if (heredoc) {
-    return heredoc[3];
+  if (CAT_HEREDOC.test(text)) {
+    return HEREDOC.exec(text)?.[3] ?? null;
   }
   const parts = [];
   for (const match of text.matchAll(MESSAGE_FLAG)) {
     parts.push(match[1] ?? match[2]);
   }
-  return parts.length === 0 ? null : parts.join("\n\n").replaceAll("\\n", "\n");
+  if (parts.length === 0 || parts.some((p) => p.includes("$("))) {
+    return null;
+  }
+  return parts.join("\n\n").replaceAll("\\n", "\n");
 }
 
 const detectable = command.replace(HEREDOC, "<<HEREDOC").replace(QUOTED, '""');

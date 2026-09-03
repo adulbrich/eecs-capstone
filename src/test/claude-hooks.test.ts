@@ -75,6 +75,7 @@ describe("guard-git", () => {
       "git push --force-with-lease origin fix/x",
       "git restore src/x.ts",
       "git restore --staged .",
+      "git restore -S .",
       "git add -A.md",
       "git branch -d fix/x",
       "ls -la",
@@ -152,6 +153,8 @@ describe("guard-git", () => {
       "git push -f origin HEAD:main",
       "git push origin +main",
       "git push origin +HEAD:main",
+      "git push --force origin HEAD:refs/heads/main",
+      "git push --force-with-lease origin fix/x:refs/heads/main",
     ]) {
       expect(bash("guard-git", command).status, command).toBe(2);
     }
@@ -192,6 +195,28 @@ describe("guard-git", () => {
       ')"',
     ].join("\n");
     expect(bash("guard-git", doubleQuoted).status).toBe(0);
+  });
+
+  it("reads a message only from -m or the harness heredoc shape", () => {
+    const elsewhere = [
+      "cat <<'EOF' > note.txt",
+      "Add the thing",
+      "EOF",
+      "git commit -m 'fix(x): y'",
+    ].join("\n");
+    expect(bash("guard-git", elsewhere).status).toBe(0);
+    expect(bash("guard-git", 'git commit -m "$(printf fix)"').status).toBe(0);
+    expect(
+      bash("guard-git", 'git commit -m "fix(x): y" -m "then \u2014 more"')
+        .status
+    ).toBe(2);
+  });
+
+  it("lets a session outside this repository alone", () => {
+    expect(
+      bash("guard-git", 'git commit -m "Add the thing"', { cwd: tmpdir() })
+        .status
+    ).toBe(0);
   });
 
   it("works from a subdirectory of the checkout", () => {
@@ -277,6 +302,7 @@ describe("guard-edits", () => {
       "src/routeTree.gen.ts",
       "src/db/auth-schema.ts",
       "CLAUDE.md",
+      ".env",
       ".env.local",
     ]) {
       const result = edit(file);
