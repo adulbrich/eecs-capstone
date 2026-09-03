@@ -57,6 +57,14 @@ contextual buttons), `default` (h-9, standalone form submits), and `lg` (h-10,
 hero / landing CTAs). Icon-only buttons use `icon-xs`, `icon-sm`, `icon`, or
 `icon-lg` to stay square.
 
+The size variant also sets the icon size, so pass no size class on an icon
+inside a `Button`. The base class carries
+`[&_svg:not([class*='size-'])]:size-4`, which `xs` and `icon-xs` override to
+`size-3`. That selector stands down only for a class containing `size-`:
+`h-5 w-5` does not match it and loses to it on specificity, so it renders 16px
+while reading as 20. If a call site genuinely needs a different size, write
+`size-5`, which the rule is built to yield to.
+
 ### A link styled as a button uses `asChild`
 
 `asChild` merges the Button styles onto the `<Link>` so one element renders. Without
@@ -277,7 +285,7 @@ and escape-dismissible for free. Four rules keep it correct:
 <Sheet open={open} onOpenChange={setOpen}>
   <SheetTrigger asChild>
     <Button aria-label="Open navigation" size="icon-sm" variant="ghost">
-      <Menu className="h-5 w-5" />
+      <Menu />
     </Button>
   </SheetTrigger>
   <SheetContent className="w-72 p-0" side="left">

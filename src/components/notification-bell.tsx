@@ -86,11 +86,10 @@ export function NotificationBell() {
           {unread > 0 ? (
             <BellRing
               aria-hidden="true"
-              className="h-5 w-5"
               style={{ color: "var(--status-warning)" }}
             />
           ) : (
-            <Bell aria-hidden="true" className="h-5 w-5" />
+            <Bell aria-hidden="true" />
           )}
           {unread > 0 && (
             <span className="absolute -top-0.5 -right-0.5 min-w-[1.25rem] rounded-full bg-destructive px-1 text-center text-destructive-foreground text-xs">
