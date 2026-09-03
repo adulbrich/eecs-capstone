@@ -53,6 +53,11 @@ const VERIFICATION_LANDING = "/verify-email";
  * raced sign-in.tsx's own `navigate` and could strand a verified person on
  * /verify-email or drop their `?redirect=` return path (#254). Setting it here
  * keeps the link right without the request body deciding where a sign-in goes.
+ *
+ * The cost of the hook being the last word is that it is the last word for
+ * every flow that mails a verification link. `user.changeEmail` is not
+ * configured, so today that is sign-up and the refused sign-in only; enabling
+ * it would want this to ask which flow it is serving before overwriting.
  */
 function withVerificationLanding(url: string): string {
   const link = new URL(url);

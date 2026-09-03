@@ -38,5 +38,15 @@ test.describe("@smoke authentication", () => {
     await page.getByRole("button", { name: /sign in/i }).click();
 
     await expect(page).toHaveURL(/\/my\/projects/, { timeout: 15_000 });
+
+    // Reaching it is not the same as staying. The bug was a full-page
+    // navigation arriving after the router's own, so a polling URL assertion
+    // can sample the right address on the way to the wrong one. Waiting for
+    // the navigation that must not happen is what makes this test fail on the
+    // code it was written against.
+    await expect(
+      page.waitForURL(/\/verify-email/, { timeout: 3000 })
+    ).rejects.toThrow();
+    await expect(page).toHaveURL(/\/my\/projects/);
   });
 });
