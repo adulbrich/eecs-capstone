@@ -24,37 +24,16 @@ npm run typecheck  # tsc --noEmit
 npm test           # unit tests only
 ```
 
-All three must be clean, because a red local run is a red PR. The `verify` job in
-`.github/workflows/ci.yml` runs those three plus `npm run build` and
-`npm run check:compression`.
+All three must be clean, because a red local run is a red PR. lefthook runs Biome and
+the prose check on the staged files at commit, and typecheck and the unit suite at
+push, so most of the time a red one is caught before it leaves your machine.
+[`CONTRIBUTING.md`](./CONTRIBUTING.md) has the table of every gate, where each runs,
+and what catches a skip; `.github/workflows/ci.yml` is what CI actually does.
 
-`npm test` excludes the integration and accessibility suites to keep the unit run
-fast, so a green `npm test` says nothing about either. Run `npm run test:integration`
-(needs docker Postgres and RustFS up, see `docker compose`) and
-`npm run test:accessibility` yourself when your change touches the database layer or
-the UI, rather than finding out from CI. The accessibility suite needs more setup than
-the integration one: the same Postgres and RustFS, plus `npm run db:seed:dev` (its
-global setup signs in as the seeded users) and `npx playwright install chromium`.
-Only the scans tagged `@smoke` run on a pull request, through
-`npm run test:accessibility:smoke`, listed in the `accessibility-smoke` job comment in
-`ci.yml`; the rest run from the dispatch-only `full-accessibility.yml`, so a change to
-a page outside that subset needs the full run locally. `npm run test:smoke` wants
-that same setup and builds the production output itself, which is the point of it:
-the dev server cannot show SSR-only breakage. Run it when you touch one of the flows
-it covers, listed in the job comment in `ci.yml`, because unlike the integration
-suite a red one blocks the merge. Other scripts live in `package.json`.
-
-`verify` and `smoke / suite` can block a merge today. `accessibility-smoke / suite`
-is meant to join them once it is registered on the ruleset (its job comment in
-`ci.yml` says how); until then it reports and does not block. The `integration` job
-runs on every pull request and a red one still merges, so read both results rather
-than trusting the merge button. The ruleset is the source of
-truth and the list endpoint does not carry the rules, so it takes two calls:
-
-```bash
-gh api repos/adulbrich/eecs-capstone/rulesets --jq '.[].id'
-gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type=="required_status_checks")'
-```
+`npm test` says nothing about the integration, smoke or accessibility suites, and
+CI's integration result does not block a merge. "Which suites to run yourself" in
+CONTRIBUTING.md says which one a change to the database layer, a covered flow or a
+scanned page needs before the PR, and what each needs running.
 
 ## Always
 
@@ -62,7 +41,10 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
   comments, string literals, docs, and chat replies. Use commas, colons, semicolons,
   parens, or a new sentence. A `--` standing in for a sentence dash is the same
   violation; hyphens inside compound words like `read-only` are fine. Emojis only
-  when the user asks for one.
+  when the user asks for one. `scripts/check-prose.mjs` enforces the two characters
+  at commit, in CI and on every edit; the `--` case is yours. The one exception is
+  the footer the harness appends to a PR body, which the check strips before it
+  looks.
 - **Commit messages use Conventional Commits with a lowercase imperative subject:**
   `fix(projects): stop the proposer field lying about pending changes`. The types in
   use are `feat`, `fix`, `docs`, `test`, `refactor`, `style`, `perf`, `build`,
@@ -70,7 +52,9 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
   history and are not the pattern to copy, same as the long bodies below. A
   breaking change takes a `!` before the colon, as in
   `feat(inventory)!: give items many categories`. Dependabot lands `chore(deps)`
-  and `build(deps)`.
+  and `build(deps)`. `scripts/check-commit-message.mjs` enforces the subject at
+  `commit-msg`, in CI, and on the pull request title, which a squash merge turns
+  into the `main` subject.
 - **Keep the body short, or leave it out.** A sentence or two on why, and only when
   the subject does not already carry it. Cut anything that does not change what a
   reader will do or understand. Commits before 2026-08-09 run to several paragraphs;
@@ -85,12 +69,15 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
   Keep `Co-Authored-By`, drop the session link. The reason it is a hard rule rather
   than a preference: this repo is public and mirrors to GitLab, so a published link
   is on two remotes at once, and taking it back costs a history rewrite against a
-  protected branch plus a force sync of the mirror. Grep the text for
-  `claude.ai/code/session` before anything reaches a remote.
+  protected branch plus a force sync of the mirror. The commit check and the
+  `.claude/hooks/guard-gh.mjs` hook refuse the text before it reaches a remote; if
+  you are in a harness without them, grep for it yourself.
 - **Stage files by name.** Never `git add -A` or `git add .`, which sweeps up
-  unrelated work in progress.
+  unrelated work in progress. `.claude/hooks/guard-git.mjs` refuses both, and
+  `git commit -a` with them.
 - **Never commit to `main`.** A branch ruleset rejects direct pushes, including the
-  user's. Branch, push, open a PR, and let the required checks go green. GitHub
+  user's, and the pre-commit hook refuses the commit. Fetch, branch from
+  `origin/main`, push, open a PR, and let the required checks go green. GitHub
   asks for no approving review, so nothing but the rule below stops a PR merging
   unread.
 - **Run `mattpocock-skills:code-review` on every PR before merging, then again after
@@ -104,7 +91,8 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
   review: it says nothing broke that was already covered, and new code with no new
   tests is the part it cannot speak to. Verify a finding before acting on it. A
   review agent reads a branch, not your intent, and will sometimes be confidently
-  wrong about what exists.
+  wrong about what exists. Record the pass count and any declined finding in the
+  PR, where the template asks for it.
 
   `.claude/settings.json` declares the marketplace and enables the plugin, so nobody
   has to add either by hand. Claude Code still asks each operator once whether to
@@ -125,9 +113,33 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
 - **Import `createServerFn` from `@tanstack/react-start`.** The bare
   `@tanstack/start` package is not what this project uses.
 
+## Agent skills
+
+The mattpocock engineering skills read three files about this repo before they act.
+
+### Issue tracker
+
+GitHub issues on this repo, driven with `gh`; the issue is the spec, and briefs name
+file paths on purpose. See [`docs/agents/issue-tracker.md`](./docs/agents/issue-tracker.md).
+
+### Triage labels
+
+The five canonical roles under their own names, plus `p0-now`, `p1-next` and
+`p2-later`. See [`docs/agents/triage-labels.md`](./docs/agents/triage-labels.md).
+
+### Domain docs
+
+Single context: `CONTEXT.md` at the root and `docs/adr/`, neither written yet; the
+vocabulary and decisions live in `docs/QUIRKS.md` until they are. See
+[`docs/agents/domain.md`](./docs/agents/domain.md).
+
 ## Reference docs
 
 Read the matching doc before you start; each one is the source of truth for its area.
+
+- **[`CONTRIBUTING.md`](./CONTRIBUTING.md)** is the process: pick up, branch, commit,
+  push, pull request, review loop, merge, and the table of every gate and where it
+  runs. It is also where a new developer or instructor starts.
 
 - **[`docs/QUIRKS.md`](./docs/QUIRKS.md)** is the ground truth for how this codebase
   actually behaves, and the first stop when something that should work does not. It
@@ -135,8 +147,7 @@ Read the matching doc before you start; each one is the source of truth for its 
   params, TanStack Form validators, Better Auth sessions and bans, Drizzle tsvector
   columns and FK rules, Vitest and integration-test setup, Sharp and S3 storage keys,
   which Biome rules are relaxed and why, the path-by-path layout of `src/`, the
-  spec-then-plan-then-implement workflow, Amazon Bedrock, and the inventory and
-  project domain rules.
+  workflow conventions, Amazon Bedrock, and the inventory and project domain rules.
 
 - **[`docs/UI-CONVENTIONS.md`](./docs/UI-CONVENTIONS.md)** is the design system:
   brand tokens and why hex codes never go in a component, `Button` variants and
@@ -165,5 +176,6 @@ Read the matching doc before you start; each one is the source of truth for its 
 
 A new gotcha goes in `docs/QUIRKS.md` under the subsystem it belongs to, following the
 pattern in its "When you add a quirk" section. A new design system rule goes in
-`docs/UI-CONVENTIONS.md`. Add to this file only when the rule binds every turn
-regardless of what is being worked on.
+`docs/UI-CONVENTIONS.md`. A change to the process or a gate goes in `CONTRIBUTING.md`.
+Add to this file only when the rule binds every turn regardless of what is being
+worked on.

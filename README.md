@@ -6,8 +6,9 @@ projects, run them through a review workflow, and manage shared inventory.
 This README covers how to run and develop the app. Known issues and the roadmap
 live in [GitHub Issues](https://github.com/adulbrich/eecs-capstone/issues). For
 the full, exhaustive feature list, see [`PRD.md`](./PRD.md). For implementation
-quirks and gotchas, see [`docs/QUIRKS.md`](./docs/QUIRKS.md). For
-agent/contributor conventions, see [`AGENTS.md`](./AGENTS.md).
+quirks and gotchas, see [`docs/QUIRKS.md`](./docs/QUIRKS.md). For how work moves
+through the repo and the gates it passes, see [`CONTRIBUTING.md`](./CONTRIBUTING.md);
+for the rules that bind an agent on every turn, [`AGENTS.md`](./AGENTS.md).
 
 ## Known issues and roadmap
 
