@@ -140,8 +140,8 @@ const COLUMNS = defineAdminColumns<Row>()([
 
 // Every field of the record, independent of which columns are visible.
 // defineCsvColumns<Row>() fails npm run typecheck if a field of Row has no
-// column here, so a future field added to listProgramsImpl's projection
-// cannot silently miss the file.
+// column here, so a future field added to listProgramsWithInstructors'
+// projection cannot silently miss the file.
 const EXPORT_COLUMNS = defineCsvColumns<Row>()([
   { header: "ID", key: "id", value: (row) => row.id },
   { header: "Course ID", key: "courseId", value: (row) => row.courseId },

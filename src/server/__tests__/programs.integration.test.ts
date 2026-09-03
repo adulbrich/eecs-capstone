@@ -146,7 +146,9 @@ describe("the admin index reads instructor names through its own staff seam", ()
 
   it("refuses a non-staff viewer", async () => {
     const plain = await makeUser(`li-p-${Date.now()}@x.com`, "user");
-    await expect(listProgramsWithInstructorsAs(plain)).rejects.toThrow();
+    await expect(listProgramsWithInstructorsAs(plain)).rejects.toThrow(
+      /Forbidden/
+    );
   });
 });
 

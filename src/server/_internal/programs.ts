@@ -25,9 +25,10 @@ export async function listProgramsImpl() {
  * staff-only. Names only: the detail read already hands out addresses, and a
  * table listing people needs nothing more.
  *
- * Two queries grouped in JS rather than one `array_agg` through Drizzle, for
- * the reason `claim-projects.ts` gives: at capstone scale the clear query
- * wins. Membership is a directory listing and grants nothing; see #92.
+ * Two queries grouped in JS rather than one `array_agg` through Drizzle: at
+ * capstone scale the clear query costs nothing, and a hand-written aggregate
+ * is one more thing to read. Membership is a directory listing and grants
+ * nothing; see #92.
  */
 export async function listProgramsWithInstructorsAs(viewer: AuthUser) {
   assertStaff(viewer);
