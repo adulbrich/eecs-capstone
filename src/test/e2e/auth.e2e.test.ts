@@ -45,13 +45,20 @@ test.describe("@smoke authentication", () => {
     // the navigation that must not happen is what makes this test fail on the
     // code it was written against.
     //
-    // The window is spent on every passing run and only buys detection on a
-    // failing one, so it is the shortest that still clears a loaded CI runner:
-    // a regression's redirect fires as the sign-in response resolves, not
-    // after a page load.
+    // The regression this guards against assigns window.location.href inside
+    // the client's onSuccess hook, which better-fetch awaits before signIn
+    // resolves, so the competing navigation is already in flight before the
+    // assertion above starts. What this window bounds is how long that page
+    // load takes to commit on a loaded runner, not how long a response takes.
+    // It is spent on every passing run and only buys detection on a failing
+    // one, which is why it is seconds rather than the 15 above.
+    //
+    // Matched on the message: a bare rejection would also be satisfied by a
+    // closed context or an aborted navigation, neither of which is proof that
+    // nothing navigated.
     await expect(
       page.waitForURL(/\/verify-email/, { timeout: 5000 })
-    ).rejects.toThrow();
+    ).rejects.toThrow(/Timeout/);
     await expect(page).toHaveURL(/\/my\/projects/);
   });
 });
