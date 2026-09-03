@@ -409,6 +409,18 @@ Any test that spawns git builds its environment from `process.env` with every
 runs git on the session's `cwd`: strip the variables, or the answer is about
 the wrong repository.
 
+### The git-guard tests run in a fixture repository, because CI checks out `main`
+
+On a push to `main`, CI checks out `main` itself. A test that ran the git guard
+with `cwd` at the checkout tripped the never-commit-on-main rule it was not
+testing, and `verify` went red on the first merge after the hooks landed. A pull
+request run never showed it, since that checkout is a detached merge ref with no
+branch name. `src/test/claude-hooks.test.ts` drives the guard from a throwaway
+repository on `fix/test`, with a `sub` directory for the subdirectory case, and
+keeps a second one on `main` for the rules that are about `main`. The same
+symptom, a wrong author on a commit, came from the fixture's `git config
+user.email` landing in this repo's config while `GIT_DIR` was exported.
+
 ESM imports hoist above all statements. Writing `import { config } from "dotenv"; config({ path: ".env.local" }); import { db } from "..."` looks correct but is wrong: the `db` import runs at module-load time BEFORE the `config()` call ever fires, so `DATABASE_URL` is unset when `src/db/index.ts` evaluates and the script crashes.
 
 Pattern that works: pass `--env-file=.env.local` to `tsx` at the command line.

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -49,23 +49,32 @@ const bash = (
 ) => hook(name, { tool_name: "Bash", tool_input: { command }, ...extra });
 
 /**
- * A throwaway repository on `main`, for the rules that read the branch. The
- * rule scripts are loaded from the session's checkout through a symlink.
+ * A throwaway repository on `branch`, with a `sub` directory, for the rules
+ * that read the branch. The git guard's tests all run in one on a feature
+ * branch rather than in this checkout: on a push to `main`, CI checks out
+ * `main` itself, and a test that commits from there trips the very rule it
+ * is not testing. The rule scripts are loaded from the session's checkout
+ * through a symlink.
  */
-function repoOnMain() {
+function repoOn(branch: string) {
   const dir = mkdtempSync(join(tmpdir(), "hooks-"));
   temp.push(dir);
   const git = (...args: string[]) =>
     spawnSync("git", ["-C", dir, ...args], { encoding: "utf8", env });
-  git("init", "-q", "-b", "main");
+  git("init", "-q", "-b", branch);
   git("config", "user.email", "t@example.com");
   git("config", "user.name", "t");
   writeFileSync(join(dir, "a"), "a");
   git("add", "a");
   git("commit", "-q", "-m", "chore: seed");
   spawnSync("ln", ["-s", join(cwd, "scripts"), join(dir, "scripts")]);
+  mkdirSync(join(dir, "sub"));
   return dir;
 }
+
+const feature = repoOn("fix/test");
+const guardGit = (command: string, extra: Record<string, unknown> = {}) =>
+  bash("guard-git", command, { cwd: feature, ...extra });
 
 describe("guard-git", () => {
   it("lets ordinary git through", () => {
@@ -80,7 +89,7 @@ describe("guard-git", () => {
       "git branch -d fix/x",
       "ls -la",
     ]) {
-      expect(bash("guard-git", command).status, command).toBe(0);
+      expect(guardGit(command).status, command).toBe(0);
     }
   });
 
@@ -96,7 +105,7 @@ describe("guard-git", () => {
       "git commit -am 'fix(x): y'",
       "git commit --all -m 'fix(x): y'",
     ]) {
-      const result = bash("guard-git", command);
+      const result = guardGit(command);
       expect(result.status, command).toBe(2);
       expect(result.stderr).toContain("Stage files by name");
     }
@@ -116,38 +125,38 @@ describe("guard-git", () => {
       "git restore --source=HEAD .",
       "git restore --staged --worktree .",
     ]) {
-      expect(bash("guard-git", command).status, command).toBe(2);
+      expect(guardGit(command).status, command).toBe(2);
     }
   });
 
   it("does not read a quoted string as a command", () => {
     expect(
-      bash("guard-git", 'git commit -m "fix(x): stop using git add -A"').status
+      guardGit('git commit -m "fix(x): stop using git add -A"').status
     ).toBe(0);
-    expect(bash("guard-git", 'echo "git branch -D foo"').status).toBe(0);
+    expect(guardGit('echo "git branch -D foo"').status).toBe(0);
   });
 
   it("denies a commit on main unless the command branches first", () => {
-    const main = repoOnMain();
-    const onMain = bash("guard-git", 'git commit -m "fix(x): y"', {
+    const main = repoOn("main");
+    const onMain = guardGit('git commit -m "fix(x): y"', {
       cwd: main,
     });
     expect(onMain.status).toBe(2);
     expect(onMain.stderr).toContain("Never commit on main");
     expect(
-      bash("guard-git", 'git checkout -b fix/x && git commit -m "fix(x): y"', {
+      guardGit('git checkout -b fix/x && git commit -m "fix(x): y"', {
         cwd: main,
       }).status
     ).toBe(0);
     expect(
-      bash("guard-git", 'git commit -m "fix(x): y" && git checkout -b fix/x', {
+      guardGit('git commit -m "fix(x): y" && git checkout -b fix/x', {
         cwd: main,
       }).status
     ).toBe(2);
   });
 
   it("denies a force push at main in every spelling", () => {
-    const main = repoOnMain();
+    const main = repoOn("main");
     for (const command of [
       "git push --force origin main",
       "git push -f origin HEAD:main",
@@ -156,21 +165,19 @@ describe("guard-git", () => {
       "git push --force origin HEAD:refs/heads/main",
       "git push --force-with-lease origin fix/x:refs/heads/main",
     ]) {
-      expect(bash("guard-git", command).status, command).toBe(2);
+      expect(guardGit(command).status, command).toBe(2);
     }
-    expect(
-      bash("guard-git", "git push --force-with-lease", { cwd: main }).status
-    ).toBe(2);
+    expect(guardGit("git push --force-with-lease", { cwd: main }).status).toBe(
+      2
+    );
   });
 
   it("checks the message of a -m commit", () => {
-    const bad = bash("guard-git", 'git commit -m "Add the thing"');
+    const bad = guardGit('git commit -m "Add the thing"');
     expect(bad.status).toBe(2);
     expect(bad.stderr).toContain("lowercase imperative");
-    expect(
-      bash("guard-git", "git commit -m 'fix(x): y \u2014 because'").status
-    ).toBe(2);
-    expect(bash("guard-git", 'git commit -m "fix(x): y"').status).toBe(0);
+    expect(guardGit("git commit -m 'fix(x): y \u2014 because'").status).toBe(2);
+    expect(guardGit('git commit -m "fix(x): y"').status).toBe(0);
   });
 
   it("checks a heredoc commit, with either quoting of the delimiter", () => {
@@ -182,7 +189,7 @@ describe("guard-git", () => {
       "EOF",
       ')"',
     ].join("\n");
-    const result = bash("guard-git", withTrailer);
+    const result = guardGit(withTrailer);
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("claude.ai/code/session");
 
@@ -194,7 +201,7 @@ describe("guard-git", () => {
       "EOF",
       ')"',
     ].join("\n");
-    expect(bash("guard-git", doubleQuoted).status).toBe(0);
+    expect(guardGit(doubleQuoted).status).toBe(0);
   });
 
   it("reads a message only from -m or the harness heredoc shape", () => {
@@ -204,7 +211,7 @@ describe("guard-git", () => {
       "EOF",
       "git commit -m 'fix(x): y'",
     ].join("\n");
-    expect(bash("guard-git", elsewhere).status).toBe(0);
+    expect(guardGit(elsewhere).status).toBe(0);
     const noteThenHarness = [
       "cat > note.txt <<'EOF'",
       "fix(x): fine note",
@@ -216,24 +223,22 @@ describe("guard-git", () => {
       "MSG",
       ')"',
     ].join("\n");
-    expect(bash("guard-git", noteThenHarness).status).toBe(2);
-    expect(bash("guard-git", 'git commit -m "$(printf fix)"').status).toBe(0);
+    expect(guardGit(noteThenHarness).status).toBe(2);
+    expect(guardGit('git commit -m "$(printf fix)"').status).toBe(0);
     expect(
-      bash("guard-git", 'git commit -m "fix(x): y" -m "then \u2014 more"')
-        .status
+      guardGit('git commit -m "fix(x): y" -m "then \u2014 more"').status
     ).toBe(2);
   });
 
   it("lets a session outside this repository alone", () => {
     expect(
-      bash("guard-git", 'git commit -m "Add the thing"', { cwd: tmpdir() })
-        .status
+      guardGit('git commit -m "Add the thing"', { cwd: tmpdir() }).status
     ).toBe(0);
   });
 
   it("works from a subdirectory of the checkout", () => {
-    const result = bash("guard-git", 'git commit -m "Add the thing"', {
-      cwd: join(cwd, "src"),
+    const result = guardGit('git commit -m "Add the thing"', {
+      cwd: join(feature, "sub"),
     });
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("lowercase imperative");
