@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { db as Db } from "#/db";
 import { db } from "#/db";
 import {
@@ -88,10 +88,24 @@ async function resolveHold(tx: Tx, input: TransitionInput): Promise<Hold> {
     program: input.holderProgram,
   };
   if (input.holderEmail) {
+    // Folded, because a hold staff type as Student@Oregonstate.edu belongs to
+    // the account at student@oregonstate.edu, and matching it exactly stored
+    // the hold as a walk-in beside an account that exists. Written as
+    // `lookupUserByEmailAs` writes it, which asks this same question from the
+    // staff HolderField; `heldByViewer` folds the read side of it.
+    //
+    // This cannot use the unique btree on `user.email`, the tradeoff
+    // `claimProjectsForVerifiedUser` names: one seq scan of a table this size,
+    // inside the transaction, against a hold that never resolves otherwise.
+    //
+    // The typed address is still what gets stored. Normalizing on write is
+    // #249, the follow-up #196's triage said a third comparison site would
+    // open.
     const [match] = await tx
       .select({ id: user.id, name: user.name })
       .from(user)
-      .where(eq(user.email, input.holderEmail));
+      .where(eq(sql`lower(${user.email})`, input.holderEmail.toLowerCase()))
+      .limit(1);
     return holdFromInput(
       { ...loose, email: input.holderEmail },
       { accountId: match?.id ?? null, accountName: match?.name ?? null }
