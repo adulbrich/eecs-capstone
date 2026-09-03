@@ -1,0 +1,49 @@
+name: Enhancement
+description: A change to what the app does. Written so an agent can take it without a triage session.
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Describe behavior, not implementation. File paths are welcome where
+        they are the grep target (this repo is organized around them), line
+        numbers are not. Check PRD.md first: the feature may exist. See
+        `docs/agents/issue-tracker.md`.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What a user cannot do today, or does with friction, and who that user is (student, proposer, instructor, admin).
+    validations:
+      required: true
+  - type: textarea
+    id: desired
+    attributes:
+      label: Desired behavior
+      description: What the app should do afterwards, including the edge cases.
+    validations:
+      required: true
+  - type: textarea
+    id: fields
+    attributes:
+      label: Fields and who sees them
+      description: >-
+        Every issue that touches data says which fields are public, who may
+        see the rest, and who may edit them. Leave empty only when no field
+        changes hands.
+      value: |
+        | Field | Visible to | Editable by |
+        | --- | --- | --- |
+        |  |  |  |
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Each one independently checkable.
+      value: |
+        - [ ]
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: The adjacent thing that is not this issue.

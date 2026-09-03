@@ -64,7 +64,7 @@ Accounts and access:
 
 ### 3.1 Create the GitHub OAuth app
 
-1. GitHub → Settings → Developer settings → **OAuth Apps** (not "GitHub Apps" —
+1. GitHub → Settings → Developer settings → **OAuth Apps** (not "GitHub Apps":
    easy to mix up, and the wrong one won't work with `better-auth`'s GitHub
    provider) → New OAuth App.
 2. Homepage URL and callback URL need the app's public URL, which you do not
@@ -326,7 +326,7 @@ The workflow:
    the service to stabilize.
 
 The workflow builds natively on a `ubuntu-24.04-arm` runner (free on public
-repos), matching the arm64 Fargate task — no QEMU cross-build involved.
+repos), matching the arm64 Fargate task, so there is no QEMU cross-build.
 
 When it finishes, open `app_url` in a browser. You should see the app over
 HTTPS.

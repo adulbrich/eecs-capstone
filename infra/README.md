@@ -51,7 +51,7 @@ To rename the project, change `var.project`. Note that the deploy workflow
 (`.github/workflows/deploy.yml`, the `PROJECT` env) and `DEPLOYMENT.md` hardcode
 `eecs-capstone` for the cluster/service/ECR/secret/SSM names, so update those to
 match if you change it again. The Terraform remote-state bucket name (currently
-`eecs-capstone-tfstate`) is intentionally independent of `var.project` — most
+`eecs-capstone-tfstate`) is intentionally independent of `var.project`: most
 resources rename cleanly via `terraform apply`, but the state bucket needs a
 manual `terraform init -migrate-state` to a new bucket, so don't assume renaming
 `var.project` alone moves it too.
