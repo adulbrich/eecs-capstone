@@ -190,6 +190,17 @@ describe("InventoryLifecyclePanel: the hard delete confirmation", () => {
     };
   }
 
+  it("is an alert dialog, and opens with focus on the name input", async () => {
+    renderPanel();
+    const { input } = openDeleteDialog();
+    // `role="alertdialog"` is announced more assertively than a plain dialog
+    // and does not dismiss on an outside click, which is the primitive an
+    // irreversible action wants. Radix would otherwise put initial focus on
+    // Cancel, one Tab away from the input the gate needs filled.
+    expect(screen.getByRole("alertdialog")).toBeDefined();
+    await waitFor(() => expect(document.activeElement).toBe(input));
+  });
+
   it("keeps the destructive button disabled until the exact item name is typed", () => {
     renderPanel();
     const { confirm, input } = openDeleteDialog();
@@ -240,7 +251,7 @@ describe("InventoryLifecyclePanel: the hard delete confirmation", () => {
     fireEvent.click(confirm);
     // Scoped to the dialog: the panel shows the same error under the danger
     // zone too, and the dialog is where the person who clicked is looking.
-    const dialog = within(screen.getByRole("dialog"));
+    const dialog = within(screen.getByRole("alertdialog"));
     expect(await dialog.findByText(HARD_DELETE_HISTORY_REFUSAL)).toBeDefined();
     expect(router.navigate).not.toHaveBeenCalled();
 

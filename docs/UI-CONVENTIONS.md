@@ -599,18 +599,28 @@ as `description`; the title is what gives the dialog its accessible name.
 
 Two exceptions add a step `ConfirmDialog` does not have: the user must type
 something exact into an `Input` before the destructive `Button` un-disables.
-The inventory hard delete in `inventory-lifecycle-panel.tsx` uses a shadcn
-`Dialog` and asks for the item's name
-(`disabled={busy || delConfirm !== item.name}`); the account deletion in
-`delete-account-dialog.tsx` uses `AlertDialog` and asks for the person's own
-email, compared case-insensitively. A single confirm click is an easy reflex
-to fire without reading; typing the exact value is a deliberate extra brake.
-Both reset the typed value before the dialog shows again (the inventory
-panel when its trigger opens it, the account dialog on every open and close),
-so a Cancel never leaves the next opening pre-armed. Reach for this shape only when a single confirmation
-is not enough friction for the action at hand, not as the default: the project
-hard delete in `staff-project-panel.tsx` is equally permanent and still
-confirms through plain `ConfirmDialog`.
+The inventory hard delete in `inventory-lifecycle-panel.tsx` asks for the
+item's name (`disabled={busy || delConfirm !== item.name}`); the account
+deletion in `delete-account-dialog.tsx` asks for the person's own email,
+compared case-insensitively. A single confirm click is an easy reflex to fire
+without reading; typing the exact value is a deliberate extra brake. Both
+reset the typed value before the dialog shows again (the inventory panel when
+its trigger opens it, the account dialog on every open and close), so a Cancel
+never leaves the next opening pre-armed. Reach for this shape only when a
+single confirmation is not enough friction for the action at hand, not as the
+default: the project hard delete in `staff-project-panel.tsx` is equally
+permanent and still confirms through plain `ConfirmDialog`.
+
+Both are built on `AlertDialog` from `#/components/ui/alert-dialog`, never
+`Dialog`. `Dialog` renders `role="dialog"`; an irreversible action wants
+`role="alertdialog"`, which screen readers announce more assertively and which
+does not dismiss on an outside click or Escape. axe does not report a plain
+`dialog` on a destructive prompt, so the role is a rule here and asserted by
+the component tests, not something the accessibility suite would catch. Radix
+moves initial focus to the cancel action, which is right for a one-click
+prompt and wrong for a typed gate; the inventory panel points
+`AlertDialogContent`'s `onOpenAutoFocus` at the input so the thing the user
+must fill is the first thing focused (#66).
 
 Results that need no acknowledgement use a toast: `import { toast } from "sonner"`.
 

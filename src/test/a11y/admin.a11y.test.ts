@@ -100,6 +100,24 @@ test("inventory item detail (staff)", async ({ page }) => {
   await checkA11y(page);
 });
 
+test("inventory hard delete confirmation", async ({ page }) => {
+  await page.goto(`/inventory/${itemId}`);
+  await waitForHydration(page);
+
+  await page.getByRole("button", { name: "Hard delete item" }).click();
+  // `alertdialog`, not `dialog`: the primitive for an irreversible action.
+  // axe does not flag a plain dialog on a destructive prompt, so the role is
+  // asserted here rather than left to the scan.
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toBeVisible();
+  // Radix would focus Cancel; the typed-name gate wants the input first.
+  await expect(dialog.getByLabel("Confirm item name")).toBeFocused();
+  await checkA11y(page);
+
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
 test("inventory item edit (staff)", async ({ page }) => {
   await page.goto(`/inventory/${itemId}/edit`);
   await checkA11y(page);
