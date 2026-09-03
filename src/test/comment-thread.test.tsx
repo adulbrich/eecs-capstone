@@ -342,4 +342,42 @@ describe("CommentThread forms while a post is in flight", () => {
       expect(screen.queryByPlaceholderText("Reply")).toBeNull()
     );
   });
+
+  it("keeps a cancelled attempt's failure off the attempt that replaced it", async () => {
+    // The catch side of the case above. #242 cleared the error when the form
+    // reopens, which covers a failure that lands first; this covers one that
+    // lands after, with a second attempt already in flight.
+    const rejecters: ((reason: Error) => void)[] = [];
+    addComment.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          rejecters.push(reject);
+        })
+    );
+
+    renderThread([comment({})]);
+    openReplyAndType("doomed reply");
+    fireEvent.click(replyForm().getByRole("button", { name: "Post" }));
+    fireEvent.click(replyForm().getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+    const box = screen.getByPlaceholderText("Reply") as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "second try" } });
+    fireEvent.click(replyForm().getByRole("button", { name: "Post" }));
+    await waitFor(() => expect(box.disabled).toBe(true));
+
+    rejecters[0](new Error("Forbidden"));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.queryByText("Forbidden")).toBeNull();
+    expect(box.disabled).toBe(true);
+
+    rejecters[1](new Error("Still forbidden"));
+    await waitFor(() =>
+      expect(screen.getByText("Still forbidden")).toBeTruthy()
+    );
+    expect(box.disabled).toBe(false);
+  });
 });
