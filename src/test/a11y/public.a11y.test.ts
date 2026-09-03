@@ -27,6 +27,23 @@ test("@smoke sign-in page", async ({ page }) => {
   await checkA11y(page);
 });
 
+// The banner carries the office address as a link inside `role="alert"`, so
+// the refusal and the one thing the reader can do about it are announced
+// together. An unknown code lands on the fallback, which is what a new Better
+// Auth error code would produce.
+for (const code of ["user_info_is_missing", "not_a_known_code"]) {
+  test(`@smoke sign-in page, ONID refusal ${code}`, async ({ page }) => {
+    await page.goto(`/sign-in?error=${code}`);
+    const alert = page.getByRole("alert");
+    await expect(alert).toBeVisible();
+    const link = alert.getByRole("link", { name: /@/ });
+    await expect(link).toHaveAttribute("href", /^mailto:/);
+    await link.focus();
+    await expect(link).toBeFocused();
+    await checkA11y(page);
+  });
+}
+
 test("@smoke sign-up page", async ({ page }) => {
   await page.goto("/sign-up");
   await checkA11y(page);
