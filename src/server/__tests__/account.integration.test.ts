@@ -139,17 +139,13 @@ describe("getAccountDeletionPreviewAs", () => {
       { id: byOther.id, name: "Held by someone else" },
     ]);
 
-    // An address hold matches the address as recorded and only for a verified
-    // account, the same rule /my/items applies: an item that page never shows
-    // must not block here either. Case first, then verification.
+    // An address hold matches the address whatever case staff typed it in,
+    // and only for a verified account, the same rule /my/items applies: an
+    // item that page never shows must not block here either. Case first,
+    // then verification.
     await db
       .update(inventoryItems)
       .set({ status: "reserved", currentHolderEmail: u.email.toUpperCase() })
-      .where(eq(inventoryItems.id, byEmail.id));
-    expect((await getAccountDeletionPreviewAs(u)).blockers.items).toEqual([]);
-    await db
-      .update(inventoryItems)
-      .set({ currentHolderEmail: u.email })
       .where(eq(inventoryItems.id, byEmail.id));
     expect((await getAccountDeletionPreviewAs(u)).blockers.items).toEqual([
       { id: byEmail.id, name: "Held by address" },

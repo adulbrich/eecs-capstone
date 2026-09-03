@@ -1937,6 +1937,26 @@ describe("staff-assigned holds in my items", () => {
     expect(active[0].kind).toBe("hold");
   });
 
+  it("matches an unlinked hold by verified email whatever case staff typed", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`h6-admin-${stamp}@x.com`, "admin");
+    const item = await makeItem({ name: "Caliper" });
+
+    // Staff recorded the address with a capital, as a walk-in might spell it.
+    await transitionItem(admin, {
+      itemId: item.id,
+      nextStatus: "checked_out",
+      holderEmail: `Mixed-${stamp}@X.com`,
+      dueAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const holder = await makeUser(`mixed-${stamp}@x.com`, "user");
+    const { active } = await listMyItemsAs(holder);
+
+    expect(active).toHaveLength(1);
+    expect(active[0].kind).toBe("hold");
+  });
+
   it("does not match by email when the address is unverified", async () => {
     const stamp = Date.now();
     const admin = await makeUser(`h5-admin-${stamp}@x.com`, "admin");
