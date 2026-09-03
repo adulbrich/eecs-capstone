@@ -51,6 +51,28 @@ export interface MantleOutputItem {
   type?: string;
 }
 
+/**
+ * The docs disagree about where a function call lands: the Responses API spec
+ * puts it at the top level of `output`, while the Bedrock tool-use guide reads
+ * it out of an item's `content`. Look in both rather than pick a side. Shared
+ * by the review and the scope assessment, which each declare their own tool.
+ */
+export function findToolCall(
+  items: MantleOutputItem[],
+  toolName: string
+): MantleOutputItem | undefined {
+  for (const item of items) {
+    if (item.type === "function_call" && item.name === toolName) {
+      return item;
+    }
+    const nested = item.content && findToolCall(item.content, toolName);
+    if (nested) {
+      return nested;
+    }
+  }
+  return;
+}
+
 /** Token counts as the Responses API reports them. */
 export interface MantleUsage {
   input_tokens?: number;

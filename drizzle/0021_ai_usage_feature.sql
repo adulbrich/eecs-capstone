@@ -1,0 +1,1 @@
+ALTER TABLE "ai_review_usage" ADD COLUMN "feature" text DEFAULT 'review' NOT NULL;

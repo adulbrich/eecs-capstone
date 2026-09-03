@@ -238,6 +238,12 @@ Each project carries:
   form.
 - [x] Backed by AWS Bedrock (`BEDROCK_MODEL_ID`, configurable); returns
   per-field improvement suggestions as Markdown, matching the fields' format.
+- [x] Staff-only scope assessment on the project's staff panel: a verdict
+  (under-scoped, about right, too large) against one term and against three
+  terms, a confidence, and a short rationale, stored on the project and shown
+  as stale when the text or the program's term count moves. Programs carry a
+  staff-editable `term_count`. Metered under its own limit pair; never shown
+  to proposers or students (#61).
 
 ## 11. Media & Images
 

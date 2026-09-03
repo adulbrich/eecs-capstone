@@ -5,6 +5,8 @@ const programSchema = z.object({
   courseId: z.string().trim().min(1).max(50),
   courseName: z.string().trim().min(1).max(200),
   description: z.string().max(2000).nullable().optional(),
+  // Academic terms the course runs. Nullable: unset is a fact, not a zero.
+  termCount: z.number().int().min(1).max(12).nullable().optional(),
 });
 
 export type ProgramInput = z.infer<typeof programSchema>;

@@ -2,13 +2,16 @@ import { and, eq, gt, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { aiReviewUsage } from "#/db/schema";
 import {
+  AI_FEATURE_NOUN,
+  type AiFeature,
+  limitsFor,
   limitVerdict,
   type ReviewOutcome,
   type ReviewWindowCounts,
-  reviewLimits,
 } from "#/lib/ai-review-limits";
 
 export interface ReviewUsageRow {
+  feature: AiFeature;
   inputTokens?: number | undefined;
   model: string;
   outcome: ReviewOutcome;
@@ -16,12 +19,17 @@ export interface ReviewUsageRow {
   projectId?: string | undefined;
   reasoningEffort: string;
   reasoningTokens?: number | undefined;
-  reviewedFieldCount: number;
+  reviewedFieldCount?: number | undefined;
   userId: string;
 }
 
+/**
+ * Per feature, so exhausting one does not block the other: the two have
+ * different cost profiles and different user counts.
+ */
 export async function countReviewsInWindows(
-  userId: string
+  userId: string,
+  feature: AiFeature
 ): Promise<ReviewWindowCounts> {
   const hourWindow = sql`${aiReviewUsage.createdAt} > now() - interval '1 hour'`;
   const [row] = await db
@@ -43,6 +51,7 @@ export async function countReviewsInWindows(
     .where(
       and(
         eq(aiReviewUsage.userId, userId),
+        eq(aiReviewUsage.feature, feature),
         gt(aiReviewUsage.createdAt, sql`now() - interval '1 day'`)
       )
     );
@@ -59,10 +68,14 @@ export async function countReviewsInWindows(
  * and overshoot by one; that is bounded by concurrency and not worth a lock,
  * because this exists to stop a loop rather than to be exact.
  */
-export async function assertReviewWithinLimit(userId: string): Promise<void> {
+export async function assertWithinLimit(
+  userId: string,
+  feature: AiFeature
+): Promise<void> {
   const message = limitVerdict(
-    await countReviewsInWindows(userId),
-    reviewLimits()
+    await countReviewsInWindows(userId, feature),
+    limitsFor(feature),
+    AI_FEATURE_NOUN[feature]
   );
   if (message) {
     throw new Error(message);
@@ -77,13 +90,14 @@ export async function recordReviewUsage(row: ReviewUsageRow): Promise<void> {
   try {
     await db.insert(aiReviewUsage).values({
       userId: row.userId,
+      feature: row.feature,
       projectId: row.projectId ?? null,
       model: row.model,
       reasoningEffort: row.reasoningEffort,
       inputTokens: row.inputTokens ?? null,
       reasoningTokens: row.reasoningTokens ?? null,
       outputTokens: row.outputTokens ?? null,
-      reviewedFieldCount: row.reviewedFieldCount,
+      reviewedFieldCount: row.reviewedFieldCount ?? null,
       outcome: row.outcome,
     });
   } catch (error) {

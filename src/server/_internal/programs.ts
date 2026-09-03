@@ -10,8 +10,26 @@ interface AuthUser {
   role?: string | null | undefined;
 }
 
+/**
+ * The public program list, projected by name.
+ *
+ * Reachable without a session, because the project listing's program filter
+ * reads it. `term_count` is staff-only and left out here; naming the columns
+ * is what stops the next staff-only column riding a public read, and
+ * `programs.integration.test.ts` pins the key set.
+ */
 export async function listProgramsImpl() {
-  const rows = await db.select().from(programs).orderBy(programs.courseId);
+  const rows = await db
+    .select({
+      id: programs.id,
+      courseId: programs.courseId,
+      courseName: programs.courseName,
+      description: programs.description,
+      createdAt: programs.createdAt,
+      updatedAt: programs.updatedAt,
+    })
+    .from(programs)
+    .orderBy(programs.courseId);
   return { rows };
 }
 
@@ -108,6 +126,7 @@ export async function createProgramAs(viewer: AuthUser, data: ProgramInput) {
       courseId: data.courseId,
       courseName: data.courseName,
       description: data.description ?? null,
+      termCount: data.termCount ?? null,
     })
     .returning();
   return { id: row.id };
@@ -129,6 +148,7 @@ export async function updateProgramAs(
       courseId: data.courseId,
       courseName: data.courseName,
       description: data.description ?? null,
+      termCount: data.termCount ?? null,
       updatedAt: new Date(),
     })
     .where(eq(programs.id, data.id));

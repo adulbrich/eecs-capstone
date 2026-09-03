@@ -18,6 +18,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { type EditLogEntry, EditLogList } from "./edit-log-list";
 import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { ProposerSummary } from "./proposer-summary";
+import { ScopeAssessmentSection } from "./scope-assessment-section";
 import { StaffMentorshipSection } from "./staff-mentorship-section";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
@@ -390,6 +391,12 @@ export function StaffProjectPanel({
       {/* Private notes render on the shared project page, above this panel:
           they are visible to the proposer as well, so they are not staff-only
           content and would be duplicated here. */}
+
+      {/* Only staff: the verdict never enters the project payload, so it is
+          loaded here by a staff-gated read (#61). */}
+      <PanelSection title="Scope assessment">
+        <ScopeAssessmentSection key={project.id} projectId={project.id} />
+      </PanelSection>
 
       <PanelSection title="Edit log">
         <EditLogList rows={editLog} />

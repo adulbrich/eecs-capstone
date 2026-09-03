@@ -7,7 +7,7 @@ import type {
   ReviewResult,
 } from "#/lib/project-review-fields";
 import { canEditProject } from "#/lib/project-visibility";
-import { assertReviewWithinLimit, recordReviewUsage } from "./ai-review-usage";
+import { assertWithinLimit, recordReviewUsage } from "./ai-review-usage";
 import { runProjectReview } from "./project-review-core";
 
 export interface AuthUser {
@@ -55,7 +55,7 @@ export async function reviewProjectAs(
     }
   }
 
-  await assertReviewWithinLimit(viewer.id);
+  await assertWithinLimit(viewer.id, "review");
 
   const run = await runProjectReview(input.fields);
   // Metered on whether a paid call happened, not on whether it succeeded. A
@@ -63,6 +63,7 @@ export async function reviewProjectAs(
   // a user spend without limit by repeating a call that fails.
   if (run.called) {
     await recordReviewUsage({
+      feature: "review",
       userId: viewer.id,
       projectId: input.projectId,
       model: run.model,
