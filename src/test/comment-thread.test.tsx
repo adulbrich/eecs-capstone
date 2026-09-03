@@ -184,3 +184,115 @@ describe("CommentThread internal replies", () => {
     expect(replyForm().queryByRole("checkbox")).toBeNull();
   });
 });
+
+describe("CommentThread forms while a post is in flight", () => {
+  function pendingPost() {
+    let resolvePost: (value: unknown) => void = () => undefined;
+    addComment.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePost = resolve;
+      })
+    );
+    return () => resolvePost({ id: "new-comment" });
+  }
+
+  it("disables the new-comment form until the post lands, then clears it", async () => {
+    const land = pendingPost();
+    renderThread([]);
+    const box = screen.getByLabelText("Comment") as HTMLTextAreaElement;
+    const post = screen.getByRole("button", { name: "Post comment" });
+    fireEvent.change(box, { target: { value: "first" } });
+    fireEvent.click(post);
+
+    await waitFor(() => expect(box.disabled).toBe(true));
+    expect(post.hasAttribute("disabled")).toBe(true);
+    // A second click while busy posts nothing twice.
+    fireEvent.click(post);
+    expect(addComment).toHaveBeenCalledTimes(1);
+
+    land();
+    await waitFor(() => expect(box.disabled).toBe(false));
+    expect(box.value).toBe("");
+  });
+
+  it("disables the reply form the same way and closes it once the reply lands", async () => {
+    const land = pendingPost();
+    renderThread([comment({})]);
+    openReplyAndType("follow-up");
+    const box = screen.getByPlaceholderText("Reply") as HTMLTextAreaElement;
+    fireEvent.click(replyForm().getByRole("button", { name: "Post" }));
+
+    await waitFor(() => expect(box.disabled).toBe(true));
+    const post = replyForm().getByRole("button", { name: "Post" });
+    expect(post.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(post);
+    expect(addComment).toHaveBeenCalledTimes(1);
+
+    land();
+    await waitFor(() =>
+      expect(screen.queryByPlaceholderText("Reply")).toBeNull()
+    );
+    expect(addComment).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a reply draft when another post lands and the thread refreshes", async () => {
+    // Step 3 of #188's triage: onChanged is shared, so a post from the
+    // new-comment form must not disturb a reply being drafted at the same
+    // time. The refresh it triggers is a rerender with a longer comments
+    // array; the reply form is keyed under its comment and keeps its state.
+    const land = pendingPost();
+    const first = comment({});
+    const view = renderThread([first]);
+    openReplyAndType("reply in progress");
+
+    fireEvent.change(screen.getByLabelText("Comment"), {
+      target: { value: "unrelated post" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText("Comment") as HTMLTextAreaElement).disabled
+      ).toBe(true)
+    );
+    land();
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText("Comment") as HTMLTextAreaElement).disabled
+      ).toBe(false)
+    );
+    view.rerender(
+      <CommentThread
+        comments={[first, comment({ id: "c2", content: "unrelated post" })]}
+        onChanged={() => {
+          // no-op
+        }}
+        projectId={PROJECT_ID}
+        viewerIsStaff={true}
+      />
+    );
+
+    const reply = screen.getByPlaceholderText("Reply") as HTMLTextAreaElement;
+    expect(reply.value).toBe("reply in progress");
+    expect(reply.disabled).toBe(false);
+  });
+
+  it("does not carry a cancelled reply's failure into the next draft", async () => {
+    let failPost: (reason: Error) => void = () => undefined;
+    addComment.mockReturnValue(
+      new Promise((_, reject) => {
+        failPost = reject;
+      })
+    );
+    renderThread([comment({})]);
+    openReplyAndType("doomed reply");
+    fireEvent.click(replyForm().getByRole("button", { name: "Post" }));
+    fireEvent.click(replyForm().getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByPlaceholderText("Reply")).toBeNull();
+
+    failPost(new Error("Forbidden"));
+    await waitFor(() => expect(addComment).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+    expect(screen.queryByText("Forbidden")).toBeNull();
+  });
+});

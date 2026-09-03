@@ -195,9 +195,10 @@ function ProjectDetail() {
           comments={comments}
           history={history}
           notes={project.notes}
+          // Only the comment list refetches. The loader carries no comments,
+          // so invalidating the route after a post re-ran it for nothing.
           onCommentsChanged={() => {
             void refreshComments();
-            void router.invalidate();
           }}
           projectId={project.id}
           teamsSupported={project.teamsSupported}

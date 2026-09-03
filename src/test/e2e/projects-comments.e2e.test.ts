@@ -80,6 +80,17 @@ function captureBodies(page: Page): {
   };
 }
 
+/**
+ * A comment that has rendered, as opposed to one that is merely typed: React
+ * mirrors a controlled textarea's value into its text content, so a bare
+ * `getByText(draft)` resolves on the composer itself the moment the draft is
+ * typed, before the post has answered. See QUIRKS, "`getByText` finds a draft
+ * typed into a controlled textarea".
+ */
+function posted(page: Page, text: string) {
+  return page.getByRole("paragraph").filter({ hasText: text });
+}
+
 test.describe("project internal comments", () => {
   test("staff internal comment never reaches the proposer", async ({
     browser,
@@ -112,16 +123,11 @@ test.describe("project internal comments", () => {
       await staff.getByLabel("Comment").fill(publicText);
       await staff.getByRole("button", { name: "Post comment" }).click();
 
-      await expect(staff.getByText(publicText)).toBeVisible();
+      await expect(posted(staff, publicText)).toBeVisible();
 
-      // Reloaded rather than typed straight into, for the reason recorded in
-      // docs/QUIRKS.md under "A second comment posted in one page load needs a
-      // reload first". The reload also proves the first comment was stored
-      // rather than only rendered.
-      await staff.reload();
-      await waitForHydration(staff);
-      await expect(staff.getByText(publicText)).toBeVisible();
-
+      // Typed straight into the same composer, no reload. The composer is
+      // disabled while a post is in flight, so this fill waits for the first
+      // post to answer rather than racing its clear (#188).
       await staff.getByLabel("Comment").fill(internalText);
       await staff
         .getByRole("checkbox", { name: "Internal (staff only)" })
@@ -131,7 +137,7 @@ test.describe("project internal comments", () => {
       // Staff see both, and the badge is what tells them the second one is not
       // going to the proposer. Exact, because the badge is the bare word and a
       // substring match would also find it inside "Internal (staff only)".
-      await expect(staff.getByText(internalText)).toBeVisible();
+      await expect(posted(staff, internalText)).toBeVisible();
       await expect(staff.getByText("internal", { exact: true })).toBeVisible();
 
       const owner = await ownerContext.newPage();
@@ -142,7 +148,7 @@ test.describe("project internal comments", () => {
       // The public comment first. Every absence below is vacuous until this
       // passes: the comment list starts as an empty `useState([])`, so a page
       // whose fetch never resolved contains neither comment.
-      await expect(owner.getByText(publicText)).toBeVisible();
+      await expect(posted(owner, publicText)).toBeVisible();
 
       await expect(owner.getByText(internalText)).toHaveCount(0);
       await expect(owner.getByText("internal", { exact: true })).toHaveCount(0);
