@@ -1633,6 +1633,12 @@ cap and keeps the rest of the review. Failing the whole review would throw away
 six good suggestions over one long one, and applying it would write text into the
 form that fails validation on submit with an error the user did not cause.
 
+### The scope assessment is a second Mantle call, not a second output of the review
+
+`src/server/_internal/scope-assessment-core.ts` is the shape of `project-review-core.ts` with its own tool (`assess_project_scope`), its own prompt, its own effort variable (`BEDROCK_SCOPE_REASONING_EFFORT`, default `high`) and a much lower output ceiling. The two share only the model id and the Mantle client. They are separate on purpose: the review is a proposer's writing assistant and the assessment is staff judgement support, so bundling would make every review pay for reasoning nobody sees. Each has its own limit pair (`AI_REVIEW_LIMIT_*`, `AI_SCOPE_LIMIT_*`) and `ai_review_usage.feature` says which one a row was, which is the only place spend per feature is attributable (#61).
+
+The verdict is stored on `projects` in three columns mirroring the embedding ones (`scope_assessment`, `scope_assessment_source_hash`, `scope_assessment_updated_at`), and the same staleness rule applies: `getScopeAssessmentAs` recomputes the hash of the current text and reports `stale` rather than re-running or hiding. The source includes the program's `term_count`, so changing that goes stale too. None of the three columns enters `projectDetailView` or `projectSummarySelect`; the key-set tests in `projects.integration.test.ts` and `scope-assessment.integration.test.ts` pin that. `programs.term_count` is staff-only the same way: `listProgramsImpl` projects the six public columns by name now, rather than a bare `select()`, and `programs.integration.test.ts` pins that key set.
+
 ### Function call arguments arrive as a JSON string
 
 A `function_call` item's `arguments` is a string, not an object: parse it

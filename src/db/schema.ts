@@ -48,6 +48,13 @@ export const programs = pgTable("programs", {
   courseId: text("course_id").notNull(),
   courseName: text("course_name").notNull(),
   description: text("description"),
+  /**
+   * How many academic terms the course runs, so a proposal can be judged
+   * against the right bar. Staff-editable, never public: `listProgramsImpl`
+   * projects the public columns by name and leaves this out. Nullable so an
+   * unset value is visibly unset rather than judged against a wrong bar (#61).
+   */
+  termCount: integer("term_count"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -191,6 +198,18 @@ export const projects = pgTable(
      */
     embedding: vector("embedding", { dimensions: 1024 }),
     embeddingSourceHash: text("embedding_source_hash"),
+    /**
+     * The staff-only scope assessment (#61), mirroring the embedding columns:
+     * the stored verdict, the hash of the text it was computed from, and
+     * when. None of the three enters `projectDetailView` or
+     * `projectSummarySelect`; a mismatched hash renders as "assessed against
+     * an earlier version" rather than re-running.
+     */
+    scopeAssessment: jsonb("scope_assessment"),
+    scopeAssessmentSourceHash: text("scope_assessment_source_hash"),
+    scopeAssessmentUpdatedAt: timestamp("scope_assessment_updated_at", {
+      withTimezone: true,
+    }),
     embeddingUpdatedAt: timestamp("embedding_updated_at", {
       withTimezone: true,
     }),
@@ -658,6 +677,13 @@ export const aiReviewUsage = pgTable(
     projectId: uuid("project_id").references(() => projects.id, {
       onDelete: "set null",
     }),
+    /**
+     * Which paid feature the row meters: `review` (the proposer's writing
+     * assistant) or `scope` (the staff scope assessment, #61). Each has its
+     * own limit pair, and this is the only place spend per feature is
+     * attributable; #34 keeps AI usage off its dashboard.
+     */
+    feature: text("feature").notNull().default("review"),
     model: text("model").notNull(),
     reasoningEffort: text("reasoning_effort").notNull(),
     inputTokens: integer("input_tokens"),

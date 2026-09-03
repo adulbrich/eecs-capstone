@@ -200,13 +200,21 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/programs.ts:listPrograms": {
     level: "public",
-    note: "Public because `programs` holds no personal data and this does not join `user`, which is what separates it from getProgram. Nothing projects that: listProgramsImpl is a bare select() returning all six columns, so a personal column added to the table would ride into a public read. programs.integration.test.ts pins the exact key set and is the only enforcement.",
+    note: "Public because this does not join `user`, which is what separates it from getProgram, and because listProgramsImpl projects the six public columns by name: `term_count` is staff-only and stays out. programs.integration.test.ts pins the exact key set.",
   },
   "server/programs.ts:listProgramsWithInstructors": {
     level: "staff",
     note: "The admin index's read. Joins `user` for instructor names, which is what listPrograms must never do, so it is a separate endpoint gated like getProgram rather than a widening of the public one.",
   },
   "server/programs.ts:removeProgramInstructor": { level: "staff" },
+  "server/scope-assessment.ts:assessProjectScope": {
+    level: "staff",
+    note: "A paid Bedrock call that writes the verdict onto the project. Staff only, and staff only: the assessment never reaches the proposer or the public payload, and it is metered under its own limit pair (#61).",
+  },
+  "server/scope-assessment.ts:getScopeAssessment": {
+    level: "staff",
+    note: "Reads the stored verdict and whether the project's text has moved since. The three columns are absent from projectDetailView, so this is the only way they leave the server.",
+  },
   "server/programs.ts:updateProgram": { level: "staff" },
 
   "server/project-review.ts:reviewProject": {

@@ -64,10 +64,9 @@ describe("the instructor-bearing reads are staff-only", () => {
   it("keeps user columns out of the public program list", async () => {
     // `listProgramsImpl` has no gate on purpose: the public project listing
     // filters by program, so it has to be reachable without a session. What
-    // makes that safe is that the query never reaches `user`, and it is a
-    // bare `select()` with no projection to enforce that, so this test is the
-    // enforcement. A join added here would nest the row under table keys,
-    // `courseId` would stop resolving, and the lookup below would fail.
+    // makes that safe is that the query never reaches `user` and projects
+    // its columns by name, leaving `term_count` out; this test pins the key
+    // set so neither a join nor a new column widens the public read.
     const admin = await makeUser(`lp-a-${Date.now()}@x.com`, "admin");
     const courseId = `PUB-${Date.now()}`;
     await createProgramAs(admin, {
@@ -148,6 +147,35 @@ describe("the admin index reads instructor names through its own staff seam", ()
     const plain = await makeUser(`li-p-${Date.now()}@x.com`, "user");
     await expect(listProgramsWithInstructorsAs(plain)).rejects.toThrow(
       /Forbidden/
+describe("term_count is staff-editable and never public", () => {
+  it("round-trips through create and update, and reaches only the staff detail", async () => {
+    const admin = await makeUser(`tc-a-${Date.now()}@x.com`, "admin");
+    const courseId = `TC-${Date.now()}`;
+    const created = await createProgramAs(admin, {
+      courseId,
+      courseName: "Three terms",
+      description: null,
+      termCount: 3,
+    });
+    const detail = await getProgramAs(admin, { id: created.id });
+    expect(detail.program.termCount).toBe(3);
+
+    // Nullable on purpose: unset must stay visibly unset, not become zero.
+    await updateProgramAs(admin, {
+      id: created.id,
+      courseId,
+      courseName: "Three terms",
+      description: null,
+      termCount: null,
+    });
+    const cleared = await getProgramAs(admin, { id: created.id });
+    expect(cleared.program.termCount).toBeNull();
+
+    // The public list projects its columns by name, so the new column does
+    // not ride into it; the six-key pin above is the enforcement.
+    const { rows } = await listProgramsImpl();
+    expect(rows.find((r) => r.id === created.id)).not.toHaveProperty(
+      "termCount"
     );
   });
 });

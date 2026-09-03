@@ -48,6 +48,10 @@ const { listProjectEditLog, getProposerForEdit, getProjectMentorship } =
     getProposerForEdit: vi.fn(),
     getProjectMentorship: vi.fn(),
   }));
+vi.mock("#/server/scope-assessment", () => ({
+  assessProjectScope: vi.fn(() => Promise.resolve(null)),
+  getScopeAssessment: vi.fn(() => Promise.resolve(null)),
+}));
 vi.mock("#/server/projects-queries", () => ({
   listProjectEditLog,
   getProposerForEdit,

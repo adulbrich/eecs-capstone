@@ -169,6 +169,24 @@ variable "ai_review_limit_per_day" {
   default     = "40"
 }
 
+variable "bedrock_scope_reasoning_effort" {
+  description = "Reasoning effort for the staff scope assessment. Higher than the review's: a verdict, not an edit."
+  type        = string
+  default     = "high"
+}
+
+variable "ai_scope_limit_per_hour" {
+  description = "Per-user hourly ceiling on scope assessments. Metered apart from AI reviews."
+  type        = string
+  default     = "10"
+}
+
+variable "ai_scope_limit_per_day" {
+  description = "Per-user daily ceiling on scope assessments."
+  type        = string
+  default     = "40"
+}
+
 variable "bedrock_embedding_model_id" {
   description = "Bedrock model id used for project and interest embeddings"
   type        = string

@@ -46,6 +46,10 @@ function ProgramEdit() {
   const [courseId, setCourseId] = useState(program.courseId);
   const [courseName, setCourseName] = useState(program.courseName);
   const [description, setDescription] = useState(program.description ?? "");
+  // A string because it is an input; "" is unset and saves as null.
+  const [termCount, setTermCount] = useState(
+    program.termCount === null ? "" : String(program.termCount)
+  );
   const [error, setError] = useState<string | null>(null);
 
   async function onSave(e: React.FormEvent) {
@@ -58,6 +62,7 @@ function ProgramEdit() {
           courseId,
           courseName,
           description: description || null,
+          termCount: termCount === "" ? null : Number(termCount),
         },
       });
       navigate({ to: "/admin/programs" });
@@ -134,6 +139,23 @@ function ProgramEdit() {
             rows={3}
             value={description}
           />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="course-terms">Terms</Label>
+          <Input
+            id="course-terms"
+            inputMode="numeric"
+            max={12}
+            min={1}
+            onChange={(e) => setTermCount(e.target.value)}
+            type="number"
+            value={termCount}
+          />
+          <p className="text-muted-foreground text-xs">
+            How many academic terms the course runs. The scope assessment judges
+            proposals against it; leave it blank if unsure, and the assessment
+            says so rather than guessing.
+          </p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" type="submit">

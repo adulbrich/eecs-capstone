@@ -22,6 +22,20 @@ export interface ReviewWindowCounts {
 export type ReviewOutcome = "ok" | "truncated" | "failed";
 
 /**
+ * The two paid, user-triggered features, each with its own limit pair and
+ * its own rows in `ai_review_usage`. The proposal review is a proposer's
+ * writing assistant; the scope assessment is staff judgement support (#61).
+ * One limit across both would make every proposer's review pay for
+ * reasoning they never see, and attribute spend to the wrong feature.
+ */
+export type AiFeature = "review" | "scope";
+
+export const AI_FEATURE_NOUN: Record<AiFeature, string> = {
+  review: "AI reviews",
+  scope: "scope assessments",
+};
+
+/**
  * Read on every call rather than captured at import, so a test can set a low
  * limit and an operator can change one without a code change; both variables
  * are plumbed through `infra/ecs.tf`. `embeddingsEnabled()` is a function for
@@ -34,6 +48,22 @@ export function reviewLimits(
     perHour: Number(env.AI_REVIEW_LIMIT_PER_HOUR ?? "10"),
     perDay: Number(env.AI_REVIEW_LIMIT_PER_DAY ?? "40"),
   };
+}
+
+export function scopeLimits(
+  env: NodeJS.ProcessEnv = process.env
+): ReviewLimits {
+  return {
+    perHour: Number(env.AI_SCOPE_LIMIT_PER_HOUR ?? "10"),
+    perDay: Number(env.AI_SCOPE_LIMIT_PER_DAY ?? "40"),
+  };
+}
+
+export function limitsFor(
+  feature: AiFeature,
+  env: NodeJS.ProcessEnv = process.env
+): ReviewLimits {
+  return feature === "scope" ? scopeLimits(env) : reviewLimits(env);
 }
 
 function waitPhrase(minutes: number): string {
@@ -53,13 +83,14 @@ function waitPhrase(minutes: number): string {
  */
 export function limitVerdict(
   counts: ReviewWindowCounts,
-  limits: ReviewLimits
+  limits: ReviewLimits,
+  noun: string = AI_FEATURE_NOUN.review
 ): string | null {
   if (counts.inHour >= limits.perHour) {
-    return `You have used all ${limits.perHour} AI reviews for this hour. Try again ${waitPhrase(counts.hourResetsInMinutes)}.`;
+    return `You have used all ${limits.perHour} ${noun} for this hour. Try again ${waitPhrase(counts.hourResetsInMinutes)}.`;
   }
   if (counts.inDay >= limits.perDay) {
-    return `You have used all ${limits.perDay} AI reviews for today. Try again ${waitPhrase(counts.dayResetsInMinutes)}.`;
+    return `You have used all ${limits.perDay} ${noun} for today. Try again ${waitPhrase(counts.dayResetsInMinutes)}.`;
   }
   return null;
 }
