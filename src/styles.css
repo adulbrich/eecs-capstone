@@ -153,7 +153,11 @@
   --accent:                      var(--surface-sunken);
   --accent-foreground:           var(--text-primary);
   --destructive:                 var(--status-error);
-  --destructive-foreground:      #FFFFFF;
+  /* Dark ink, not white: --destructive is the light coral above, and white on
+     it measures 2.28:1. #1A1A1A measures 7.62. Any component that pairs
+     bg-destructive with text-destructive-foreground inherits this, which is
+     why the fix is the token and not a class on the badge that surfaced it. */
+  --destructive-foreground:      #1A1A1A;
   /* border/input raised so outline buttons are visible */
   --border:                      rgba(245, 241, 238, 0.18);
   --input:                       rgba(245, 241, 238, 0.15);
