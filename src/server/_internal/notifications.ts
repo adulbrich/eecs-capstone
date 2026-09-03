@@ -1,14 +1,15 @@
-import { and, count, desc, eq } from "drizzle-orm";
-import { db } from "#/db";
-import { notifications } from "#/db/schema";
-import { requireUser } from "#/lib/_internal/auth-guards";
-
 /**
  * A notification row is visible to its recipient and to nobody else, and only
  * the recipient may mark it read. There is no staff read path. Every query
  * below therefore carries `userId = viewer.id`, and the integration suite
  * proves that a foreign id reads nothing and updates zero rows.
  */
+
+import { and, count, desc, eq } from "drizzle-orm";
+import { db } from "#/db";
+import { notifications } from "#/db/schema";
+import { requireUser } from "#/lib/_internal/auth-guards";
+
 interface AuthUser {
   id: string;
 }
