@@ -49,13 +49,13 @@ function SignIn() {
     setLoading(true);
     const form = new FormData(e.currentTarget);
     const email = String(form.get("email") ?? "");
+    // No callbackURL here. Better Auth would echo it back as a redirect on a
+    // successful sign-in too, and the client would follow it instead of the
+    // navigate below (#254). The link a refused sign-in mails still lands on
+    // /verify-email: `sendVerificationEmail` in auth.ts sets that.
     const { error: signInError } = await authClient.signIn.email({
       email,
       password: String(form.get("password") ?? ""),
-      // Where the verification link lands when an unverified account is
-      // refused and re-mailed (`sendOnSignIn` in auth.ts). Better Auth reads
-      // it from this request body and defaults to "/", same as sign-up.
-      callbackURL: "/verify-email",
     });
     setLoading(false);
     if (signInError) {
