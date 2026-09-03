@@ -25,9 +25,11 @@ jobs:
       - run: npm run check
       - run: npm run check:prose
       # The same script lefthook runs at commit-msg, over the commits a
-      # `--no-verify` could have let through. `--range` skips merge commits,
-      # so the PR merge ref itself is not checked.
-      - if: github.event_name == 'pull_request'
+      # `--no-verify` could have let through. A merge commit's subject is
+      # exempt and its body is still checked, so the PR merge ref passes.
+      # Dependabot is skipped: its bodies embed upstream release notes, which
+      # carry whatever characters the upstream maintainers typed.
+      - if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
         env:
           BASE_REF: ${{ github.base_ref }}
         run: node scripts/check-commit-message.mjs --range "origin/$BASE_REF..HEAD"

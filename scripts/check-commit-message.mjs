@@ -42,11 +42,12 @@ const TYPES = [
 
 /**
  * `type(scope)!: subject`, scope optional. "Lowercase imperative" is checked
- * as "does not start with a capital", so a subject may lead with a digit, a
- * quote or an identifier in backticks.
+ * as "does not start with a capital letter", in any script, so a subject may
+ * lead with a digit, a quote or an identifier in backticks.
  */
 const SUBJECT = new RegExp(
-  `^(?:${TYPES.join("|")})(?:\\([a-z0-9-]+\\))?!?: (?![A-Z])\\S`
+  `^(?:${TYPES.join("|")})(?:\\([a-z0-9-]+\\))?!?: (?!\\p{Lu})\\S`,
+  "u"
 );
 
 /**
@@ -112,12 +113,19 @@ function report(label, problems) {
   }
 }
 
+function fail() {
+  process.stderr.write(RULE);
+  process.exit(1);
+}
+
 function main(argv) {
   const [mode, ...rest] = argv;
 
   if (mode === "--range") {
+    // Merge commits are walked too: their subject is exempt, their body is
+    // where a stray session trailer would sit.
     let failed = false;
-    for (const sha of gitLines(["log", "--no-merges", "--format=%H", rest[0]])) {
+    for (const sha of gitLines(["log", "--format=%H", rest[0]])) {
       const message = execFileSync("git", ["log", "-1", "--format=%B", sha], {
         encoding: "utf8",
       });
@@ -128,8 +136,7 @@ function main(argv) {
       }
     }
     if (failed) {
-      process.stderr.write(RULE);
-      process.exit(1);
+      fail();
     }
     return;
   }
@@ -146,8 +153,7 @@ function main(argv) {
   const problems = checkCommitMessage(message);
   if (problems.length > 0) {
     report("commit message", problems);
-    process.stderr.write(RULE);
-    process.exit(1);
+    fail();
   }
 }
 

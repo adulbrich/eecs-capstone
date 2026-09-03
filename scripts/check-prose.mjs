@@ -28,15 +28,18 @@ const EMDASH = "\u2014";
 /**
  * The blocks emoji are drawn from: the astral range from Mahjong tiles up
  * through the extended pictographs, Miscellaneous Symbols and Dingbats (the
- * check and cross marks, the warning sign, stars), Miscellaneous Technical
- * (hourglass, alarm clock, the media buttons), the play and reverse
- * triangles, the information source, and the few squares and circles from
- * Miscellaneous Symbols and Arrows that keyboards offer as emoji. Arrows
- * (U+2190 to U+21FF) and box drawing are deliberately not in here: the rule
- * is about emoji, and a diagram in a doc is not one.
+ * check and cross marks, the warning sign, stars), the emoji subset of
+ * Miscellaneous Technical (watch, hourglass, keyboard, eject, the media
+ * buttons, alarm clock, stopwatch, timer), the information source, and the
+ * few arrows, squares and circles from Miscellaneous Symbols and Arrows that
+ * keyboards offer as emoji. Not in here on purpose: the arrows block (U+2190
+ * to U+21FF), box drawing, the command, option and return glyphs a keyboard
+ * shortcut doc uses (U+2318, U+2325, U+23CE), and the play and reverse
+ * triangles a `<details>` marker copies. The rule is about emoji, and a
+ * diagram or a shortcut in a doc is not one.
  */
 const EMOJI =
-  /[\u{1F000}-\u{1FAFF}\u{2300}-\u{23FF}\u{2600}-\u{27BF}\u{2139}\u{25B6}\u{25C0}\u{2B05}-\u{2B07}\u{2B1B}\u{2B1C}\u{2B50}\u{2B55}]/u;
+  /[\u{1F000}-\u{1FAFF}\u{231A}\u{231B}\u{2328}\u{23CF}\u{23E9}-\u{23F3}\u{23F8}-\u{23FA}\u{2600}-\u{27BF}\u{2139}\u{2B05}-\u{2B07}\u{2B1B}\u{2B1C}\u{2B50}\u{2B55}]/u;
 
 /**
  * Extensions that are prose or source. Anything else `git ls-files` reports
