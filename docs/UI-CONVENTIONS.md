@@ -497,10 +497,24 @@ when disabled, which is what actually removes it from the tab order.
       </Link>
     </PaginationLink>
   )}
-  <PaginationStatus page={page} totalPages={totalPages} />
+  <PaginationStatus
+    page={page}
+    shown={rows.length}
+    total={total}
+    totalPages={totalPages}
+  />
   ...
 </Pagination>
 ```
+
+`PaginationStatus` is the one live region that counts rows, on every list:
+`47 results` when everything fits on one page, `Page 2 of 3 · 20 of 47
+results` otherwise, nothing when the total is zero. The route renders it, never
+the table, because on `/projects` the same footer serves the card view. A list
+the server does not page renders `ListCount` under its table, which is the
+same component with everything shown on one page, so the count sits in the
+same place with the same format everywhere. `AdminDataTable` announces only
+the sort order, so a screen reader hears one number (#209).
 
 ### Badges
 
