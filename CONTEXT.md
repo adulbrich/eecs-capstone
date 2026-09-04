@@ -6,8 +6,10 @@ equipment from an inventory. One context; this file is the glossary for all of i
 Decisions live in `docs/adr/`, gotchas in `docs/QUIRKS.md`, and this file holds
 neither.
 
-Where a term here differs from what the code says, the code won, and the entry says
-so. Where a term here differs from an older doc, this file wins.
+Where the code's identifier and the user-facing name differ, the entry names both
+and says which one this file uses. Where a definition here differs from what the
+code does, the code is right and the entry is wrong: fix the entry. Where a term
+here differs from an older doc, this file wins.
 
 ## People and roles
 
@@ -56,14 +58,16 @@ _Avoid_: advisor, supervisor, sponsor
 A capstone course: its course id, name, description, instructors, and the two
 staff-only numbers that size it (how many terms it runs, how many teams are
 expected). A project belongs to at most one program.
-_Avoid_: course (in code and copy; a program is a course, but the term is program),
-section, class, cohort
+The code describes a program by its course id and course name, and those two
+column names are the only place the word course belongs.
+_Avoid_: course (for the entity), section, class, cohort
 
 ## Projects
 
 **Project**:
 The one record a proposal, a review, a listing entry and an archived project all are.
-A project has exactly one status at a time, one proposer, and at most one program.
+A project has exactly one status at a time, at most one proposer, and at most one
+program.
 _Avoid_: idea, listing, posting, capstone (on its own)
 
 **Proposal**:
@@ -79,7 +83,7 @@ spells it. Closed to applicants and soft-deleted are not statuses.
 - **Submitted**: handed to staff for review. The only status that mails the review
   inbox.
 - **Changes requested**: staff sent it back with a note; the proposer edits and
-  resubmits. The one status in which the proposer replies to review comments.
+  resubmits.
 - **Approved**: accepted by staff and not yet published. Nobody but staff and the
   proposer sees it.
 - **Published**: in the public catalog.
@@ -104,25 +108,20 @@ _Avoid_: audit log, timeline (as a term; the UI may call it that)
 **Closed to applicants**:
 A published project whose team is full. It stays in the catalog, marked "Not
 accepting applicants", and a listing filter hides it. A flag on the project, edited
-by staff and the proposer alike, orthogonal to status.
+by staff and the proposer alike, orthogonal to status. The code stores the inverse,
+an accepting-applicants boolean that defaults to true.
 _Avoid_: full, archived (a closed project is still published), inactive
 
 **Applicant**:
 A student who would apply to join a project's team. The app records whether a
-project is taking them; it does not record who they are. Bidding and assignment
-happen outside the app.
+project is taking them and never who they are; bidding and assignment happen
+outside the app.
 _Avoid_: bidder, candidate
 
 **Soft delete**:
 Hiding a non-draft project from everyone but staff while keeping its row, so staff
 can restore it. A draft is hard-deleted instead: it has nothing to keep.
 _Avoid_: archive (that is a status), trash, remove
-
-**Private notes**:
-Free text on a project that only staff and the proposer can read or write; the
-proposer writes it on the submission page. The same name and rule serve inventory
-items, except that an item has no proposer, so there they are staff-only.
-_Avoid_: notes (unqualified), internal notes, staff notes, comments
 
 **Comment**:
 A message on a project's review, threaded. Staff and the proposer see the thread;
@@ -141,8 +140,8 @@ of the writing, not a staff decision.
 _Avoid_: approval (one outcome of a review), moderation, evaluation
 
 **Scope assessment**:
-A staff-only, AI-generated verdict on whether a project is sized for its program,
-stored on the project and marked stale when the text or the program's term count
+A staff-only, AI-generated verdict on whether a project is sized for its program.
+It goes stale, rather than being redone, when the text or the program's term count
 changes. Never shown to the proposer.
 _Avoid_: sizing, feasibility, review (it is not one)
 
@@ -167,8 +166,7 @@ How many student teams a project can take on, one to five. Set by staff.
 _Avoid_: capacity, slots, team count (that is the mentor's number)
 
 **Bookmark**:
-A project a signed-in user has saved to come back to. Listed on a small decision
-table of their own; visibility is re-checked when the list is read.
+A project a signed-in user has saved to come back to. Private to that user.
 _Avoid_: shortlist, favourite, save, star, watch
 
 **Interests**:
@@ -182,15 +180,6 @@ The catalog ordered by how close each published project is to the viewer's
 interests. A sort, not a separate list, and unavailable until the viewer has written
 interests.
 _Avoid_: suggestion, match, personalization
-
-**Category**:
-A tag from a fixed list that classifies a project or an item. Every category belongs
-to one domain, project or inventory, for life. Project categories also carry a type,
-a free-text facet such as technology or industry that groups them in the picker;
-inventory categories are flat. Filtering by several categories means all of them,
-not any.
-_Avoid_: tag, label (that is an inventory field), topic, keyword, facet (that is
-the type, not the category)
 
 **Review inbox**:
 The staff mailbox that receives one email per submission. The only email a project
@@ -208,12 +197,30 @@ A project linking itself to a newly verified account at its proposer email. Only
 verified address claims; registering alone never does.
 _Avoid_: link (the resulting state, not the act), transfer, adopt
 
+## Both domains
+
 **Visibility**:
 Who may see what: the public, staff, the proposer, or the viewer whose own rows
 they are. Decided per field and per row, never per page: a page shows a viewer what
 the rules let that viewer see, at one URL for everyone.
 _Avoid_: permissions (that is who may act), access level (the code's name for what
 an endpoint requires), privacy
+
+**Category**:
+A tag from a fixed list that classifies a project or an item. Every category belongs
+to one domain, project or inventory, for life. Project categories also carry a type,
+a free-text facet such as technology or industry that groups them in the picker;
+inventory categories are flat. Filtering by several categories means all of them,
+not any.
+_Avoid_: tag, label (that is an inventory field), topic, keyword, facet (that is
+the type, not the category)
+
+**Private notes**:
+Free text on a project that only staff and the proposer can read or write; the
+proposer writes it on the submission page. The same name and rule serve an item,
+for locker codes and storage quirks, except that an item has no proposer, so there
+they are staff-only.
+_Avoid_: notes (unqualified), internal notes, staff notes, comments
 
 **Edit log**:
 The record of every edit to a project or an item: which fields changed, from what,
@@ -223,7 +230,8 @@ _Avoid_: history (that is status history), changelog, audit trail
 **Notification**:
 An in-app message to one user, rendered by the bell. Projects notify the proposer of
 transitions, deletions and comments; inventory notifies requesters and holders.
-Never an email; the emails the app sends are a separate, fixed set of four.
+Never an email; the few emails the app sends are a separate, fixed set the README
+lists.
 _Avoid_: alert, push, email (for an in-app row), message
 
 ## Inventory
@@ -239,7 +247,8 @@ Where an item is in its lending life. Exactly one of the six below, spelled as t
 code spells it.
 
 - **Available**: on the shelf and requestable.
-- **Requested**: on a submitted borrow list and awaiting staff. Not yet held.
+- **Requested**: on a submitted borrow list and awaiting staff. The requester is
+  already recorded as its holder, so a request is always on a person.
 - **Reserved**: approved and waiting to be picked up by its pickup deadline.
 - **Checked out**: collected and out, due back by its due date.
 - **Maintenance**: withdrawn from lending until staff release it.
@@ -286,9 +295,9 @@ whether or not they are the one carrying the item.
 _Avoid_: borrower (ambiguous between requester and holder), user, student
 
 **Hold**:
-Who or what has an item that is reserved or checked out. A hold is on a person or
-on a thing, never both and never neither. A hold can exist without a request line:
-staff can reserve or check out an item nobody carted.
+Who or what an item that is requested, reserved or checked out is with, or is for.
+A hold is on a person or on a thing, never both and never neither. A hold can exist
+without a request line: staff can reserve or check out an item nobody carted.
 _Avoid_: assignment, loan, allocation, booking
 
 **Holder**:
@@ -337,8 +346,8 @@ raises an overdue notification.
 _Avoid_: late, expired, past due, delinquent
 
 **Release**:
-A transition that takes an item back to available, closing whatever line it was
-held for as returned, cancelled or rejected.
+A transition that takes an item out of a hold, to available, maintenance or
+retired, closing whatever line it was held for as returned, cancelled or rejected.
 _Avoid_: return (one kind of release), free, check in, unassign
 
 **Retire**:
@@ -349,18 +358,14 @@ _Avoid_: delete, archive, decommission, remove
 
 **Transition** (inventory):
 A change of an item's status, with the hold, deadlines and line decision that go
-with it. Staff make transitions; a user makes exactly two, requesting an available
-item and cancelling their own pending or reserved line, and the rules name those two
-as the user's own authority.
+with it. Staff make transitions; a user makes the two under Self-service and no
+other.
 _Avoid_: status change, update, move
 
 **Self-service**:
 The two transitions a user may make on their own behalf, submitting a borrow list
 and cancelling their own line. Everything else is staff.
 _Avoid_: user action, student transition
-
-**Private notes** (inventory):
-See Projects. Staff-only on an item, for locker codes and storage quirks.
 
 **Label** (inventory field):
 The tag physically on an item, such as an asset sticker. Staff-only, along with the

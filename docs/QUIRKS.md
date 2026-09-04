@@ -665,6 +665,16 @@ grep -n 'update(projects)' src/server/_internal/uploads.ts
 grep -n 'update(inventoryItems)' src/server/_internal/inventory-images.ts
 ```
 
+### What `image_url` may accept, and where each check sits
+
+A write may only CHANGE `image_url` to empty, or to a single filename directly under the row's own prefix: one segment of letters, digits, underscore or hyphen, one dot, an alphanumeric extension. `assertOwnedKey` in `src/lib/_internal/storage.ts` is the check, and `KeySpace.owns` is the one predicate behind it and behind `deleteOwnedObject` (#162). Looser than the `<uuid>.webp` `newKey` mints, deliberately: a key naming nothing renders a broken image rather than leaking anything, and demanding a uuid would force every test to mint one. Three things about the shape that are load-bearing:
+
+- **`owns` is tighter than `startsWith(prefix)`**, which accepts `projects/<own-id>/../<other-id>/x.webp`. That is a distinct key in S3, so it destroys nothing, but a browser normalizes the path and renders another row's image out of this app's bucket. Both call sites read one predicate, and "inside this space" should mean one thing.
+- **`assertNoImageKeyOnCreate` lives in `src/lib/image-upload-policy.ts`, not beside `assertOwnedKey`**, because it needs no `KeySpace` and can be a plain static import at both create sites instead of the dynamic import every other reach into the storage module needs. Both guards throw the one `INVALID_IMAGE` message so the wording has a single home.
+- **The cleanup runs after the row write, never inside the transaction**, because a rollback would destroy the object the surviving row still points at. `hardDeleteProjectAs` opens no transaction, so there it simply follows the row delete.
+
+Before #162 the column was validated for length only, so any signed-in user could point a project at a URL they control and every viewer fetched it; `img` is not in the markdown allowlist and there is no CSP, so this was the one field a non-staff user could use to get an image element rendered. It moves nothing in `access-contract.ts`: the column is still writable by the proposer or staff.
+
 ### TanStack Start FormData server functions
 
 `createServerFn(...).inputValidator(...)` accepts FormData when the
@@ -759,7 +769,7 @@ Inventory full-text search no longer matches category names: `search_vector` is 
 
 The four callers keep what is theirs (who may act, which line is eligible) and pass the rest as two fields. **`authority`** is the only way past `assertStaff` and is default-deny; `AUTHORITY_TARGET` says which status each value may reach. **`transitionSchema` in `src/server/inventory.ts` must never declare it**: `transitionInventoryItem` carries only `requireUser()`, so `assertStaff` inside `transitionItem` is that endpoint's entire staff gate, and `z.object().parse` stripping the unknown key is what keeps it shut. `src/test/inventory-schemas.test.ts` asserts the stripping, including through `__proto__`; `.passthrough()` there would let any signed-in user retire any item. **`lineDecision`** carries the outcome together with the id of the line it was decided about, because a release cannot carry `requestItemId` and an outcome alone would land on whatever line the item points at. The denial notification goes to the **requester** read from the line, not the item's holder: staff can check a pending item straight out for a teammate.
 
-The rules that stayed in `inventory-transitions.ts` are the ones about a row read under `FOR UPDATE` (a line is still open, belongs to this item, the item is free, a rejection lands on a pending line). A single `plan(viewer, input, currentRow)` is not available: it would read the item before the line, and `lockAttachableRequestLine` takes them line-then-item to match `approveRequestItemAs`; inverting that deadlocks the two paths.
+The rules that stayed in `inventory-transitions.ts` are the ones about a row read under `FOR UPDATE` (a line is still open, belongs to this item, the item is free, a rejection lands on a pending line). A single `plan(viewer, input, currentRow)` is not available: it would read the item before the line, and `lockAttachableRequestLine` takes them line-then-item to match `approveRequestItemAs`; inverting that deadlocks the two paths. `TransitionActor` in `inventory-workflow.ts` is the non-null arm of `Viewer` rather than the union, because the self-service path reads `viewer.id` without `assertStaff` having narrowed it first. One integration case stays on purpose under `defense in depth` in `inventory.integration.test.ts`: `transitionItem throws Forbidden for a non-staff viewer` proves the impl re-checks role on every staff write, which a unit test of the rules module cannot show.
 
 ### The dev seed drives the real write path
 

@@ -145,12 +145,8 @@ Read the matching doc before you start; each one is the source of truth for its 
   projects, inventory, and the people and roles around them, each with the synonyms
   the codebase does not use. Use its words in issue titles, test names and copy.
 
-- **[`docs/adr/`](./docs/adr/)** holds the decisions, one paragraph each: the
-  `_internal/` layout, one wrapper per action, declared access levels, the single
-  status writers, lazy deadlines, retired as the archive, proposer linking, account
-  anonymization, the image policy, one URL per resource, the shared test database,
-  Bedrock through Mantle, and specs in issues. Read the ones that touch your area,
-  and say so before contradicting one.
+- **[`docs/adr/`](./docs/adr/)** holds the decisions, one paragraph each, numbered.
+  Read the ones that touch your area, and say so before contradicting one.
 
 - **[`docs/QUIRKS.md`](./docs/QUIRKS.md)** is the ground truth for how this codebase
   actually behaves, and the first stop when something that should work does not. It
