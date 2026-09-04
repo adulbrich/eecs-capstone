@@ -8,14 +8,14 @@ import {
   softDeleteNotification,
   statusChangeNotification,
 } from "#/lib/project-notifications";
-import type { Status } from "#/lib/project-workflow";
+import type { ProjectStatus } from "#/lib/vocabularies";
 
 type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
 
 export async function recordStatusChangeNotifications(
   tx: Tx,
   project: NotifiableProject,
-  newStatus: Status,
+  newStatus: ProjectStatus,
   actorId: string,
   comment?: string | null
 ): Promise<void> {

@@ -1,14 +1,7 @@
+import type { ItemStatus } from "#/lib/vocabularies";
 import { Badge } from "./ui/badge";
 
-type Status =
-  | "available"
-  | "requested"
-  | "reserved"
-  | "checked_out"
-  | "maintenance"
-  | "retired";
-
-const LABEL: Record<Status, string> = {
+const LABEL: Record<ItemStatus, string> = {
   available: "Available",
   requested: "Requested",
   reserved: "Reserved",
@@ -21,7 +14,7 @@ export function InventoryStatusBadge({
   status,
   showRetired = false,
 }: {
-  status: Status;
+  status: ItemStatus;
   showRetired?: boolean;
 }) {
   if (status === "retired" && !showRetired) {
@@ -35,7 +28,7 @@ export function InventoryStatusBadge({
   );
 }
 
-const STYLES: Record<Status, React.CSSProperties> = {
+const STYLES: Record<ItemStatus, React.CSSProperties> = {
   available: {
     background: "var(--status-success-bg)",
     color: "var(--status-success)",

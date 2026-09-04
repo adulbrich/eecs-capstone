@@ -24,8 +24,12 @@
  * why reversing it deadlocks.
  */
 
-import type { ItemStatus } from "./inventory-visibility";
 import { assertStaff, type Viewer } from "./viewer";
+import type {
+  InventoryRequestItemStatus,
+  ItemStatus,
+  SubsetOf,
+} from "./vocabularies";
 
 /**
  * Whoever is making the transition.
@@ -63,8 +67,17 @@ export type TransitionAuthority = "self_cancel" | "self_request";
  * `cancelled` otherwise. It is passed rather than derived because rejecting a
  * pending line and releasing a reserved item both end at `available` with a
  * comment, and nothing in the transition itself distinguishes them.
+ *
+ * Written out rather than derived from the column, because it is a proper
+ * subset of it: `pending` and `approved` are line statuses a release never
+ * writes. The constraint is what holds the two together, so renaming a value
+ * in `INVENTORY_REQUEST_ITEM_STATUSES` fails to compile here instead of
+ * failing at runtime against a column that rejects it (#102).
  */
-export type RequestLineOutcome = "cancelled" | "rejected" | "returned";
+export type RequestLineOutcome = SubsetOf<
+  InventoryRequestItemStatus,
+  "cancelled" | "rejected" | "returned"
+>;
 
 /**
  * A decision about one specific request line.

@@ -8,6 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { INVENTORY_ITEM_STATUSES, type ItemStatus } from "#/lib/vocabularies";
 
 const { router, server } = vi.hoisted(() => ({
   router: {
@@ -31,7 +32,6 @@ vi.mock("#/server/users", () => ({
 vi.mock("@tanstack/react-router", () => ({ useRouter: () => router }));
 
 import { InventoryLifecyclePanel } from "#/components/inventory-lifecycle-panel";
-import type { ItemStatus } from "#/lib/inventory-visibility";
 import {
   HARD_DELETE_HISTORY_REFUSAL,
   needsHolder,
@@ -42,14 +42,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-const STATUSES: ItemStatus[] = [
-  "available",
-  "requested",
-  "reserved",
-  "checked_out",
-  "maintenance",
-  "retired",
-];
+const STATUSES: ItemStatus[] = [...INVENTORY_ITEM_STATUSES];
 
 function renderPanel(
   overrides: { status?: ItemStatus; hasRequestHistory?: boolean } = {}

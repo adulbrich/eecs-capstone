@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { PROJECT_STATUSES } from "#/lib/vocabularies";
 
 // Re-exported so components can type the shape `getProposerForEdit` returns
 // without importing server internals. A type-only export; `verbatimModuleSyntax`
@@ -10,15 +11,8 @@ export type {
   ProposerForEdit,
 } from "./_internal/projects-queries";
 
-const STATUS_FILTER_VALUES = [
-  "all",
-  "draft",
-  "submitted",
-  "approved",
-  "changes_requested",
-  "published",
-  "archived",
-] as const;
+/** The vocabulary plus the sentinel this filter adds for "no filter". */
+const STATUS_FILTER_VALUES = ["all", ...PROJECT_STATUSES] as const;
 
 const myProjectsSchema = z.object({
   status: z.enum(STATUS_FILTER_VALUES).default("all"),

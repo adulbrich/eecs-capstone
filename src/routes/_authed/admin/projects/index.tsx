@@ -41,21 +41,15 @@ import { projectImageSrc } from "#/lib/project-image";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import { PROJECT_STATUSES } from "#/lib/vocabularies";
 import { listPrograms } from "#/server/programs";
 import {
   exportAdminProjects,
   listAdminProjects,
 } from "#/server/projects-queries";
 
-const STATUSES = [
-  "all",
-  "draft",
-  "submitted",
-  "approved",
-  "changes_requested",
-  "published",
-  "archived",
-] as const;
+/** The vocabulary plus the sentinel this filter adds for "no filter". */
+const STATUSES = ["all", ...PROJECT_STATUSES] as const;
 
 const searchSchema = z.object({
   cols: z.string().optional(),

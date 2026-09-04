@@ -14,7 +14,12 @@ import {
   user,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
+import { PROJECT_STATUSES_IN_DISPLAY_ORDER } from "#/lib/project-workflow";
 import { assertStaff, type Viewer } from "#/lib/viewer";
+import {
+  INVENTORY_ITEM_STATUSES,
+  INVENTORY_REQUEST_ITEM_STATUSES,
+} from "#/lib/vocabularies";
 import type { AnalyticsInput } from "../analytics";
 import { countPendingRequests, countRows, countSubmitted } from "./admin";
 
@@ -31,32 +36,6 @@ export interface Bucket {
 export interface LabelledBucket extends Bucket {
   label: string;
 }
-
-export const PROJECT_STATUSES = [
-  "draft",
-  "submitted",
-  "changes_requested",
-  "approved",
-  "published",
-  "archived",
-] as const;
-
-export const ITEM_STATUSES = [
-  "available",
-  "requested",
-  "reserved",
-  "checked_out",
-  "maintenance",
-  "retired",
-] as const;
-
-export const LINE_STATUSES = [
-  "pending",
-  "approved",
-  "rejected",
-  "cancelled",
-  "returned",
-] as const;
 
 export const USER_ROLES = ["admin", "instructor", "user"] as const;
 
@@ -493,7 +472,7 @@ async function breakdowns(programId: string | null, isAdmin: boolean) {
       : Promise.resolve(null),
   ]);
   return {
-    projectsByStatus: fill(PROJECT_STATUSES, byStatus),
+    projectsByStatus: fill(PROJECT_STATUSES_IN_DISPLAY_ORDER, byStatus),
     projectsByProgram: byProgram
       ? byProgram
           .map((row) => ({
@@ -504,9 +483,9 @@ async function breakdowns(programId: string | null, isAdmin: boolean) {
           .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
       : null,
     projectsByCategory: byCategory,
-    itemsByStatus: fill(ITEM_STATUSES, itemsByStatus),
+    itemsByStatus: fill(INVENTORY_ITEM_STATUSES, itemsByStatus),
     itemsByCategory,
-    requestLinesByStatus: fill(LINE_STATUSES, linesByStatus),
+    requestLinesByStatus: fill(INVENTORY_REQUEST_ITEM_STATUSES, linesByStatus),
     usersByRole: byRole ? fill(USER_ROLES, byRole) : null,
   };
 }

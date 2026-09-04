@@ -332,6 +332,10 @@ and every inventory category carries `type = null`, so a plain `UNIQUE (domain, 
 `db-reset.ts` only truncates, so this index is schema state that outlives a test. The
 dedupe test drops it to create the duplicates it exists for and restores it in a `finally`; a test that drops it and dies without restoring disarms every uniqueness assertion after it.
 
+### The status enums take their values from `src/lib/vocabularies.ts`
+
+`projectStatusEnum`, `inventoryItemStatusEnum` and `inventoryRequestItemStatusEnum` are declared with an `as const` tuple imported from `src/lib/vocabularies.ts` rather than an inline array, and the client-safe modules derive their unions from the same tuple with `(typeof T)[number]`. `pgEnum`'s overload is `pgEnum<U extends string, T extends Readonly<[U, ...U[]]>>`, so a readonly tuple is accepted as is. Add a status by editing the tuple and generating a migration: the union derives from it, so the two cannot disagree. Every consumer that names a whole vocabulary derives from it too, but that half was swept by hand rather than enforced, so check for a fresh copy before adding one (#271). [ADR-0014](./adr/0014-status-vocabularies-live-in-src-lib.md) says why the tuples live in `src/lib` rather than being derived from `enumValues` here. `categoryDomainEnum` is still inline: nothing outside the server names a category domain, and `src/server/_internal/categories.ts` derives its type from `enumValues` directly.
+
 ### Timestamps always `withTimezone: true`
 
 Every timestamp column uses `timestamp("col", { withTimezone: true })`. Stored as `timestamptz`. Required ones chain `.notNull().defaultNow()`. Optional event timestamps (`publishedAt`, `archivedAt`, `deletedAt`, `reviewedAt`, `banExpires`) are nullable but still `withTimezone`.

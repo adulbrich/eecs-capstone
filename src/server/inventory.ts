@@ -1,6 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { ACTIVE_STATUSES } from "#/lib/inventory-visibility";
 import { PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX } from "#/lib/pagination";
+import {
+  INVENTORY_ITEM_STATUSES,
+  INVENTORY_REQUEST_ITEM_STATUSES,
+} from "#/lib/vocabularies";
 
 function expectFormData(data: unknown): FormData {
   if (!(data instanceof FormData)) {
@@ -18,13 +23,9 @@ export const uploadInventoryImage = createServerFn({ method: "POST" })
     return uploadInventoryImageForCurrentUser(data);
   });
 
-const itemStatusEnum = z.enum([
-  "available",
-  "requested",
-  "reserved",
-  "checked_out",
-  "maintenance",
-]);
+// The working set: an item is retired through the lifecycle panel, never by
+// writing "retired" into a listing filter.
+const itemStatusEnum = z.enum(ACTIVE_STATUSES);
 
 const listInventorySchema = z.object({
   q: z.string().default(""),
@@ -256,7 +257,7 @@ const requestQueueSchema = z.object({
   // "all" is a view, never combinable with a specific status, so it is one of
   // the exclusive options rather than a separate flag.
   status: z
-    .enum(["pending", "approved", "rejected", "cancelled", "returned", "all"])
+    .enum([...INVENTORY_REQUEST_ITEM_STATUSES, "all"])
     .default("pending"),
   q: z.string().default(""),
 });
@@ -283,14 +284,7 @@ export const listInventoryRequests = createServerFn({ method: "GET" })
  */
 export const transitionSchema = z.object({
   itemId: z.string().uuid(),
-  nextStatus: z.enum([
-    "available",
-    "requested",
-    "reserved",
-    "checked_out",
-    "maintenance",
-    "retired",
-  ]),
+  nextStatus: z.enum(INVENTORY_ITEM_STATUSES),
   requestItemId: z.string().uuid().nullable().default(null),
   // No holderId. Staff assign a hold by address or by label; the account is
   // resolved from the address server-side. The two callers that pass an

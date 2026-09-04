@@ -18,8 +18,8 @@
  */
 
 import { overdueFlags } from "./inventory-deadlines";
-import type { ItemStatus } from "./inventory-visibility";
 import type { NotificationRow } from "./notification-row";
+import type { ItemStatus } from "./vocabularies";
 
 /** The item as it stood before the transition. */
 export interface TransitionSubject {

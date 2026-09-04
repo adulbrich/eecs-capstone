@@ -1,3 +1,4 @@
+import { ACTIVE_STATUSES, type ActiveStatus } from "#/lib/inventory-visibility";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import type { ViewMode } from "#/lib/view-preference";
 import { Card } from "./ui/card";
@@ -13,13 +14,8 @@ import {
 } from "./ui/select";
 import { ViewToggle } from "./view-toggle";
 
-type StatusFilter =
-  | "available"
-  | "requested"
-  | "reserved"
-  | "checked_out"
-  | "maintenance"
-  | null;
+/** The working set, or null for no filter: retired is not offered here. */
+type StatusFilter = ActiveStatus | null;
 
 interface Props {
   categories: { id: string; name: string }[];
@@ -33,13 +29,20 @@ interface Props {
   view: ViewMode;
 }
 
-const STATUS_OPTIONS: { value: NonNullable<StatusFilter>; label: string }[] = [
-  { value: "available", label: "Available" },
-  { value: "requested", label: "Requested" },
-  { value: "reserved", label: "Reserved" },
-  { value: "checked_out", label: "Checked out" },
-  { value: "maintenance", label: "Maintenance" },
-];
+// A label per status, keyed by the union so a new one cannot reach the
+// dropdown unlabelled, and ordered by the vocabulary rather than by hand.
+const STATUS_LABEL: Record<ActiveStatus, string> = {
+  available: "Available",
+  requested: "Requested",
+  reserved: "Reserved",
+  checked_out: "Checked out",
+  maintenance: "Maintenance",
+};
+
+const STATUS_OPTIONS = ACTIVE_STATUSES.map((value) => ({
+  label: STATUS_LABEL[value],
+  value,
+}));
 
 export function InventoryFilterBar(props: Props) {
   const [localQ, setLocalQ] = useDebouncedDraft(props.q, props.onQChange);

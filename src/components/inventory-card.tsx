@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import type { ActiveStatus } from "#/lib/inventory-visibility";
 import { getPublicUrl } from "#/lib/storage";
 import { AddToCartButton } from "./add-to-cart-button";
 import { CategoryChip } from "./category-chip";
@@ -13,12 +14,7 @@ interface Props {
     description: string | null;
     categories: { id: string; name: string }[];
     imageUrl: string | null;
-    status:
-      | "available"
-      | "requested"
-      | "reserved"
-      | "checked_out"
-      | "maintenance";
+    status: ActiveStatus;
   };
   signedIn: boolean;
 }

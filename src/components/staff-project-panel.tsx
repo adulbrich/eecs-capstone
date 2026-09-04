@@ -1,7 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { STAFF_PANEL_AUDIENCE_HINT } from "#/lib/private-notes";
-import { canTransition, type Status } from "#/lib/project-workflow";
+import {
+  canTransition,
+  PROJECT_STATUSES_IN_DISPLAY_ORDER,
+} from "#/lib/project-workflow";
+import type { ProjectStatus } from "#/lib/vocabularies";
 import {
   forceSetProjectStatus,
   hardDeleteProject,
@@ -33,16 +37,9 @@ import {
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
-const WORKFLOW: readonly Status[] = [
-  "draft",
-  "submitted",
-  "changes_requested",
-  "approved",
-  "published",
-  "archived",
-];
+const WORKFLOW = PROJECT_STATUSES_IN_DISPLAY_ORDER;
 
-const STATUS_LABEL: Record<Status, string> = {
+const STATUS_LABEL: Record<ProjectStatus, string> = {
   draft: "Draft",
   submitted: "Submitted",
   changes_requested: "Changes Req.",
@@ -67,7 +64,7 @@ export function StaffProjectPanel({
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<{
-    target: Status;
+    target: ProjectStatus;
     force: boolean;
   } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -108,9 +105,9 @@ export function StaffProjectPanel({
     })();
   }, [project.id]);
 
-  const currentStatus = project.status as Status;
+  const currentStatus = project.status as ProjectStatus;
 
-  function openTransition(target: Status, force: boolean) {
+  function openTransition(target: ProjectStatus, force: boolean) {
     setError(null);
     setComment("");
     setSendEmail(true);

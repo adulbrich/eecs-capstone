@@ -24,11 +24,11 @@ import { compareByDeadline } from "#/lib/inventory-deadlines";
 import {
   type HoldItemView,
   holdItemView,
-  type ItemStatus,
   type MyRequestLineView,
   myRequestLineView,
 } from "#/lib/inventory-visibility";
 import { assertStaff, type Viewer } from "#/lib/viewer";
+import type { ItemStatus } from "#/lib/vocabularies";
 import type { InventoryRequestQueueFilter } from "../inventory";
 import { getCartAs } from "./inventory-cart";
 import { recordOverdueNotificationsAs } from "./inventory-overdue";

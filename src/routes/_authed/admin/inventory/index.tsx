@@ -44,26 +44,24 @@ import {
   deadlinePairOf,
   isOverdue,
 } from "#/lib/inventory-deadlines";
-import { statusRank } from "#/lib/inventory-visibility";
+import {
+  ACTIVE_STATUSES,
+  type ActiveStatus,
+  statusRank,
+} from "#/lib/inventory-visibility";
 import { pageTitle } from "#/lib/page-title";
 import { getPublicUrl } from "#/lib/storage";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import type { ItemStatus } from "#/lib/vocabularies";
 import {
   listAdminInventory,
   listInventoryCategories,
 } from "#/server/inventory";
 
-const STATUSES = [
-  "available",
-  "requested",
-  "reserved",
-  "checked_out",
-  "maintenance",
-] as const;
-
-type Status = (typeof STATUSES)[number];
+// The filter offers the working set: retired is reached through
+// `retiredOnly` rather than by picking it here.
 
 const searchSchema = z.object({
   // A stale pre-UUID `?category=` link (singular) fails
@@ -81,7 +79,7 @@ const searchSchema = z.object({
   // default, and reachable only through this switch.
   retiredOnly: z.boolean().default(false),
   sort: z.string().optional(),
-  status: z.enum(STATUSES).nullable().default(null),
+  status: z.enum(ACTIVE_STATUSES).nullable().default(null),
 });
 
 export const Route = createFileRoute("/_authed/admin/inventory/")({
@@ -218,7 +216,7 @@ export const COLUMNS = defineAdminColumns<Row>()([
       <div className="flex flex-wrap items-center gap-1">
         <InventoryStatusBadge
           showRetired
-          status={row.original.status as Status}
+          status={row.original.status as ItemStatus}
         />
         <OverdueBadge entry={deadlineEntryOf(row.original)} />
       </div>
@@ -541,7 +539,7 @@ function AdminInventory() {
                   void navigate({
                     search: (prev) => ({
                       ...prev,
-                      status: (v === "_all_" ? null : v) as Status | null,
+                      status: (v === "_all_" ? null : v) as ActiveStatus | null,
                     }),
                   })
                 }
@@ -552,7 +550,7 @@ function AdminInventory() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_all_">All statuses</SelectItem>
-                  {STATUSES.map((s) => (
+                  {ACTIVE_STATUSES.map((s) => (
                     <SelectItem key={s} value={s}>
                       {s.replace(/_/g, " ")}
                     </SelectItem>

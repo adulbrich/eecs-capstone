@@ -19,14 +19,7 @@
 
 import { type Hold, holdEmail, holdName } from "./hold";
 import { isStaff, type Viewer } from "./viewer";
-
-export type ItemStatus =
-  | "available"
-  | "requested"
-  | "reserved"
-  | "checked_out"
-  | "maintenance"
-  | "retired";
+import type { ItemStatus } from "./vocabularies";
 
 /**
  * Every status except retired: the working set of items.
@@ -37,13 +30,16 @@ export type ItemStatus =
  * The order is significant: `statusRank` below reads it as the lifecycle
  * order the status tables sort by, so reordering this list reorders them.
  */
-export const ACTIVE_STATUSES: ItemStatus[] = [
+export const ACTIVE_STATUSES = [
   "available",
   "requested",
   "reserved",
   "checked_out",
   "maintenance",
-];
+] as const satisfies readonly ItemStatus[];
+
+/** One of the working statuses: every status a listing filter may offer. */
+export type ActiveStatus = (typeof ACTIVE_STATUSES)[number];
 
 /**
  * Where a status sits in the lifecycle, for a table that sorts by it:
@@ -51,7 +47,7 @@ export const ACTIVE_STATUSES: ItemStatus[] = [
  * means nothing to a reader. Retired, and anything unknown, sorts last.
  */
 export function statusRank(status: string): number {
-  const index = ACTIVE_STATUSES.indexOf(status as ItemStatus);
+  const index = (ACTIVE_STATUSES as readonly string[]).indexOf(status);
   return index === -1 ? ACTIVE_STATUSES.length : index;
 }
 
@@ -87,7 +83,7 @@ export function visibleStatuses(
   if (opts?.retiredOnly && canSeeRetired(viewer)) {
     return ["retired"];
   }
-  return ACTIVE_STATUSES;
+  return [...ACTIVE_STATUSES];
 }
 
 /**

@@ -12,7 +12,7 @@ import {
   projectSubmittedEmail,
   type RenderedEmail,
 } from "#/lib/email/templates";
-import type { Status } from "#/lib/project-workflow";
+import type { ProjectStatus } from "#/lib/vocabularies";
 
 export type SendEmailFn = (to: string, email: RenderedEmail) => Promise<void>;
 
@@ -119,7 +119,7 @@ async function sendToProposer(
  */
 export async function notifyTransitionByEmail(
   project: TransitionEmailProject,
-  target: Status,
+  target: ProjectStatus,
   comment: string | null,
   sendEmail: boolean,
   send?: SendEmailFn,

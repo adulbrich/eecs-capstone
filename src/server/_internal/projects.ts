@@ -14,9 +14,9 @@ import { canEditProject, canWritePrivateNotes } from "#/lib/project-visibility";
 import {
   type ActorRole,
   assertTransitionAllowed,
-  type Status,
 } from "#/lib/project-workflow";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
+import type { ProjectStatus } from "#/lib/vocabularies";
 import type {
   MentorshipInput,
   ProjectInput,
@@ -308,7 +308,7 @@ export async function updateProjectMentorshipForCurrentUser(
 }
 
 function assertChangesRequestedHasComment(
-  target: Status,
+  target: ProjectStatus,
   comment: string | null
 ): void {
   if (target === "changes_requested" && !comment?.trim()) {
@@ -334,10 +334,10 @@ function assertChangesRequestedHasComment(
 async function commitTransition(
   actorId: string,
   project: typeof projects.$inferSelect,
-  target: Status,
+  target: ProjectStatus,
   comment: string | null,
   opts?: TransitionOptions
-): Promise<{ id: string; status: Status }> {
+): Promise<{ id: string; status: ProjectStatus }> {
   assertChangesRequestedHasComment(target, comment);
 
   await db.transaction(async (tx) => {
@@ -403,16 +403,16 @@ async function commitTransition(
 export async function performTransitionAs(
   viewer: AuthUser,
   id: string,
-  target: Status,
+  target: ProjectStatus,
   comment?: string,
   opts?: TransitionOptions
-): Promise<{ id: string; status: Status }> {
+): Promise<{ id: string; status: ProjectStatus }> {
   const project = await loadProjectOr404(id);
   if (!isStaff(viewer) && project.proposerId !== viewer.id) {
     throw new Error("Forbidden");
   }
   const role: ActorRole = isStaff(viewer) ? "staff" : "owner";
-  assertTransitionAllowed(project.status as Status, target, role);
+  assertTransitionAllowed(project.status as ProjectStatus, target, role);
   // Skipping the mail is a staff affordance, so the decision is made here from
   // the role rather than read off the request. `sendEmail` cannot be gated by
   // the schema instead: three owner-reachable endpoints carry it, and one of
@@ -508,10 +508,10 @@ export async function hardDeleteProjectAs(
 export async function forceTransitionAs(
   viewer: AuthUser,
   id: string,
-  target: Status,
+  target: ProjectStatus,
   comment?: string,
   opts?: TransitionOptions
-): Promise<{ id: string; status: Status }> {
+): Promise<{ id: string; status: ProjectStatus }> {
   assertStaff(viewer);
   const project = await loadProjectOr404(id);
   if (project.status === target) {
@@ -536,7 +536,7 @@ export async function updateProjectForCurrentUser(data: UpdateProjectInput) {
 
 export async function performTransitionForCurrentUser(
   id: string,
-  target: Status,
+  target: ProjectStatus,
   comment?: string,
   sendEmail?: boolean
 ) {
@@ -546,7 +546,7 @@ export async function performTransitionForCurrentUser(
 
 export async function forceTransitionForCurrentUser(
   id: string,
-  target: Status,
+  target: ProjectStatus,
   comment?: string,
   sendEmail?: boolean
 ) {

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
+import type { ProjectStatus } from "#/lib/vocabularies";
 import {
   type ActorRole,
   assertTransitionAllowed,
   canTransition,
-  type Status,
 } from "../project-workflow";
 
-const allowedCases: [Status, Status, ActorRole][] = [
+const allowedCases: [ProjectStatus, ProjectStatus, ActorRole][] = [
   ["draft", "submitted", "owner"],
   ["draft", "submitted", "staff"],
   ["draft", "approved", "staff"],
@@ -23,7 +23,7 @@ const allowedCases: [Status, Status, ActorRole][] = [
   ["archived", "published", "staff"],
 ];
 
-const forbiddenCases: [Status, Status, ActorRole][] = [
+const forbiddenCases: [ProjectStatus, ProjectStatus, ActorRole][] = [
   ["draft", "approved", "owner"],
   ["draft", "published", "owner"],
   ["draft", "published", "staff"],

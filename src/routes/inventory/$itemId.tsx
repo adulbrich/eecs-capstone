@@ -10,6 +10,7 @@ import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
 import { getPublicUrl } from "#/lib/storage";
 import { useHasMounted } from "#/lib/use-has-mounted";
+import type { ItemStatus } from "#/lib/vocabularies";
 import { getInventoryItemDetail } from "#/server/inventory";
 
 export const Route = createFileRoute("/inventory/$itemId")({
@@ -67,15 +68,7 @@ function ItemDetail() {
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <InventoryStatusBadge
               showRetired={detail.viewerIsStaff}
-              status={
-                item.status as
-                  | "available"
-                  | "requested"
-                  | "reserved"
-                  | "checked_out"
-                  | "maintenance"
-                  | "retired"
-              }
+              status={item.status as ItemStatus}
             />
             {item.categories.map((category) => (
               <CategoryChip category={category} key={category.id} />

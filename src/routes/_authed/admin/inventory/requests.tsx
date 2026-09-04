@@ -37,16 +37,11 @@ import { pageTitle } from "#/lib/page-title";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import { INVENTORY_REQUEST_ITEM_STATUSES } from "#/lib/vocabularies";
 import { listInventoryRequests } from "#/server/inventory";
 
-const STATUSES = [
-  "pending",
-  "approved",
-  "rejected",
-  "cancelled",
-  "returned",
-  "all",
-] as const;
+/** The vocabulary plus the sentinel this filter adds for "no filter". */
+const STATUSES = [...INVENTORY_REQUEST_ITEM_STATUSES, "all"] as const;
 
 const searchSchema = z.object({
   cols: z.string().optional(),

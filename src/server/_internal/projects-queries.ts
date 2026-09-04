@@ -28,6 +28,7 @@ import {
   projectDetailView,
 } from "#/lib/project-visibility";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
+import type { ProjectStatus } from "#/lib/vocabularies";
 import {
   adminProjectSummarySelect,
   mentorNameSql,
@@ -44,16 +45,8 @@ type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
-type StatusFilter =
-  | "all"
-  | "draft"
-  | "submitted"
-  | "approved"
-  | "changes_requested"
-  | "published"
-  | "archived";
-
-type ProjectStatus = Exclude<StatusFilter, "all">;
+/** The vocabulary plus the sentinel this filter adds for "no filter". */
+type StatusFilter = "all" | ProjectStatus;
 
 async function getViewer(): Promise<Viewer> {
   const session = await readSession();

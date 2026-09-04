@@ -12,17 +12,11 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { pageTitle } from "#/lib/page-title";
+import { PROJECT_STATUSES } from "#/lib/vocabularies";
 import { listMyProjects } from "#/server/projects-queries";
 
-const STATUSES = [
-  "all",
-  "draft",
-  "submitted",
-  "approved",
-  "changes_requested",
-  "published",
-  "archived",
-] as const;
+/** The vocabulary plus the sentinel this filter adds for "no filter". */
+const STATUSES = ["all", ...PROJECT_STATUSES] as const;
 
 const searchSchema = z.object({
   status: z.enum(STATUSES).default("all"),
