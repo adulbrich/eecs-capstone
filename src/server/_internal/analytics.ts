@@ -15,7 +15,7 @@ import {
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { PROJECT_STATUSES_IN_DISPLAY_ORDER } from "#/lib/project-workflow";
-import { assertStaff, type Viewer } from "#/lib/viewer";
+import { assertStaff, isAdmin, type Viewer } from "#/lib/viewer";
 import {
   INVENTORY_ITEM_STATUSES,
   INVENTORY_REQUEST_ITEM_STATUSES,
@@ -500,7 +500,7 @@ export async function getAnalyticsAs(
   input: AnalyticsInput
 ): Promise<AnalyticsView> {
   assertStaff(viewer);
-  const isAdmin = viewer.role === "admin";
+  const viewerIsAdmin = isAdmin(viewer);
   const p = periods(input);
   const programId = input.programId;
 
@@ -525,8 +525,8 @@ export async function getAnalyticsAs(
       flow((s, e) => transitionsIn("submitted", s, e, programId), p),
       flow((s, e) => transitionsIn("published", s, e, programId), p),
       flow(requestsIn, p),
-      isAdmin ? flow(usersIn, p) : Promise.resolve(null),
-      breakdowns(programId, isAdmin),
+      viewerIsAdmin ? flow(usersIn, p) : Promise.resolve(null),
+      breakdowns(programId, viewerIsAdmin),
     ]);
 
   return {

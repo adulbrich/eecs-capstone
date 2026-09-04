@@ -12,7 +12,7 @@
  * `isStaff`, two inlined the role comparison.
  *
  * `isAdmin` and `assertAdmin` answer the narrower question, and joined them
- * here for the same reason one layer out: sixteen route guards under
+ * here for the same reason one layer out: seventeen sites under
  * `src/routes/_authed/` spelled a role comparison out rather than asking
  * either predicate, and `assertAdmin` had a private copy in
  * `_internal/users.ts` (#266).
@@ -30,11 +30,22 @@ export type Viewer =
   | null
   | undefined;
 
-/** The roles that carry staff powers. Anything else fails closed. */
-const STAFF_ROLES = new Set(["admin", "instructor"]);
+/**
+ * The roles that carry staff powers. Anything else fails closed.
+ *
+ * Exported as a tuple rather than kept private as a `Set`, because one caller
+ * cannot use the predicate: `listStaffCandidates` in `_internal/programs.ts`
+ * filters the `user.role` column with `inArray`, and a question asked in SQL
+ * needs the roles as data. That is the same shape as the status vocabularies
+ * in `vocabularies.ts` and has the same rule: this is the one definition, and
+ * a second copy of the list is the bug (#266).
+ */
+export const STAFF_ROLES = ["admin", "instructor"] as const;
 
 export function isStaff(viewer: Viewer): boolean {
-  return !!viewer && STAFF_ROLES.has(viewer.role ?? "");
+  return (
+    !!viewer && (STAFF_ROLES as readonly string[]).includes(viewer.role ?? "")
+  );
 }
 
 /**
@@ -57,11 +68,10 @@ export function isAdmin(viewer: Viewer): boolean {
  * `assertStaff` for the same reason: six seams in `src/server/_internal/`
  * read `viewer.id` right after asking, so the narrowing carries.
  *
- * This was a seventh hand-rolled role comparison living in
- * `_internal/users.ts`. It moved here rather than staying private to that
- * module for the reason the header gives: the routes now ask the same
- * question, and a predicate with two homes is the thing #266 exists to
- * remove.
+ * This was a hand-rolled comparison private to `_internal/users.ts`, with
+ * six call sites. It moved here rather than staying there for the reason the
+ * header gives: the routes ask the same question now, and a predicate with
+ * two homes is the thing #266 exists to remove.
  */
 export function assertAdmin(
   viewer: Viewer

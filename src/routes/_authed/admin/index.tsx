@@ -25,7 +25,6 @@ export const Route = createFileRoute("/_authed/admin/")({
     if (!isStaff(session.user)) {
       throw redirect({ to: "/" });
     }
-    return { user: session.user };
   },
   loader: async () => getAdminStats(),
   component: AdminHome,

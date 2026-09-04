@@ -2,7 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { programInstructors, programs, projects, user } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import { assertStaff } from "#/lib/viewer";
+import { assertStaff, isStaff, STAFF_ROLES } from "#/lib/viewer";
 import type { ProgramInput, ProgramUpdateInput } from "../programs";
 
 interface AuthUser {
@@ -186,7 +186,7 @@ export async function addProgramInstructorAs(
   if (!target) {
     throw new Error("User not found");
   }
-  if (target.role !== "admin" && target.role !== "instructor") {
+  if (!isStaff(target)) {
     throw new Error(
       "Only users with role admin or instructor can be assigned as program instructors"
     );
@@ -247,7 +247,7 @@ export async function listEligibleInstructorsAs(viewer: AuthUser) {
       role: user.role,
     })
     .from(user)
-    .where(inArray(user.role, ["admin", "instructor"]))
+    .where(inArray(user.role, [...STAFF_ROLES]))
     .orderBy(user.name);
   return { rows };
 }
