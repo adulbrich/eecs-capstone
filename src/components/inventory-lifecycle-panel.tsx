@@ -10,10 +10,7 @@ import {
   needsDueAt,
   needsHolder,
 } from "#/lib/inventory-workflow";
-import {
-  INVENTORY_ITEM_STATUSES,
-  type ItemStatus as Status,
-} from "#/lib/vocabularies";
+import { INVENTORY_ITEM_STATUSES, type ItemStatus } from "#/lib/vocabularies";
 import {
   hardDeleteInventoryItem,
   listInventoryItemEditLog,
@@ -53,7 +50,7 @@ import {
 } from "./ui/select";
 import { Textarea } from "./ui/textarea";
 
-const ALL_STATUSES: Status[] = [...INVENTORY_ITEM_STATUSES];
+const ALL_STATUSES: ItemStatus[] = [...INVENTORY_ITEM_STATUSES];
 
 export interface HistoryRow {
   changedByEmail: string;
@@ -153,8 +150,8 @@ function holderFields({
   };
 }
 
-function recommendedNext(status: Status): {
-  next: Status;
+function recommendedNext(status: ItemStatus): {
+  next: ItemStatus;
   label: string;
 } | null {
   switch (status) {
@@ -335,7 +332,7 @@ export function InventoryLifecyclePanel({
   hasRequestHistory,
 }: Props) {
   const router = useRouter();
-  const status = item.status as Status;
+  const status = item.status as ItemStatus;
   const rec = recommendedNext(status);
 
   const [busy, setBusy] = useState(false);
@@ -343,7 +340,8 @@ export function InventoryLifecyclePanel({
 
   // Checkout / reserve dialog state
   const [dlgOpen, setDlgOpen] = useState(false);
-  const [dlgTargetStatus, setDlgTargetStatus] = useState<Status>("checked_out");
+  const [dlgTargetStatus, setDlgTargetStatus] =
+    useState<ItemStatus>("checked_out");
   const [assignEmail, setAssignEmail] = useState("");
   const [assignName, setAssignName] = useState("");
   const [assignProgram, setAssignProgram] = useState("");
@@ -364,10 +362,10 @@ export function InventoryLifecyclePanel({
   const delInputRef = useRef<HTMLInputElement>(null);
 
   // Override "change status to" select
-  const [overrideStatus, setOverrideStatus] = useState<Status | "">("");
+  const [overrideStatus, setOverrideStatus] = useState<ItemStatus | "">("");
 
   async function runTransition(input: {
-    nextStatus: Status;
+    nextStatus: ItemStatus;
     requestItemId?: string | null;
     holderEmail?: string | null;
     holderLabel?: string | null;
@@ -402,7 +400,7 @@ export function InventoryLifecyclePanel({
     }
   }
 
-  function openDialogFor(target: Status) {
+  function openDialogFor(target: ItemStatus) {
     setDlgTargetStatus(target);
     // Prefilled with whoever the item is already associated with, so a
     // reserved to checked-out step does not silently reassign the hold, and
@@ -489,7 +487,7 @@ export function InventoryLifecyclePanel({
   }
 
   async function onOverrideChange(v: string) {
-    const next = v as Status;
+    const next = v as ItemStatus;
     setOverrideStatus(next);
     if (needsHolder(next)) {
       openDialogFor(next);

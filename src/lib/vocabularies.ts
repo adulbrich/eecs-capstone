@@ -56,9 +56,8 @@ export type InventoryRequestItemStatus =
  * `Part extends Whole` is the assertion: a member of `Part` that `Whole` does
  * not have fails to compile where the alias is used.
  *
- * Two shapes use it. A hand-written subset of a vocabulary, like
- * `RequestLineOutcome`, declares itself through it. A list that orders a whole
- * vocabulary for display, like the staff status stepper, passes the arguments
- * the other way round to assert it left nothing out.
+ * A hand-written subset of a vocabulary, like `RequestLineOutcome`, declares
+ * itself through it, so a member the whole does not have is a compile error at
+ * the declaration rather than a value the column rejects at runtime.
  */
 export type SubsetOf<Whole extends string, Part extends Whole> = Part;

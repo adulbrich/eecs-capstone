@@ -16,16 +16,13 @@ import {
   PaginationButton,
   PaginationStatus,
 } from "#/components/ui/pagination";
-import { ACTIVE_STATUSES } from "#/lib/inventory-visibility";
+import { ACTIVE_STATUSES, type ActiveStatus } from "#/lib/inventory-visibility";
 import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
 import { useSignedIn } from "#/lib/use-signed-in";
 import type { ViewMode } from "#/lib/view-preference";
 import { listInventory, listInventoryCategories } from "#/server/inventory";
-
-/** The working set: the public listing never offers retired as a filter. */
-type PublicStatus = (typeof ACTIVE_STATUSES)[number];
 
 const searchSchema = z.object({
   q: z.string().default(""),
@@ -126,7 +123,7 @@ function InventoryCards({
     <div className="mx-auto mt-6 flex max-w-4xl flex-col gap-3">
       {rows.map((it) => (
         <InventoryCard
-          item={{ ...it, status: it.status as PublicStatus }}
+          item={{ ...it, status: it.status as ActiveStatus }}
           key={it.id}
           signedIn={signedIn}
         />

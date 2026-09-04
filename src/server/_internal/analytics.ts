@@ -37,16 +37,6 @@ export interface LabelledBucket extends Bucket {
   label: string;
 }
 
-/**
- * The breakdown's bar order. Shared with the staff stepper, so the two cannot
- * show a reader the same statuses in two different orders.
- */
-export const PROJECT_STATUSES = PROJECT_STATUSES_IN_DISPLAY_ORDER;
-
-export const ITEM_STATUSES = INVENTORY_ITEM_STATUSES;
-
-export const LINE_STATUSES = INVENTORY_REQUEST_ITEM_STATUSES;
-
 export const USER_ROLES = ["admin", "instructor", "user"] as const;
 
 export interface AnalyticsView {
@@ -482,7 +472,7 @@ async function breakdowns(programId: string | null, isAdmin: boolean) {
       : Promise.resolve(null),
   ]);
   return {
-    projectsByStatus: fill(PROJECT_STATUSES, byStatus),
+    projectsByStatus: fill(PROJECT_STATUSES_IN_DISPLAY_ORDER, byStatus),
     projectsByProgram: byProgram
       ? byProgram
           .map((row) => ({
@@ -493,9 +483,9 @@ async function breakdowns(programId: string | null, isAdmin: boolean) {
           .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
       : null,
     projectsByCategory: byCategory,
-    itemsByStatus: fill(ITEM_STATUSES, itemsByStatus),
+    itemsByStatus: fill(INVENTORY_ITEM_STATUSES, itemsByStatus),
     itemsByCategory,
-    requestLinesByStatus: fill(LINE_STATUSES, linesByStatus),
+    requestLinesByStatus: fill(INVENTORY_REQUEST_ITEM_STATUSES, linesByStatus),
     usersByRole: byRole ? fill(USER_ROLES, byRole) : null,
   };
 }
