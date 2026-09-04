@@ -382,7 +382,7 @@ Only the route can tell the two apart, because the loader did the filtering. Der
 `filtered` from the search params that narrow the result, and leave out a switch that
 widens it (`includeSoftDeleted` on projects, `includeBanned` on users): an empty result
 with a widening switch on is still nothing at all. A default that narrows counts as a
-filter: the requests queue opens on `pending`, and a staff member with no pending
+filter: the request queue opens on `pending`, and a staff member with no pending
 requests still wants the status select and the headers rather than a bare message.
 A route with no filters (programs, categories, bookmarks, My Items) never sets it.
 
