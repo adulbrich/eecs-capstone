@@ -8,7 +8,8 @@
  * to agree about what "overdue" means, and they cannot if the rule lives
  * inside a server-only file that only one of them can import.
  *
- * `docs/QUIRKS.md` records the decision this depends on: there is no cron.
+ * `docs/adr/0005-lazy-deadlines-no-scheduler.md` records the decision this
+ * depends on: there is no cron.
  * Deadlines are informational columns and overdue is derived at query time,
  * which is why this is a rule rather than a stored flag.
  */

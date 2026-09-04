@@ -1,0 +1,5 @@
+# Bedrock review goes through the `bedrock-mantle` endpoint signed by hand; embeddings sit behind a flag
+
+The AI review and the scope assessment call the OpenAI-compatible Responses API on `bedrock-mantle`, signed with SigV4 by a hand-written client under the `bedrock-mantle` service name, because no AWS SDK client exists for that endpoint. The alternative, the OpenAI SDK with a long-lived Bedrock API key, would put a model credential in the task definition; SigV4 keeps production on the task role. Every call sends `store: false`, since proposals carry unpublished IP and the endpoint retains inputs for thirty days by default. Embeddings use `bedrock-runtime` through the SDK, and almost nothing is shared between the two paths; a fact about one says nothing about the other.
+
+Embeddings run behind `BEDROCK_EMBEDDINGS_ENABLED`, and the integration suite refuses to start unless it arrived as `false`: a fail-open reaches the SDK credential chain and pays an IMDS probe with retries, which presents as a slow flaky test rather than a configuration error.

@@ -129,8 +129,8 @@ The five canonical roles under their own names, plus `p0-now`, `p1-next` and
 
 ### Domain docs
 
-Single context: `CONTEXT.md` at the root and `docs/adr/`, neither written yet; the
-vocabulary and decisions live in `docs/QUIRKS.md` until they are. See
+Single context: the glossary is `CONTEXT.md` at the root and the decisions are one
+paragraph each under `docs/adr/`. See
 [`docs/agents/domain.md`](./docs/agents/domain.md).
 
 ## Reference docs
@@ -141,13 +141,21 @@ Read the matching doc before you start; each one is the source of truth for its 
   push, pull request, review loop, merge, and the table of every gate and where it
   runs. It is also where a new developer or instructor starts.
 
+- **[`CONTEXT.md`](./CONTEXT.md)** is the glossary: one definition per term for
+  projects, inventory, and the people and roles around them, each with the synonyms
+  the codebase does not use. Use its words in issue titles, test names and copy.
+
+- **[`docs/adr/`](./docs/adr/)** holds the decisions, one paragraph each, numbered.
+  Read the ones that touch your area, and say so before contradicting one.
+
 - **[`docs/QUIRKS.md`](./docs/QUIRKS.md)** is the ground truth for how this codebase
   actually behaves, and the first stop when something that should work does not. It
   covers `createServerFn` and the server/client boundary, route layouts and search
   params, TanStack Form validators, Better Auth sessions and bans, Drizzle tsvector
   columns and FK rules, Vitest and integration-test setup, Sharp and S3 storage keys,
   which Biome rules are relaxed and why, the path-by-path layout of `src/`, the
-  workflow conventions, Amazon Bedrock, and the inventory and project domain rules.
+  workflow conventions, Amazon Bedrock, and the gotchas in the inventory and project
+  modules that the ADRs and the glossary do not carry.
 
 - **[`docs/UI-CONVENTIONS.md`](./docs/UI-CONVENTIONS.md)** is the design system:
   brand tokens and why hex codes never go in a component, `Button` variants and
@@ -175,7 +183,10 @@ Read the matching doc before you start; each one is the source of truth for its 
 ## Adding to these docs
 
 A new gotcha goes in `docs/QUIRKS.md` under the subsystem it belongs to, following the
-pattern in its "When you add a quirk" section. A new design system rule goes in
-`docs/UI-CONVENTIONS.md`. A change to the process or a gate goes in `CONTRIBUTING.md`.
+pattern in its "When you add a quirk" section. A decision (hard to reverse,
+surprising without context, the result of a trade-off) goes in `docs/adr/` as one
+paragraph with the next number. A term goes in `CONTEXT.md`, with the synonyms to
+avoid. A new design system rule goes in `docs/UI-CONVENTIONS.md`. A change to the
+process or a gate goes in `CONTRIBUTING.md`.
 Add to this file only when the rule binds every turn regardless of what is being
 worked on.
