@@ -2,10 +2,9 @@
 --
 -- The write paths normalize from this release on (normalizeEmailAddress in
 -- src/lib/email-address.ts, reached through holdToColumns and the three
--- project writers), so this catches only rows written before it. Every row is
--- rewritten rather than only the mixed-case ones being selected: the WHERE
--- clause keeps the update off rows that are already lowercase, which on these
--- table sizes is most of them.
+-- project writers), so this catches only rows written before it. The WHERE
+-- clause keeps each statement off rows that are already lowercase, which on
+-- these tables is most of them.
 --
 -- The reads still fold. Dropping a lower() on one of these columns is a
 -- separate change that may only land after this migration has actually run
