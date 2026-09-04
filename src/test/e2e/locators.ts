@@ -28,16 +28,16 @@ export function rowFor(scope: Page | Locator, text: string): Locator {
  *
  * Those two tabs are `AdminDataTable`s, so an entry is a table row and
  * `rowFor` scoped to the open tab panel reaches it. The cart tab is a list,
- * not a table, so this finds nothing there. Only the selected panel is in the
- * tree today; the scope is what keeps that true if a table ever lands on the
- * page outside it.
+ * not a table, so this finds nothing there. Today every `row` on the page is
+ * inside the selected panel; the scope keeps the locator there if a table
+ * ever lands on the page outside it.
  *
  * This used to be a `> div > div` chain from when the entries were plain
  * divs. That chain kept matching after the tables landed, on the table's
  * wrapper rather than a row, which is why a test that only looked for one
  * button inside it stayed green while one that asserted on a `time` element
  * hit every row at once. The general form of that trap is in `docs/QUIRKS.md`
- * under "Browser suites select by role and name".
+ * under "A structural selector fails open when the markup under it changes".
  */
 export function entryFor(page: Page, itemName: string): Locator {
   return rowFor(page.getByRole("tabpanel"), itemName);
