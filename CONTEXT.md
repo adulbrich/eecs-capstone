@@ -58,8 +58,8 @@ _Avoid_: advisor, supervisor, sponsor
 A capstone course: its course id, name, description, instructors, and the two
 staff-only numbers that size it (how many terms it runs, how many teams are
 expected). A project belongs to at most one program.
-_Avoid_: course (for the entity; the code and the copy use it for the id, the
-name and the description of what a program is), section, class, cohort
+_Avoid_: course (the column names and some copy still say it; use program in
+anything new), section, class, cohort
 
 ## Projects
 
@@ -250,7 +250,7 @@ code spells it.
   already recorded as its holder, so a request is always on a person.
 - **Reserved**: approved and waiting to be picked up by its pickup deadline.
 - **Checked out**: collected and out, due back by its due date.
-- **Maintenance**: withdrawn from lending until staff return it to available.
+- **Maintenance**: withdrawn from lending until staff move it on.
 - **Retired**: out of the inventory for good, kept for its history. The archive,
   and staff-only.
 
