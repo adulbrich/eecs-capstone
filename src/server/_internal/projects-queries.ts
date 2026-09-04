@@ -27,7 +27,7 @@ import {
   filterCommentsForViewer,
   projectDetailView,
 } from "#/lib/project-visibility";
-import { isStaff, type Viewer } from "#/lib/viewer";
+import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import {
   adminProjectSummarySelect,
   mentorNameSql,
@@ -170,9 +170,7 @@ export async function listAdminProjectsAs(
   viewer: Viewer,
   data: AdminProjectsFilter
 ) {
-  if (!isStaff(viewer)) {
-    throw new Error("Forbidden");
-  }
+  assertStaff(viewer);
   const scope = buildAdminProjectScope(data);
   const listConditions = buildAdminProjectListConditions(data);
 
@@ -216,9 +214,7 @@ export async function exportAdminProjectsAs(
   viewer: Viewer,
   data: AdminProjectsFilter
 ) {
-  if (!isStaff(viewer)) {
-    throw new Error("Forbidden");
-  }
+  assertStaff(viewer);
   const conditions = buildAdminProjectListConditions(data);
   const rows = await db
     .select({
@@ -338,9 +334,7 @@ export async function getProposerForEditAs(
   viewer: Viewer,
   data: { projectId: string }
 ): Promise<ProposerForEdit> {
-  if (!isStaff(viewer)) {
-    throw new Error("Forbidden");
-  }
+  assertStaff(viewer);
   const [project] = await db
     .select({
       proposerId: projects.proposerId,
@@ -391,9 +385,7 @@ export async function getProjectMentorshipAs(
   viewer: Viewer,
   data: { projectId: string }
 ): Promise<ProjectMentorship> {
-  if (!isStaff(viewer)) {
-    throw new Error("Forbidden");
-  }
+  assertStaff(viewer);
   const [row] = await db
     .select({
       mentorEmail: projects.mentorEmail,
@@ -426,11 +418,16 @@ export async function getProposerForEditImpl(data: {
   return getProposerForEditAs(await getViewer(), data);
 }
 
-export async function listProjectEditLogImpl(data: { id: string }) {
-  const viewer = await getViewer();
-  if (!isStaff(viewer)) {
-    throw new Error("Forbidden");
-  }
+/**
+ * Test seam, the same *As / *Impl split the rest of this file uses: the gate
+ * lived inside the Impl, where nothing but a request could reach it, and so
+ * had no refusal test.
+ */
+export async function listProjectEditLogAs(
+  viewer: Viewer,
+  data: { id: string }
+) {
+  assertStaff(viewer);
   const rows = await db
     .select()
     .from(projectEditLog)
@@ -443,6 +440,10 @@ export async function listProjectEditLogImpl(data: { id: string }) {
       newValues: r.newValues as JsonValue,
     })),
   };
+}
+
+export async function listProjectEditLogImpl(data: { id: string }) {
+  return listProjectEditLogAs(await getViewer(), data);
 }
 
 export async function listProjectCommentsAs(

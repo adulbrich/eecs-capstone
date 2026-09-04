@@ -15,7 +15,6 @@ export async function addCommentAs(
   viewer: AuthUser,
   data: AddCommentInput
 ): Promise<{ id: string }> {
-  const visibility = { id: viewer.id, role: viewer.role ?? null };
   const [project] = await db
     .select()
     .from(projects)
@@ -26,12 +25,12 @@ export async function addCommentAs(
   // Comments are a private submitter <-> staff dialogue, so only the project
   // submitter and staff may participate.
   const isOwner = project.proposerId === viewer.id;
-  if (!(isStaff(visibility) || isOwner)) {
+  if (!(isStaff(viewer) || isOwner)) {
     throw new Error("Forbidden");
   }
   // Checked against the caller's own flag, before any inheritance below, so a
   // non-staff caller cannot smuggle an internal comment in via a parentId.
-  if (data.isInternal && !isStaff(visibility)) {
+  if (data.isInternal && !isStaff(viewer)) {
     throw new Error("Only staff may post internal comments");
   }
   let isInternal = data.isInternal;

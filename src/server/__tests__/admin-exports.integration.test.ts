@@ -129,6 +129,24 @@ describe("admin project export", () => {
       "Forbidden"
     );
   });
+
+  // The listing shares the export's projection, so it shares the reason for
+  // the gate: proposerEmail. Signed out refuses too, since neither read has
+  // an owner path.
+  it("gates the listing the same way, signed out included", async () => {
+    const instructor = await makeUser(`li-${Date.now()}@x.com`, "instructor");
+    const student = await makeUser(`ls-${Date.now()}@x.com`, "user");
+
+    await expect(
+      listAdminProjectsAs(instructor, ALL_PROJECTS)
+    ).resolves.toBeDefined();
+    await expect(listAdminProjectsAs(student, ALL_PROJECTS)).rejects.toThrow(
+      "Forbidden"
+    );
+    await expect(listAdminProjectsAs(null, ALL_PROJECTS)).rejects.toThrow(
+      "Forbidden"
+    );
+  });
 });
 
 const ALL_USERS = {

@@ -48,9 +48,7 @@ export async function reviewProjectAs(
     if (!project) {
       throw new Error("Project not found");
     }
-    if (
-      !canEditProject(project, { id: viewer.id, role: viewer.role ?? null })
-    ) {
+    if (!canEditProject(project, viewer)) {
       throw new Error("Forbidden");
     }
   }

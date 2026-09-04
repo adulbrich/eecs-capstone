@@ -34,7 +34,7 @@ export async function addBookmarkAs(
   // You cannot bookmark what you cannot see. Without this, a draft or
   // soft-deleted project id guessed from anywhere would be bookmarkable, and
   // the listing joins the project back in.
-  if (!canSeeProject(project, { id: viewer.id, role: viewer.role ?? null })) {
+  if (!canSeeProject(project, viewer)) {
     throw new Error("Forbidden");
   }
   await db
@@ -121,9 +121,7 @@ export async function listMyBookmarksAs(viewer: BookmarkViewer) {
     )
     .orderBy(desc(projectBookmarks.createdAt));
 
-  const visible = rows.filter((row) =>
-    canSeeProject(row, { id: viewer.id, role: viewer.role ?? null })
-  );
+  const visible = rows.filter((row) => canSeeProject(row, viewer));
   return {
     rows: visible.map(({ deletedAt, proposerId, ...row }) => row),
     unavailableCount: rows.length - visible.length,
