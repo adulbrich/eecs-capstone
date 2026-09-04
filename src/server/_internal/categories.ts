@@ -26,10 +26,6 @@ interface AuthUser {
   role?: string | null | undefined;
 }
 
-function viewerToVisibility(viewer: AuthUser) {
-  return { id: viewer.id, role: viewer.role ?? null };
-}
-
 /**
  * Turns a unique violation on the (domain, type, lower(name)) index into the
  * sentence the staff form should show, naming the stored spelling so a
@@ -198,7 +194,7 @@ export async function setProjectCategoriesAs(
   if (!project) {
     throw new Error("Project not found");
   }
-  if (!canSeeProject(project, viewerToVisibility(viewer))) {
+  if (!canSeeProject(project, viewer)) {
     throw new Error("Forbidden");
   }
   await db.transaction(async (tx) => {
