@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   scan,
   scanFile,
+  scannedFileCount,
   type Vocabulary,
   vocabulariesIn,
 } from "./vocabulary-scan";
@@ -64,6 +65,12 @@ describe("scan over src/", () => {
     ]);
   });
 
+  it("scans a plausible number of files, so an empty walk cannot pass", () => {
+    // scan() throws when vocabularies.ts yields nothing, but a walk that
+    // returned no files would report a clean tree just as convincingly.
+    expect(scannedFileCount()).toBeGreaterThan(100);
+  });
+
   it("discovers the vocabularies rather than being told them", () => {
     // Listing them in the scan would be a fourth copy of exactly the thing it
     // forbids, and a new vocabulary would arrive unscanned.
@@ -74,9 +81,14 @@ describe("scan over src/", () => {
        const NOT_EXPORTED = ["p", "q"] as const;
        export const NOT_LITERALS = [1, 2] as const;
        export const NOT_AS_CONST = ["m", "n"];
-       export const MIXED = ["a", 1] as const;`
+       export const MIXED = ["a", 1] as const;
+       export const SATISFIES = ["s", "t"] as const satisfies readonly string[];`
     ).map((vocabulary) => vocabulary.name);
-    expect(names).toEqual(["A_STATUSES", "B_STATUSES"]);
+    // SATISFIES is the shape ACTIVE_STATUSES used until #271: `as const
+    // satisfies readonly T[]` parses as a SatisfiesExpression wrapping the
+    // AsExpression, so matching only the latter would let a vocabulary
+    // written that way arrive unscanned.
+    expect(names).toEqual(["A_STATUSES", "B_STATUSES", "SATISFIES"]);
   });
 });
 
@@ -206,6 +218,23 @@ describe("what does not count", () => {
          const f = "retired";`
       )
     ).toEqual([]);
+  });
+});
+
+describe("a node naming two vocabularies reports both", () => {
+  it("does not stop at the first match", () => {
+    // The three real vocabularies are disjoint, so nothing exercises this
+    // today. A future pair sharing members would otherwise have one copy
+    // reported and the other hidden.
+    const overlapping = [
+      { name: "FIRST", members: new Set(["a", "b"]) },
+      { name: "SECOND", members: new Set(["b", "c"]) },
+    ];
+    expect(
+      scanFile("probe.ts", `const all = ["a", "b", "c"];`, overlapping).map(
+        (copy) => copy.vocabulary
+      )
+    ).toEqual(["FIRST", "SECOND"]);
   });
 });
 

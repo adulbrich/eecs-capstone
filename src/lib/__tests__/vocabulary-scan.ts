@@ -35,6 +35,15 @@ import ts from "typescript";
  * fails to compile there rather than silently rendering nothing. Those are the
  * shape that works. Only the two shapes #102 could not catch are in scope.
  *
+ * ## What it cannot see
+ *
+ * One node, one judgement. A copy assembled across two adjacent array
+ * literals, or built with `concat`, names no whole vocabulary in any single
+ * node and passes. That is the cost of judging a node rather than a value,
+ * and it is accepted: the shapes this catches are the ones people write, and
+ * following a value through concatenation is a type checker's job rather
+ * than a scan's.
+ *
  * ## The vocabularies are discovered, not listed
  *
  * This reads `vocabularies.ts` and takes every exported `as const` array of
@@ -70,14 +79,22 @@ const SOURCE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts"];
  * expectation in a test, and the boundary belongs in the rule rather than in a
  * suppression comment somebody has to remember to justify.
  */
-const SKIP_DIRS = new Set(["__tests__", "node_modules", "test"]);
+const SKIP_DIRS = new Set(["__tests__", "node_modules"]);
+
+/**
+ * The test tree, skipped by full path rather than by directory name. A bare
+ * `"test"` in `SKIP_DIRS` would exempt any directory called `test` anywhere
+ * under `src/`, including a production one somebody adds later, and it would
+ * do that silently.
+ */
+const TEST_DIR = join(SRC_DIR, "test");
 
 function typeScriptFilesUnder(dir: string): string[] {
   const found: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) {
+      if (!(SKIP_DIRS.has(entry.name) || full === TEST_DIR)) {
         found.push(...typeScriptFilesUnder(full));
       }
     } else if (SOURCE_EXTENSIONS.some((ext) => entry.name.endsWith(ext))) {
@@ -139,7 +156,14 @@ export function vocabulariesIn(file: string, source: string): Vocabulary[] {
       continue;
     }
     for (const declaration of statement.declarationList.declarations) {
-      const initializer = declaration.initializer;
+      // `as const` alone is an AsExpression; `as const satisfies readonly
+      // T[]` wraps that in a SatisfiesExpression. Both are the idiom, and
+      // matching only the first is how a new vocabulary would arrive
+      // unscanned: ACTIVE_STATUSES was written the second way until #271.
+      let initializer = declaration.initializer;
+      if (initializer && ts.isSatisfiesExpression(initializer)) {
+        initializer = initializer.expression;
+      }
       if (
         !(
           initializer &&
@@ -175,19 +199,27 @@ export interface Copy {
   vocabulary: string;
 }
 
-function namesWholeVocabulary(
+/**
+ * Every vocabulary the given literals name in whole. Plural rather than the
+ * first match: the three vocabularies are disjoint today, so a node can only
+ * name one, but a future pair sharing members would make `find` report one
+ * copy and hide the other.
+ */
+function vocabulariesNamedWhole(
   members: string[],
   vocabularies: readonly Vocabulary[]
-): string | undefined {
+): string[] {
   if (members.length === 0) {
-    return;
+    return [];
   }
   const present = new Set(members);
-  return vocabularies.find(
-    (vocabulary) =>
-      vocabulary.members.size <= present.size &&
-      [...vocabulary.members].every((member) => present.has(member))
-  )?.name;
+  return vocabularies
+    .filter(
+      (vocabulary) =>
+        vocabulary.members.size <= present.size &&
+        [...vocabulary.members].every((member) => present.has(member))
+    )
+    .map((vocabulary) => vocabulary.name);
 }
 
 /**
@@ -205,14 +237,11 @@ export function scanFile(
   const copies: Copy[] = [];
 
   const record = (node: ts.Node, members: string[]) => {
-    const vocabulary = namesWholeVocabulary(members, vocabularies);
-    if (vocabulary) {
-      copies.push({
-        vocabulary,
-        line:
-          sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
-            .line + 1,
-      });
+    const line =
+      sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line +
+      1;
+    for (const vocabulary of vocabulariesNamedWhole(members, vocabularies)) {
+      copies.push({ vocabulary, line });
     }
   };
 
@@ -240,6 +269,15 @@ export function scanFile(
   visit(sourceFile);
 
   return copies;
+}
+
+/**
+ * How many files the scan looks at. Exported for one assertion: a walk that
+ * returned nothing would report a clean tree exactly as convincingly as a
+ * clean tree does.
+ */
+export function scannedFileCount(): number {
+  return typeScriptFilesUnder(SRC_DIR).length;
 }
 
 /** Every copy in `src/`, as `path:line names VOCABULARY` lines. */
