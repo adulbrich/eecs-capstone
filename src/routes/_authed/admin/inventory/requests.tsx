@@ -178,6 +178,10 @@ function AdminRequestQueue() {
   const router = useRouter();
   const search = Route.useSearch();
   const { line, q, status } = search;
+  // The default view is already narrowed to pending, so it counts as a filter:
+  // a staff member with no pending requests still wants the status select
+  // and the headers, not a bare message.
+  const filtered = q !== "" || status !== "all";
   const navigate = useNavigate({ from: "/admin/inventory/requests" });
 
   const onDone = useCallback(() => {
@@ -227,9 +231,11 @@ function AdminRequestQueue() {
       <AdminDataTable
         caption="Inventory requests"
         data={rows}
-        emptyMessage="No requests in this view."
+        emptyMessage="No requests yet."
+        filtered={filtered}
         getRowId={(row) => row.line.id}
         highlightedRowId={line}
+        noMatchMessage="No requests in this view."
         {...tableProps}
         toolbar={
           <>

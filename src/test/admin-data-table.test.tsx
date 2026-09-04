@@ -591,3 +591,58 @@ describe("the Columns menu", () => {
     expect(screen.queryByRole("button", { name: "Columns" })).toBeNull();
   });
 });
+
+describe("an empty table", () => {
+  it("shows neither the Columns menu nor the table when there are no rows and no filter", () => {
+    // Nothing to show the columns of: the picker would toggle headers that
+    // are not on the page (#260).
+    renderTable({ data: [] });
+    expect(screen.getByText("Nothing here.")).not.toBeNull();
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Columns" })).toBeNull();
+  });
+
+  it("drops the actions slot too when there are no rows and no filter", () => {
+    // Export CSV lives here; a file of nothing is no more useful than a
+    // picker over nothing, and one gate keeps the two controls together.
+    renderTable({
+      actions: <button type="button">Export CSV</button>,
+      data: [],
+    });
+    expect(screen.queryByRole("button", { name: "Export CSV" })).toBeNull();
+  });
+
+  it("keeps the headers and the controls when a filter matches nothing", () => {
+    // The reader is mid-search: the headers say what they were searching
+    // over, and the controls are how they widen it or take what they have.
+    renderTable({
+      actions: <button type="button">Export CSV</button>,
+      data: [],
+      filtered: true,
+      hidden: [],
+    });
+    expect(screen.getByRole("table")).not.toBeNull();
+    expect(screen.getByRole("columnheader", { name: /Name/ })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Columns" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Export CSV" })).not.toBeNull();
+    expect(screen.queryByText("Nothing here.")).toBeNull();
+    const cell = screen.getByRole("cell", {
+      name: "Nothing matches these filters.",
+    });
+    // One cell across every visible column, so the message reads as a
+    // single line under the headers rather than landing in the first one.
+    expect(cell.getAttribute("colspan")).toBe("2");
+    expect(cell.hasAttribute("data-label")).toBe(false);
+  });
+
+  it("says the route's own no-match message when it has one", () => {
+    renderTable({
+      data: [],
+      filtered: true,
+      noMatchMessage: "No items match.",
+    });
+    expect(
+      screen.getByRole("cell", { name: "No items match." })
+    ).not.toBeNull();
+  });
+});

@@ -101,12 +101,20 @@ function ProjectTable({
     search,
     storageKey: "public-projects",
   });
+  const filtered =
+    search.q !== "" ||
+    search.categories.length > 0 ||
+    search.program !== null ||
+    search.archivedOnly ||
+    search.acceptingOnly;
   return (
     <AdminDataTable
       caption="Projects"
       data={rows}
-      emptyMessage="No projects matched your search."
+      emptyMessage="No projects yet."
+      filtered={filtered}
       getRowId={(row) => row.id}
+      noMatchMessage="No projects matched your search."
       {...tableProps}
     />
   );

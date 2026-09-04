@@ -398,6 +398,8 @@ function AdminInventory() {
   // The whole search object goes to the hook, which reads cols/dir/sort.
   const search = Route.useSearch();
   const { categories: selectedCategories, q, retiredOnly, status } = search;
+  const filtered =
+    q !== "" || status !== null || selectedCategories.length > 0 || retiredOnly;
 
   const commitQuery = useCallback(
     (next: string) => {
@@ -458,8 +460,10 @@ function AdminInventory() {
         }
         caption="Inventory items"
         data={rows}
-        emptyMessage="No items in this view."
+        emptyMessage="No items yet."
+        filtered={filtered}
         getRowId={(row) => row.id}
+        noMatchMessage="No items in this view."
         {...tableProps}
         toolbar={
           <>

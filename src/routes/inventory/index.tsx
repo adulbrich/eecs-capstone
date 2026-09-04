@@ -103,12 +103,16 @@ function InventoryTable({
     search,
     storageKey: "public-inventory",
   });
+  const filtered =
+    search.q !== "" || search.status !== null || search.categories.length > 0;
   return (
     <AdminDataTable
       caption="Inventory"
       data={rows}
-      emptyMessage="No items match."
+      emptyMessage="No items yet."
+      filtered={filtered}
       getRowId={(row) => row.id}
+      noMatchMessage="No items match."
       {...tableProps}
     />
   );
