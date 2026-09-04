@@ -8,8 +8,9 @@ because nothing here matches automatically.
 
 An entry is a rejected concept, not a rejected issue: three issues asking for the
 same thing are one file with three links. A concept that comes back with a reason
-the file does not answer is a reason to reopen the decision, and the file says so
-when that happens rather than being deleted.
+the file does not answer is a reason to reopen the decision; when it is reopened,
+the file is updated or deleted, so this directory only ever says what still
+stands.
 
 ## Format
 
@@ -27,4 +28,6 @@ whether their case is the one this file already answers.
 ```
 
 The three bold fields are the whole contract. Add a paragraph after them only when
-the decision came with a condition under which it would be revisited.
+the decision came with a condition under which it would be revisited; a decision
+whose thread says only "not now" is a deferral, not a rejection, and stays an
+issue rather than becoming a file.

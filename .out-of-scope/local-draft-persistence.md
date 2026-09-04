@@ -7,8 +7,10 @@ is infrequent, and doing it right needs decisions that are not obvious: whether
 local storage is even the right layer next to the server-side draft, whether NDA
 and private-notes text may sit on disk on a shared lab machine, that the pending
 image cannot be serialized, when to write, whether to restore silently, expiry,
-multi-tab keying, and SSR hydration. The maintainer declined to spend that thought
-now. A spec answering those questions is what would reopen it; a bare "add
-localStorage" request does not.
+multi-tab keying, and SSR hydration. The maintainer's words: not frequent, and it
+requires quite some thought to make right.
 
 **Prior requests:** #56
+
+Revisit only with a spec that answers the questions #56 lists. A bare "add
+localStorage" request is this file's case again.

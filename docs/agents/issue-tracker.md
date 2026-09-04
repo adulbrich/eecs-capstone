@@ -40,11 +40,9 @@ Two local deltas from the default agent-brief guidance:
 
 ## Rejected concepts
 
-`.out-of-scope/` holds one Markdown file per concept this project has decided not to
-build: the decision, the reason, and links to every issue that asked. `/triage` reads
-it before evaluating a new enhancement and writes a file there when it closes one as
-`wontfix`; its `README.md` carries the format. The maintainer confirms a match by
-hand.
+`.out-of-scope/` is the knowledge base of concepts this project has decided not to
+build, one file each. `/triage` reads it before evaluating a new enhancement and
+writes to it on a `wontfix`; its `README.md` carries the format and the rules.
 
 ## Pull requests as a triage surface
 
