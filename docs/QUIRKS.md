@@ -412,6 +412,10 @@ Better Auth signs the email-verification and password-reset tokens rather than s
 
 Both Playwright suites locate by accessible role and name first, falling back to `data-slot`, and never to a test id added to a production component: a selector nobody can reach with a screen reader says nothing about whether the page works. Where the markup offers no role, a structural or attribute selector appears with the reason inline (`time[datetime]` for a rendered date, `p.text-destructive` for a form error); `src/test/e2e/locators.ts` holds the ones more than one flow needs.
 
+### A structural selector fails open when the markup under it changes
+
+When the `/my/items` entries went from plain divs to table rows, the `> div > div` chain that had reached an entry kept matching, on the table's wrapper, so a test that looked for one button inside it stayed green and only the test that asserted on a `time` element went red. The tell is a locator that still finds something after the markup it described is gone; check the accessibility snapshot in the failure's error context before trusting a structural selector's green.
+
 ### `getByText` is case-insensitive substring matching, so status words need `exact`
 
 A status word is rarely unique on the page that shows it. On a staff item page the Danger zone reads "allowed only when status is available or retired" from first paint, and the override select renders a lowercase status name in its trigger for the length of an in-flight transition; two assertions passed on those decoys. Pass `{ exact: true }` whenever the text is a status label, and scope to `statusSection` from `locators.ts` when the badge is what you mean: `exact` excludes the decoys, scoping disambiguates the two legitimate badges a staff viewer gets (header and panel, both reading `Retired`), which an unscoped exact match resolves to both and trips strict mode.
