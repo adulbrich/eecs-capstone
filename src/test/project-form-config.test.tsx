@@ -55,7 +55,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-type Config = Partial<Parameters<typeof ProjectForm>[0] & { isStaff: boolean }>;
+type Config = Partial<Parameters<typeof ProjectForm>[0]>;
 
 function renderForm(config: Config = {}) {
   render(
