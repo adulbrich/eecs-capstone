@@ -7,8 +7,9 @@ is infrequent, and doing it right needs decisions that are not obvious: whether
 local storage is even the right layer next to the server-side draft, whether NDA
 and private-notes text may sit on disk on a shared lab machine, that the pending
 image cannot be serialized, when to write, whether to restore silently, expiry,
-multi-tab keying, and SSR hydration. The maintainer's words: not frequent, and it
-requires quite some thought to make right.
+multi-tab keying, and SSR hydration. The maintainer closed it with "won't do
+this now, as it is something not frequent and which requires quite some thought
+to make right", and the label says which of those two clauses decided it.
 
 **Prior requests:** #56
 

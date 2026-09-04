@@ -28,6 +28,10 @@ whether their case is the one this file already answers.
 ```
 
 The three bold fields are the whole contract. Add a paragraph after them only when
-the decision came with a condition under which it would be revisited; a decision
-whose thread says only "not now" is a deferral, not a rejection, and stays an
-issue rather than becoming a file.
+the decision came with a condition under which it would be revisited.
+
+What makes a closed issue an entry is the `wontfix` label, which triage applies
+when the maintainer rejects the concept; an issue closed without it is a deferral
+and stays an issue, whatever its thread says about timing. Two of the first
+entries, #33 and #86, predate the label and were closed with the reasoning in
+their threads.
