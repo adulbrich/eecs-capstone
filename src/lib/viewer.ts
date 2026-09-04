@@ -34,7 +34,7 @@ export type Viewer =
  * The roles that carry staff powers. Anything else fails closed.
  *
  * Exported as a tuple rather than kept private as a `Set`, because one caller
- * cannot use the predicate: `listStaffCandidates` in `_internal/programs.ts`
+ * cannot use the predicate: `listEligibleInstructorsAs` in `_internal/programs.ts`
  * filters the `user.role` column with `inArray`, and a question asked in SQL
  * needs the roles as data. That is the same shape as the status vocabularies
  * in `vocabularies.ts` and has the same rule: this is the one definition, and
