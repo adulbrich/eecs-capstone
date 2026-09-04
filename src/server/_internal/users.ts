@@ -8,18 +8,12 @@ import {
   user,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import { assertStaff } from "#/lib/viewer";
+import { assertAdmin, assertStaff } from "#/lib/viewer";
 import type { BanUserInput, ListUsersInput, SetUserRoleInput } from "../users";
 
 interface AuthUser {
   id: string;
   role?: string | null | undefined;
-}
-
-function assertAdmin(viewer: AuthUser) {
-  if (viewer.role !== "admin") {
-    throw new Error("Forbidden");
-  }
 }
 
 function assertNotSelf(viewer: AuthUser, targetId: string, action: string) {

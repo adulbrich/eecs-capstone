@@ -20,6 +20,7 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { isStaff } from "#/lib/viewer";
 import {
   deleteCategory,
   getCategory,
@@ -34,7 +35,7 @@ export const Route = createFileRoute("/_authed/admin/categories/$categoryId")({
     if (!session?.user) {
       throw redirect({ to: "/sign-in" });
     }
-    if (!["admin", "instructor"].includes(session.user.role ?? "")) {
+    if (!isStaff(session.user)) {
       throw redirect({ to: "/" });
     }
   },

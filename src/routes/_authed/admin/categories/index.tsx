@@ -42,6 +42,7 @@ import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
+import { isStaff } from "#/lib/viewer";
 import {
   createCategory,
   listCategoriesWithUsage,
@@ -64,7 +65,7 @@ export const Route = createFileRoute("/_authed/admin/categories/")({
     if (!session?.user) {
       throw redirect({ to: "/sign-in" });
     }
-    if (!["admin", "instructor"].includes(session.user.role ?? "")) {
+    if (!isStaff(session.user)) {
       throw redirect({ to: "/" });
     }
   },

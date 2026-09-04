@@ -41,6 +41,7 @@ import { projectImageSrc } from "#/lib/project-image";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import { isStaff } from "#/lib/viewer";
 import { PROJECT_STATUSES } from "#/lib/vocabularies";
 import { listPrograms } from "#/server/programs";
 import {
@@ -71,7 +72,7 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
     if (!session?.user) {
       throw redirect({ to: "/sign-in" });
     }
-    if (!["admin", "instructor"].includes(session.user.role ?? "")) {
+    if (!isStaff(session.user)) {
       throw redirect({ to: "/" });
     }
   },

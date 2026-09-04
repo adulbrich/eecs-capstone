@@ -42,6 +42,7 @@ import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import { isAdmin } from "#/lib/viewer";
 import { exportUsers, listUsers } from "#/server/users";
 
 const ROLES = ["user", "instructor", "admin"] as const;
@@ -64,7 +65,7 @@ export const Route = createFileRoute("/_authed/admin/users/")({
     if (!session?.user) {
       throw redirect({ to: "/sign-in" });
     }
-    if (session.user.role !== "admin") {
+    if (!isAdmin(session.user)) {
       throw redirect({ to: "/admin" });
     }
   },

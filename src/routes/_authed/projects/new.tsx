@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ProjectForm } from "#/components/project-form";
 import { pageTitle } from "#/lib/page-title";
+import { isStaff } from "#/lib/viewer";
 
 export const Route = createFileRoute("/_authed/projects/new")({
   head: () => ({ meta: [{ title: pageTitle("New Project") }] }),
@@ -10,9 +11,9 @@ export const Route = createFileRoute("/_authed/projects/new")({
 function NewProject() {
   const navigate = useNavigate();
   const ctx = Route.useRouteContext() as {
-    user: { role?: string | null };
+    user: { id: string; role?: string | null };
   };
-  const isStaff = ctx.user.role === "admin" || ctx.user.role === "instructor";
+  const viewerIsStaff = isStaff(ctx.user);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
@@ -20,14 +21,14 @@ function NewProject() {
       <div className="mt-6">
         <ProjectForm
           enableAiReview
-          isStaff={isStaff}
+          isStaff={viewerIsStaff}
           onSaved={(projectId) => {
             navigate({ to: "/projects/$projectId", params: { projectId } });
           }}
           proposer={{ accountLinked: false, accountName: null, email: "" }}
-          showCategories={isStaff}
+          showCategories={viewerIsStaff}
           showNotes
-          showProposer={isStaff}
+          showProposer={viewerIsStaff}
           submitLabel="Create draft"
         />
       </div>

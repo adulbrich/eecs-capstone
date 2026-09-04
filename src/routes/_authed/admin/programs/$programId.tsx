@@ -22,6 +22,7 @@ import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { isStaff } from "#/lib/viewer";
 import { deleteProgram, getProgram, updateProgram } from "#/server/programs";
 
 export const Route = createFileRoute("/_authed/admin/programs/$programId")({
@@ -31,7 +32,7 @@ export const Route = createFileRoute("/_authed/admin/programs/$programId")({
     if (!session?.user) {
       throw redirect({ to: "/sign-in" });
     }
-    if (!["admin", "instructor"].includes(session.user.role ?? "")) {
+    if (!isStaff(session.user)) {
       throw redirect({ to: "/" });
     }
   },

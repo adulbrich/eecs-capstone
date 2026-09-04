@@ -54,6 +54,7 @@ import { getPublicUrl } from "#/lib/storage";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import { isStaff } from "#/lib/viewer";
 import type { ItemStatus } from "#/lib/vocabularies";
 import {
   listAdminInventory,
@@ -90,7 +91,7 @@ export const Route = createFileRoute("/_authed/admin/inventory/")({
     if (!session?.user) {
       throw redirect({ to: "/sign-in" });
     }
-    if (!["admin", "instructor"].includes(session.user.role ?? "")) {
+    if (!isStaff(session.user)) {
       throw redirect({ to: "/" });
     }
   },

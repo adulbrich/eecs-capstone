@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { assertStaff, isStaff, type Viewer } from "../viewer";
+import {
+  assertAdmin,
+  assertStaff,
+  isAdmin,
+  isStaff,
+  type Viewer,
+} from "../viewer";
 
 const admin: Viewer = { id: "u-admin", role: "admin" };
 const instructor: Viewer = { id: "u-inst", role: "instructor" };
@@ -23,6 +29,41 @@ describe("isStaff", () => {
     // Fails closed. A role added to the database without being added here
     // must not inherit staff powers by default.
     expect(isStaff({ id: "u-x", role: "mentor" })).toBe(false);
+  });
+});
+
+describe("isAdmin", () => {
+  it("is true for admin only", () => {
+    expect(isAdmin(admin)).toBe(true);
+  });
+
+  it("is false for an instructor, who is staff but not admin", () => {
+    // The whole reason this predicate exists beside isStaff. Widening the two
+    // /admin/users routes to isStaff would hand instructors role changes and
+    // bans (#266).
+    expect(isStaff(instructor)).toBe(true);
+    expect(isAdmin(instructor)).toBe(false);
+  });
+
+  it("is false for a student, a roleless account and anonymous", () => {
+    expect(isAdmin(student)).toBe(false);
+    expect(isAdmin(roleless)).toBe(false);
+    expect(isAdmin(anon)).toBe(false);
+  });
+});
+
+describe("assertAdmin", () => {
+  it("passes an admin through and refuses an instructor", () => {
+    expect(() => assertAdmin(admin)).not.toThrow();
+    expect(() => assertAdmin(instructor)).toThrow(/Forbidden/);
+    expect(() => assertAdmin(anon)).toThrow(/Forbidden/);
+  });
+
+  it("narrows the viewer to non-null", () => {
+    const viewer: Viewer = admin;
+    assertAdmin(viewer);
+    const id: string = viewer.id;
+    expect(id).toBe("u-admin");
   });
 });
 

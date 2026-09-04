@@ -12,6 +12,7 @@ import type {
 } from "#/lib/inventory-visibility";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
+import { isStaff } from "#/lib/viewer";
 import { getInventoryItem } from "#/server/inventory";
 
 /**
@@ -37,7 +38,7 @@ export const Route = createFileRoute("/_authed/inventory/$itemId/edit")({
     if (!session?.user) {
       throw redirect({ to: "/sign-in" });
     }
-    if (!["admin", "instructor"].includes(session.user.role ?? "")) {
+    if (!isStaff(session.user)) {
       throw redirect({ to: "/" });
     }
   },

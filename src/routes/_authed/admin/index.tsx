@@ -12,6 +12,7 @@ import {
 import { Card } from "#/components/ui/card";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { isAdmin, isStaff } from "#/lib/viewer";
 import { getAdminStats } from "#/server/admin";
 
 export const Route = createFileRoute("/_authed/admin/")({
@@ -21,10 +22,10 @@ export const Route = createFileRoute("/_authed/admin/")({
     if (!session?.user) {
       throw redirect({ to: "/sign-in" });
     }
-    if (!["admin", "instructor"].includes(session.user.role ?? "")) {
+    if (!isStaff(session.user)) {
       throw redirect({ to: "/" });
     }
-    return { role: session.user.role as "admin" | "instructor" };
+    return { user: session.user };
   },
   loader: async () => getAdminStats(),
   component: AdminHome,
@@ -94,8 +95,8 @@ function NavCard({ to, icon: Icon, label, description }: NavCard) {
 
 function AdminHome() {
   const { submitted, pendingRequests } = Route.useLoaderData();
-  const { role } = Route.useRouteContext();
-  const isAdmin = role === "admin";
+  const { user } = Route.useRouteContext();
+  const viewerIsAdmin = isAdmin(user);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
@@ -185,7 +186,7 @@ function AdminHome() {
             label="Mentors"
             to="/admin/mentors"
           />
-          {isAdmin && (
+          {viewerIsAdmin && (
             <NavCard
               description="Manage roles, bans, and accounts"
               icon={Users}

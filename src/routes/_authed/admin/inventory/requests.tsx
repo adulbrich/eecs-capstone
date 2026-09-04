@@ -37,6 +37,7 @@ import { pageTitle } from "#/lib/page-title";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
+import { isStaff } from "#/lib/viewer";
 import { INVENTORY_REQUEST_ITEM_STATUSES } from "#/lib/vocabularies";
 import { listInventoryRequests } from "#/server/inventory";
 
@@ -68,7 +69,7 @@ export const Route = createFileRoute("/_authed/admin/inventory/requests")({
     if (!session?.user) {
       throw redirect({ to: "/sign-in" });
     }
-    if (!["admin", "instructor"].includes(session.user.role ?? "")) {
+    if (!isStaff(session.user)) {
       throw redirect({ to: "/" });
     }
   },
