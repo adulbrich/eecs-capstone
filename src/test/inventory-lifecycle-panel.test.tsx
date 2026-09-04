@@ -8,7 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { ItemStatus } from "#/lib/vocabularies";
+import { INVENTORY_ITEM_STATUSES, type ItemStatus } from "#/lib/vocabularies";
 
 const { router, server } = vi.hoisted(() => ({
   router: {
@@ -42,14 +42,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-const STATUSES: ItemStatus[] = [
-  "available",
-  "requested",
-  "reserved",
-  "checked_out",
-  "maintenance",
-  "retired",
-];
+const STATUSES: ItemStatus[] = [...INVENTORY_ITEM_STATUSES];
 
 function renderPanel(
   overrides: { status?: ItemStatus; hasRequestHistory?: boolean } = {}

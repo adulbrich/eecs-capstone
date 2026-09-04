@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { INVENTORY_ITEM_STATUSES } from "#/lib/vocabularies";
 import {
   assertTransitionAllowed,
   needsDueAt,
@@ -15,14 +16,7 @@ const STUDENT: TransitionActor = { id: "student-1", role: "user" };
 
 const LATER = new Date("2030-01-01T00:00:00Z");
 
-const ITEM_STATUSES = [
-  "available",
-  "checked_out",
-  "maintenance",
-  "requested",
-  "reserved",
-  "retired",
-] as const;
+const ITEM_STATUSES = INVENTORY_ITEM_STATUSES;
 
 function input(over: Partial<TransitionInput> = {}): TransitionInput {
   return { itemId: "item-1", nextStatus: "available", ...over };
