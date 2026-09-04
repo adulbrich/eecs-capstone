@@ -1,15 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import type { ProjectStatus } from "#/lib/vocabularies";
-
-const STATUS_VALUES = [
-  "draft",
-  "submitted",
-  "changes_requested",
-  "approved",
-  "published",
-  "archived",
-] as const;
+import { PROJECT_STATUSES, type ProjectStatus } from "#/lib/vocabularies";
 
 const projectInputSchema = z.object({
   title: z.string().min(1).max(200),
@@ -228,7 +219,7 @@ export const hardDeleteProject = createServerFn({ method: "POST" })
 
 const statusTransitionSchema = z.object({
   id: z.string().uuid(),
-  status: z.enum(STATUS_VALUES),
+  status: z.enum(PROJECT_STATUSES),
   comment: z.string().max(2000).optional(),
   ...SEND_EMAIL_FIELD,
 });

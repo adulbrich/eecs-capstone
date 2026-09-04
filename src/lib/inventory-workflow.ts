@@ -1,5 +1,3 @@
-import type { ItemStatus } from "#/lib/vocabularies";
-import type { InventoryRequestItemStatus } from "./vocabularies";
 /**
  * The rules a transition must satisfy, and the outcome it writes to the line
  * it closes.
@@ -27,6 +25,7 @@ import type { InventoryRequestItemStatus } from "./vocabularies";
  */
 
 import { assertStaff, type Viewer } from "./viewer";
+import type { InventoryRequestItemStatus, ItemStatus } from "./vocabularies";
 
 /**
  * Whoever is making the transition.

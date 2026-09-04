@@ -1,4 +1,3 @@
-import type { ItemStatus } from "#/lib/vocabularies";
 /**
  * Who receives an inventory notification, and what it says.
  *
@@ -20,6 +19,7 @@ import type { ItemStatus } from "#/lib/vocabularies";
 
 import { overdueFlags } from "./inventory-deadlines";
 import type { NotificationRow } from "./notification-row";
+import type { ItemStatus } from "./vocabularies";
 
 /** The item as it stood before the transition. */
 export interface TransitionSubject {

@@ -44,7 +44,7 @@ import {
   deadlinePairOf,
   isOverdue,
 } from "#/lib/inventory-deadlines";
-import { statusRank } from "#/lib/inventory-visibility";
+import { ACTIVE_STATUSES, statusRank } from "#/lib/inventory-visibility";
 import { pageTitle } from "#/lib/page-title";
 import { getPublicUrl } from "#/lib/storage";
 import type { SortState } from "#/lib/table-state";
@@ -55,13 +55,11 @@ import {
   listInventoryCategories,
 } from "#/server/inventory";
 
-const STATUSES = [
-  "available",
-  "requested",
-  "reserved",
-  "checked_out",
-  "maintenance",
-] as const;
+/**
+ * The working set, which is also this filter's vocabulary: retired is reached
+ * through `retiredOnly` rather than by picking it here.
+ */
+const STATUSES = ACTIVE_STATUSES;
 
 type Status = (typeof STATUSES)[number];
 
