@@ -19,7 +19,16 @@
 
 import { type Hold, holdEmail, holdName } from "./hold";
 import { isStaff, type Viewer } from "./viewer";
-import type { ItemStatus } from "./vocabularies";
+import { INVENTORY_ITEM_STATUSES, type ItemStatus } from "./vocabularies";
+
+/**
+ * The archive. Named once, because both the type and the value below are
+ * "the vocabulary without this one".
+ */
+const ARCHIVE_STATUS = "retired";
+
+/** One of the working statuses: every status a listing filter may offer. */
+export type ActiveStatus = Exclude<ItemStatus, typeof ARCHIVE_STATUS>;
 
 /**
  * Every status except retired: the working set of items.
@@ -27,19 +36,17 @@ import type { ItemStatus } from "./vocabularies";
  * Retired is the archive. It is excluded from every listing by default, for
  * staff as well, and reachable only through the retired-only filter.
  *
- * The order is significant: `statusRank` below reads it as the lifecycle
- * order the status tables sort by, so reordering this list reorders them.
+ * Derived rather than written out (#271). The hand-written list was five of
+ * the six item statuses, and the `satisfies` clause could not see the failure
+ * that mattered: a seventh status added to the tuple would compile here and
+ * then never appear in a listing filter. `filter` keeps the tuple's order,
+ * which `statusRank` below reads as the lifecycle order the status tables
+ * sort by, so a reordering of the tuple still reorders them.
  */
-export const ACTIVE_STATUSES = [
-  "available",
-  "requested",
-  "reserved",
-  "checked_out",
-  "maintenance",
-] as const satisfies readonly ItemStatus[];
-
-/** One of the working statuses: every status a listing filter may offer. */
-export type ActiveStatus = (typeof ACTIVE_STATUSES)[number];
+export const ACTIVE_STATUSES: readonly ActiveStatus[] =
+  INVENTORY_ITEM_STATUSES.filter(
+    (status): status is ActiveStatus => status !== ARCHIVE_STATUS
+  );
 
 /**
  * Where a status sits in the lifecycle, for a table that sorts by it:
@@ -81,7 +88,7 @@ export function visibleStatuses(
   opts?: { retiredOnly?: boolean }
 ): ItemStatus[] {
   if (opts?.retiredOnly && canSeeRetired(viewer)) {
-    return ["retired"];
+    return [ARCHIVE_STATUS];
   }
   return [...ACTIVE_STATUSES];
 }
@@ -99,7 +106,7 @@ export function canReadInventoryItem(
   item: { status: string },
   viewer: Viewer
 ): boolean {
-  return item.status !== "retired" || canSeeRetired(viewer);
+  return item.status !== ARCHIVE_STATUS || canSeeRetired(viewer);
 }
 
 export interface ItemCategory {

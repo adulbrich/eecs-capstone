@@ -1,0 +1,226 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import {
+  scan,
+  scanFile,
+  type Vocabulary,
+  vocabulariesIn,
+} from "./vocabulary-scan";
+
+/**
+ * The scan, run against `src/` and against sources written to break it.
+ *
+ * #102 gave each status vocabulary one home and swept twenty-one consumers
+ * onto it by hand. Nothing stopped the twenty-second, which is #271. This is
+ * what stops it.
+ *
+ * The second half is the point. Running the scan over a tree it already
+ * agrees with proves they agree today; it cannot show the scan would notice
+ * anything new, and a check that quietly notices nothing is worse than none.
+ */
+
+const VOCABULARIES_FILE = join(process.cwd(), "src", "lib", "vocabularies.ts");
+
+const ITEM: Vocabulary = {
+  name: "INVENTORY_ITEM_STATUSES",
+  members: new Set([
+    "available",
+    "requested",
+    "reserved",
+    "checked_out",
+    "maintenance",
+    "retired",
+  ]),
+};
+
+const VOCABULARIES = [ITEM];
+
+function copiesIn(source: string, file = "probe.ts") {
+  return scanFile(file, source, VOCABULARIES).map((copy) => copy.vocabulary);
+}
+
+describe("scan over src/", () => {
+  it("finds no hand-written vocabulary copy", () => {
+    // The failure message is the whole value of this assertion: it names the
+    // file, the line and the vocabulary. If it fires, derive the list from
+    // src/lib/vocabularies.ts rather than adding an exception here.
+    expect(scan()).toEqual([]);
+  });
+
+  it("reads the real vocabularies.ts, so the assertion above is not vacuous", () => {
+    // scan() passing would mean nothing if it were looking at no files or no
+    // vocabularies. It throws on the second, and this pins the first: these
+    // are the three tuples src/db/schema.ts hands to pgEnum.
+    expect(
+      vocabulariesIn(
+        VOCABULARIES_FILE,
+        readFileSync(VOCABULARIES_FILE, "utf8")
+      ).map((vocabulary) => vocabulary.name)
+    ).toEqual([
+      "PROJECT_STATUSES",
+      "INVENTORY_ITEM_STATUSES",
+      "INVENTORY_REQUEST_ITEM_STATUSES",
+    ]);
+  });
+
+  it("discovers the vocabularies rather than being told them", () => {
+    // Listing them in the scan would be a fourth copy of exactly the thing it
+    // forbids, and a new vocabulary would arrive unscanned.
+    const names = vocabulariesIn(
+      "vocabularies.ts",
+      `export const A_STATUSES = ["one", "two"] as const;
+       export const B_STATUSES = ["x", "y", "z"] as const;
+       const NOT_EXPORTED = ["p", "q"] as const;
+       export const NOT_LITERALS = [1, 2] as const;
+       export const NOT_AS_CONST = ["m", "n"];
+       export const MIXED = ["a", 1] as const;`
+    ).map((vocabulary) => vocabulary.name);
+    expect(names).toEqual(["A_STATUSES", "B_STATUSES"]);
+  });
+});
+
+describe("what counts as a copy", () => {
+  it("catches a whole vocabulary in an array literal", () => {
+    expect(
+      copiesIn(
+        `const all = ["available", "requested", "reserved", "checked_out", "maintenance", "retired"];`
+      )
+    ).toEqual(["INVENTORY_ITEM_STATUSES"]);
+  });
+
+  it("catches a whole vocabulary written out as a union", () => {
+    expect(
+      copiesIn(
+        `type Status = "available" | "requested" | "reserved" | "checked_out" | "maintenance" | "retired";`
+      )
+    ).toEqual(["INVENTORY_ITEM_STATUSES"]);
+  });
+
+  it("catches one inside a z.enum, which is the shape #102 could not", () => {
+    expect(
+      copiesIn(
+        `const schema = z.enum(["available", "requested", "reserved", "checked_out", "maintenance", "retired"]);`
+      )
+    ).toEqual(["INVENTORY_ITEM_STATUSES"]);
+  });
+
+  it("catches a reordered copy, since a set is not a sequence", () => {
+    expect(
+      copiesIn(
+        `const all = ["retired", "maintenance", "checked_out", "reserved", "requested", "available"];`
+      )
+    ).toEqual(["INVENTORY_ITEM_STATUSES"]);
+  });
+
+  it("catches a copy carrying extra members", () => {
+    // A superset still names the whole vocabulary, so it goes stale the same
+    // way. `lost` here is a member no column has.
+    expect(
+      copiesIn(
+        `const all = ["available", "requested", "reserved", "checked_out", "maintenance", "retired", "lost"];`
+      )
+    ).toEqual(["INVENTORY_ITEM_STATUSES"]);
+  });
+});
+
+describe("what does not count", () => {
+  it("passes a subset one member short", () => {
+    // The threshold. "One short" would catch ACTIVE_STATUSES, which #271
+    // derived from the tuple instead, and would cost a false positive budget
+    // forever after.
+    expect(
+      copiesIn(
+        `const active = ["available", "requested", "reserved", "checked_out", "maintenance"];`
+      )
+    ).toEqual([]);
+  });
+
+  it("passes a deliberate narrow subset in a union", () => {
+    // sendToProposer's `target: "approved" | "changes_requested"`.
+    expect(copiesIn(`type Target = "reserved" | "checked_out";`)).toEqual([]);
+  });
+
+  it("passes an inArray filter over two statuses", () => {
+    expect(
+      copiesIn(
+        `const rows = inArray(items.status, ["reserved", "checked_out"]);`
+      )
+    ).toEqual([]);
+  });
+
+  it("passes a Record keyed by the whole vocabulary", () => {
+    // The shape that works: the type forces it to be total, so a new status
+    // fails to compile here rather than silently rendering nothing. Examining
+    // these would flag every label and style table in the app.
+    expect(
+      copiesIn(
+        `const LABELS: Record<ItemStatus, string> = {
+           available: "Available",
+           requested: "Requested",
+           reserved: "Reserved",
+           checked_out: "Checked out",
+           maintenance: "Maintenance",
+           retired: "Retired",
+         };`
+      )
+    ).toEqual([]);
+  });
+
+  it("passes a switch that handles every status", () => {
+    expect(
+      copiesIn(
+        `switch (status) {
+           case "available": return 0;
+           case "requested": return 1;
+           case "reserved": return 2;
+           case "checked_out": return 3;
+           case "maintenance": return 4;
+           case "retired": return 5;
+         }`
+      )
+    ).toEqual([]);
+  });
+
+  it("passes a chain of equality comparisons", () => {
+    expect(
+      copiesIn(
+        `const x = s === "available" || s === "requested" || s === "reserved" ||
+                   s === "checked_out" || s === "maintenance" || s === "retired";`
+      )
+    ).toEqual([]);
+  });
+
+  it("passes a spread of the tuple, which is the derivation it asks for", () => {
+    expect(copiesIn("const all = [...INVENTORY_ITEM_STATUSES];")).toEqual([]);
+  });
+
+  it("passes single literals scattered through a file", () => {
+    expect(
+      copiesIn(
+        `const a = "available";
+         const b = "requested";
+         const c = "reserved";
+         const d = "checked_out";
+         const e = "maintenance";
+         const f = "retired";`
+      )
+    ).toEqual([]);
+  });
+});
+
+describe("a file it cannot read fails rather than passing", () => {
+  it("throws on a syntax error instead of reporting nothing", () => {
+    // The defect this guards against is the one server-fn-scan.ts records: a
+    // tree the parser gave up on is empty, and an empty tree looks exactly
+    // like a clean file.
+    expect(() => copiesIn("const x = (((;")).toThrow(/did not parse/);
+  });
+
+  it("finds no vocabulary in a file that declares none", () => {
+    // The companion to the assertion above: scan() throws when this returns
+    // empty for the real file, rather than reporting a clean tree it never
+    // had anything to compare against.
+    expect(vocabulariesIn("empty.ts", "export const x = 1;")).toEqual([]);
+  });
+});
