@@ -119,6 +119,17 @@ describe("what counts as a copy", () => {
     ).toEqual(["INVENTORY_ITEM_STATUSES"]);
   });
 
+  it("catches a tuple type whose members are named", () => {
+    // A NamedTupleMember wraps the literal, so reading the element directly
+    // finds no string and the copy passes. False negatives are the direction
+    // that matters here: a copy nobody is told about.
+    expect(
+      copiesIn(
+        `type Ordered = [a: "available", b: "requested", c: "reserved", d: "checked_out", e: "maintenance", f: "retired"];`
+      )
+    ).toEqual(["INVENTORY_ITEM_STATUSES"]);
+  });
+
   it("catches one inside a z.enum, which is the shape #102 could not", () => {
     expect(
       copiesIn(

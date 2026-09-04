@@ -261,13 +261,17 @@ export function scanFile(
     } else if (ts.isTupleTypeNode(node)) {
       // `type X = ["a", "b", ...]` is a written-out list like the other two,
       // and is neither an array literal nor a union, so it needs its own arm.
+      // A named member (`[first: "a"]`) is a NamedTupleMember wrapping the
+      // literal, so unwrap it rather than dropping it: dropping would make a
+      // named copy a false negative, which is the one direction that matters.
       record(
         node,
-        node.elements.flatMap((element) =>
-          ts.isLiteralTypeNode(element) && ts.isStringLiteral(element.literal)
-            ? [element.literal.text]
-            : []
-        )
+        node.elements.flatMap((element) => {
+          const type = ts.isNamedTupleMember(element) ? element.type : element;
+          return ts.isLiteralTypeNode(type) && ts.isStringLiteral(type.literal)
+            ? [type.literal.text]
+            : [];
+        })
       );
     } else if (ts.isUnionTypeNode(node)) {
       record(
