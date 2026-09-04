@@ -3,7 +3,8 @@
 How work moves through this repo, for a person. `AGENTS.md` carries the rules that
 bind an agent on every turn; this file is the map of the process those rules sit in,
 and the first thing to read if you are joining as a developer or an instructor.
-`README.md` covers install and running the app.
+`README.md` covers install and running the app, and `docs/ONBOARDING.md` is day
+one: accounts, the setup wizard, and what Claude Code does in your terminal.
 
 ## The process
 
@@ -86,15 +87,10 @@ everything that goes wrong here.
 
 ## Working with Claude Code
 
-The repo enables the `mattpocock-skills` plugin through `.claude/settings.json`; a
-fresh clone answers one prompt to trust the marketplace. The same file installs the
+`.claude/settings.json` enables the `mattpocock-skills` plugin and installs the
 hooks under `.claude/hooks/`, which is what the middle column above describes.
-`SessionStart` prints the branch, the working tree state, the Node version and the
-running compose services into every session.
-
-The agent sandbox refuses `gh` and anything that writes `.git/config`; the Vitest
-section of `docs/QUIRKS.md` says which commands and why, and they run with the
-sandbox off.
+`docs/ONBOARDING.md` has the trust prompt a fresh clone answers, a table of the
+hooks, what a refusal looks like, and the two commands the sandbox refuses.
 
 Working several issues at once: put a worktree outside the repo and symlink
 `node_modules` and `.env.local` into it. The smoke and accessibility suites want the
@@ -106,6 +102,8 @@ Ordinary work does not go through it: the issue is the spec.
 
 ## What to read for what
 
+- `docs/ONBOARDING.md`: day one. Accounts, the setup wizard, Claude Code, a first
+  week.
 - `AGENTS.md`: the rules that bind every turn, and the reference docs.
 - `CONTEXT.md`: the glossary. The words to use for projects, inventory and roles,
   and the ones not to.
