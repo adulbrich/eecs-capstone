@@ -485,6 +485,8 @@ Older docs show `test.poolOptions.forks.singleFork: true`. Vitest 4 removed that
 
 Component tests that mount a Radix Popover or a cmdk `Command` throw on render unless you stub the DOM APIs jsdom omits. Add them in a `beforeAll`: `Element.prototype.scrollIntoView`, `hasPointerCapture`, `setPointerCapture`, `releasePointerCapture` (each `vi.fn()`), plus a no-op `globalThis.ResizeObserver` class. `PopoverContent` only mounts when the popover is open, so click the trigger before querying inside it. The canonical setup is in `src/test/proposer-picker.test.tsx`; most form tests dodge this by mocking the heavy Radix children instead (`src/test/project-form-ai-review.test.tsx`).
 
+A Radix `Select` needs the same stubs and a different gesture: its trigger opens on `pointerdown`, not `click`, and only for a primary mouse button with no ctrl key, so `fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" })` is what opens it. A `fireEvent.click` there does nothing and the `findByRole("option")` that follows times out. The trigger answers to `getByRole("combobox")`, named by its `Label`. `src/test/inventory-lifecycle-panel.test.tsx` drives one.
+
 ### `as ReturnType<typeof vi.fn>` triggers TS2352
 
 Use the double-cast variant for mock typings:

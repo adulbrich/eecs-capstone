@@ -492,7 +492,7 @@ export function InventoryLifecyclePanel({
     if (!rec) {
       return;
     }
-    if (rec.next === "checked_out" || rec.next === "reserved") {
+    if (needsHolder(rec.next)) {
       openDialogFor(rec.next);
       return;
     }
@@ -502,7 +502,7 @@ export function InventoryLifecyclePanel({
   async function onOverrideChange(v: string) {
     const next = v as Status;
     setOverrideStatus(next);
-    if (next === "reserved" || next === "checked_out") {
+    if (needsHolder(next)) {
       openDialogFor(next);
       return;
     }
