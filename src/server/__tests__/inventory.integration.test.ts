@@ -1980,9 +1980,10 @@ describe("staff-assigned holds in my items", () => {
       .from(inventoryItems)
       .where(eq(inventoryItems.id, item.id));
     expect(row.currentHolderId).toBe(holder.id);
-    // Matching does not normalize: the address is stored as staff typed it,
-    // which is #249's question rather than this one's.
-    expect(row.currentHolderEmail).toBe(`Cased-${stamp}@X.com`);
+    // Stored lowercase, not as staff typed it. #245 matched through the
+    // capitals and kept them; #249 decided the column is normalized on write,
+    // so holdToColumns folds the address on the way in.
+    expect(row.currentHolderEmail).toBe(`cased-${stamp}@x.com`);
     // An account hold stores neither, so the typed pair is dropped instead of
     // being recorded as a walk-in's name and program.
     expect(row.currentHolderName).toBeNull();

@@ -36,6 +36,11 @@
  *
  * ## Whitespace is not trimmed, but an empty string is not a value
  *
+ * One exception, added by #249: `holdToColumns` lowercases and trims the
+ * address, because the two holder columns are normalized on write. That is
+ * the write gate, not the constructor, so a `Hold` in flight still carries
+ * the address as typed and only the stored copy is folded.
+ *
  * `inventory-workflow.ts` decides person-versus-thing on raw truthiness, and
  * `transitionItemInTx` stores the raw strings. This module matches both on
  * whitespace, so a caller cannot pass a guard on one rule and then be
@@ -65,6 +70,8 @@
  * server wins and drops the typed name, which is exactly the behavior the
  * `account` case makes structural.
  */
+
+import { normalizeEmailAddress } from "./email-address";
 
 /** The five columns on `inventory_items` that describe the current hold. */
 export interface HoldColumns {
@@ -174,7 +181,15 @@ export function holdFromInput(
   return { kind: "none" };
 }
 
-/** Flattens a hold back onto the five columns. */
+/**
+ * Flattens a hold back onto the five columns.
+ *
+ * The address is lowercased here and only here, which makes this the write
+ * gate for the two holder columns: `transitionItemInTx` builds both the item
+ * update and the history row from what this returns, so neither can carry an
+ * address the other does not (#249). The read constructors above deliberately
+ * do not normalize, because an unjoined read must report what is stored.
+ */
 export function holdToColumns(hold: Hold): HoldColumns {
   switch (hold.kind) {
     case "thing":
@@ -190,7 +205,7 @@ export function holdToColumns(hold: Hold): HoldColumns {
       // the join, so there is no second copy to fall out of date.
       return {
         currentHolderId: hold.accountId,
-        currentHolderEmail: hold.email,
+        currentHolderEmail: normalizeEmailAddress(hold.email),
         currentHolderLabel: null,
         currentHolderName: null,
         currentHolderProgram: null,
@@ -198,7 +213,7 @@ export function holdToColumns(hold: Hold): HoldColumns {
     case "walk_in":
       return {
         currentHolderId: null,
-        currentHolderEmail: hold.email,
+        currentHolderEmail: normalizeEmailAddress(hold.email),
         currentHolderLabel: null,
         currentHolderName: hold.name,
         currentHolderProgram: hold.program,
