@@ -1,8 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { STAFF_PANEL_AUDIENCE_HINT } from "#/lib/private-notes";
-import { canTransition } from "#/lib/project-workflow";
-import { PROJECT_STATUSES, type ProjectStatus } from "#/lib/vocabularies";
+import {
+  canTransition,
+  PROJECT_STATUSES_IN_DISPLAY_ORDER,
+} from "#/lib/project-workflow";
+import type { ProjectStatus } from "#/lib/vocabularies";
 import {
   forceSetProjectStatus,
   hardDeleteProject,
@@ -34,26 +37,7 @@ import {
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
-/**
- * The stepper's order, which is not the vocabulary's: this reads
- * `changes_requested` as the step back out of `submitted` and draws it beside
- * it, where the tuple lists the two outcomes of a review the other way round.
- * The order lives in a `Record` keyed by the union, so a status added to the
- * vocabulary and not ranked here fails to compile rather than quietly going
- * missing from the stepper.
- */
-const WORKFLOW_RANK: Record<ProjectStatus, number> = {
-  draft: 0,
-  submitted: 1,
-  changes_requested: 2,
-  approved: 3,
-  published: 4,
-  archived: 5,
-};
-
-const WORKFLOW: readonly ProjectStatus[] = [...PROJECT_STATUSES].sort(
-  (a, b) => WORKFLOW_RANK[a] - WORKFLOW_RANK[b]
-);
+const WORKFLOW = PROJECT_STATUSES_IN_DISPLAY_ORDER;
 
 const STATUS_LABEL: Record<ProjectStatus, string> = {
   draft: "Draft",

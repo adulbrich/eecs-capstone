@@ -14,12 +14,11 @@ import {
   user,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
+import { PROJECT_STATUSES_IN_DISPLAY_ORDER } from "#/lib/project-workflow";
 import { assertStaff, type Viewer } from "#/lib/viewer";
 import {
   INVENTORY_ITEM_STATUSES,
   INVENTORY_REQUEST_ITEM_STATUSES,
-  PROJECT_STATUSES as PROJECT_STATUS_VOCABULARY,
-  type ProjectStatus,
 } from "#/lib/vocabularies";
 import type { AnalyticsInput } from "../analytics";
 import { countPendingRequests, countRows, countSubmitted } from "./admin";
@@ -39,25 +38,10 @@ export interface LabelledBucket extends Bucket {
 }
 
 /**
- * The bar order for the project breakdown, which is not the vocabulary's
- * order: this reads `changes_requested` as the step back out of `submitted`
- * and puts it beside it, where the tuple lists the two outcomes of a review
- * the other way round. The order lives in a `Record` keyed by the union, so
- * a status added to the vocabulary and not ranked here fails to compile
- * rather than quietly dropping a bar off the chart.
+ * The breakdown's bar order. Shared with the staff stepper, so the two cannot
+ * show a reader the same statuses in two different orders.
  */
-const PROJECT_STATUS_RANK: Record<ProjectStatus, number> = {
-  draft: 0,
-  submitted: 1,
-  changes_requested: 2,
-  approved: 3,
-  published: 4,
-  archived: 5,
-};
-
-export const PROJECT_STATUSES = [...PROJECT_STATUS_VOCABULARY].sort(
-  (a, b) => PROJECT_STATUS_RANK[a] - PROJECT_STATUS_RANK[b]
-);
+export const PROJECT_STATUSES = PROJECT_STATUSES_IN_DISPLAY_ORDER;
 
 export const ITEM_STATUSES = INVENTORY_ITEM_STATUSES;
 

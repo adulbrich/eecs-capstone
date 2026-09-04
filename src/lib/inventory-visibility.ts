@@ -38,6 +38,9 @@ export const ACTIVE_STATUSES = [
   "maintenance",
 ] as const satisfies readonly ItemStatus[];
 
+/** One of the working statuses: every status a listing filter may offer. */
+export type ActiveStatus = (typeof ACTIVE_STATUSES)[number];
+
 /**
  * Where a status sits in the lifecycle, for a table that sorts by it:
  * available first, then the states an item moves through. Alphabetical order

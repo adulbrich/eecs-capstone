@@ -11,6 +11,10 @@ import {
   needsHolder,
 } from "#/lib/inventory-workflow";
 import {
+  INVENTORY_ITEM_STATUSES,
+  type ItemStatus as Status,
+} from "#/lib/vocabularies";
+import {
   hardDeleteInventoryItem,
   listInventoryItemEditLog,
   transitionInventoryItem,
@@ -49,22 +53,7 @@ import {
 } from "./ui/select";
 import { Textarea } from "./ui/textarea";
 
-type Status =
-  | "available"
-  | "requested"
-  | "reserved"
-  | "checked_out"
-  | "maintenance"
-  | "retired";
-
-const ALL_STATUSES: Status[] = [
-  "available",
-  "requested",
-  "reserved",
-  "checked_out",
-  "maintenance",
-  "retired",
-];
+const ALL_STATUSES: Status[] = [...INVENTORY_ITEM_STATUSES];
 
 export interface HistoryRow {
   changedByEmail: string;
