@@ -175,13 +175,8 @@ describe("ProjectForm proposer field by role", () => {
   // The routes pass showProposer={isStaff}, so a non-staff viewer gets no
   // proposer control at all rather than a disabled one, and the form drops
   // the value on the way out too (src/test/project-form.test.tsx).
-  //
-  // That is the decision, not an accident waiting on a read-only state: #270
-  // weighed adding one and declined, because the proposer is the viewer
-  // themselves in the common case. #173's brief assumed the read-only state,
-  // which is why this block reads the way it does rather than the way that
-  // brief worded it. docs/QUIRKS.md, "Both forms own their save", is the
-  // record.
+  // That is the decision rather than a gap: #270 declined a read-only state.
+  // docs/QUIRKS.md, "Both forms own their save", says why.
   it("gives a non-staff viewer no proposer control to edit", () => {
     renderForm({ isStaff: false, showProposer: false });
     expect(screen.queryByLabelText("Proposer email")).toBeNull();
