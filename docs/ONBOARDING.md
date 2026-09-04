@@ -32,20 +32,17 @@ Run the wizard from a fresh clone:
 bash scripts/onboard.sh
 ```
 
-It walks the steps a person has to be present for and stops at the first one
-that fails: the Node in `.nvmrc`, `npm install` (which installs the git hooks),
-`docker compose up -d` with the port check, `.env.local` from `.env.example` with
-a generated `BETTER_AUTH_SECRET`, the optional GitHub OAuth app, `npm run
-db:migrate` and `npm run storage:init`, the dev seed, the Playwright browser, and
-then every suite once: unit, integration, smoke and accessibility smoke, with a
-reseed after the integration run because that suite empties the database. It ends
-with all four green or it tells you which one went red and where to read.
-Re-running it is safe; it keeps what `.env.local` already holds.
+It walks the steps a person has to be present for, from the Node in `.nvmrc`
+through docker, `.env.local`, migrations, the seed and the Playwright browser to
+every suite once, and it stops at the first one that fails with a pointer at
+where to read. It asks before the suites, because the integration one empties the
+dev database. Re-running it is safe; it keeps what `.env.local` already holds.
 
 `README.md` covers the same steps by hand, the port-conflict case, and the email
 transport. Do not read it for the roadmap: that is GitHub Issues.
 
-The three seeded accounts, all with the password `password`:
+The seed creates one account per role, among others, all with the password
+`password`:
 
 | Address | Role |
 | --- | --- |
@@ -77,13 +74,14 @@ execute:
 | Hook | When | What it does |
 | --- | --- | --- |
 | `session-context.mjs` | session start | Prints the branch, working tree, Node against `.nvmrc`, and the running compose services. |
-| `guard-git.mjs` | before a `git` command | Refuses `add -A`, `commit -a`, a commit on `main`, a force push at `main`, `reset --hard`, `clean -f`, `branch -D`, and a commit message that fails the commit check. |
+| `guard-git.mjs` | before a `git` command | Refuses `add -A`, `commit -a`, a commit on `main`, a force push at `main`, `reset --hard`, `checkout .`, `restore .`, `clean -f`, `branch -D`, and a commit message that fails the commit check. |
 | `guard-gh.mjs` | before a `gh` command | Refuses PR or issue text with an emdash, an emoji, a session link, or a title that is not a Conventional Commits subject. |
 | `guard-edits.mjs` | before an edit | Refuses edits to the generated and personal files: the route tree, the auth schema, `CLAUDE.md`, `.env` and `.env.local`. |
 | `after-edit.mjs` | after an edit | Reports Biome and the prose rule on the edited file. |
 
-A refusal looks like this in the session, and the agent is expected to change what
-it was about to do rather than retry:
+A refusal from the git guard looks like this in the session, and the agent is
+expected to change what it was about to do rather than retry; the edit guard
+answers with a structured denial carrying the same kind of reason:
 
 ```
 PreToolUse:Bash hook error: Stage files by name (AGENTS.md): `git add -A` and
