@@ -207,7 +207,9 @@ export interface AdminDataTableProps<T> {
   emptyMessage: string;
   /**
    * Set when the route's search or filters narrowed the rows before they got
-   * here, which only the route can know: the loader did the filtering. With
+   * here, which only the route can know: the filtering happened in the loader,
+   * or in the route itself for a rule no query can express, as
+   * `/admin/inventory` does for overdue. With
    * it, an empty result keeps the headers and the controls and says
    * `noMatchMessage` in one row, because the reader is mid-search and the
    * headers and the Columns menu are what they are searching over. Without
