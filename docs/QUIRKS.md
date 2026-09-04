@@ -179,6 +179,8 @@ Three rules live in that save, and each looks like cleanup waiting to happen:
 - **The category write is asymmetric.** Edit calls `setProjectCategories` unconditionally for staff, because clearing every category must reach the server. Create guards on a non-empty list, because a new project has nothing to clear.
 - **`isStaff` is its own required prop, not `showProposer`.** `showProposer` and `showCategories` decide what is drawn; `isStaff` decides what is sent. A display prop gating the payload would make hiding a control change the request.
 
+The proposer control is staff-only, and there is no read-only path. `new.tsx` and `edit.tsx` both pass `showProposer={isStaff}`, so a non-staff viewer gets no proposer control rather than a disabled one, and `ProposerPicker` is gated on `showProposer` alone. The form and the project detail page disagree about this on purpose: the page renders `ProposerSummary` to everyone who can read the project, the form draws it only inside the staff panel. #173's brief assumed a read-only state that has never existed and #270 decided not to add one, because the proposer of a project is the viewer themselves in the common case, so the field would tell them nothing they do not already know. Do not read the absence of a disabled input as an oversight, and do not write a test asserting one.
+
 ### Server errors via `applyServerErrors`
 
 When a server function throws a `ZodError`, the helper `src/lib/apply-server-errors.ts` maps issues back to field-level errors via `setFieldMeta`. Wrap form `onSubmit` with `try` / `catch` and call it; if it returns false (non-Zod error), surface the message in a top-level banner. Don't expect server validation errors to appear silently next to fields without this helper.
