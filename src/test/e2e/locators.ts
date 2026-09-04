@@ -29,8 +29,8 @@ export function rowFor(scope: Page | Locator, text: string): Locator {
  * Those two tabs are `AdminDataTable`s, so an entry is a table row and
  * `rowFor` scoped to the open tab panel reaches it. The cart tab is a list,
  * not a table, so this finds nothing there. Only the selected panel is in the
- * tree, but scoping keeps the locator off the attention summary above the
- * tabs and off any table that lands outside the panel later.
+ * tree today; the scope is what keeps that true if a table ever lands on the
+ * page outside it.
  *
  * This used to be a `> div > div` chain from when the entries were plain
  * divs. That chain kept matching after the tables landed, on the table's
