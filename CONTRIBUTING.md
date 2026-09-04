@@ -107,6 +107,10 @@ Ordinary work does not go through it: the issue is the spec.
 ## What to read for what
 
 - `AGENTS.md`: the rules that bind every turn, and the reference docs.
+- `CONTEXT.md`: the glossary. The words to use for projects, inventory and roles,
+  and the ones not to.
+- `docs/adr/`: the decisions, one paragraph each. Read before proposing a change of
+  shape.
 - `docs/QUIRKS.md`: how this codebase actually behaves. First stop when something
   that should work does not.
 - `docs/UI-CONVENTIONS.md`: the design system.

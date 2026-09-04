@@ -443,9 +443,7 @@ Migrations run during deploy. To run them out of band, use the same
 ### Find and clear image URLs the app did not mint
 
 `image_url` on `projects` and `inventory_items` is guarded on the change, not
-on what a row already holds, see
-"What `image_url` may contain, and why the check is on the change"
-in `docs/QUIRKS.md`, so
+on what a row already holds (`docs/adr/0009-one-image-upload-policy.md`), so
 a row written before the upload flow, or before #162, can still carry an
 absolute URL and still render it. Nothing in the column tells a stock photo
 somebody chose from a planted link, so `scripts/image-url-legacy.mjs` does not

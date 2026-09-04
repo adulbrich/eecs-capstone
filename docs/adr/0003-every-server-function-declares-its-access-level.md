@@ -1,0 +1,5 @@
+# Every server function declares its access level
+
+There is no global middleware, so the guard an endpoint carries is the only guard it has, and no grep can tell a gated endpoint from an ungated one. Rather than detect the level, `src/server/__tests__/access-contract.ts` declares it, one line per endpoint, and its test fails on an endpoint with no line, a line naming no endpoint, a change to the set declared public, or a `createServerFn` in a shape the scan cannot parse. The declaration is the effective level, so a transition endpoint whose gate admits the proposer is still `staff` when the rules decide per role.
+
+The rule for reads that the table encodes: a read is staff-only when its query reaches a column of somebody's account, by projection or by join. Two public endpoints shipped ungated for three months while a design table classified one of them as staff, because a classification that lives only in prose cannot fail. `mentorNameSql`, which resolves a mentor's address to a name and nothing else, is the one public fragment that reaches `user` on purpose.
