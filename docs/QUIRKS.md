@@ -171,7 +171,7 @@ Entries can be strings or `{ message }` objects depending on which validator pro
 
 ### Both forms own their save; the route components only navigate
 
-`InventoryForm` and `ProjectForm` import the server functions and write the row themselves. A route passes configuration in and gets a saved id back through `onSaved`; its loader still loads, but its component does nothing but navigate. `ProjectForm` took an `onSubmit` prop until 2026-09-02, so `new.tsx` and `edit.tsx` each held a copy of the payload rules, and nothing could test either: `src/test/` has no route tests, because a route is a `createFileRoute` call rather than a renderable component.
+`InventoryForm` and `ProjectForm` import the server functions and write the row themselves. A route passes configuration in and gets a saved id back through `onSaved`; its loader still loads, but its component does nothing but navigate. `ProjectForm` took an `onSubmit` prop until 2026-09-02, so `new.tsx` and `edit.tsx` each held a copy of the payload rules, and nothing could test either: `src/test/` renders no route component, because a route is a `createFileRoute` call rather than a renderable component. A test can still import a route module to read something it exports, which is what `src/test/admin-inventory-columns.test.tsx` does with that page's column list; see the partial router mock in the Vitest section below.
 
 Three rules live in that save, and each looks like cleanup waiting to happen:
 
@@ -499,6 +499,19 @@ Use the double-cast variant for mock typings:
 ### `vi.spyOn` mock-calls callback typing
 
 If you get TS7006 ("Parameter implicitly has 'any' type") on `mock.calls.map((c) => ...)`, annotate as `(c: unknown[])`.
+
+### A route module under test needs a partial router mock, not a full one
+
+A unit test that imports a route module to reach its column list cannot `vi.mock("@tanstack/react-router")` with a plain factory. The TanStack Start plugin rewrites route files and injects its own router imports (`lazyRouteComponent` among them), so a full mock fails the import with "No \"lazyRouteComponent\" export is defined". Spread the real module and override only what the cells render:
+
+```ts
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
+  Link: (/* plain anchor */) => null,
+}));
+```
+
+The real `createFileRoute` runs fine at import time, so nothing else needs stubbing. `src/test/admin-inventory-columns.test.tsx` is the canonical one. Reaching a route's column list also means exporting it: `/admin/inventory` exports `COLUMNS` and `DEFAULT_SORT` for this, and every other admin route still keeps them private, so a second consumer test starts by adding that export. A column module under `src/components/` (`inventory-table-columns.tsx`) has neither constraint: it exports its columns already and mocks the whole router.
 
 ### Integration tests call the `*As(viewer, ...)` seam, never `requireUser()`
 
