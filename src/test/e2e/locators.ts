@@ -18,30 +18,29 @@ import type { Locator, Page } from "@playwright/test";
  * rather than named, because a row's accessible name is every cell concatenated
  * and matching against that is matching against the whole row's layout.
  */
-export function rowFor(page: Page, text: string): Locator {
-  return page.getByRole("row").filter({ hasText: text });
+export function rowFor(scope: Page | Locator, text: string): Locator {
+  return scope.getByRole("row").filter({ hasText: text });
 }
 
 /**
- * One entry on `/my/items`, by the item it is about.
+ * One entry on the Active or History tab of `/my/items`, by the item it is
+ * about.
  *
- * The tabs are `AdminDataTable`s, so an entry is a table row and `rowFor`
- * scoped to the open tab panel is what reaches it. The scope matters: the
- * page renders one table per tab, and only the selected panel is in the tree,
- * but scoping to it keeps the locator from ever matching a row in another
- * tab's table if that changes.
+ * Those two tabs are `AdminDataTable`s, so an entry is a table row and
+ * `rowFor` scoped to the open tab panel reaches it. The cart tab is a list,
+ * not a table, so this finds nothing there. Only the selected panel is in the
+ * tree, but scoping keeps the locator off the attention summary above the
+ * tabs and off any table that lands outside the panel later.
  *
  * This used to be a `> div > div` chain from when the entries were plain
  * divs. That chain kept matching after the tables landed, on the table's
  * wrapper rather than a row, which is why a test that only looked for one
  * button inside it stayed green while one that asserted on a `time` element
- * hit every row at once.
+ * hit every row at once. The general form of that trap is in `docs/QUIRKS.md`
+ * under "Browser suites select by role and name".
  */
 export function entryFor(page: Page, itemName: string): Locator {
-  return page
-    .getByRole("tabpanel")
-    .getByRole("row")
-    .filter({ hasText: itemName });
+  return rowFor(page.getByRole("tabpanel"), itemName);
 }
 
 /**
