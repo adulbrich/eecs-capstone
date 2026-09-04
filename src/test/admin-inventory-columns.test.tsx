@@ -119,7 +119,7 @@ function rowFor(name: string) {
   if (!row) {
     throw new Error(`no row for ${name}`);
   }
-  return within(row);
+  return row as HTMLElement;
 }
 
 describe("the staff inventory table", () => {
@@ -181,13 +181,13 @@ describe("the staff inventory table", () => {
     expect(headers()).toContain("Label");
     expect(headers()).toContain("Serial");
     expect(headers()).toContain("Created");
-    expect(rowFor("Oscilloscope").getByText("EECS-004")).toBeTruthy();
-    expect(rowFor("Oscilloscope").getByText("SN-1")).toBeTruthy();
+    expect(within(rowFor("Oscilloscope")).getByText("EECS-004")).toBeTruthy();
+    expect(within(rowFor("Oscilloscope")).getByText("SN-1")).toBeTruthy();
   });
 
   it("names the holder and links the request line behind a held item", () => {
     renderTable();
-    const row = rowFor("Oscilloscope");
+    const row = within(rowFor("Oscilloscope"));
     expect(row.getByText(/Sam Rivera/)).toBeTruthy();
     expect(
       row.getByRole("link", { name: "View request" }).getAttribute("href")
@@ -196,10 +196,7 @@ describe("the staff inventory table", () => {
 
   it("dashes each empty cell of an unheld item rather than leaving it blank", () => {
     renderTable();
-    const row = screen.getByRole("link", { name: "Drill" }).closest("tr");
-    if (!row) {
-      throw new Error("no row for Drill");
-    }
+    const row = rowFor("Drill");
     // By name rather than by count, so a column added to the page does not
     // fail this for a reason that has nothing to do with the dash.
     for (const label of [

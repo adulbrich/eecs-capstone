@@ -171,7 +171,7 @@ Entries can be strings or `{ message }` objects depending on which validator pro
 
 ### Both forms own their save; the route components only navigate
 
-`InventoryForm` and `ProjectForm` import the server functions and write the row themselves. A route passes configuration in and gets a saved id back through `onSaved`; its loader still loads, but its component does nothing but navigate. `ProjectForm` took an `onSubmit` prop until 2026-09-02, so `new.tsx` and `edit.tsx` each held a copy of the payload rules, and nothing could test either: `src/test/` has no route tests, because a route is a `createFileRoute` call rather than a renderable component.
+`InventoryForm` and `ProjectForm` import the server functions and write the row themselves. A route passes configuration in and gets a saved id back through `onSaved`; its loader still loads, but its component does nothing but navigate. `ProjectForm` took an `onSubmit` prop until 2026-09-02, so `new.tsx` and `edit.tsx` each held a copy of the payload rules, and nothing could test either: `src/test/` renders no route component, because a route is a `createFileRoute` call rather than a renderable component. A test can still import a route module to read something it exports, which is what `src/test/admin-inventory-columns.test.tsx` does with that page's column list; see the partial router mock in the Vitest section below.
 
 Three rules live in that save, and each looks like cleanup waiting to happen:
 
