@@ -200,7 +200,20 @@ export interface AdminDataTableProps<T> {
   columns: AdminColumn<T>[];
   data: T[];
   defaultSort: SortState;
+  /**
+   * Shown alone, with no table and no controls, when there are no rows and
+   * `filtered` is not set: the listing has nothing in it at all.
+   */
   emptyMessage: string;
+  /**
+   * Set when the route's search or filters narrowed the rows before they got
+   * here, which only the route can know: the loader did the filtering. With
+   * it, an empty result keeps the headers and the controls and says
+   * `noMatchMessage` in one row, because the reader is mid-search and the
+   * headers and the Columns menu are what they are searching over. Without
+   * it, an empty result is `emptyMessage` and nothing else.
+   */
+  filtered?: boolean;
   getRowId: (row: T) => string;
   hidden: string[];
   /**
@@ -210,6 +223,8 @@ export interface AdminDataTableProps<T> {
    * the row it named.
    */
   highlightedRowId?: string | null;
+  /** The one-row message for a filtered result with no rows. */
+  noMatchMessage?: string;
   onHiddenChange: (cols: string | undefined) => void;
   onSortChange: (sort: SortState) => void;
   /**
@@ -274,9 +289,11 @@ export function AdminDataTable<T>({
   data,
   defaultSort,
   emptyMessage,
+  filtered = false,
   getRowId,
   hidden,
   highlightedRowId,
+  noMatchMessage = "Nothing matches these filters.",
   onHiddenChange,
   onSortChange,
   onSortedIdsChange,
@@ -402,6 +419,14 @@ export function AdminDataTable<T>({
 
   const rows = table.getRowModel().rows;
   const hideable = table.getAllLeafColumns().filter((c) => c.getCanHide());
+  // A filtered result keeps its table even with no rows in it: the headers
+  // and the controls are what the reader is searching over. An unfiltered
+  // one has nothing to show and shows the message alone. The right-hand
+  // controls (the caller's `actions`, Export CSV on the admin routes, and the
+  // Columns menu) act on the table, so they go when it does: a picker there
+  // would toggle headers that are not on the page, and an export would write
+  // a file of nothing (#260). One flag for both so they cannot drift apart.
+  const showTable = rows.length > 0 || filtered;
 
   // Reports the table's own sorted row order to the caller. Skipped when
   // serverSorted: the rows there are not locally reordered at all (see
@@ -442,9 +467,10 @@ export function AdminDataTable<T>({
     <div className="mt-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-3">{toolbar}</div>
-        <div className="flex items-end gap-3">
-          {actions}
-          {/*
+        {showTable && (
+          <div className="flex items-end gap-3">
+            {actions}
+            {/*
             modal={false}: Radix's default modal DropdownMenu hides the rest
             of the page from assistive tech via `aria-hidden` (not `inert`)
             while it's open: @radix-ui/react-menu calls `hideOthers` from the
@@ -457,52 +483,55 @@ export function AdminDataTable<T>({
             behavior is the right fix here rather than living with the
             violation or fighting Radix's internals.
           */}
-          {/*
+            {/*
             No menu when nothing can be hidden: a table whose columns are all
             `enableHiding: false` (the bookmarks shortlist) would otherwise
             offer an empty picker, a control that exists to be ignored.
           */}
-          {hideable.length > 0 && (
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                {/*
+            {hideable.length > 0 && (
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  {/*
                 Default size, not sm: this button sits on the same row as
                 the page's search input and filter selects, which are all
                 h-9. An h-8 button beside them reads as misaligned rather
                 than compact.
               */}
-                <Button variant="outline">
-                  <Columns3 aria-hidden className="size-4" />
-                  Columns
-                </Button>
-              </DropdownMenuTrigger>
-              {/*
+                  <Button variant="outline">
+                    <Columns3 aria-hidden className="size-4" />
+                    Columns
+                  </Button>
+                </DropdownMenuTrigger>
+                {/*
               tabIndex 0, not Radix's -1: a menu with enough columns to
               scroll (the public projects table has fifteen) fails axe's
               scrollable-region-focusable otherwise. See docs/QUIRKS.md,
               "A Columns menu that scrolls must be focusable itself".
             */}
-              <DropdownMenuContent align="end" tabIndex={0}>
-                <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {hideable.map((column) => (
-                  <DropdownMenuCheckboxItem
-                    checked={column.getIsVisible()}
-                    key={column.id}
-                    onCheckedChange={(value) => column.toggleVisibility(value)}
-                    onSelect={(event) => event.preventDefault()}
-                  >
-                    {labels.get(column.id) ?? column.id}
-                  </DropdownMenuCheckboxItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={resetColumns}>
-                  Reset columns
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
+                <DropdownMenuContent align="end" tabIndex={0}>
+                  <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {hideable.map((column) => (
+                    <DropdownMenuCheckboxItem
+                      checked={column.getIsVisible()}
+                      key={column.id}
+                      onCheckedChange={(value) =>
+                        column.toggleVisibility(value)
+                      }
+                      onSelect={(event) => event.preventDefault()}
+                    >
+                      {labels.get(column.id) ?? column.id}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={resetColumns}>
+                    Reset columns
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        )}
       </div>
 
       <p aria-live="polite" className="sr-only">
@@ -517,9 +546,7 @@ export function AdminDataTable<T>({
         the page, so orange title links lose contrast there. Below md this is
         skipped, because `src/styles.css` already gives each row its own card.
       */}
-      {rows.length === 0 ? (
-        <EmptyState>{emptyMessage}</EmptyState>
-      ) : (
+      {showTable ? (
         <Table
           className="admin-table"
           containerClassName="mt-4 md:rounded-lg md:border md:border-border md:bg-card"
@@ -558,6 +585,21 @@ export function AdminDataTable<T>({
             ))}
           </TableHeader>
           <TableBody>
+            {rows.length === 0 && (
+              <TableRow>
+                {/*
+                  One cell across every visible column, with no data-label:
+                  on mobile a labelled cell would draw a field name in front
+                  of the message, and this row is a message, not a record.
+                */}
+                <TableCell
+                  className="justify-center py-8 text-center text-muted-foreground text-sm"
+                  colSpan={table.getVisibleLeafColumns().length}
+                >
+                  {noMatchMessage}
+                </TableCell>
+              </TableRow>
+            )}
             {rows.map((row) => {
               const isHighlighted =
                 !!highlightedRowId && row.id === highlightedRowId;
@@ -598,6 +640,8 @@ export function AdminDataTable<T>({
             })}
           </TableBody>
         </Table>
+      ) : (
+        <EmptyState>{emptyMessage}</EmptyState>
       )}
     </div>
   );

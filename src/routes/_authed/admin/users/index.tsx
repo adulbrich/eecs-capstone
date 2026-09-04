@@ -202,6 +202,8 @@ function UsersAdmin() {
   // The whole search object goes to the hook, which reads cols/dir/sort.
   const search = Route.useSearch();
   const { includeBanned, q, role } = search;
+  // Banned users are included by default, so hiding them is the narrowing.
+  const filtered = q !== "" || role !== null || !includeBanned;
   const commitQuery = useCallback(
     (next: string) => {
       void navigate({
@@ -266,8 +268,10 @@ function UsersAdmin() {
         }
         caption="Users"
         data={rows}
-        emptyMessage="No users in this view."
+        emptyMessage="No users yet."
+        filtered={filtered}
         getRowId={(row) => row.id}
+        noMatchMessage="No users in this view."
         {...tableProps}
         toolbar={
           <>

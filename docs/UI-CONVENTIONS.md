@@ -362,6 +362,41 @@ per table may set it. A second one is logged and does not become a header strip;
 still renders as an ordinary labelled field. Two title rows on one card read as a styling
 oddity and get lived with instead of reported, which is why this is checked at all.
 
+### Two empty states
+
+A table with no rows is one of two things, and the route says which with `filtered`.
+
+Unfiltered and empty is a listing with nothing in it. The component renders
+`emptyMessage` and nothing else: no headers, no Columns menu, and nothing from the
+`actions` slot, because a column picker over headers that are not on the page and an
+Export CSV of no rows are controls that exist to be ignored (#260). The two are gated
+together inside the component so they cannot drift apart.
+
+Filtered and empty is a search or filter that matched nothing. The headers, the Columns
+menu and `actions` stay, because the reader is mid-search and they are what is being
+searched over, and one row across every visible column says `noMatchMessage`
+("Nothing matches these filters." unless the route has better words). On the mobile
+card layout that row is a single card with no field label.
+
+Only the route can tell the two apart, because the loader did the filtering. Derive
+`filtered` from the search params that narrow the result, and leave out a switch that
+widens it (`includeSoftDeleted` on projects, `includeBanned` on users): an empty result
+with a widening switch on is still nothing at all. A default that narrows counts as a
+filter: the requests queue opens on `pending`, and a staff member with no pending
+requests still wants the status select and the headers rather than a bare message.
+A route with no filters (programs, categories, bookmarks, My Items) never sets it.
+
+```tsx
+const filtered = q !== "" || status !== null || categories.length > 0;
+
+<AdminDataTable
+  emptyMessage="No items yet."
+  filtered={filtered}
+  noMatchMessage="No items in this view."
+  {...rest}
+/>;
+```
+
 `useAdminTableState` in `#/lib/table-state` is the router-agnostic core underneath, and
 stays directly unit-testable. Every admin route goes through `useAdminTable`; reach past
 it to the core only if you are driving a table from somewhere that has no `navigate`.

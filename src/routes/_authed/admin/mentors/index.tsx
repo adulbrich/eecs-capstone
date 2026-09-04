@@ -189,6 +189,7 @@ function MentorsAdmin() {
   const { rows } = Route.useLoaderData();
   const search = Route.useSearch();
   const { q } = search;
+  const filtered = q !== "";
   const navigate = useNavigate({ from: "/admin/mentors/" });
 
   const commitQuery = useCallback(
@@ -250,8 +251,10 @@ function MentorsAdmin() {
         }
         caption="Mentors"
         data={rows}
-        emptyMessage="No mentors in this view."
+        emptyMessage="No mentors yet."
+        filtered={filtered}
         getRowId={(row) => row.id}
+        noMatchMessage="No mentors in this view."
         {...tableProps}
         toolbar={
           <div>

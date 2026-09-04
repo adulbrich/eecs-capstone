@@ -373,6 +373,10 @@ function AdminProjects() {
   // The whole search object goes to the hook, which reads cols/dir/sort.
   const search = Route.useSearch();
   const { includeSoftDeleted, program, proposer, q, status } = search;
+  // Narrowing only: the soft-deleted switch widens the view, so an empty
+  // result with it on is still "nothing at all".
+  const filtered =
+    q !== "" || status !== "all" || program !== null || proposer !== null;
   const navigate = useNavigate({ from: "/admin/projects/" });
   const [allPrograms, setAllPrograms] = useState<
     { courseId: string; courseName: string; id: string }[]
@@ -461,8 +465,10 @@ function AdminProjects() {
         }
         caption="Projects"
         data={rows}
-        emptyMessage="No projects in this view."
+        emptyMessage="No projects yet."
+        filtered={filtered}
         getRowId={(row) => row.id}
+        noMatchMessage="No projects in this view."
         {...tableProps}
         toolbar={
           <>
