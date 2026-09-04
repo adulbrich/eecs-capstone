@@ -20,6 +20,10 @@ For the exhaustive list of what is already **built**, see [`PRD.md`](./PRD.md).
 
 ## Getting Started
 
+New to the repo? [`docs/ONBOARDING.md`](./docs/ONBOARDING.md) is day one: the
+accounts to ask for, a wizard that runs the steps below and every test suite
+once (`bash scripts/onboard.sh`), what Claude Code does here, and a first week.
+
 ```bash
 npm install
 docker compose up -d

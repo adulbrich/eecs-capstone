@@ -3,7 +3,8 @@
 How work moves through this repo, for a person. `AGENTS.md` carries the rules that
 bind an agent on every turn; this file is the map of the process those rules sit in,
 and the first thing to read if you are joining as a developer or an instructor.
-`README.md` covers install and running the app.
+`README.md` covers install and running the app, and `docs/ONBOARDING.md` is day
+one: accounts, the setup wizard, and what Claude Code does in your terminal.
 
 ## The process
 
@@ -106,6 +107,8 @@ Ordinary work does not go through it: the issue is the spec.
 
 ## What to read for what
 
+- `docs/ONBOARDING.md`: day one. Accounts, the setup wizard, Claude Code, a first
+  week.
 - `AGENTS.md`: the rules that bind every turn, and the reference docs.
 - `docs/QUIRKS.md`: how this codebase actually behaves. First stop when something
   that should work does not.
