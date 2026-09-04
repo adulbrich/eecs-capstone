@@ -38,6 +38,12 @@ Two local deltas from the default agent-brief guidance:
 - **Close**: `gh issue close <number> --comment "..."`. A pull request closes its
   issue with `Closes #N` in the body.
 
+## Rejected concepts
+
+`.out-of-scope/` is the knowledge base of concepts this project has decided not to
+build, one file each. `/triage` reads it before evaluating a new enhancement and
+writes to it on a `wontfix`; its `README.md` carries the format and the rules.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** Every pull request comes from a collaborator and
