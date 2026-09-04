@@ -3,6 +3,11 @@ import { Switch } from "./ui/switch";
 
 interface Props {
   checked: boolean;
+  /**
+   * For a filter that cannot mean anything under the current one, so that a
+   * reader cannot set a value the page would silently ignore.
+   */
+  disabled?: boolean;
   id: string;
   label: string;
   onCheckedChange: (checked: boolean) => void;
@@ -18,10 +23,21 @@ interface Props {
  * `id` and `htmlFor` are required, not optional: Radix renders the switch as a
  * `button`, and a `button` nested in a `label` is not implicitly labelled.
  */
-export function FilterSwitch({ checked, id, label, onCheckedChange }: Props) {
+export function FilterSwitch({
+  checked,
+  disabled,
+  id,
+  label,
+  onCheckedChange,
+}: Props) {
   return (
     <div className="flex h-9 items-center gap-2">
-      <Switch checked={checked} id={id} onCheckedChange={onCheckedChange} />
+      <Switch
+        checked={checked}
+        disabled={disabled}
+        id={id}
+        onCheckedChange={onCheckedChange}
+      />
       <Label className="font-normal" htmlFor={id}>
         {label}
       </Label>

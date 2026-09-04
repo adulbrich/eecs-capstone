@@ -59,6 +59,19 @@ export function overdueFlags(
 }
 
 /**
+ * Whether either deadline has been missed, for a caller that does not care
+ * which. The staff listing filter asks this; the badge asks `overdueFlags`,
+ * because it renders a different word for each kind.
+ */
+export function isOverdue(
+  pair: DeadlinePair,
+  now: number = Date.now()
+): boolean {
+  const flags = overdueFlags(pair, now);
+  return flags.pickupOverdue || flags.checkoutOverdue;
+}
+
+/**
  * An entry on the Active tab, structurally.
  *
  * A hold has no request line by definition, so this is a union rather than a

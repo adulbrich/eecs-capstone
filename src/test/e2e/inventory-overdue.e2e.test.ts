@@ -23,7 +23,11 @@ test.describe("inventory overdue derivation", () => {
   test("a past due date shows the holder a badge and files a notice", async ({
     browser,
   }) => {
-    const itemName = fixtureName("Item");
+    // Two items under one searchable prefix, so the staff listing below can
+    // show both at once and the overdue filter has something to leave out.
+    const group = fixtureName("Overdue");
+    const itemName = `${group}-late`;
+    const onTimeName = `${group}-ontime`;
     const dueAt = daysFromNow(-10);
     const { db, close } = openDb();
     let itemId: string;
@@ -33,6 +37,12 @@ test.describe("inventory overdue derivation", () => {
         itemId,
         holderEmail: "user@example.com",
         dueAt,
+      });
+      const { id: onTimeId } = await createFixtureItem(db, onTimeName);
+      await giveFixtureHold(db, {
+        itemId: onTimeId,
+        holderEmail: "user@example.com",
+        dueAt: daysFromNow(10),
       });
     } finally {
       await close();
@@ -73,32 +83,34 @@ test.describe("inventory overdue derivation", () => {
       await expect(user.getByText(`Overdue: ${itemName}`)).toBeVisible();
       await closeMenu(user);
 
-      // Staff see the same hold, but the app gives them no overdue treatment:
-      // no badge, no filter, and the Due column is hidden until somebody turns
-      // it on. Asserting what is actually there rather than what would be
-      // useful, because a test written against the second one would fail on
-      // every run and prove nothing about a regression.
+      // Staff see the same lateness the holder does (#150): the badge beside
+      // the status, the due date without turning a column on, and a switch
+      // that leaves only the late rows.
       const staff = await staffContext.newPage();
-      await staff.goto(`/admin/inventory?q=${encodeURIComponent(itemName)}`);
+      await staff.goto(`/admin/inventory?q=${encodeURIComponent(group)}`);
       await waitForHydration(staff);
 
       const row = rowFor(staff, itemName);
       await expect(row.getByText("Checked out", { exact: true })).toBeVisible();
+      await expect(row.getByText("Overdue", { exact: true })).toBeVisible();
 
       // The row carries more than one timestamp once every column is on, so
       // the due date is addressed by its own value rather than by "the time
-      // element in this row".
-      const dueCell = row.locator(`time[datetime="${dueAt.toISOString()}"]`);
+      // element in this row". Visible with no Columns menu involved, which is
+      // the half of this that #150 changed.
+      await expect(
+        row.locator(`time[datetime="${dueAt.toISOString()}"]`)
+      ).toBeVisible();
 
-      // Absent first. That is the assertion that the toggle below is what puts
-      // it on screen, rather than it having been visible all along.
-      await expect(dueCell).toHaveCount(0);
+      // The on-time item is the control: same holder, same status, a due date
+      // in the future. Without it the filter below would prove nothing.
+      const onTimeRow = rowFor(staff, onTimeName);
+      await expect(onTimeRow).toBeVisible();
+      await expect(onTimeRow.getByText("Overdue")).toHaveCount(0);
 
-      await staff.getByRole("button", { name: "Columns" }).click();
-      await staff.getByRole("menuitemcheckbox", { name: "Due" }).click();
-      await closeMenu(staff);
-
-      await expect(dueCell).toBeVisible();
+      await staff.getByRole("switch", { name: "Show only overdue" }).click();
+      await expect(row).toBeVisible();
+      await expect(onTimeRow).toHaveCount(0);
     } finally {
       await userContext.close();
       await staffContext.close();
