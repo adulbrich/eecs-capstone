@@ -227,7 +227,7 @@ test.describe("inventory hard delete gate", () => {
           { exact: true }
         )
       ).toBeVisible();
-      await expect(staff.getByRole("dialog")).toHaveCount(0);
+      await expect(staff.getByRole("alertdialog")).toHaveCount(0);
 
       await staff.goto(`/inventory/${cleanId}`);
       await waitForHydration(staff);
@@ -257,13 +257,19 @@ async function retire(page: import("@playwright/test").Page): Promise<void> {
   await page.getByRole("option", { name: "retired", exact: true }).click();
 }
 
-/** Opens the delete dialog and types the item name the confirmation demands. */
+/**
+ * Opens the delete dialog and types the item name the confirmation demands.
+ *
+ * `alertdialog`, not `dialog`: the confirmation is a Radix AlertDialog (see
+ * "Destructive actions" in docs/UI-CONVENTIONS.md), and Playwright matches
+ * ARIA roles exactly, so `getByRole("dialog")` never finds it.
+ */
 async function confirmHardDelete(
   page: import("@playwright/test").Page,
   itemName: string
 ): Promise<void> {
   await page.getByRole("button", { name: "Hard delete item" }).click();
-  const dialog = page.getByRole("dialog");
+  const dialog = page.getByRole("alertdialog");
   await dialog.getByLabel("Confirm item name").fill(itemName);
   await dialog
     .getByRole("button", { name: "Hard delete", exact: true })

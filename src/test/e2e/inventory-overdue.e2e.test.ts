@@ -49,9 +49,9 @@ test.describe("inventory overdue derivation", () => {
       const entry = entryFor(user, itemName);
 
       // A staff-assigned hold, which is the arm of DeadlineEntry whose dates
-      // live on the item rather than on a request line. "Assigned by staff" is
-      // how the page says which arm it took.
-      await expect(entry.getByText("Assigned by staff")).toBeVisible();
+      // live on the item rather than on a request line. "Assigned to you by
+      // staff" is how the Who column says which arm it took.
+      await expect(entry.getByText("Assigned to you by staff")).toBeVisible();
       await expect(entry.getByText("Overdue", { exact: true })).toBeVisible();
 
       // The date itself, off the `datetime` attribute rather than the rendered
