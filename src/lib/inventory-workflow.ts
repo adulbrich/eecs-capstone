@@ -25,7 +25,11 @@
  */
 
 import { assertStaff, type Viewer } from "./viewer";
-import type { InventoryRequestItemStatus, ItemStatus } from "./vocabularies";
+import type {
+  InventoryRequestItemStatus,
+  ItemStatus,
+  SubsetOf,
+} from "./vocabularies";
 
 /**
  * Whoever is making the transition.
@@ -55,13 +59,6 @@ export type TransitionActor = NonNullable<Viewer>;
  * carries only `requireUser()` of its own.
  */
 export type TransitionAuthority = "self_cancel" | "self_request";
-
-/**
- * Constrains one union to be a subset of another, and resolves to the subset.
- * `Part extends Whole` is the assertion: a member of `Part` that `Whole` does
- * not have fails to compile at the declaration below.
- */
-type SubsetOf<Whole extends string, Part extends Whole> = Part;
 
 /**
  * What a request line becomes when the item is released out from under it.

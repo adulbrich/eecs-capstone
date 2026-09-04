@@ -50,3 +50,15 @@ export const INVENTORY_REQUEST_ITEM_STATUSES = [
 
 export type InventoryRequestItemStatus =
   (typeof INVENTORY_REQUEST_ITEM_STATUSES)[number];
+
+/**
+ * Constrains one union to be a subset of another, and resolves to the subset.
+ * `Part extends Whole` is the assertion: a member of `Part` that `Whole` does
+ * not have fails to compile where the alias is used.
+ *
+ * Two shapes use it. A hand-written subset of a vocabulary, like
+ * `RequestLineOutcome`, declares itself through it. A list that orders a whole
+ * vocabulary for display, like the staff status stepper, passes the arguments
+ * the other way round to assert it left nothing out.
+ */
+export type SubsetOf<Whole extends string, Part extends Whole> = Part;

@@ -16,6 +16,7 @@ import {
   PaginationButton,
   PaginationStatus,
 } from "#/components/ui/pagination";
+import { ACTIVE_STATUSES } from "#/lib/inventory-visibility";
 import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
@@ -23,19 +24,12 @@ import { useSignedIn } from "#/lib/use-signed-in";
 import type { ViewMode } from "#/lib/view-preference";
 import { listInventory, listInventoryCategories } from "#/server/inventory";
 
-type PublicStatus =
-  | "available"
-  | "requested"
-  | "reserved"
-  | "checked_out"
-  | "maintenance";
+/** The working set: the public listing never offers retired as a filter. */
+type PublicStatus = (typeof ACTIVE_STATUSES)[number];
 
 const searchSchema = z.object({
   q: z.string().default(""),
-  status: z
-    .enum(["available", "requested", "reserved", "checked_out", "maintenance"])
-    .nullable()
-    .default(null),
+  status: z.enum(ACTIVE_STATUSES).nullable().default(null),
   // A stale `?category=Electronics` link (pre-UUID, singular) fails
   // `.array().uuid()`; caught and treated as "no filter" rather than a
   // router error, per the brief: old links intentionally break as filters
