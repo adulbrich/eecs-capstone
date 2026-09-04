@@ -1,53 +1,45 @@
 import { describe, expect, it } from "vitest";
 import {
-  inventoryItemStatusEnum,
-  inventoryRequestItemStatusEnum,
-  projectStatusEnum,
-} from "#/db/schema";
-import type { ItemStatus } from "../inventory-visibility";
-import {
   assertTransitionAllowed,
   type RequestLineOutcome,
   type TransitionAuthority,
   type TransitionInput,
 } from "../inventory-workflow";
+import { type ActorRole, canTransition } from "../project-workflow";
 import {
-  type ActorRole,
-  canTransition,
-  type Status,
-} from "../project-workflow";
+  INVENTORY_ITEM_STATUSES,
+  PROJECT_STATUSES,
+  type ProjectStatus,
+} from "../vocabularies";
 
 /**
- * The runtime spelling of a compile-time union.
+ * Every workflow table answers every input its vocabulary can hand it.
+ *
+ * The vocabularies themselves are no longer checked here: each one is a
+ * single `as const` tuple that `src/db/schema.ts` passes to `pgEnum` and the
+ * lib modules derive their union from, so the two cannot disagree and the
+ * assertion that used to hold them together could no longer fail (#102).
+ * What remains is the part deriving the types does not give you: that the
+ * tables keyed by those vocabularies are total, and that the project graph is
+ * connected.
+ */
+
+/**
+ * The runtime spelling of a compile-time union, for the unions with no tuple
+ * of their own.
  *
  * `Record<T, true>` forces every member of the union to appear, so adding one
  * without listing it here fails to compile, and `Object.keys` then hands the
  * assertions below the same list the type carries. A bare array would let the
- * two drift, which is the whole defect this file exists to catch.
+ * two drift.
  */
 function members<T extends string>(record: Record<T, true>): T[] {
   return Object.keys(record) as T[];
 }
 
-const PROJECT_STATUSES = members<Status>({
-  approved: true,
-  archived: true,
-  changes_requested: true,
-  draft: true,
-  published: true,
-  submitted: true,
-});
-
 const ROLES = members<ActorRole>({ owner: true, staff: true });
 
-const ITEM_STATUSES = members<ItemStatus>({
-  available: true,
-  checked_out: true,
-  maintenance: true,
-  requested: true,
-  reserved: true,
-  retired: true,
-});
+const ITEM_STATUSES = INVENTORY_ITEM_STATUSES;
 
 const LINE_OUTCOMES = members<RequestLineOutcome>({
   cancelled: true,
@@ -60,39 +52,6 @@ const LATER = new Date("2030-01-01T00:00:00Z");
 const AUTHORITIES = members<TransitionAuthority>({
   self_cancel: true,
   self_request: true,
-});
-
-describe("the TypeScript vocabularies match the database enums", () => {
-  // Each pair is two hand-written lists of the same strings, in two files,
-  // with nothing linking them. A value added to one and not the other is a
-  // row Postgres accepts and the app cannot name, or the reverse: a status
-  // the app hands to a column that rejects it, at runtime, in production.
-  //
-  // `categories.ts` already derives its domain type from `enumValues`, which
-  // is the fix rather than the test. Until the status vocabularies do the
-  // same, this is what holds them together. See issue #102.
-  it("project statuses agree", () => {
-    expect([...PROJECT_STATUSES].sort()).toEqual(
-      [...projectStatusEnum.enumValues].sort()
-    );
-  });
-
-  it("inventory item statuses agree", () => {
-    expect([...ITEM_STATUSES].sort()).toEqual(
-      [...inventoryItemStatusEnum.enumValues].sort()
-    );
-  });
-
-  it("every request line outcome is a status the column accepts", () => {
-    // A subset, not an equality: `pending` and `approved` are line statuses a
-    // release never writes, so they are in the column and not in the union.
-    for (const outcome of LINE_OUTCOMES) {
-      expect(
-        inventoryRequestItemStatusEnum.enumValues,
-        `${outcome} is not in inventory_request_item_status`
-      ).toContain(outcome);
-    }
-  });
 });
 
 describe("the project transition table is total and connected", () => {
@@ -113,7 +72,7 @@ describe("the project transition table is total and connected", () => {
     // Every status is reachable from draft by somebody, and every status can
     // be left again. A status that fails either half is one an operator can
     // strand a project in, and neither the type nor the table would say so.
-    const reachable = new Set<Status>(["draft"]);
+    const reachable = new Set<ProjectStatus>(["draft"]);
     let grew = true;
     while (grew) {
       grew = false;

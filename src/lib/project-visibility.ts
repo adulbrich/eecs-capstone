@@ -1,10 +1,10 @@
+import type { ProjectStatus } from "#/lib/vocabularies";
 // `isStaff` and `Viewer` live in `src/lib/viewer.ts`. They answer questions
 // about a viewer's role, not about a project, and seven non-project domains
 // were importing them through this module. Consumers import them from there
 // directly rather than through a re-export here, which Biome forbids as a
 // barrel and which the project's no-shims rule would reject anyway.
 
-import type { Status } from "./project-workflow";
 import type { Viewer } from "./viewer";
 import { isStaff } from "./viewer";
 
@@ -154,7 +154,7 @@ export interface ProjectDetailView {
   requiresNdaIp: boolean;
   /** `studentProposed` with no mentor address on file. Derived in SQL, never stored. */
   seekingMentor: boolean;
-  status: Status;
+  status: ProjectStatus;
   studentProposed: boolean;
   teamsSupported: number;
   title: string;
@@ -199,7 +199,7 @@ export function projectDetailView(
     teamsSupported: project.teamsSupported,
     acceptingApplicants: project.acceptingApplicants,
     programId: project.programId,
-    status: project.status as Status,
+    status: project.status as ProjectStatus,
     deletedAt: project.deletedAt,
     // The one viewer-dependent field, and the reason this cannot be a SQL
     // column map: the rule is which columns for THIS viewer, not which columns.

@@ -2,11 +2,11 @@ import { Link } from "@tanstack/react-router";
 import { defineAdminColumns } from "#/components/admin-data-table";
 import {
   type InventoryItemPublic,
-  type ItemStatus,
   statusRank,
 } from "#/lib/inventory-visibility";
 import { getPublicUrl } from "#/lib/storage";
 import type { SortState } from "#/lib/table-state";
+import type { ItemStatus } from "#/lib/vocabularies";
 import { ListingAddToCart } from "./add-to-cart-button";
 import { CategoryChip } from "./category-chip";
 import { ImageOrFallback } from "./image-or-fallback";

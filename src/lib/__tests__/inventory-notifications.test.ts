@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { ItemStatus } from "#/lib/vocabularies";
 import {
   notificationFor,
   overdueNotifications,
 } from "../inventory-notifications";
-import type { ItemStatus } from "../inventory-visibility";
 
 const item = {
   currentHolderId: null as string | null,

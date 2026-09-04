@@ -11,7 +11,6 @@ import {
 } from "#/db/schema";
 import { type Hold, holdFromInput, holdToColumns } from "#/lib/hold";
 import { notificationFor } from "#/lib/inventory-notifications";
-import type { ItemStatus } from "#/lib/inventory-visibility";
 import {
   assertTransitionAllowed,
   type RequestLineDecision,
@@ -20,6 +19,7 @@ import {
   type TransitionActor,
   type TransitionInput,
 } from "#/lib/inventory-workflow";
+import type { ItemStatus } from "#/lib/vocabularies";
 
 export type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
 

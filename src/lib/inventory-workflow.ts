@@ -1,3 +1,5 @@
+import type { ItemStatus } from "#/lib/vocabularies";
+import type { InventoryRequestItemStatus } from "./vocabularies";
 /**
  * The rules a transition must satisfy, and the outcome it writes to the line
  * it closes.
@@ -24,7 +26,6 @@
  * why reversing it deadlocks.
  */
 
-import type { ItemStatus } from "./inventory-visibility";
 import { assertStaff, type Viewer } from "./viewer";
 
 /**
@@ -57,14 +58,30 @@ export type TransitionActor = NonNullable<Viewer>;
 export type TransitionAuthority = "self_cancel" | "self_request";
 
 /**
+ * Constrains one union to be a subset of another, and resolves to the subset.
+ * `Part extends Whole` is the assertion: a member of `Part` that `Whole` does
+ * not have fails to compile at the declaration below.
+ */
+type SubsetOf<Whole extends string, Part extends Whole> = Part;
+
+/**
  * What a request line becomes when the item is released out from under it.
  *
  * Absent keeps the existing derivation, `returned` from a checkout and
  * `cancelled` otherwise. It is passed rather than derived because rejecting a
  * pending line and releasing a reserved item both end at `available` with a
  * comment, and nothing in the transition itself distinguishes them.
+ *
+ * Written out rather than derived from the column, because it is a proper
+ * subset of it: `pending` and `approved` are line statuses a release never
+ * writes. The constraint is what holds the two together, so renaming a value
+ * in `INVENTORY_REQUEST_ITEM_STATUSES` fails to compile here instead of
+ * failing at runtime against a column that rejects it (#102).
  */
-export type RequestLineOutcome = "cancelled" | "rejected" | "returned";
+export type RequestLineOutcome = SubsetOf<
+  InventoryRequestItemStatus,
+  "cancelled" | "rejected" | "returned"
+>;
 
 /**
  * A decision about one specific request line.

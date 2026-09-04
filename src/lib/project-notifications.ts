@@ -1,3 +1,4 @@
+import type { ProjectStatus } from "#/lib/vocabularies";
 /**
  * Who receives a project notification, and what it says.
  *
@@ -14,7 +15,6 @@
  */
 
 import type { NotificationRow } from "./notification-row";
-import type { Status } from "./project-workflow";
 
 /** The parts of a project these decisions read. */
 export interface NotifiableProject {
@@ -53,7 +53,7 @@ function proposerToTell(
 /** The notice a status change owes the proposer, or none. */
 export function statusChangeNotification(
   project: NotifiableProject,
-  newStatus: Status,
+  newStatus: ProjectStatus,
   actorId: string,
   comment?: string | null
 ): NotificationRow | null {

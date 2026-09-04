@@ -1,14 +1,11 @@
-export type Status =
-  | "draft"
-  | "submitted"
-  | "approved"
-  | "changes_requested"
-  | "published"
-  | "archived";
+import type { ProjectStatus } from "./vocabularies";
 
 export type ActorRole = "owner" | "staff";
 
-const TRANSITIONS: Record<Status, Partial<Record<ActorRole, Status[]>>> = {
+const TRANSITIONS: Record<
+  ProjectStatus,
+  Partial<Record<ActorRole, ProjectStatus[]>>
+> = {
   draft: {
     owner: ["submitted"],
     staff: ["submitted", "approved"],
@@ -33,16 +30,16 @@ const TRANSITIONS: Record<Status, Partial<Record<ActorRole, Status[]>>> = {
 };
 
 export function canTransition(
-  from: Status,
-  to: Status,
+  from: ProjectStatus,
+  to: ProjectStatus,
   role: ActorRole
 ): boolean {
   return (TRANSITIONS[from][role] ?? []).includes(to);
 }
 
 export function assertTransitionAllowed(
-  from: Status,
-  to: Status,
+  from: ProjectStatus,
+  to: ProjectStatus,
   role: ActorRole
 ): void {
   if (!canTransition(from, to, role)) {

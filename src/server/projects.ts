@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import type { Status } from "#/lib/project-workflow";
+import type { ProjectStatus } from "#/lib/vocabularies";
 
 const STATUS_VALUES = [
   "draft",
@@ -241,7 +241,7 @@ export const performTransition = createServerFn({ method: "POST" })
     );
     return performTransitionForCurrentUser(
       data.id,
-      data.status as Status,
+      data.status as ProjectStatus,
       data.comment,
       data.sendEmail
     );
@@ -255,7 +255,7 @@ export const forceSetProjectStatus = createServerFn({ method: "POST" })
     );
     return forceTransitionForCurrentUser(
       data.id,
-      data.status as Status,
+      data.status as ProjectStatus,
       data.comment,
       data.sendEmail
     );

@@ -8,6 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type { ItemStatus } from "#/lib/vocabularies";
 
 const { router, server } = vi.hoisted(() => ({
   router: {
@@ -31,7 +32,6 @@ vi.mock("#/server/users", () => ({
 vi.mock("@tanstack/react-router", () => ({ useRouter: () => router }));
 
 import { InventoryLifecyclePanel } from "#/components/inventory-lifecycle-panel";
-import type { ItemStatus } from "#/lib/inventory-visibility";
 import {
   HARD_DELETE_HISTORY_REFUSAL,
   needsHolder,

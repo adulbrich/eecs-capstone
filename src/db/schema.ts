@@ -14,6 +14,15 @@ import {
   uuid,
   vector,
 } from "drizzle-orm/pg-core";
+// The vocabularies live in src/lib so the client-safe modules can derive
+// their unions from them without importing this file, and therefore without
+// pulling drizzle-orm into the client bundle (#102).
+import {
+  INVENTORY_ITEM_STATUSES,
+  INVENTORY_REQUEST_ITEM_STATUSES,
+  PROJECT_STATUSES,
+} from "#/lib/vocabularies";
+
 import { user } from "./auth-schema";
 
 // biome-ignore lint/performance/noBarrelFile: single schema surface for drizzle and better-auth
@@ -29,14 +38,7 @@ const tsvector = customType<{ data: string; driverData: string }>({
 });
 
 // Enums
-export const projectStatusEnum = pgEnum("project_status", [
-  "draft",
-  "submitted",
-  "approved",
-  "changes_requested",
-  "published",
-  "archived",
-]);
+export const projectStatusEnum = pgEnum("project_status", PROJECT_STATUSES);
 
 export const categoryDomainEnum = pgEnum("category_domain", [
   "project",
@@ -396,18 +398,14 @@ export const projectBookmarks = pgTable(
 );
 
 // INVENTORY
-export const inventoryItemStatusEnum = pgEnum("inventory_item_status", [
-  "available",
-  "requested",
-  "reserved",
-  "checked_out",
-  "maintenance",
-  "retired",
-]);
+export const inventoryItemStatusEnum = pgEnum(
+  "inventory_item_status",
+  INVENTORY_ITEM_STATUSES
+);
 
 export const inventoryRequestItemStatusEnum = pgEnum(
   "inventory_request_item_status",
-  ["pending", "approved", "rejected", "cancelled", "returned"]
+  INVENTORY_REQUEST_ITEM_STATUSES
 );
 
 export const inventoryItems = pgTable(

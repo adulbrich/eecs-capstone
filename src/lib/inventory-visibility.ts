@@ -19,14 +19,7 @@
 
 import { type Hold, holdEmail, holdName } from "./hold";
 import { isStaff, type Viewer } from "./viewer";
-
-export type ItemStatus =
-  | "available"
-  | "requested"
-  | "reserved"
-  | "checked_out"
-  | "maintenance"
-  | "retired";
+import type { ItemStatus } from "./vocabularies";
 
 /**
  * Every status except retired: the working set of items.
