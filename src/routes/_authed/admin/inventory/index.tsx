@@ -116,7 +116,12 @@ export const Route = createFileRoute("/_authed/admin/inventory/")({
 
 type Row = Awaited<ReturnType<typeof listAdminInventory>>["rows"][number];
 
-const DEFAULT_SORT: SortState = { desc: true, id: "updatedAt" };
+/**
+ * Newest first. Exported, like COLUMNS below, so
+ * `src/test/admin-inventory-columns.test.tsx` can assert the set of columns
+ * this page offers and the order it puts them in without a router.
+ */
+export const DEFAULT_SORT: SortState = { desc: true, id: "updatedAt" };
 
 /**
  * A staff row as the deadline rule sees it: the "hold" arm, whose dates live
@@ -180,7 +185,7 @@ function reservedFor(row: Row): string | null {
     : null;
 }
 
-const COLUMNS = defineAdminColumns<Row>()([
+export const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => row.name,
     cell: ({ row }) => {

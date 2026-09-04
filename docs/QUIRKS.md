@@ -500,6 +500,19 @@ Use the double-cast variant for mock typings:
 
 If you get TS7006 ("Parameter implicitly has 'any' type") on `mock.calls.map((c) => ...)`, annotate as `(c: unknown[])`.
 
+### A route module under test needs a partial router mock, not a full one
+
+A unit test that imports a route module to reach its column list cannot `vi.mock("@tanstack/react-router")` with a plain factory. The TanStack Start plugin rewrites route files and injects its own router imports (`lazyRouteComponent` among them), so a full mock fails the import with "No \"lazyRouteComponent\" export is defined". Spread the real module and override only what the cells render:
+
+```ts
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
+  Link: (/* plain anchor */) => null,
+}));
+```
+
+The real `createFileRoute` runs fine at import time, so nothing else needs stubbing. `src/test/admin-inventory-columns.test.tsx` is the canonical one. A column module under `src/components/` (`inventory-table-columns.tsx`) has no such constraint and mocks the whole router.
+
 ### Integration tests call the `*As(viewer, ...)` seam, never `requireUser()`
 
 `requireUser()` reads TanStack Start's AsyncLocalStorage request context, which the Vitest integration harness cannot provide. Tests construct a synthetic viewer (`{ id, role }`) with a local `makeUser` helper and call the `*As` variant directly; [ADR-0002](./adr/0002-one-named-wrapper-per-action.md) is the convention that guarantees one exists. `uploadProjectImageAs` / `uploadProjectImageForCurrentUser` in `src/server/_internal/uploads.ts` is the canonical pair.
