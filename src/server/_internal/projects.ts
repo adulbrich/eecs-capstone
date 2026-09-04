@@ -64,6 +64,11 @@ async function loadProjectOr404(id: string) {
  * than a published contract, and an upgrade changing it would otherwise
  * unlink proposers silently. It costs the index on `user.email`, which is
  * the same trade `claimProjectsForVerifiedUser` documents and takes.
+ *
+ * Fixing this does not reach the projects the bug already orphaned. Their
+ * `proposer_id` is null and no write path revisits them, because
+ * `claimProjectsForVerifiedUser` fires once per account at verification and
+ * an already-verified account never verifies again (#277).
  */
 async function resolveProposerId(
   email: string | null | undefined

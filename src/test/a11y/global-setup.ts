@@ -9,6 +9,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
+import { normalizeEmailAddress } from "../../lib/email-address";
 import { SEED_PASSWORD, saveStorageState } from "../shared/playwright";
 
 // Prefixes used by the create-dialog-plus-dropdown coverage in
@@ -309,7 +310,7 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
           "scan the delete confirmation dialog in its open and closed states.",
         status: "draft",
         proposerId: owner.id,
-        proposerEmail: owner.email,
+        proposerEmail: normalizeEmailAddress(owner.email),
       })
       .returning();
   }
