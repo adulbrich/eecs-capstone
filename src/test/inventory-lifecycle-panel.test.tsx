@@ -203,6 +203,7 @@ describe("InventoryLifecyclePanel: the status override", () => {
         data: expect.objectContaining({ itemId: "item-1", nextStatus: next }),
       });
       expect(screen.queryByRole("dialog")).toBeNull();
+      expect(router.invalidate).toHaveBeenCalledTimes(1);
     }
   });
 
