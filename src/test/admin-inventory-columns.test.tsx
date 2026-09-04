@@ -176,7 +176,7 @@ describe("the staff inventory table", () => {
     expect(pinned).toEqual(["name", "actions"]);
   });
 
-  it("renders the hidden columns once they are toggled on", () => {
+  it("carries the route's own fields in the columns hidden by default", () => {
     renderTable([]);
     expect(headers()).toContain("Label");
     expect(headers()).toContain("Serial");
@@ -194,13 +194,25 @@ describe("the staff inventory table", () => {
     ).toBe("/admin/inventory/requests");
   });
 
-  it("dashes every unheld cell rather than leaving it blank", () => {
+  it("dashes each empty cell of an unheld item rather than leaving it blank", () => {
     renderTable();
-    const cells = within(
-      screen.getByRole("link", { name: "Drill" }).closest("tr") as HTMLElement
-    ).getAllByRole("cell");
-    // Holder, Reserved for, Request, Location and Category are all empty on
-    // this row, and Due is empty too.
-    expect(cells.filter((cell) => cell.textContent === "-")).toHaveLength(6);
+    const row = screen.getByRole("link", { name: "Drill" }).closest("tr");
+    if (!row) {
+      throw new Error("no row for Drill");
+    }
+    // By name rather than by count, so a column added to the page does not
+    // fail this for a reason that has nothing to do with the dash.
+    for (const label of [
+      "Holder",
+      "Reserved for",
+      "Request",
+      "Location",
+      "Category",
+      "Due",
+    ]) {
+      expect(row.querySelector(`[data-label="${label}"]`)?.textContent).toBe(
+        "-"
+      );
+    }
   });
 });

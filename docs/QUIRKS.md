@@ -511,7 +511,7 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
 }));
 ```
 
-The real `createFileRoute` runs fine at import time, so nothing else needs stubbing. `src/test/admin-inventory-columns.test.tsx` is the canonical one. A column module under `src/components/` (`inventory-table-columns.tsx`) has no such constraint and mocks the whole router.
+The real `createFileRoute` runs fine at import time, so nothing else needs stubbing. `src/test/admin-inventory-columns.test.tsx` is the canonical one. Reaching a route's column list also means exporting it: `/admin/inventory` exports `COLUMNS` and `DEFAULT_SORT` for this, and every other admin route still keeps them private, so a second consumer test starts by adding that export. A column module under `src/components/` (`inventory-table-columns.tsx`) has neither constraint: it exports its columns already and mocks the whole router.
 
 ### Integration tests call the `*As(viewer, ...)` seam, never `requireUser()`
 
