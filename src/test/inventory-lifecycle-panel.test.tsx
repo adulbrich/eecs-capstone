@@ -7,7 +7,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const { router, server } = vi.hoisted(() => ({
   router: {
@@ -155,6 +155,67 @@ describe("InventoryLifecyclePanel: the recommended transition per status", () =>
       expect(screen.queryByRole("dialog")).toBeNull();
       expect(router.invalidate).toHaveBeenCalledTimes(1);
     }
+  });
+});
+
+describe("InventoryLifecyclePanel: the status override", () => {
+  // Radix's Select opens through pointer capture, which jsdom does not
+  // implement. The same four stubs proposer-picker.test.tsx installs.
+  beforeAll(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+    Element.prototype.hasPointerCapture = vi.fn();
+    Element.prototype.setPointerCapture = vi.fn();
+    Element.prototype.releasePointerCapture = vi.fn();
+  });
+
+  async function pickOverride(next: ItemStatus) {
+    fireEvent.pointerDown(
+      screen.getByRole("combobox", { name: "Change status to..." }),
+      { button: 0, ctrlKey: false, pointerType: "mouse" }
+    );
+    fireEvent.click(
+      await screen.findByRole("option", { name: next.replace(/_/g, " ") })
+    );
+  }
+
+  // The same rule as the recommended button, asked of the other handler:
+  // the override opens the holder dialog exactly when needsHolder says so.
+  // "requested" is excluded because the panel refuses it outright, and
+  // "available" because it is the rendered item's own status.
+  it.each(
+    STATUSES.filter((s) => s !== "requested" && s !== "available").map(
+      (next) => ({ next })
+    )
+  )("overriding to $next asks who holds the item exactly when the rules say the target needs a holder", async ({
+    next,
+  }) => {
+    renderPanel({ status: "available" });
+    await pickOverride(next);
+
+    if (needsHolder(next)) {
+      expect(await screen.findByRole("dialog")).toBeDefined();
+      expect(server.transitionInventoryItem).not.toHaveBeenCalled();
+    } else {
+      await waitFor(() =>
+        expect(server.transitionInventoryItem).toHaveBeenCalledTimes(1)
+      );
+      expect(server.transitionInventoryItem).toHaveBeenCalledWith({
+        data: expect.objectContaining({ itemId: "item-1", nextStatus: next }),
+      });
+      expect(screen.queryByRole("dialog")).toBeNull();
+    }
+  });
+
+  it("refuses 'requested' with its own message and sends nothing", async () => {
+    renderPanel({ status: "available" });
+    await pickOverride("requested");
+
+    expect(
+      await screen.findByText(
+        "Cannot directly set 'requested'; use the request queue."
+      )
+    ).toBeDefined();
+    expect(server.transitionInventoryItem).not.toHaveBeenCalled();
   });
 });
 
