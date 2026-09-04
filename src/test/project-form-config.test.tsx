@@ -42,6 +42,12 @@ import { installResizeObserver } from "./radix-jsdom";
 
 const mockedCreate = vi.mocked(createProject);
 
+const PROPOSER = {
+  accountLinked: true,
+  accountName: "Sam Rivera",
+  email: "sam@oregonstate.edu",
+};
+
 beforeAll(installResizeObserver);
 
 afterEach(() => {
@@ -106,40 +112,44 @@ describe("ProjectForm validators", () => {
 });
 
 describe("ProjectForm configuration props", () => {
-  it("offers the AI review only when enableAiReview is set", () => {
+  it("offers no AI review without enableAiReview", () => {
     renderForm();
     expect(screen.queryByRole("button", { name: /Review with AI/ })).toBeNull();
-    cleanup();
+  });
 
+  it("offers the AI review with enableAiReview", () => {
     renderForm({ enableAiReview: true });
     expect(screen.getByRole("button", { name: /Review with AI/ })).toBeTruthy();
   });
 
-  it("draws the private notes field only when showNotes is set", () => {
+  it("draws no private notes field without showNotes", () => {
     renderForm();
     expect(screen.queryByLabelText(PRIVATE_NOTES_LABEL)).toBeNull();
-    cleanup();
+  });
 
+  it("draws the private notes field with showNotes", () => {
     renderForm({ showNotes: true });
     expect(screen.getByLabelText(PRIVATE_NOTES_LABEL)).toBeTruthy();
   });
 
-  it("draws the proposer picker only when showProposer is set", () => {
+  it("draws no proposer picker, and no staff panel, without showProposer", () => {
     renderForm();
     expect(screen.queryByLabelText("Proposer email")).toBeNull();
     expect(screen.queryByText("Staff panel")).toBeNull();
-    cleanup();
+  });
 
+  it("draws the proposer picker inside the staff panel with showProposer", () => {
     renderForm({ showProposer: true });
     expect(screen.getByLabelText("Proposer email")).toBeTruthy();
     expect(screen.getByText("Staff panel")).toBeTruthy();
   });
 
-  it("draws the category picker only when showCategories is set", () => {
+  it("draws no category picker without showCategories", () => {
     renderForm();
     expect(screen.queryByText("Categories")).toBeNull();
-    cleanup();
+  });
 
+  it("draws the category picker inside the staff panel with showCategories", () => {
     renderForm({ showCategories: true });
     expect(screen.getByText("Categories")).toBeTruthy();
     expect(screen.getByText("Staff panel")).toBeTruthy();
@@ -150,17 +160,13 @@ describe("ProjectForm configuration props", () => {
     expect(screen.queryByText("Staff panel")).toBeNull();
   });
 
-  it("shows the proposer summary only alongside the picker", () => {
-    const proposer = {
-      accountLinked: true,
-      accountName: "Sam Rivera",
-      email: "sam@oregonstate.edu",
-    };
-    renderForm({ proposer, showCategories: true });
+  it("withholds the proposer summary when only the categories section shows", () => {
+    renderForm({ proposer: PROPOSER, showCategories: true });
     expect(screen.queryByText(/Sam Rivera/)).toBeNull();
-    cleanup();
+  });
 
-    renderForm({ proposer, showProposer: true });
+  it("shows the proposer summary alongside the picker", () => {
+    renderForm({ proposer: PROPOSER, showProposer: true });
     expect(screen.getAllByText(/Sam Rivera/).length).toBeGreaterThan(0);
   });
 });
