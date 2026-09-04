@@ -286,13 +286,13 @@ export async function updateProjectAs(
  * these" structural rather than a check someone remembers to keep.
  *
  * The address is trimmed and lowercased, like every address column this app
- * writes (#249). That has a cost this function is where you feel it: the
- * edit log below records the normalized address rather than what staff
- * typed, and an edit that changes only case now finds no changed field and
- * returns `updated: false`. Both follow from normalizing on write and were
- * accepted with it; matching stays case-insensitive at read time regardless,
- * because `mentorNameSql` compares against `user.email`, which is Better
- * Auth's column and is not normalized.
+ * writes (#249), and this function is where that costs something: the edit
+ * log below records the normalized address rather than what staff typed, and
+ * an edit changing only case finds no changed field and returns
+ * `updated: false`. Both follow from normalizing on write and were accepted
+ * with it. Matching stays case-insensitive at read time regardless, because
+ * `mentorNameSql` compares against `user.email`, which is Better Auth's
+ * column rather than one of the four this app normalizes.
  *
  * No embedding refresh: neither column is part of the embedding source text.
  */
