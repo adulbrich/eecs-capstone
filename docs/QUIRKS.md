@@ -673,7 +673,7 @@ A write may only CHANGE `image_url` to empty, or to a single filename directly u
 - **`assertNoImageKeyOnCreate` lives in `src/lib/image-upload-policy.ts`, not beside `assertOwnedKey`**, because it needs no `KeySpace` and can be a plain static import at both create sites instead of the dynamic import every other reach into the storage module needs. Both guards throw the one `INVALID_IMAGE` message so the wording has a single home.
 - **The cleanup runs after the row write, never inside the transaction**, because a rollback would destroy the object the surviving row still points at. `hardDeleteProjectAs` opens no transaction, so there it simply follows the row delete.
 
-Before #162 the column was validated for length only, so any signed-in user could point a project at a URL they control and every viewer fetched it; `img` is not in the markdown allowlist and there is no CSP, so this was the one field a non-staff user could use to get an image element rendered. It moves nothing in `access-contract.ts`: the column is still writable by the proposer or staff.
+Before #162 the column was validated for length only, so any signed-in user could point a project at a URL they control and every viewer fetched it; `img` is not in the markdown allowlist and there is no CSP, so this was the one field a non-staff user could use to get an image element rendered. It moves nothing in `access-contract.ts`: the column is still writable by the proposer or staff on a project, and by staff only on an item.
 
 ### TanStack Start FormData server functions
 

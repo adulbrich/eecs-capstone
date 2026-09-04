@@ -58,9 +58,8 @@ _Avoid_: advisor, supervisor, sponsor
 A capstone course: its course id, name, description, instructors, and the two
 staff-only numbers that size it (how many terms it runs, how many teams are
 expected). A project belongs to at most one program.
-The code describes a program by its course id and course name, and those two
-column names are the only place the word course belongs.
-_Avoid_: course (for the entity), section, class, cohort
+_Avoid_: course (for the entity; the code and the copy use it for the id, the
+name and the description of what a program is), section, class, cohort
 
 ## Projects
 
@@ -106,10 +105,10 @@ to staff and the proposer only.
 _Avoid_: audit log, timeline (as a term; the UI may call it that)
 
 **Closed to applicants**:
-A published project whose team is full. It stays in the catalog, marked "Not
-accepting applicants", and a listing filter hides it. A flag on the project, edited
-by staff and the proposer alike, orthogonal to status. The code stores the inverse,
-an accepting-applicants boolean that defaults to true.
+A published project whose team is full, which stays in the catalog marked "Not
+accepting applicants" and which a listing filter hides. A flag on the project,
+stored as its inverse (accepting applicants, default true), edited by staff and the
+proposer alike, orthogonal to status.
 _Avoid_: full, archived (a closed project is still published), inactive
 
 **Applicant**:
@@ -140,9 +139,9 @@ of the writing, not a staff decision.
 _Avoid_: approval (one outcome of a review), moderation, evaluation
 
 **Scope assessment**:
-A staff-only, AI-generated verdict on whether a project is sized for its program.
-It goes stale, rather than being redone, when the text or the program's term count
-changes. Never shown to the proposer.
+A staff-only, AI-generated verdict on whether a project is sized for its program,
+never shown to the proposer. It goes stale, rather than being redone, when the text
+or the program's term count changes.
 _Avoid_: sizing, feasibility, review (it is not one)
 
 **Student proposed**:
@@ -251,7 +250,7 @@ code spells it.
   already recorded as its holder, so a request is always on a person.
 - **Reserved**: approved and waiting to be picked up by its pickup deadline.
 - **Checked out**: collected and out, due back by its due date.
-- **Maintenance**: withdrawn from lending until staff release it.
+- **Maintenance**: withdrawn from lending until staff return it to available.
 - **Retired**: out of the inventory for good, kept for its history. The archive,
   and staff-only.
 
