@@ -5,6 +5,7 @@ import {
   type DeadlineEntry,
   deadlineOf,
   deadlinePairOf,
+  isOverdue,
   needsAttention,
   overdueFlags,
 } from "../inventory-deadlines";
@@ -72,6 +73,42 @@ describe("overdueFlags", () => {
     expect(
       overdueFlags({ status: "checked_out", pickupBy: null, dueAt: longAgo })
         .checkoutOverdue
+    ).toBe(true);
+  });
+});
+
+describe("isOverdue", () => {
+  it("is true for either kind and false for neither", () => {
+    expect(
+      isOverdue({ status: "reserved", pickupBy: BEFORE, dueAt: null }, NOW)
+    ).toBe(true);
+    expect(
+      isOverdue({ status: "checked_out", pickupBy: null, dueAt: BEFORE }, NOW)
+    ).toBe(true);
+    expect(
+      isOverdue({ status: "checked_out", pickupBy: null, dueAt: AFTER }, NOW)
+    ).toBe(false);
+    expect(
+      isOverdue({ status: "available", pickupBy: BEFORE, dueAt: BEFORE }, NOW)
+    ).toBe(false);
+  });
+
+  it("is false exactly at the deadline, like the flags it reads", () => {
+    expect(
+      isOverdue(
+        { status: "checked_out", pickupBy: null, dueAt: new Date(NOW) },
+        NOW
+      )
+    ).toBe(false);
+  });
+
+  it("defaults the clock to now", () => {
+    expect(
+      isOverdue({
+        status: "checked_out",
+        pickupBy: null,
+        dueAt: new Date("2000-01-01"),
+      })
     ).toBe(true);
   });
 });

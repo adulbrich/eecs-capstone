@@ -53,6 +53,23 @@ describe("FilterSwitch", () => {
     expect(onCheckedChange).toHaveBeenCalledWith(true);
   });
 
+  it("disables the control when a filter above it rules this one out", () => {
+    const onCheckedChange = vi.fn();
+    render(
+      <FilterSwitch
+        checked={false}
+        disabled
+        id="archived-only"
+        label="Only show archived projects"
+        onCheckedChange={onCheckedChange}
+      />
+    );
+    const control = screen.getByRole("switch");
+    expect(control.hasAttribute("disabled")).toBe(true);
+    control.click();
+    expect(onCheckedChange).not.toHaveBeenCalled();
+  });
+
   it("aligns to the control row height, not the label row", () => {
     const { container } = render(
       <FilterSwitch

@@ -16,6 +16,7 @@ import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { LocalTime } from "#/components/local-time";
+import { OverdueBadge } from "#/components/overdue-badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -38,6 +39,11 @@ import {
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { formatHoldShort, holdFromStoredRow } from "#/lib/hold";
+import {
+  type DeadlineEntry,
+  deadlinePairOf,
+  isOverdue,
+} from "#/lib/inventory-deadlines";
 import { statusRank } from "#/lib/inventory-visibility";
 import { pageTitle } from "#/lib/page-title";
 import { getPublicUrl } from "#/lib/storage";
@@ -67,6 +73,10 @@ const searchSchema = z.object({
   cols: z.string().optional(),
   dir: z.enum(["asc", "desc"]).optional(),
   q: z.string().default(""),
+  // Client-side, unlike every other filter here: overdue is derived from the
+  // deadline and now, so no query can express it. Deliberately absent from
+  // loaderDeps for the same reason, since flipping it must not refetch.
+  overdueOnly: z.boolean().default(false),
   // Staff only. Retired items are the archive: excluded from every listing by
   // default, and reachable only through this switch.
   retiredOnly: z.boolean().default(false),
@@ -107,6 +117,24 @@ export const Route = createFileRoute("/_authed/admin/inventory/")({
 type Row = Awaited<ReturnType<typeof listAdminInventory>>["rows"][number];
 
 const DEFAULT_SORT: SortState = { desc: true, id: "updatedAt" };
+
+/**
+ * A staff row as the deadline rule sees it: the "hold" arm, whose dates live
+ * on the item rather than on a request line, which is what this listing has.
+ * Built here rather than inline so the badge and the filter cannot read the
+ * pair differently.
+ */
+function deadlineEntryOf(row: Row): DeadlineEntry {
+  return {
+    kind: "hold",
+    item: {
+      dueAt: row.dueAt,
+      pickupBy: row.pickupBy,
+      status: row.status,
+      updatedAt: row.updatedAt,
+    },
+  };
+}
 
 /**
  * Who the item is associated with, in one line. The row's columns arrive
@@ -182,10 +210,13 @@ const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => statusRank(row.status),
     cell: ({ row }) => (
-      <InventoryStatusBadge
-        showRetired
-        status={row.original.status as Status}
-      />
+      <div className="flex flex-wrap items-center gap-1">
+        <InventoryStatusBadge
+          showRetired
+          status={row.original.status as Status}
+        />
+        <OverdueBadge entry={deadlineEntryOf(row.original)} />
+      </div>
     ),
     header: "Status",
     id: "status",
@@ -287,7 +318,6 @@ const COLUMNS = defineAdminColumns<Row>()([
       ) : (
         "-"
       ),
-    defaultHidden: true,
     header: "Due",
     id: "dueAt",
     // Values arrive as Date instances (or ISO strings); the locale-compare
@@ -397,9 +427,25 @@ function AdminInventory() {
   const { categories, rows } = Route.useLoaderData();
   // The whole search object goes to the hook, which reads cols/dir/sort.
   const search = Route.useSearch();
-  const { categories: selectedCategories, q, retiredOnly, status } = search;
+  const {
+    categories: selectedCategories,
+    overdueOnly,
+    q,
+    retiredOnly,
+    status,
+  } = search;
   const filtered =
-    q !== "" || status !== null || selectedCategories.length > 0 || retiredOnly;
+    q !== "" ||
+    status !== null ||
+    selectedCategories.length > 0 ||
+    retiredOnly ||
+    overdueOnly;
+  // The only filter applied here rather than in the loader. Everything below
+  // reads `visible`, so the count, the table and the export agree on what the
+  // switch left.
+  const visible = overdueOnly
+    ? rows.filter((row) => isOverdue(deadlinePairOf(deadlineEntryOf(row))))
+    : rows;
 
   const commitQuery = useCallback(
     (next: string) => {
@@ -452,14 +498,14 @@ function AdminInventory() {
               Promise.resolve(
                 toCsv(
                   EXPORT_COLUMNS,
-                  orderRows(rows, (row) => row.id)
+                  orderRows(visible, (row) => row.id)
                 )
               )
             }
           />
         }
         caption="Inventory items"
-        data={rows}
+        data={visible}
         emptyMessage="No items yet."
         filtered={filtered}
         getRowId={(row) => row.id}
@@ -520,9 +566,26 @@ function AdminInventory() {
                     // Clearing the status keeps the URL honest about what is
                     // actually filtering, rather than carrying a value the
                     // disabled control no longer applies.
+                    // Overdue goes with it: nothing retired is reserved or
+                    // checked out, so the pair can only ever match nothing.
+                    overdueOnly: next ? false : prev.overdueOnly,
                     retiredOnly: next,
                     status: next ? null : prev.status,
                   }),
+                })
+              }
+            />
+            {/* Nothing retired can be overdue: a retired item is neither
+                reserved nor checked out, which is what the two deadlines
+                belong to. Leaving both on would always show an empty table. */}
+            <FilterSwitch
+              checked={overdueOnly}
+              disabled={retiredOnly}
+              id="inv-overdue-only"
+              label="Show only overdue"
+              onCheckedChange={(next) =>
+                void navigate({
+                  search: (prev) => ({ ...prev, overdueOnly: next }),
                 })
               }
             />
@@ -546,7 +609,7 @@ function AdminInventory() {
           </>
         }
       />
-      <ListCount count={rows.length} />
+      <ListCount count={visible.length} />
     </div>
   );
 }
