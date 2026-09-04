@@ -25,7 +25,9 @@ test.describe("inventory overdue derivation", () => {
   }) => {
     // Two items under one searchable prefix, so the staff listing below can
     // show both at once and the overdue filter has something to leave out.
-    const group = fixtureName("Overdue");
+    // Not the word "Overdue": the names appear in the rows this test then
+    // searches for the badge text, and a name containing it matches.
+    const group = fixtureName("Deadline");
     const itemName = `${group}-late`;
     const onTimeName = `${group}-ontime`;
     const dueAt = daysFromNow(-10);
@@ -106,7 +108,9 @@ test.describe("inventory overdue derivation", () => {
       // in the future. Without it the filter below would prove nothing.
       const onTimeRow = rowFor(staff, onTimeName);
       await expect(onTimeRow).toBeVisible();
-      await expect(onTimeRow.getByText("Overdue")).toHaveCount(0);
+      await expect(onTimeRow.getByText("Overdue", { exact: true })).toHaveCount(
+        0
+      );
 
       await staff.getByRole("switch", { name: "Show only overdue" }).click();
       await expect(row).toBeVisible();

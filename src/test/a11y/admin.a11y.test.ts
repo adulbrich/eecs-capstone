@@ -209,8 +209,14 @@ test("admin inventory table shows its default-hidden columns when toggled on", a
   await page.goto("/admin/inventory");
   await waitForHydration(page);
   // Updated is not in this list: it is the page's default sort column and is
-  // visible by default now, so toggling it here would hide it instead.
-  const hiddenColumns = ["Label", "Serial", "Due", "Created"];
+  // visible by default now, so toggling it here would hide it instead. Due
+  // left the list for the same reason when #150 made it visible by default,
+  // so it is asserted here instead of being toggled.
+  const hiddenColumns = ["Label", "Serial", "Created"];
+
+  await expect(
+    page.getByRole("columnheader", { name: "Due", exact: true })
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Columns" }).click();
   for (const label of hiddenColumns) {
