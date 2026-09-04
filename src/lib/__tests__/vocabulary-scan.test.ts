@@ -109,6 +109,16 @@ describe("what counts as a copy", () => {
     ).toEqual(["INVENTORY_ITEM_STATUSES"]);
   });
 
+  it("catches a whole vocabulary written out as a tuple type", () => {
+    // Neither an array literal nor a union, so it needs its own arm. A
+    // written-out list is a copy whichever of the three shapes it wears.
+    expect(
+      copiesIn(
+        `type Ordered = ["available", "requested", "reserved", "checked_out", "maintenance", "retired"];`
+      )
+    ).toEqual(["INVENTORY_ITEM_STATUSES"]);
+  });
+
   it("catches one inside a z.enum, which is the shape #102 could not", () => {
     expect(
       copiesIn(

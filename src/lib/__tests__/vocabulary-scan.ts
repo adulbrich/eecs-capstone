@@ -14,8 +14,8 @@ import ts from "typescript";
  *
  * ## What counts as a copy
  *
- * One array literal or one written-out union naming **every** member of a
- * vocabulary. Nothing less. That threshold is the whole design, and the
+ * One array literal, one written-out union, or one tuple type naming **every**
+ * member of a vocabulary. Nothing less. That threshold is the whole design, and the
  * alternatives were rejected for reasons worth not relitigating:
  *
  * - A copy is written complete, so this fails the pull request that writes the
@@ -43,6 +43,10 @@ import ts from "typescript";
  * and it is accepted: the shapes this catches are the ones people write, and
  * following a value through concatenation is a type checker's job rather
  * than a scan's.
+ *
+ * A hand-written `enum` is not examined either, and does not need to be:
+ * Biome's `style.noEnum` is an error in this repo, so `npm run check` refuses
+ * one before this scan is reached.
  *
  * ## The vocabularies are discovered, not listed
  *
@@ -253,6 +257,17 @@ export function scanFile(
       record(
         node,
         node.elements.filter(ts.isStringLiteral).map((element) => element.text)
+      );
+    } else if (ts.isTupleTypeNode(node)) {
+      // `type X = ["a", "b", ...]` is a written-out list like the other two,
+      // and is neither an array literal nor a union, so it needs its own arm.
+      record(
+        node,
+        node.elements.flatMap((element) =>
+          ts.isLiteralTypeNode(element) && ts.isStringLiteral(element.literal)
+            ? [element.literal.text]
+            : []
+        )
       );
     } else if (ts.isUnionTypeNode(node)) {
       record(
