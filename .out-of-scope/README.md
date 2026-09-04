@@ -32,6 +32,7 @@ the decision came with a condition under which it would be revisited.
 
 What makes a closed issue an entry is the `wontfix` label, which triage applies
 when the maintainer rejects the concept; an issue closed without it is a deferral
-and stays an issue, whatever its thread says about timing. Two of the first
-entries, #33 and #86, predate the label and were closed with the reasoning in
-their threads.
+and stays an issue, whatever its thread says about timing. The first three entries
+predate that rule: none of #33, #56 and #86 carries the label today (#56 did,
+before the label was recreated), and the maintainer's closing comment is the
+record for each.

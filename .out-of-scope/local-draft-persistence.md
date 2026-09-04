@@ -9,7 +9,7 @@ and private-notes text may sit on disk on a shared lab machine, that the pending
 image cannot be serialized, when to write, whether to restore silently, expiry,
 multi-tab keying, and SSR hydration. The maintainer closed it with "won't do
 this now, as it is something not frequent and which requires quite some thought
-to make right", and the label says which of those two clauses decided it.
+to make right"; the second clause is what this file records.
 
 **Prior requests:** #56
 
