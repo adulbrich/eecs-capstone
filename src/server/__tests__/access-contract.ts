@@ -256,7 +256,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/projects-queries.ts:listProjectEditLog": {
     level: "staff",
-    note: "Gated by an inline getViewer() plus assertStaff inside listProjectEditLogImpl, which the handler calls directly. One of the seven endpoints #108 found a guard-name grep could not see.",
+    note: "Gated by assertStaff inside listProjectEditLogAs, which the Impl the handler calls wraps around getViewer(). One of the seven endpoints #108 found a guard-name grep could not see.",
   },
 
   "server/projects.ts:approveProject": {

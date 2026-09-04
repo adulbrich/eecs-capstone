@@ -418,8 +418,15 @@ export async function getProposerForEditImpl(data: {
   return getProposerForEditAs(await getViewer(), data);
 }
 
-export async function listProjectEditLogImpl(data: { id: string }) {
-  const viewer = await getViewer();
+/**
+ * Test seam, the same *As / *Impl split the rest of this file uses: the gate
+ * lived inside the Impl, where nothing but a request could reach it, and so
+ * had no refusal test.
+ */
+export async function listProjectEditLogAs(
+  viewer: Viewer,
+  data: { id: string }
+) {
   assertStaff(viewer);
   const rows = await db
     .select()
@@ -433,6 +440,10 @@ export async function listProjectEditLogImpl(data: { id: string }) {
       newValues: r.newValues as JsonValue,
     })),
   };
+}
+
+export async function listProjectEditLogImpl(data: { id: string }) {
+  return listProjectEditLogAs(await getViewer(), data);
 }
 
 export async function listProjectCommentsAs(

@@ -21,6 +21,7 @@ import {
 import {
   getProjectAs,
   getProposerForEditAs,
+  listProjectEditLogAs,
 } from "#/server/_internal/projects-queries";
 
 async function makeUser(email: string, role: "user" | "admin") {
@@ -535,6 +536,24 @@ describe("private notes", () => {
     expect(log).toHaveLength(1);
     expect(log[0].changedFields).toContain("notes");
     expect(log[0].editorId).toBe(owner.id);
+  });
+
+  it("refuses the log to the proposer who wrote the rows, and to a stranger", async () => {
+    // The rows name every field an editor touched, including the staff-only
+    // ones, so being the subject of the log is not a reason to read it.
+    const owner = await makeUser(`log-o-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`log-a-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+    await updateProjectAs(owner, { id, ...baseProject(), notes: "later" });
+
+    await expect(listProjectEditLogAs(owner, { id })).rejects.toThrow(
+      "Forbidden"
+    );
+    await expect(listProjectEditLogAs(null, { id })).rejects.toThrow(
+      "Forbidden"
+    );
+    const { rows } = await listProjectEditLogAs(admin, { id });
+    expect(rows).toHaveLength(1);
   });
 
   it("logs an image change like any other field", async () => {
