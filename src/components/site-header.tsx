@@ -4,6 +4,7 @@ import { useState } from "react";
 import { authClient } from "#/lib/auth-client";
 import { brand } from "#/lib/brand";
 import { getPublicUrl } from "#/lib/storage";
+import { isStaff, type Viewer } from "#/lib/viewer";
 import { InstitutionLogo } from "./institution-logo";
 import { NotificationBell } from "./notification-bell";
 import { Button } from "./ui/button";
@@ -20,9 +21,7 @@ import { UserMenu } from "./user-menu";
 export function SiteHeader() {
   const { data: session, isPending } = authClient.useSession();
   const signedIn = !!session?.user;
-  const role =
-    (session?.user as { role?: string | null } | undefined)?.role ?? null;
-  const isStaff = role === "admin" || role === "instructor";
+  const viewerIsStaff = isStaff(session?.user as Viewer);
 
   return (
     <header
@@ -42,7 +41,7 @@ export function SiteHeader() {
           <Link className="nav-link" to="/inventory">
             Inventory
           </Link>
-          {isStaff && (
+          {viewerIsStaff && (
             <Link className="nav-link" to="/admin">
               Admin
             </Link>
@@ -81,7 +80,7 @@ export function SiteHeader() {
           {signedIn && <NotificationBell />}
           <MobileMenu
             isPending={isPending}
-            isStaff={isStaff}
+            isStaff={viewerIsStaff}
             signedIn={signedIn}
             user={
               signedIn

@@ -22,6 +22,7 @@ import {
 import { slotsHint } from "#/lib/analytics-copy";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { isStaff } from "#/lib/viewer";
 import { getAnalytics } from "#/server/analytics";
 import { listPrograms } from "#/server/programs";
 
@@ -65,7 +66,7 @@ export const Route = createFileRoute("/_authed/admin/analytics")({
     if (!session?.user) {
       throw redirect({ to: "/sign-in" });
     }
-    if (!["admin", "instructor"].includes(session.user.role ?? "")) {
+    if (!isStaff(session.user)) {
       throw redirect({ to: "/" });
     }
   },

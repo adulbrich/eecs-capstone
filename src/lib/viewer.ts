@@ -10,6 +10,12 @@
  * `assertStaff` had five hand-rolled definitions before this: inventory,
  * inventory-transitions, programs, categories and users. Three wrapped
  * `isStaff`, two inlined the role comparison.
+ *
+ * `isAdmin` and `assertAdmin` answer the narrower question, and joined them
+ * here for the same reason one layer out: seventeen sites under
+ * `src/routes/_authed/` spelled a role comparison out rather than asking
+ * either predicate, and `assertAdmin` had a private copy in
+ * `_internal/users.ts` (#266).
  */
 
 /**
@@ -24,11 +30,55 @@ export type Viewer =
   | null
   | undefined;
 
-/** The roles that carry staff powers. Anything else fails closed. */
-const STAFF_ROLES = new Set(["admin", "instructor"]);
+/**
+ * The roles that carry staff powers. Anything else fails closed.
+ *
+ * Exported as a tuple rather than kept private as a `Set`, because one caller
+ * cannot use the predicate: `listEligibleInstructorsAs` in `_internal/programs.ts`
+ * filters the `user.role` column with `inArray`, and a question asked in SQL
+ * needs the roles as data. That is the same shape as the status vocabularies
+ * in `vocabularies.ts` and has the same rule: this is the one definition, and
+ * a second copy of the list is the bug (#266).
+ */
+export const STAFF_ROLES = ["admin", "instructor"] as const;
 
 export function isStaff(viewer: Viewer): boolean {
-  return !!viewer && STAFF_ROLES.has(viewer.role ?? "");
+  return (
+    !!viewer && (STAFF_ROLES as readonly string[]).includes(viewer.role ?? "")
+  );
+}
+
+/**
+ * Admin, which is a strictly narrower question than staff.
+ *
+ * User administration asks this one: an instructor is staff and must not
+ * reach `/admin/users`. Keeping it here rather than leaving those two routes
+ * to compare the string themselves is the point of #266. Widening either of
+ * them to `isStaff` hands instructors the ability to change roles and ban
+ * accounts, so the two predicates are deliberately not interchangeable and
+ * neither is defined in terms of the other.
+ *
+ */
+export function isAdmin(viewer: Viewer): boolean {
+  return !!viewer && viewer.role === "admin";
+}
+
+/**
+ * The admin gate, throwing rather than returning, and the same shape as
+ * `assertStaff` for the same reason: six seams in `src/server/_internal/`
+ * read `viewer.id` right after asking, so the narrowing carries.
+ *
+ * This was a hand-rolled comparison private to `_internal/users.ts`, with
+ * six call sites. It moved here rather than staying there for the reason the
+ * header gives: the routes ask the same question now, and a predicate with
+ * two homes is the thing #266 exists to remove.
+ */
+export function assertAdmin(
+  viewer: Viewer
+): asserts viewer is NonNullable<Viewer> {
+  if (!isAdmin(viewer)) {
+    throw new Error("Forbidden");
+  }
 }
 
 /**

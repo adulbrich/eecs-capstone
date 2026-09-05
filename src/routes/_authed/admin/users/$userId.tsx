@@ -17,6 +17,7 @@ import {
 } from "#/components/ui/breadcrumb";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { isAdmin } from "#/lib/viewer";
 import { getUser } from "#/server/users";
 
 type Role = "user" | "instructor" | "admin";
@@ -38,7 +39,7 @@ export const Route = createFileRoute("/_authed/admin/users/$userId")({
     if (!session?.user) {
       throw redirect({ to: "/sign-in" });
     }
-    if (session.user.role !== "admin") {
+    if (!isAdmin(session.user)) {
       throw redirect({ to: "/admin" });
     }
     return { actorId: session.user.id };

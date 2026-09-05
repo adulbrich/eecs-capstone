@@ -2,6 +2,7 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { InventoryForm } from "#/components/inventory-form";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { isStaff } from "#/lib/viewer";
 
 export const Route = createFileRoute("/_authed/inventory/new")({
   head: () => ({ meta: [{ title: pageTitle("New Inventory Item") }] }),
@@ -12,7 +13,7 @@ export const Route = createFileRoute("/_authed/inventory/new")({
     if (!session?.user) {
       throw redirect({ to: "/sign-in" });
     }
-    if (!["admin", "instructor"].includes(session.user.role ?? "")) {
+    if (!isStaff(session.user)) {
       throw redirect({ to: "/" });
     }
   },

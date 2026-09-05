@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { getSession } from "#/lib/auth-guards";
+import { isStaff } from "#/lib/viewer";
 
 export const Route = createFileRoute("/_authed/admin")({
   beforeLoad: async () => {
@@ -7,7 +8,7 @@ export const Route = createFileRoute("/_authed/admin")({
     if (!session?.user) {
       throw redirect({ to: "/sign-in" });
     }
-    if (!["admin", "instructor"].includes(session.user.role ?? "")) {
+    if (!isStaff(session.user)) {
       throw redirect({ to: "/" });
     }
     return { user: session.user };
