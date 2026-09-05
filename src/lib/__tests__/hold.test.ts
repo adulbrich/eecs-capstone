@@ -222,7 +222,32 @@ describe("holdToColumns", () => {
     expect(holdFromStoredRow(holdToColumns(hold))).toEqual(hold);
   });
 
-  it("round-trips a walk-in hold", () => {
+  it("lowercases the address on a walk-in hold", () => {
+    expect(
+      holdToColumns({
+        kind: "walk_in",
+        email: "  Wanda@Example.TEST ",
+        name: "Wanda",
+        program: "ECE",
+      }).currentHolderEmail
+    ).toBe("wanda@example.test");
+  });
+
+  it("lowercases the address on an account hold", () => {
+    expect(
+      holdToColumns({
+        kind: "account",
+        accountId: "u-1",
+        email: "Sam@Oregonstate.edu",
+        name: "Sam",
+      }).currentHolderEmail
+    ).toBe("sam@oregonstate.edu");
+  });
+
+  it("round-trips a walk-in hold whose address is already normal", () => {
+    // The round trip holds only for a normalized address, since #249: the
+    // write gate lowercases and the read constructor reports what is stored,
+    // so a mixed-case Hold comes back differing in exactly that.
     const hold: Hold = {
       kind: "walk_in",
       email: "w@in.test",
@@ -230,6 +255,9 @@ describe("holdToColumns", () => {
       program: "ECE",
     };
     expect(holdFromStoredRow(holdToColumns(hold))).toEqual(hold);
+    expect(
+      holdFromStoredRow(holdToColumns({ ...hold, email: "W@In.TEST" }))
+    ).toEqual(hold);
   });
 });
 

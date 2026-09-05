@@ -162,6 +162,13 @@
       "when": 1788439523166,
       "tag": "0022_program_expected_teams",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788549484534,
+      "tag": "0023_normalize_address_columns",
+      "breakpoints": true
     }
   ]
 }

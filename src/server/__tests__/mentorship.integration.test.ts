@@ -84,16 +84,18 @@ describe("updateProjectMentorshipAs", () => {
       studentProposed: true,
     });
     expect(first.updated).toBe(true);
-    // Trimmed, and stored as typed: the match is case-insensitive at read
-    // time, so lowercasing here would only hide what staff entered.
+    // Trimmed and lowercased, since #249 chose to normalize on write.
     expect(await columns(id)).toEqual({
-      mentorEmail: "Mentor@X.com",
+      mentorEmail: "mentor@x.com",
       studentProposed: true,
     });
 
+    // A save that differs only in case now finds no changed field, so it
+    // writes no row and no edit log entry. That is the cost of normalizing
+    // on write, recorded in QUIRKS rather than worked around here.
     const again = await updateProjectMentorshipAs(admin, {
       id,
-      mentorEmail: "Mentor@X.com",
+      mentorEmail: "MENTOR@x.com",
       studentProposed: true,
     });
     expect(again.updated).toBe(false);
@@ -226,7 +228,7 @@ describe("the three public states", () => {
 });
 
 describe("getProjectMentorshipAs", () => {
-  it("returns the raw address and the resolved name to staff, and Forbidden to anyone else", async () => {
+  it("returns the stored address and the resolved name to staff, and Forbidden to anyone else", async () => {
     const owner = await makeUser(`go-${Date.now()}@x.com`, "user");
     const admin = await makeUser(`ga-${Date.now()}@x.com`, "admin");
     const { id } = await createProjectAs(owner, baseProject());
@@ -237,13 +239,16 @@ describe("getProjectMentorshipAs", () => {
       studentProposed: false,
     });
 
+    // Typed with capitals, stored without them, and the name still resolves:
+    // mentorNameSql matches the normalized column against user.email, which
+    // Better Auth lowercases on every path that creates an account (#249).
     await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: owner.email.toUpperCase(),
       studentProposed: true,
     });
     expect(await getProjectMentorshipAs(admin, { projectId: id })).toEqual({
-      mentorEmail: owner.email.toUpperCase(),
+      mentorEmail: owner.email,
       mentorName: owner.name,
       studentProposed: true,
     });

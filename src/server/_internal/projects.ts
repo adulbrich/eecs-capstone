@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
   projectEditLog,
@@ -9,6 +9,7 @@ import {
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
 import { diffRowFields } from "#/lib/edit-diff";
+import { normalizeEmailAddress } from "#/lib/email-address";
 import { assertNoImageKeyOnCreate } from "#/lib/image-upload-policy";
 import { canEditProject, canWritePrivateNotes } from "#/lib/project-visibility";
 import {
@@ -49,16 +50,37 @@ async function loadProjectOr404(id: string) {
   return row;
 }
 
+/**
+ * The account behind a proposer address, or null when there is none.
+ *
+ * This matched case-sensitively until #249, so staff entering
+ * `Sam@oregonstate.edu` for an account stored as `sam@oregonstate.edu`
+ * linked nobody and the project was written with a null `proposer_id` and no
+ * error. Normalizing the input is what fixes it.
+ *
+ * The `lower()` on the column is belt and braces on top. Better Auth
+ * lowercases `user.email` on every path that creates an account here, so
+ * both sides are already lowercase in practice; that is its internals rather
+ * than a published contract, and an upgrade changing it would otherwise
+ * unlink proposers silently. It costs the index on `user.email`, which is
+ * the same trade `claimProjectsForVerifiedUser` documents and takes.
+ *
+ * Fixing this does not reach the projects the bug already orphaned. Their
+ * `proposer_id` is null and no write path revisits them, because
+ * `claimProjectsForVerifiedUser` fires once per account at verification and
+ * an already-verified account never verifies again (#277).
+ */
 async function resolveProposerId(
   email: string | null | undefined
 ): Promise<string | null> {
-  if (!email) {
+  const address = normalizeEmailAddress(email);
+  if (!address) {
     return null;
   }
   const [match] = await db
     .select({ id: user.id })
     .from(user)
-    .where(eq(user.email, email));
+    .where(eq(sql`lower(${user.email})`, address));
   return match?.id ?? null;
 }
 
@@ -87,7 +109,9 @@ export async function createProjectAs(
   data: ProjectInput
 ): Promise<{ id: string }> {
   const staff = isStaff(viewer);
-  const proposerEmail = staff ? data.proposerEmail || null : null;
+  const proposerEmail = staff
+    ? normalizeEmailAddress(data.proposerEmail)
+    : null;
   // On create a blank proposer email defaults the proposer to the creator, so a
   // new project always has an owner. Staff link a different proposer by entering
   // their email. On edit, clearing the field is instead an explicit unlink.
@@ -182,7 +206,7 @@ async function buildProjectValues(
   // depends on, that this object is the one statement of which columns an edit
   // touches. This is not a general partial-update facility.
   if (isStaff(viewer) && data.proposerEmail !== undefined) {
-    const proposerEmail = data.proposerEmail || null;
+    const proposerEmail = normalizeEmailAddress(data.proposerEmail);
     newValues.proposerEmail = proposerEmail;
     newValues.proposerId = proposerEmail
       ? await resolveProposerId(proposerEmail)
@@ -261,9 +285,14 @@ export async function updateProjectAs(
  * proposer has no endpoint that accepts them. That is what makes "staff edit
  * these" structural rather than a check someone remembers to keep.
  *
- * The address is trimmed and stored as typed. Matching is case-insensitive
- * at read time (`mentorNameSql`), so lowercasing here would only hide what
- * staff entered from the edit log.
+ * The address is trimmed and lowercased, like every address column this app
+ * writes (#249), and this function is where that costs something: the edit
+ * log below records the normalized address rather than what staff typed, and
+ * an edit changing only case finds no changed field and returns
+ * `updated: false`. Both follow from normalizing on write and were accepted
+ * with it. Matching stays case-insensitive at read time regardless, because
+ * `mentorNameSql` compares against `user.email`, which is Better Auth's
+ * column rather than one of the four this app normalizes.
  *
  * No embedding refresh: neither column is part of the embedding source text.
  */
@@ -275,7 +304,7 @@ export async function updateProjectMentorshipAs(
   const existing = await loadProjectOr404(data.id);
   const newValues: Partial<typeof projects.$inferSelect> = {
     studentProposed: data.studentProposed,
-    mentorEmail: data.mentorEmail.trim() || null,
+    mentorEmail: normalizeEmailAddress(data.mentorEmail),
   };
   const { changedFields, newDiff, oldDiff } = diffRowFields(
     existing,
