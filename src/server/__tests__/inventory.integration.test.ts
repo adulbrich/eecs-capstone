@@ -15,6 +15,7 @@ import {
   user,
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
+import type { UserRole } from "#/lib/vocabularies";
 import {
   createCategoryAs,
   deleteCategoryAs,
@@ -45,7 +46,7 @@ import {
 import { transitionItem } from "#/server/_internal/inventory-transitions";
 import { itemPayloadSchema } from "#/server/inventory";
 
-async function makeUser(email: string, role: "user" | "admin" | "instructor") {
+async function makeUser(email: string, role: UserRole) {
   await auth.api.signUpEmail({
     body: { email, password: "Password1!", name: email },
   });

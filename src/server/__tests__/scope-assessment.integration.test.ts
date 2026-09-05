@@ -4,6 +4,7 @@ import { db } from "#/db";
 import { aiReviewUsage, programs, projects, user } from "#/db/schema";
 import type { MantleResponse } from "#/lib/_internal/bedrock-mantle";
 import { auth } from "#/lib/auth";
+import type { UserRole } from "#/lib/vocabularies";
 import {
   assertWithinLimit,
   recordReviewUsage,
@@ -20,7 +21,7 @@ import {
 } from "#/server/_internal/scope-assessment";
 import { SCOPE_TOOL_NAME } from "#/server/_internal/scope-assessment-core";
 
-async function makeUser(email: string, role: "user" | "admin" | "instructor") {
+async function makeUser(email: string, role: UserRole) {
   await auth.api.signUpEmail({
     body: { email, password: "Password1!", name: email },
   });

@@ -43,9 +43,8 @@ import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import { isAdmin } from "#/lib/viewer";
+import { USER_ROLES, type UserRole } from "#/lib/vocabularies";
 import { exportUsers, listUsers } from "#/server/users";
-
-const ROLES = ["user", "instructor", "admin"] as const;
 
 const searchSchema = z.object({
   cols: z.string().optional(),
@@ -53,7 +52,7 @@ const searchSchema = z.object({
   includeBanned: z.boolean().default(true),
   page: z.number().int().min(1).default(1),
   q: z.string().default(""),
-  role: z.enum(ROLES).nullable().default(null),
+  role: z.enum(USER_ROLES).nullable().default(null),
   sort: z.string().optional(),
 });
 
@@ -295,9 +294,7 @@ function UsersAdmin() {
                     search: (prev) => ({
                       ...prev,
                       page: 1,
-                      role: (v === "_all_" ? null : v) as
-                        | (typeof ROLES)[number]
-                        | null,
+                      role: (v === "_all_" ? null : v) as UserRole | null,
                     }),
                   })
                 }
@@ -308,7 +305,7 @@ function UsersAdmin() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_all_">All roles</SelectItem>
-                  {ROLES.map((r) => (
+                  {USER_ROLES.map((r) => (
                     <SelectItem key={r} value={r}>
                       {r}
                     </SelectItem>

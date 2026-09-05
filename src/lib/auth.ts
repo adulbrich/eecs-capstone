@@ -10,6 +10,7 @@ import {
 import { onidProfileFromIdToken } from "#/lib/_internal/onid-profile";
 import { getEmailSender } from "#/lib/email/sender";
 import { passwordResetEmail, verificationEmail } from "#/lib/email/templates";
+import type { UserRole } from "#/lib/vocabularies";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
 
 const emailSender = getEmailSender();
@@ -158,7 +159,17 @@ export const auth = betterAuth({
     },
   },
   plugins: [
-    admin({ defaultRole: "user", adminRoles: ["admin"] }),
+    // Both role names are held to `USER_ROLES` by `satisfies` rather than read
+    // out of it. The plugin types these as `string` and `string | string[]`,
+    // so a readonly tuple is not assignable and passing the vocabulary itself
+    // would mean spreading it into a fresh array, which names no role in
+    // particular and would hand admin powers to every role in the list. What
+    // this buys is the failure that matters: a role renamed in the vocabulary
+    // stops compiling here rather than silently un-admining every admin (#274).
+    admin({
+      adminRoles: ["admin" satisfies UserRole],
+      defaultRole: "user" satisfies UserRole,
+    }),
     // ONID, via the Oregon State Entra ID tenant. UIT registered the app as an
     // OIDC relying party rather than a SAML SP, which is why this is the
     // genericOAuth plugin and not @better-auth/sso.

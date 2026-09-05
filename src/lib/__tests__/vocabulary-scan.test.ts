@@ -14,7 +14,9 @@ import {
  *
  * #102 gave each status vocabulary one home and swept twenty-one consumers
  * onto it by hand. Nothing stopped the twenty-second, which is #271. This is
- * what stops it.
+ * what stops it, and it covers every vocabulary in the file rather than only
+ * the status ones: `USER_ROLES` arrived with five copies under `src/` already
+ * written, and the scan is what named them (#274).
  *
  * The second half is the point. Running the scan over a tree it already
  * agrees with proves they agree today; it cannot show the scan would notice
@@ -51,8 +53,9 @@ describe("scan over src/", () => {
 
   it("reads the real vocabularies.ts, so the assertion above is not vacuous", () => {
     // scan() passing would mean nothing if it were looking at no files or no
-    // vocabularies. It throws on the second, and this pins the first: these
-    // are the three tuples src/db/schema.ts hands to pgEnum.
+    // vocabularies. It throws on the second, and this pins the first: the
+    // three tuples src/db/schema.ts hands to pgEnum, and the roles, which no
+    // column constrains and which therefore rely on the scan for more.
     expect(
       vocabulariesIn(
         VOCABULARIES_FILE,
@@ -62,6 +65,7 @@ describe("scan over src/", () => {
       "PROJECT_STATUSES",
       "INVENTORY_ITEM_STATUSES",
       "INVENTORY_REQUEST_ITEM_STATUSES",
+      "USER_ROLES",
     ]);
   });
 
@@ -244,7 +248,7 @@ describe("what does not count", () => {
 
 describe("a node naming two vocabularies reports both", () => {
   it("does not stop at the first match", () => {
-    // The three real vocabularies are disjoint, so nothing exercises this
+    // The four real vocabularies are disjoint, so nothing exercises this
     // today. A future pair sharing members would otherwise have one copy
     // reported and the other hidden.
     const overlapping = [
