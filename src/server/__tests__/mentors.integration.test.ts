@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { user } from "#/db/schema";
 import { auth } from "#/lib/auth";
+import type { UserRole } from "#/lib/vocabularies";
 import { listMentorsAs, setUserMentorStatusAs } from "#/server/_internal/users";
 
-async function makeUser(email: string, role: "user" | "instructor" | "admin") {
+async function makeUser(email: string, role: UserRole) {
   await auth.api.signUpEmail({
     body: { email, password: "Password1!", name: email },
   });

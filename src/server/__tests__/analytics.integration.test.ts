@@ -9,6 +9,7 @@ import {
   user,
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
+import type { UserRole } from "#/lib/vocabularies";
 import { getAdminStatsAs } from "#/server/_internal/admin";
 import { getAnalyticsAs } from "#/server/_internal/analytics";
 import { addToCartAs, submitCartAs } from "#/server/_internal/inventory-cart";
@@ -18,7 +19,7 @@ import {
   forceTransitionAs,
 } from "#/server/_internal/projects";
 
-async function makeUser(email: string, role: "user" | "admin" | "instructor") {
+async function makeUser(email: string, role: UserRole) {
   await auth.api.signUpEmail({
     body: { email, password: "Password1!", name: email },
   });

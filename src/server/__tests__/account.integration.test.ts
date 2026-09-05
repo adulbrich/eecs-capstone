@@ -22,6 +22,7 @@ import {
   userInterests,
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
+import type { UserRole } from "#/lib/vocabularies";
 import {
   CASCADE_TABLES,
   deleteAccountAs,
@@ -37,7 +38,7 @@ import {
   listAdminProjectsAs,
 } from "#/server/_internal/projects-queries";
 
-async function makeUser(email: string, role: "user" | "instructor" | "admin") {
+async function makeUser(email: string, role: UserRole) {
   await auth.api.signUpEmail({
     body: { email, password: "Password1!", name: `Name of ${email}` },
   });

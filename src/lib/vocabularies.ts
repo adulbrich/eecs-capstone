@@ -60,19 +60,22 @@ export type InventoryRequestItemStatus =
 /**
  * The roles an account can hold, in ascending order of what they may do.
  *
- * This was written out three times, in three orders, with nothing linking the
- * copies: the analytics breakdown, the wire contract in `src/server/users.ts`
- * and the admin filter dropdown, plus two hand-written unions in the user
- * admin components. A fourth role added to one and not the others is a role
- * nobody can filter by, a role the admin table cannot assign, and a bar
- * missing from the analytics chart, and no type related any two of them
- * (#274).
+ * This was written out five times in `src/`, in two orders, with nothing
+ * linking the copies: the analytics breakdown, the wire contract in
+ * `src/server/users.ts`, the admin filter dropdown, and a `type Role` union in
+ * each of the two user admin components. `scripts/seed-dev.ts` held a sixth. A
+ * fourth role added to one and not the others is a role nobody can filter by,
+ * a role the admin table cannot assign, and a bar missing from the analytics
+ * chart, and no type related any two of them (#274).
  *
- * There is no reader's order beside this one. `PROJECT_STATUSES_IN_DISPLAY_ORDER`
- * exists because `pgEnum` pins the status tuple's order in the database and
- * reordering it is a migration, so the order a reader wants has to live
- * somewhere else. Nothing pins this tuple, so its order is the one the admin
- * filter, the role selects and the analytics chart all read.
+ * There is no reader's order beside this one, and none was lost: the two
+ * orders this replaced disagreed by accident rather than because anybody had
+ * decided what a reader wants. `PROJECT_STATUSES_IN_DISPLAY_ORDER` exists
+ * because a reader does want a different order there, reading
+ * `changes_requested` as the step back out of review where the tuple lists it
+ * as one of two outcomes (ADR-0014). The precedent is written down if a role
+ * chart ever earns it; until then this order serves the admin filter, the role
+ * select on the user detail page and the analytics breakdown alike.
  *
  * `STAFF_ROLES` in `viewer.ts` is the subset that carries staff powers, and
  * `isAdmin` there is the narrower question still. Neither is derived from

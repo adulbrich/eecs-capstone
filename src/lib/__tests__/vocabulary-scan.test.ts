@@ -14,9 +14,9 @@ import {
  *
  * #102 gave each status vocabulary one home and swept twenty-one consumers
  * onto it by hand. Nothing stopped the twenty-second, which is #271. This is
- * what stops it, and it covers every vocabulary in the file rather than the
- * status ones: `USER_ROLES` arrived with five copies already written and the
- * scan is what named them (#274).
+ * what stops it, and it covers every vocabulary in the file rather than only
+ * the status ones: `USER_ROLES` arrived with five copies under `src/` already
+ * written, and the scan is what named them (#274).
  *
  * The second half is the point. Running the scan over a tree it already
  * agrees with proves they agree today; it cannot show the scan would notice

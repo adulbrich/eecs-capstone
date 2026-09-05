@@ -227,13 +227,19 @@ Note the predicate is not the one beside it: `useSecureCookies` is `NODE_ENV ===
 
 ### Session role typing
 
-`session.user.role` is typed as `string | null | undefined`, because `user.role` is a `text` column Better Auth's admin plugin owns and no enum narrows it. Ask `isStaff` or `isAdmin` from `src/lib/viewer.ts` rather than comparing the string, and coerce with `?? ""` wherever you cannot:
+`session.user.role` is typed as `string | null | undefined`, because `user.role` is a `text` column Better Auth's admin plugin owns and no enum narrows it. Ask `isStaff` or `isAdmin` from `src/lib/viewer.ts` rather than comparing the string:
 
 ```ts
-["admin", "instructor"].includes(session.user.role ?? "")
+isStaff(session.user)
 ```
 
-The legal values are `USER_ROLES` in `src/lib/vocabularies.ts` and nowhere else, including Better Auth's own `defaultRole` and `adminRoles`, which are held to it with `satisfies` because the plugin types them as `string` and `string | string[]` (#274). Since no column rejects a role the tuple does not name, `vocabulary-scan.ts` is the only thing that catches a copy: see [ADR-0016](./adr/0016-the-role-vocabulary-lives-with-the-statuses.md).
+Where the question is one those predicates do not answer, coerce before comparing, because `undefined` is not a role:
+
+```ts
+someRoles.includes(session.user.role ?? "")
+```
+
+The legal values are `USER_ROLES` in `src/lib/vocabularies.ts` and nowhere else, including Better Auth's own `defaultRole` and `adminRoles`, which are held to it with `satisfies` because the plugin types them as `string` and `string | string[]` (#274). No column rejects a role the tuple does not name, so `vocabulary-scan.ts` is the only thing that catches a copy, and it reads `src/` alone: a copy in `scripts/` or under `__tests__` is yours to catch. See [ADR-0016](./adr/0016-the-role-vocabulary-lives-with-the-statuses.md).
 
 ### Sign-up returns optional `user`
 

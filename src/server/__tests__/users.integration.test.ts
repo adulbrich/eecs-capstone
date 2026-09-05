@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { session, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
+import type { UserRole } from "#/lib/vocabularies";
 import {
   banUserAs,
   listUsersImpl,
@@ -10,7 +11,7 @@ import {
   unbanUserAs,
 } from "#/server/_internal/users";
 
-async function makeUser(email: string, role: "user" | "admin" | "instructor") {
+async function makeUser(email: string, role: UserRole) {
   await auth.api.signUpEmail({
     body: { email, password: "Password1!", name: email },
   });
