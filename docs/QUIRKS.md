@@ -179,6 +179,8 @@ Three rules live in that save, and each looks like cleanup waiting to happen:
 - **The category write is asymmetric.** Edit calls `setProjectCategories` unconditionally for staff, because clearing every category must reach the server. Create guards on a non-empty list, because a new project has nothing to clear.
 - **`isStaff` is its own required prop, not `showProposer`.** `showProposer` and `showCategories` decide what is drawn; `isStaff` decides what is sent. A display prop gating the payload would make hiding a control change the request.
 
+The proposer control is staff-only and has no read-only path. Both routes pass their staff flag as `showProposer`, so a non-staff viewer gets no control rather than a disabled one, and the detail page agrees: `ProposerSummary` renders only inside `StaffProjectPanel`, and `getProposerForEditAs` asserts staff, so no non-staff path reaches the address. #173's brief assumed a read-only state and #270 declined to add one, because drawing it would widen who can read `proposer_email`, which [ADR-0007](./adr/0007-proposer-linking-by-email.md) keeps private to staff.
+
 ### Server errors via `applyServerErrors`
 
 When a server function throws a `ZodError`, the helper `src/lib/apply-server-errors.ts` maps issues back to field-level errors via `setFieldMeta`. Wrap form `onSubmit` with `try` / `catch` and call it; if it returns false (non-Zod error), surface the message in a top-level banner. Don't expect server validation errors to appear silently next to fields without this helper.
