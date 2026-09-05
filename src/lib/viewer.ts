@@ -16,7 +16,13 @@
  * `src/routes/_authed/` spelled a role comparison out rather than asking
  * either predicate, and `assertAdmin` had a private copy in
  * `_internal/users.ts` (#266).
+ *
+ * The roles themselves are not declared here. `USER_ROLES` in
+ * `vocabularies.ts` is the whole list, and this module holds the questions
+ * asked about it (#274).
  */
+
+import type { UserRole } from "./vocabularies";
 
 /**
  * Anyone a permission question can be asked about. Nullable because an
@@ -39,8 +45,17 @@ export type Viewer =
  * needs the roles as data. That is the same shape as the status vocabularies
  * in `vocabularies.ts` and has the same rule: this is the one definition, and
  * a second copy of the list is the bug (#266).
+ *
+ * The `satisfies` clause holds it to `USER_ROLES` without deriving it: which
+ * roles carry staff powers is a judgement, and a role added there is one
+ * somebody has to decide about rather than one that joins this list on its
+ * own. What it buys is that a role renamed in the vocabulary fails to compile
+ * here rather than quietly stripping every instructor of staff powers.
  */
-export const STAFF_ROLES = ["admin", "instructor"] as const;
+export const STAFF_ROLES = [
+  "admin",
+  "instructor",
+] as const satisfies readonly UserRole[];
 
 export function isStaff(viewer: Viewer): boolean {
   return (

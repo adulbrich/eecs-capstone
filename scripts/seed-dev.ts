@@ -18,6 +18,7 @@ import {
   user,
 } from "../src/db/schema";
 import { auth } from "../src/lib/auth";
+import type { UserRole } from "../src/lib/vocabularies";
 import {
   addToCartAs,
   submitCartAs,
@@ -38,7 +39,7 @@ const PASSWORD = "password";
 type SeedUser = {
   email: string;
   name: string;
-  role: "user" | "instructor" | "admin";
+  role: UserRole;
   affiliation?: string;
   linkedin?: string;
 };

@@ -1,8 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX } from "#/lib/pagination";
+import { USER_ROLES } from "#/lib/vocabularies";
 
-const roleEnum = z.enum(["user", "instructor", "admin"]);
+const roleEnum = z.enum(USER_ROLES);
 
 const listUsersSchema = z.object({
   q: z.string().trim().max(200).optional().default(""),

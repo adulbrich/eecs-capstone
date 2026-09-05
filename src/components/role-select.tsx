@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { USER_ROLES, type UserRole } from "#/lib/vocabularies";
 import { setUserRole } from "#/server/users";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
@@ -10,16 +11,14 @@ import {
   SelectValue,
 } from "./ui/select";
 
-type Role = "user" | "instructor" | "admin";
-
 interface Props {
-  initialRole: Role;
+  initialRole: UserRole;
   onChanged: () => void;
   userId: string;
 }
 
 export function RoleSelect({ userId, initialRole, onChanged }: Props) {
-  const [role, setRole] = useState<Role>(initialRole);
+  const [role, setRole] = useState<UserRole>(initialRole);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,14 +41,16 @@ export function RoleSelect({ userId, initialRole, onChanged }: Props) {
     <div className="mt-4">
       <Label htmlFor="role-select">Role</Label>
       <div className="mt-1 flex items-center gap-2">
-        <Select onValueChange={(v) => setRole(v as Role)} value={role}>
+        <Select onValueChange={(v) => setRole(v as UserRole)} value={role}>
           <SelectTrigger className="w-36" id="role-select" size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="user">user</SelectItem>
-            <SelectItem value="instructor">instructor</SelectItem>
-            <SelectItem value="admin">admin</SelectItem>
+            {USER_ROLES.map((r) => (
+              <SelectItem key={r} value={r}>
+                {r}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Button

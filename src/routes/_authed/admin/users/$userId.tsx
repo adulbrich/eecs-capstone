@@ -18,9 +18,8 @@ import {
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { isAdmin } from "#/lib/viewer";
+import type { UserRole } from "#/lib/vocabularies";
 import { getUser } from "#/server/users";
-
-type Role = "user" | "instructor" | "admin";
 
 const PROVIDER_LABELS: Record<string, string> = {
   github: "GitHub",
@@ -134,7 +133,7 @@ function UserDetail() {
 
       {!isSelf && (
         <RoleSelect
-          initialRole={user.role as Role}
+          initialRole={user.role as UserRole}
           onChanged={onChanged}
           userId={user.id}
         />

@@ -227,11 +227,13 @@ Note the predicate is not the one beside it: `useSecureCookies` is `NODE_ENV ===
 
 ### Session role typing
 
-`session.user.role` is typed as `string | null | undefined`. Always coerce with `?? ""` or default before comparing:
+`session.user.role` is typed as `string | null | undefined`, because `user.role` is a `text` column Better Auth's admin plugin owns and no enum narrows it. Ask `isStaff` or `isAdmin` from `src/lib/viewer.ts` rather than comparing the string, and coerce with `?? ""` wherever you cannot:
 
 ```ts
 ["admin", "instructor"].includes(session.user.role ?? "")
 ```
+
+The legal values are `USER_ROLES` in `src/lib/vocabularies.ts` and nowhere else, including Better Auth's own `defaultRole` and `adminRoles`, which are held to it with `satisfies` because the plugin types them as `string` and `string | string[]` (#274). Since no column rejects a role the tuple does not name, `vocabulary-scan.ts` is the only thing that catches a copy: see [ADR-0016](./adr/0016-the-role-vocabulary-lives-with-the-statuses.md).
 
 ### Sign-up returns optional `user`
 
@@ -336,7 +338,7 @@ dedupe test drops it to create the duplicates it exists for and restores it in a
 
 ### The status enums take their values from `src/lib/vocabularies.ts`
 
-`projectStatusEnum`, `inventoryItemStatusEnum` and `inventoryRequestItemStatusEnum` are declared with an `as const` tuple imported from `src/lib/vocabularies.ts` rather than an inline array, and the client-safe modules derive their unions from the same tuple with `(typeof T)[number]`. `pgEnum`'s overload is `pgEnum<U extends string, T extends Readonly<[U, ...U[]]>>`, so a readonly tuple is accepted as is. Add a status by editing the tuple and generating a migration: the union derives from it, so the two cannot disagree. Every consumer that names a whole vocabulary derives from it too, and `src/lib/__tests__/vocabulary-scan.ts` is what keeps it that way (#271): it discovers the tuples by parsing this file, then fails on any array literal, written-out union or tuple type elsewhere in `src/` that names a whole vocabulary. Complete copies only, because a copy is written complete. A subset one member short passes, which is why `ACTIVE_STATUSES` is derived rather than listed; a `Record` keyed by a vocabulary is not examined at all, because the type already forces it to be total. `__tests__` and `src/test/` are skipped, and the scan's docblock says why: it cannot tell a test's case list from its expected value, and deriving the second is a tautology. [ADR-0014](./adr/0014-status-vocabularies-live-in-src-lib.md) says why the tuples live in `src/lib` rather than being derived from `enumValues` here. `categoryDomainEnum` is still inline: nothing outside the server names a category domain, and `src/server/_internal/categories.ts` derives its type from `enumValues` directly.
+`projectStatusEnum`, `inventoryItemStatusEnum` and `inventoryRequestItemStatusEnum` are declared with an `as const` tuple imported from `src/lib/vocabularies.ts` rather than an inline array, and the client-safe modules derive their unions from the same tuple with `(typeof T)[number]`. `pgEnum`'s overload is `pgEnum<U extends string, T extends Readonly<[U, ...U[]]>>`, so a readonly tuple is accepted as is. Add a status by editing the tuple and generating a migration: the union derives from it, so the two cannot disagree. Every consumer that names a whole vocabulary derives from it too, and `src/lib/__tests__/vocabulary-scan.ts` is what keeps it that way (#271): it discovers the tuples by parsing this file, then fails on any array literal, written-out union or tuple type elsewhere in `src/` that names a whole vocabulary. It covers every tuple in the file, not just the three with a `pgEnum` behind them, which is why `USER_ROLES` lives there too ([ADR-0016](./adr/0016-the-role-vocabulary-lives-with-the-statuses.md)). Complete copies only, because a copy is written complete. A subset one member short passes, which is why `ACTIVE_STATUSES` is derived rather than listed; a `Record` keyed by a vocabulary is not examined at all, because the type already forces it to be total. `__tests__` and `src/test/` are skipped, and the scan's docblock says why: it cannot tell a test's case list from its expected value, and deriving the second is a tautology. [ADR-0014](./adr/0014-status-vocabularies-live-in-src-lib.md) says why the tuples live in `src/lib` rather than being derived from `enumValues` here. `categoryDomainEnum` is still inline: nothing outside the server names a category domain, and `src/server/_internal/categories.ts` derives its type from `enumValues` directly.
 
 ### Addresses are lowercase in the four columns we write
 

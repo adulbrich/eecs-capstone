@@ -19,6 +19,7 @@ import { assertStaff, isAdmin, type Viewer } from "#/lib/viewer";
 import {
   INVENTORY_ITEM_STATUSES,
   INVENTORY_REQUEST_ITEM_STATUSES,
+  USER_ROLES,
 } from "#/lib/vocabularies";
 import type { AnalyticsInput } from "../analytics";
 import { countPendingRequests, countRows, countSubmitted } from "./admin";
@@ -36,8 +37,6 @@ export interface Bucket {
 export interface LabelledBucket extends Bucket {
   label: string;
 }
-
-export const USER_ROLES = ["admin", "instructor", "user"] as const;
 
 export interface AnalyticsView {
   asOf: Date;

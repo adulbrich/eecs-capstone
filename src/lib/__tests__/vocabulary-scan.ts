@@ -3,14 +3,18 @@ import { join, relative } from "node:path";
 import ts from "typescript";
 
 /**
- * Finds every hand-written copy of a status vocabulary.
+ * Finds every hand-written copy of a vocabulary.
  *
  * #102 made each vocabulary a single `as const` tuple in
  * `src/lib/vocabularies.ts` and swept twenty-one consumers onto it by hand.
- * The tuple half is enforced, because `pgEnum` and the derived unions read the
- * same tuple. The sweep half was not, and #271 is that gap: a status added to
- * a tuple and not to a copy is a filter that cannot select it, a badge with no
- * label, or a chart bar that is not drawn.
+ * The tuple half is enforced for the statuses, because `pgEnum` and the
+ * derived unions read the same tuple. The sweep half was not, and #271 is
+ * that gap: a status added to a tuple and not to a copy is a filter that
+ * cannot select it, a badge with no label, or a chart bar that is not drawn.
+ *
+ * `USER_ROLES` has no `pgEnum` behind it at all, so neither half was enforced
+ * until it moved into `vocabularies.ts`: this scan named its five copies, two
+ * of which were unions no grep for the word "roles" would have found (#274).
  *
  * ## What counts as a copy
  *
