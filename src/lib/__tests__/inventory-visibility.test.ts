@@ -197,25 +197,27 @@ describe("myRequestLineView", () => {
   const view = myRequestLineView(lineRow);
 
   it("carries only what a requester's own page reads", () => {
+    // The two dates feed the requester's timeline; the identities beside
+    // them do not come along.
     expect(view).toEqual({
       id: "line-1",
       status: "approved",
       pickupBy: new Date("2026-02-10"),
       dueAt: new Date("2026-03-01"),
       createdAt: new Date("2026-02-01"),
+      reviewedAt: new Date("2026-02-02"),
+      closedAt: null,
       closedReason: null,
     });
   });
 
-  it("omits the staff review columns", () => {
+  it("omits the staff identities and the review comment", () => {
     // reviewComment is the same string as closedReason, which the page does
     // render, so dropping it costs the requester nothing.
     for (const key of [
       "reviewedBy",
-      "reviewedAt",
       "reviewComment",
       "closedBy",
-      "closedAt",
       "requestId",
       "itemId",
       "updatedAt",
