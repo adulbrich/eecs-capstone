@@ -264,7 +264,8 @@ Three indexes, matching the three `inventory_request_items` carries: `(request_i
 because both grouped tables group by it; `(status)`, because the queue filters on it;
 and `(item_id)` on the join table, which the `RESTRICT` check on an item delete reads
 and which answers "which custom line produced this hold" on `/my/items`. `quantity` is `integer not null` with a floor of **1**, enforced by
-`z.number().int().min(1)` on the submit schema rather than by a CHECK constraint:
+`z.number().int().positive()` on the submit schema, which is the idiom the inventory
+module already uses for a floor of one (`.min(1)` there is for strings) rather than by a CHECK constraint:
 `src/db/schema.ts` carries no CHECK constraints today, and this is not the feature
 that should introduce the first one. The floor is a rule either way, so it is written
 here rather than left to the reader to infer.
