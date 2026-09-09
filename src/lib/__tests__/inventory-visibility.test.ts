@@ -314,15 +314,15 @@ describe("custom line views", () => {
       "outcomeNote",
       "quantity",
       "reason",
+      "reviewedAt",
       "sourcingNote",
       "status",
     ]);
   });
 
-  it("keeps the identities for staff, and reviewedAt beside them", () => {
+  it("keeps the identities for staff", () => {
     const view = staffCustomLineView(row);
     expect(view.reviewedBy).toBe("u-staff");
-    expect(view.reviewedAt).toEqual(new Date("2026-02-02"));
     expect(view.closedBy).toBeNull();
     expect(Object.keys(view)).not.toContain("requestId");
   });

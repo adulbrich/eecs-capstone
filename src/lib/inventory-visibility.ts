@@ -253,6 +253,7 @@ export interface MyCustomLineView {
   outcomeNote: string | null;
   quantity: number;
   reason: string;
+  reviewedAt: Date | null;
   sourcingNote: string | null;
   status: string;
 }
@@ -260,7 +261,6 @@ export interface MyCustomLineView {
 /** What staff see: the requester's view plus who decided and who closed. */
 export type StaffCustomLineView = MyCustomLineView & {
   closedBy: string | null;
-  reviewedAt: Date | null;
   reviewedBy: string | null;
 };
 
@@ -368,6 +368,7 @@ export function myCustomLineView(row: CustomLineRow): MyCustomLineView {
     sourcingNote: row.sourcingNote,
     outcomeNote: row.outcomeNote,
     createdAt: row.createdAt,
+    reviewedAt: row.reviewedAt,
     closedAt: row.closedAt,
   };
 }
@@ -375,7 +376,6 @@ export function myCustomLineView(row: CustomLineRow): MyCustomLineView {
 export function staffCustomLineView(row: CustomLineRow): StaffCustomLineView {
   return {
     ...myCustomLineView(row),
-    reviewedAt: row.reviewedAt,
     reviewedBy: row.reviewedBy,
     closedBy: row.closedBy,
   };

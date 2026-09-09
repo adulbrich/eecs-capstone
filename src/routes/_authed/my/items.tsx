@@ -572,16 +572,13 @@ function timelineOf(row: Row) {
     });
   }
   if (row.kind === "custom") {
-    // reviewedAt is staff data; the requester's view carries the sourcing
-    // note but not the date it was written, so the decided event has no
-    // date of its own here and the note sits on the line's fields instead.
     return lineTimeline({
       closedAt: row.line.closedAt,
       closedLabel: lineLabel(row.line.status),
       closedNote: row.line.outcomeNote,
       decidedLabel: "Sourcing",
       decidedNote: row.line.sourcingNote,
-      reviewedAt: null,
+      reviewedAt: row.line.reviewedAt,
       submittedAt: row.requestedAt,
     });
   }

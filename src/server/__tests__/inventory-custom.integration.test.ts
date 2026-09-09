@@ -614,6 +614,7 @@ describe("custom requests on my items", () => {
         "outcomeNote",
         "quantity",
         "reason",
+        "reviewedAt",
         "sourcingNote",
         "status",
       ]);
