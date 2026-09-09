@@ -8,7 +8,7 @@
  * name, or a status the app hands to a column that rejects it at runtime
  * (#102).
  *
- * The three status tuples are anchored twice over, because `src/db/schema.ts`
+ * The four status tuples are anchored twice over, because `src/db/schema.ts`
  * hands each one to `pgEnum` and the column then refuses anything the tuple
  * does not name. `USER_ROLES` is not: `user.role` is `text`, owned by Better
  * Auth. The tuple is the whole anchor there, which is why it belongs here
@@ -56,6 +56,26 @@ export const INVENTORY_REQUEST_ITEM_STATUSES = [
 
 export type InventoryRequestItemStatus =
   (typeof INVENTORY_REQUEST_ITEM_STATUSES)[number];
+
+/**
+ * Where a custom line is: a request for equipment the inventory does not
+ * hold. The same five slots as a request line (undecided, decided yes and
+ * still live, succeeded, refused, withdrawn), with two words swapped on
+ * purpose. `sourcing` rather than `approved`, because approving a request
+ * line hands over a physical thing and a custom line has no item yet;
+ * `fulfilled` rather than `returned`, because an acquisition succeeds when
+ * the thing exists rather than when it comes back (ADR-0018).
+ */
+export const INVENTORY_CUSTOM_LINE_STATUSES = [
+  "pending",
+  "sourcing",
+  "fulfilled",
+  "rejected",
+  "cancelled",
+] as const;
+
+export type InventoryCustomLineStatus =
+  (typeof INVENTORY_CUSTOM_LINE_STATUSES)[number];
 
 /**
  * The roles an account can hold, in ascending order of what they may do.

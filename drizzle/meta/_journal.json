@@ -169,6 +169,13 @@
       "when": 1788549484534,
       "tag": "0023_normalize_address_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788986856456,
+      "tag": "0024_custom_requests",
+      "breakpoints": true
     }
   ]
 }

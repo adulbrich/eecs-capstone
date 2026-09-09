@@ -54,7 +54,7 @@ describe("scan over src/", () => {
   it("reads the real vocabularies.ts, so the assertion above is not vacuous", () => {
     // scan() passing would mean nothing if it were looking at no files or no
     // vocabularies. It throws on the second, and this pins the first: the
-    // three tuples src/db/schema.ts hands to pgEnum, and the roles, which no
+    // four tuples src/db/schema.ts hands to pgEnum, and the roles, which no
     // column constrains and which therefore rely on the scan for more.
     expect(
       vocabulariesIn(
@@ -65,6 +65,7 @@ describe("scan over src/", () => {
       "PROJECT_STATUSES",
       "INVENTORY_ITEM_STATUSES",
       "INVENTORY_REQUEST_ITEM_STATUSES",
+      "INVENTORY_CUSTOM_LINE_STATUSES",
       "USER_ROLES",
     ]);
   });
