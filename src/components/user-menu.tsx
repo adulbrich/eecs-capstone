@@ -46,7 +46,7 @@ export function UserMenu({ user }: Props) {
           <Link to="/my/bookmarks">My Bookmarks</Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link search={{ tab: "active" }} to="/my/items">
+          <Link search={{ filter: "open" }} to="/my/items">
             My Items
           </Link>
         </DropdownMenuItem>

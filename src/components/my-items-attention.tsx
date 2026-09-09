@@ -11,7 +11,7 @@ import {
  * (#64). Driven by the same deadline data the `OverdueBadge` reads, so the
  * summary and the badges cannot disagree. Nothing at all for an account with
  * nothing active; a quiet line when everything is in order; a warning region
- * with counts and a link into the Active tab otherwise.
+ * with counts and a link into the open rows below otherwise.
  */
 export function NeedsAttention({
   entries,
@@ -75,10 +75,10 @@ export function NeedsAttention({
       <p className="mt-2 text-sm">
         <Link
           className="text-brand hover:underline"
-          search={{ tab: "active" }}
+          search={{ filter: "open" }}
           to="/my/items"
         >
-          See them under Active
+          See them below
         </Link>
       </p>
     </section>

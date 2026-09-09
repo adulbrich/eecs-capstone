@@ -13,13 +13,14 @@
  * a second kind of line (#80) extends this rule rather than restating it.
  */
 
-export type MyItemsFilter = "all" | "closed" | "open";
+/**
+ * Open first, so a bare `/my/items` lands on what still matters. A tuple
+ * rather than a union, because the route's search schema builds its enum
+ * from it and the select renders it in this order.
+ */
+export const MY_ITEMS_FILTERS = ["open", "closed", "all"] as const;
 
-export const MY_ITEMS_FILTERS: readonly MyItemsFilter[] = [
-  "open",
-  "closed",
-  "all",
-];
+export type MyItemsFilter = (typeof MY_ITEMS_FILTERS)[number];
 
 /** The shape the rule reads: the kind, and a line status where there is one. */
 export type MyItemsFilterRow =

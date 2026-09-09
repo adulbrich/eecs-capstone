@@ -30,7 +30,7 @@ export function BorrowListButton() {
   const count = data?.length ?? 0;
   return (
     <Button asChild size="sm" variant="outline">
-      <Link search={{ tab: "cart" }} to="/my/items">
+      <Link search={{ filter: "open" }} to="/my/items">
         <ClipboardList aria-hidden="true" className="h-4 w-4" />
         Borrow list <CountBadge count={count} />
       </Link>

@@ -87,7 +87,7 @@ export function notificationFor(
         type: "inventory_request_rejected",
         title: `Request denied: ${prev.name}`,
         message: input.comment ?? `Your request for ${prev.name} was denied.`,
-        link: "/my/items?tab=history",
+        link: "/my/items?filter=closed",
       };
     }
     return null;
@@ -126,7 +126,7 @@ export function notificationFor(
         type: "inventory_request_approved",
         title,
         message: `Your request for ${prev.name} was approved.`,
-        link: "/my/items?tab=active",
+        link: "/my/items?filter=open",
       };
     }
     case "checked_out": {
@@ -135,7 +135,7 @@ export function notificationFor(
         type: "inventory_item_checked_out",
         title: `Checked out: ${prev.name}. Due ${formatDate(input.dueAt)}.`,
         message: `${prev.name} is now in your hands.`,
-        link: "/my/items?tab=active",
+        link: "/my/items?filter=open",
       };
     }
     case "available":
@@ -159,7 +159,7 @@ export function notificationFor(
         title: `Request closed: ${prev.name}`,
         message:
           input.comment ?? `Your request for ${prev.name} was closed by staff.`,
-        link: "/my/items?tab=history",
+        link: "/my/items?filter=closed",
       };
     }
     default:

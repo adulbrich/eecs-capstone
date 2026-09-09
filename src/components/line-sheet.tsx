@@ -67,15 +67,18 @@ export function LineSheet({
               </div>
             ))}
           </dl>
-          <section aria-labelledby="line-sheet-timeline-heading">
-            <h3
-              className="mb-2 font-medium text-sm"
-              id="line-sheet-timeline-heading"
-            >
-              History
-            </h3>
-            <LineTimeline events={events} />
-          </section>
+          {/* A hold has no line and so no history; the heading goes with it. */}
+          {events.length > 0 && (
+            <section aria-labelledby="line-sheet-timeline-heading">
+              <h3
+                className="mb-2 font-medium text-sm"
+                id="line-sheet-timeline-heading"
+              >
+                History
+              </h3>
+              <LineTimeline events={events} />
+            </section>
+          )}
         </div>
         {actions && <SheetFooter>{actions}</SheetFooter>}
       </SheetContent>
