@@ -3425,6 +3425,50 @@ describe("listInventoryRequestsAs", () => {
     ]);
   });
 
+  it("names the reviewer and the closer, and neither on a pending line", async () => {
+    // The line sheet's timeline names who decided and who closed, for staff.
+    // Two different staff members, so the two joins cannot be confused for
+    // one.
+    const stamp = Date.now();
+    const reviewer = await makeUser(`lir-rev-${stamp}@x.com`, "admin");
+    const closer = await makeUser(`lir-close-${stamp}@x.com`, "instructor");
+    const student = await makeUser(`lir-stu-${stamp}@x.com`, "user");
+    const decided = await makeItem({ name: `Decided ${stamp}` });
+    const untouched = await makeItem({ name: `Untouched ${stamp}` });
+    await addToCartAs(student, { itemId: decided.id });
+    await addToCartAs(student, { itemId: untouched.id });
+    await submitCartAs(student, { note: null });
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.itemId, decided.id));
+    await approveRequestItemAs(reviewer, {
+      requestItemId: line.id,
+      pickupBy: null,
+    });
+    await transitionItem(closer, {
+      itemId: decided.id,
+      nextStatus: "available",
+    });
+
+    const rows = await listInventoryRequestsAs(reviewer, {
+      status: "all",
+      q: "",
+    });
+    const closed = rows.find((r) => r.item.id === decided.id);
+    const pending = rows.find((r) => r.item.id === untouched.id);
+    expect(closed?.reviewer).toEqual({
+      email: `lir-rev-${stamp}@x.com`,
+      name: `lir-rev-${stamp}@x.com`,
+    });
+    expect(closed?.closer).toEqual({
+      email: `lir-close-${stamp}@x.com`,
+      name: `lir-close-${stamp}@x.com`,
+    });
+    expect(pending?.reviewer).toBeNull();
+    expect(pending?.closer).toBeNull();
+  });
+
   it("filters to a single status", async () => {
     const admin = await makeUser(`lir-b-${Date.now()}@x.com`, "admin");
     const student = await makeUser(`lir-c-${Date.now()}@x.com`, "user");

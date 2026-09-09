@@ -10,6 +10,7 @@ import {
   type SQL,
   sql,
 } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "#/db";
 import {
   inventoryItemStatusHistory,
@@ -361,6 +362,11 @@ export async function listInventoryRequestsAs(
       )
     : undefined;
   const conditions = [statusFilter, searchFilter].filter(Boolean);
+  // `user` three times in one query: the requester, and the two staff
+  // members the line sheet's timeline names. Left joins, because a pending
+  // line has neither and a cancelled one has no reviewer.
+  const reviewer = alias(user, "reviewer");
+  const closer = alias(user, "closer");
   const rows = await db
     .select({
       line: inventoryRequestItems,
@@ -368,6 +374,10 @@ export async function listInventoryRequestsAs(
       request: inventoryRequests,
       requesterEmail: user.email,
       requesterName: user.name,
+      reviewerEmail: reviewer.email,
+      reviewerName: reviewer.name,
+      closerEmail: closer.email,
+      closerName: closer.name,
     })
     .from(inventoryRequestItems)
     .innerJoin(
@@ -379,6 +389,8 @@ export async function listInventoryRequestsAs(
       eq(inventoryRequestItems.itemId, inventoryItems.id)
     )
     .innerJoin(user, eq(inventoryRequests.userId, user.id))
+    .leftJoin(reviewer, eq(inventoryRequestItems.reviewedBy, reviewer.id))
+    .leftJoin(closer, eq(inventoryRequestItems.closedBy, closer.id))
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(inventoryRequests.createdAt));
 
@@ -405,6 +417,10 @@ export async function listInventoryRequestsAs(
     requestedAt: r.request.createdAt,
     note: r.request.note,
     collectedBy: r.collectedBy,
+    reviewer: r.reviewerEmail
+      ? { email: r.reviewerEmail, name: r.reviewerName }
+      : null,
+    closer: r.closerEmail ? { email: r.closerEmail, name: r.closerName } : null,
   }));
 }
 
