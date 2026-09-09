@@ -40,6 +40,7 @@ import {
 import { recordOverdueNotificationsAs } from "#/server/_internal/inventory-overdue";
 import {
   approveRequestItemAs,
+  approveRequestLinesAs,
   cancelRequestItemAs,
   rejectRequestItemAs,
 } from "#/server/_internal/inventory-requests";
@@ -1567,6 +1568,174 @@ describe("request lifecycle", () => {
     expect(released.status).toBe("available");
     expect(released.currentHolderName).toBeNull();
     expect(released.currentHolderProgram).toBeNull();
+  });
+});
+
+describe("approveRequestLinesAs", () => {
+  /** A borrow list of `items` submitted as one request, with its lines. */
+  async function submitBatch(
+    student: { id: string; role: string },
+    items: { id: string }[]
+  ) {
+    for (const item of items) {
+      await addToCartAs(student, { itemId: item.id });
+    }
+    await submitCartAs(student, { note: null });
+    const lines = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(
+        inArray(
+          inventoryRequestItems.itemId,
+          items.map((item) => item.id)
+        )
+      );
+    const byItem = new Map(lines.map((line) => [line.itemId, line]));
+    return items.map((item) => {
+      const line = byItem.get(item.id);
+      if (!line) {
+        throw new Error("no line for item");
+      }
+      return line;
+    });
+  }
+
+  async function lineStatus(id: string) {
+    const [line] = await db
+      .select()
+      .from(inventoryRequestItems)
+      .where(eq(inventoryRequestItems.id, id));
+    return line;
+  }
+
+  async function itemStatus(id: string) {
+    const [item] = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, id));
+    return item.status;
+  }
+
+  it("approves every line with the one pickup date and reserves every item", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`batch-admin-${stamp}@x.com`, "admin");
+    const student = await makeUser(`batch-student-${stamp}@x.com`, "user");
+    const items = [await makeItem(), await makeItem()];
+    const lines = await submitBatch(student, items);
+    const pickupBy = new Date("2026-10-01T00:00:00.000Z");
+
+    const result = await approveRequestLinesAs(admin, {
+      requestItemIds: lines.map((line) => line.id),
+      pickupBy,
+    });
+
+    expect(result.approved.sort()).toEqual(lines.map((l) => l.id).sort());
+    for (const line of lines) {
+      const after = await lineStatus(line.id);
+      expect(after.status).toBe("approved");
+      expect(after.pickupBy?.toISOString()).toBe(pickupBy.toISOString());
+      expect(after.reviewedBy).toBe(admin.id);
+    }
+    for (const item of items) {
+      expect(await itemStatus(item.id)).toBe("reserved");
+    }
+    // One notification per line, as the single-line path writes.
+    const notifs = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, student.id));
+    expect(
+      notifs.filter((n) => n.type === "inventory_request_approved")
+    ).toHaveLength(2);
+  });
+
+  it("leaves a decided line alone when the caller passes only the pending ones", async () => {
+    const stamp = Date.now();
+    const admin = await makeUser(`part-admin-${stamp}@x.com`, "admin");
+    const student = await makeUser(`part-student-${stamp}@x.com`, "user");
+    const items = [await makeItem(), await makeItem(), await makeItem()];
+    const [rejected, ...pending] = await submitBatch(student, items);
+    await rejectRequestItemAs(admin, {
+      requestItemId: rejected.id,
+      reviewComment: "Not this one",
+    });
+
+    await approveRequestLinesAs(admin, {
+      requestItemIds: pending.map((line) => line.id),
+      pickupBy: null,
+    });
+
+    expect((await lineStatus(rejected.id)).status).toBe("rejected");
+    for (const line of pending) {
+      expect((await lineStatus(line.id)).status).toBe("approved");
+    }
+  });
+
+  it("applies nothing and names the item when one line lost its item to a race", async () => {
+    // The dialog listed both lines; the student cancelled one between the
+    // render and the click. What staff confirmed no longer holds, so nothing
+    // is written and the message says which item moved.
+    const stamp = Date.now();
+    const admin = await makeUser(`race-admin-${stamp}@x.com`, "admin");
+    const student = await makeUser(`race-student-${stamp}@x.com`, "user");
+    const items = [
+      await makeItem({ name: `Stays ${stamp}` }),
+      await makeItem({ name: `Gone ${stamp}` }),
+    ];
+    const [stays, gone] = await submitBatch(student, items);
+    await cancelRequestItemAs(student, { requestItemId: gone.id, note: null });
+
+    await expect(
+      approveRequestLinesAs(admin, {
+        requestItemIds: [stays.id, gone.id],
+        pickupBy: null,
+      })
+    ).rejects.toThrow(`Gone ${stamp} is no longer pending`);
+
+    expect((await lineStatus(stays.id)).status).toBe("pending");
+    expect(await itemStatus(items[0].id)).toBe("requested");
+  });
+
+  it("settles two overlapping batches without deadlocking", async () => {
+    // Both batches lock lines in ascending id order whatever order they were
+    // given, so the second waits on the first rather than each waiting on
+    // the other. Postgres would otherwise abort one with a deadlock error.
+    const stamp = Date.now();
+    const a = await makeUser(`ovl-a-${stamp}@x.com`, "admin");
+    const b = await makeUser(`ovl-b-${stamp}@x.com`, "admin");
+    const student = await makeUser(`ovl-student-${stamp}@x.com`, "user");
+    const items = [await makeItem(), await makeItem()];
+    const lines = await submitBatch(student, items);
+    const ids = lines.map((line) => line.id);
+
+    const results = await Promise.allSettled([
+      approveRequestLinesAs(a, { requestItemIds: ids, pickupBy: null }),
+      approveRequestLinesAs(b, {
+        requestItemIds: [...ids].reverse(),
+        pickupBy: null,
+      }),
+    ]);
+
+    const outcomes = results.map((r) => r.status).sort();
+    expect(outcomes).toEqual(["fulfilled", "rejected"]);
+    const failure = results.find((r) => r.status === "rejected");
+    expect(String(failure?.reason)).not.toMatch(/deadlock/i);
+    expect(String(failure?.reason)).toMatch(/no longer pending/);
+    for (const line of lines) {
+      expect((await lineStatus(line.id)).status).toBe("approved");
+    }
+  });
+
+  it("refuses a non-staff viewer", async () => {
+    const stamp = Date.now();
+    const student = await makeUser(`nostaff-${stamp}@x.com`, "user");
+    const [line] = await submitBatch(student, [await makeItem()]);
+    await expect(
+      approveRequestLinesAs(student, {
+        requestItemIds: [line.id],
+        pickupBy: null,
+      })
+    ).rejects.toThrow("Forbidden");
   });
 });
 

@@ -135,6 +135,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     note: "Any signed-in user may cart any item, but addToCartAs throws unless item.status is available. That check is the per-item rule: a retired or otherwise non-available item is hidden from non-staff by canReadInventoryItem, and the status guard is what stops one being carted by id. Do not remove it as redundant with the public catalog.",
   },
   "server/inventory.ts:approveRequestItem": { level: "staff" },
+  "server/inventory.ts:approveRequestLines": {
+    level: "staff",
+    note: "The batch over approveRequestItemAs's path: the named lines are approved in ascending id order inside one transaction, and a line no longer pending fails the whole batch and names its item.",
+  },
   "server/inventory.ts:cancelRequestItem": {
     level: "authenticated",
     note: "Requester only: the line's requesterId must equal the viewer. Staff cancel through transitionInventoryItem instead.",

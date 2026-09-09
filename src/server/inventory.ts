@@ -216,6 +216,20 @@ export const approveRequestItem = createServerFn({ method: "POST" })
     return approveRequestItemForCurrentUser(data);
   });
 
+const approveLinesSchema = z.object({
+  requestItemIds: z.array(z.string().uuid()).min(1).max(100),
+  pickupBy: z.coerce.date().nullable().default(null),
+});
+
+export const approveRequestLines = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => approveLinesSchema.parse(d))
+  .handler(async ({ data }) => {
+    const { approveRequestLinesForCurrentUser } = await import(
+      "./_internal/inventory-requests"
+    );
+    return approveRequestLinesForCurrentUser(data);
+  });
+
 const rejectSchema = z.object({
   requestItemId: z.string().uuid(),
   reviewComment: z.string().min(1).max(2000),
