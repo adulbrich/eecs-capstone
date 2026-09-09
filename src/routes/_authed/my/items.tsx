@@ -49,7 +49,9 @@ import {
 // purpose: no column here accepts a sort, so a URL naming one could only
 // mislead, and sorting would drop the grouping and take the borrow list's
 // Submit button, which lives on a group header, with it.
-const searchSchema = z.object({
+// Exported, with `buildColumns`, for `src/test/my-items-columns.test.tsx`,
+// which pins the default filter and that no column can sort or hide.
+export const searchSchema = z.object({
   filter: z.enum(MY_ITEMS_FILTERS).default("open"),
 });
 
@@ -221,7 +223,7 @@ interface Actions {
  * no admin machinery, and a sort would drop the grouping (see
  * `docs/QUIRKS.md`, Inventory).
  */
-function buildColumns({ busy, onCancel, onOpen, onRemove }: Actions) {
+export function buildColumns({ busy, onCancel, onOpen, onRemove }: Actions) {
   return defineAdminColumns<Row>()([
     {
       accessorFn: (row) => rowName(row),
