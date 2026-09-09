@@ -290,6 +290,69 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
     })
     .where(eq(schema.inventoryItems.id, overdueItem.id));
 
+  // A custom request for the fixture user: one line sourcing with a note and
+  // one fulfilled with an item linked and reserved to them, so /my/items
+  // scans a custom group with a hold nested under its line, and the queue
+  // scans the second row kind. Written directly, as the other fixtures are;
+  // select-first on the line name.
+  const [existingCustom] = await db
+    .select()
+    .from(schema.inventoryCustomLines)
+    .where(eq(schema.inventoryCustomLines.name, "A11Y Custom Line"));
+  if (!existingCustom) {
+    const [envelope] = await db
+      .insert(schema.inventoryRequests)
+      .values({ userId: owner.id, note: "For the accessibility scan." })
+      .returning();
+    await db.insert(schema.inventoryCustomLines).values({
+      requestId: envelope.id,
+      name: "A11Y Custom Line",
+      reason: "A thing the inventory does not hold.",
+      quantity: 2,
+      status: "sourcing",
+      sourcingNote: "Ordered, two weeks.",
+      reviewedAt: new Date(),
+    });
+    let [produced] = await db
+      .select()
+      .from(schema.inventoryItems)
+      .where(eq(schema.inventoryItems.name, "A11Y Produced Item"));
+    if (!produced) {
+      [produced] = await db
+        .insert(schema.inventoryItems)
+        .values({
+          name: "A11Y Produced Item",
+          description: "Bought to fulfil the fixture user's custom line.",
+        })
+        .returning();
+    }
+    const [fulfilled] = await db
+      .insert(schema.inventoryCustomLines)
+      .values({
+        requestId: envelope.id,
+        name: "A11Y Fulfilled Line",
+        reason: "Arrived and reserved.",
+        quantity: 1,
+        status: "fulfilled",
+        outcomeNote: "On the shelf by the door.",
+        reviewedAt: new Date(),
+        closedAt: new Date(),
+      })
+      .returning();
+    await db
+      .insert(schema.inventoryCustomLineItems)
+      .values({ customLineId: fulfilled.id, itemId: produced.id })
+      .onConflictDoNothing();
+    await db
+      .update(schema.inventoryItems)
+      .set({
+        status: "reserved",
+        currentHolderId: owner.id,
+        currentPickupBy: new Date(Date.now() + 5 * 86_400_000),
+      })
+      .where(eq(schema.inventoryItems.id, produced.id));
+  }
+
   // Draft project owned by the fixture user (no unique constraint on title,
   // select-first pattern). user.a11y.test.ts needs a draft it can sign in as
   // user@example.com and see a delete trigger on: the dev seed's only draft
