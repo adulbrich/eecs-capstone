@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ItemStatus } from "#/lib/vocabularies";
 import {
+  customLineNotification,
   notificationFor,
   overdueNotifications,
 } from "../inventory-notifications";
@@ -188,5 +189,94 @@ describe("overdueNotifications", () => {
     expect(pickup.type).toBe("inventory_pickup_overdue");
     const [checkout] = overdueNotifications([candidate], NOW);
     expect(checkout.type).toBe("inventory_checkout_overdue");
+  });
+});
+
+describe("notificationFor: silent", () => {
+  it("writes nothing when the transition is silent, even a reservation", () => {
+    // The fulfill path reserves each linked item through transitionItem and
+    // then writes one notice for the whole fulfillment; the per-item
+    // "Reserved" notices would be noise on top of it.
+    expect(
+      notificationFor(
+        { ...item, status: "available" },
+        {
+          nextStatus: "reserved",
+          pickupBy: new Date("2026-10-01T00:00:00Z"),
+          silent: true,
+        },
+        "u-requester",
+        null
+      )
+    ).toBeNull();
+  });
+});
+
+describe("customLineNotification", () => {
+  const base = { name: "Thermal camera", note: null, requesterId: "u-req" };
+
+  it("says staff are sourcing, carrying the note verbatim when there is one", () => {
+    const withNote = customLineNotification("sourcing", {
+      ...base,
+      note: "Ordered from the vendor, two weeks",
+    });
+    expect(withNote).toEqual({
+      userId: "u-req",
+      type: "inventory_custom_sourcing",
+      title: "Sourcing: Thermal camera",
+      message: "Ordered from the vendor, two weeks",
+      link: "/my/items?filter=open",
+    });
+    expect(customLineNotification("sourcing", base).message).toBe(
+      "Staff are getting Thermal camera."
+    );
+    // Whitespace is not a note.
+    expect(
+      customLineNotification("sourcing", { ...base, note: "   " }).message
+    ).toBe("Staff are getting Thermal camera.");
+  });
+
+  it("announces a rewritten sourcing note as an update", () => {
+    const row = customLineNotification("sourcing_note", {
+      ...base,
+      note: "Slipped to next month",
+    });
+    expect(row.type).toBe("inventory_custom_sourcing_note");
+    expect(row.title).toBe("Update on Thermal camera");
+    expect(row.message).toBe("Slipped to next month");
+  });
+
+  it("names every item a fulfillment linked, and the pickup deadline when reserved", () => {
+    const reserved = customLineNotification("fulfilled", {
+      ...base,
+      items: [{ name: "FLIR One" }, { name: "FLIR One (2)" }],
+      note: "Both on the shelf by the door",
+      pickupBy: new Date("2026-10-01T12:00:00Z"),
+    });
+    expect(reserved.type).toBe("inventory_custom_fulfilled");
+    expect(reserved.message).toContain(
+      "FLIR One, FLIR One (2) reserved for you"
+    );
+    expect(reserved.message).toContain("2026");
+    expect(reserved.message).toContain("Both on the shelf by the door");
+    expect(reserved.link).toBe("/my/items?filter=open");
+
+    const unreserved = customLineNotification("fulfilled", {
+      ...base,
+      items: [{ name: "FLIR One" }],
+      pickupBy: null,
+    });
+    expect(unreserved.message).toBe("FLIR One now in the inventory.");
+    expect(unreserved.link).toBe("/my/items?filter=closed");
+  });
+
+  it("carries the reason on a rejection", () => {
+    const row = customLineNotification("rejected", {
+      ...base,
+      note: "Out of budget this term",
+    });
+    expect(row.type).toBe("inventory_custom_rejected");
+    expect(row.message).toBe("Out of budget this term");
+    expect(row.link).toBe("/my/items?filter=closed");
   });
 });

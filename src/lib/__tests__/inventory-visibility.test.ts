@@ -4,8 +4,10 @@ import {
   canReadInventoryItem,
   canSeeRetired,
   holdItemView,
+  myCustomLineView,
   myRequestLineView,
   publicItemView,
+  staffCustomLineView,
   staffItemView,
   statusRank,
   visibleStatuses,
@@ -281,5 +283,47 @@ describe("statusRank", () => {
   it("ranks an unknown status with retired, after everything live", () => {
     expect(statusRank("banana")).toBe(statusRank("retired"));
     expect(statusRank("banana")).toBeGreaterThan(statusRank("maintenance"));
+  });
+});
+
+describe("custom line views", () => {
+  const row = {
+    id: "custom-1",
+    requestId: "req-2",
+    name: "Thermal camera",
+    reason: "Heat mapping for the greenhouse project",
+    quantity: 2,
+    link: "https://example.com/camera",
+    status: "sourcing",
+    sourcingNote: "Ordered, two weeks",
+    outcomeNote: null,
+    reviewedBy: "u-staff",
+    reviewedAt: new Date("2026-02-02"),
+    closedBy: null,
+    closedAt: null,
+    createdAt: new Date("2026-02-01"),
+  };
+
+  it("gives the requester what was asked, where it is, both notes and the dates", () => {
+    expect(Object.keys(myCustomLineView(row)).sort()).toEqual([
+      "closedAt",
+      "createdAt",
+      "id",
+      "link",
+      "name",
+      "outcomeNote",
+      "quantity",
+      "reason",
+      "sourcingNote",
+      "status",
+    ]);
+  });
+
+  it("keeps the identities for staff, and reviewedAt beside them", () => {
+    const view = staffCustomLineView(row);
+    expect(view.reviewedBy).toBe("u-staff");
+    expect(view.reviewedAt).toEqual(new Date("2026-02-02"));
+    expect(view.closedBy).toBeNull();
+    expect(Object.keys(view)).not.toContain("requestId");
   });
 });
