@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { z } from "zod";
 import { AdminDataTable } from "#/components/admin-data-table";
@@ -11,6 +11,7 @@ import {
   INVENTORY_TABLE_DEFAULT_SORT,
   type InventoryListRow,
 } from "#/components/inventory-table-columns";
+import { Button } from "#/components/ui/button";
 import {
   Pagination,
   PaginationButton,
@@ -110,14 +111,36 @@ function InventoryTable({
 }
 
 function InventoryCards({
+  q,
   rows,
   signedIn,
 }: {
+  q: string;
   rows: InventoryListRow[];
   signedIn: boolean;
 }) {
   if (rows.length === 0) {
-    return <EmptyState>No items match.</EmptyState>;
+    // The place someone discovers the gap: the search found nothing, so the
+    // ask carries the query into the first line's name. Hidden when signed
+    // out, the same rule the two buttons on the title row follow.
+    return (
+      <EmptyState>
+        No items match.
+        {signedIn && (
+          <>
+            {" "}
+            <Link
+              className="text-brand hover:underline"
+              search={{ q: q || undefined }}
+              to="/inventory/request"
+            >
+              Ask for it anyway
+            </Link>
+            .
+          </>
+        )}
+      </EmptyState>
+    );
   }
   return (
     <div className="mx-auto mt-6 flex max-w-4xl flex-col gap-3">
@@ -160,7 +183,15 @@ function InventoryIndex() {
       <div className="mx-auto max-w-4xl">
         <div className="flex items-center justify-between gap-4">
           <h1 className="font-semibold text-2xl">Inventory</h1>
-          <BorrowListButton />
+          <div className="flex items-center gap-2">
+            {/* Same sign-in gate as its sibling: a visitor cannot ask. */}
+            {signedIn && (
+              <Button asChild size="sm" variant="outline">
+                <Link to="/inventory/request">Request something else</Link>
+              </Button>
+            )}
+            <BorrowListButton />
+          </div>
         </div>
         <div className="mt-4">
           <InventoryFilterBar
@@ -185,7 +216,7 @@ function InventoryIndex() {
       {view === "table" ? (
         <InventoryTable rows={data.rows} search={search} />
       ) : (
-        <InventoryCards rows={data.rows} signedIn={signedIn} />
+        <InventoryCards q={search.q} rows={data.rows} signedIn={signedIn} />
       )}
       <Pagination className="mx-auto max-w-4xl">
         <PaginationButton
