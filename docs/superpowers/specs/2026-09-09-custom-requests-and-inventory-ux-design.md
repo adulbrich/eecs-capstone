@@ -32,8 +32,8 @@ with an optional note, holding one custom line per thing asked for. Visible to i
 requester and to staff, never to anyone else.
 _Avoid_: wishlist, purchase order, acquisition, suggestion.
 
-**Custom line**: one thing within one custom request, with its own status, staff
-reply, and the items it eventually produced. Staff decide lines, not requests, the
+**Custom line**: one thing within one custom request, with its own status, its two
+staff notes, and the items it eventually produced. Staff decide lines, not requests, the
 same way they do for a borrow list.
 _Avoid_: wanted item, custom item, wish.
 
@@ -175,11 +175,12 @@ inventory_custom_lines
   quantity      integer not null
   link          text
   status        inventory_custom_line_status not null default 'pending'
-  staff_reply   text
+  sourcing_note text
+  outcome_note  text
   reviewed_by   text -> user, set null
   reviewed_at   timestamptz
-  closed_at     timestamptz
   closed_by     text -> user, set null
+  closed_at     timestamptz
   created_at    timestamptz not null default now()
 
 index on (request_id)
@@ -210,7 +211,8 @@ exists, and a tuple placed anywhere else is scanned by nothing and passes silent
 | --- | --- | --- |
 | `name`, `reason`, `quantity`, `link` | requester, staff | nobody after submit |
 | `status` | requester, staff | staff, plus the requester for `cancelled` |
-| `staff_reply` | requester, staff | staff |
+| `sourcing_note` | requester, staff | staff, while the line is `sourcing` |
+| `outcome_note` | requester, staff | staff on a close, requester on a cancel |
 | `reviewed_by`, `reviewed_at` | staff | staff, on the first decision only; never overwritten |
 | `closed_by`, `closed_at` | staff | whichever transition closes the line, staff or requester |
 | `inventory_custom_line_items` rows | requester, staff | staff |
@@ -223,20 +225,39 @@ requester, sees no custom request at all.
 the line and files another; there is no `updateCustomLineAs`, which is why the five
 wrappers below do not list one. Staff answer a request, they do not rewrite it.
 
-**One requester-visible reply column, not two.** An item line carries both
-`review_comment` and `closed_reason`, and a rejection writes the same text into each,
-but only `closed_reason` reaches the student: `myRequestLineView` in
-`src/lib/inventory-visibility.ts` omits `review_comment` deliberately, and
-`docs/QUIRKS.md` records shipping it to students as the leak that projection exists to
-stop. Giving a custom line a `review_comment` that the requester *can* read would be
-the same name meaning two different things across one queue, which is the exact hazard
-this spec uses to reject `approved`.
+### Two notes, because two transitions speak
 
-So the custom line has a single `staff_reply`, requester-visible, and that is the
-only column that departs from the sibling's naming. `staff_reply` is renamed
-precisely because it does **not** match: the sibling's `review_comment` is staff-only
-and this one is not. Every other column keeps the sibling's name **and its write
-rule**, which matters more than the name:
+**A line visits at most three of its five statuses.** `pending`, then at most one
+intermediate, then one terminal, and the terminals are mutually exclusive. That holds
+for both kinds, and it is what makes the columns a complete record rather than a
+lossy summary of something longer.
+
+| Kind | Longest path | Transitions that carry a comment |
+| --- | --- | --- |
+| Request line | `pending`, `approved`, `returned` or `cancelled` | one, at the close. Approving says nothing: `approveRequestItemAs` takes only a line id and a pickup date |
+| Custom line | `pending`, `sourcing`, `fulfilled` or `rejected` or `cancelled` | two: the sourcing note, and the closing note |
+
+So the delta between the two kinds is exactly **one comment**, because `sourcing` is a
+staff action with something to say and approving is not: approving hands over a
+physical thing and the thing is the message. Two speaking transitions get two columns,
+and nothing is ever overwritten by the next event.
+
+**Neither kind gets a history table.** A per-line log would be an audit trail for a
+lifecycle that cannot lose anything, and `inventory_item_status_history` cannot stand
+in for one either: its `new_status` is the *item's* status, so a release to
+`available` is written identically whether the line was returned, cancelled or
+rejected. It is read per line in exactly one place today,
+`src/server/_internal/inventory-holdings.ts`, and only to answer "who collected this",
+with a `selectDistinctOn` to get there.
+
+**The custom line does not inherit `review_comment`.** On a request line that column
+is staff-only, `myRequestLineView` omits it deliberately, and `docs/QUIRKS.md` records
+shipping it to students as the leak that projection exists to stop. The custom line's
+first note is a promise the requester must read, so reusing the name would make it
+mean two different things in one queue, which is the hazard this spec uses to reject
+`approved`. `sourcing_note` and `outcome_note` say what they are and carry no
+inherited contract. The remaining columns keep the sibling's names **and their write
+rules**, which matters more than the names:
 
 - **`reviewed_by` and `reviewed_at` are written once**, on the first staff decision,
   and never overwritten. That is what they mean on `inventory_request_items`, where
@@ -253,12 +274,20 @@ rule**, which matters more than the name:
 
 What each transition writes:
 
-| Transition | `staff_reply` | `reviewed_by`, `reviewed_at` | `closed_by`, `closed_at` |
-| --- | --- | --- | --- |
-| `sourcing` | the note, optional | the staff member, now, if unset | unset |
-| `fulfilled` | the note, optional | the staff member, now, if unset | the staff member, now |
-| `rejected` | the reason, **required** | the staff member, now, if unset | the staff member, now |
-| `cancelled` | untouched | untouched | the requester, now |
+| Transition | `sourcing_note` | `outcome_note` | `reviewed_by`, `reviewed_at` | `closed_by`, `closed_at` |
+| --- | --- | --- | --- | --- |
+| `sourcing` | the note, optional | untouched | the staff member, now, if unset | unset |
+| `fulfilled` | untouched | the note, optional | the staff member, now, if unset | the staff member, now |
+| `rejected` | untouched | the reason, **required** | the staff member, now, if unset | the staff member, now |
+| `cancelled` | untouched | the note, optional | untouched | the requester, now |
+
+**Staff may rewrite `sourcing_note` while the line is `sourcing`**, and doing so
+notifies the requester. An order slipping is the likeliest thing to happen to a
+sourcing line, and the alternative is an app that goes silent exactly when the person
+waiting most wants a word. It is the same event rewritten rather than a new one, so
+the superseded text is not kept: a status update's value dies when a fresher one
+replaces it, and what was promised now and what happened in the end both survive in
+their own columns.
 
 Three indexes, matching the three `inventory_request_items` carries: `(request_id)`,
 because both grouped tables group by it; `(status)`, because the queue filters on it;
@@ -269,13 +298,6 @@ module already uses for a floor of one (`.min(1)` there is for strings) rather t
 `src/db/schema.ts` carries no CHECK constraints today, and this is not the feature
 that should introduce the first one. The floor is a rule either way, so it is written
 here rather than left to the reader to infer.
-
-**`staff_reply` is the latest reply, not a log.** Fulfilling after sourcing
-overwrites the sourcing note, which is accepted rather than solved, and it is why
-each of the three notifications below carries the reply text verbatim: the column
-keeps the last word, the bell keeps the sequence. Extending
-`inventory_item_status_history` to cover custom lines is the fix if that ever stops
-being enough, and it is not in this version.
 
 `cancelled` is the requester's own transition, so it leaves the review columns alone:
 nobody decided anything, the requester withdrew. It still writes `closed_by`, naming
@@ -351,6 +373,31 @@ a group stops being contiguous the moment rows are ordered by status.
 
 `defineAdminColumns` and every existing call site are untouched.
 
+## The line sheet, on both pages
+
+Opening a row opens a `Sheet`, and the sheet is where one line is read and acted on.
+It holds the line's own fields, its **timeline**, and its actions, on the staff queue
+and on `/my/items` alike.
+
+The timeline is three events at most, drawn from columns rather than from a log:
+submitted (the envelope's `created_at`), decided (`reviewed_by`, `reviewed_at`, and
+the note that belongs to that step), and closed (`closed_by`, `closed_at`, and the
+closing note). Both kinds of line have that shape, so **one pure module in `src/lib`
+builds a `TimelineEvent[]` from either**, and one component draws it. Unit tested with
+no docker, like the five modules beside it.
+
+Two things follow from choosing a sheet:
+
+- **`AdminDataTable` is not touched.** A sheet is a sibling of the table, not a row
+  detail, and `src/components/ui/sheet.tsx` is already installed, though only the
+  mobile nav in `site-header.tsx` uses it today. That matters because PR 1 is already
+  extending the shared table, and row expansion is on its out-of-scope list.
+- **The queue keeps its width.** The fulfill flow wants more room than a table cell,
+  and the sheet gives the actions somewhere to live that is not a seventh column.
+
+The requester's sheet omits the actor on every event, matching `/my/items`, which
+names nobody today.
+
 ## The two pages
 
 ### `/admin/inventory/requests`
@@ -364,7 +411,15 @@ single pickup date and applies it to every pending line in the group.
 **Start sourcing all** on a custom request, which takes no input.
 
 Row actions branch on kind. An item line keeps Approve and Reject. A custom line gets
-Start sourcing, Fulfill and Reject, and never the word Approve.
+Start sourcing, Fulfill and Reject, and never the word Approve. Every row also opens
+the sheet above, which is where the timeline and the roomier actions live.
+
+**The `request` search param** joins `line`, in the same shape: a nullable uuid with
+`.catch(null)`, kept out of `loaderDeps` because it changes what is highlighted and
+never what is fetched. The Request column in the flat view links to it, and **that
+link clears `sort` and `dir`**, which is the part that makes it work: without it you
+land back in the flat view you clicked from, with nothing grouped. The two params
+compose, so a link that names both highlights a line inside a highlighted group.
 
 `kind` is switched on at four sites here: the row actions, the group action, the badge
 and the filter's status set. That is one discriminant re-tested four times, so it
@@ -473,29 +528,31 @@ else's. (#104 is closed, and it was about `_internal/inventory.ts`, not the endp
 file. It is precedent here, not an open complaint.)
 
 One named wrapper per action over an `*As` seam: `submitCustomRequestAs`,
-`startSourcingCustomLineAs`, `rejectCustomLineAs`, `fulfillCustomLineAs`,
-`cancelCustomLineAs`. Note the spelling: the repo writes fulfillment with two `l`s.
+`startSourcingCustomLineAs`, `updateSourcingNoteAs`, `rejectCustomLineAs`,
+`fulfillCustomLineAs`, `cancelCustomLineAs`. Note the spelling: the repo writes
+fulfillment with two `l`s. `updateSourcingNoteAs` is the only one that is not a
+transition: it rewrites `sourcing_note` on a line that is already `sourcing`, and
+notifies.
 
-Each of the five endpoints needs its line in `src/server/__tests__/access-contract.ts`
+Each of the six endpoints needs its line in `src/server/__tests__/access-contract.ts`
 (ADR-0003). There is no global middleware, so an endpoint with no declared level is a
 test failure, and the file's own docblock records the three months during which two
 endpoints returned every admin's name, email and role to anonymous callers.
 
 The rules stay pure and client-safe, beside the five modules already in `src/lib`: a
 new `inventory-custom-workflow.ts` says which transition a custom line may make and
-who may make it, unit tested with no docker. Who gets told extends
+who may make it, and `inventory-timeline.ts` turns either kind of line into the
+`TimelineEvent[]` the sheet draws. Both unit tested with no docker. Who gets told extends
 `inventory-notifications.ts` rather than forking it; who sees what extends
 `inventory-visibility.ts` with a requester projection and a staff projection, so
 `reviewed_by` and `reviewed_at` cannot leak the way whole table objects once shipped
 `serial` and `reviewComment` to students.
 
-**Notifications**: three cases, all in-app, none by email. Sourcing ("we are getting
-this"), fulfilled (naming the items, and the pickup deadline when they were
-reserved), rejected. **Each of the three carries `staff_reply` verbatim when it is
-non-empty**, which is not decoration: the column keeps only the latest reply, so the
-notification is where the sequence survives, and a sourcing note overwritten by a
-fulfillment note is still readable in the bell. One notification per fulfill, not one per
-item. Staff get nothing on submit, because the admin overview tile is already the
+**Notifications**: four cases, all in-app, none by email. Sourcing ("we are getting
+this"), a rewritten sourcing note ("an update on what you asked for"), fulfilled
+(naming the items, and the pickup deadline when they were reserved), and rejected.
+Each carries the note it belongs to verbatim when that note is non-empty. One
+notification per fulfill, not one per item. Staff get nothing on submit, because the admin overview tile is already the
 signal; that tile's count now includes pending custom lines.
 
 ## Landing plan
@@ -503,8 +560,10 @@ signal; that tile's count now includes pending custom lines.
 Four issues, four branches, in order. Each is green and reviewable alone.
 
 1. **The grouping mode** on `AdminDataTable`, with unit tests. No page touched.
-2. **The admin queue grouped**, with Approve all over item lines.
-3. **`/my/items` restructured**, `tab` retired, every link rewritten.
+2. **The admin queue grouped**, with Approve all over item lines, plus the `request`
+   search param, the line sheet and `inventory-timeline.ts` over request lines.
+3. **`/my/items` restructured**, `tab` retired, every link rewritten, and the same
+   sheet reused with the actor omitted.
 4. **Custom requests end to end**: schema, vocabulary, rules module, server, form,
    queue rows, fulfill dialog, notifications, plus the docs below.
 
@@ -523,6 +582,8 @@ two lock orders are separate entries on purpose: they are different rules.
 
 - `docs/QUIRKS.md`, Inventory: the batch approve lock order, **lines** in ascending
   id order, and why (line-then-item, against `lockAttachableRequestLine`).
+- `docs/UI-CONVENTIONS.md`: the line sheet, and that `Sheet` is now used outside the
+  mobile nav for the first time.
 
 **PR 3, `/my/items`**
 
@@ -549,11 +610,35 @@ two lock orders are separate entries on purpose: they are different rules.
 - ADR: `sourcing` rather than `approved`, and why a custom line has no `returned`.
 - `PRD.md`: the feature, under Inventory.
 
-## Open questions, carried rather than closed
+## Questions raised and settled
 
-1. **What the flat view's Request column links to.** There is no single request page
-   today. Plain text for now.
-2. **Partial fulfillment of one line.** Two asked for, one arrived, has no state of
-   its own; staff say it in the reply and leave the line sourcing.
-3. **Quantity against reality.** Quantity is what the requester asked for, never a
-   promise, and never stock counting: an item is one physical thing.
+Recorded because each was argued and two reversed an earlier decision in this file.
+
+1. **The Request column links to the grouped queue**, `?request=<id>`, and the link
+   clears `sort` and `dir` so it lands in the grouped view rather than the flat one it
+   was clicked from. No request page: the grouped view already is the request view,
+   and a page would be a second rendering of the same rows with its own visibility
+   rules to get wrong.
+2. **Partial arrival is told in the note.** Two asked for and one arrived has no state
+   of its own; the line stays `sourcing` and nothing is linked or reserved until it is
+   fulfilled. The item created early is `available` like any other, which is the same
+   window the ordinary fulfill path already has and only longer, and the requester can
+   cart it in the meantime like anyone else.
+3. **Quantity is what was asked for**, never a promise and never stock counting: an
+   item is one physical thing.
+4. **No history table, on either kind.** An earlier draft of this spec gave the custom
+   line a single reply column, noticed that fulfilling would overwrite the sourcing
+   note, and proposed a per-line log to catch what was lost. The log was solving a
+   problem the single column had created. Two speaking transitions get two columns and
+   nothing is lost, and a line visits at most three of its five statuses, so the
+   columns are the complete record rather than a summary of something longer.
+5. **No private staff note.** `project_comments` carries `is_internal` as precedent,
+   but nothing on a custom request has asked for one, and an item already has
+   staff-only `notes` for the thing itself. Everything written on a line is readable by
+   the person who asked for it, which is one rule instead of two, and the column is a
+   default-false migration the day a real need appears.
+6. **No staff names reach requesters.** The timeline shows date, status and note to the
+   requester and adds the actor for staff. `/my/items` names nobody today, and its
+   History column is headed "Note from staff" with no author. Showing names would be a
+   new class of information about staff flowing to students, and it would want to apply
+   to request-line rejections too, which is wider than this spec.
