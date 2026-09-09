@@ -320,6 +320,14 @@ describe("custom line views", () => {
     ]);
   });
 
+  it("gives the requester the date the line was decided, for the timeline", () => {
+    // The decided event has nothing to sit on without it; the identity of
+    // who decided stays with staff.
+    const view = myCustomLineView(row);
+    expect(view.reviewedAt).toEqual(new Date("2026-02-02"));
+    expect(view.closedAt).toBeNull();
+  });
+
   it("keeps the identities for staff", () => {
     const view = staffCustomLineView(row);
     expect(view.reviewedBy).toBe("u-staff");
