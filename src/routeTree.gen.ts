@@ -30,6 +30,7 @@ import { Route as AuthedProjectsNewRouteImport } from './routes/_authed/projects
 import { Route as AuthedMyProjectsRouteImport } from './routes/_authed/my/projects'
 import { Route as AuthedMyItemsRouteImport } from './routes/_authed/my/items'
 import { Route as AuthedMyBookmarksRouteImport } from './routes/_authed/my/bookmarks'
+import { Route as AuthedInventoryRequestRouteImport } from './routes/_authed/inventory/request'
 import { Route as AuthedInventoryNewRouteImport } from './routes/_authed/inventory/new'
 import { Route as AuthedAdminAnalyticsRouteImport } from './routes/_authed/admin/analytics'
 import { Route as AuthedAdminUsersIndexRouteImport } from './routes/_authed/admin/users/index'
@@ -149,6 +150,11 @@ const AuthedMyBookmarksRoute = AuthedMyBookmarksRouteImport.update({
   path: '/my/bookmarks',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedInventoryRequestRoute = AuthedInventoryRequestRouteImport.update({
+  id: '/inventory/request',
+  path: '/inventory/request',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedInventoryNewRoute = AuthedInventoryNewRouteImport.update({
   id: '/inventory/new',
   path: '/inventory/new',
@@ -246,6 +252,7 @@ export interface FileRoutesByFullPath {
   '/projects/': typeof ProjectsIndexRoute
   '/admin/analytics': typeof AuthedAdminAnalyticsRoute
   '/inventory/new': typeof AuthedInventoryNewRoute
+  '/inventory/request': typeof AuthedInventoryRequestRoute
   '/my/bookmarks': typeof AuthedMyBookmarksRoute
   '/my/items': typeof AuthedMyItemsRoute
   '/my/projects': typeof AuthedMyProjectsRoute
@@ -281,6 +288,7 @@ export interface FileRoutesByTo {
   '/projects': typeof ProjectsIndexRoute
   '/admin/analytics': typeof AuthedAdminAnalyticsRoute
   '/inventory/new': typeof AuthedInventoryNewRoute
+  '/inventory/request': typeof AuthedInventoryRequestRoute
   '/my/bookmarks': typeof AuthedMyBookmarksRoute
   '/my/items': typeof AuthedMyItemsRoute
   '/my/projects': typeof AuthedMyProjectsRoute
@@ -319,6 +327,7 @@ export interface FileRoutesById {
   '/projects/': typeof ProjectsIndexRoute
   '/_authed/admin/analytics': typeof AuthedAdminAnalyticsRoute
   '/_authed/inventory/new': typeof AuthedInventoryNewRoute
+  '/_authed/inventory/request': typeof AuthedInventoryRequestRoute
   '/_authed/my/bookmarks': typeof AuthedMyBookmarksRoute
   '/_authed/my/items': typeof AuthedMyItemsRoute
   '/_authed/my/projects': typeof AuthedMyProjectsRoute
@@ -357,6 +366,7 @@ export interface FileRouteTypes {
     | '/projects/'
     | '/admin/analytics'
     | '/inventory/new'
+    | '/inventory/request'
     | '/my/bookmarks'
     | '/my/items'
     | '/my/projects'
@@ -392,6 +402,7 @@ export interface FileRouteTypes {
     | '/projects'
     | '/admin/analytics'
     | '/inventory/new'
+    | '/inventory/request'
     | '/my/bookmarks'
     | '/my/items'
     | '/my/projects'
@@ -429,6 +440,7 @@ export interface FileRouteTypes {
     | '/projects/'
     | '/_authed/admin/analytics'
     | '/_authed/inventory/new'
+    | '/_authed/inventory/request'
     | '/_authed/my/bookmarks'
     | '/_authed/my/items'
     | '/_authed/my/projects'
@@ -615,6 +627,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedMyBookmarksRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/inventory/request': {
+      id: '/_authed/inventory/request'
+      path: '/inventory/request'
+      fullPath: '/inventory/request'
+      preLoaderRoute: typeof AuthedInventoryRequestRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/inventory/new': {
       id: '/_authed/inventory/new'
       path: '/inventory/new'
@@ -754,6 +773,7 @@ interface AuthedRouteChildren {
   AuthedAdminRoute: typeof AuthedAdminRouteWithChildren
   AuthedProfileRoute: typeof AuthedProfileRoute
   AuthedInventoryNewRoute: typeof AuthedInventoryNewRoute
+  AuthedInventoryRequestRoute: typeof AuthedInventoryRequestRoute
   AuthedMyBookmarksRoute: typeof AuthedMyBookmarksRoute
   AuthedMyItemsRoute: typeof AuthedMyItemsRoute
   AuthedMyProjectsRoute: typeof AuthedMyProjectsRoute
@@ -766,6 +786,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAdminRoute: AuthedAdminRouteWithChildren,
   AuthedProfileRoute: AuthedProfileRoute,
   AuthedInventoryNewRoute: AuthedInventoryNewRoute,
+  AuthedInventoryRequestRoute: AuthedInventoryRequestRoute,
   AuthedMyBookmarksRoute: AuthedMyBookmarksRoute,
   AuthedMyItemsRoute: AuthedMyItemsRoute,
   AuthedMyProjectsRoute: AuthedMyProjectsRoute,
