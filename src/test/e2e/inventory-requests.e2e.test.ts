@@ -56,7 +56,7 @@ test.describe("inventory request rejection", () => {
       await expect(row).toHaveCount(0);
 
       const user = await userContext.newPage();
-      await user.goto("/my/items?tab=history");
+      await user.goto("/my/items?filter=closed");
       await waitForHydration(user);
       await expect(user.getByText(itemName)).toBeVisible();
       await expect(user.getByText(reason)).toBeVisible();
@@ -65,7 +65,7 @@ test.describe("inventory request rejection", () => {
       // different rows. The reason names a specific person's request, so this
       // is the assertion that it reaches only them.
       const other = await otherContext.newPage();
-      await other.goto("/my/items?tab=history");
+      await other.goto("/my/items?filter=closed");
       await waitForHydration(other);
       await expect(other.getByText(reason)).toHaveCount(0);
 
@@ -100,7 +100,7 @@ test.describe("inventory request self-cancel", () => {
     const otherContext = await browser.newContext({ storageState: OTHER_AUTH });
     try {
       const user = await userContext.newPage();
-      await user.goto("/my/items?tab=active");
+      await user.goto("/my/items");
       await waitForHydration(user);
 
       await entryFor(user, itemName)
@@ -110,7 +110,7 @@ test.describe("inventory request self-cancel", () => {
       // Off the active tab entirely, which is what a cancelled line does: the
       // Active tab lists pending and approved lines only.
       await expect(user.getByText(itemName)).toHaveCount(0);
-      await user.goto("/my/items?tab=history");
+      await user.goto("/my/items?filter=closed");
       await waitForHydration(user);
       await expect(user.getByText(itemName)).toBeVisible();
 
@@ -123,7 +123,7 @@ test.describe("inventory request self-cancel", () => {
       // `cancelRequestItemAs` case in the integration suite passes the same
       // student. Tracked separately rather than claimed here.
       const other = await otherContext.newPage();
-      await other.goto("/my/items?tab=active");
+      await other.goto("/my/items");
       await waitForHydration(other);
       await expect(other.getByText(itemName)).toHaveCount(0);
     } finally {
@@ -157,7 +157,7 @@ test.describe("inventory request self-cancel", () => {
     const context = await browser.newContext({ storageState: USER_AUTH });
     try {
       const user = await context.newPage();
-      await user.goto("/my/items?tab=active");
+      await user.goto("/my/items");
       await waitForHydration(user);
 
       await entryFor(user, itemName)
@@ -165,7 +165,7 @@ test.describe("inventory request self-cancel", () => {
         .click();
 
       await expect(user.getByText(itemName)).toHaveCount(0);
-      await user.goto("/my/items?tab=history");
+      await user.goto("/my/items?filter=closed");
       await waitForHydration(user);
       await expect(user.getByText(itemName)).toBeVisible();
     } finally {
@@ -198,7 +198,7 @@ test.describe("inventory request self-cancel", () => {
     const userContext = await browser.newContext({ storageState: USER_AUTH });
     try {
       const user = await userContext.newPage();
-      await user.goto("/my/items?tab=active");
+      await user.goto("/my/items");
       await waitForHydration(user);
 
       const entry = entryFor(user, itemName);

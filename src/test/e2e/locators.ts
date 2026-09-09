@@ -23,24 +23,33 @@ export function rowFor(scope: Page | Locator, text: string): Locator {
 }
 
 /**
- * One entry on the Active or History tab of `/my/items`, by the item it is
- * about.
+ * One entry on `/my/items`, by the item it is about.
  *
- * Those two tabs are `AdminDataTable`s, so an entry is a table row and
- * `rowFor` scoped to the open tab panel reaches it. The cart tab is a list,
- * not a table, so this finds nothing there. Today every `row` on the page is
- * inside the selected panel; the scope keeps the locator there if a table
- * ever lands on the page outside it.
+ * The page is one `AdminDataTable` grouped by request, so an entry is a
+ * table row and `rowFor` scoped to that table reaches it. Group headers are
+ * rows too, but they name a request rather than an item, so the text filter
+ * never lands on one. Scoped to the table by its accessible name rather than
+ * to the page, so a second table on the page would not widen this.
  *
  * This used to be a `> div > div` chain from when the entries were plain
- * divs. That chain kept matching after the tables landed, on the table's
- * wrapper rather than a row, which is why a test that only looked for one
- * button inside it stayed green while one that asserted on a `time` element
- * hit every row at once. The general form of that trap is in `docs/QUIRKS.md`
- * under "A structural selector fails open when the markup under it changes".
+ * divs, then a lookup inside the open tab panel. The chain kept matching
+ * after the tables landed, on the table's wrapper rather than a row, which
+ * is why a test that only looked for one button inside it stayed green while
+ * one that asserted on a `time` element hit every row at once. The general
+ * form of that trap is in `docs/QUIRKS.md` under "A structural selector
+ * fails open when the markup under it changes".
  */
 export function entryFor(page: Page, itemName: string): Locator {
-  return rowFor(page.getByRole("tabpanel"), itemName);
+  return rowFor(page.getByRole("table", { name: "My items" }), itemName);
+}
+
+/**
+ * The group an entry sits in: the `tbody` whose header carries `text`. A
+ * hold assigned by staff sits under "Assigned to you by staff", a submitted
+ * request under its date.
+ */
+export function groupFor(page: Page, text: string): Locator {
+  return page.getByRole("rowgroup").filter({ hasText: text });
 }
 
 /**
