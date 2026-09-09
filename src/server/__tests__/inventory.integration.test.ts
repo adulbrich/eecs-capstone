@@ -15,6 +15,7 @@ import {
   user,
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
+import { isOpenRow } from "#/lib/my-items-filter";
 import type { UserRole } from "#/lib/vocabularies";
 import {
   createCategoryAs,
@@ -36,6 +37,7 @@ import {
   collectedByForRequestItems,
   listInventoryRequestsAs,
   listMyItemsAs,
+  type MyItemsRow,
 } from "#/server/_internal/inventory-holdings";
 import { recordOverdueNotificationsAs } from "#/server/_internal/inventory-overdue";
 import {
@@ -88,6 +90,15 @@ function baseItemInput(name: string) {
     notes: null,
     imageUrl: null,
   };
+}
+
+/**
+ * The rows the page shows under its default filter, minus the borrow list:
+ * open lines and holds, in page order. Most cases below are about one of
+ * those and never cart anything, so this is the shape they read.
+ */
+function activeOf(rows: MyItemsRow[]) {
+  return rows.filter((row) => row.kind !== "cart" && isOpenRow(row));
 }
 
 async function makeRequestLine(userId: string, itemId: string) {
@@ -1356,7 +1367,7 @@ describe("request lifecycle", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].type).toBe("inventory_request_rejected");
     expect(rows[0].message).toBe("Reserved for class");
-    expect(rows[0].link).toBe("/my/items?tab=history");
+    expect(rows[0].link).toBe("/my/items?filter=closed");
   });
 
   it("denies the requester even when a teammate is holding the item", async () => {
@@ -2026,7 +2037,7 @@ describe("staff-assigned holds in my items", () => {
       dueAt: new Date("2026-09-01T00:00:00.000Z"),
     });
 
-    const { active } = await listMyItemsAs(holder);
+    const active = activeOf(await listMyItemsAs(holder));
 
     expect(active).toHaveLength(1);
     const only = active[0];
@@ -2049,7 +2060,7 @@ describe("staff-assigned holds in my items", () => {
       holderId: holder.id,
     });
 
-    const { active } = await listMyItemsAs(other);
+    const active = activeOf(await listMyItemsAs(other));
     expect(active).toHaveLength(0);
   });
 
@@ -2080,7 +2091,7 @@ describe("staff-assigned holds in my items", () => {
     expect(afterApprove.currentHolderId).toBe(requester.id);
     expect(afterApprove.currentRequestItemId).not.toBeNull();
 
-    const { active } = await listMyItemsAs(requester);
+    const active = activeOf(await listMyItemsAs(requester));
 
     expect(active).toHaveLength(1);
     expect(active[0].kind).toBe("request");
@@ -2101,7 +2112,7 @@ describe("staff-assigned holds in my items", () => {
     });
 
     const walkIn = await makeUser(`walkin-${stamp}@x.com`, "user");
-    const { active } = await listMyItemsAs(walkIn);
+    const active = activeOf(await listMyItemsAs(walkIn));
 
     expect(active).toHaveLength(1);
     expect(active[0].kind).toBe("hold");
@@ -2121,7 +2132,7 @@ describe("staff-assigned holds in my items", () => {
     });
 
     const holder = await makeUser(`mixed-${stamp}@x.com`, "user");
-    const { active } = await listMyItemsAs(holder);
+    const active = activeOf(await listMyItemsAs(holder));
 
     expect(active).toHaveLength(1);
     expect(active[0].kind).toBe("hold");
@@ -2178,7 +2189,7 @@ describe("staff-assigned holds in my items", () => {
       .set({ emailVerified: false })
       .where(eq(user.id, impostor.id));
 
-    const { active } = await listMyItemsAs(impostor);
+    const active = activeOf(await listMyItemsAs(impostor));
     expect(active).toHaveLength(0);
   });
 
@@ -2206,7 +2217,7 @@ describe("staff-assigned holds in my items", () => {
       .set({ status: "returned", closedAt: new Date() })
       .where(eq(inventoryRequestItems.id, line.id));
 
-    const { active } = await listMyItemsAs(holder);
+    const active = activeOf(await listMyItemsAs(holder));
 
     expect(active).toHaveLength(1);
     const only = active[0];
@@ -2238,13 +2249,13 @@ describe("staff-assigned holds in my items", () => {
       .set({ currentHolderEmail: `h6-b-${stamp}@x.com` })
       .where(eq(inventoryItems.id, item.id));
 
-    const { active } = await listMyItemsAs(holderB);
+    const active = activeOf(await listMyItemsAs(holderB));
     expect(active).toHaveLength(0);
   });
 });
 
 describe("my items payload names every field it returns", () => {
-  it("carries no column a consumer does not read, on either arm", async () => {
+  it("carries no column a consumer does not read, on any of the three kinds", async () => {
     const stamp = Date.now();
     const admin = await makeUser(`shape-admin-${stamp}@x.com`, "admin");
     const viewer = await makeUser(`shape-viewer-${stamp}@x.com`, "user");
@@ -2267,13 +2278,25 @@ describe("my items payload names every field it returns", () => {
       requestItemId: line.id,
       pickupBy: null,
     });
+    const carted = await makeItem({ name: "Carted", serial: "hidden" });
+    await addToCartAs(viewer, { itemId: carted.id });
 
-    const { active } = await listMyItemsAs(viewer);
+    const rows = await listMyItemsAs(viewer);
+    const active = activeOf(rows);
 
     // The projections cannot widen on their own, because they name their
     // fields. What broke before was a db.select() above them handing whole
     // rows straight to the client, and an exact key set is what catches a
     // fourth read path written the same way.
+    const cart = rows.find((e) => e.kind === "cart");
+    expect(cart).toBeDefined();
+    expect(Object.keys(cart ?? {}).sort()).toEqual([
+      "itemId",
+      "itemName",
+      "itemStatus",
+      "kind",
+    ]);
+
     const hold = active.find((e) => e.kind === "hold");
     expect(hold).toBeDefined();
     if (hold?.kind === "hold") {
@@ -2296,85 +2319,102 @@ describe("my items payload names every field it returns", () => {
         "itemStatus",
         "kind",
         "line",
+        "note",
+        "requestId",
+        "requestedAt",
       ]);
+      // reviewedAt and closedAt feed the requester's timeline. The
+      // identities beside them, and reviewComment, do not come along.
       expect(Object.keys(request.line).sort()).toEqual([
+        "closedAt",
         "closedReason",
         "createdAt",
         "dueAt",
         "id",
         "pickupBy",
+        "reviewedAt",
         "status",
       ]);
     }
   });
 });
 
-describe("active tab ordering (byDeadline)", () => {
-  it("sorts by soonest deadline, then newest first when there is no deadline", async () => {
+describe("my items order", () => {
+  it("puts the borrow list first, then requests newest first with their lines in cart order, then holds", async () => {
     const stamp = Date.now();
     const admin = await makeUser(`ord-admin-${stamp}@x.com`, "admin");
     const viewer = await makeUser(`ord-viewer-${stamp}@x.com`, "user");
 
-    const soonItem = await makeItem({ name: "Soon Hold" });
-    const laterItem = await makeItem({ name: "Later Request" });
-    // Named so alphabetical order and recency order disagree: "Apple" sorts
-    // before "Zebra", but Zebra is the one created second and must still
-    // sort first once the tiebreak is recency rather than name. A test that
-    // used "Older"/"Newer" names here would pass under either tiebreak and
-    // would not catch a regression back to the old name-based one.
-    const olderItem = await makeItem({ name: "Apple Pending" });
-    const newerItem = await makeItem({ name: "Zebra Pending" });
+    const carted = await makeItem({ name: "Still In Cart" });
+    const olderA = await makeItem({ name: "Older Request A" });
+    const olderB = await makeItem({ name: "Older Request B" });
+    const newer = await makeItem({ name: "Newer Request" });
+    const held = await makeItem({ name: "Staff Hold" });
 
-    // A hold with the soonest deadline of the four.
+    // The hold has the soonest deadline of everything on the page. It still
+    // renders last: the page is grouped, not sorted by deadline.
     await transitionItem(admin, {
-      itemId: soonItem.id,
+      itemId: held.id,
       nextStatus: "checked_out",
       holderId: viewer.id,
       dueAt: new Date(Date.now() + 86_400_000),
     });
 
-    // A request line with a later deadline: approved, so pickupBy is set.
-    await addToCartAs(viewer, { itemId: laterItem.id });
-    await submitCartAs(viewer, { note: null });
-    const [laterLine] = await db
-      .select()
-      .from(inventoryRequestItems)
-      .where(eq(inventoryRequestItems.itemId, laterItem.id));
-    await approveRequestItemAs(admin, {
-      requestItemId: laterLine.id,
-      pickupBy: new Date(Date.now() + 5 * 86_400_000),
-    });
-
-    // Two pending request lines with no deadline. createdAt is set
-    // explicitly rather than relying on the two submitCartAs calls landing
-    // in different milliseconds, so the ordering this asserts cannot flake.
-    await addToCartAs(viewer, { itemId: olderItem.id });
-    await submitCartAs(viewer, { note: null });
-    await addToCartAs(viewer, { itemId: newerItem.id });
-    await submitCartAs(viewer, { note: null });
+    // Two requests. createdAt is set explicitly rather than relying on the
+    // two submitCartAs calls landing in different milliseconds, and the
+    // older request's second line is dated after the newer request so the
+    // order proves the grouping rather than a flat sort by line date.
+    await addToCartAs(viewer, { itemId: olderA.id });
+    await addToCartAs(viewer, { itemId: olderB.id });
+    const older = await submitCartAs(viewer, { note: "older" });
+    await addToCartAs(viewer, { itemId: newer.id });
+    const newest = await submitCartAs(viewer, { note: "newer" });
+    await db
+      .update(inventoryRequests)
+      .set({ createdAt: new Date("2020-01-01T00:00:00.000Z") })
+      .where(eq(inventoryRequests.id, older.requestId ?? ""));
+    await db
+      .update(inventoryRequests)
+      .set({ createdAt: new Date("2020-01-02T00:00:00.000Z") })
+      .where(eq(inventoryRequests.id, newest.requestId ?? ""));
     await db
       .update(inventoryRequestItems)
       .set({ createdAt: new Date("2020-01-01T00:00:00.000Z") })
-      .where(eq(inventoryRequestItems.itemId, olderItem.id));
+      .where(eq(inventoryRequestItems.itemId, olderA.id));
+    await db
+      .update(inventoryRequestItems)
+      .set({ createdAt: new Date("2020-01-03T00:00:00.000Z") })
+      .where(eq(inventoryRequestItems.itemId, olderB.id));
     await db
       .update(inventoryRequestItems)
       .set({ createdAt: new Date("2020-01-02T00:00:00.000Z") })
-      .where(eq(inventoryRequestItems.itemId, newerItem.id));
+      .where(eq(inventoryRequestItems.itemId, newer.id));
 
-    const { active } = await listMyItemsAs(viewer);
+    await addToCartAs(viewer, { itemId: carted.id });
 
-    // With no deadline to sort by, these fall back to recency, newest
-    // first: the created_at DESC order the active list used before holds
-    // existed. Under the old name tiebreak this would come back
-    // alphabetically ("Apple Pending" before "Zebra Pending") instead.
+    const rows = await listMyItemsAs(viewer);
+
     expect(
-      active.map((entry) =>
-        entry.kind === "hold" ? entry.item.name : entry.itemName
-      )
-    ).toEqual(["Soon Hold", "Later Request", "Zebra Pending", "Apple Pending"]);
+      rows.map((row) => (row.kind === "hold" ? row.item.name : row.itemName))
+    ).toEqual([
+      "Still In Cart",
+      "Newer Request",
+      "Older Request A",
+      "Older Request B",
+      "Staff Hold",
+    ]);
+    // The envelope rides on every line, which is what lets the page group
+    // without a second lookup.
+    const olderRows = rows.filter(
+      (row) => row.kind === "request" && row.requestId === older.requestId
+    );
+    expect(olderRows).toHaveLength(2);
+    expect(
+      olderRows.every((row) => row.kind === "request" && row.note === "older")
+    ).toBe(true);
   });
 
-  it("falls back to newest first when two entries share the same deadline", async () => {
+  it("orders holds by deadline, newest first when two share one", async () => {
     const stamp = Date.now();
     const admin = await makeUser(`ordeq-admin-${stamp}@x.com`, "admin");
     const viewer = await makeUser(`ordeq-viewer-${stamp}@x.com`, "user");
@@ -2410,7 +2450,7 @@ describe("active tab ordering (byDeadline)", () => {
       .set({ updatedAt: new Date("2020-01-02T00:00:00.000Z") })
       .where(eq(inventoryItems.id, newerItem.id));
 
-    const { active } = await listMyItemsAs(viewer);
+    const active = activeOf(await listMyItemsAs(viewer));
 
     // Equal deadlines: falls back to recency, newest first. Under the old
     // name tiebreak this would come back alphabetically ("Ant Match" before
@@ -2454,7 +2494,7 @@ describe("disjointness invariant between the hold and request-line queries", () 
       .set({ currentRequestItemId: null })
       .where(eq(inventoryItems.id, item.id));
 
-    const { active } = await listMyItemsAs(requester);
+    const active = activeOf(await listMyItemsAs(requester));
 
     // This pins the current (undesirable) behavior, not a guarantee: the
     // request-line query does not check current_request_item_id at all,
@@ -2495,14 +2535,14 @@ describe("a teammate collects a requested item", () => {
     });
 
     const requesterView = await listMyItemsAs(requester);
-    const requesterEntries = requesterView.active.filter(
+    const requesterEntries = activeOf(requesterView).filter(
       (e) => e.kind === "request"
     );
     expect(requesterEntries).toHaveLength(1);
     expect(requesterEntries[0].kind).toBe("request");
 
     const pickerView = await listMyItemsAs(picker);
-    const pickerEntries = pickerView.active.filter((e) => e.kind === "hold");
+    const pickerEntries = activeOf(pickerView).filter((e) => e.kind === "hold");
     expect(pickerEntries).toHaveLength(1);
     expect(pickerEntries[0].kind).toBe("hold");
   });
@@ -3095,7 +3135,7 @@ describe("listMyItemsAs collectedBy gate", () => {
       dueAt: new Date(Date.now() + 86_400_000),
     });
 
-    const { active } = await listMyItemsAs(requester);
+    const active = activeOf(await listMyItemsAs(requester));
     const entry = active.find((e) => e.kind === "request");
     expect(entry?.kind).toBe("request");
     if (entry?.kind === "request") {
@@ -3127,7 +3167,7 @@ describe("listMyItemsAs collectedBy gate", () => {
       dueAt: new Date(Date.now() + 86_400_000),
     });
 
-    const { active } = await listMyItemsAs(requester);
+    const active = activeOf(await listMyItemsAs(requester));
     const entry = active.find((e) => e.kind === "request");
     expect(entry?.kind).toBe("request");
     if (entry?.kind === "request") {
