@@ -17,6 +17,7 @@ import { LocalTime } from "#/components/local-time";
 import { NeedsAttention } from "#/components/my-items-attention";
 import { OverdueBadge } from "#/components/overdue-badge";
 import { SubmitBorrowListDialog } from "#/components/submit-borrow-list-dialog";
+import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
@@ -27,23 +28,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
+import { isOpenCustomLine } from "#/lib/inventory-custom-workflow";
 import type { DeadlineEntry } from "#/lib/inventory-deadlines";
 import { deadlineOf } from "#/lib/inventory-deadlines";
 import { lineTimeline } from "#/lib/inventory-timeline";
 import {
+  filterMyItems,
   isOpenRow,
   MY_ITEMS_FILTERS,
   type MyItemsFilter,
-  matchesMyItemsFilter,
 } from "#/lib/my-items-filter";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
+import { cn } from "#/lib/utils";
 import {
   cancelRequestItem,
   listMyItems,
   removeFromCart,
   submitCart,
 } from "#/server/inventory";
+import { cancelCustomLine } from "#/server/inventory-custom";
 
 // `filter` is the page's only search param. `sort` and `dir` are gone on
 // purpose: no column here accepts a sort, so a URL naming one could only
@@ -77,10 +81,24 @@ const LINE_STATUS_LABEL: Record<string, string> = {
   rejected: "Rejected",
   cancelled: "Cancelled",
   returned: "Returned",
+  sourcing: "Sourcing",
+  fulfilled: "Fulfilled",
 };
 
 function rowName(row: Row): string {
-  return row.kind === "hold" ? row.item.name : row.itemName;
+  switch (row.kind) {
+    case "hold":
+      return row.item.name;
+    case "custom":
+      return row.line.name;
+    default:
+      return row.itemName;
+  }
+}
+
+/** The status word a line row shows once it is not an item badge. */
+function lineLabel(status: string): string {
+  return LINE_STATUS_LABEL[status] ?? status;
 }
 
 function rowId(row: Row): string {
@@ -88,6 +106,7 @@ function rowId(row: Row): string {
     case "cart":
       return `cart:${row.itemId}`;
     case "request":
+    case "custom":
       return row.line.id;
     case "hold":
       return `hold:${row.item.id}`;
@@ -104,9 +123,12 @@ function groupKey(row: Row): string {
     case "cart":
       return "cart";
     case "request":
+    case "custom":
       return `request:${row.requestId}`;
     case "hold":
-      return "holds";
+      // A hold a fulfillment produced sits inside its request's group,
+      // directly after the line, which is where the server placed it.
+      return row.viaCustomLineId ? `request:${row.viaCustomLineId}` : "holds";
     default: {
       const unhandled: never = row;
       throw new Error(`No group for ${JSON.stringify(unhandled)}`);
@@ -114,9 +136,9 @@ function groupKey(row: Row): string {
   }
 }
 
-/** A row the deadline rules can read: everything but the borrow list. */
+/** A row the deadline rules can read: a hold, or a request line. */
 function isDeadlineEntry(row: Row): row is Row & DeadlineEntry {
-  return row.kind !== "cart";
+  return row.kind === "hold" || row.kind === "request";
 }
 
 function GroupHeader({ rows }: { rows: Row[] }) {
@@ -134,15 +156,21 @@ function GroupHeader({ rows }: { rows: Row[] }) {
         </p>
       );
     case "request":
+    case "custom":
       return (
         <div className="space-y-0.5">
-          <p>
-            Requested
-            <span className="font-normal text-muted-foreground">
-              {" "}
-              on <LocalTime dateOnly value={first.requestedAt} />, {count}{" "}
-              {count === 1 ? "line" : "lines"}
+          <p className="flex flex-wrap items-center gap-2">
+            <span>
+              Requested
+              <span className="font-normal text-muted-foreground">
+                {" "}
+                on <LocalTime dateOnly value={first.requestedAt} />, {count}{" "}
+                {count === 1 ? "line" : "lines"}
+              </span>
             </span>
+            {first.kind === "custom" && (
+              <Badge variant="secondary">Custom</Badge>
+            )}
           </p>
           {first.note && (
             <p className="whitespace-pre-wrap font-normal text-muted-foreground text-xs">
@@ -190,8 +218,11 @@ function StateCell({ row }: { row: Row }) {
   if (row.kind === "cart") {
     return <span className="text-muted-foreground">Not submitted</span>;
   }
+  if (row.kind === "custom") {
+    return <>{lineLabel(row.line.status)}</>;
+  }
   if (row.kind === "request" && !isOpenRow(row)) {
-    return <>{LINE_STATUS_LABEL[row.line.status] ?? row.line.status}</>;
+    return <>{lineLabel(row.line.status)}</>;
   }
   const status = row.kind === "hold" ? row.item.status : row.itemStatus;
   return (
@@ -203,6 +234,9 @@ function StateCell({ row }: { row: Row }) {
 }
 
 function canCancel(row: Row): boolean {
+  if (row.kind === "custom") {
+    return isOpenCustomLine(row.line.status);
+  }
   return (
     row.kind === "request" &&
     (row.line.status === "pending" || row.line.status === "approved") &&
@@ -210,9 +244,20 @@ function canCancel(row: Row): boolean {
   );
 }
 
+/** What staff said, on either kind of line: the latest note there is. */
+function staffNote(row: Row): string | null {
+  if (row.kind === "request") {
+    return row.line.closedReason;
+  }
+  if (row.kind === "custom") {
+    return row.line.outcomeNote ?? row.line.sourcingNote;
+  }
+  return null;
+}
+
 interface Actions {
   busy: boolean;
-  onCancel: (requestItemId: string) => void;
+  onCancel: (row: Row) => void;
   onOpen: (id: string) => void;
   onRemove: (itemId: string) => void;
 }
@@ -229,8 +274,23 @@ export function buildColumns({ busy, onCancel, onOpen, onRemove }: Actions) {
       accessorFn: (row) => rowName(row),
       cardHeader: true,
       cell: ({ row }) => (
-        <div className="min-w-0">
+        // A hold a fulfillment produced is indented under the line that
+        // produced it: one level of nesting, drawn here rather than by the
+        // shared table, which groups and never nests.
+        <div
+          className={cn(
+            "min-w-0",
+            row.original.kind === "hold" &&
+              row.original.viaCustomLineId &&
+              "border-border border-l-2 pl-3"
+          )}
+        >
           <p className="font-medium">{rowName(row.original)}</p>
+          {row.original.kind === "custom" && row.original.line.quantity > 1 && (
+            <p className="text-muted-foreground text-xs">
+              Asked for {row.original.line.quantity}
+            </p>
+          )}
           {row.original.kind === "request" && row.original.collectedBy && (
             <p className="text-muted-foreground text-xs">
               Collected by{" "}
@@ -245,8 +305,12 @@ export function buildColumns({ busy, onCancel, onOpen, onRemove }: Actions) {
       id: "item",
     },
     {
-      accessorFn: (row) =>
-        row.kind === "hold" ? row.item.status : row.itemStatus,
+      accessorFn: (row) => {
+        if (row.kind === "hold") {
+          return row.item.status;
+        }
+        return row.kind === "custom" ? row.line.status : row.itemStatus;
+      },
       cell: ({ row }) => <StateCell row={row.original} />,
       enableHiding: false,
       enableSorting: false,
@@ -264,14 +328,8 @@ export function buildColumns({ busy, onCancel, onOpen, onRemove }: Actions) {
       sortingFn: "datetime",
     },
     {
-      accessorFn: (row) =>
-        row.kind === "request"
-          ? (row.line.closedReason ?? undefined)
-          : undefined,
-      cell: ({ row }) =>
-        row.original.kind === "request"
-          ? (row.original.line.closedReason ?? "-")
-          : "-",
+      accessorFn: (row) => staffNote(row) ?? undefined,
+      cell: ({ row }) => staffNote(row.original) ?? "-",
       enableHiding: false,
       enableSorting: false,
       header: "Note from staff",
@@ -301,10 +359,10 @@ export function buildColumns({ busy, onCancel, onOpen, onRemove }: Actions) {
                 Remove
               </Button>
             )}
-            {entry.kind === "request" && canCancel(entry) && (
+            {canCancel(entry) && (
               <Button
                 disabled={busy}
-                onClick={() => onCancel(entry.line.id)}
+                onClick={() => onCancel(entry)}
                 size="sm"
                 variant="outline"
               >
@@ -363,21 +421,33 @@ function MyItems() {
     [qc, router]
   );
 
+  const cancel = useCallback(
+    (row: Row) =>
+      run(async () => {
+        if (row.kind === "custom") {
+          await cancelCustomLine({
+            data: { customLineId: row.line.id, outcomeNote: null },
+          });
+        } else if (row.kind === "request") {
+          await cancelRequestItem({
+            data: { requestItemId: row.line.id, note: null },
+          });
+        }
+      }),
+    [run]
+  );
   const columns = useMemo(
     () =>
       buildColumns({
         busy,
-        onCancel: (requestItemId) =>
-          run(async () => {
-            await cancelRequestItem({ data: { requestItemId, note: null } });
-          }),
+        onCancel: cancel,
         onOpen: setOpenId,
         onRemove: (itemId) =>
           run(async () => {
             await removeFromCart({ data: { itemId } });
           }),
       }),
-    [busy, run]
+    [busy, cancel, run]
   );
   const { tableProps } = useAdminTable({
     columns,
@@ -388,10 +458,9 @@ function MyItems() {
     storageKey: "my-items",
   });
 
-  const rows = useMemo(
-    () => data.filter((row) => matchesMyItemsFilter(row, filter)),
-    [data, filter]
-  );
+  // The filter keeps a linked item's line visible beside it, so a reserved
+  // item never appears without the fulfilled line that produced it.
+  const rows = useMemo(() => filterMyItems(data, filter), [data, filter]);
   const attention = useMemo(
     () => data.filter(isDeadlineEntry).filter(isOpenRow),
     [data]
@@ -463,17 +532,12 @@ function MyItems() {
       <ListCount count={rows.length} />
       <LineSheet
         actions={
-          openRow && canCancel(openRow) && openRow.kind === "request" ? (
+          openRow && canCancel(openRow) ? (
             <Button
               disabled={busy}
               onClick={() => {
-                const requestItemId = openRow.line.id;
                 setOpenId(null);
-                void run(async () => {
-                  await cancelRequestItem({
-                    data: { requestItemId, note: null },
-                  });
-                });
+                void cancel(openRow);
               }}
               variant="outline"
             >
@@ -495,24 +559,66 @@ function MyItems() {
   );
 }
 
-/** The requester's timeline: dates and the closing note, and nobody named. */
+/** The requester's timeline: dates and the notes, and nobody named. */
 function timelineOf(row: Row) {
-  if (row.kind !== "request") {
-    return [];
+  if (row.kind === "request") {
+    return lineTimeline({
+      closedAt: row.line.closedAt,
+      closedLabel: lineLabel(row.line.status),
+      closedNote: row.line.closedReason,
+      decidedLabel: "Approved",
+      reviewedAt: row.line.reviewedAt,
+      submittedAt: row.requestedAt,
+    });
   }
-  return lineTimeline({
-    closedAt: row.line.closedAt,
-    closedLabel: LINE_STATUS_LABEL[row.line.status] ?? row.line.status,
-    closedNote: row.line.closedReason,
-    decidedLabel: "Approved",
-    reviewedAt: row.line.reviewedAt,
-    submittedAt: row.requestedAt,
-  });
+  if (row.kind === "custom") {
+    // reviewedAt is staff data; the requester's view carries the sourcing
+    // note but not the date it was written, so the decided event has no
+    // date of its own here and the note sits on the line's fields instead.
+    return lineTimeline({
+      closedAt: row.line.closedAt,
+      closedLabel: lineLabel(row.line.status),
+      closedNote: row.line.outcomeNote,
+      decidedLabel: "Sourcing",
+      decidedNote: row.line.sourcingNote,
+      reviewedAt: null,
+      submittedAt: row.requestedAt,
+    });
+  }
+  return [];
 }
 
 function fieldsOf(row: Row): LineSheetField[] {
   if (row.kind === "cart") {
     return [];
+  }
+  if (row.kind === "custom") {
+    return [
+      { label: "Asked for", value: row.line.name },
+      { label: "Quantity", value: String(row.line.quantity) },
+      {
+        label: "Reason",
+        value: <span className="whitespace-pre-wrap">{row.line.reason}</span>,
+      },
+      { label: "Link", value: row.line.link ?? "-" },
+      { label: "Status", value: lineLabel(row.line.status) },
+      {
+        label: "What staff said",
+        value: row.line.sourcingNote ? (
+          <span className="whitespace-pre-wrap">{row.line.sourcingNote}</span>
+        ) : (
+          "-"
+        ),
+      },
+      {
+        label: "Outcome",
+        value: row.line.outcomeNote ? (
+          <span className="whitespace-pre-wrap">{row.line.outcomeNote}</span>
+        ) : (
+          "-"
+        ),
+      },
+    ];
   }
   const pair = row.kind === "hold" ? row.item : row.line;
   return [
