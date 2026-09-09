@@ -104,8 +104,9 @@ from `sourcing`**, where a request line can only be rejected while `pending`. An
 order falls through, and the alternative is a line stuck sourcing with no way out but
 a lie.
 
-Fulfilling writes the join rows, optionally reserves each linked item to the
-requester with a pickup deadline, and sends one notification. It runs in a single
+Fulfilling writes the join rows, reserves each linked item to the requester with a
+pickup deadline **unless staff untick that box, which is ticked by default**, and
+sends one notification. It runs in a single
 transaction, locking items in ascending id order, and fails whole if any linked item
 is not `available`, naming the item.
 
@@ -179,7 +180,7 @@ tuple with a `pgEnum` behind it. Anywhere else and `vocabulary-scan` fails the b
 
 | Field | Visible to | Editable by |
 | --- | --- | --- |
-| `name`, `reason`, `quantity`, `link` | requester, staff | requester while `pending`, nobody after |
+| `name`, `reason`, `quantity`, `link` | requester, staff | nobody after submit |
 | `status` | requester, staff | staff, plus the requester for `cancelled` |
 | `review_comment` | requester, staff | staff |
 | `reviewed_by`, `reviewed_at` | staff | staff, on decision |
@@ -190,6 +191,15 @@ tuple with a `pgEnum` behind it. Anywhere else and `vocabulary-scan` fails the b
 
 Nothing here is public. A signed-out visitor, and a signed-in user who is not the
 requester, sees no custom request at all.
+
+**Nothing is editable after submit**, by anyone. A requester who got it wrong cancels
+the line and files another; there is no `updateCustomLineAs`, which is why the five
+wrappers below do not list one. Staff answer a request, they do not rewrite it.
+
+**A rejection writes its reason to both `closed_reason` and `review_comment`**,
+mirroring what `transitionItemInTx` already does for an item line: a rejection is a
+review decision as well as a closure, and the comment does double duty. Any other
+close writes `closed_reason` only.
 
 ## The grouping mode on AdminDataTable
 
@@ -218,9 +228,23 @@ a group stops being contiguous the moment rows are ordered by status.
 - **CSV export**: data rows only. Group headers are presentation.
 - **`getRowId` and `highlightedRowId`** keep addressing data rows, so the deep link
   from the admin overview still highlights one line.
-- **Group order** follows the first row of each group under the default sort.
+- **Group order** follows the first row of each group under the default sort, so a
+  page that needs a fixed group order supplies one as its default sort. `/my/items`
+  does exactly that: a hidden `groupRank` accessor is its `defaultSort`, which is
+  what puts the borrow list first, then requests newest first, then staff-assigned
+  holds. Without it, groups would order by whatever the first sorted row happened to
+  be.
+- **`header(rows)` receives rows and nothing else**, so whatever identifies a group
+  is denormalized onto every row in it. Both pages already do this: the queue has a
+  requester column, and `/my/items` carries the submitted date. This is a constraint
+  on the callers, and PR 1 freezes it.
 - **Empty groups** do not render, so filtering to pending shows only requests that
   still have a pending line.
+- **One level only.** The mode groups; it does not nest. Where `/my/items` shows a
+  fulfilled custom line with the items it produced underneath, those items are
+  ordinary rows of the same group, indented by the page's own cell renderer. The
+  grouping mode never sees the relationship, which is why multi-level grouping stays
+  out of scope in PR 1.
 
 `defineAdminColumns` and every existing call site are untouched.
 
@@ -243,10 +267,15 @@ The status filter offers the union of both vocabularies: `pending`, `approved`,
 `sourcing`, `fulfilled`, `rejected`, `cancelled`, `returned`. A status only one kind
 has filters to that kind, which needs no special case.
 
-Batch approve iterates lines in ascending id order. `approveRequestItemAs` locks line
-then item, and `docs/QUIRKS.md` records that inverting that order deadlocks against
-`lockAttachableRequestLine`, so a fixed iteration order is what stops two concurrent
-batches on overlapping items deadlocking each other.
+Batch approve is a new `approveRequestLinesAs` wrapping the existing single-line
+path, which stays. It is all or nothing: every pending line in the group takes the
+one pickup date, or none does. It iterates lines in **ascending line id order**;
+`approveRequestItemAs` locks line then item, and `docs/QUIRKS.md` records that
+inverting that order deadlocks against `lockAttachableRequestLine`, so a fixed
+iteration order is what stops two concurrent batches on overlapping items deadlocking
+each other. This is a different lock order from the fulfil path below, which locks
+**items** in ascending id order; the two are recorded separately because they are two
+rules, not one.
 
 ### `/my/items`
 
@@ -262,12 +291,25 @@ request's group.
 
 `?tab=cart|active|history` is replaced by `?filter=open|closed|all`, defaulting to
 open. The filter is **derived**, not a raw status, because a borrow-list row has no
-line status and a hold carries an item status. Open means unsubmitted, pending,
-sourcing, approved, or currently held. Closed means rejected, cancelled, returned or
-fulfilled.
+line status and a hold carries an item status.
 
-Every column on this page is declared `enableHiding: false`, so the shared table
-renders no column picker for a student, and no CSV export is offered.
+PR 3 implements it over the statuses that exist then: **open** means unsubmitted,
+pending, approved, or currently held; **closed** means rejected, cancelled or
+returned. PR 4 extends the derivation with the two custom statuses, `sourcing` into
+open and `fulfilled` into closed. PR 3 must not name a status the enum does not yet
+have.
+
+**A nested item row keeps its parent line visible.** A fulfilled custom line is
+closed while the item it reserved is open, so under the default filter the item would
+otherwise appear with nothing above it saying which request produced it. The rule is
+that a row shown by the filter also shows the line row it hangs from, as context,
+whether or not that line matches.
+
+Every column on this page is declared `enableHiding: false` and
+`enableSorting: false`, so the shared table renders no column picker and no CSV
+export for a student, and the grouped view can never be sorted out from under itself.
+That matters here in a way it does not on the queue: the borrow list's Submit button
+lives on a group header, and a sort would take the headers, and Submit with them.
 
 `listMyItemsAs` returns groups rather than three flat arrays. The `docs/QUIRKS.md`
 rule holds: a request row still carries `itemName` and `itemStatus` flat rather than
@@ -336,16 +378,35 @@ Four issues, four branches, in order. Each is green and reviewable alone.
 4. **Custom requests end to end**: schema, vocabulary, rules module, server, form,
    queue rows, fulfil dialog, notifications, plus the docs below.
 
-## Docs to write, in the fourth PR
+## Docs, and which PR writes each
 
-- `CONTEXT.md`: the three new terms above, in the Inventory section, with their
-  avoid lists.
-- `docs/QUIRKS.md`, Inventory section: the three lifecycle tables, beside the
-  existing pointer at the five pure modules; the note that an
-  `inventory_requests` row no longer implies an item line; the lock order for batch
-  approve.
-- `docs/UI-CONVENTIONS.md`, admin tables: the grouping mode, and that grouped-ness
-  is derived from sort rather than stored.
+Split by PR, because three of these describe work that lands before the fourth. The
+two lock orders are separate entries on purpose: they are different rules.
+
+**PR 1, the grouping mode**
+
+- `docs/UI-CONVENTIONS.md`, admin tables: the `group` prop, that grouped-ness is
+  derived from the sort rather than stored, and the `header(rows)` constraint that
+  group identity is denormalized onto every row.
+
+**PR 2, the staff queue**
+
+- `docs/QUIRKS.md`, Inventory: the batch approve lock order, **lines** in ascending
+  id order, and why (line-then-item, against `lockAttachableRequestLine`).
+
+**PR 3, `/my/items`**
+
+- `docs/QUIRKS.md`, Inventory: that `/my/items` disables sorting so its grouped view
+  cannot be sorted away from under the Submit button on the borrow list header.
+
+**PR 4, custom requests**
+
+- `CONTEXT.md`: custom request, custom line, custom line status, with their avoid
+  lists, in the Inventory section.
+- `docs/QUIRKS.md`, Inventory: the three lifecycle tables from this spec, beside the
+  existing pointer at the five pure modules; that an `inventory_requests` row no
+  longer implies an item line exists; and the fulfil lock order, **items** in
+  ascending id order, which is not the same rule as PR 2's.
 - ADR: custom requests reuse the request envelope, and an envelope holds one kind of
   line.
 - ADR: `sourcing` rather than `approved`, and why a custom line has no `returned`.
