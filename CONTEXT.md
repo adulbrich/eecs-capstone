@@ -286,7 +286,7 @@ Where a request line is. Exactly one of the five below.
 - **Returned**: the item came back from a checkout.
 
 _Avoid_: declined, denied (for rejected), closed (that is any of the last three),
-done, complete, fulfilled
+done, complete, fulfilled (for a request line; it is the custom line's own status)
 
 **Requester**:
 The user who submitted the request a line belongs to. Accountable for the request
@@ -378,6 +378,34 @@ collector is told apart from a requester after the return clears the hold.
 _Avoid_: status log, audit log, history (unqualified)
 
 **Request queue**:
-The staff page listing pending lines, with approve and reject. The count of pending
-lines is what the admin overview turns into an alert.
+The staff page listing pending lines of both kinds, grouped by the request they
+arrived in, with approve and reject on a request line and start sourcing, fulfil
+and reject on a custom line. The count of requests with a pending line is what the
+admin overview turns into an alert.
 _Avoid_: inbox, approvals, pending requests (as a name)
+
+**Custom request**:
+An ask for equipment the inventory does not hold. One envelope with an optional
+note, holding one custom line per thing asked for. Visible to its requester and to
+staff, never to anyone else. It reuses the request's envelope table, and an
+envelope holds one kind of line, never both.
+_Avoid_: wishlist, purchase order, acquisition, suggestion
+
+**Custom line**:
+One thing within one custom request, with its own status, a sourcing note, an
+outcome note, and the items it eventually produced. Staff decide lines, not
+requests, the same way they do for a borrow list. Nothing on a submitted line is
+editable; a requester who got it wrong cancels it and files another.
+_Avoid_: wanted item, custom item, wish
+
+**Custom line status**:
+Where a custom line is. Exactly one of the five below.
+
+- **Pending**: awaiting a staff decision.
+- **Sourcing**: staff accepted it and are getting it. Nothing physical exists yet.
+- **Fulfilled**: the thing now exists and is linked to the line. Terminal.
+- **Rejected**: refused by staff, with a reason the requester sees.
+- **Cancelled**: withdrawn by the requester.
+
+_Avoid_: approved (that hands over a physical thing, which a custom line has none
+of), ordered, on order, delivered, done, returned (a custom line never lends)
