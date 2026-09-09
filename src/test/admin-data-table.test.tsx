@@ -720,7 +720,11 @@ describe("group", () => {
     const bodies = [...container.querySelectorAll("tbody")];
     expect(bodies.map((b) => b.getAttribute("data-group"))).toEqual(["A", "B"]);
     for (const body of bodies) {
-      const th = body.querySelector("tr:first-child th");
+      // The header row is what both CSS breakpoints hook off; a renamed
+      // attribute would otherwise pass this suite and break the styling.
+      const headerRow = body.querySelector("tr:first-child");
+      expect(headerRow?.hasAttribute("data-group-header")).toBe(true);
+      const th = headerRow?.querySelector("th");
       expect(th?.getAttribute("scope")).toBe("rowgroup");
     }
     expect(bodies[0].textContent).toContain("Batch A");
@@ -788,6 +792,16 @@ describe("group", () => {
     const highlighted = container.querySelector("[data-highlighted]");
     expect(highlighted?.textContent).toContain("beta");
     expect(highlighted?.closest("tbody")?.getAttribute("data-group")).toBe("B");
+  });
+
+  it("renders no tbody for a group whose rows a filter removed", () => {
+    // The route filters before the rows get here, so an emptied group is
+    // simply absent from the data; the sibling group still renders alone.
+    const { container } = renderGrouped({
+      data: GROUPED.filter((row) => row.batch === "B"),
+    });
+    const bodies = [...container.querySelectorAll("tbody")];
+    expect(bodies.map((b) => b.getAttribute("data-group"))).toEqual(["B"]);
   });
 
   it("renders the no-match row in one plain tbody when a filter empties the table", () => {

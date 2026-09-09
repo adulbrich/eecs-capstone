@@ -292,6 +292,30 @@ export interface AdminDataTableProps<T> {
   toolbar?: ReactNode;
 }
 
+/**
+ * Insertion order over the sorted model: a group is placed where its first
+ * row lands, and every later row with the same key joins it there.
+ */
+function groupRows<T>(
+  rows: Row<T>[],
+  keyOf: (row: T) => string
+): { key: string; rows: Row<T>[] }[] {
+  const byKey = new Map<string, Row<T>[]>();
+  for (const row of rows) {
+    const key = keyOf(row.original);
+    const bucket = byKey.get(key);
+    if (bucket) {
+      bucket.push(row);
+    } else {
+      byKey.set(key, [row]);
+    }
+  }
+  return [...byKey.entries()].map(([key, rowsOfKey]) => ({
+    key,
+    rows: rowsOfKey,
+  }));
+}
+
 function ariaSort(
   direction: false | "asc" | "desc"
 ): "ascending" | "descending" | "none" {
@@ -463,27 +487,10 @@ export function AdminDataTable<T>({
     group !== undefined &&
     sort.id === defaultSort.id &&
     sort.desc === defaultSort.desc;
-  const groups = useMemo(() => {
-    if (!(group && grouped)) {
-      return [];
-    }
-    // Insertion order over the sorted model: a group is placed where its
-    // first row lands, and every later row with the same key joins it there.
-    const byKey = new Map<string, Row<T>[]>();
-    for (const row of rows) {
-      const key = group.key(row.original);
-      const bucket = byKey.get(key);
-      if (bucket) {
-        bucket.push(row);
-      } else {
-        byKey.set(key, [row]);
-      }
-    }
-    return [...byKey.entries()].map(([key, groupRows]) => ({
-      key,
-      rows: groupRows,
-    }));
-  }, [group, grouped, rows]);
+  // Not memoized: a route passes `group` as an inline object, so a memo keyed
+  // on it would recompute every render anyway, and one pass over rows that
+  // TanStack has already sorted is cheap.
+  const groups = group && grouped ? groupRows(rows, group.key) : [];
   const visibleColumnCount = table.getVisibleLeafColumns().length;
   const hideable = table.getAllLeafColumns().filter((c) => c.getCanHide());
   // A filtered result keeps its table even with no rows in it: the headers
@@ -683,32 +690,33 @@ export function AdminDataTable<T>({
             ))}
           </TableHeader>
           {group && grouped && groups.length > 0 ? (
-            groups.map(({ key, rows: groupRows }) => (
-              <TableBody data-group={key} key={key}>
-                {/*
+            groups.map(({ key, rows: rowsOfGroup }) => {
+              const originals = rowsOfGroup.map((row) => row.original);
+              return (
+                <TableBody data-group={key} key={key}>
+                  {/*
                   A bare tr and th rather than TableRow and TableHead: their
                   classes (the hover tint, h-10, border-b) are for data rows
                   and column headers, and a group header is neither.
                   `src/styles.css` styles it through data-group-header under
                   both breakpoints.
                 */}
-                <tr data-group-header="">
-                  <th colSpan={visibleColumnCount} scope="rowgroup">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        {group.header(groupRows.map((row) => row.original))}
+                  <tr data-group-header="">
+                    <th colSpan={visibleColumnCount} scope="rowgroup">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0">{group.header(originals)}</div>
+                        {group.actions && (
+                          <div className="flex shrink-0 items-center gap-2">
+                            {group.actions(originals)}
+                          </div>
+                        )}
                       </div>
-                      {group.actions && (
-                        <div className="flex shrink-0 items-center gap-2">
-                          {group.actions(groupRows.map((row) => row.original))}
-                        </div>
-                      )}
-                    </div>
-                  </th>
-                </tr>
-                {groupRows.map(renderRow)}
-              </TableBody>
-            ))
+                    </th>
+                  </tr>
+                  {rowsOfGroup.map(renderRow)}
+                </TableBody>
+              );
+            })
           ) : (
             <TableBody>
               {rows.length === 0 && (
