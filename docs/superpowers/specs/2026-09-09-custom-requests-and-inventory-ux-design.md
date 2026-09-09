@@ -205,8 +205,8 @@ exists, and a tuple placed anywhere else is scanned by nothing and passes silent
 | `name`, `reason`, `quantity`, `link` | requester, staff | nobody after submit |
 | `status` | requester, staff | staff, plus the requester for `cancelled` |
 | `staff_reply` | requester, staff | staff |
-| `decided_by`, `decided_at` | staff | staff, on every staff action |
-| `closed_at` | staff | staff |
+| `decided_by`, `decided_at` | staff | staff, on every staff action; untouched by a requester cancel |
+| `closed_at` | staff | written by whichever transition closes the line, staff or requester |
 | `inventory_custom_line_items` rows | requester, staff | staff |
 | envelope `note` | requester, staff | requester at submit, nobody after |
 
@@ -226,11 +226,27 @@ stop. Giving a custom line a `review_comment` that the requester *can* read woul
 the same name meaning two different things across one queue, which is the exact hazard
 this spec uses to reject `approved`.
 
-So the custom line has a single `staff_reply`, requester-visible, written by every
-staff action: the note that comes with starting to source, the note that comes with
-fulfilling, and the reason on a rejection, which must be non-empty. `decided_by` and
+So the custom line has a single `staff_reply`, requester-visible. `decided_by` and
 `decided_at` are the staff-only metadata beside it, named for what they are rather
-than borrowed from a table whose columns mean something else.
+than borrowed from a table whose columns mean something else. What each transition
+writes:
+
+| Transition | `staff_reply` | `decided_by`, `decided_at` | `closed_at` |
+| --- | --- | --- | --- |
+| `sourcing` | the note, optional | the staff member, now | unset |
+| `fulfilled` | the note, optional | the staff member, now | now |
+| `rejected` | the reason, **required** | the staff member, now | now |
+| `cancelled` | untouched | untouched | now |
+
+**`staff_reply` is the latest reply, not a log.** Fulfilling after sourcing
+overwrites the sourcing note, and that is accepted rather than solved: each staff
+action already sends the requester a notification carrying its text, so the sequence
+survives in the bell even though the column keeps only the last one. Extending
+`inventory_item_status_history` to cover custom lines is the fix if it ever bites,
+and it is not in this version.
+
+`cancelled` is the requester's own transition, so it writes `closed_at` without
+touching the two decision columns: nobody decided anything, the requester withdrew.
 
 ## The grouping mode on AdminDataTable
 
@@ -256,7 +272,11 @@ a group stops being contiguous the moment rows are ordered by status.
   the group before its rows. The accessibility suite scans both pages that use this.
 - **Mobile**: `src/styles.css` already renders each row as a card. A group header
   becomes a full-width strip above its cards, not a card of its own.
-- **CSV export**: data rows only. Group headers are presentation.
+- **CSV export is not this component's business.** Export is per-route: a page builds
+  its own button from `defineCsvColumns` in `src/lib/csv.ts` over its own rows, and
+  `AdminDataTable` holds no export code. So grouping cannot corrupt an export, and
+  neither page in this spec has one to corrupt: `/admin/inventory/requests` and
+  `/my/items` both ship without CSV today and gain none here.
 - **`getRowId` and `highlightedRowId`** keep addressing data rows, so the deep link
   from the admin overview still highlights one line.
 - **Group order** follows the first row of each group under the default sort, so a
@@ -302,7 +322,9 @@ a new entry rather than four edits in four places.
 
 The status filter offers the union of both vocabularies: `pending`, `approved`,
 `sourcing`, `fulfilled`, `rejected`, `cancelled`, `returned`. A status only one kind
-has filters to that kind, which needs no special case.
+has filters to that kind, which needs no special case. Staged like the `/my/items`
+filter: **PR 2 ships it over the request line vocabulary alone**, and PR 4 adds
+`sourcing` and `fulfilled` once the enum holding them exists.
 
 Batch approve is a new `approveRequestLinesAs` wrapping the existing single-line
 path, which stays. It is all or nothing: every pending line in the group takes the
@@ -343,8 +365,9 @@ that a row shown by the filter also shows the line row it hangs from, as context
 whether or not that line matches.
 
 Every column on this page is declared `enableHiding: false` and
-`enableSorting: false`, so the shared table renders no column picker and no CSV
-export for a student, and the grouped view can never be sorted out from under itself.
+`enableSorting: false`, so the shared table renders no column picker for a student
+and the grouped view can never be sorted out from under itself. There is no CSV
+export to suppress: a page only has one if it builds one.
 That matters here in a way it does not on the queue: the borrow list's Submit button
 lives on a group header, and a sort would take the headers, and Submit with them.
 
@@ -407,8 +430,8 @@ new `inventory-custom-workflow.ts` says which transition a custom line may make 
 who may make it, unit tested with no docker. Who gets told extends
 `inventory-notifications.ts` rather than forking it; who sees what extends
 `inventory-visibility.ts` with a requester projection and a staff projection, so
-`reviewed_by` cannot leak the way whole table objects once shipped `serial` and
-`reviewComment` to students.
+`decided_by` and `decided_at` cannot leak the way whole table objects once shipped
+`serial` and `reviewComment` to students.
 
 **Notifications**: three cases, all in-app, none by email. Sourcing ("we are getting
 this"), fulfilled (naming the items, and the pickup deadline when they were
