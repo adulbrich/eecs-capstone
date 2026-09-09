@@ -258,8 +258,10 @@ What each transition writes:
 | `rejected` | the reason, **required** | the staff member, now, if unset | the staff member, now |
 | `cancelled` | untouched | untouched | the requester, now |
 
-Two indexes, matching what the sibling carries: `(request_id)`, because both grouped
-tables group by it, and `(status)`, because the queue filters on it. `quantity` is
+Three indexes, matching the three `inventory_request_items` carries: `(request_id)`,
+because both grouped tables group by it; `(status)`, because the queue filters on it;
+and `(item_id)` on the join table, which the `RESTRICT` check on an item delete reads
+and which answers "which custom line produced this hold" on `/my/items`. `quantity` is
 `integer not null` validated at the boundary by Zod rather than by a CHECK
 constraint, because `src/db/schema.ts` has no CHECK constraints today and this is not
 the feature that should introduce the first one.
