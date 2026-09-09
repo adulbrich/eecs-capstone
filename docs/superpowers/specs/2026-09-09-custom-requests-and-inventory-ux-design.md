@@ -32,8 +32,8 @@ with an optional note, holding one custom line per thing asked for. Visible to i
 requester and to staff, never to anyone else.
 _Avoid_: wishlist, purchase order, acquisition, suggestion.
 
-**Custom line**: one thing within one custom request, with its own status, its two
-staff notes, and the items it eventually produced. Staff decide lines, not requests, the
+**Custom line**: one thing within one custom request, with its own status, a sourcing
+note and an outcome note, and the items it eventually produced. Staff decide lines, not requests, the
 same way they do for a borrow list.
 _Avoid_: wanted item, custom item, wish.
 
@@ -213,16 +213,20 @@ exists, and a tuple placed anywhere else is scanned by nothing and passes silent
 | `status` | requester, staff | staff, plus the requester for `cancelled` |
 | `sourcing_note` | requester, staff | staff, while the line is `sourcing` |
 | `outcome_note` | requester, staff | staff on a close, requester on a cancel |
-| `reviewed_by`, `reviewed_at` | staff | staff, on the first decision only; never overwritten |
-| `closed_by`, `closed_at` | staff | whichever transition closes the line, staff or requester |
+| `reviewed_at`, `closed_at` | requester, staff | written by the transition; the timeline needs the dates |
+| `reviewed_by` | staff | staff, on the first decision only; never overwritten |
+| `closed_by` | staff | whichever transition closes the line, staff or requester |
 | `inventory_custom_line_items` rows | requester, staff | staff |
 | envelope `note` | requester, staff | requester at submit, nobody after |
 
 Nothing here is public. A signed-out visitor, and a signed-in user who is not the
 requester, sees no custom request at all.
 
-**Nothing is editable after submit**, by anyone. A requester who got it wrong cancels
-the line and files another; there is no `updateCustomLineAs`, which is why the five
+**The request's own fields are not editable after submit**, by anyone: `name`,
+`reason`, `quantity`, `link` and the envelope note are what was asked for, and they
+stay that way. Staff notes are a separate matter, and `sourcing_note` is rewritable
+while the line is sourcing. A requester who got it wrong cancels
+the line and files another; there is no `updateCustomLineAs`, which is why the six
 wrappers below do not list one. Staff answer a request, they do not rewrite it.
 
 ### Two notes, because two transitions speak
@@ -380,11 +384,30 @@ It holds the line's own fields, its **timeline**, and its actions, on the staff 
 and on `/my/items` alike.
 
 The timeline is three events at most, drawn from columns rather than from a log:
-submitted (the envelope's `created_at`), decided (`reviewed_by`, `reviewed_at`, and
-the note that belongs to that step), and closed (`closed_by`, `closed_at`, and the
-closing note). Both kinds of line have that shape, so **one pure module in `src/lib`
-builds a `TimelineEvent[]` from either**, and one component draws it. Unit tested with
-no docker, like the five modules beside it.
+submitted (the envelope's `created_at`), decided (`reviewed_at`, plus `reviewed_by`
+and the sourcing note where each exists), and closed (`closed_at`, plus `closed_by`
+and the closing note). Both kinds of line have that shape, so **one pure module in
+`src/lib` builds a `TimelineEvent[]` from either**, and one component draws it. Unit
+tested with no docker, like the five modules beside it.
+
+**What each audience sees, per kind**, because the projections do not currently carry
+enough for this and saying so is the point:
+
+| Event | Staff, request line | Requester, request line | Staff, custom line | Requester, custom line |
+| --- | --- | --- | --- | --- |
+| submitted | date | date | date | date |
+| decided | date, actor | date | date, actor, `sourcing_note` | date, `sourcing_note` |
+| closed | date, actor, `closed_reason` | date, `closed_reason` | date, actor, `outcome_note` | date, `outcome_note` |
+
+**`reviewed_at` and `closed_at` join `MyRequestLineView`**, which today carries only
+`closedReason`, `createdAt`, `dueAt`, `id`, `pickupBy` and `status`. Two timestamps
+about the requester's own line are not a new class of information, and without them
+the requester's timeline has no dates to sit on. **`reviewed_by`, `closed_by` and
+`review_comment` do not join it**: the identities are the Q9 rule, and
+`review_comment` is the column `docs/QUIRKS.md` records as the leak the projection
+exists to stop. Nothing is lost by withholding it, because on a request line the only
+transition that writes it is a rejection, which writes the same text into
+`closed_reason`, which the requester already reads at the closed event.
 
 Two things follow from choosing a sheet:
 
@@ -416,8 +439,9 @@ the sheet above, which is where the timeline and the roomier actions live.
 
 **The `request` search param** joins `line`, in the same shape: a nullable uuid with
 `.catch(null)`, kept out of `loaderDeps` because it changes what is highlighted and
-never what is fetched. The Request column in the flat view links to it, and **that
-link clears `sort` and `dir`**, which is the part that makes it work: without it you
+never what is fetched. The **Requester** column, which the queue already has and
+which is the only thing naming the envelope once grouping is off, links to it, and
+**that link clears `sort` and `dir`**, which is the part that makes it work: without it you
 land back in the flat view you clicked from, with nothing grouped. The two params
 compose, so a link that names both highlights a line inside a highlighted group.
 
@@ -598,7 +622,7 @@ two lock orders are separate entries on purpose: they are different rules.
 - `CONTEXT.md`: custom request, custom line, custom line status, with their avoid
   lists, in the Inventory section. Also amend the existing Line status avoid entry,
   which currently lists `fulfilled` unqualified, to say "for a request line".
-- `src/server/__tests__/access-contract.ts`: one line per new endpoint, five in all.
+- `src/server/__tests__/access-contract.ts`: one line per new endpoint, six in all.
   Not documentation, but it fails the same way a missing doc should and is easiest to
   forget here.
 - `docs/QUIRKS.md`, Inventory: the three lifecycle tables from this spec, beside the
@@ -614,7 +638,7 @@ two lock orders are separate entries on purpose: they are different rules.
 
 Recorded because each was argued and two reversed an earlier decision in this file.
 
-1. **The Request column links to the grouped queue**, `?request=<id>`, and the link
+1. **The Requester column links to the grouped queue**, `?request=<id>`, and the link
    clears `sort` and `dir` so it lands in the grouped view rather than the flat one it
    was clicked from. No request page: the grouped view already is the request view,
    and a page would be a second rendering of the same rows with its own visibility
