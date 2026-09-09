@@ -127,7 +127,7 @@ id order, and fails whole if any linked item is not `available`, naming the item
 makes it the only writer of `inventory_item_status_history` and the only thing that
 syncs the `current_holder_*` columns with the status, and records what an earlier
 exemption cost: two new hold columns that only two of four writers learned about.
-Fulfill is a fifth caller of it, passing the requester as the holder, not a fifth
+Fulfill is another caller of it, passing the requester as the holder, not another
 writer beside it.
 
 ### Item, unchanged
@@ -176,10 +176,13 @@ inventory_custom_lines
   link          text
   status        inventory_custom_line_status not null default 'pending'
   staff_reply   text
-  decided_by    text -> user, set null
-  decided_at    timestamptz
+  reviewed_by   text -> user, set null
+  reviewed_at   timestamptz
   closed_at     timestamptz
   created_at    timestamptz not null default now()
+
+index on (request_id)
+index on (status)
 
 inventory_custom_line_items
   custom_line_id uuid -> inventory_custom_lines, cascade
@@ -205,7 +208,7 @@ exists, and a tuple placed anywhere else is scanned by nothing and passes silent
 | `name`, `reason`, `quantity`, `link` | requester, staff | nobody after submit |
 | `status` | requester, staff | staff, plus the requester for `cancelled` |
 | `staff_reply` | requester, staff | staff |
-| `decided_by`, `decided_at` | staff | staff, on every staff action; untouched by a requester cancel |
+| `reviewed_by`, `reviewed_at` | staff | staff, on every staff action; untouched by a requester cancel |
 | `closed_at` | staff | written by whichever transition closes the line, staff or requester |
 | `inventory_custom_line_items` rows | requester, staff | staff |
 | envelope `note` | requester, staff | requester at submit, nobody after |
@@ -226,17 +229,34 @@ stop. Giving a custom line a `review_comment` that the requester *can* read woul
 the same name meaning two different things across one queue, which is the exact hazard
 this spec uses to reject `approved`.
 
-So the custom line has a single `staff_reply`, requester-visible. `decided_by` and
-`decided_at` are the staff-only metadata beside it, named for what they are rather
-than borrowed from a table whose columns mean something else. What each transition
-writes:
+So the custom line has a single `staff_reply`, requester-visible, and that is the
+only column that departs from the sibling's naming. `reviewed_by` and `reviewed_at`
+keep their names, because they mean exactly what they mean on
+`inventory_request_items`: who decided this line and when. `approveRequestItemAs`
+already writes them on an approval, not only on a rejection, so "the staff member who
+decided" is the established meaning and a new name for it would be the confusing
+choice. `staff_reply` is renamed precisely because it does **not** match: the
+sibling's `review_comment` is staff-only, and this one is not.
 
-| Transition | `staff_reply` | `decided_by`, `decided_at` | `closed_at` |
+There is no `closed_by`. While cancelling is requester-only the actor is always
+either the requester on `inventory_requests.user_id` or the staff member in
+`reviewed_by`, so the column would hold nothing new. It comes back the day staff can
+cancel on a requester's behalf, as they already can on a request line.
+
+What each transition writes:
+
+| Transition | `staff_reply` | `reviewed_by`, `reviewed_at` | `closed_at` |
 | --- | --- | --- | --- |
 | `sourcing` | the note, optional | the staff member, now | unset |
 | `fulfilled` | the note, optional | the staff member, now | now |
 | `rejected` | the reason, **required** | the staff member, now | now |
 | `cancelled` | untouched | untouched | now |
+
+Two indexes, matching what the sibling carries: `(request_id)`, because both grouped
+tables group by it, and `(status)`, because the queue filters on it. `quantity` is
+`integer not null` validated at the boundary by Zod rather than by a CHECK
+constraint, because `src/db/schema.ts` has no CHECK constraints today and this is not
+the feature that should introduce the first one.
 
 **`staff_reply` is the latest reply, not a log.** Fulfilling after sourcing
 overwrites the sourcing note, and that is accepted rather than solved: each staff
@@ -270,8 +290,14 @@ a group stops being contiguous the moment rows are ordered by status.
 - **Markup**: one `<tbody>` per group, its first row a
   `<th scope="rowgroup" colspan={visibleColumnCount}>`, so a screen reader announces
   the group before its rows. The accessibility suite scans both pages that use this.
-- **Mobile**: `src/styles.css` already renders each row as a card. A group header
-  becomes a full-width strip above its cards, not a card of its own.
+- **Mobile, and this is real work rather than a note.** `src/styles.css` renders
+  each row as a card under `@media (max-width: 767px)`, and three of its rules
+  assume one `tbody`: `.admin-table tbody` is `display: flex` with `gap: 0.5rem`, so
+  cards in different tbodies get no gap between them; `.admin-table tbody tr` puts
+  the card border, radius and `--card` background on **every** row, including a
+  group header that should be a bare strip; and `.admin-table tbody td:last-child`
+  drops its divider at the end of each group rather than at the end of the table.
+  PR 1 edits that block, and `src/styles.css` is on its deliverable list.
 - **CSV export is not this component's business.** Export is per-route: a page builds
   its own button from `defineCsvColumns` in `src/lib/csv.ts` over its own rows, and
   `AdminDataTable` holds no export code. So grouping cannot corrupt an export, and
@@ -279,12 +305,15 @@ a group stops being contiguous the moment rows are ordered by status.
   `/my/items` both ship without CSV today and gain none here.
 - **`getRowId` and `highlightedRowId`** keep addressing data rows, so the deep link
   from the admin overview still highlights one line.
-- **Group order** follows the first row of each group under the default sort, so a
-  page that needs a fixed group order supplies one as its default sort. `/my/items`
-  does exactly that: a hidden `groupRank` accessor is its `defaultSort`, which is
-  what puts the borrow list first, then requests newest first, then staff-assigned
-  holds. Without it, groups would order by whatever the first sorted row happened to
-  be.
+- **Group order follows the data.** Groups appear in the order their first row
+  appears in the rows the table was handed, which under the default sort is the
+  server's order. A page that needs a fixed group order returns its rows in that
+  order and declares no sortable column, which is what `/my/items` does: with every
+  column `enableSorting: false`, `getCanSort` is false everywhere, TanStack Table's
+  sorting state selects nothing, and rows render exactly as they arrived. There is
+  no hidden rank column, and there must not be: a sortable one would put
+  `?sort=groupRank&dir=desc` in reach, which differs from `defaultSort` and would
+  drop grouping, taking the Submit-bearing header with it.
 - **`header(rows)` receives rows and nothing else**, so whatever identifies a group
   is denormalized onto every row in it. Both pages already do this: the queue has a
   requester column, and `/my/items` carries the submitted date. This is a constraint
@@ -366,8 +395,12 @@ whether or not that line matches.
 
 Every column on this page is declared `enableHiding: false` and
 `enableSorting: false`, so the shared table renders no column picker for a student
-and the grouped view can never be sorted out from under itself. There is no CSV
-export to suppress: a page only has one if it builds one.
+and the grouped view can never be sorted out from under itself. `listMyItemsAs`
+returns the groups in display order, borrow list first, then requests newest first,
+then staff-assigned holds, and the page renders that order because nothing can
+reorder it. **PR 3 also drops `sort` and `dir` from this route's search schema**,
+since a URL naming a sort no column accepts is a parameter that can only mislead.
+There is no CSV export to suppress: a page only has one if it builds one.
 That matters here in a way it does not on the queue: the borrow list's Submit button
 lives on a group header, and a sort would take the headers, and Submit with them.
 
@@ -430,7 +463,7 @@ new `inventory-custom-workflow.ts` says which transition a custom line may make 
 who may make it, unit tested with no docker. Who gets told extends
 `inventory-notifications.ts` rather than forking it; who sees what extends
 `inventory-visibility.ts` with a requester projection and a staff projection, so
-`decided_by` and `decided_at` cannot leak the way whole table objects once shipped
+`reviewed_by` and `reviewed_at` cannot leak the way whole table objects once shipped
 `serial` and `reviewComment` to students.
 
 **Notifications**: three cases, all in-app, none by email. Sourcing ("we are getting
