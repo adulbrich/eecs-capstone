@@ -266,7 +266,8 @@ live count of a page's own collection does not.
 ```
 
 The mobile drawer is a shadcn `Sheet` with `side="left"`, opened by a hamburger
-`<Button variant="ghost">`. It is a Radix Dialog underneath, so it is focus-trapped
+`<Button variant="ghost">`. It shares the component with the line sheet under
+Admin tables below, and nothing else. It is a Radix Dialog underneath, so it is focus-trapped
 and escape-dismissible for free. Four rules keep it correct:
 
 - Call `setOpen(false)` in every `<Link>` click handler, so the drawer closes once
@@ -395,6 +396,35 @@ it. `getRowId` and `highlightedRowId` keep addressing data rows, so a deep link
 still lands inside a group. On mobile the header renders as a strip above its
 cards rather than a card of its own. One level only: no nesting, collapsing or
 sorting within a group. CSV export is per-route and unaffected.
+
+### The line sheet
+
+Reading or acting on one request line opens a `Sheet` beside the table, never a
+row that expands inside it. `LineSheet` in `#/components/line-sheet` is the shell:
+a title, a description, a definition list of fields, the timeline, and an
+actions slot in the footer. `LineTimeline` draws the `TimelineEvent[]` that
+`lineTimeline` in `#/lib/inventory-timeline` builds from the line's own columns,
+so the staff queue and `/my/items` cannot disagree about what happened to a line.
+A row opens it through a `Details` button in its Actions cell; the sheet closes
+without navigating.
+
+```tsx
+<LineSheet
+  actions={<AdminRequestActions lineId={row.line.id} onDone={onDone} status={row.line.status} />}
+  description={`Requested by ${requester}`}
+  events={lineTimeline({ ... })}
+  fields={[{ label: "Item", value: row.item.name }]}
+  onOpenChange={(open) => !open && setOpenLineId(null)}
+  open={row !== null}
+  title={row.item.name}
+/>
+```
+
+Two things follow from choosing a sheet. `AdminDataTable` grows no expansion
+mode, which matters because the grouping mode above is already the shared
+component's one extension. And the actions get room: a fulfill flow wants more
+than a table cell, and the sheet is where it lives rather than a seventh column.
+This is the first use of `Sheet` outside the mobile navigation drawer.
 
 ### Two empty states
 
