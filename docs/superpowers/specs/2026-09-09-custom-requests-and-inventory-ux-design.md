@@ -172,13 +172,14 @@ inventory_custom_lines
   request_id    uuid -> inventory_requests, cascade, not null
   name          text not null
   reason        text not null
-  quantity      integer not null, >= 1
+  quantity      integer not null
   link          text
   status        inventory_custom_line_status not null default 'pending'
   staff_reply   text
   reviewed_by   text -> user, set null
   reviewed_at   timestamptz
   closed_at     timestamptz
+  closed_by     text -> user, set null
   created_at    timestamptz not null default now()
 
 index on (request_id)
@@ -188,6 +189,8 @@ inventory_custom_line_items
   custom_line_id uuid -> inventory_custom_lines, cascade
   item_id        uuid -> inventory_items, restrict
   primary key (custom_line_id, item_id)
+
+index on (item_id)
 ```
 
 `item_id` is `RESTRICT`, matching `inventory_request_items.item_id` and ADR-0006: an
@@ -208,8 +211,8 @@ exists, and a tuple placed anywhere else is scanned by nothing and passes silent
 | `name`, `reason`, `quantity`, `link` | requester, staff | nobody after submit |
 | `status` | requester, staff | staff, plus the requester for `cancelled` |
 | `staff_reply` | requester, staff | staff |
-| `reviewed_by`, `reviewed_at` | staff | staff, on every staff action; untouched by a requester cancel |
-| `closed_at` | staff | written by whichever transition closes the line, staff or requester |
+| `reviewed_by`, `reviewed_at` | staff | staff, on the first decision only; never overwritten |
+| `closed_by`, `closed_at` | staff | whichever transition closes the line, staff or requester |
 | `inventory_custom_line_items` rows | requester, staff | staff |
 | envelope `note` | requester, staff | requester at submit, nobody after |
 
@@ -230,27 +233,30 @@ the same name meaning two different things across one queue, which is the exact 
 this spec uses to reject `approved`.
 
 So the custom line has a single `staff_reply`, requester-visible, and that is the
-only column that departs from the sibling's naming. `reviewed_by` and `reviewed_at`
-keep their names, because they mean exactly what they mean on
-`inventory_request_items`: who decided this line and when. `approveRequestItemAs`
-already writes them on an approval, not only on a rejection, so "the staff member who
-decided" is the established meaning and a new name for it would be the confusing
-choice. `staff_reply` is renamed precisely because it does **not** match: the
-sibling's `review_comment` is staff-only, and this one is not.
+only column that departs from the sibling's naming. `staff_reply` is renamed
+precisely because it does **not** match: the sibling's `review_comment` is staff-only
+and this one is not. Every other column keeps the sibling's name **and its write
+rule**, which matters more than the name:
 
-There is no `closed_by`. While cancelling is requester-only the actor is always
-either the requester on `inventory_requests.user_id` or the staff member in
-`reviewed_by`, so the column would hold nothing new. It comes back the day staff can
-cancel on a requester's behalf, as they already can on a request line.
+- **`reviewed_by` and `reviewed_at` are written once**, on the first staff decision,
+  and never overwritten. That is what they mean on `inventory_request_items`, where
+  `approveRequestItemAs` writes them on approval and `transitionItemInTx` writes them
+  on a rejection, which is pending-only, so neither path can write twice. Sourcing
+  then fulfilling would overwrite them if this table were laxer, and the date the
+  line left `pending` would be lost.
+- **`closed_by` and `closed_at` are written by the closing transition**, whoever made
+  it, exactly as `transitionItemInTx` writes `closedBy: actorId` on every close. On a
+  requester cancel that is the requester. Without it, a line sourced by one staff
+  member and fulfilled by another could not say who closed it.
 
 What each transition writes:
 
-| Transition | `staff_reply` | `reviewed_by`, `reviewed_at` | `closed_at` |
+| Transition | `staff_reply` | `reviewed_by`, `reviewed_at` | `closed_by`, `closed_at` |
 | --- | --- | --- | --- |
-| `sourcing` | the note, optional | the staff member, now | unset |
-| `fulfilled` | the note, optional | the staff member, now | now |
-| `rejected` | the reason, **required** | the staff member, now | now |
-| `cancelled` | untouched | untouched | now |
+| `sourcing` | the note, optional | the staff member, now, if unset | unset |
+| `fulfilled` | the note, optional | the staff member, now, if unset | the staff member, now |
+| `rejected` | the reason, **required** | the staff member, now, if unset | the staff member, now |
+| `cancelled` | untouched | untouched | the requester, now |
 
 Two indexes, matching what the sibling carries: `(request_id)`, because both grouped
 tables group by it, and `(status)`, because the queue filters on it. `quantity` is
@@ -259,14 +265,15 @@ constraint, because `src/db/schema.ts` has no CHECK constraints today and this i
 the feature that should introduce the first one.
 
 **`staff_reply` is the latest reply, not a log.** Fulfilling after sourcing
-overwrites the sourcing note, and that is accepted rather than solved: each staff
-action already sends the requester a notification carrying its text, so the sequence
-survives in the bell even though the column keeps only the last one. Extending
-`inventory_item_status_history` to cover custom lines is the fix if it ever bites,
-and it is not in this version.
+overwrites the sourcing note, which is accepted rather than solved, and it is why
+each of the three notifications below carries the reply text verbatim: the column
+keeps the last word, the bell keeps the sequence. Extending
+`inventory_item_status_history` to cover custom lines is the fix if that ever stops
+being enough, and it is not in this version.
 
-`cancelled` is the requester's own transition, so it writes `closed_at` without
-touching the two decision columns: nobody decided anything, the requester withdrew.
+`cancelled` is the requester's own transition, so it leaves the review columns alone:
+nobody decided anything, the requester withdrew. It still writes `closed_by`, naming
+the requester, which is what tells a cancel from a staff close on inspection.
 
 ## The grouping mode on AdminDataTable
 
@@ -290,14 +297,18 @@ a group stops being contiguous the moment rows are ordered by status.
 - **Markup**: one `<tbody>` per group, its first row a
   `<th scope="rowgroup" colspan={visibleColumnCount}>`, so a screen reader announces
   the group before its rows. The accessibility suite scans both pages that use this.
-- **Mobile, and this is real work rather than a note.** `src/styles.css` renders
-  each row as a card under `@media (max-width: 767px)`, and three of its rules
-  assume one `tbody`: `.admin-table tbody` is `display: flex` with `gap: 0.5rem`, so
-  cards in different tbodies get no gap between them; `.admin-table tbody tr` puts
-  the card border, radius and `--card` background on **every** row, including a
-  group header that should be a bare strip; and `.admin-table tbody td:last-child`
-  drops its divider at the end of each group rather than at the end of the table.
-  PR 1 edits that block, and `src/styles.css` is on its deliverable list.
+- **CSS in both breakpoints, which is real work rather than a note.** Three rules in
+  `src/styles.css` assume a single `tbody`, and they are not all in one block.
+  Under `@media (max-width: 767px)`, `.admin-table tbody` is `display: flex` with
+  `gap: 0.5rem`, so cards in two different tbodies get no gap between them, and
+  `.admin-table tbody tr` puts the card border, radius and `--card` background on
+  **every** row, including a group header that should be a bare strip. Under
+  `@media (min-width: 768px)`, `.admin-table tbody tr:last-child td` drops the bottom
+  rule so the body meets the container's rounded edge; with one tbody per group it
+  drops that rule at the end of **every group** instead. A fourth thing follows from
+  the markup rather than from a rule: the header is a `th`, so none of the `td`
+  padding reaches it and it needs its own. `src/styles.css` is on PR 1's deliverable
+  list.
 - **CSV export is not this component's business.** Export is per-route: a page builds
   its own button from `defineCsvColumns` in `src/lib/csv.ts` over its own rows, and
   `AdminDataTable` holds no export code. So grouping cannot corrupt an export, and
@@ -305,15 +316,21 @@ a group stops being contiguous the moment rows are ordered by status.
   `/my/items` both ship without CSV today and gain none here.
 - **`getRowId` and `highlightedRowId`** keep addressing data rows, so the deep link
   from the admin overview still highlights one line.
-- **Group order follows the data.** Groups appear in the order their first row
-  appears in the rows the table was handed, which under the default sort is the
-  server's order. A page that needs a fixed group order returns its rows in that
-  order and declares no sortable column, which is what `/my/items` does: with every
-  column `enableSorting: false`, `getCanSort` is false everywhere, TanStack Table's
-  sorting state selects nothing, and rows render exactly as they arrived. There is
-  no hidden rank column, and there must not be: a sortable one would put
-  `?sort=groupRank&dir=desc` in reach, which differs from `defaultSort` and would
-  drop grouping, taking the Submit-bearing header with it.
+- **Grouping runs after sorting, not before.** Groups are formed from
+  `table.getRowModel().rows`, which is the sorted model, so a group's position is
+  where its first row lands after TanStack has ordered them. Grouping the input array
+  instead would be wrong on the queue, which sorts client-side: `requests.tsx` sets
+  its default sort to `requestedAt` descending and passes no `serverSorted`, so the
+  table reorders before anything is grouped.
+- **A page that needs a fixed group order returns its rows in that order and makes
+  nothing sortable.** That is `/my/items`: with every column `enableSorting: false`,
+  `getCanSort` is false everywhere, the sorting state selects nothing, and the sorted
+  model is the input order. It still passes a `defaultSort`, because `useAdminTable`
+  requires one, and `parseSort` returns that fallback unconditionally when no column
+  is sortable; the value is inert rather than meaningful. There is no hidden rank
+  column and there must not be: a sortable one would put `?sort=groupRank&dir=desc`
+  in reach, which differs from `defaultSort`, drops grouping, and takes the
+  Submit-bearing header with it.
 - **`header(rows)` receives rows and nothing else**, so whatever identifies a group
   is denormalized onto every row in it. Both pages already do this: the queue has a
   requester column, and `/my/items` carries the submitted date. This is a constraint
@@ -468,7 +485,10 @@ who may make it, unit tested with no docker. Who gets told extends
 
 **Notifications**: three cases, all in-app, none by email. Sourcing ("we are getting
 this"), fulfilled (naming the items, and the pickup deadline when they were
-reserved), rejected (carrying the reason). One notification per fulfill, not one per
+reserved), rejected. **Each of the three carries `staff_reply` verbatim when it is
+non-empty**, which is not decoration: the column keeps only the latest reply, so the
+notification is where the sequence survives, and a sourcing note overwritten by a
+fulfillment note is still readable in the bell. One notification per fulfill, not one per
 item. Staff get nothing on submit, because the admin overview tile is already the
 signal; that tile's count now includes pending custom lines.
 
