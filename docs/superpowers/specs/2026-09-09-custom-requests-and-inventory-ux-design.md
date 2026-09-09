@@ -240,13 +240,15 @@ rule**, which matters more than the name:
 
 - **`reviewed_by` and `reviewed_at` are written once**, on the first staff decision,
   and never overwritten. That is what they mean on `inventory_request_items`, where
-  `approveRequestItemAs` writes them on approval and `transitionItemInTx` writes them
-  on a rejection, which is pending-only, so neither path can write twice. Sourcing
+  `approveRequestItemAs` writes them on approval and `closeRequestItemOnRelease` in
+  `src/server/_internal/inventory-transitions.ts` writes them on a rejection, behind
+  a pending-only guard, so neither path can write twice. Sourcing
   then fulfilling would overwrite them if this table were laxer, and the date the
   line left `pending` would be lost.
 - **`closed_by` and `closed_at` are written by the closing transition**, whoever made
-  it, exactly as `transitionItemInTx` writes `closedBy: actorId` on every close. On a
-  requester cancel that is the requester. Without it, a line sourced by one staff
+  it, exactly as `closeRequestItemOnRelease` writes `closedBy: actorId` on every
+  close. On a requester cancel that is the requester: `cancelRequestItemAs` passes
+  the viewer into `transitionItem`, which reaches that function as the actor. Without it, a line sourced by one staff
   member and fulfilled by another could not say who closed it.
 
 What each transition writes:
@@ -261,10 +263,11 @@ What each transition writes:
 Three indexes, matching the three `inventory_request_items` carries: `(request_id)`,
 because both grouped tables group by it; `(status)`, because the queue filters on it;
 and `(item_id)` on the join table, which the `RESTRICT` check on an item delete reads
-and which answers "which custom line produced this hold" on `/my/items`. `quantity` is
-`integer not null` validated at the boundary by Zod rather than by a CHECK
-constraint, because `src/db/schema.ts` has no CHECK constraints today and this is not
-the feature that should introduce the first one.
+and which answers "which custom line produced this hold" on `/my/items`. `quantity` is `integer not null` with a floor of **1**, enforced by
+`z.number().int().min(1)` on the submit schema rather than by a CHECK constraint:
+`src/db/schema.ts` carries no CHECK constraints today, and this is not the feature
+that should introduce the first one. The floor is a rule either way, so it is written
+here rather than left to the reader to infer.
 
 **`staff_reply` is the latest reply, not a log.** Fulfilling after sourcing
 overwrites the sourcing note, which is accepted rather than solved, and it is why
