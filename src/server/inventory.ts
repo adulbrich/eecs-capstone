@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ACTIVE_STATUSES } from "#/lib/inventory-visibility";
 import { PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX } from "#/lib/pagination";
 import {
+  INVENTORY_CUSTOM_LINE_STATUSES,
   INVENTORY_ITEM_STATUSES,
   INVENTORY_REQUEST_ITEM_STATUSES,
 } from "#/lib/vocabularies";
@@ -267,12 +268,27 @@ export const listMyItems = createServerFn({ method: "GET" }).handler(
   }
 );
 
+type QueueStatus =
+  | (typeof INVENTORY_CUSTOM_LINE_STATUSES)[number]
+  | (typeof INVENTORY_REQUEST_ITEM_STATUSES)[number];
+
+/**
+ * The union of both line vocabularies, for the queue's status filter. A
+ * status only one kind has filters to that kind. Built from the tuples
+ * rather than written out, so a status added to either lands here and the
+ * vocabulary scan has no copy to find.
+ */
+export const INVENTORY_QUEUE_STATUSES = [
+  ...new Set<QueueStatus>([
+    ...INVENTORY_REQUEST_ITEM_STATUSES,
+    ...INVENTORY_CUSTOM_LINE_STATUSES,
+  ]),
+] as [QueueStatus, ...QueueStatus[]];
+
 const requestQueueSchema = z.object({
   // "all" is a view, never combinable with a specific status, so it is one of
   // the exclusive options rather than a separate flag.
-  status: z
-    .enum([...INVENTORY_REQUEST_ITEM_STATUSES, "all"])
-    .default("pending"),
+  status: z.enum([...INVENTORY_QUEUE_STATUSES, "all"]).default("pending"),
   q: z.string().default(""),
 });
 

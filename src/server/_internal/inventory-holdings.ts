@@ -13,6 +13,7 @@ import {
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "#/db";
 import {
+  inventoryCustomLines,
   inventoryItemStatusHistory,
   inventoryItems,
   inventoryRequestItems,
@@ -25,27 +26,39 @@ import { compareByDeadline } from "#/lib/inventory-deadlines";
 import {
   type HoldItemView,
   holdItemView,
+  type MyCustomLineView,
   type MyRequestLineView,
+  myCustomLineView,
   myRequestLineView,
+  type StaffCustomLineView,
+  staffCustomLineView,
 } from "#/lib/inventory-visibility";
 import { assertStaff, type Viewer } from "#/lib/viewer";
-import type { ItemStatus } from "#/lib/vocabularies";
+import {
+  INVENTORY_CUSTOM_LINE_STATUSES,
+  INVENTORY_REQUEST_ITEM_STATUSES,
+  type ItemStatus,
+} from "#/lib/vocabularies";
 import type { InventoryRequestQueueFilter } from "../inventory";
 import { getCartAs } from "./inventory-cart";
+import { linkedItemsFor } from "./inventory-custom";
 import { recordOverdueNotificationsAs } from "./inventory-overdue";
 
 /**
  * One row of `/my/items`, carrying the group it belongs to.
  *
- * Three kinds, because three things can sit on a person's page: an item in
- * the borrow list, not yet submitted; a request line, open or closed, with the
+ * Four kinds, because four things can sit on a person's page: an item in the
+ * borrow list, not yet submitted; a request line, open or closed, with the
  * envelope it arrived in denormalized onto it so the page can group by request
- * without a second lookup; and a hold with no request line behind it.
+ * without a second lookup; a custom line, carrying its envelope the same way;
+ * and a hold. A hold produced by fulfilling a custom line names that line in
+ * `viaCustomLineId` and is placed directly after it, so the page can indent
+ * it under the line rather than file it under "Assigned to you by staff".
  *
  * Only a hold carries the item as its subject, because only a hold has no
- * request line. A request row carries its line plus the item's name and
- * status: a request's deadlines live on the line, and letting it carry the
- * item's too would put two different `pickupBy` values on one object (see
+ * line. A request row carries its line plus the item's name and status: a
+ * request's deadlines live on the line, and letting it carry the item's too
+ * would put two different `pickupBy` values on one object (see
  * `docs/QUIRKS.md`). A cart row carries the item's name and status the same
  * way, since it has no line at all.
  */
@@ -61,7 +74,14 @@ export type MyItemsRow =
       requestId: string;
       requestedAt: Date;
     }
-  | { item: HoldItemView; kind: "hold" };
+  | {
+      kind: "custom";
+      line: MyCustomLineView;
+      note: string | null;
+      requestId: string;
+      requestedAt: Date;
+    }
+  | { item: HoldItemView; kind: "hold"; viaCustomLineId: string | null };
 
 /** The closed lines the page shows, most recently closed first. */
 const CLOSED_LINES_LIMIT = 50;
@@ -139,7 +159,7 @@ export async function listMyItemsAs(viewer: Viewer): Promise<MyItemsRow[]> {
     item: inventoryItems,
     request: inventoryRequests,
   };
-  const [cart, openLines, holds, closedLines] = await Promise.all([
+  const [cart, openLines, holds, closedLines, customLines] = await Promise.all([
     getCartAs(viewer),
     db
       .select(lineSelection)
@@ -157,7 +177,10 @@ export async function listMyItemsAs(viewer: Viewer): Promise<MyItemsRow[]> {
           eq(inventoryRequests.userId, viewer.id),
           inArray(inventoryRequestItems.status, ["pending", "approved"])
         )
-      ),
+      )
+      // Deterministic within a request: lines of one borrow list share a
+      // createdAt, and a heap scan returns updated rows in a new place.
+      .orderBy(inventoryRequestItems.createdAt, inventoryRequestItems.id),
     db
       .select({ item: inventoryItems })
       .from(inventoryItems)
@@ -217,9 +240,21 @@ export async function listMyItemsAs(viewer: Viewer): Promise<MyItemsRow[]> {
       )
       .orderBy(desc(inventoryRequestItems.updatedAt))
       .limit(CLOSED_LINES_LIMIT),
+    db
+      .select({ line: inventoryCustomLines, request: inventoryRequests })
+      .from(inventoryCustomLines)
+      .innerJoin(
+        inventoryRequests,
+        eq(inventoryCustomLines.requestId, inventoryRequests.id)
+      )
+      .where(eq(inventoryRequests.userId, viewer.id))
+      .orderBy(inventoryCustomLines.createdAt, inventoryCustomLines.id),
   ]);
 
   const lines = [...openLines, ...closedLines];
+  // The items each custom line produced, to file the holds it created under
+  // it. Read after the holds, so a hold and its line come from one moment.
+  const linked = await linkedItemsFor(customLines.map((row) => row.line.id));
   const collected = await collectedByForRequestItems(
     lines.map((r) => r.line.id)
   );
@@ -243,48 +278,101 @@ export async function listMyItemsAs(viewer: Viewer): Promise<MyItemsRow[]> {
     return collector.name || collector.email ? collector : null;
   };
 
+  const holdRowsById = new Map(
+    holds.map((row) => [
+      row.item.id,
+      {
+        kind: "hold" as const,
+        item: holdItemView(row.item),
+        viaCustomLineId: null as string | null,
+      },
+    ])
+  );
+  // A hold created by a fulfillment is filed under the line that produced it
+  // and taken out of the staff-holds group. The join table is what makes the
+  // distinction available: mechanically the hold is an ordinary staff one.
+  const holdsViaLine = new Map<
+    string,
+    Extract<MyItemsRow, { kind: "hold" }>[]
+  >();
+  for (const [lineId, items] of linked) {
+    for (const item of items) {
+      const hold = holdRowsById.get(item.id);
+      if (!hold) {
+        continue;
+      }
+      hold.viaCustomLineId = lineId;
+      holdRowsById.delete(item.id);
+      holdsViaLine.set(lineId, [...(holdsViaLine.get(lineId) ?? []), hold]);
+    }
+  }
+
   // One run of rows per request, newest request first, the lines inside it
   // in the order they were carted. Grouped here rather than by the page, so
   // a request whose lines straddle open and closed still arrives contiguous.
-  const byRequest = new Map<string, typeof lines>();
-  for (const row of lines) {
-    const bucket = byRequest.get(row.request.id);
-    if (bucket) {
-      bucket.push(row);
-    } else {
-      byRequest.set(row.request.id, [row]);
+  // An envelope holds one kind of line, so a bucket is all item lines or all
+  // custom lines.
+  interface Envelope {
+    createdAt: Date;
+    id: string;
+    note: string | null;
+  }
+  const byRequest = new Map<
+    string,
+    { request: Envelope; rows: MyItemsRow[]; sortKeys: number[] }
+  >();
+  const fileUnder = (request: Envelope, at: Date, ...rows: MyItemsRow[]) => {
+    const bucket = byRequest.get(request.id) ?? {
+      request,
+      rows: [],
+      sortKeys: [],
+    };
+    for (const row of rows) {
+      bucket.rows.push(row);
+      bucket.sortKeys.push(at.getTime());
     }
+    byRequest.set(request.id, bucket);
+  };
+  for (const row of lines) {
+    fileUnder(row.request, row.line.createdAt, {
+      kind: "request",
+      requestId: row.request.id,
+      requestedAt: row.request.createdAt,
+      note: row.request.note,
+      collectedBy: collectedByForViewer(row.line.id),
+      itemName: row.item.name,
+      itemStatus: row.item.status,
+      line: myRequestLineView(row.line),
+    });
+  }
+  for (const row of customLines) {
+    fileUnder(
+      row.request,
+      row.line.createdAt,
+      {
+        kind: "custom",
+        requestId: row.request.id,
+        requestedAt: row.request.createdAt,
+        note: row.request.note,
+        line: myCustomLineView(row.line),
+      },
+      ...(holdsViaLine.get(row.line.id) ?? [])
+    );
   }
   const requestRows = [...byRequest.values()]
     .sort(
-      (a, b) =>
-        b[0].request.createdAt.getTime() - a[0].request.createdAt.getTime()
+      (a, b) => b.request.createdAt.getTime() - a.request.createdAt.getTime()
     )
-    .flatMap((group) =>
-      group
-        .sort((a, b) => a.line.createdAt.getTime() - b.line.createdAt.getTime())
-        .map(
-          (row): MyItemsRow => ({
-            kind: "request",
-            requestId: row.request.id,
-            requestedAt: row.request.createdAt,
-            note: row.request.note,
-            collectedBy: collectedByForViewer(row.line.id),
-            itemName: row.item.name,
-            itemStatus: row.item.status,
-            line: myRequestLineView(row.line),
-          })
-        )
+    .flatMap((bucket) =>
+      // A stable sort by line date keeps a hold right after its line, since
+      // both were filed with the line's own timestamp.
+      bucket.rows
+        .map((row, index) => ({ row, key: bucket.sortKeys[index], index }))
+        .sort((a, b) => a.key - b.key || a.index - b.index)
+        .map((entry) => entry.row)
     );
 
-  const holdRows = holds
-    .map(
-      (row): Extract<MyItemsRow, { kind: "hold" }> => ({
-        kind: "hold",
-        item: holdItemView(row.item),
-      })
-    )
-    .sort(compareByDeadline);
+  const holdRows = [...holdRowsById.values()].sort(compareByDeadline);
 
   return [
     ...cart.map(
@@ -375,75 +463,155 @@ export async function collectedByForRequestItems(
   return map;
 }
 
+/** Who did something, as the queue names them: a name, else an address. */
+interface Person {
+  email: string;
+  name: string | null;
+}
+
+/**
+ * One row of the staff queue: a request line with its item, or a custom line
+ * with the items it produced. The envelope rides on every row so the table
+ * can group by request, and `kind` is what the page's one map switches on.
+ */
+export type QueueRow = {
+  closer: Person | null;
+  note: string | null;
+  requestId: string;
+  requestedAt: Date;
+  requester: { email: string; id: string; name: string | null };
+  reviewer: Person | null;
+} & (
+  | {
+      collectedBy: CollectedBy | null;
+      item: typeof inventoryItems.$inferSelect;
+      kind: "item";
+      line: typeof inventoryRequestItems.$inferSelect;
+    }
+  | {
+      items: { id: string; name: string; status: string }[];
+      kind: "custom";
+      line: StaffCustomLineView;
+    }
+);
+
+function person(email: string | null, name: string | null): Person | null {
+  return email ? { email, name } : null;
+}
+
 export async function listInventoryRequestsAs(
   viewer: Viewer,
   data: InventoryRequestQueueFilter
-) {
+): Promise<QueueRow[]> {
   assertStaff(viewer);
   // No lazy overdue trigger here: notifications are for the requester, not
   // staff, and a global scan on every queue read is wasteful. The notification
   // fires when the requester reads /my/items.
-  const statusFilter =
-    data.status === "all"
-      ? undefined
-      : eq(inventoryRequestItems.status, data.status);
+  //
+  // One status filter over two vocabularies. A status only one kind has
+  // filters to that kind: the other kind's query is skipped rather than
+  // asked for a value its column cannot hold.
+  const wantsItemLines =
+    data.status === "all" ||
+    (INVENTORY_REQUEST_ITEM_STATUSES as readonly string[]).includes(
+      data.status
+    );
+  const wantsCustomLines =
+    data.status === "all" ||
+    (INVENTORY_CUSTOM_LINE_STATUSES as readonly string[]).includes(data.status);
   // Free-text search spans what a staff member has in front of them when they
   // go looking: the thing requested, and who asked for it.
   const q = data.q.trim();
-  const searchFilter = q
-    ? or(
-        ilike(inventoryItems.name, `%${q}%`),
-        ilike(user.name, `%${q}%`),
-        ilike(user.email, `%${q}%`)
-      )
-    : undefined;
-  const conditions = [statusFilter, searchFilter].filter(Boolean);
+  const requesterMatches = q
+    ? [ilike(user.name, `%${q}%`), ilike(user.email, `%${q}%`)]
+    : [];
   // `user` three times in one query: the requester, and the two staff
   // members the line sheet's timeline names. Left joins, because a pending
   // line has neither and a cancelled one has no reviewer.
   const reviewer = alias(user, "reviewer");
   const closer = alias(user, "closer");
-  const rows = await db
-    .select({
-      line: inventoryRequestItems,
-      item: inventoryItems,
-      request: inventoryRequests,
-      requesterEmail: user.email,
-      requesterName: user.name,
-      reviewerEmail: reviewer.email,
-      reviewerName: reviewer.name,
-      closerEmail: closer.email,
-      closerName: closer.name,
-    })
-    .from(inventoryRequestItems)
-    .innerJoin(
-      inventoryRequests,
-      eq(inventoryRequestItems.requestId, inventoryRequests.id)
-    )
-    .innerJoin(
-      inventoryItems,
-      eq(inventoryRequestItems.itemId, inventoryItems.id)
-    )
-    .innerJoin(user, eq(inventoryRequests.userId, user.id))
-    .leftJoin(reviewer, eq(inventoryRequestItems.reviewedBy, reviewer.id))
-    .leftJoin(closer, eq(inventoryRequestItems.closedBy, closer.id))
-    .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(desc(inventoryRequests.createdAt));
+  const people = {
+    requesterEmail: user.email,
+    requesterName: user.name,
+    reviewerEmail: reviewer.email,
+    reviewerName: reviewer.name,
+    closerEmail: closer.email,
+    closerName: closer.name,
+  };
 
-  const collected = await collectedByForRequestItems(
-    rows.map((r) => r.line.id)
-  );
-  const enriched = rows.map((r) => ({
-    ...r,
-    collectedBy: collected.get(r.line.id) ?? null,
-  }));
+  const itemConditions = [
+    data.status === "all"
+      ? undefined
+      : eq(
+          inventoryRequestItems.status,
+          data.status as (typeof INVENTORY_REQUEST_ITEM_STATUSES)[number]
+        ),
+    q
+      ? or(ilike(inventoryItems.name, `%${q}%`), ...requesterMatches)
+      : undefined,
+  ].filter(Boolean);
+  const itemRows = wantsItemLines
+    ? await db
+        .select({
+          line: inventoryRequestItems,
+          item: inventoryItems,
+          request: inventoryRequests,
+          ...people,
+        })
+        .from(inventoryRequestItems)
+        .innerJoin(
+          inventoryRequests,
+          eq(inventoryRequestItems.requestId, inventoryRequests.id)
+        )
+        .innerJoin(
+          inventoryItems,
+          eq(inventoryRequestItems.itemId, inventoryItems.id)
+        )
+        .innerJoin(user, eq(inventoryRequests.userId, user.id))
+        .leftJoin(reviewer, eq(inventoryRequestItems.reviewedBy, reviewer.id))
+        .leftJoin(closer, eq(inventoryRequestItems.closedBy, closer.id))
+        .where(itemConditions.length ? and(...itemConditions) : undefined)
+        .orderBy(desc(inventoryRequests.createdAt))
+    : [];
 
-  // One row per request line. The queue used to group these into one card per
-  // batch; the table needs the flat shape, and the batch fields ride along on
-  // every line so a row can still say who asked and why.
-  return enriched.map((r) => ({
-    line: r.line,
-    item: r.item,
+  const customConditions = [
+    data.status === "all"
+      ? undefined
+      : eq(
+          inventoryCustomLines.status,
+          data.status as (typeof INVENTORY_CUSTOM_LINE_STATUSES)[number]
+        ),
+    q
+      ? or(ilike(inventoryCustomLines.name, `%${q}%`), ...requesterMatches)
+      : undefined,
+  ].filter(Boolean);
+  const customRows = wantsCustomLines
+    ? await db
+        .select({
+          line: inventoryCustomLines,
+          request: inventoryRequests,
+          ...people,
+        })
+        .from(inventoryCustomLines)
+        .innerJoin(
+          inventoryRequests,
+          eq(inventoryCustomLines.requestId, inventoryRequests.id)
+        )
+        .innerJoin(user, eq(inventoryRequests.userId, user.id))
+        .leftJoin(reviewer, eq(inventoryCustomLines.reviewedBy, reviewer.id))
+        .leftJoin(closer, eq(inventoryCustomLines.closedBy, closer.id))
+        .where(customConditions.length ? and(...customConditions) : undefined)
+        .orderBy(desc(inventoryRequests.createdAt))
+    : [];
+
+  const [collected, linked] = await Promise.all([
+    collectedByForRequestItems(itemRows.map((r) => r.line.id)),
+    linkedItemsFor(customRows.map((r) => r.line.id)),
+  ]);
+
+  const envelope = (
+    r: (typeof itemRows)[number] | (typeof customRows)[number]
+  ) => ({
     requestId: r.request.id,
     requester: {
       id: r.request.userId,
@@ -452,12 +620,33 @@ export async function listInventoryRequestsAs(
     },
     requestedAt: r.request.createdAt,
     note: r.request.note,
-    collectedBy: r.collectedBy,
-    reviewer: r.reviewerEmail
-      ? { email: r.reviewerEmail, name: r.reviewerName }
-      : null,
-    closer: r.closerEmail ? { email: r.closerEmail, name: r.closerName } : null,
-  }));
+    reviewer: person(r.reviewerEmail, r.reviewerName),
+    closer: person(r.closerEmail, r.closerName),
+  });
+
+  // One row per line of either kind. The batch fields ride along on every
+  // line so a row can still say who asked and why, and so the table can
+  // group. Newest request first across both kinds.
+  const rows: QueueRow[] = [
+    ...itemRows.map(
+      (r): QueueRow => ({
+        ...envelope(r),
+        kind: "item",
+        line: r.line,
+        item: r.item,
+        collectedBy: collected.get(r.line.id) ?? null,
+      })
+    ),
+    ...customRows.map(
+      (r): QueueRow => ({
+        ...envelope(r),
+        kind: "custom",
+        line: staffCustomLineView(r.line),
+        items: linked.get(r.line.id) ?? [],
+      })
+    ),
+  ];
+  return rows.sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime());
 }
 
 export async function listMyItemsForCurrentUser() {

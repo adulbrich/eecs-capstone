@@ -13,6 +13,7 @@ import {
 import { auth } from "#/lib/auth";
 import type { UserRole } from "#/lib/vocabularies";
 import { countPendingRequests } from "#/server/_internal/admin";
+import { addToCartAs, submitCartAs } from "#/server/_internal/inventory-cart";
 import {
   cancelCustomLineAs,
   fulfillCustomLineAs,
@@ -21,6 +22,10 @@ import {
   submitCustomRequestAs,
   updateSourcingNoteAs,
 } from "#/server/_internal/inventory-custom";
+import {
+  listInventoryRequestsAs,
+  listMyItemsAs,
+} from "#/server/_internal/inventory-holdings";
 import { transitionItem } from "#/server/_internal/inventory-transitions";
 
 async function makeUser(email: string, role: UserRole) {
@@ -443,5 +448,191 @@ describe("fulfillCustomLineAs", () => {
         reserve: true,
       })
     ).rejects.toThrow("Forbidden");
+  });
+});
+
+describe("the queue with both kinds", () => {
+  it("lists custom lines beside item lines, and filters each by its own vocabulary", async () => {
+    const stamp = Date.now();
+    const staff = await makeUser(`cq-staff-${stamp}@x.com`, "admin");
+    const student = await makeUser(`cq-student-${stamp}@x.com`, "user");
+    const item = await makeItem(`Carted ${stamp}`);
+    await addToCartAs(student, { itemId: item.id });
+    await submitCartAs(student, { note: null });
+    const {
+      lineIds: [custom],
+    } = await submitCustomRequestAs(student, {
+      lines: [ask(`Wanted ${stamp}`)],
+      note: "custom note",
+    });
+    await startSourcingCustomLineAs(staff, {
+      customLineId: custom,
+      sourcingNote: "Ordered",
+    });
+
+    const all = await listInventoryRequestsAs(staff, { status: "all", q: "" });
+    const mine = all.filter((row) => row.requester.id === student.id);
+    expect(mine.map((row) => row.kind).sort()).toEqual(["custom", "item"]);
+    const customRow = mine.find((row) => row.kind === "custom");
+    expect(customRow?.kind).toBe("custom");
+    if (customRow?.kind === "custom") {
+      expect(customRow.line.name).toBe(`Wanted ${stamp}`);
+      expect(customRow.line.sourcingNote).toBe("Ordered");
+      expect(customRow.line.reviewedBy).toBe(staff.id);
+      expect(customRow.reviewer?.email).toBe(`cq-staff-${stamp}@x.com`);
+      expect(customRow.note).toBe("custom note");
+      expect(customRow.items).toEqual([]);
+    }
+
+    // A status only one kind has filters to that kind.
+    const sourcing = await listInventoryRequestsAs(staff, {
+      status: "sourcing",
+      q: "",
+    });
+    expect(sourcing.every((row) => row.kind === "custom")).toBe(true);
+    expect(sourcing.some((row) => row.requester.id === student.id)).toBe(true);
+    const approved = await listInventoryRequestsAs(staff, {
+      status: "approved",
+      q: "",
+    });
+    expect(approved.every((row) => row.kind === "item")).toBe(true);
+
+    // Search reaches a custom line's name.
+    const found = await listInventoryRequestsAs(staff, {
+      status: "all",
+      q: `Wanted ${stamp}`,
+    });
+    expect(found).toHaveLength(1);
+    expect(found[0].kind).toBe("custom");
+  });
+
+  it("names the items a fulfilled line produced", async () => {
+    const stamp = Date.now();
+    const staff = await makeUser(`cq-ful-${stamp}@x.com`, "admin");
+    const student = await makeUser(`cq-ful-s-${stamp}@x.com`, "user");
+    const item = await makeItem(`Arrived ${stamp}`);
+    const {
+      lineIds: [custom],
+    } = await submitCustomRequestAs(student, {
+      lines: [ask("Thing")],
+      note: null,
+    });
+    await fulfillCustomLineAs(staff, {
+      customLineId: custom,
+      itemIds: [item.id],
+      outcomeNote: null,
+      pickupBy: null,
+      reserve: true,
+    });
+    const rows = await listInventoryRequestsAs(staff, {
+      status: "fulfilled",
+      q: "",
+    });
+    const row = rows.find((r) => r.kind === "custom" && r.line.id === custom);
+    expect(row?.kind).toBe("custom");
+    if (row?.kind === "custom") {
+      expect(row.items).toEqual([
+        { id: item.id, name: `Arrived ${stamp}`, status: "reserved" },
+      ]);
+    }
+  });
+
+  it("is staff only", async () => {
+    const stamp = Date.now();
+    const student = await makeUser(`cq-nostaff-${stamp}@x.com`, "user");
+    await expect(
+      listInventoryRequestsAs(student, { status: "all", q: "" })
+    ).rejects.toThrow("Forbidden");
+  });
+});
+
+describe("custom requests on my items", () => {
+  it("files custom lines under their request and the holds they produced under the line", async () => {
+    const stamp = Date.now();
+    const staff = await makeUser(`cm-staff-${stamp}@x.com`, "admin");
+    const student = await makeUser(`cm-student-${stamp}@x.com`, "user");
+    const stranger = await makeUser(`cm-stranger-${stamp}@x.com`, "user");
+    const produced = await makeItem(`Produced ${stamp}`);
+    const plain = await makeItem(`Plain hold ${stamp}`);
+    await transitionItem(staff, {
+      itemId: plain.id,
+      nextStatus: "reserved",
+      holderId: student.id,
+    });
+    const { requestId, lineIds } = await submitCustomRequestAs(student, {
+      lines: [ask("First"), ask("Second")],
+      note: "for the rig",
+    });
+    await fulfillCustomLineAs(staff, {
+      customLineId: lineIds[0],
+      itemIds: [produced.id],
+      outcomeNote: "On the shelf",
+      pickupBy: null,
+      reserve: true,
+    });
+
+    const rows = await listMyItemsAs(student);
+    // Two custom lines under one request, the hold directly after the line
+    // that produced it, and the plain staff hold last in its own group.
+    expect(rows.map((row) => row.kind).sort()).toEqual([
+      "custom",
+      "custom",
+      "hold",
+      "hold",
+    ]);
+    const fulfilledAt = rows.findIndex(
+      (row) => row.kind === "custom" && row.line.id === lineIds[0]
+    );
+    const first = rows[fulfilledAt];
+    const hold = rows[fulfilledAt + 1];
+    const last = rows.at(-1);
+    expect(first.kind).toBe("custom");
+    expect(hold.kind).toBe("hold");
+    expect(last?.kind).toBe("hold");
+    if (
+      first.kind === "custom" &&
+      hold.kind === "hold" &&
+      last?.kind === "hold"
+    ) {
+      expect(first.requestId).toBe(requestId);
+      expect(first.note).toBe("for the rig");
+      expect(first.line.status).toBe("fulfilled");
+      expect(first.line.outcomeNote).toBe("On the shelf");
+      expect(Object.keys(first).sort()).toEqual([
+        "kind",
+        "line",
+        "note",
+        "requestId",
+        "requestedAt",
+      ]);
+      expect(Object.keys(first.line).sort()).toEqual([
+        "closedAt",
+        "createdAt",
+        "id",
+        "link",
+        "name",
+        "outcomeNote",
+        "quantity",
+        "reason",
+        "sourcingNote",
+        "status",
+      ]);
+      expect(hold.viaCustomLineId).toBe(lineIds[0]);
+      expect(hold.item.id).toBe(produced.id);
+      expect(Object.keys(hold).sort()).toEqual([
+        "item",
+        "kind",
+        "viaCustomLineId",
+      ]);
+      expect(last.viaCustomLineId).toBeNull();
+      expect(last.item.id).toBe(plain.id);
+    }
+    const pending = rows.find(
+      (row) => row.kind === "custom" && row.line.id === lineIds[1]
+    );
+    expect(pending?.kind === "custom" && pending.line.status).toBe("pending");
+
+    // Nobody else sees any of it.
+    expect(await listMyItemsAs(stranger)).toEqual([]);
   });
 });
