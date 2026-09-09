@@ -161,9 +161,7 @@ function buildColumns(onDone: () => void, onOpen: (lineId: string) => void) {
       cell: (ctx) => (
         <div className="flex items-center gap-2">
           <span className="font-medium">{ctx.row.original.item.name}</span>
-          <InventoryStatusBadge
-            status={ctx.row.original.item.status as "available"}
-          />
+          <InventoryStatusBadge status={ctx.row.original.item.status} />
         </div>
       ),
       enableHiding: false,
@@ -441,7 +439,7 @@ function fieldsOf(row: Row): LineSheetField[] {
       value: (
         <span className="flex flex-wrap items-center gap-2">
           {row.item.name}
-          <InventoryStatusBadge status={row.item.status as "available"} />
+          <InventoryStatusBadge status={row.item.status} />
         </span>
       ),
     },
