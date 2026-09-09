@@ -5,7 +5,14 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { z } from "zod";
 import {
   AdminDataTable,
@@ -13,9 +20,14 @@ import {
 } from "#/components/admin-data-table";
 import { AdminRequestActions } from "#/components/admin-request-actions";
 import { ApproveAllDialog } from "#/components/approve-all-dialog";
+import {
+  CustomLineActions,
+  StartSourcingAllButton,
+} from "#/components/custom-line-actions";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { LineSheet, type LineSheetField } from "#/components/line-sheet";
 import { LocalTime } from "#/components/local-time";
+import { Badge } from "#/components/ui/badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -36,6 +48,7 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { getSession } from "#/lib/auth-guards";
+import { isOpenCustomLine } from "#/lib/inventory-custom-workflow";
 import { lineTimeline } from "#/lib/inventory-timeline";
 import { pageTitle } from "#/lib/page-title";
 import type { SortState } from "#/lib/table-state";
@@ -43,11 +56,17 @@ import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import { cn } from "#/lib/utils";
 import { isStaff } from "#/lib/viewer";
-import { INVENTORY_REQUEST_ITEM_STATUSES } from "#/lib/vocabularies";
-import { listInventoryRequests } from "#/server/inventory";
+import {
+  INVENTORY_CUSTOM_LINE_STATUSES,
+  INVENTORY_REQUEST_ITEM_STATUSES,
+} from "#/lib/vocabularies";
+import {
+  INVENTORY_QUEUE_STATUSES,
+  listInventoryRequests,
+} from "#/server/inventory";
 
-/** The vocabulary plus the sentinel this filter adds for "no filter". */
-const STATUSES = [...INVENTORY_REQUEST_ITEM_STATUSES, "all"] as const;
+/** Both vocabularies plus the sentinel this filter adds for "no filter". */
+const STATUSES = [...INVENTORY_QUEUE_STATUSES, "all"] as const;
 
 const searchSchema = z.object({
   cols: z.string().optional(),
@@ -93,6 +112,8 @@ export const Route = createFileRoute("/_authed/admin/inventory/requests")({
 });
 
 type Row = Awaited<ReturnType<typeof listInventoryRequests>>[number];
+type ItemRow = Extract<Row, { kind: "item" }>;
+type CustomRow = Extract<Row, { kind: "custom" }>;
 
 const DEFAULT_SORT: SortState = { desc: true, id: "requestedAt" };
 
@@ -104,10 +125,72 @@ function personName(person: { email: string; name: string | null } | null) {
   return person ? (person.name ?? person.email) : null;
 }
 
+/** What a row is about: the item on an item line, the ask on a custom one. */
+function subjectOf(row: Row): string {
+  return row.kind === "item" ? row.item.name : row.line.name;
+}
+
+/**
+ * Everything that differs between the two kinds of line, in one place.
+ * `kind` is switched on at four sites (the row actions, the group action, the
+ * badge and the filter's status set), which is one discriminant re-tested
+ * four times, so each site reads this map rather than branching itself. A
+ * third kind is a new entry here, not four edits in four places.
+ */
+interface KindConfig {
+  /** On the group header, beside the requester. */
+  badge: ReactNode;
+  groupAction: (rows: Row[], onDone: () => void) => ReactNode;
+  rowActions: (row: Row, onDone: () => void) => ReactNode;
+  statuses: readonly string[];
+}
+
+const KIND: Record<Row["kind"], KindConfig> = {
+  custom: {
+    badge: <Badge variant="secondary">Custom</Badge>,
+    groupAction: (rows, onDone) => (
+      <StartSourcingAllButton
+        lines={rows.map((row) => ({
+          id: row.line.id,
+          status: row.line.status,
+        }))}
+        onDone={onDone}
+      />
+    ),
+    rowActions: (row, onDone) =>
+      row.kind === "custom" ? (
+        <CustomLineActions line={row.line} onDone={onDone} />
+      ) : null,
+    statuses: INVENTORY_CUSTOM_LINE_STATUSES,
+  },
+  item: {
+    badge: null,
+    groupAction: (rows, onDone) => (
+      <ApproveAllDialog
+        lines={rows.map((row) => ({
+          id: row.line.id,
+          itemName: subjectOf(row),
+          status: row.line.status,
+        }))}
+        onDone={onDone}
+      />
+    ),
+    rowActions: (row, onDone) => (
+      <AdminRequestActions
+        lineId={row.line.id}
+        onDone={onDone}
+        status={row.line.status}
+      />
+    ),
+    statuses: INVENTORY_REQUEST_ITEM_STATUSES,
+  },
+};
+
 /**
  * The strip above one request's lines: who asked, when, the note for staff
- * and how many lines. Everything here rides on every row of the group, which
- * is the constraint the grouping mode puts on its callers.
+ * and how many lines, and a badge on a custom request. Everything here rides
+ * on every row of the group, which is the constraint the grouping mode puts
+ * on its callers.
  *
  * `highlighted` is the `?request=` deep link. Scrolled into view on arrival,
  * the way `AdminDataTable` scrolls a highlighted row.
@@ -136,13 +219,16 @@ function RequestGroupHeader({
       data-highlighted-group={highlighted ? "" : undefined}
       ref={ref}
     >
-      <p>
-        {personName(first.requester)}
-        <span className="font-normal text-muted-foreground">
-          {" "}
-          requested {count} {count === 1 ? "line" : "lines"} on{" "}
-          <LocalTime value={first.requestedAt} />
+      <p className="flex flex-wrap items-center gap-2">
+        <span>
+          {personName(first.requester)}
+          <span className="font-normal text-muted-foreground">
+            {" "}
+            requested {count} {count === 1 ? "line" : "lines"} on{" "}
+            <LocalTime value={first.requestedAt} />
+          </span>
         </span>
+        {KIND[first.kind].badge}
       </p>
       {first.note && (
         <p className="whitespace-pre-wrap font-normal text-muted-foreground text-xs">
@@ -156,14 +242,25 @@ function RequestGroupHeader({
 function buildColumns(onDone: () => void, onOpen: (lineId: string) => void) {
   return defineAdminColumns<Row>()([
     {
-      accessorFn: (row) => row.item.name,
+      accessorFn: (row) => subjectOf(row),
       cardHeader: true,
-      cell: (ctx) => (
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{ctx.row.original.item.name}</span>
-          <InventoryStatusBadge status={ctx.row.original.item.status} />
-        </div>
-      ),
+      cell: (ctx) => {
+        const row = ctx.row.original;
+        return (
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{subjectOf(row)}</span>
+            {row.kind === "item" ? (
+              <InventoryStatusBadge status={row.item.status} />
+            ) : (
+              row.line.quantity > 1 && (
+                <span className="text-muted-foreground text-xs">
+                  x{row.line.quantity}
+                </span>
+              )
+            )}
+          </div>
+        );
+      },
       enableHiding: false,
       header: "Item",
       id: "item",
@@ -226,7 +323,9 @@ function buildColumns(onDone: () => void, onOpen: (lineId: string) => void) {
     },
     {
       accessorFn: (row) =>
-        row.collectedBy?.name ?? row.collectedBy?.email ?? "",
+        row.kind === "item"
+          ? (row.collectedBy?.name ?? row.collectedBy?.email ?? "")
+          : "",
       header: "Collected by",
       defaultHidden: true,
       id: "collectedBy",
@@ -241,11 +340,7 @@ function buildColumns(onDone: () => void, onOpen: (lineId: string) => void) {
           >
             Details
           </Button>
-          <AdminRequestActions
-            lineId={ctx.row.original.line.id}
-            onDone={onDone}
-            status={ctx.row.original.line.status}
-          />
+          {KIND[ctx.row.original.kind].rowActions(ctx.row.original, onDone)}
         </div>
       ),
       enableSorting: false,
@@ -323,16 +418,8 @@ function AdminRequestQueue() {
         filtered={filtered}
         getRowId={(row) => row.line.id}
         group={{
-          actions: (groupRows) => (
-            <ApproveAllDialog
-              lines={groupRows.map((row) => ({
-                id: row.line.id,
-                itemName: row.item.name,
-                status: row.line.status,
-              }))}
-              onDone={onDone}
-            />
-          ),
+          actions: (groupRows) =>
+            KIND[groupRows[0].kind].groupAction(groupRows, onDone),
           header: (groupRows) => (
             <RequestGroupHeader
               highlighted={groupRows[0].requestId === request}
@@ -388,16 +475,7 @@ function AdminRequestQueue() {
       <ListCount count={rows.length} />
       <LineSheet
         actions={
-          openRow && openRow.line.status === "pending" ? (
-            <AdminRequestActions
-              lineId={openRow.line.id}
-              onDone={() => {
-                setOpenLineId(null);
-                onDone();
-              }}
-              status={openRow.line.status}
-            />
-          ) : undefined
+          openRow ? sheetActions(openRow, onDone, setOpenLineId) : undefined
         }
         description={
           openRow
@@ -412,27 +490,92 @@ function AdminRequestQueue() {
           }
         }}
         open={openRow !== null}
-        title={openRow?.item.name ?? ""}
+        title={openRow ? subjectOf(openRow) : ""}
       />
     </div>
   );
 }
 
-/** The staff timeline: dates, actors, and the closing reason. */
+/** The staff timeline: dates, actors, and the notes each kind carries. */
 function timelineOf(row: Row) {
-  return lineTimeline({
+  const shared = {
     closedAt: row.line.closedAt,
     closedBy: personName(row.closer),
     closedLabel: statusLabel(row.line.status),
-    closedNote: row.line.closedReason,
-    decidedLabel: "Approved",
     reviewedAt: row.line.reviewedAt,
     reviewedBy: personName(row.reviewer),
     submittedAt: row.requestedAt,
+  };
+  if (row.kind === "item") {
+    // Approving says nothing: the thing is the message. The rejection's
+    // reason reaches the timeline at the close.
+    return lineTimeline({
+      ...shared,
+      closedNote: row.line.closedReason,
+      decidedLabel: "Approved",
+    });
+  }
+  return lineTimeline({
+    ...shared,
+    closedNote: row.line.outcomeNote,
+    decidedLabel: "Sourcing",
+    decidedNote: row.line.sourcingNote,
   });
 }
 
-function fieldsOf(row: Row): LineSheetField[] {
+function sheetActions(
+  row: Row,
+  onDone: () => void,
+  setOpenLineId: (id: string | null) => void
+): ReactNode {
+  const done = () => {
+    setOpenLineId(null);
+    onDone();
+  };
+  if (row.kind === "item") {
+    return row.line.status === "pending" ? (
+      <AdminRequestActions
+        lineId={row.line.id}
+        onDone={done}
+        status={row.line.status}
+      />
+    ) : undefined;
+  }
+  if (!isOpenCustomLine(row.line.status)) {
+    return;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <CustomLineActions line={row.line} onDone={done} />
+      {/*
+        Fulfil links items that exist. This is the path to one that does
+        not: the ordinary item form, prefilled, returning here on save.
+      */}
+      <Button asChild size="sm" variant="ghost">
+        <Link
+          search={{
+            description: row.line.reason,
+            from: "requests",
+            name: row.line.name,
+          }}
+          to="/inventory/new"
+        >
+          Create item from this line
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+function dateOr(value: Date | null): ReactNode {
+  return value ? <LocalTime dateOnly value={value} /> : "-";
+}
+
+function textOr(value: string | null): ReactNode {
+  return value ? <span className="whitespace-pre-wrap">{value}</span> : "-";
+}
+
+function itemFields(row: ItemRow): LineSheetField[] {
   return [
     {
       label: "Item",
@@ -443,38 +586,72 @@ function fieldsOf(row: Row): LineSheetField[] {
         </span>
       ),
     },
-    {
-      label: "Requester",
-      value: `${row.requester.name ?? row.requester.email} (${row.requester.email})`,
-    },
     { label: "Status", value: statusLabel(row.line.status) },
-    {
-      label: "Pickup by",
-      value: row.line.pickupBy ? (
-        <LocalTime dateOnly value={row.line.pickupBy} />
-      ) : (
-        "-"
-      ),
-    },
-    {
-      label: "Due",
-      value: row.line.dueAt ? (
-        <LocalTime dateOnly value={row.line.dueAt} />
-      ) : (
-        "-"
-      ),
-    },
+    { label: "Pickup by", value: dateOr(row.line.pickupBy) },
+    { label: "Due", value: dateOr(row.line.dueAt) },
     {
       label: "Collected by",
       value: row.collectedBy?.name ?? row.collectedBy?.email ?? "-",
     },
+  ];
+}
+
+function customFields(row: CustomRow): LineSheetField[] {
+  return [
+    { label: "Asked for", value: row.line.name },
+    { label: "Quantity", value: String(row.line.quantity) },
+    { label: "Reason", value: textOr(row.line.reason) },
     {
-      label: "Note",
-      value: row.note ? (
-        <span className="whitespace-pre-wrap">{row.note}</span>
+      label: "Link",
+      value: row.line.link ? (
+        <a
+          className="break-all underline underline-offset-2"
+          href={row.line.link}
+          rel="noreferrer"
+          target="_blank"
+        >
+          {row.line.link}
+        </a>
       ) : (
         "-"
       ),
     },
+    { label: "Status", value: statusLabel(row.line.status) },
+    { label: "Sourcing note", value: textOr(row.line.sourcingNote) },
+    { label: "Outcome", value: textOr(row.line.outcomeNote) },
+    {
+      label: "Items",
+      value:
+        row.items.length > 0 ? (
+          <ul className="space-y-0.5">
+            {row.items.map((item) => (
+              <li className="flex flex-wrap items-center gap-2" key={item.id}>
+                <Link
+                  className="underline underline-offset-2"
+                  params={{ itemId: item.id }}
+                  to="/inventory/$itemId"
+                >
+                  {item.name}
+                </Link>
+                <InventoryStatusBadge status={item.status as "available"} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          "-"
+        ),
+    },
+  ];
+}
+
+function fieldsOf(row: Row): LineSheetField[] {
+  const own = row.kind === "item" ? itemFields(row) : customFields(row);
+  return [
+    ...own,
+    {
+      label: "Requester",
+      value: `${row.requester.name ?? row.requester.email} (${row.requester.email})`,
+    },
+    { label: "Note", value: textOr(row.note) },
   ];
 }
