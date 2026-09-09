@@ -54,11 +54,25 @@ custom line has no item, so the same word would name a promise on one screen and
 reservation on the next, in a queue that shows both. `sourcing` exists to keep that
 distinction visible.
 
+**`fulfilled` needs the glossary amended, not ignored.** `CONTEXT.md` lists it today
+under Line status as a word to avoid, beside `done` and `complete`, because on a
+request line it would be a loose synonym for `returned`. That entry stays true and
+gains a parenthesis: avoid `fulfilled` **for a request line**, because it is the
+custom line's own status. Leaving the glossary contradicting itself would break its
+one-definition-per-term rule, so the amendment is part of PR 4 rather than a
+follow-up.
+
 ## The three lifecycles
 
-These are normative. `docs/QUIRKS.md` gets the same three tables under its Inventory
-section, next to the pointer at `inventory-workflow.ts`; this spec is where they were
-decided, that file is where a reader looks them up.
+These are normative as of the date above. `docs/QUIRKS.md` gets the same three tables
+under its Inventory section, next to the pointer at `inventory-workflow.ts`.
+
+Two copies is deliberate and the precedence is one way: **QUIRKS is the living copy
+and wins wherever the two disagree**, per the rule in `AGENTS.md` that it is the
+ground truth for how this codebase behaves. This file is the dated record of what was
+decided and why, and it is not maintained against later change. Neither duplicates
+`CONTEXT.md`, which defines what each status means and does not say which transitions
+are legal.
 
 ### Request line, unchanged
 
@@ -106,9 +120,15 @@ a lie.
 
 Fulfilling writes the join rows, reserves each linked item to the requester with a
 pickup deadline **unless staff untick that box, which is ticked by default**, and
-sends one notification. It runs in a single
-transaction, locking items in ascending id order, and fails whole if any linked item
-is not `available`, naming the item.
+sends one notification. It runs in a single transaction, locking items in ascending
+id order, and fails whole if any linked item is not `available`, naming the item.
+
+**The reservation goes through `transitionItem`, never a direct write.** ADR-0004
+makes it the only writer of `inventory_item_status_history` and the only thing that
+syncs the `current_holder_*` columns with the status, and records what an earlier
+exemption cost: two new hold columns that only two of four writers learned about.
+Fulfill is a fifth caller of it, passing the requester as the holder, not a fifth
+writer beside it.
 
 ### Item, unchanged
 
@@ -155,12 +175,10 @@ inventory_custom_lines
   quantity      integer not null, >= 1
   link          text
   status        inventory_custom_line_status not null default 'pending'
-  reviewed_by   text -> user, set null
-  reviewed_at   timestamptz
-  review_comment text
+  staff_reply   text
+  decided_by    text -> user, set null
+  decided_at    timestamptz
   closed_at     timestamptz
-  closed_by     text -> user, set null
-  closed_reason text
   created_at    timestamptz not null default now()
 
 inventory_custom_line_items
@@ -171,10 +189,14 @@ inventory_custom_line_items
 
 `item_id` is `RESTRICT`, matching `inventory_request_items.item_id` and ADR-0006: an
 item that fulfilled a request can be retired but not hard-deleted, because the
-fulfilment record is the point.
+fulfillment record is the point.
 
 `INVENTORY_CUSTOM_LINE_STATUSES` goes in `src/lib/vocabularies.ts` as an `as const`
-tuple with a `pgEnum` behind it. Anywhere else and `vocabulary-scan` fails the build.
+tuple with a `pgEnum` behind it. It has to be that file: `vocabulary-scan` discovers
+what to look for by parsing `vocabularies.ts` and taking every exported `as const`
+array of string literals, so a tuple that lands there is scanned from the moment it
+exists, and a tuple placed anywhere else is scanned by nothing and passes silently
+(ADR-0016). The scan runs in `npm test`, not at build.
 
 ### Fields and who sees them
 
@@ -182,10 +204,9 @@ tuple with a `pgEnum` behind it. Anywhere else and `vocabulary-scan` fails the b
 | --- | --- | --- |
 | `name`, `reason`, `quantity`, `link` | requester, staff | nobody after submit |
 | `status` | requester, staff | staff, plus the requester for `cancelled` |
-| `review_comment` | requester, staff | staff |
-| `reviewed_by`, `reviewed_at` | staff | staff, on decision |
-| `closed_reason` | requester, staff | staff |
-| `closed_at`, `closed_by` | staff | staff |
+| `staff_reply` | requester, staff | staff |
+| `decided_by`, `decided_at` | staff | staff, on every staff action |
+| `closed_at` | staff | staff |
 | `inventory_custom_line_items` rows | requester, staff | staff |
 | envelope `note` | requester, staff | requester at submit, nobody after |
 
@@ -196,10 +217,20 @@ requester, sees no custom request at all.
 the line and files another; there is no `updateCustomLineAs`, which is why the five
 wrappers below do not list one. Staff answer a request, they do not rewrite it.
 
-**A rejection writes its reason to both `closed_reason` and `review_comment`**,
-mirroring what `transitionItemInTx` already does for an item line: a rejection is a
-review decision as well as a closure, and the comment does double duty. Any other
-close writes `closed_reason` only.
+**One requester-visible reply column, not two.** An item line carries both
+`review_comment` and `closed_reason`, and a rejection writes the same text into each,
+but only `closed_reason` reaches the student: `myRequestLineView` in
+`src/lib/inventory-visibility.ts` omits `review_comment` deliberately, and
+`docs/QUIRKS.md` records shipping it to students as the leak that projection exists to
+stop. Giving a custom line a `review_comment` that the requester *can* read would be
+the same name meaning two different things across one queue, which is the exact hazard
+this spec uses to reject `approved`.
+
+So the custom line has a single `staff_reply`, requester-visible, written by every
+staff action: the note that comes with starting to source, the note that comes with
+fulfilling, and the reason on a rejection, which must be non-empty. `decided_by` and
+`decided_at` are the staff-only metadata beside it, named for what they are rather
+than borrowed from a table whose columns mean something else.
 
 ## The grouping mode on AdminDataTable
 
@@ -261,7 +292,13 @@ single pickup date and applies it to every pending line in the group.
 **Start sourcing all** on a custom request, which takes no input.
 
 Row actions branch on kind. An item line keeps Approve and Reject. A custom line gets
-Start sourcing, Fulfil and Reject, and never the word Approve.
+Start sourcing, Fulfill and Reject, and never the word Approve.
+
+`kind` is switched on at four sites here: the row actions, the group action, the badge
+and the filter's status set. That is one discriminant re-tested four times, so it
+lands as **one map keyed by `kind`** holding those four things, and each site reads
+the map rather than re-deriving the branch. A third kind, if one ever arrives, is then
+a new entry rather than four edits in four places.
 
 The status filter offers the union of both vocabularies: `pending`, `approved`,
 `sourcing`, `fulfilled`, `rejected`, `cancelled`, `returned`. A status only one kind
@@ -273,7 +310,7 @@ one pickup date, or none does. It iterates lines in **ascending line id order**;
 `approveRequestItemAs` locks line then item, and `docs/QUIRKS.md` records that
 inverting that order deadlocks against `lockAttachableRequestLine`, so a fixed
 iteration order is what stops two concurrent batches on overlapping items deadlocking
-each other. This is a different lock order from the fulfil path below, which locks
+each other. This is a different lock order from the fulfill path below, which locks
 **items** in ascending id order; the two are recorded separately because they are two
 rules, not one.
 
@@ -285,7 +322,7 @@ Tabs go away. One grouped table with three kinds of group:
 - **One group per submitted request**, item or custom, headed with the date and note.
 - **Assigned to you by staff**: holds with no request behind them.
 
-A hold created by fulfilment does not land in the third group. The join table says
+A hold created by fulfillment does not land in the third group. The join table says
 which custom line produced it, so it nests under that line inside the custom
 request's group.
 
@@ -340,19 +377,30 @@ Reached two ways, both on the page where someone discovers the gap:
 - the `EmptyState` when a search returns nothing, carrying the query into the first
   line's name.
 
-**Fulfil links items, it never creates one.** `/inventory/new` owns the image upload,
+**Fulfill links items, it never creates one.** `/inventory/new` owns the image upload,
 the categories and the four staff-only fields, each with its own visibility line;
 reproducing that in a dialog would mean two item forms drifting apart. The custom
 line carries a Create item from this line action that opens the normal item form
 prefilled from the request and returns to the queue. This is also the "we already
-have one" path: staff skip `sourcing` entirely and fulfil from `pending` by linking
+have one" path: staff skip `sourcing` entirely and fulfill from `pending` by linking
 the item on the shelf.
 
 Endpoints go in a new `src/server/inventory-custom.ts` rather than growing
-`src/server/inventory.ts`, which #104 already flags as five subsystems in one file.
-Internals in `src/server/_internal/inventory-custom.ts`, one named wrapper per action
-over an `*As` seam: `submitCustomRequestAs`, `startSourcingCustomLineAs`,
-`rejectCustomLineAs`, `fulfilCustomLineAs`, `cancelCustomLineAs`.
+`src/server/inventory.ts`, and internals in
+`src/server/_internal/inventory-custom.ts`. That follows the split #104 already
+carried out on the internals, which are seven `inventory-*.ts` files today; a new
+subsystem arrives as its own file rather than as the eighth reason to open somebody
+else's. (#104 is closed, and it was about `_internal/inventory.ts`, not the endpoint
+file. It is precedent here, not an open complaint.)
+
+One named wrapper per action over an `*As` seam: `submitCustomRequestAs`,
+`startSourcingCustomLineAs`, `rejectCustomLineAs`, `fulfillCustomLineAs`,
+`cancelCustomLineAs`. Note the spelling: the repo writes fulfillment with two `l`s.
+
+Each of the five endpoints needs its line in `src/server/__tests__/access-contract.ts`
+(ADR-0003). There is no global middleware, so an endpoint with no declared level is a
+test failure, and the file's own docblock records the three months during which two
+endpoints returned every admin's name, email and role to anonymous callers.
 
 The rules stay pure and client-safe, beside the five modules already in `src/lib`: a
 new `inventory-custom-workflow.ts` says which transition a custom line may make and
@@ -364,7 +412,7 @@ who may make it, unit tested with no docker. Who gets told extends
 
 **Notifications**: three cases, all in-app, none by email. Sourcing ("we are getting
 this"), fulfilled (naming the items, and the pickup deadline when they were
-reserved), rejected (carrying the reason). One notification per fulfil, not one per
+reserved), rejected (carrying the reason). One notification per fulfill, not one per
 item. Staff get nothing on submit, because the admin overview tile is already the
 signal; that tile's count now includes pending custom lines.
 
@@ -376,7 +424,7 @@ Four issues, four branches, in order. Each is green and reviewable alone.
 2. **The admin queue grouped**, with Approve all over item lines.
 3. **`/my/items` restructured**, `tab` retired, every link rewritten.
 4. **Custom requests end to end**: schema, vocabulary, rules module, server, form,
-   queue rows, fulfil dialog, notifications, plus the docs below.
+   queue rows, fulfill dialog, notifications, plus the docs below.
 
 ## Docs, and which PR writes each
 
@@ -398,14 +446,21 @@ two lock orders are separate entries on purpose: they are different rules.
 
 - `docs/QUIRKS.md`, Inventory: that `/my/items` disables sorting so its grouped view
   cannot be sorted away from under the Submit button on the borrow list header.
+- `docs/UI-CONVENTIONS.md`, the page-width paragraph: it says `my/items.tsx` holds
+  "an attention region, a borrow-list card and two tab panels of tables", which stops
+  being true in this PR.
 
 **PR 4, custom requests**
 
 - `CONTEXT.md`: custom request, custom line, custom line status, with their avoid
-  lists, in the Inventory section.
+  lists, in the Inventory section. Also amend the existing Line status avoid entry,
+  which currently lists `fulfilled` unqualified, to say "for a request line".
+- `src/server/__tests__/access-contract.ts`: one line per new endpoint, five in all.
+  Not documentation, but it fails the same way a missing doc should and is easiest to
+  forget here.
 - `docs/QUIRKS.md`, Inventory: the three lifecycle tables from this spec, beside the
   existing pointer at the five pure modules; that an `inventory_requests` row no
-  longer implies an item line exists; and the fulfil lock order, **items** in
+  longer implies an item line exists; and the fulfill lock order, **items** in
   ascending id order, which is not the same rule as PR 2's.
 - ADR: custom requests reuse the request envelope, and an envelope holds one kind of
   line.
@@ -416,7 +471,7 @@ two lock orders are separate entries on purpose: they are different rules.
 
 1. **What the flat view's Request column links to.** There is no single request page
    today. Plain text for now.
-2. **Partial fulfilment of one line.** Two asked for, one arrived, has no state of
+2. **Partial fulfillment of one line.** Two asked for, one arrived, has no state of
    its own; staff say it in the reply and leave the line sourcing.
 3. **Quantity against reality.** Quantity is what the requester asked for, never a
    promise, and never stock counting: an item is one physical thing.
