@@ -106,11 +106,13 @@ interface AdminColumnExtras {
  * sortable, which leaves the sorted model equal to the input.
  *
  * `header` receives the group's rows and nothing else, so whatever names the
- * group has to be denormalized onto every row in it. Both consuming pages
- * already do this: the request queue carries the requester on every line.
+ * group has to be denormalized onto every row in it. A page adopting the
+ * mode carries the request's identity on every line, the way the request
+ * queue already carries the requester and the request date.
  *
  * One level only. The mode groups; it does not nest, collapse or sort within
- * a group.
+ * a group. `docs/UI-CONVENTIONS.md`, "Grouping rows that arrived together",
+ * is the reader's copy of these rules.
  */
 export interface AdminTableGroup<T> {
   /** Controls on the right of the header, for a decision over the group. */
@@ -487,9 +489,9 @@ export function AdminDataTable<T>({
     group !== undefined &&
     sort.id === defaultSort.id &&
     sort.desc === defaultSort.desc;
-  // Not memoized: a route passes `group` as an inline object, so a memo keyed
-  // on it would recompute every render anyway, and one pass over rows that
-  // TanStack has already sorted is cheap.
+  // Not memoized: the documented usage passes `group` as an inline object, so
+  // a memo keyed on it would recompute every render anyway, and one pass over
+  // rows that TanStack has already sorted is cheap.
   const groups = group && grouped ? groupRows(rows, group.key) : [];
   const visibleColumnCount = table.getVisibleLeafColumns().length;
   const hideable = table.getAllLeafColumns().filter((c) => c.getCanHide());
@@ -695,12 +697,12 @@ export function AdminDataTable<T>({
               return (
                 <TableBody data-group={key} key={key}>
                   {/*
-                  A bare tr and th rather than TableRow and TableHead: their
-                  classes (the hover tint, h-10, border-b) are for data rows
-                  and column headers, and a group header is neither.
-                  `src/styles.css` styles it through data-group-header under
-                  both breakpoints.
-                */}
+                    A bare tr and th rather than TableRow and TableHead: their
+                    classes (the hover tint, h-10, border-b) are for data rows
+                    and column headers, and a group header is neither.
+                    `src/styles.css` styles it through data-group-header under
+                    both breakpoints.
+                  */}
                   <tr data-group-header="">
                     <th colSpan={visibleColumnCount} scope="rowgroup">
                       <div className="flex flex-wrap items-center justify-between gap-2">
