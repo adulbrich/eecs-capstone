@@ -122,6 +122,22 @@ export async function waitForSurfaceSettled(surface: Locator): Promise<void> {
 }
 
 /**
+ * Asserts the page is no wider than its viewport, which is how a title row
+ * or a card layout that does not fit a phone shows up: the document scrolls
+ * sideways. `clientWidth`, not `innerWidth`, because the latter counts a
+ * vertical scrollbar's gutter and would hide an overflow of up to that
+ * width. Call it after `setViewportSize` and a fresh `goto` (#280, #297).
+ */
+export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+}
+
+/**
  * Toggles a column's checkbox in an `AdminDataTable` Columns menu and waits
  * for its columnheader to actually appear before moving on.
  * `onColumnVisibilityChange` derives its next state from the current
