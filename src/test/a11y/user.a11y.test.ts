@@ -66,6 +66,25 @@ test("inventory table, signed in, with borrow list controls", async ({
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /^Borrow list/ })).toBeVisible();
   await checkA11y(page);
+
+  // Both title-row buttons share the row at a phone width without pushing
+  // the page wider than the viewport, as on /projects (#297). Measured on
+  // the card view: the table view overflows on its own at this width, on
+  // both pages, which is the table's problem and not the row's.
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/inventory");
+  await waitForHydration(page);
+  await expect(
+    page.getByRole("link", { name: "Request something else" })
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Borrow list/ })).toBeVisible();
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+  await checkA11y(page);
 });
 
 test("my projects", async ({ page }) => {
