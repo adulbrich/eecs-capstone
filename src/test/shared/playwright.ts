@@ -3,7 +3,7 @@
  * suite. Both drive the same app through the same hydration and Radix
  * behaviors, so these live here rather than being copied per suite.
  */
-import type { Browser, Page } from "@playwright/test";
+import type { Browser, Locator, Page } from "@playwright/test";
 import { chromium, expect } from "@playwright/test";
 
 /** The password scripts/seed-dev.ts sets on every seeded user. */
@@ -72,6 +72,36 @@ export async function closeMenu(page: Page): Promise<void> {
   await expect(page.locator('[data-slot="dropdown-menu-content"]')).toHaveCount(
     0
   );
+}
+
+/**
+ * Waits for an open Radix surface (a dialog, alert dialog, sheet or dropdown
+ * menu) to finish entering, so a scan that follows sees its settled colours.
+ * The enter side of the `closeMenu` transient: the content mounts with
+ * `data-state="open"` and an `animate-in` CSS animation, and `toBeVisible`
+ * is satisfied at that animation's first frame, where a `fade-in` has the
+ * surface at partial opacity. axe sampling that frame reports a
+ * `color-contrast` violation on a button whose settled colours pass, once in
+ * a dozen runs, which is a timing artifact and not a rendering bug (#294).
+ *
+ * Takes the locator the test already holds, which for a Radix surface is the
+ * animated content itself (`role="dialog"`, `role="alertdialog"` or
+ * `role="menu"`). Waits on the content's parent so a dialog's overlay, its
+ * sibling in the portal, settles too. Animations that never finish, such as
+ * a spinner, are skipped rather than waited on.
+ */
+export async function waitForSurfaceSettled(surface: Locator): Promise<void> {
+  await expect(surface).toHaveAttribute("data-state", "open");
+  await surface.evaluate((element) => {
+    const scope = element.parentElement ?? element;
+    const finite = scope
+      .getAnimations({ subtree: true })
+      .filter(
+        (animation) =>
+          animation.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY
+      );
+    return Promise.all(finite.map((animation) => animation.finished));
+  });
 }
 
 /**

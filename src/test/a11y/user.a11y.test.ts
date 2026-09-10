@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import { waitForHydration } from "../shared/playwright";
+import { waitForHydration, waitForSurfaceSettled } from "../shared/playwright";
 import { checkA11y } from "./helpers";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -123,7 +123,7 @@ test("@smoke my items, each filter", async ({ page }) => {
   }
   // The sheet, open: a dialog beside the table with the line's timeline.
   await page.getByRole("button", { name: "Details" }).first().click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await waitForSurfaceSettled(page.getByRole("dialog"));
   await checkA11y(page);
 });
 
@@ -140,9 +140,9 @@ test("my items opens by saying what needs attention", async ({ page }) => {
   // dialog that carries the note behind it.
   await expect(page.getByText("Not submitted yet")).toBeVisible();
   await page.getByRole("button", { name: "Submit" }).click();
-  await expect(
+  await waitForSurfaceSettled(
     page.getByRole("dialog", { name: /as one request/ })
-  ).toBeVisible();
+  );
   await expect(page.getByLabel("Note for staff (optional)")).toBeVisible();
   await checkA11y(page);
 });
@@ -182,7 +182,7 @@ test("delete confirmation dialog", async ({ page }) => {
     .first()
     .click();
   const dialog = page.getByRole("alertdialog");
-  await expect(dialog).toBeVisible();
+  await waitForSurfaceSettled(dialog);
 
   // A native confirm() could not be scanned at all: axe cannot reach a page
   // whose script is parked on a modal browser prompt.

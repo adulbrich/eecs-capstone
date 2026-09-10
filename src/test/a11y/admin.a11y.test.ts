@@ -12,6 +12,7 @@ import {
   closeMenu,
   toggleColumnOn,
   waitForHydration,
+  waitForSurfaceSettled,
 } from "../shared/playwright";
 import { checkA11y } from "./helpers";
 
@@ -96,6 +97,7 @@ test("admin inventory table interactions", async ({ page }) => {
   await page.goto("/admin/inventory");
   await waitForHydration(page);
   await page.getByRole("button", { name: "Columns" }).click();
+  await waitForSurfaceSettled(page.getByRole("menu"));
   await checkA11y(page);
   await closeMenu(page);
   await page.getByRole("button", { name: /Name/ }).click();
@@ -141,7 +143,7 @@ test("inventory hard delete confirmation", async ({ page }) => {
   // axe does not flag a plain dialog on a destructive prompt, so the role and
   // the focus rule (docs/UI-CONVENTIONS.md, Destructive actions) are asserted.
   const dialog = page.getByRole("alertdialog", { name: "Hard delete item" });
-  await expect(dialog).toBeVisible();
+  await waitForSurfaceSettled(dialog);
   await expect(dialog.getByLabel("Confirm item name")).toBeFocused();
   await checkA11y(page);
 
@@ -529,6 +531,7 @@ test("admin categories table interactions", async ({ page }) => {
   await page.goto("/admin/categories");
   await waitForHydration(page);
   await page.getByRole("button", { name: "Columns" }).click();
+  await waitForSurfaceSettled(page.getByRole("menu"));
   await checkA11y(page);
   await closeMenu(page);
   // Not "Type": that's this page's default sort column (see DEFAULT_SORT in
@@ -550,6 +553,7 @@ test("admin programs table interactions", async ({ page }) => {
   await page.goto("/admin/programs");
   await waitForHydration(page);
   await page.getByRole("button", { name: "Columns" }).click();
+  await waitForSurfaceSettled(page.getByRole("menu"));
   await checkA11y(page);
   await closeMenu(page);
   const header = page.getByRole("columnheader", {
@@ -567,6 +571,7 @@ test("admin users table interactions", async ({ page }) => {
   await page.goto("/admin/users");
   await waitForHydration(page);
   await page.getByRole("button", { name: "Columns" }).click();
+  await waitForSurfaceSettled(page.getByRole("menu"));
   await checkA11y(page);
   await closeMenu(page);
   const header = page.getByRole("columnheader", { exact: true, name: "Email" });

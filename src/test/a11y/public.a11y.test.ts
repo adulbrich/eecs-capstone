@@ -6,6 +6,7 @@ import {
   closeMenu,
   toggleColumnOn,
   waitForHydration,
+  waitForSurfaceSettled,
 } from "../shared/playwright";
 import { checkA11y } from "./helpers";
 
@@ -130,6 +131,7 @@ test("projects table interactions", async ({ page }) => {
   await page.goto("/projects?view=table");
   await waitForHydration(page);
   await page.getByRole("button", { name: "Columns" }).click();
+  await waitForSurfaceSettled(page.getByRole("menu"));
   await checkA11y(page);
   await closeMenu(page);
 
@@ -227,6 +229,7 @@ test("inventory table interactions", async ({ page }) => {
   await page.goto("/inventory?view=table");
   await waitForHydration(page);
   await page.getByRole("button", { name: "Columns" }).click();
+  await waitForSurfaceSettled(page.getByRole("menu"));
   await checkA11y(page);
   await closeMenu(page);
 
