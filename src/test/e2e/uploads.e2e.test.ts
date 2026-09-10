@@ -9,7 +9,7 @@ import {
   openDb,
   userIdByEmail,
 } from "./fixtures";
-import { confirmed } from "./waits";
+import { confirmed, recordServerFunctionCalls } from "./waits";
 
 /**
  * The two upload paths. The crop and save flows stay out of the smoke suite
@@ -87,9 +87,10 @@ test.describe("project image upload", () => {
  *
  * The assertion is on what the save would have done, not on the crop UI: the
  * crop renders in milliseconds and the save round trip takes hundreds, so a
- * test that only checked for "Use image" would pass on the broken build. No
- * server function may be called by picking a file, and the URL has to survive
- * the network going quiet.
+ * test that only checked for "Use image" would pass on the broken build. The
+ * submit fires at click time, so the server function call it makes is on
+ * record before the file chooser has even answered; the URL check behind it
+ * catches the navigation the save's success handler would make.
  */
 test.describe("@smoke project image pick", () => {
   test("picking an image keeps the owner on the edit page", async ({
@@ -115,32 +116,23 @@ test.describe("@smoke project image pick", () => {
       await owner.goto(`/projects/${projectId}/edit`);
       await waitForHydration(owner, "form");
 
-      const serverCalls: string[] = [];
-      owner.on("request", (request) => {
-        if (
-          request.method() === "POST" &&
-          request.url().includes("/_serverFn/")
-        ) {
-          serverCalls.push(request.url());
-        }
-      });
+      const editUrl = new RegExp(`/projects/${projectId}/edit$`);
+      const serverCalls = recordServerFunctionCalls(owner);
 
       await pickImage(owner);
       await expect(
         owner.getByRole("button", { name: "Use image" })
       ).toBeVisible();
-      await owner.waitForLoadState("networkidle");
-      await expect(owner).toHaveURL(new RegExp(`/projects/${projectId}/edit$`));
       expect(serverCalls).toEqual([]);
+      await expect(owner).toHaveURL(editUrl);
 
       // Cancel was a submit button too, so it gets the same check.
       await owner.getByRole("button", { name: "Cancel" }).click();
       await expect(
         owner.getByRole("button", { name: "Upload image" })
       ).toBeVisible();
-      await owner.waitForLoadState("networkidle");
-      await expect(owner).toHaveURL(new RegExp(`/projects/${projectId}/edit$`));
       expect(serverCalls).toEqual([]);
+      await expect(owner).toHaveURL(editUrl);
     } finally {
       await context.close();
     }

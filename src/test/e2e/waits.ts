@@ -1,5 +1,30 @@
-import type { Page } from "@playwright/test";
+import type { Page, Request } from "@playwright/test";
 import { expect } from "@playwright/test";
+
+/**
+ * A call into a server function. Matched on the `/_serverFn/` prefix rather
+ * than a name: TanStack Start addresses server functions by a build-time hash,
+ * which no test can predict.
+ */
+function isServerFunctionCall(request: Request): boolean {
+  return request.method() === "POST" && request.url().includes("/_serverFn/");
+}
+
+/**
+ * Records every server function call the page makes from now on, for a test
+ * that asserts an interaction made none. The listener is attached before the
+ * interaction, so a call issued at click time is caught even when the page
+ * then navigates away.
+ */
+export function recordServerFunctionCalls(page: Page): string[] {
+  const calls: string[] = [];
+  page.on("request", (request) => {
+    if (isServerFunctionCall(request)) {
+      calls.push(request.url());
+    }
+  });
+  return calls;
+}
 
 /**
  * Runs a click that writes through a server function, and waits for the server
@@ -11,8 +36,6 @@ import { expect } from "@playwright/test";
  * in a local blob URL, and the bookmark button has already flipped its own
  * label optimistically. Both would pass an assertion made straight afterwards.
  *
- * Matched on the `/_serverFn/` prefix rather than a name: TanStack Start
- * addresses server functions by a build-time hash, which no test can predict.
  * Use it only where the page under test fires the one request, which is what
  * makes the prefix specific enough to wait on.
  */
@@ -21,9 +44,7 @@ export async function confirmed(
   click: () => Promise<void>
 ): Promise<void> {
   const answered = page.waitForResponse(
-    (response) =>
-      response.url().includes("/_serverFn/") &&
-      response.request().method() === "POST",
+    (response) => isServerFunctionCall(response.request()),
     { timeout: 15_000 }
   );
   await click();
