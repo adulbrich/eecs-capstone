@@ -72,6 +72,11 @@ test("@smoke reset-password page", async ({ page }) => {
 
 test("@smoke projects list", async ({ page }) => {
   await page.goto("/projects");
+  await waitForHydration(page);
+  // Signed out: the proposal door stays hidden, like the bookmarks count.
+  await expect(page.getByRole("link", { name: "Propose project" })).toHaveCount(
+    0
+  );
   await checkA11y(page);
 });
 

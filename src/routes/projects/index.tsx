@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { FilePlus } from "lucide-react";
 import { useCallback } from "react";
 import { z } from "zod";
 import { AdminDataTable } from "#/components/admin-data-table";
@@ -12,6 +13,7 @@ import {
   type ProjectListRow,
 } from "#/components/project-table-columns";
 import { ProjectsFilterBar } from "#/components/projects-filter-bar";
+import { Button } from "#/components/ui/button";
 import {
   Pagination,
   PaginationLink,
@@ -21,6 +23,7 @@ import { pageTitle } from "#/lib/page-title";
 import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
+import { useSignedIn } from "#/lib/use-signed-in";
 import type { ViewMode } from "#/lib/view-preference";
 import { searchProjects } from "#/server/search";
 
@@ -144,13 +147,30 @@ function ProjectsList() {
     [navigate]
   );
   useSeedViewFromStorage(search.view, seedView);
+  const signedIn = useSignedIn();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   return (
     <div className="px-4 py-6 md:p-8">
       <div className="mx-auto max-w-4xl">
-        <div className="flex items-center justify-between gap-4">
+        {/* flex-wrap and ml-auto: at a phone width the two buttons drop
+            under the heading, right-aligned, rather than pushing the page
+            wider than the viewport (#280). */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="font-semibold text-2xl">Projects</h1>
-          <BookmarksButton />
+          <div className="ml-auto flex items-center gap-2">
+            {/* The same sign-in gate as BookmarksButton beside it and the
+                request button on /inventory: /projects/new is behind _authed,
+                and a visitor is sent to sign in rather than shown a door. */}
+            {signedIn && (
+              <Button asChild size="sm" variant="outline">
+                <Link to="/projects/new">
+                  <FilePlus aria-hidden="true" className="h-4 w-4" />
+                  Propose project
+                </Link>
+              </Button>
+            )}
+            <BookmarksButton />
+          </div>
         </div>
         <div className="mt-4">
           <ProjectsFilterBar
