@@ -449,12 +449,30 @@ a {
     flex-direction: column;
     gap: 0.5rem;
   }
+  /* One tbody per group when the table is grouped. The gap above is inside
+     each tbody, so two adjacent tbodies would otherwise butt together. */
+  .admin-table tbody + tbody {
+    margin-top: 0.5rem;
+  }
   .admin-table tbody tr {
     display: block;
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow: hidden;
     background: var(--card);
+  }
+  /* A group header is a strip above its cards, not a card of its own: no
+     border, no radius, no surface. The th carries its own padding because
+     none of the td rules below reach it. */
+  .admin-table tbody tr[data-group-header] {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+  .admin-table tbody tr[data-group-header] th {
+    display: block;
+    padding: 0.25rem 0.25rem 0.5rem;
+    text-align: left;
   }
   .admin-table tbody td {
     display: flex;
@@ -492,12 +510,23 @@ a {
 }
 
 /* The table proper, at md and up. The container supplies the surface, the
-   border and the radius (see `admin-data-table.tsx`); the last row drops its
-   rule so the body meets that rounded edge cleanly instead of drawing a line
-   across it. */
+   border and the radius (see `admin-data-table.tsx`); the last row of the
+   last tbody drops its rule so the body meets that rounded edge cleanly
+   instead of drawing a line across it. `tbody:last-child`, not `tbody`: a
+   grouped table has one tbody per group, and dropping the rule at the end of
+   every group would leave each group's last row bare against the next
+   group's header. */
 @media (min-width: 768px) {
-  .admin-table tbody tr:last-child td {
+  .admin-table tbody:last-child tr:last-child td {
     border-bottom: none;
+  }
+  /* The group header is a th, so the td padding never reaches it. */
+  .admin-table tbody tr[data-group-header] th {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--secondary);
+    font-weight: 500;
+    text-align: left;
   }
 }
 

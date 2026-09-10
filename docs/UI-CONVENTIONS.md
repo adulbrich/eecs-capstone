@@ -362,6 +362,40 @@ per table may set it. A second one is logged and does not become a header strip;
 still renders as an ordinary labelled field. Two title rows on one card read as a styling
 oddity and get lived with instead of reported, which is why this is checked at all.
 
+### Grouping rows that arrived together
+
+`group` renders one `tbody` per group with a `th scope="rowgroup"` header across
+every visible column, so a screen reader announces the group before its rows.
+Absent means the flat table every other admin route renders.
+
+```tsx
+<AdminDataTable
+  group={{
+    key: (row) => row.requestId,
+    header: (rows) => <RequestHeader row={rows[0]} count={rows.length} />,
+    actions: (rows) => <ApproveAll rows={rows} />,
+  }}
+  {...tableProps}
+/>
+```
+
+Grouped-ness is derived from the sort, never stored: rows are grouped while the
+table's sort equals its `defaultSort` and flat the moment the reader sorts by
+anything else. Nothing enters the URL. Grouping and sorting genuinely conflict,
+because a group stops being contiguous once rows are ordered by another column,
+so sorting is the escape hatch rather than a mode a reader can get stuck in. A
+page that needs a fixed group order returns its rows in that order and declares
+every column `enableSorting: false`; it still passes a `defaultSort`, which is
+inert there.
+
+Groups are formed from the sorted row model, so a page that sorts client-side
+groups what the reader sees. `header(rows)` receives the group's rows and nothing
+else, which means whatever identifies the group is denormalized onto every row in
+it. `getRowId` and `highlightedRowId` keep addressing data rows, so a deep link
+still lands inside a group. On mobile the header renders as a strip above its
+cards rather than a card of its own. One level only: no nesting, collapsing or
+sorting within a group. CSV export is per-route and unaffected.
+
 ### Two empty states
 
 A table with no rows is one of two things, and the route says which with `filtered`.

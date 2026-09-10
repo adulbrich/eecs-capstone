@@ -4,6 +4,7 @@ import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
+  type Row,
   type SortingFn,
   type SortingState,
   useReactTable,
@@ -87,6 +88,37 @@ interface AdminColumnExtras {
   defaultHidden?: boolean;
   header: string;
   id: string;
+}
+
+/**
+ * Rows that arrived together, rendered together.
+ *
+ * Grouping is derived from the sort and never stored: rows render grouped
+ * while the table's `sort` equals its `defaultSort`, and flat the moment the
+ * reader sorts by anything else. The two genuinely conflict, since a group
+ * stops being contiguous once rows are ordered by another column, so sorting
+ * is the escape hatch rather than a mode a reader can get stuck in. Nothing
+ * enters the URL and `useAdminTable` gains no state.
+ *
+ * Groups are formed from the sorted row model, not the input array: on a page
+ * that sorts client-side, a group sits where its first row lands. A page that
+ * needs a fixed group order returns its rows in that order and makes nothing
+ * sortable, which leaves the sorted model equal to the input.
+ *
+ * `header` receives the group's rows and nothing else, so whatever names the
+ * group has to be denormalized onto every row in it. A page adopting the
+ * mode carries the request's identity on every line, the way the request
+ * queue already carries the requester and the request date.
+ *
+ * One level only. The mode groups; it does not nest, collapse or sort within
+ * a group. `docs/UI-CONVENTIONS.md`, "Grouping rows that arrived together",
+ * is the reader's copy of these rules.
+ */
+export interface AdminTableGroup<T> {
+  /** Controls on the right of the header, for a decision over the group. */
+  actions?: (rows: T[]) => ReactNode;
+  header: (rows: T[]) => ReactNode;
+  key: (row: T) => string;
 }
 
 /**
@@ -217,6 +249,11 @@ export interface AdminDataTableProps<T> {
    */
   filtered?: boolean;
   getRowId: (row: T) => string;
+  /**
+   * Render rows in groups under the default sort. See `AdminTableGroup`.
+   * Absent means the flat table every other admin route renders.
+   */
+  group?: AdminTableGroup<T>;
   hidden: string[];
   /**
    * A row to mark and scroll to, matched against `getRowId`. Used by links
@@ -257,6 +294,30 @@ export interface AdminDataTableProps<T> {
   toolbar?: ReactNode;
 }
 
+/**
+ * Insertion order over the sorted model: a group is placed where its first
+ * row lands, and every later row with the same key joins it there.
+ */
+function groupRows<T>(
+  rows: Row<T>[],
+  keyOf: (row: T) => string
+): { key: string; rows: Row<T>[] }[] {
+  const byKey = new Map<string, Row<T>[]>();
+  for (const row of rows) {
+    const key = keyOf(row.original);
+    const bucket = byKey.get(key);
+    if (bucket) {
+      bucket.push(row);
+    } else {
+      byKey.set(key, [row]);
+    }
+  }
+  return [...byKey.entries()].map(([key, rowsOfKey]) => ({
+    key,
+    rows: rowsOfKey,
+  }));
+}
+
 function ariaSort(
   direction: false | "asc" | "desc"
 ): "ascending" | "descending" | "none" {
@@ -293,6 +354,7 @@ export function AdminDataTable<T>({
   emptyMessage,
   filtered = false,
   getRowId,
+  group,
   hidden,
   highlightedRowId,
   noMatchMessage = "Nothing matches these filters.",
@@ -420,6 +482,18 @@ export function AdminDataTable<T>({
   });
 
   const rows = table.getRowModel().rows;
+  // Grouped only while the sort is the page default, compared by value: a
+  // direction flip on the default column also drops grouping, because
+  // descending by date is not the order the groups were formed in.
+  const grouped =
+    group !== undefined &&
+    sort.id === defaultSort.id &&
+    sort.desc === defaultSort.desc;
+  // Not memoized: the documented usage passes `group` as an inline object, so
+  // a memo keyed on it would recompute every render anyway, and one pass over
+  // rows that TanStack has already sorted is cheap.
+  const groups = group && grouped ? groupRows(rows, group.key) : [];
+  const visibleColumnCount = table.getVisibleLeafColumns().length;
   const hideable = table.getAllLeafColumns().filter((c) => c.getCanHide());
   // A filtered result keeps its table even with no rows in it: the headers
   // and the controls are what the reader is searching over. An unfiltered
@@ -463,6 +537,37 @@ export function AdminDataTable<T>({
     // undoing the clean URL that onHiddenChange(undefined) just produced.
     clearStoredHidden(storageKey);
     onHiddenChange(undefined);
+  };
+
+  const renderRow = (row: Row<T>) => {
+    const isHighlighted = !!highlightedRowId && row.id === highlightedRowId;
+    return (
+      <TableRow
+        // The documented highlight token, not a colour of its own.
+        className={isHighlighted ? "bg-[var(--brand-primary-tint)]" : undefined}
+        data-highlighted={isHighlighted ? "" : undefined}
+        key={row.id}
+        ref={isHighlighted ? highlighted : undefined}
+      >
+        {row.getVisibleCells().map((cell) => {
+          // A card-header cell carries no data-label on purpose: the mobile
+          // field name is drawn from that attribute, and this cell is the
+          // card's title rather than one of its fields.
+          const isCardHeader = cardHeaderIds.has(cell.column.id);
+          return (
+            <TableCell
+              data-card-header={isCardHeader ? "" : undefined}
+              data-label={
+                isCardHeader ? undefined : (labels.get(cell.column.id) ?? "")
+              }
+              key={cell.id}
+            >
+              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            </TableCell>
+          );
+        })}
+      </TableRow>
+    );
   };
 
   return (
@@ -586,61 +691,54 @@ export function AdminDataTable<T>({
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody>
-            {rows.length === 0 && (
-              <TableRow>
-                {/*
-                  One cell across every visible column, with no data-label:
-                  on mobile a labelled cell would draw a field name in front
-                  of the message, and this row is a message, not a record.
-                */}
-                <TableCell
-                  className="justify-center py-8 text-center text-muted-foreground text-sm"
-                  colSpan={table.getVisibleLeafColumns().length}
-                >
-                  {noMatchMessage}
-                </TableCell>
-              </TableRow>
-            )}
-            {rows.map((row) => {
-              const isHighlighted =
-                !!highlightedRowId && row.id === highlightedRowId;
+          {group && grouped && groups.length > 0 ? (
+            groups.map(({ key, rows: rowsOfGroup }) => {
+              const originals = rowsOfGroup.map((row) => row.original);
               return (
-                <TableRow
-                  // The documented highlight token, not a colour of its own.
-                  className={
-                    isHighlighted ? "bg-[var(--brand-primary-tint)]" : undefined
-                  }
-                  data-highlighted={isHighlighted ? "" : undefined}
-                  key={row.id}
-                  ref={isHighlighted ? highlighted : undefined}
-                >
-                  {row.getVisibleCells().map((cell) => {
-                    // A card-header cell carries no data-label on purpose: the
-                    // mobile field name is drawn from that attribute, and this
-                    // cell is the card's title rather than one of its fields.
-                    const isCardHeader = cardHeaderIds.has(cell.column.id);
-                    return (
-                      <TableCell
-                        data-card-header={isCardHeader ? "" : undefined}
-                        data-label={
-                          isCardHeader
-                            ? undefined
-                            : (labels.get(cell.column.id) ?? "")
-                        }
-                        key={cell.id}
-                      >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
+                <TableBody data-group={key} key={key}>
+                  {/*
+                    A bare tr and th rather than TableRow and TableHead: their
+                    classes (the hover tint, h-10, border-b) are for data rows
+                    and column headers, and a group header is neither.
+                    `src/styles.css` styles it through data-group-header under
+                    both breakpoints.
+                  */}
+                  <tr data-group-header="">
+                    <th colSpan={visibleColumnCount} scope="rowgroup">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0">{group.header(originals)}</div>
+                        {group.actions && (
+                          <div className="flex shrink-0 items-center gap-2">
+                            {group.actions(originals)}
+                          </div>
                         )}
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
+                      </div>
+                    </th>
+                  </tr>
+                  {rowsOfGroup.map(renderRow)}
+                </TableBody>
               );
-            })}
-          </TableBody>
+            })
+          ) : (
+            <TableBody>
+              {rows.length === 0 && (
+                <TableRow>
+                  {/*
+                    One cell across every visible column, with no data-label:
+                    on mobile a labelled cell would draw a field name in front
+                    of the message, and this row is a message, not a record.
+                  */}
+                  <TableCell
+                    className="justify-center py-8 text-center text-muted-foreground text-sm"
+                    colSpan={visibleColumnCount}
+                  >
+                    {noMatchMessage}
+                  </TableCell>
+                </TableRow>
+              )}
+              {rows.map(renderRow)}
+            </TableBody>
+          )}
         </Table>
       ) : (
         <EmptyState>{emptyMessage}</EmptyState>

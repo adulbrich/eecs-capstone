@@ -646,3 +646,168 @@ describe("an empty table", () => {
     ).not.toBeNull();
   });
 });
+
+describe("group", () => {
+  it("renders one tbody and no rowgroup header without a group prop", () => {
+    // The flat path is the one every other admin table takes, and this pins
+    // that the grouped branch is a sibling of it rather than a wrapper
+    // around it.
+    const { container } = renderTable({ hidden: [] });
+    expect(container.querySelectorAll("tbody")).toHaveLength(1);
+    expect(container.querySelector("tbody th")).toBeNull();
+    expect(container.querySelector("[data-group]")).toBeNull();
+  });
+
+  interface GroupedRow {
+    batch: string;
+    id: string;
+    name: string;
+  }
+  const GROUPED: GroupedRow[] = [
+    { batch: "B", id: "1", name: "delta" },
+    { batch: "A", id: "2", name: "alpha" },
+    { batch: "B", id: "3", name: "beta" },
+    { batch: "A", id: "4", name: "gamma" },
+  ];
+  const GROUPED_COLUMNS: AdminColumn<GroupedRow>[] = [
+    {
+      accessorFn: (row) => row.name,
+      cell: (ctx) => ctx.row.original.name,
+      enableHiding: false,
+      header: "Name",
+      id: "name",
+    },
+    {
+      accessorFn: (row) => row.batch,
+      cell: (ctx) => ctx.row.original.batch,
+      header: "Batch",
+      id: "batch",
+    },
+  ];
+  const GROUPED_SORT = { desc: false, id: "name" } as const;
+  const group = {
+    actions: (rows: GroupedRow[]) => (
+      <button type="button">Approve {rows.length}</button>
+    ),
+    header: (rows: GroupedRow[]) => `Batch ${rows[0].batch}`,
+    key: (row: GroupedRow) => row.batch,
+  };
+
+  function renderGrouped(
+    overrides: Partial<AdminDataTableProps<GroupedRow>> = {}
+  ) {
+    return render(
+      <AdminDataTable
+        caption="Grouped"
+        columns={GROUPED_COLUMNS}
+        data={GROUPED}
+        defaultSort={GROUPED_SORT}
+        emptyMessage="Nothing here."
+        getRowId={(row) => row.id}
+        group={group}
+        hidden={[]}
+        onHiddenChange={vi.fn()}
+        onSortChange={vi.fn()}
+        sort={GROUPED_SORT}
+        storageKey="grouped"
+        {...overrides}
+      />
+    );
+  }
+
+  it("renders one tbody per group under the default sort, headed by a rowgroup th", () => {
+    const { container } = renderGrouped();
+    const bodies = [...container.querySelectorAll("tbody")];
+    expect(bodies.map((b) => b.getAttribute("data-group"))).toEqual(["A", "B"]);
+    for (const body of bodies) {
+      // The header row is what both CSS breakpoints hook off; a renamed
+      // attribute would otherwise pass this suite and break the styling.
+      const headerRow = body.querySelector("tr:first-child");
+      expect(headerRow?.hasAttribute("data-group-header")).toBe(true);
+      const th = headerRow?.querySelector("th");
+      expect(th?.getAttribute("scope")).toBe("rowgroup");
+    }
+    expect(bodies[0].textContent).toContain("Batch A");
+    expect(bodies[0].textContent).toContain("Approve 2");
+  });
+
+  it("forms groups from the sorted model, so a group sits where its first row lands", () => {
+    // Input order puts a B row first. Sorted by name ascending, "alpha" (A)
+    // comes first, so A is the first group and B's rows are beta then
+    // delta.
+    const { container } = renderGrouped();
+    const names = [...container.querySelectorAll("tbody")].map((body) =>
+      [...body.querySelectorAll("td:first-child")].map((td) => td.textContent)
+    );
+    expect(names).toEqual([
+      ["alpha", "gamma"],
+      ["beta", "delta"],
+    ]);
+  });
+
+  it("spans the header across the visible columns only", () => {
+    const { container, rerender } = renderGrouped();
+    expect(
+      container.querySelector("th[scope=rowgroup]")?.getAttribute("colspan")
+    ).toBe("2");
+    rerender(
+      <AdminDataTable
+        caption="Grouped"
+        columns={GROUPED_COLUMNS}
+        data={GROUPED}
+        defaultSort={GROUPED_SORT}
+        emptyMessage="Nothing here."
+        getRowId={(row) => row.id}
+        group={group}
+        hidden={["batch"]}
+        onHiddenChange={vi.fn()}
+        onSortChange={vi.fn()}
+        sort={GROUPED_SORT}
+        storageKey="grouped"
+      />
+    );
+    expect(
+      container.querySelector("th[scope=rowgroup]")?.getAttribute("colspan")
+    ).toBe("1");
+  });
+
+  it("renders flat rows and no headers once the sort leaves the default", () => {
+    const { container } = renderGrouped({
+      sort: { desc: false, id: "batch" },
+    });
+    expect(container.querySelectorAll("tbody")).toHaveLength(1);
+    expect(container.querySelector("th[scope=rowgroup]")).toBeNull();
+    expect(container.querySelector("[data-group-header]")).toBeNull();
+  });
+
+  it("treats a direction change alone as leaving the default", () => {
+    const { container } = renderGrouped({
+      sort: { desc: true, id: "name" },
+    });
+    expect(container.querySelectorAll("tbody")).toHaveLength(1);
+  });
+
+  it("still highlights a data row inside a group", () => {
+    const { container } = renderGrouped({ highlightedRowId: "3" });
+    const highlighted = container.querySelector("[data-highlighted]");
+    expect(highlighted?.textContent).toContain("beta");
+    expect(highlighted?.closest("tbody")?.getAttribute("data-group")).toBe("B");
+  });
+
+  it("renders no tbody for a group whose rows a filter removed", () => {
+    // The route filters before the rows get here, so an emptied group is
+    // simply absent from the data; the sibling group still renders alone.
+    const { container } = renderGrouped({
+      data: GROUPED.filter((row) => row.batch === "B"),
+    });
+    const bodies = [...container.querySelectorAll("tbody")];
+    expect(bodies.map((b) => b.getAttribute("data-group"))).toEqual(["B"]);
+  });
+
+  it("renders the no-match row in one plain tbody when a filter empties the table", () => {
+    const { container } = renderGrouped({ data: [], filtered: true });
+    expect(container.querySelectorAll("tbody")).toHaveLength(1);
+    expect(container.querySelector("th[scope=rowgroup]")).toBeNull();
+    expect(screen.getByText("Nothing matches these filters.")).not.toBeNull();
+  });
+});
