@@ -242,7 +242,7 @@ test("admin inventory table shows its default-hidden columns when toggled on", a
   await checkA11y(page);
 });
 
-test("projects list, admin, offers the proposal door too", async ({ page }) => {
+test("admin projects list, proposal link", async ({ page }) => {
   // The gate is signed-in, not role: staff propose through the same form and
   // get their extra fields there (#280).
   await page.goto("/projects");
