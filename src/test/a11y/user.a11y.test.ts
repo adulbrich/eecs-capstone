@@ -47,6 +47,7 @@ test("projects list, signed in, with bookmark controls", async ({ page }) => {
   await waitForHydration(page);
   await expect(page.locator(".admin-table")).toBeVisible();
   await expectNoHorizontalOverflow(page);
+  await checkA11y(page);
 });
 
 test("projects table, signed in, with bookmark controls", async ({ page }) => {
