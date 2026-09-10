@@ -94,9 +94,10 @@ export async function closeMenu(page: Page): Promise<void> {
  * wait looks again after each batch settles and returns only when a fresh
  * look finds nothing running or about to run, so an animation cancelled
  * under the wait (`finished` rejects then) leads to another look at whatever
- * replaced it rather than to a pass or a failure on its own. Play-pending
- * counts as running: the enter animation is in that state when sampled
- * before its first frame, which is the very moment this guards.
+ * replaced it rather than to a pass or a failure on its own. An enter
+ * animation sampled before its first frame is play-pending, and the Web
+ * Animations spec reports that as `running`, so it is waited on; only a
+ * pause, pending or applied, reports `paused`.
  */
 export async function waitForSurfaceSettled(surface: Locator): Promise<void> {
   await expect(surface).toHaveAttribute("data-state", "open");
@@ -109,7 +110,7 @@ export async function waitForSurfaceSettled(surface: Locator): Promise<void> {
         .flatMap((node) => node.getAnimations({ subtree: true }))
         .filter(
           (animation) =>
-            (animation.playState === "running" || animation.pending) &&
+            animation.playState === "running" &&
             animation.effect?.getTiming().iterations !==
               Number.POSITIVE_INFINITY
         );
