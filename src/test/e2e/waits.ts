@@ -36,8 +36,9 @@ export function recordServerFunctionCalls(page: Page): string[] {
  * in a local blob URL, and the bookmark button has already flipped its own
  * label optimistically. Both would pass an assertion made straight afterwards.
  *
- * Use it only where the page under test fires the one request, which is what
- * makes the prefix specific enough to wait on.
+ * Use it only where the page under test fires the one request: the match in
+ * `isServerFunctionCall` is any server function, so it is specific enough to
+ * wait on only when there is one to wait for.
  */
 export async function confirmed(
   page: Page,
