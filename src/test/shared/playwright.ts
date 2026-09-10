@@ -90,24 +90,30 @@ export async function closeMenu(page: Page): Promise<void> {
  * the two as separate children of `document.body` rather than under a shared
  * wrapper, so the overlay is found by its `data-slot` instead of by walking
  * up from the content. Animations that never finish, such as a spinner, are
- * skipped, and one cancelled under the wait (`finished` rejects then) is not
- * a failure: the surface has already been asserted open.
+ * skipped. The wait looks again after each batch settles and returns only
+ * when a fresh look finds nothing running, so an animation cancelled under
+ * the wait (`finished` rejects then) leads to another look at whatever
+ * replaced it rather than to a pass or a failure on its own.
  */
 export async function waitForSurfaceSettled(surface: Locator): Promise<void> {
   await expect(surface).toHaveAttribute("data-state", "open");
-  await surface.evaluate((element) => {
-    const overlays = Array.from(
-      document.querySelectorAll('[data-slot$="-overlay"][data-state="open"]')
-    );
-    const finite = [element, ...overlays]
-      .flatMap((node) => node.getAnimations({ subtree: true }))
-      .filter(
-        (animation) =>
-          animation.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY
+  await surface.evaluate(async (element) => {
+    const running = () => {
+      const overlays = Array.from(
+        document.querySelectorAll('[data-slot$="-overlay"][data-state="open"]')
       );
-    return Promise.all(
-      finite.map((animation) => animation.finished.catch(() => undefined))
-    );
+      return [element, ...overlays]
+        .flatMap((node) => node.getAnimations({ subtree: true }))
+        .filter(
+          (animation) =>
+            animation.playState !== "finished" &&
+            animation.effect?.getTiming().iterations !==
+              Number.POSITIVE_INFINITY
+        );
+    };
+    for (let batch = running(); batch.length > 0; batch = running()) {
+      await Promise.allSettled(batch.map((animation) => animation.finished));
+    }
   });
 }
 
