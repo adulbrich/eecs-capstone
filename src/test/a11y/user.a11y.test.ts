@@ -2,7 +2,11 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import { waitForHydration, waitForSurfaceSettled } from "../shared/playwright";
+import {
+  expectNoHorizontalOverflow,
+  waitForHydration,
+  waitForSurfaceSettled,
+} from "../shared/playwright";
 import { checkA11y } from "./helpers";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,14 +38,7 @@ test("projects list, signed in, with bookmark controls", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await expect(propose).toBeVisible();
   await expect(page.getByRole("link", { name: /^Bookmarks/ })).toBeVisible();
-  // clientWidth, not innerWidth: the latter counts a vertical scrollbar's
-  // gutter, which would hide an overflow of up to that width.
-  const overflow = await page.evaluate(
-    () =>
-      document.documentElement.scrollWidth -
-      document.documentElement.clientWidth
-  );
-  expect(overflow).toBeLessThanOrEqual(0);
+  await expectNoHorizontalOverflow(page);
   await checkA11y(page);
 });
 
@@ -78,12 +75,7 @@ test("inventory table, signed in, with borrow list controls", async ({
     page.getByRole("link", { name: "Request something else" })
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /^Borrow list/ })).toBeVisible();
-  const overflow = await page.evaluate(
-    () =>
-      document.documentElement.scrollWidth -
-      document.documentElement.clientWidth
-  );
-  expect(overflow).toBeLessThanOrEqual(0);
+  await expectNoHorizontalOverflow(page);
   await checkA11y(page);
 });
 
