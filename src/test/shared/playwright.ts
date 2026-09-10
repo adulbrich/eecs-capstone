@@ -3,7 +3,7 @@
  * suite. Both drive the same app through the same hydration and Radix
  * behaviors, so these live here rather than being copied per suite.
  */
-import type { Browser, Page } from "@playwright/test";
+import type { Browser, Locator, Page } from "@playwright/test";
 import { chromium, expect } from "@playwright/test";
 
 /** The password scripts/seed-dev.ts sets on every seeded user. */
@@ -72,6 +72,53 @@ export async function closeMenu(page: Page): Promise<void> {
   await expect(page.locator('[data-slot="dropdown-menu-content"]')).toHaveCount(
     0
   );
+}
+
+/**
+ * Waits for an open Radix surface (a dialog, alert dialog, sheet or dropdown
+ * menu) to finish entering, so a scan that follows sees its settled colours.
+ * The enter side of the `closeMenu` transient: the content mounts with
+ * `data-state="open"` and an `animate-in` CSS animation, and `toBeVisible`
+ * is satisfied at that animation's first frame, where a `fade-in` has the
+ * surface at partial opacity. axe sampling that frame reports a
+ * `color-contrast` violation on a button whose settled colours pass, once in
+ * a dozen runs, which is a timing artifact and not a rendering bug (#294).
+ *
+ * Takes the locator the test already holds, which for a Radix surface is the
+ * animated content itself (`role="dialog"`, `role="alertdialog"` or
+ * `role="menu"`). A modal's overlay fades in beside it, and Radix portals
+ * the two as separate children of `document.body` rather than under a shared
+ * wrapper, so the overlay is found by its `data-slot` instead of by walking
+ * up from the content. Animations that never finish, such as a spinner, are
+ * skipped, and so is a paused one, whose `finished` would never settle. The
+ * wait looks again after each batch settles and returns only when a fresh
+ * look finds nothing running or about to run, so an animation cancelled
+ * under the wait (`finished` rejects then) leads to another look at whatever
+ * replaced it rather than to a pass or a failure on its own. An enter
+ * animation sampled before its first frame is play-pending, and the Web
+ * Animations spec reports that as `running`, so it is waited on; only a
+ * pause, pending or applied, reports `paused`.
+ */
+export async function waitForSurfaceSettled(surface: Locator): Promise<void> {
+  await expect(surface).toHaveAttribute("data-state", "open");
+  await surface.evaluate(async (element) => {
+    const running = () => {
+      const overlays = Array.from(
+        document.querySelectorAll('[data-slot$="-overlay"][data-state="open"]')
+      );
+      return [element, ...overlays]
+        .flatMap((node) => node.getAnimations({ subtree: true }))
+        .filter(
+          (animation) =>
+            animation.playState === "running" &&
+            animation.effect?.getTiming().iterations !==
+              Number.POSITIVE_INFINITY
+        );
+    };
+    for (let batch = running(); batch.length > 0; batch = running()) {
+      await Promise.allSettled(batch.map((animation) => animation.finished));
+    }
+  });
 }
 
 /**
