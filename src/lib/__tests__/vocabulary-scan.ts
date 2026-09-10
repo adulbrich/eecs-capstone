@@ -35,9 +35,13 @@ import ts from "typescript";
  * examined. The label and style tables in `status-badge.tsx`,
  * `inventory-status-badge.tsx`, `inventory-filter-bar.tsx`,
  * `admin/analytics.tsx` and `my/items.tsx` all name a whole vocabulary on
- * purpose, and the type already forces them to be total: adding a status
- * fails to compile there rather than silently rendering nothing. Those are the
- * shape that works. Only the two shapes #102 could not catch are in scope.
+ * purpose, and the type forces them to be total: adding a status fails to
+ * compile there rather than silently rendering nothing. That holds only while
+ * the key is the union. Three of the five were `Record<string, ...>` until
+ * #286, which named a whole vocabulary and forced nothing, and fell through
+ * both halves of this rule. A `Record` keyed by `string` over a vocabulary is
+ * the shape to reject in review; the scan does not look for it. Only the two
+ * shapes #102 could not catch are in scope.
  *
  * ## What it cannot see
  *

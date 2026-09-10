@@ -41,6 +41,10 @@ import {
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { cn } from "#/lib/utils";
+import type {
+  InventoryCustomLineStatus,
+  InventoryRequestItemStatus,
+} from "#/lib/vocabularies";
 import {
   cancelRequestItem,
   listMyItems,
@@ -75,7 +79,13 @@ const FILTER_LABEL: Record<MyItemsFilter, string> = {
   open: "Open",
 };
 
-const LINE_STATUS_LABEL: Record<string, string> = {
+// Both line vocabularies, keyed by their union so a status added to either
+// tuple and not here fails to compile rather than rendering its raw key at a
+// student (#286).
+const LINE_STATUS_LABEL: Record<
+  InventoryRequestItemStatus | InventoryCustomLineStatus,
+  string
+> = {
   pending: "Pending",
   approved: "Approved",
   rejected: "Rejected",
@@ -96,9 +106,17 @@ function rowName(row: Row): string {
   }
 }
 
-/** The status word a line row shows once it is not an item badge. */
+/**
+ * The status word a line row shows once it is not an item badge. The row
+ * carries the wire's `string`, so the fallback stays reachable for a value
+ * neither tuple has; the cast only picks the map's row type.
+ */
 function lineLabel(status: string): string {
-  return LINE_STATUS_LABEL[status] ?? status;
+  return (
+    LINE_STATUS_LABEL[
+      status as InventoryRequestItemStatus | InventoryCustomLineStatus
+    ] ?? status
+  );
 }
 
 function rowId(row: Row): string {
@@ -626,7 +644,7 @@ function fieldsOf(row: Row): LineSheetField[] {
         row.kind === "hold" ? (
           <InventoryStatusBadge status={row.item.status} />
         ) : (
-          (LINE_STATUS_LABEL[row.line.status] ?? row.line.status)
+          lineLabel(row.line.status)
         ),
     },
     {
