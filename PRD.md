@@ -295,6 +295,16 @@ Each project carries:
   is called a cart in code (`inventory_cart_items`, `getCart`) and a borrow
   list in every user-facing string.
 - [x] Staff approve or reject inventory requests (`/admin/inventory/requests`).
+  The queue groups lines by the request they arrived in, with Approve all over a
+  borrow list, and a line sheet holding each line's timeline.
+- [x] Custom requests: a signed-in user asks for equipment the inventory does not
+  hold (`/inventory/request`), one line per thing with a reason, a quantity and an
+  optional link. Staff work the lines in the same queue: start sourcing with a
+  note, rewrite that note while sourcing, fulfil by linking items that exist
+  (reserving them to the requester by default), or reject with a reason. The
+  requester sees the request as a group on `/my/items`, with the items a
+  fulfilment produced nested under their line, and is notified in-app at each
+  step. Nothing is public and nothing on a submitted line is editable.
 - [x] Rejection requires a reason that is shown to the user; rejected/returned
   items go back to `available`.
 - [x] Staff change item status and assign holders; items auto-assign to the

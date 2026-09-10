@@ -183,6 +183,31 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     note: "The handler carries only requireUser(). The staff gate is the assertStaff in assertAuthorized (src/lib/inventory-workflow.ts), reached through transitionItem and assertTransitionAllowed, and the schema deliberately omits `authority` so a signed-in user cannot supply one. See the transitionSchema docblock.",
   },
   "server/inventory.ts:updateInventoryItem": { level: "staff" },
+
+  "server/inventory-custom.ts:cancelCustomLine": {
+    level: "authenticated",
+    note: "Requester only: assertCustomLineTransition in src/lib/inventory-custom-workflow.ts compares the envelope's userId to the viewer, and refuses staff too. Pending or sourcing only.",
+  },
+  "server/inventory-custom.ts:fulfillCustomLine": {
+    level: "staff",
+    note: "Links items that already exist and, by default, reserves each to the requester through transitionItem with the notification silenced; one fulfill notice is written instead. Items locked in ascending id order; any item not available fails the whole call and is named.",
+  },
+  "server/inventory-custom.ts:rejectCustomLine": {
+    level: "staff",
+    note: "Reason required; it reaches the requester as outcome_note and in the notification. Legal from pending or sourcing, unlike a request line.",
+  },
+  "server/inventory-custom.ts:startSourcingCustomLine": {
+    level: "staff",
+    note: "Writes reviewed_by and reviewed_at once, on this first decision, and notifies the requester with the sourcing note.",
+  },
+  "server/inventory-custom.ts:submitCustomRequest": {
+    level: "authenticated",
+    note: "Scoped to the session user: the envelope is theirs. Writes no item line, so an inventory_requests row no longer implies one exists.",
+  },
+  "server/inventory-custom.ts:updateSourcingNote": {
+    level: "staff",
+    note: "The one endpoint that is not a transition: rewrites sourcing_note while the line is sourcing and notifies the requester. It never touches the request's own fields.",
+  },
   "server/inventory.ts:uploadInventoryImage": { level: "staff" },
 
   "server/notifications.ts:listMyNotifications": { level: "authenticated" },

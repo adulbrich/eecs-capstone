@@ -221,6 +221,49 @@ export interface MyRequestLineView {
   status: string;
 }
 
+/** Every column on a custom line, so the narrowing below is visible. */
+export interface CustomLineRow {
+  closedAt: Date | null;
+  closedBy: string | null;
+  createdAt: Date;
+  id: string;
+  link: string | null;
+  name: string;
+  outcomeNote: string | null;
+  quantity: number;
+  reason: string;
+  requestId: string;
+  reviewedAt: Date | null;
+  reviewedBy: string | null;
+  sourcingNote: string | null;
+  status: string;
+}
+
+/**
+ * What the requester may see about their own custom line: what they asked
+ * for, where it is, both notes, and the two dates the timeline sits on. The
+ * identities stay behind, as they do on `MyRequestLineView`.
+ */
+export interface MyCustomLineView {
+  closedAt: Date | null;
+  createdAt: Date;
+  id: string;
+  link: string | null;
+  name: string;
+  outcomeNote: string | null;
+  quantity: number;
+  reason: string;
+  reviewedAt: Date | null;
+  sourcingNote: string | null;
+  status: string;
+}
+
+/** What staff see: the requester's view plus who decided and who closed. */
+export type StaffCustomLineView = MyCustomLineView & {
+  closedBy: string | null;
+  reviewedBy: string | null;
+};
+
 /**
  * What anyone may see. Every field is named here, which is the property worth
  * keeping: adding a column to `inventory_items` cannot leak through this
@@ -311,5 +354,29 @@ export function myRequestLineView(row: RequestLineRow): MyRequestLineView {
     reviewedAt: row.reviewedAt,
     closedAt: row.closedAt,
     closedReason: row.closedReason,
+  };
+}
+
+export function myCustomLineView(row: CustomLineRow): MyCustomLineView {
+  return {
+    id: row.id,
+    name: row.name,
+    reason: row.reason,
+    quantity: row.quantity,
+    link: row.link,
+    status: row.status,
+    sourcingNote: row.sourcingNote,
+    outcomeNote: row.outcomeNote,
+    createdAt: row.createdAt,
+    reviewedAt: row.reviewedAt,
+    closedAt: row.closedAt,
+  };
+}
+
+export function staffCustomLineView(row: CustomLineRow): StaffCustomLineView {
+  return {
+    ...myCustomLineView(row),
+    reviewedBy: row.reviewedBy,
+    closedBy: row.closedBy,
   };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  filterMyItems,
   isOpenRow,
   MY_ITEMS_FILTERS,
   matchesMyItemsFilter,
@@ -46,5 +47,35 @@ describe("matchesMyItemsFilter", () => {
       rows[2],
     ]);
     expect(rows.filter((r) => matchesMyItemsFilter(r, "all"))).toEqual(rows);
+  });
+});
+
+describe("custom lines", () => {
+  const custom = (id: string, status: string) => ({
+    kind: "custom" as const,
+    line: { id, status },
+  });
+
+  it("counts pending and sourcing as open, and fulfilled with the endings", () => {
+    expect(isOpenRow(custom("c", "pending"))).toBe(true);
+    expect(isOpenRow(custom("c", "sourcing"))).toBe(true);
+    expect(isOpenRow(custom("c", "fulfilled"))).toBe(false);
+    expect(isOpenRow(custom("c", "rejected"))).toBe(false);
+    expect(isOpenRow(custom("c", "cancelled"))).toBe(false);
+  });
+
+  it("keeps a fulfilled line visible under open while the item it reserved is", () => {
+    // A fulfilled line is closed; the hold it produced is open. Under the
+    // default filter the item must not appear with nothing above it saying
+    // which request produced it.
+    const rows = [
+      custom("done", "fulfilled"),
+      { kind: "hold" as const, viaCustomLineId: "done" },
+      custom("gone", "rejected"),
+      { kind: "hold" as const, viaCustomLineId: null },
+    ];
+    expect(filterMyItems(rows, "open")).toEqual([rows[0], rows[1], rows[3]]);
+    expect(filterMyItems(rows, "closed")).toEqual([rows[0], rows[2]]);
+    expect(filterMyItems(rows, "all")).toEqual(rows);
   });
 });

@@ -18,6 +18,7 @@ import {
 // their unions from them without importing this file, and therefore without
 // pulling drizzle-orm into the client bundle (#102).
 import {
+  INVENTORY_CUSTOM_LINE_STATUSES,
   INVENTORY_ITEM_STATUSES,
   INVENTORY_REQUEST_ITEM_STATUSES,
   PROJECT_STATUSES,
@@ -408,6 +409,11 @@ export const inventoryRequestItemStatusEnum = pgEnum(
   INVENTORY_REQUEST_ITEM_STATUSES
 );
 
+export const inventoryCustomLineStatusEnum = pgEnum(
+  "inventory_custom_line_status",
+  INVENTORY_CUSTOM_LINE_STATUSES
+);
+
 export const inventoryItems = pgTable(
   "inventory_items",
   {
@@ -537,6 +543,80 @@ export const inventoryRequestItems = pgTable(
     index("inventory_request_items_request_idx").on(t.requestId),
     index("inventory_request_items_item_idx").on(t.itemId),
     index("inventory_request_items_status_idx").on(t.status),
+  ]
+);
+
+// A custom request reuses the envelope above: an `inventory_requests` row
+// holds either item lines or custom lines, never both, which the standalone
+// form guarantees (ADR-0017). An envelope therefore no longer implies an
+// `inventory_request_items` row exists.
+export const inventoryCustomLines = pgTable(
+  "inventory_custom_lines",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    requestId: uuid("request_id")
+      .references(() => inventoryRequests.id, { onDelete: "cascade" })
+      .notNull(),
+    // What was asked for. Not editable after submit, by anyone: a requester
+    // who got it wrong cancels the line and files another.
+    name: text("name").notNull(),
+    reason: text("reason").notNull(),
+    // What was asked for, never stock: an item is one physical thing. The
+    // floor of one is enforced by the submit schema, not a CHECK constraint;
+    // this schema carries none and this is not the feature to introduce one.
+    quantity: integer("quantity").notNull(),
+    link: text("link"),
+
+    status: inventoryCustomLineStatusEnum("status")
+      .notNull()
+      .default("pending"),
+    // Two notes because two transitions speak: sourcing says what staff are
+    // doing, and the close says how it ended. Neither overwrites the other,
+    // and neither is `review_comment`, which the sibling table keeps staff
+    // only; both of these are for the requester to read.
+    sourcingNote: text("sourcing_note"),
+    outcomeNote: text("outcome_note"),
+    // Written once, on the first staff decision, and never overwritten, the
+    // same rule `inventory_request_items` follows. Sourcing then fulfilling
+    // would otherwise lose the date the line left pending.
+    reviewedBy: text("reviewed_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    // Written by whichever transition closes the line, staff or requester.
+    closedBy: text("closed_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("inventory_custom_lines_request_idx").on(t.requestId),
+    index("inventory_custom_lines_status_idx").on(t.status),
+  ]
+);
+
+// The items a fulfilled line produced. `RESTRICT` on the item, matching
+// `inventory_request_items.item_id` and ADR-0006: an item that fulfilled a
+// request can be retired but not hard deleted, because this row is the
+// point. The item index answers "which custom line produced this hold" on
+// `/my/items` and serves the RESTRICT check on an item delete.
+export const inventoryCustomLineItems = pgTable(
+  "inventory_custom_line_items",
+  {
+    customLineId: uuid("custom_line_id")
+      .references(() => inventoryCustomLines.id, { onDelete: "cascade" })
+      .notNull(),
+    itemId: uuid("item_id")
+      .references(() => inventoryItems.id, { onDelete: "restrict" })
+      .notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.customLineId, t.itemId] }),
+    index("inventory_custom_line_items_item_idx").on(t.itemId),
   ]
 );
 

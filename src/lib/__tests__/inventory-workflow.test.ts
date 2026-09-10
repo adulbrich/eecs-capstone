@@ -446,3 +446,33 @@ describe("resolveLineOutcome", () => {
     ).toBe("rejected");
   });
 });
+
+describe("assertTransitionAllowed: silent", () => {
+  const staff = { id: "u-staff", role: "admin" as const };
+  const student = { id: "u-student", role: "user" as const };
+
+  it("lets staff silence a transition, for the fulfill path", () => {
+    expect(() =>
+      assertTransitionAllowed(staff, {
+        itemId: "i-1",
+        nextStatus: "reserved",
+        holderId: "u-requester",
+        pickupBy: new Date("2026-10-01"),
+        silent: true,
+      })
+    ).not.toThrow();
+  });
+
+  it("refuses silence under a self-service authority", () => {
+    // A student may cancel their own line, but not quietly: the authority
+    // is the whole claim, and silence is not part of it.
+    expect(() =>
+      assertTransitionAllowed(student, {
+        itemId: "i-1",
+        nextStatus: "available",
+        authority: "self_cancel",
+        silent: true,
+      })
+    ).toThrow("A self-service transition cannot be silent");
+  });
+});

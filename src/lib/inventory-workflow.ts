@@ -129,6 +129,14 @@ export interface TransitionInput {
   nextStatus: ItemStatus;
   pickupBy?: Date | null;
   requestItemId?: string | null;
+  /**
+   * Suppresses the notification this transition would otherwise write. One
+   * caller sets it: fulfilling a custom line reserves each linked item
+   * through here and then writes one notice for the whole fulfillment, so
+   * the per-item "Reserved" notices would be noise. Staff only: a
+   * self-service caller cannot silence what it does to itself.
+   */
+  silent?: boolean | null;
 }
 
 /**
@@ -156,6 +164,9 @@ function assertAuthorized(viewer: TransitionActor, input: TransitionInput) {
   }
   if (!Object.hasOwn(AUTHORITY_TARGET, input.authority)) {
     throw new Error("Forbidden");
+  }
+  if (input.silent) {
+    throw new Error("A self-service transition cannot be silent");
   }
   // "Self" is the whole claim, so it is checked rather than trusted. Without
   // this, self_request would let a caller place a request hold on somebody

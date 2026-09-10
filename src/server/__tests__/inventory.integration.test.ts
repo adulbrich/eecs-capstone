@@ -38,6 +38,7 @@ import {
   listInventoryRequestsAs,
   listMyItemsAs,
   type MyItemsRow,
+  type QueueRow,
 } from "#/server/_internal/inventory-holdings";
 import { recordOverdueNotificationsAs } from "#/server/_internal/inventory-overdue";
 import {
@@ -99,6 +100,22 @@ function baseItemInput(name: string) {
  */
 function activeOf(rows: MyItemsRow[]) {
   return rows.filter((row) => row.kind !== "cart" && isOpenRow(row));
+}
+
+/** The name a row is about, whatever its kind. */
+function nameOf(row: MyItemsRow): string {
+  if (row.kind === "hold") {
+    return row.item.name;
+  }
+  if (row.kind === "custom") {
+    return row.line.name;
+  }
+  return row.itemName;
+}
+
+/** The item behind a queue row, for the item-line cases below. */
+function itemOf(row: QueueRow) {
+  return row.kind === "item" ? row.item : null;
 }
 
 async function makeRequestLine(userId: string, itemId: string) {
@@ -2394,9 +2411,7 @@ describe("my items order", () => {
 
     const rows = await listMyItemsAs(viewer);
 
-    expect(
-      rows.map((row) => (row.kind === "hold" ? row.item.name : row.itemName))
-    ).toEqual([
+    expect(rows.map(nameOf)).toEqual([
       "Still In Cart",
       "Newer Request",
       "Older Request A",
@@ -2455,11 +2470,10 @@ describe("my items order", () => {
     // Equal deadlines: falls back to recency, newest first. Under the old
     // name tiebreak this would come back alphabetically ("Ant Match" before
     // "Yak Match") instead.
-    expect(
-      active.map((entry) =>
-        entry.kind === "hold" ? entry.item.name : entry.itemName
-      )
-    ).toEqual(["Yak Match", "Ant Match"]);
+    expect(active.map((entry) => nameOf(entry))).toEqual([
+      "Yak Match",
+      "Ant Match",
+    ]);
   });
 });
 
@@ -3459,7 +3473,7 @@ describe("listInventoryRequestsAs", () => {
     });
 
     expect(rows).toHaveLength(2);
-    expect(rows.map((r) => r.item.name).sort()).toEqual([
+    expect(rows.map((r) => itemOf(r)?.name).sort()).toEqual([
       "Oscilloscope",
       "Soldering iron",
     ]);
@@ -3495,8 +3509,8 @@ describe("listInventoryRequestsAs", () => {
       status: "all",
       q: "",
     });
-    const closed = rows.find((r) => r.item.id === decided.id);
-    const pending = rows.find((r) => r.item.id === untouched.id);
+    const closed = rows.find((r) => itemOf(r)?.id === decided.id);
+    const pending = rows.find((r) => itemOf(r)?.id === untouched.id);
     expect(closed?.reviewer).toEqual({
       email: `lir-rev-${stamp}@x.com`,
       name: `lir-rev-${stamp}@x.com`,
@@ -3523,7 +3537,7 @@ describe("listInventoryRequestsAs", () => {
       status: "pending",
       q: "",
     });
-    const target = pending.find((r) => r.item.id === moves.id);
+    const target = pending.find((r) => itemOf(r)?.id === moves.id);
     await approveRequestItemAs(admin, {
       requestItemId: target?.line.id ?? "",
       pickupBy: null,
@@ -3531,12 +3545,12 @@ describe("listInventoryRequestsAs", () => {
 
     expect(
       (await listInventoryRequestsAs(admin, { status: "pending", q: "" })).map(
-        (r) => r.item.id
+        (r) => itemOf(r)?.id
       )
     ).toEqual([stays.id]);
     expect(
       (await listInventoryRequestsAs(admin, { status: "approved", q: "" })).map(
-        (r) => r.item.id
+        (r) => itemOf(r)?.id
       )
     ).toEqual([moves.id]);
   });
@@ -3555,7 +3569,7 @@ describe("listInventoryRequestsAs", () => {
       status: "pending",
       q: "",
     });
-    const target = pending.find((r) => r.item.id === refused.id);
+    const target = pending.find((r) => itemOf(r)?.id === refused.id);
     await rejectRequestItemAs(admin, {
       requestItemId: target?.line.id ?? "",
       reviewComment: "out of stock",
@@ -3598,7 +3612,7 @@ describe("listInventoryRequestsAs", () => {
       status: "pending",
       q: "thermal",
     });
-    expect(byItem.map((r) => r.item.id)).toEqual([wanted.id]);
+    expect(byItem.map((r) => itemOf(r)?.id)).toEqual([wanted.id]);
 
     // Requester name and email both match, so both lines come back.
     expect(

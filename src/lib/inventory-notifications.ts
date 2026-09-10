@@ -38,6 +38,8 @@ export interface TransitionNotice {
   nextStatus: ItemStatus;
   pickupBy?: Date | null;
   requestItemId?: string | null;
+  /** See `TransitionInput.silent`: the fulfill path speaks for itself. */
+  silent?: boolean | null;
 }
 
 /** A request line closed by the transition, if one was. */
@@ -72,6 +74,12 @@ export function notificationFor(
   holderId: string | null,
   closed: ClosedLineOutcome | null
 ): NotificationRow | null {
+  // Before everything, including the denial: the one caller that sets this
+  // is fulfilling a custom line, which never closes a request line and
+  // writes its own single notice afterwards.
+  if (input.silent) {
+    return null;
+  }
   // A denial is answered first, and to the requester, because it is the one
   // notice whose recipient is not "whoever holds the item". `closed` is only
   // set on the release path and a rejection is only legal there, so reaching
@@ -164,6 +172,84 @@ export function notificationFor(
     }
     default:
       return null;
+  }
+}
+
+/** The four things a custom line can tell its requester. */
+export type CustomLineEvent =
+  | "fulfilled"
+  | "rejected"
+  | "sourcing"
+  | "sourcing_note";
+
+export interface CustomLineNotice {
+  /** The items a fulfillment linked, in the order they were linked. */
+  items?: { name: string }[];
+  name: string;
+  /** The note the event carries: the sourcing note, or the outcome note. */
+  note: string | null;
+  /** Set when a fulfillment reserved the items; null when it did not. */
+  pickupBy?: Date | null;
+  requesterId: string;
+}
+
+/**
+ * The one notification a custom line event owes its requester. In-app only,
+ * none by email; each carries the note it belongs to verbatim when it is
+ * non-empty. One row per fulfill, whatever the item count. Staff get nothing
+ * on submit: the admin overview tile is the signal.
+ */
+export function customLineNotification(
+  event: CustomLineEvent,
+  notice: CustomLineNotice
+): NotificationRow {
+  const note = notice.note?.trim() ? notice.note : null;
+  switch (event) {
+    case "sourcing":
+      return {
+        userId: notice.requesterId,
+        type: "inventory_custom_sourcing",
+        title: `Sourcing: ${notice.name}`,
+        message: note ?? `Staff are getting ${notice.name}.`,
+        link: "/my/items?filter=open",
+      };
+    case "sourcing_note":
+      return {
+        userId: notice.requesterId,
+        type: "inventory_custom_sourcing_note",
+        title: `Update on ${notice.name}`,
+        message: note ?? `The plan for ${notice.name} changed.`,
+        link: "/my/items?filter=open",
+      };
+    case "fulfilled": {
+      const names = (notice.items ?? []).map((item) => item.name).join(", ");
+      const reserved = notice.pickupBy
+        ? `${names} reserved for you. Pick up by ${formatDate(notice.pickupBy)}.`
+        : `${names} now in the inventory.`;
+      return {
+        userId: notice.requesterId,
+        type: "inventory_custom_fulfilled",
+        title: `Fulfilled: ${notice.name}`,
+        message: note ? `${reserved} ${note}` : reserved,
+        // The line is closed, but a reservation is open and is what the
+        // requester acts on next; without one, the closed view holds it.
+        link: notice.pickupBy
+          ? "/my/items?filter=open"
+          : "/my/items?filter=closed",
+      };
+    }
+    case "rejected":
+      return {
+        userId: notice.requesterId,
+        type: "inventory_custom_rejected",
+        title: `Request denied: ${notice.name}`,
+        message: note ?? `Your request for ${notice.name} was denied.`,
+        link: "/my/items?filter=closed",
+      };
+    default: {
+      const unhandled: never = event;
+      throw new Error(`No notification for ${String(unhandled)}`);
+    }
   }
 }
 

@@ -28,6 +28,10 @@ import {
   cancelRequestItemAs,
   rejectRequestItemAs,
 } from "../src/server/_internal/inventory-requests";
+import {
+  startSourcingCustomLineAs,
+  submitCustomRequestAs,
+} from "../src/server/_internal/inventory-custom";
 import { transitionItem } from "../src/server/_internal/inventory-transitions";
 
 const PASSWORD = "password";
@@ -1042,7 +1046,32 @@ async function seedInventoryFlows(
     note: "Both for the same demo rig; one pickup would be easiest.",
   });
 
-  console.log("inventory flows: 10 seeded");
+  // 11. A custom request: equipment the inventory does not hold. Two lines,
+  //     one already sourcing with a note, one still pending, so the queue
+  //     shows the second row kind and /my/items shows a custom group.
+  const custom = await submitCustomRequestAs(sam, {
+    lines: [
+      {
+        name: "Thermal camera (FLIR One Edge)",
+        reason: "Heat mapping for the greenhouse monitoring capstone.",
+        quantity: 1,
+        link: "https://www.flir.com/products/flir-one-edge/",
+      },
+      {
+        name: "USB oscilloscope",
+        reason: "Bench debugging away from the lab.",
+        quantity: 2,
+        link: null,
+      },
+    ],
+    note: "Both for the same project; the camera matters more.",
+  });
+  await startSourcingCustomLineAs(staff, {
+    customLineId: custom.lineIds[0],
+    sourcingNote: "Ordered from the vendor, expected in two weeks.",
+  });
+
+  console.log("inventory flows: 11 seeded");
   console.log(
     "  sign in as user@example.com (password) and open /my/items: two overdue"
   );

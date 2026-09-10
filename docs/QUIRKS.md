@@ -318,11 +318,11 @@ Cascade rules are encoded in the schema, not in application code. Never recomput
 | --- | --- |
 | `CASCADE` | `session.user_id`, `account.user_id`, `notifications.user_id`, `user_interests.user_id`, `program_instructors.user_id`, `project_collaborators.user_id`, `project_bookmarks.user_id`, `inventory_cart_items.user_id`. Sessions, credentials, and things the account merely marked. |
 | `RESTRICT` | `project_comments.author_id`, `project_status_history.changed_by`, `project_edit_log.editor_id`, `inventory_item_status_history.changed_by`, `inventory_item_edit_log.editor_id`, `inventory_requests.user_id`, `project_bids.student_id`, `project_assignments.student_id`, `project_assignments.assigned_by`. Authorship and audit trail: history has to outlive the person, so an account with any of this cannot be hard-deleted. |
-| `SET NULL` | `projects.proposer_id`, `inventory_items.current_holder_id`, `inventory_request_items.reviewed_by`, `inventory_request_items.closed_by`, `inventory_item_status_history.holder_id`. Attribution that can be lost without losing the record. |
+| `SET NULL` | `projects.proposer_id`, `inventory_items.current_holder_id`, `inventory_request_items.reviewed_by`, `inventory_request_items.closed_by`, `inventory_custom_lines.reviewed_by`, `inventory_custom_lines.closed_by`, `inventory_item_status_history.holder_id`. Attribution that can be lost without losing the record. |
 
 Note `inventory_items.current_holder_id`: nulling it does **not** change `status`, so deleting a user who holds an item strands it in `checked_out` with no holder and no way to return it. Return the item first.
 
-**Everywhere else.** `CASCADE` on junction tables and on anything scoped to a parent row (`project_categories`, `inventory_item_categories`, and the comment, history, and edit-log tables against their project or item). `SET NULL` on `projects.program_id`, `inventory_item_status_history.request_item_id`, and `inventory_items.current_request_item_id`. `RESTRICT` on `inventory_request_items.item_id`, so an item with request lines cannot be deleted.
+**Everywhere else.** `CASCADE` on junction tables and on anything scoped to a parent row (`project_categories`, `inventory_item_categories`, and the comment, history, and edit-log tables against their project or item). `SET NULL` on `projects.program_id`, `inventory_item_status_history.request_item_id`, and `inventory_items.current_request_item_id`. `RESTRICT` on `inventory_request_items.item_id` and `inventory_custom_line_items.item_id`, so an item with request lines, or one that fulfilled a custom line, cannot be deleted.
 
 `project_bids.project_id`, `project_bids.program_id`, and `project_assignments.project_id` declare no rule at all and so are `NO ACTION`. Those two tables have no UI; if they ever get one, give them explicit rules first.
 
@@ -763,7 +763,7 @@ Two things do not go here. A decision (something chosen, with a trade-off, that 
 
 ## Inventory
 
-The vocabulary (item, hold, holder, request line, borrow list, release, retire, the two status sets) is in [`../CONTEXT.md`](../CONTEXT.md). The rules are five pure, client-safe modules under `src/lib/`, each unit tested in `npm test` with no docker: `inventory-workflow.ts` (what a transition may do), `hold.ts` (who holds an item), `inventory-deadlines.ts` (what overdue means), `inventory-notifications.ts` (who is told), `inventory-visibility.ts` (who sees what). Read the module before this section; a new rule or a new case belongs in its unit test, not in the integration suite, which is for assertions about a row.
+The vocabulary (item, hold, holder, request line, custom line, borrow list, release, retire, the three status sets) is in [`../CONTEXT.md`](../CONTEXT.md). The rules are pure, client-safe modules under `src/lib/`, each unit tested in `npm test` with no docker: `inventory-workflow.ts` (what an item transition may do), `inventory-custom-workflow.ts` (what a custom line may do, and who may do it), `hold.ts` (who holds an item), `inventory-deadlines.ts` (what overdue means), `inventory-notifications.ts` (who is told), `inventory-visibility.ts` (who sees what), `inventory-timeline.ts` (what happened to a line), `my-items-filter.ts` (what counts as open on a student's page). Read the module before this section; a new rule or a new case belongs in its unit test, not in the integration suite, which is for assertions about a row.
 
 The decisions: `transitionItem` is the only writer ([ADR-0004](./adr/0004-one-writer-per-status-history.md)), deadlines are lazy and there is no scheduler ([ADR-0005](./adr/0005-lazy-deadlines-no-scheduler.md)), retired is the archive and hard delete is narrow ([ADR-0006](./adr/0006-retired-is-the-archive.md)), one image policy ([ADR-0009](./adr/0009-one-image-upload-policy.md)), addresses are lowercased on write ([ADR-0015](./adr/0015-addresses-are-normalized-on-write.md)).
 
@@ -825,6 +825,55 @@ The rules that stayed in `inventory-transitions.ts` are the ones about a row rea
 ### Deferred FK
 
 `inventory_items.current_request_item_id` references `inventory_request_items.id` but the FK is declared in raw SQL inside the migration (not in `schema.ts`) because the two tables reference each other. `ON DELETE SET NULL`.
+
+### The three lifecycles
+
+Normative as of 2026-09-09, and the living copy: `docs/superpowers/specs/2026-09-09-custom-requests-and-inventory-ux-design.md` is the dated record of why, and this table wins wherever the two disagree. `CONTEXT.md` defines what each status means and does not say which transitions are legal; that is this section.
+
+**Request line**, enforced by `inventory-workflow.ts` and the row-locked rules in `inventory-transitions.ts`:
+
+| From | To | Who | What else happens |
+| --- | --- | --- | --- |
+| (new) | `pending` | requester, by submitting a borrow list | item goes to `requested`, held by the requester |
+| `pending` | `approved` | staff | item goes to `reserved`, pickup deadline set |
+| `pending` | `rejected` | staff, reason required | item released, usually to `available` |
+| `pending` | `cancelled` | requester | item released |
+| `approved` | `returned` | staff, on a release from `checked_out` | item released |
+| `approved` | `cancelled` | requester, or staff releasing without a return | item released; refused once the item is `checked_out` |
+
+**Custom line**, enforced by `inventory-custom-workflow.ts`:
+
+| From | To | Who | What else happens |
+| --- | --- | --- | --- |
+| (new) | `pending` | requester, by submitting the form | nothing else; no item exists |
+| `pending` | `sourcing` | staff | notification, no item, no dates |
+| `pending` | `fulfilled` | staff, linking items we already own | join rows, items reserved unless staff untick it, one notification |
+| `sourcing` | `fulfilled` | staff, linking items that arrived | the same |
+| `pending` or `sourcing` | `rejected` | staff, reason required | notification carrying the reason |
+| `pending` or `sourcing` | `cancelled` | requester | nothing else |
+
+`sourcing` rather than `approved`, and no `returned`: [ADR-0018](./adr/0018-sourcing-not-approved-on-a-custom-line.md). A custom line may be rejected from `sourcing`, unlike a request line, because an order can fall through. Staff may also rewrite `sourcing_note` while the line is `sourcing`, which is the one write that is not a transition; it notifies the requester and never touches the request's own fields. `reviewed_by` and `reviewed_at` are written once, on the first staff decision; `closed_by` and `closed_at` by whichever transition closes the line, the requester included. A line visits at most three of its five statuses, so there is no history table for either kind: the columns are the complete record.
+
+**Item**, unchanged by all of this:
+
+| From | To | Who |
+| --- | --- | --- |
+| `available` | `requested` | requester, via `submitCartAs` under `self_request`; the only path to `requested` |
+| `available` | `reserved` or `checked_out` | staff, with no request line at all; a fulfilment is this, with the requester as holder |
+| `requested` | `reserved` | staff, approving the line |
+| `requested` | `checked_out` | staff, checking out directly for a teammate |
+| `reserved` | `checked_out` | staff, on collection |
+| any of `requested`, `reserved`, `checked_out` | `available`, `maintenance` or `retired` | staff; this is a release |
+| `available` | `maintenance` and back | staff |
+| any | `retired` | staff; the archive |
+
+### An `inventory_requests` row no longer implies an item line
+
+A custom request reuses the envelope ([ADR-0017](./adr/0017-custom-requests-reuse-the-request-envelope.md)), so an envelope holds either item lines or custom lines, never both, and a query that joins `inventory_requests` to `inventory_request_items` sees only the first kind. `countPendingRequests` in `_internal/admin.ts` counts envelopes with a pending line of either kind through two `exists`; `listInventoryRequestsAs` and `listMyItemsAs` run one query per kind and merge. A new join that assumes the old shape silently drops every custom request.
+
+### Fulfil locks items in ascending id order
+
+`fulfillCustomLineAs` locks the line, then each linked item with `SELECT ... FOR UPDATE` in ascending id order, and fails the whole call naming the first item that is not `available`. The reservation is an ordinary staff hold through `transitionItem` with `silent: true`, so the per-item "Reserved" notice is not written and the one fulfil notice is; `assertAuthorized` refuses `silent` under any self-service authority. This is a different rule from the batch approve below, which locks **lines** in ascending id order because each line then locks its item inside `transitionItem`. The two are recorded separately because they are two rules.
 
 ### Batch approve iterates lines in ascending id order
 

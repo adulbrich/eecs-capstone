@@ -11,7 +11,8 @@ import type { Tx } from "./inventory-transitions";
 
 const DEFAULT_PICKUP_DAYS = 7;
 
-function defaultPickupBy(): Date {
+/** Seven days out. Shared with the fulfill path in `inventory-custom.ts`. */
+export function defaultPickupBy(): Date {
   return new Date(Date.now() + DEFAULT_PICKUP_DAYS * 86_400_000);
 }
 
