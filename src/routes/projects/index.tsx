@@ -164,7 +164,7 @@ function ProjectsList() {
             {signedIn && (
               <Button asChild size="sm" variant="outline">
                 <Link to="/projects/new">
-                  <FilePlus aria-hidden="true" className="h-4 w-4" />
+                  <FilePlus aria-hidden="true" />
                   Propose project
                 </Link>
               </Button>
