@@ -242,6 +242,16 @@ test("admin inventory table shows its default-hidden columns when toggled on", a
   await checkA11y(page);
 });
 
+test("admin projects list, proposal link", async ({ page }) => {
+  // The gate is signed-in, not role: staff propose through the same form and
+  // get their extra fields there (#280).
+  await page.goto("/projects");
+  await waitForHydration(page);
+  await expect(
+    page.getByRole("link", { name: "Propose project" })
+  ).toHaveAttribute("href", "/projects/new");
+});
+
 test("admin projects table shows its default-hidden columns when toggled on", async ({
   page,
 }) => {

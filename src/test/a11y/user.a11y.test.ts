@@ -25,6 +25,23 @@ test("projects list, signed in, with bookmark controls", async ({ page }) => {
     page.getByRole("button", { name: /^(Bookmark|Remove bookmark)$/ }).first()
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /^Bookmarks/ })).toBeVisible();
+  const propose = page.getByRole("link", { name: "Propose project" });
+  await expect(propose).toHaveAttribute("href", "/projects/new");
+  await checkA11y(page);
+
+  // Both title-row buttons share the row at a phone width without pushing
+  // the page wider than the viewport (#280).
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect(propose).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Bookmarks/ })).toBeVisible();
+  // clientWidth, not innerWidth: the latter counts a vertical scrollbar's
+  // gutter, which would hide an overflow of up to that width.
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
   await checkA11y(page);
 });
 
