@@ -15,7 +15,14 @@ export const SEED_PASSWORD = "password";
  * "actionable" the moment `load` fires, but React hasn't necessarily
  * hydrated yet: a click that lands in that window reaches a button with no
  * listener attached and silently does nothing. Poll for React's internal
- * fiber keys on a concrete element instead of guessing at a timeout.
+ * fiber keys on concrete elements instead of guessing at a timeout.
+ *
+ * Every match must carry the keys, not the first one. Route components are
+ * code-split, so the root layout hydrates as soon as its chunk arrives while
+ * the route's own content is still fetching modules; on a slow runner the
+ * first button on the page (the header's) is live seconds before the last
+ * one (a route's danger zone), and a click in between does nothing. See
+ * "One hydrated button does not mean a hydrated page" in docs/QUIRKS.md.
  *
  * `selector` exists because the sign-in page has no button until its form
  * renders, so the storage-state capture waits on the form instead.
@@ -26,12 +33,22 @@ export async function waitForHydration(
 ): Promise<void> {
   await page.waitForFunction(
     (sel) => {
-      const element = document.querySelector(sel);
-      if (!element) {
+      // TanStack Devtools renders with Solid inside a container React owns,
+      // so its trigger and panel buttons never carry a fiber key. Its host
+      // is the body-level element holding the trigger's test id.
+      const devtools = document
+        .querySelector('[data-testid="tanstack_devtools"]')
+        ?.closest("body > *");
+      const elements = Array.from(document.querySelectorAll(sel)).filter(
+        (element) => !devtools?.contains(element)
+      );
+      if (elements.length === 0) {
         return false;
       }
-      return Object.keys(element).some(
-        (k) => k.startsWith("__reactFiber") || k.startsWith("__reactProps")
+      return elements.every((element) =>
+        Object.keys(element).some(
+          (k) => k.startsWith("__reactFiber") || k.startsWith("__reactProps")
+        )
       );
     },
     selector,
