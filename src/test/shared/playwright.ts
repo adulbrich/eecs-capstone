@@ -126,7 +126,9 @@ export async function waitForSurfaceSettled(surface: Locator): Promise<void> {
  * or a card layout that does not fit a phone shows up: the document scrolls
  * sideways. `clientWidth`, not `innerWidth`, because the latter counts a
  * vertical scrollbar's gutter and would hide an overflow of up to that
- * width. Call it after `setViewportSize` and a fresh `goto` (#280, #297).
+ * width. Call it after `setViewportSize`; a resize alone reflows the page,
+ * so a `goto` is only needed when the view to measure is a different one
+ * from the view already loaded (#280, #297).
  */
 export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   const overflow = await page.evaluate(
