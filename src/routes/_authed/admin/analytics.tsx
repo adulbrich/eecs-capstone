@@ -23,6 +23,12 @@ import { slotsHint } from "#/lib/analytics-copy";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { isStaff } from "#/lib/viewer";
+import type {
+  InventoryRequestItemStatus,
+  ItemStatus,
+  ProjectStatus,
+  UserRole,
+} from "#/lib/vocabularies";
 import { getAnalytics } from "#/server/analytics";
 import { listPrograms } from "#/server/programs";
 
@@ -86,7 +92,10 @@ export const Route = createFileRoute("/_authed/admin/analytics")({
   component: AnalyticsPage,
 });
 
-const PROJECT_STATUS_LABEL: Record<string, string> = {
+// Keyed by the vocabulary, not by string, so a status added to the tuple and
+// not here fails to compile rather than drawing a row labelled with its raw
+// key (#286).
+const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   draft: "Draft",
   submitted: "Submitted",
   changes_requested: "Changes requested",
@@ -95,7 +104,7 @@ const PROJECT_STATUS_LABEL: Record<string, string> = {
   archived: "Archived",
 };
 
-const ITEM_STATUS_LABEL: Record<string, string> = {
+const ITEM_STATUS_LABEL: Record<ItemStatus, string> = {
   available: "Available",
   requested: "Requested",
   reserved: "Reserved",
@@ -104,7 +113,7 @@ const ITEM_STATUS_LABEL: Record<string, string> = {
   retired: "Retired",
 };
 
-const LINE_STATUS_LABEL: Record<string, string> = {
+const LINE_STATUS_LABEL: Record<InventoryRequestItemStatus, string> = {
   pending: "Pending",
   approved: "Approved",
   rejected: "Rejected",
@@ -112,7 +121,7 @@ const LINE_STATUS_LABEL: Record<string, string> = {
   returned: "Returned",
 };
 
-const ROLE_LABEL: Record<string, string> = {
+const ROLE_LABEL: Record<UserRole, string> = {
   admin: "Admin",
   instructor: "Instructor",
   user: "User",
