@@ -33,9 +33,10 @@ export async function waitForHydration(
 ): Promise<void> {
   await page.waitForFunction(
     (sel) => {
-      // TanStack Devtools renders with Solid inside a container React owns,
-      // so its trigger and panel buttons never carry a fiber key. Its host
-      // is the body-level element holding the trigger's test id.
+      // TanStack Devtools mounts a Solid tree under body: its trigger and
+      // panel chrome never carry a fiber key, and the plugin panels inside
+      // are React portals that hydrate on their own schedule. The host is
+      // the body-level element holding the trigger's test id.
       const devtools = document
         .querySelector('[data-testid="tanstack_devtools"]')
         ?.closest("body > *");
