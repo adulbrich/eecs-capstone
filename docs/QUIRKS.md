@@ -822,6 +822,10 @@ The rules that stayed in `inventory-transitions.ts` are the ones about a row rea
 
 `inventory_items.current_request_item_id` references `inventory_request_items.id` but the FK is declared in raw SQL inside the migration (not in `schema.ts`) because the two tables reference each other. `ON DELETE SET NULL`.
 
+### Batch approve iterates lines in ascending id order
+
+`approveRequestLinesAs` in `src/server/_internal/inventory-requests.ts` approves every line the dialog listed inside one transaction, or none of them, and it sorts the ids before it starts. The order is the point, not tidiness. Each line is approved by `approveLineInTx`, which locks the line and then, inside `transitionItem`, the item, the same line-then-item order `lockAttachableRequestLine` takes; two staff running overlapping batches in different orders would each hold a line the other wants next, and Postgres would abort one with a deadlock. Sorted, the second batch waits on the first and then fails with `<item> is no longer pending`, which is what `inventory.integration.test.ts` asserts under `approveRequestLinesAs`. A line no longer pending fails the whole batch rather than being skipped, because the ids are what staff confirmed in the dialog. The fulfill path for custom lines (#80) locks **items** in ascending id order; that is a separate rule and is recorded separately.
+
 ### submitCart is lock-first
 
 `submitCartAs` locks each cart item with `SELECT FOR UPDATE` and re-checks `status === "available"` before treating it as a survivor. The `inventoryRequests` envelope is inserted only after the lock phase confirms at least one survivor, so an all-race path never leaves an orphaned request row. Items that lost the race are returned in the `skipped` array with reason `"no_longer_available"`.

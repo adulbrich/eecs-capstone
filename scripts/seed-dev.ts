@@ -1029,12 +1029,25 @@ async function seedInventoryFlows(
     note: null,
   });
 
-  console.log("inventory flows: 9 seeded");
+  // 10. One borrow list of two items, submitted as one request and left
+  //     pending, so the staff queue shows a real group with an Approve all
+  //     over it. The other pending request has a single line, which never
+  //     exercises the grouped view. The Jetson and the ESP32 are available
+  //     again after the history cases above.
+  const jetsonAgain = await itemBySerial("JETSON-ORIN-N-0001");
+  const espAgain = await itemBySerial("ESP32S3-DK-0031");
+  await addToCartAs(jordan, { itemId: jetsonAgain });
+  await addToCartAs(jordan, { itemId: espAgain });
+  await submitCartAs(jordan, {
+    note: "Both for the same demo rig; one pickup would be easiest.",
+  });
+
+  console.log("inventory flows: 10 seeded");
   console.log(
     "  sign in as user@example.com (password) and open /my/items: two overdue"
   );
   console.log(
-    "  badges, one healthy hold, and a populated History tab. The bell fills on"
+    "  badges, one healthy hold, and closed requests below. The bell fills on"
   );
   console.log(
     "  that first read, because the overdue scan is lazy and there is no cron."
