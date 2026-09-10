@@ -12,8 +12,10 @@ import {
 import { confirmed } from "./waits";
 
 /**
- * The two upload paths, kept out of the smoke suite because the crop is the
- * likeliest thing in the app to flake on a required check.
+ * The two upload paths. The crop and save flows stay out of the smoke suite
+ * because the crop drag is the likeliest thing in the app to flake on a
+ * required check; the pick-and-cancel test below is in it, because it is the
+ * part that broke in production and it never touches the drag.
  *
  * The project image is also the only coverage anywhere that proves
  * `VITE_STORAGE_PUBLIC_BASE` was inlined at build time. `src/lib/storage.ts`
@@ -70,6 +72,75 @@ test.describe("project image upload", () => {
       const image = owner.locator(`img[src^="${storageBase()}/projects/"]`);
       await expect(image).toBeVisible();
       await expectDecoded(image);
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+/**
+ * The regression that took the edit page down: the uploader's buttons were
+ * `Button` with no `type`, which inside a form is a submit button. Clicking
+ * "Upload image" opened the file picker and saved the form underneath it, and
+ * the save's success handler navigated to the detail page. The crop is never
+ * confirmed here, so the drag the header warns about is not in this test.
+ *
+ * The assertion is on what the save would have done, not on the crop UI: the
+ * crop renders in milliseconds and the save round trip takes hundreds, so a
+ * test that only checked for "Use image" would pass on the broken build. No
+ * server function may be called by picking a file, and the URL has to survive
+ * the network going quiet.
+ */
+test.describe("@smoke project image pick", () => {
+  test("picking an image keeps the owner on the edit page", async ({
+    browser,
+  }) => {
+    const title = fixtureName("Project");
+    const { db, close } = openDb();
+    let projectId: string;
+    try {
+      const proposerId = await userIdByEmail(db, "user@example.com");
+      ({ id: projectId } = await createFixtureProject(db, {
+        title,
+        proposerId,
+        status: "draft",
+      }));
+    } finally {
+      await close();
+    }
+
+    const context = await browser.newContext({ storageState: USER_AUTH });
+    try {
+      const owner = await context.newPage();
+      await owner.goto(`/projects/${projectId}/edit`);
+      await waitForHydration(owner, "form");
+
+      const serverCalls: string[] = [];
+      owner.on("request", (request) => {
+        if (
+          request.method() === "POST" &&
+          request.url().includes("/_serverFn/")
+        ) {
+          serverCalls.push(request.url());
+        }
+      });
+
+      await pickImage(owner);
+      await expect(
+        owner.getByRole("button", { name: "Use image" })
+      ).toBeVisible();
+      await owner.waitForLoadState("networkidle");
+      await expect(owner).toHaveURL(new RegExp(`/projects/${projectId}/edit$`));
+      expect(serverCalls).toEqual([]);
+
+      // Cancel was a submit button too, so it gets the same check.
+      await owner.getByRole("button", { name: "Cancel" }).click();
+      await expect(
+        owner.getByRole("button", { name: "Upload image" })
+      ).toBeVisible();
+      await owner.waitForLoadState("networkidle");
+      await expect(owner).toHaveURL(new RegExp(`/projects/${projectId}/edit$`));
+      expect(serverCalls).toEqual([]);
     } finally {
       await context.close();
     }
@@ -184,10 +255,15 @@ async function pickImage(page: Page): Promise<void> {
     .png()
     .toBuffer();
 
-  // `setInputFiles`, not a click on "Upload image": the input carries a
-  // `hidden` class and the button clicks it through a ref, and Playwright can
-  // set files on a hidden input directly.
-  await page.locator('input[type="file"]').setInputFiles({
+  // Through the button, not `setInputFiles` on the hidden input. This helper
+  // used to set the input directly because Playwright can, and that is exactly
+  // how a button that submitted the form on its way to the file picker reached
+  // production unseen: no test ever clicked it. The click is the point.
+  const chooser = page.waitForEvent("filechooser");
+  await page
+    .getByRole("button", { name: /Upload image|Replace image/ })
+    .click();
+  await (await chooser).setFiles({
     name: "e2e-upload.png",
     mimeType: "image/png",
     buffer: png,
