@@ -86,21 +86,28 @@ export async function closeMenu(page: Page): Promise<void> {
  *
  * Takes the locator the test already holds, which for a Radix surface is the
  * animated content itself (`role="dialog"`, `role="alertdialog"` or
- * `role="menu"`). Waits on the content's parent so a dialog's overlay, its
- * sibling in the portal, settles too. Animations that never finish, such as
- * a spinner, are skipped rather than waited on.
+ * `role="menu"`). A modal's overlay fades in beside it, and Radix portals
+ * the two as separate children of `document.body` rather than under a shared
+ * wrapper, so the overlay is found by its `data-slot` instead of by walking
+ * up from the content. Animations that never finish, such as a spinner, are
+ * skipped, and one cancelled under the wait (`finished` rejects then) is not
+ * a failure: the surface has already been asserted open.
  */
 export async function waitForSurfaceSettled(surface: Locator): Promise<void> {
   await expect(surface).toHaveAttribute("data-state", "open");
   await surface.evaluate((element) => {
-    const scope = element.parentElement ?? element;
-    const finite = scope
-      .getAnimations({ subtree: true })
+    const overlays = Array.from(
+      document.querySelectorAll('[data-slot$="-overlay"][data-state="open"]')
+    );
+    const finite = [element, ...overlays]
+      .flatMap((node) => node.getAnimations({ subtree: true }))
       .filter(
         (animation) =>
           animation.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY
       );
-    return Promise.all(finite.map((animation) => animation.finished));
+    return Promise.all(
+      finite.map((animation) => animation.finished.catch(() => undefined))
+    );
   });
 }
 
