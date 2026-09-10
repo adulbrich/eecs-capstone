@@ -181,9 +181,12 @@ function InventoryIndex() {
   return (
     <div className="px-4 py-6 md:p-8">
       <div className="mx-auto max-w-4xl">
-        <div className="flex items-center justify-between gap-4">
+        {/* flex-wrap and ml-auto, as on /projects: at a phone width the two
+            buttons drop under the heading, right-aligned, rather than
+            pushing the page wider than the viewport (#297). */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="font-semibold text-2xl">Inventory</h1>
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2">
             {/* Same sign-in gate as its sibling: a visitor cannot ask. */}
             {signedIn && (
               <Button asChild size="sm" variant="outline">

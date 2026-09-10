@@ -2,7 +2,11 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import { waitForHydration, waitForSurfaceSettled } from "../shared/playwright";
+import {
+  expectNoHorizontalOverflow,
+  waitForHydration,
+  waitForSurfaceSettled,
+} from "../shared/playwright";
 import { checkA11y } from "./helpers";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,14 +38,7 @@ test("projects list, signed in, with bookmark controls", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await expect(propose).toBeVisible();
   await expect(page.getByRole("link", { name: /^Bookmarks/ })).toBeVisible();
-  // clientWidth, not innerWidth: the latter counts a vertical scrollbar's
-  // gutter, which would hide an overflow of up to that width.
-  const overflow = await page.evaluate(
-    () =>
-      document.documentElement.scrollWidth -
-      document.documentElement.clientWidth
-  );
-  expect(overflow).toBeLessThanOrEqual(0);
+  await expectNoHorizontalOverflow(page);
   await checkA11y(page);
 });
 
@@ -65,6 +62,20 @@ test("inventory table, signed in, with borrow list controls", async ({
       .first()
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /^Borrow list/ })).toBeVisible();
+  await checkA11y(page);
+
+  // Both title-row buttons share the row at a phone width without pushing
+  // the page wider than the viewport, as on /projects (#297). Measured on
+  // the card view: the table view overflows on its own at this width, on
+  // both pages, which is the table's problem and not the row's.
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/inventory");
+  await waitForHydration(page);
+  await expect(
+    page.getByRole("link", { name: "Request something else" })
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Borrow list/ })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
   await checkA11y(page);
 });
 
