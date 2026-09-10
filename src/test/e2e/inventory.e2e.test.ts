@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { waitForHydration } from "../shared/playwright";
 import { ADMIN_AUTH, USER_AUTH } from "./constants";
 import { createFixtureItem, fixtureName, openDb } from "./fixtures";
-import { rowFor } from "./locators";
+import { entryFor, rowFor } from "./locators";
 
 /**
  * The full cart path: available -> requested -> reserved -> checked_out ->
@@ -38,12 +38,18 @@ test.describe("@smoke inventory lifecycle", () => {
         user.getByRole("button", { name: "In borrow list" })
       ).toBeVisible();
 
-      await user.goto("/my/items?tab=cart");
+      await user.goto("/my/items");
       await waitForHydration(user);
+      // Submit lives on the borrow list's group header and opens a dialog
+      // that carries the one note for the whole request.
+      await user.getByRole("button", { name: "Submit" }).click();
       await user.getByLabel("Note for staff").fill("Smoke test request.");
       await user.getByRole("button", { name: "Submit request" }).click();
-      await expect(user).toHaveURL(/tab=active/);
-      await expect(user.getByText(itemName)).toBeVisible();
+      // No navigation: the item moves from the borrow list group into a
+      // request group on the same page, and its state says it was submitted.
+      await expect(
+        entryFor(user, itemName).getByText("Requested", { exact: true })
+      ).toBeVisible();
 
       const staff = await staffContext.newPage();
       await staff.goto("/admin/inventory/requests");
@@ -83,7 +89,7 @@ test.describe("@smoke inventory lifecycle", () => {
         staff.getByRole("button", { name: "Check out" })
       ).toBeVisible();
 
-      await user.goto("/my/items?tab=history");
+      await user.goto("/my/items?filter=closed");
       await waitForHydration(user);
       await expect(user.getByText(itemName)).toBeVisible();
     } finally {

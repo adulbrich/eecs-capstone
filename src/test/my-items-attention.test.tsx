@@ -14,7 +14,7 @@ vi.mock("@tanstack/react-router", () => ({
     to: string;
     search?: Record<string, string>;
   } & Record<string, unknown>) => (
-    <a href={`${to}?tab=${search?.tab ?? ""}`} {...rest}>
+    <a href={`${to}?filter=${search?.filter ?? ""}`} {...rest}>
       {children}
     </a>
   ),
@@ -50,7 +50,7 @@ describe("NeedsAttention", () => {
     expect(screen.queryByRole("link")).toBeNull();
   });
 
-  it("opens the page by answering what is wrong, with a link into Active", () => {
+  it("opens the page by answering what is wrong, with a link to the open rows", () => {
     render(
       <NeedsAttention
         entries={[
@@ -67,7 +67,7 @@ describe("NeedsAttention", () => {
     expect(region.textContent).toContain("1 pickup overdue");
     expect(region.textContent).toContain("1 return due within 3 days");
     expect(
-      screen.getByRole("link", { name: /Active/ }).getAttribute("href")
-    ).toBe("/my/items?tab=active");
+      screen.getByRole("link", { name: /below/ }).getAttribute("href")
+    ).toBe("/my/items?filter=open");
   });
 });

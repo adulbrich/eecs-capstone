@@ -96,7 +96,7 @@ describe("notificationFor", () => {
       null
     );
     expect(row?.type).toBe("inventory_item_checked_out");
-    expect(row?.link).toBe("/my/items?tab=active");
+    expect(row?.link).toBe("/my/items?filter=open");
     expect(row?.title).toContain("2026");
   });
 

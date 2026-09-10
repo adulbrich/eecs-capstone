@@ -96,7 +96,7 @@ test("my items", async ({ page }) => {
   await checkA11y(page);
 });
 
-test("@smoke my items, each tab panel", async ({ page }) => {
+test("@smoke my items, each filter", async ({ page }) => {
   await page.goto("/my/items");
   await waitForHydration(page);
   // The unread badge on the bell is fetched after hydration, so a scan taken
@@ -110,14 +110,21 @@ test("@smoke my items, each tab panel", async ({ page }) => {
     page.getByRole("button", { name: "Notifications" }).getByText(/^\d+\+?$/)
   ).toBeVisible();
 
-  // The tab strip was three loose buttons until 2026-08-22 and this suite
-  // could not tell, because a labelled button is valid markup on its own. The
-  // scan that matters is of the selected state and each panel's content.
-  for (const name of [/^Borrow list/, /^Active/, /^History/]) {
-    await page.getByRole("tab", { name }).click();
-    await expect(page.getByRole("tab", { name, selected: true })).toBeVisible();
+  // One grouped table under a filter, since 2026-09-09. Each filter renders
+  // a different set of groups, and the group headers are `th` elements
+  // inside the body, which is the markup this scan exists to check. The
+  // select is driven by URL rather than by clicking, because the scan is of
+  // the rendered page, not of the Radix menu.
+  for (const filter of ["open", "closed", "all"]) {
+    await page.goto(`/my/items?filter=${filter}`);
+    await waitForHydration(page);
+    await expect(page.getByRole("table", { name: "My items" })).toBeVisible();
     await checkA11y(page);
   }
+  // The sheet, open: a dialog beside the table with the line's timeline.
+  await page.getByRole("button", { name: "Details" }).first().click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await checkA11y(page);
 });
 
 test("my items opens by saying what needs attention", async ({ page }) => {
@@ -128,10 +135,13 @@ test("my items opens by saying what needs attention", async ({ page }) => {
   // Borrow list tab shows the assembled request rather than the empty state.
   const region = page.getByRole("region", { name: "Needs your attention" });
   await expect(region).toBeVisible();
-  await expect(region.getByRole("link", { name: /Active/ })).toBeVisible();
-  await page.getByRole("tab", { name: /^Borrow list/ }).click();
+  await expect(region.getByRole("link", { name: /below/ })).toBeVisible();
+  // The borrow list is the first group, with Submit on its header and the
+  // dialog that carries the note behind it.
+  await expect(page.getByText("Not submitted yet")).toBeVisible();
+  await page.getByRole("button", { name: "Submit" }).click();
   await expect(
-    page.getByRole("region", { name: /Request being assembled/ })
+    page.getByRole("dialog", { name: /as one request/ })
   ).toBeVisible();
   await expect(page.getByLabel("Note for staff (optional)")).toBeVisible();
   await checkA11y(page);

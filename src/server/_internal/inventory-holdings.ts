@@ -35,32 +35,36 @@ import { getCartAs } from "./inventory-cart";
 import { recordOverdueNotificationsAs } from "./inventory-overdue";
 
 /**
- * An entry in the Active tab.
+ * One row of `/my/items`, carrying the group it belongs to.
+ *
+ * Three kinds, because three things can sit on a person's page: an item in
+ * the borrow list, not yet submitted; a request line, open or closed, with the
+ * envelope it arrived in denormalized onto it so the page can group by request
+ * without a second lookup; and a hold with no request line behind it.
  *
  * Only a hold carries the item as its subject, because only a hold has no
- * request line. A request carries its line plus the item's name and status: a
- * request's deadlines live on the line, and letting it carry the item's too
- * would put two different `pickupBy` values on one object.
+ * request line. A request row carries its line plus the item's name and
+ * status: a request's deadlines live on the line, and letting it carry the
+ * item's too would put two different `pickupBy` values on one object (see
+ * `docs/QUIRKS.md`). A cart row carries the item's name and status the same
+ * way, since it has no line at all.
  */
-export type ActiveEntry =
+export type MyItemsRow =
+  | { itemId: string; itemName: string; itemStatus: ItemStatus; kind: "cart" }
   | {
       collectedBy: CollectedBy | null;
       itemName: string;
       itemStatus: ItemStatus;
       kind: "request";
       line: MyRequestLineView;
+      note: string | null;
+      requestId: string;
+      requestedAt: Date;
     }
   | { item: HoldItemView; kind: "hold" };
 
-/**
- * A closed line. The item's current status and dates describe whoever has it
- * now, which is not this record, so only the name comes along.
- */
-export interface HistoryEntry {
-  collectedBy: CollectedBy | null;
-  itemName: string;
-  line: MyRequestLineView;
-}
+/** The closed lines the page shows, most recently closed first. */
+const CLOSED_LINES_LIMIT = 50;
 
 /**
  * The items a viewer is currently holding: a live hold assigned to their
@@ -96,7 +100,14 @@ export function heldByViewer(
   );
 }
 
-export async function listMyItemsAs(viewer: Viewer) {
+/**
+ * Everything on a person's page, as one list in display order: the borrow
+ * list, then one run of rows per submitted request, newest request first and
+ * the lines inside it oldest first, then the holds staff assigned with no
+ * request behind them, soonest deadline first. The page groups by `kind` and
+ * `requestId` and renders this order as given, because nothing on it sorts.
+ */
+export async function listMyItemsAs(viewer: Viewer): Promise<MyItemsRow[]> {
   if (!viewer) {
     throw new Error("Sign in required");
   }
@@ -123,14 +134,15 @@ export async function listMyItemsAs(viewer: Viewer) {
     .where(eq(user.id, viewer.id));
   const verifiedEmail = account?.verified ? account.email : null;
 
-  const [cart, activeLines, holds, history] = await Promise.all([
+  const lineSelection = {
+    line: inventoryRequestItems,
+    item: inventoryItems,
+    request: inventoryRequests,
+  };
+  const [cart, openLines, holds, closedLines] = await Promise.all([
     getCartAs(viewer),
     db
-      .select({
-        line: inventoryRequestItems,
-        item: inventoryItems,
-        request: inventoryRequests,
-      })
+      .select(lineSelection)
       .from(inventoryRequestItems)
       .innerJoin(
         inventoryRequests,
@@ -145,8 +157,7 @@ export async function listMyItemsAs(viewer: Viewer) {
           eq(inventoryRequests.userId, viewer.id),
           inArray(inventoryRequestItems.status, ["pending", "approved"])
         )
-      )
-      .orderBy(desc(inventoryRequestItems.createdAt)),
+      ),
     db
       .select({ item: inventoryItems })
       .from(inventoryItems)
@@ -157,10 +168,10 @@ export async function listMyItemsAs(viewer: Viewer) {
           // Stated that way it also lets a teammate who collected someone
           // else's requested item see the hold they are actually carrying.
           //
-          // The status filter has to be the same one the request half above
-          // uses, or the two stop partitioning: an item pointing at a closed
-          // line would be excluded here as a duplicate of a row that half
-          // never returns, and would vanish from the tab entirely.
+          // The status filter has to be the same one the open-lines query
+          // above uses, or the two stop partitioning: an item pointing at a
+          // closed line would be excluded here as a duplicate of a row that
+          // query never returns, and would vanish from the page entirely.
           notExists(
             db
               .select({ one: sql`1` })
@@ -184,11 +195,7 @@ export async function listMyItemsAs(viewer: Viewer) {
         )
       ),
     db
-      .select({
-        line: inventoryRequestItems,
-        item: inventoryItems,
-        request: inventoryRequests,
-      })
+      .select(lineSelection)
       .from(inventoryRequestItems)
       .innerJoin(
         inventoryRequests,
@@ -209,13 +216,13 @@ export async function listMyItemsAs(viewer: Viewer) {
         )
       )
       .orderBy(desc(inventoryRequestItems.updatedAt))
-      .limit(50),
+      .limit(CLOSED_LINES_LIMIT),
   ]);
 
-  const collected = await collectedByForRequestItems([
-    ...activeLines.map((r) => r.line.id),
-    ...history.map((r) => r.line.id),
-  ]);
+  const lines = [...openLines, ...closedLines];
+  const collected = await collectedByForRequestItems(
+    lines.map((r) => r.line.id)
+  );
 
   // Every row on this page belongs to the viewer as requester, so a collector
   // who is the viewer is the ordinary case, not news: drop it. A collector
@@ -236,32 +243,61 @@ export async function listMyItemsAs(viewer: Viewer) {
     return collector.name || collector.email ? collector : null;
   };
 
-  const active: ActiveEntry[] = [
-    ...activeLines.map(
-      (row): ActiveEntry => ({
-        kind: "request",
-        collectedBy: collectedByForViewer(row.line.id),
-        itemName: row.item.name,
-        itemStatus: row.item.status,
-        line: myRequestLineView(row.line),
-      })
-    ),
-    ...holds.map(
-      (row): ActiveEntry => ({ kind: "hold", item: holdItemView(row.item) })
-    ),
-  ].sort(compareByDeadline);
+  // One run of rows per request, newest request first, the lines inside it
+  // in the order they were carted. Grouped here rather than by the page, so
+  // a request whose lines straddle open and closed still arrives contiguous.
+  const byRequest = new Map<string, typeof lines>();
+  for (const row of lines) {
+    const bucket = byRequest.get(row.request.id);
+    if (bucket) {
+      bucket.push(row);
+    } else {
+      byRequest.set(row.request.id, [row]);
+    }
+  }
+  const requestRows = [...byRequest.values()]
+    .sort(
+      (a, b) =>
+        b[0].request.createdAt.getTime() - a[0].request.createdAt.getTime()
+    )
+    .flatMap((group) =>
+      group
+        .sort((a, b) => a.line.createdAt.getTime() - b.line.createdAt.getTime())
+        .map(
+          (row): MyItemsRow => ({
+            kind: "request",
+            requestId: row.request.id,
+            requestedAt: row.request.createdAt,
+            note: row.request.note,
+            collectedBy: collectedByForViewer(row.line.id),
+            itemName: row.item.name,
+            itemStatus: row.item.status,
+            line: myRequestLineView(row.line),
+          })
+        )
+    );
 
-  return {
-    cart,
-    active,
-    history: history.map(
-      (row): HistoryEntry => ({
-        itemName: row.item.name,
-        line: myRequestLineView(row.line),
-        collectedBy: collectedByForViewer(row.line.id),
+  const holdRows = holds
+    .map(
+      (row): Extract<MyItemsRow, { kind: "hold" }> => ({
+        kind: "hold",
+        item: holdItemView(row.item),
+      })
+    )
+    .sort(compareByDeadline);
+
+  return [
+    ...cart.map(
+      (row): MyItemsRow => ({
+        kind: "cart",
+        itemId: row.itemId,
+        itemName: row.name,
+        itemStatus: row.status,
       })
     ),
-  };
+    ...requestRows,
+    ...holdRows,
+  ];
 }
 
 export interface CollectedBy {

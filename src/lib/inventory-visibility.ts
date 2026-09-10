@@ -211,11 +211,13 @@ export interface RequestLineRow {
 }
 
 export interface MyRequestLineView {
+  closedAt: Date | null;
   closedReason: string | null;
   createdAt: Date;
   dueAt: Date | null;
   id: string;
   pickupBy: Date | null;
+  reviewedAt: Date | null;
   status: string;
 }
 
@@ -292,9 +294,12 @@ export function holdItemView(row: HoldItemRow): HoldItemView {
 /**
  * What the requester may see about their own request line.
  *
- * The review columns stay behind. `reviewedBy` names the staff member who
- * decided, and `reviewComment` is the same string as `closedReason`, which is
- * the one the page renders.
+ * The two dates are here because the requester's timeline has nothing to sit
+ * on without them; two timestamps about the viewer's own line are not a new
+ * class of information. The identities beside them stay behind: `reviewedBy`
+ * and `closedBy` name staff members, which `/my/items` never does, and
+ * `reviewComment` is the same string as `closedReason`, which is the one the
+ * page renders.
  */
 export function myRequestLineView(row: RequestLineRow): MyRequestLineView {
   return {
@@ -303,6 +308,8 @@ export function myRequestLineView(row: RequestLineRow): MyRequestLineView {
     pickupBy: row.pickupBy,
     dueAt: row.dueAt,
     createdAt: row.createdAt,
+    reviewedAt: row.reviewedAt,
+    closedAt: row.closedAt,
     closedReason: row.closedReason,
   };
 }

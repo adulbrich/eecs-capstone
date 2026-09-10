@@ -8,7 +8,7 @@ import {
   giveFixtureHold,
   openDb,
 } from "./fixtures";
-import { entryFor, rowFor } from "./locators";
+import { entryFor, groupFor, rowFor } from "./locators";
 
 /**
  * Overdue is derived, never stored. There is no cron and no `overdue` column:
@@ -55,15 +55,17 @@ test.describe("inventory overdue derivation", () => {
 
     try {
       const user = await userContext.newPage();
-      await user.goto("/my/items?tab=active");
+      await user.goto("/my/items");
       await waitForHydration(user);
 
       const entry = entryFor(user, itemName);
 
       // A staff-assigned hold, which is the arm of DeadlineEntry whose dates
       // live on the item rather than on a request line. "Assigned to you by
-      // staff" is how the Who column says which arm it took.
-      await expect(entry.getByText("Assigned to you by staff")).toBeVisible();
+      // staff" is the group such a hold is filed under.
+      await expect(
+        groupFor(user, "Assigned to you by staff").filter({ hasText: itemName })
+      ).toBeVisible();
       await expect(entry.getByText("Overdue", { exact: true })).toBeVisible();
 
       // The date itself, off the `datetime` attribute rather than the rendered
