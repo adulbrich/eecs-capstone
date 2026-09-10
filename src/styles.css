@@ -440,6 +440,13 @@ a {
 @media (max-width: 767px) {
   .admin-table {
     border: none;
+    /* Fixed, not auto: the element stays a table for assistive tech while
+       its body is restacked into flex cards below, and auto layout sizes a
+       table to its content's intrinsic width, which the restacked body
+       reports wider than the container. At 375px that put every card 21px
+       past the viewport on /projects and /inventory (#300). Fixed layout
+       honours the 100% width instead. */
+    table-layout: fixed;
   }
   .admin-table thead {
     display: none;

@@ -40,6 +40,14 @@ test("projects list, signed in, with bookmark controls", async ({ page }) => {
   await expect(page.getByRole("link", { name: /^Bookmarks/ })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await checkA11y(page);
+
+  // The table view restacks into cards at this width, and the cards fit
+  // too (#300).
+  await page.goto("/projects?view=table");
+  await waitForHydration(page);
+  await expect(page.locator(".admin-table")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await checkA11y(page);
 });
 
 test("projects table, signed in, with bookmark controls", async ({ page }) => {
@@ -64,11 +72,11 @@ test("inventory table, signed in, with borrow list controls", async ({
   await expect(page.getByRole("link", { name: /^Borrow list/ })).toBeVisible();
   await checkA11y(page);
 
-  // Both title-row buttons share the row at a phone width without pushing
-  // the page wider than the viewport, as on /projects (#297). Measured on
-  // the card view: the table view overflows on its own at this width, on
-  // both pages, which is the table's problem and not the row's.
+  // At a phone width the table restacks into cards that fit (#300), and
+  // the two title-row buttons share the row without pushing the page wider
+  // than the viewport, as on /projects (#297).
   await page.setViewportSize({ width: 375, height: 812 });
+  await expectNoHorizontalOverflow(page);
   await page.goto("/inventory");
   await waitForHydration(page);
   await expect(

@@ -641,6 +641,10 @@ const NAME_COLUMN = {
 
 `/admin/categories` shares column consts between two tables (a project tab and an inventory tab). `/projects` and `/my/bookmarks` share five columns through `projectSummaryColumns<Row>()` in `src/components/project-summary-columns.tsx`, a factory rather than consts because each table's row type differs and a column's `cell` is typed on it; the `satisfies` rule is the same inside the factory.
 
+### The mobile card layout keeps the table a table, so its layout mode is fixed
+
+Below `md`, `src/styles.css` restacks `.admin-table` into cards: `thead` hidden, `tbody` a flex column, each `tr` a block card, each `td` a flex row. The `table` element keeps `display: table`, on purpose, so assistive tech still gets a table with a caption. That leaves the table's own width under auto table layout, which sizes the box to its content's intrinsic width rather than to the `w-full` it carries, and the restacked body reports an intrinsic width 37px past a 343px container. At 375px every card ran 21px past the viewport on `/projects` and `/inventory` and the page scrolled sideways (#300). `table-layout: fixed` inside the same media query is the whole fix: with no table-row or table-cell boxes left to size, all it does is honour the specified width. `display: block` on the table would also fix it and would stop it being a table. Do not touch `containerClassName` for this; the container was never the thing that was wide. The two signed-in scans in `user.a11y.test.ts` measure both views at 375px with `expectNoHorizontalOverflow`.
+
 ### Path-by-path convention summary
 
 | Path | What goes there |
