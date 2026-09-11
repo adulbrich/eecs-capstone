@@ -20,6 +20,20 @@ export async function searchProjectsForRequest(data: SearchProjectsInput) {
   return searchProjectsImpl(data, session?.user?.id ?? null);
 }
 
+/** The viewer's interest vector, or null for a visitor or a member without one. One indexed row. */
+async function interestsVectorFor(
+  viewerId: string | null
+): Promise<number[] | null> {
+  if (!viewerId) {
+    return null;
+  }
+  const [row] = await db
+    .select({ embedding: userInterests.embedding })
+    .from(userInterests)
+    .where(eq(userInterests.userId, viewerId));
+  return row?.embedding ?? null;
+}
+
 export async function searchProjectsImpl(
   data: SearchProjectsInput,
   viewerId: string | null = null
@@ -60,16 +74,8 @@ export async function searchProjectsImpl(
   // Read for every signed-in viewer, not only under `recommended`: the
   // listing tells the reader whether the recommended sort is open to them,
   // and reading that here, in the loader, is what stops the prompt flashing
-  // on first paint for someone who already has interests (#321). One indexed
-  // row per request.
-  const interestsVector = viewerId
-    ? ((
-        await db
-          .select({ embedding: userInterests.embedding })
-          .from(userInterests)
-          .where(eq(userInterests.userId, viewerId))
-      )[0]?.embedding ?? null)
-    : null;
+  // on first paint for someone who already has interests (#321).
+  const interestsVector = await interestsVectorFor(viewerId);
 
   let orderBy = relevanceOrder;
   if (data.sort === "newest") {
