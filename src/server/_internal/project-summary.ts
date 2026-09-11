@@ -77,7 +77,7 @@ export const projectSummarySelect = {
   url: projects.url,
   licenseRestrictions: projects.licenseRestrictions,
   // Public by design, see projectDetailView: a student needs to know an
-  // agreement is involved before bidding.
+  // agreement is involved before applying.
   requiresNdaIp: projects.requiresNdaIp,
   teamsSupported: projects.teamsSupported,
   // Public by design: a student needs to see a closed roster before they

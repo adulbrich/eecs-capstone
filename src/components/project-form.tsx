@@ -537,7 +537,7 @@ export function ProjectForm({
               </Label>
             </div>
             <p className="mt-1 text-muted-foreground text-xs">
-              Students see this before they bid. Unchecking it clears
+              Students see this before they apply. Unchecking it clears
               Licensing/IP/NDA notes.
             </p>
             {/*
@@ -650,12 +650,12 @@ export function ProjectForm({
                 onCheckedChange={(next) => field.handleChange(next === true)}
               />
               <Label className="font-normal" htmlFor="acceptingApplicants">
-                Accepting applicants
+                Students can apply to join this project
               </Label>
             </div>
             <p className="mt-1 text-muted-foreground text-xs">
-              Uncheck once the roster is full. The project stays listed, marked
-              as not accepting applicants, so students know before they apply.
+              Uncheck once you have the team you need. The project stays listed,
+              but students see it is no longer taking applicants.
             </p>
           </div>
         )}
