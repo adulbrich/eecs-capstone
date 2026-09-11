@@ -28,7 +28,7 @@ export type SubmitCustomRequestInput = z.infer<
 >;
 
 export const submitCustomRequest = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => submitCustomRequestSchema.parse(d))
+  .validator((d: unknown) => submitCustomRequestSchema.parse(d))
   .handler(async ({ data }) => {
     const { submitCustomRequestForCurrentUser } = await import(
       "./_internal/inventory-custom"
@@ -39,7 +39,7 @@ export const submitCustomRequest = createServerFn({ method: "POST" })
 const lineId = z.string().uuid();
 
 export const startSourcingCustomLine = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         customLineId: lineId,
@@ -55,7 +55,7 @@ export const startSourcingCustomLine = createServerFn({ method: "POST" })
   });
 
 export const updateSourcingNote = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         customLineId: lineId,
@@ -71,7 +71,7 @@ export const updateSourcingNote = createServerFn({ method: "POST" })
   });
 
 export const rejectCustomLine = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         customLineId: lineId,
@@ -87,7 +87,7 @@ export const rejectCustomLine = createServerFn({ method: "POST" })
   });
 
 export const fulfillCustomLine = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         customLineId: lineId,
@@ -108,7 +108,7 @@ export const fulfillCustomLine = createServerFn({ method: "POST" })
   });
 
 export const cancelCustomLine = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         customLineId: lineId,

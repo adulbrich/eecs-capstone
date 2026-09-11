@@ -4,14 +4,14 @@ import { z } from "zod";
 const projectIdSchema = z.object({ projectId: z.string().uuid() });
 
 export const addBookmark = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => projectIdSchema.parse(data))
+  .validator((data: unknown) => projectIdSchema.parse(data))
   .handler(async ({ data }) => {
     const { addBookmarkForCurrentUser } = await import("./_internal/bookmarks");
     return addBookmarkForCurrentUser(data);
   });
 
 export const removeBookmark = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => projectIdSchema.parse(data))
+  .validator((data: unknown) => projectIdSchema.parse(data))
   .handler(async ({ data }) => {
     const { removeBookmarkForCurrentUser } = await import(
       "./_internal/bookmarks"
@@ -20,7 +20,7 @@ export const removeBookmark = createServerFn({ method: "POST" })
   });
 
 export const isBookmarked = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => projectIdSchema.parse(data))
+  .validator((data: unknown) => projectIdSchema.parse(data))
   .handler(async ({ data }) => {
     const { isBookmarkedForCurrentUser } = await import(
       "./_internal/bookmarks"

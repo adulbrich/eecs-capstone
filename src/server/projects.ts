@@ -66,7 +66,7 @@ const transitionInputSchema = z.object({
 const idOnlySchema = z.object({ id: z.string().uuid() });
 
 export const createProject = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => projectInputSchema.parse(data))
+  .validator((data: unknown) => projectInputSchema.parse(data))
   .handler(async ({ data }) => {
     const { createProjectForCurrentUser } = await import(
       "./_internal/projects"
@@ -75,7 +75,7 @@ export const createProject = createServerFn({ method: "POST" })
   });
 
 export const updateProject = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => updateProjectSchema.parse(data))
+  .validator((data: unknown) => updateProjectSchema.parse(data))
   .handler(async ({ data }) => {
     const { updateProjectForCurrentUser } = await import(
       "./_internal/projects"
@@ -84,7 +84,7 @@ export const updateProject = createServerFn({ method: "POST" })
   });
 
 export const updateProjectMentorship = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => mentorshipSchema.parse(data))
+  .validator((data: unknown) => mentorshipSchema.parse(data))
   .handler(async ({ data }) => {
     const { updateProjectMentorshipForCurrentUser } = await import(
       "./_internal/projects"
@@ -93,7 +93,7 @@ export const updateProjectMentorship = createServerFn({ method: "POST" })
   });
 
 export const submitProject = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => transitionInputSchema.parse(data))
+  .validator((data: unknown) => transitionInputSchema.parse(data))
   .handler(async ({ data }) => {
     const { performTransitionForCurrentUser } = await import(
       "./_internal/projects"
@@ -107,7 +107,7 @@ export const submitProject = createServerFn({ method: "POST" })
   });
 
 export const returnToDraft = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => transitionInputSchema.parse(data))
+  .validator((data: unknown) => transitionInputSchema.parse(data))
   .handler(async ({ data }) => {
     const { performTransitionForCurrentUser } = await import(
       "./_internal/projects"
@@ -121,7 +121,7 @@ export const returnToDraft = createServerFn({ method: "POST" })
   });
 
 export const requestChanges = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => transitionInputSchema.parse(data))
+  .validator((data: unknown) => transitionInputSchema.parse(data))
   .handler(async ({ data }) => {
     const { performTransitionForCurrentUser } = await import(
       "./_internal/projects"
@@ -135,7 +135,7 @@ export const requestChanges = createServerFn({ method: "POST" })
   });
 
 export const approveProject = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => transitionInputSchema.parse(data))
+  .validator((data: unknown) => transitionInputSchema.parse(data))
   .handler(async ({ data }) => {
     const { performTransitionForCurrentUser } = await import(
       "./_internal/projects"
@@ -149,7 +149,7 @@ export const approveProject = createServerFn({ method: "POST" })
   });
 
 export const publishProject = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => transitionInputSchema.parse(data))
+  .validator((data: unknown) => transitionInputSchema.parse(data))
   .handler(async ({ data }) => {
     const { performTransitionForCurrentUser } = await import(
       "./_internal/projects"
@@ -163,7 +163,7 @@ export const publishProject = createServerFn({ method: "POST" })
   });
 
 export const archiveProject = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => transitionInputSchema.parse(data))
+  .validator((data: unknown) => transitionInputSchema.parse(data))
   .handler(async ({ data }) => {
     const { performTransitionForCurrentUser } = await import(
       "./_internal/projects"
@@ -177,7 +177,7 @@ export const archiveProject = createServerFn({ method: "POST" })
   });
 
 export const restoreArchived = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => transitionInputSchema.parse(data))
+  .validator((data: unknown) => transitionInputSchema.parse(data))
   .handler(async ({ data }) => {
     const { performTransitionForCurrentUser } = await import(
       "./_internal/projects"
@@ -191,7 +191,7 @@ export const restoreArchived = createServerFn({ method: "POST" })
   });
 
 export const softDeleteProject = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => idOnlySchema.parse(data))
+  .validator((data: unknown) => idOnlySchema.parse(data))
   .handler(async ({ data }) => {
     const { softDeleteProjectForCurrentUser } = await import(
       "./_internal/projects"
@@ -200,7 +200,7 @@ export const softDeleteProject = createServerFn({ method: "POST" })
   });
 
 export const restoreProject = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => idOnlySchema.parse(data))
+  .validator((data: unknown) => idOnlySchema.parse(data))
   .handler(async ({ data }) => {
     const { restoreProjectForCurrentUser } = await import(
       "./_internal/projects"
@@ -209,7 +209,7 @@ export const restoreProject = createServerFn({ method: "POST" })
   });
 
 export const hardDeleteProject = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => idOnlySchema.parse(data))
+  .validator((data: unknown) => idOnlySchema.parse(data))
   .handler(async ({ data }) => {
     const { hardDeleteProjectForCurrentUser } = await import(
       "./_internal/projects"
@@ -225,7 +225,7 @@ const statusTransitionSchema = z.object({
 });
 
 export const performTransition = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => statusTransitionSchema.parse(data))
+  .validator((data: unknown) => statusTransitionSchema.parse(data))
   .handler(async ({ data }) => {
     const { performTransitionForCurrentUser } = await import(
       "./_internal/projects"
@@ -239,7 +239,7 @@ export const performTransition = createServerFn({ method: "POST" })
   });
 
 export const forceSetProjectStatus = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => statusTransitionSchema.parse(data))
+  .validator((data: unknown) => statusTransitionSchema.parse(data))
   .handler(async ({ data }) => {
     const { forceTransitionForCurrentUser } = await import(
       "./_internal/projects"

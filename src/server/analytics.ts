@@ -15,7 +15,7 @@ export const analyticsInputSchema = z
 export type AnalyticsInput = z.infer<typeof analyticsInputSchema>;
 
 export const getAnalytics = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => analyticsInputSchema.parse(data))
+  .validator((data: unknown) => analyticsInputSchema.parse(data))
   .handler(async ({ data }) => {
     const { getAnalyticsForCurrentUser } = await import(
       "./_internal/analytics"

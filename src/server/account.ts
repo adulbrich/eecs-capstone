@@ -23,7 +23,7 @@ export const getAccountDeletionPreview = createServerFn({
 });
 
 export const deleteAccount = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => deleteAccountSchema.parse(data))
+  .validator((data: unknown) => deleteAccountSchema.parse(data))
   .handler(async ({ data }) => {
     const { deleteAccountForCurrentUser } = await import("./_internal/account");
     return deleteAccountForCurrentUser(data);

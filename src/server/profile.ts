@@ -17,7 +17,7 @@ export const profileSchema = z
 export type ProfileInput = z.infer<typeof profileSchema>;
 
 export const updateProfile = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => profileSchema.parse(data))
+  .validator((data: unknown) => profileSchema.parse(data))
   .handler(async ({ data }) => {
     const { updateProfileForCurrentUser } = await import("./_internal/profile");
     return updateProfileForCurrentUser(data);

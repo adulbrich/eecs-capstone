@@ -52,14 +52,14 @@ export type SetProjectCategoriesInput = z.infer<
 >;
 
 export const listCategories = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => listSchema.parse(data ?? {}))
+  .validator((data: unknown) => listSchema.parse(data ?? {}))
   .handler(async ({ data }) => {
     const { listCategoriesImpl } = await import("./_internal/categories");
     return listCategoriesImpl(data);
   });
 
 export const listCategoriesWithUsage = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => listSchema.parse(data ?? {}))
+  .validator((data: unknown) => listSchema.parse(data ?? {}))
   .handler(async ({ data }) => {
     const { listCategoriesWithUsageForCurrentUser } = await import(
       "./_internal/categories"
@@ -75,14 +75,14 @@ export const listCategoryTypes = createServerFn({ method: "GET" }).handler(
 );
 
 export const getCategory = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => idSchema.parse(data))
+  .validator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data }) => {
     const { getCategoryImpl } = await import("./_internal/categories");
     return getCategoryImpl(data);
   });
 
 export const createCategory = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => categorySchema.parse(data))
+  .validator((data: unknown) => categorySchema.parse(data))
   .handler(async ({ data }) => {
     const { createCategoryForCurrentUser } = await import(
       "./_internal/categories"
@@ -91,7 +91,7 @@ export const createCategory = createServerFn({ method: "POST" })
   });
 
 export const updateCategory = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => categoryUpdateSchema.parse(data))
+  .validator((data: unknown) => categoryUpdateSchema.parse(data))
   .handler(async ({ data }) => {
     const { updateCategoryForCurrentUser } = await import(
       "./_internal/categories"
@@ -100,7 +100,7 @@ export const updateCategory = createServerFn({ method: "POST" })
   });
 
 export const deleteCategory = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => idSchema.parse(data))
+  .validator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data }) => {
     const { deleteCategoryForCurrentUser } = await import(
       "./_internal/categories"
@@ -109,7 +109,7 @@ export const deleteCategory = createServerFn({ method: "POST" })
   });
 
 export const setProjectCategories = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => setProjectCategoriesSchema.parse(data))
+  .validator((data: unknown) => setProjectCategoriesSchema.parse(data))
   .handler(async ({ data }) => {
     const { setProjectCategoriesForCurrentUser } = await import(
       "./_internal/categories"
@@ -118,7 +118,7 @@ export const setProjectCategories = createServerFn({ method: "POST" })
   });
 
 export const listProjectCategories = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     z.object({ projectId: z.string().uuid() }).parse(data)
   )
   .handler(async ({ data }) => {

@@ -60,9 +60,9 @@ A domain split across several impls points every impl that needs an input type a
 
 The currently installed version of `@tanstack/react-start/server` exports `getRequest`. Older docs and examples reference `getWebRequest`, which does not exist. Use `getRequest()` to access the in-flight `Request`.
 
-### `.inputValidator(...)`, not `.validator(...)`
+### `.validator(...)`, and before 2026-09-10 `.inputValidator(...)`
 
-`createServerFn(...).inputValidator((d) => schema.parse(d)).handler(...)`. The method was renamed; older docs (and even some sub-versions of the plugin) still show `.validator`.
+`createServerFn(...).validator((d) => schema.parse(d)).handler(...)`. The method has been renamed twice: `.validator` became `.inputValidator` for a while, and `@tanstack/react-start` 1.168 renamed it back, keeping `.inputValidator` as a deprecated alias that the Start compiler warns about on every call site (a `TODO remove upon stable` in `start-plugin-core`). The plans under `docs/superpowers/plans/` still say `.inputValidator`, because they are the record of what was written; the code and this entry say `.validator`. Check `node_modules/@tanstack/start-client-core/dist/esm/createServerFn.d.ts` for the `@deprecated` marker before trusting either name in a doc.
 
 ### `redirect()` throws an object whose target lives at `.options.to`
 
@@ -388,15 +388,11 @@ ESM imports hoist above all statements. Writing `import { config } from "dotenv"
 
 Running Vitest inside a sandboxed tool call dies with `EMFILE: too many open files`, and `ulimit -n 8192` does not help: Vite's watcher opens more descriptors than the sandbox allows, and the failure looks like a broken test. Run the suites with the sandbox off. Two more things the sandbox refuses, both of which look like the tool being broken: `gh` fails TLS inside it, and anything that writes `.git/config`, such as `git branch -d`, `git worktree add` and `git remote`, half-completes.
 
-Two harmless things every run prints in this repo:
+One harmless thing every run prints in this repo is `ReferenceError: module is not defined`, from the nitro Vite plugin loading under Vitest. The results above it and the exit code are still authoritative. Until 2026-09-10 every run also ended with `close timed out after 10000ms` and `something prevents 2 Vite servers from exiting`: that was the May nitro nightly holding a handle open, found by bisecting `vite.config.ts` plugins against a one-file run, and the September nightly closes cleanly. If it comes back, bisect the plugins again before blaming Vitest.
 
-```
-module is not defined
-close timed out after 10000ms
-Tests closed successfully but something prevents Vite server from exiting
-```
+### Vitest 5 and better-auth's optional peer range
 
-The results above those lines and the exit code are still authoritative.
+`better-auth` 1.6 declares an optional peer on `vitest` `^2 || ^3 || ^4`, and 1.7 is the first line that admits 5. Optional or not, npm refuses to place `vitest` 5 next to it with `ERESOLVE`, and the refusal surfaces only on the next `npm install` or `npm update` that re-resolves that edge, so a lockfile can look fine until something unrelated moves. `package.json` carries `"overrides": { "better-auth": { "vitest": "$vitest" } }`, which tells npm the edge is satisfied by whatever `devDependencies.vitest` says. Drop the override when the 1.7 upgrade (#278) lands.
 
 ### A test that spawns a subprocess needs a budget above the subprocess's own
 

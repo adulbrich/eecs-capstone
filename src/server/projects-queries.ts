@@ -30,14 +30,14 @@ const adminListSchema = z.object({
 const projectIdSchema = z.object({ id: z.string().uuid() });
 
 export const listMyProjects = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => myProjectsSchema.parse(data ?? {}))
+  .validator((data: unknown) => myProjectsSchema.parse(data ?? {}))
   .handler(async ({ data }) => {
     const { listMyProjectsImpl } = await import("./_internal/projects-queries");
     return listMyProjectsImpl(data);
   });
 
 export const listAdminProjects = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => adminListSchema.parse(data ?? {}))
+  .validator((data: unknown) => adminListSchema.parse(data ?? {}))
   .handler(async ({ data }) => {
     const { listAdminProjectsImpl } = await import(
       "./_internal/projects-queries"
@@ -46,7 +46,7 @@ export const listAdminProjects = createServerFn({ method: "GET" })
   });
 
 export const exportAdminProjects = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => adminListSchema.parse(data ?? {}))
+  .validator((data: unknown) => adminListSchema.parse(data ?? {}))
   .handler(async ({ data }) => {
     const { exportAdminProjectsImpl } = await import(
       "./_internal/projects-queries"
@@ -55,14 +55,14 @@ export const exportAdminProjects = createServerFn({ method: "GET" })
   });
 
 export const getProject = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => projectIdSchema.parse(data))
+  .validator((data: unknown) => projectIdSchema.parse(data))
   .handler(async ({ data }) => {
     const { getProjectImpl } = await import("./_internal/projects-queries");
     return getProjectImpl(data);
   });
 
 export const getProposerForEdit = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     z.object({ projectId: z.string().uuid() }).parse(data)
   )
   .handler(async ({ data }) => {
@@ -73,7 +73,7 @@ export const getProposerForEdit = createServerFn({ method: "GET" })
   });
 
 export const getProjectMentorship = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     z.object({ projectId: z.string().uuid() }).parse(data)
   )
   .handler(async ({ data }) => {
@@ -84,7 +84,7 @@ export const getProjectMentorship = createServerFn({ method: "GET" })
   });
 
 export const listProjectEditLog = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => projectIdSchema.parse(data))
+  .validator((data: unknown) => projectIdSchema.parse(data))
   .handler(async ({ data }) => {
     const { listProjectEditLogImpl } = await import(
       "./_internal/projects-queries"
@@ -93,7 +93,7 @@ export const listProjectEditLog = createServerFn({ method: "GET" })
   });
 
 export const listProjectComments = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => projectIdSchema.parse(data))
+  .validator((data: unknown) => projectIdSchema.parse(data))
   .handler(async ({ data }) => {
     const { listProjectCommentsImpl } = await import(
       "./_internal/projects-queries"

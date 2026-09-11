@@ -114,7 +114,7 @@ function factoryImports(sourceFile: ts.SourceFile) {
 }
 
 /**
- * Walk down `createServerFn({...}).inputValidator(...).handler(...)` to the
+ * Walk down `createServerFn({...}).validator(...).handler(...)` to the
  * identifier the chain is rooted in, and return it only if the chain actually
  * calls it. `createServerFn.mock()` and a bare `export const x = createServerFn`
  * both reach the identifier without calling it, and neither is an endpoint.

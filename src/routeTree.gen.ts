@@ -9,110 +9,55 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
-import { Route as InventoryIndexRouteImport } from './routes/inventory/index'
-import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
-import { Route as InventoryItemIdRouteImport } from './routes/inventory/$itemId'
-import { Route as ApiHealthzRouteImport } from './routes/api/healthz'
-import { Route as AuthedProfileRouteImport } from './routes/_authed/profile'
-import { Route as AuthedAdminRouteImport } from './routes/_authed/admin'
-import { Route as authVerifyEmailRouteImport } from './routes/(auth)/verify-email'
-import { Route as authSignUpRouteImport } from './routes/(auth)/sign-up'
-import { Route as authSignInRouteImport } from './routes/(auth)/sign-in'
-import { Route as authResetPasswordRouteImport } from './routes/(auth)/reset-password'
+import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-password'
+import { Route as authResetPasswordRouteImport } from './routes/(auth)/reset-password'
+import { Route as authSignInRouteImport } from './routes/(auth)/sign-in'
+import { Route as authSignUpRouteImport } from './routes/(auth)/sign-up'
+import { Route as authVerifyEmailRouteImport } from './routes/(auth)/verify-email'
+import { Route as AuthedAdminRouteImport } from './routes/_authed/admin'
+import { Route as AuthedProfileRouteImport } from './routes/_authed/profile'
+import { Route as ApiHealthzRouteImport } from './routes/api/healthz'
+import { Route as InventoryIndexRouteImport } from './routes/inventory/index'
+import { Route as InventoryItemIdRouteImport } from './routes/inventory/$itemId'
+import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
+import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
 import { Route as AuthedAdminIndexRouteImport } from './routes/_authed/admin/index'
-import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
-import { Route as AuthedProjectsNewRouteImport } from './routes/_authed/projects/new'
-import { Route as AuthedMyProjectsRouteImport } from './routes/_authed/my/projects'
-import { Route as AuthedMyItemsRouteImport } from './routes/_authed/my/items'
-import { Route as AuthedMyBookmarksRouteImport } from './routes/_authed/my/bookmarks'
-import { Route as AuthedInventoryRequestRouteImport } from './routes/_authed/inventory/request'
-import { Route as AuthedInventoryNewRouteImport } from './routes/_authed/inventory/new'
 import { Route as AuthedAdminAnalyticsRouteImport } from './routes/_authed/admin/analytics'
-import { Route as AuthedAdminUsersIndexRouteImport } from './routes/_authed/admin/users/index'
-import { Route as AuthedAdminProjectsIndexRouteImport } from './routes/_authed/admin/projects/index'
-import { Route as AuthedAdminProgramsIndexRouteImport } from './routes/_authed/admin/programs/index'
-import { Route as AuthedAdminMentorsIndexRouteImport } from './routes/_authed/admin/mentors/index'
-import { Route as AuthedAdminInventoryIndexRouteImport } from './routes/_authed/admin/inventory/index'
+import { Route as AuthedInventoryNewRouteImport } from './routes/_authed/inventory/new'
+import { Route as AuthedInventoryRequestRouteImport } from './routes/_authed/inventory/request'
+import { Route as AuthedMyBookmarksRouteImport } from './routes/_authed/my/bookmarks'
+import { Route as AuthedMyItemsRouteImport } from './routes/_authed/my/items'
+import { Route as AuthedMyProjectsRouteImport } from './routes/_authed/my/projects'
+import { Route as AuthedProjectsNewRouteImport } from './routes/_authed/projects/new'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AuthedAdminCategoriesIndexRouteImport } from './routes/_authed/admin/categories/index'
-import { Route as AuthedProjectsProjectIdEditRouteImport } from './routes/_authed/projects/$projectId/edit'
-import { Route as AuthedInventoryItemIdEditRouteImport } from './routes/_authed/inventory/$itemId/edit'
-import { Route as AuthedAdminUsersUserIdRouteImport } from './routes/_authed/admin/users/$userId'
-import { Route as AuthedAdminProgramsProgramIdRouteImport } from './routes/_authed/admin/programs/$programId'
-import { Route as AuthedAdminInventoryRequestsRouteImport } from './routes/_authed/admin/inventory/requests'
 import { Route as AuthedAdminCategoriesCategoryIdRouteImport } from './routes/_authed/admin/categories/$categoryId'
+import { Route as AuthedAdminInventoryIndexRouteImport } from './routes/_authed/admin/inventory/index'
+import { Route as AuthedAdminInventoryRequestsRouteImport } from './routes/_authed/admin/inventory/requests'
+import { Route as AuthedAdminMentorsIndexRouteImport } from './routes/_authed/admin/mentors/index'
+import { Route as AuthedAdminProgramsIndexRouteImport } from './routes/_authed/admin/programs/index'
+import { Route as AuthedAdminProgramsProgramIdRouteImport } from './routes/_authed/admin/programs/$programId'
+import { Route as AuthedAdminProjectsIndexRouteImport } from './routes/_authed/admin/projects/index'
+import { Route as AuthedAdminUsersIndexRouteImport } from './routes/_authed/admin/users/index'
+import { Route as AuthedAdminUsersUserIdRouteImport } from './routes/_authed/admin/users/$userId'
+import { Route as AuthedInventoryItemIdEditRouteImport } from './routes/_authed/inventory/$itemId/edit'
+import { Route as AuthedProjectsProjectIdEditRouteImport } from './routes/_authed/projects/$projectId/edit'
 
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
-  id: '/projects/',
-  path: '/projects/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InventoryIndexRoute = InventoryIndexRouteImport.update({
-  id: '/inventory/',
-  path: '/inventory/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
-  id: '/projects/$projectId',
-  path: '/projects/$projectId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InventoryItemIdRoute = InventoryItemIdRouteImport.update({
-  id: '/inventory/$itemId',
-  path: '/inventory/$itemId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiHealthzRoute = ApiHealthzRouteImport.update({
-  id: '/api/healthz',
-  path: '/api/healthz',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthedProfileRoute = AuthedProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedAdminRoute = AuthedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const authVerifyEmailRoute = authVerifyEmailRouteImport.update({
-  id: '/(auth)/verify-email',
-  path: '/verify-email',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const authSignUpRoute = authSignUpRouteImport.update({
-  id: '/(auth)/sign-up',
-  path: '/sign-up',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const authSignInRoute = authSignInRouteImport.update({
-  id: '/(auth)/sign-in',
-  path: '/sign-in',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const authResetPasswordRoute = authResetPasswordRouteImport.update({
-  id: '/(auth)/reset-password',
-  path: '/reset-password',
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const authForgotPasswordRoute = authForgotPasswordRouteImport.update({
@@ -120,34 +65,74 @@ const authForgotPasswordRoute = authForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const authResetPasswordRoute = authResetPasswordRouteImport.update({
+  id: '/(auth)/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const authSignInRoute = authSignInRouteImport.update({
+  id: '/(auth)/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const authSignUpRoute = authSignUpRouteImport.update({
+  id: '/(auth)/sign-up',
+  path: '/sign-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const authVerifyEmailRoute = authVerifyEmailRouteImport.update({
+  id: '/(auth)/verify-email',
+  path: '/verify-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthedAdminRoute = AuthedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedProfileRoute = AuthedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const ApiHealthzRoute = ApiHealthzRouteImport.update({
+  id: '/api/healthz',
+  path: '/api/healthz',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InventoryIndexRoute = InventoryIndexRouteImport.update({
+  id: '/inventory/',
+  path: '/inventory/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InventoryItemIdRoute = InventoryItemIdRouteImport.update({
+  id: '/inventory/$itemId',
+  path: '/inventory/$itemId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
+  id: '/projects/',
+  path: '/projects/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
+  id: '/projects/$projectId',
+  path: '/projects/$projectId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthedAdminIndexRoute = AuthedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthedAdminRoute,
 } as any)
-const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
-  getParentRoute: () => rootRouteImport,
+const AuthedAdminAnalyticsRoute = AuthedAdminAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AuthedAdminRoute,
 } as any)
-const AuthedProjectsNewRoute = AuthedProjectsNewRouteImport.update({
-  id: '/projects/new',
-  path: '/projects/new',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedMyProjectsRoute = AuthedMyProjectsRouteImport.update({
-  id: '/my/projects',
-  path: '/my/projects',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedMyItemsRoute = AuthedMyItemsRouteImport.update({
-  id: '/my/items',
-  path: '/my/items',
-  getParentRoute: () => AuthedRoute,
-} as any)
-const AuthedMyBookmarksRoute = AuthedMyBookmarksRouteImport.update({
-  id: '/my/bookmarks',
-  path: '/my/bookmarks',
+const AuthedInventoryNewRoute = AuthedInventoryNewRouteImport.update({
+  id: '/inventory/new',
+  path: '/inventory/new',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedInventoryRequestRoute = AuthedInventoryRequestRouteImport.update({
@@ -155,71 +140,47 @@ const AuthedInventoryRequestRoute = AuthedInventoryRequestRouteImport.update({
   path: '/inventory/request',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedInventoryNewRoute = AuthedInventoryNewRouteImport.update({
-  id: '/inventory/new',
-  path: '/inventory/new',
+const AuthedMyBookmarksRoute = AuthedMyBookmarksRouteImport.update({
+  id: '/my/bookmarks',
+  path: '/my/bookmarks',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAdminAnalyticsRoute = AuthedAdminAnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
-  getParentRoute: () => AuthedAdminRoute,
+const AuthedMyItemsRoute = AuthedMyItemsRouteImport.update({
+  id: '/my/items',
+  path: '/my/items',
+  getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAdminUsersIndexRoute = AuthedAdminUsersIndexRouteImport.update({
-  id: '/users/',
-  path: '/users/',
-  getParentRoute: () => AuthedAdminRoute,
+const AuthedMyProjectsRoute = AuthedMyProjectsRouteImport.update({
+  id: '/my/projects',
+  path: '/my/projects',
+  getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAdminProjectsIndexRoute =
-  AuthedAdminProjectsIndexRouteImport.update({
-    id: '/projects/',
-    path: '/projects/',
-    getParentRoute: () => AuthedAdminRoute,
-  } as any)
-const AuthedAdminProgramsIndexRoute =
-  AuthedAdminProgramsIndexRouteImport.update({
-    id: '/programs/',
-    path: '/programs/',
-    getParentRoute: () => AuthedAdminRoute,
-  } as any)
-const AuthedAdminMentorsIndexRoute = AuthedAdminMentorsIndexRouteImport.update({
-  id: '/mentors/',
-  path: '/mentors/',
-  getParentRoute: () => AuthedAdminRoute,
+const AuthedProjectsNewRoute = AuthedProjectsNewRouteImport.update({
+  id: '/projects/new',
+  path: '/projects/new',
+  getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAdminInventoryIndexRoute =
-  AuthedAdminInventoryIndexRouteImport.update({
-    id: '/inventory/',
-    path: '/inventory/',
-    getParentRoute: () => AuthedAdminRoute,
-  } as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthedAdminCategoriesIndexRoute =
   AuthedAdminCategoriesIndexRouteImport.update({
     id: '/categories/',
     path: '/categories/',
     getParentRoute: () => AuthedAdminRoute,
   } as any)
-const AuthedProjectsProjectIdEditRoute =
-  AuthedProjectsProjectIdEditRouteImport.update({
-    id: '/projects/$projectId/edit',
-    path: '/projects/$projectId/edit',
-    getParentRoute: () => AuthedRoute,
+const AuthedAdminCategoriesCategoryIdRoute =
+  AuthedAdminCategoriesCategoryIdRouteImport.update({
+    id: '/categories/$categoryId',
+    path: '/categories/$categoryId',
+    getParentRoute: () => AuthedAdminRoute,
   } as any)
-const AuthedInventoryItemIdEditRoute =
-  AuthedInventoryItemIdEditRouteImport.update({
-    id: '/inventory/$itemId/edit',
-    path: '/inventory/$itemId/edit',
-    getParentRoute: () => AuthedRoute,
-  } as any)
-const AuthedAdminUsersUserIdRoute = AuthedAdminUsersUserIdRouteImport.update({
-  id: '/users/$userId',
-  path: '/users/$userId',
-  getParentRoute: () => AuthedAdminRoute,
-} as any)
-const AuthedAdminProgramsProgramIdRoute =
-  AuthedAdminProgramsProgramIdRouteImport.update({
-    id: '/programs/$programId',
-    path: '/programs/$programId',
+const AuthedAdminInventoryIndexRoute =
+  AuthedAdminInventoryIndexRouteImport.update({
+    id: '/inventory/',
+    path: '/inventory/',
     getParentRoute: () => AuthedAdminRoute,
   } as any)
 const AuthedAdminInventoryRequestsRoute =
@@ -228,11 +189,50 @@ const AuthedAdminInventoryRequestsRoute =
     path: '/inventory/requests',
     getParentRoute: () => AuthedAdminRoute,
   } as any)
-const AuthedAdminCategoriesCategoryIdRoute =
-  AuthedAdminCategoriesCategoryIdRouteImport.update({
-    id: '/categories/$categoryId',
-    path: '/categories/$categoryId',
+const AuthedAdminMentorsIndexRoute = AuthedAdminMentorsIndexRouteImport.update({
+  id: '/mentors/',
+  path: '/mentors/',
+  getParentRoute: () => AuthedAdminRoute,
+} as any)
+const AuthedAdminProgramsIndexRoute =
+  AuthedAdminProgramsIndexRouteImport.update({
+    id: '/programs/',
+    path: '/programs/',
     getParentRoute: () => AuthedAdminRoute,
+  } as any)
+const AuthedAdminProgramsProgramIdRoute =
+  AuthedAdminProgramsProgramIdRouteImport.update({
+    id: '/programs/$programId',
+    path: '/programs/$programId',
+    getParentRoute: () => AuthedAdminRoute,
+  } as any)
+const AuthedAdminProjectsIndexRoute =
+  AuthedAdminProjectsIndexRouteImport.update({
+    id: '/projects/',
+    path: '/projects/',
+    getParentRoute: () => AuthedAdminRoute,
+  } as any)
+const AuthedAdminUsersIndexRoute = AuthedAdminUsersIndexRouteImport.update({
+  id: '/users/',
+  path: '/users/',
+  getParentRoute: () => AuthedAdminRoute,
+} as any)
+const AuthedAdminUsersUserIdRoute = AuthedAdminUsersUserIdRouteImport.update({
+  id: '/users/$userId',
+  path: '/users/$userId',
+  getParentRoute: () => AuthedAdminRoute,
+} as any)
+const AuthedInventoryItemIdEditRoute =
+  AuthedInventoryItemIdEditRouteImport.update({
+    id: '/inventory/$itemId/edit',
+    path: '/inventory/$itemId/edit',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedProjectsProjectIdEditRoute =
+  AuthedProjectsProjectIdEditRouteImport.update({
+    id: '/projects/$projectId/edit',
+    path: '/projects/$projectId/edit',
+    getParentRoute: () => AuthedRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -480,11 +480,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authed': {
@@ -494,88 +494,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/projects/': {
-      id: '/projects/'
-      path: '/projects'
-      fullPath: '/projects/'
-      preLoaderRoute: typeof ProjectsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/inventory/': {
-      id: '/inventory/'
-      path: '/inventory'
-      fullPath: '/inventory/'
-      preLoaderRoute: typeof InventoryIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/projects/$projectId': {
-      id: '/projects/$projectId'
-      path: '/projects/$projectId'
-      fullPath: '/projects/$projectId'
-      preLoaderRoute: typeof ProjectsProjectIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/inventory/$itemId': {
-      id: '/inventory/$itemId'
-      path: '/inventory/$itemId'
-      fullPath: '/inventory/$itemId'
-      preLoaderRoute: typeof InventoryItemIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/healthz': {
-      id: '/api/healthz'
-      path: '/api/healthz'
-      fullPath: '/api/healthz'
-      preLoaderRoute: typeof ApiHealthzRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authed/profile': {
-      id: '/_authed/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof AuthedProfileRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/admin': {
-      id: '/_authed/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthedAdminRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/(auth)/verify-email': {
-      id: '/(auth)/verify-email'
-      path: '/verify-email'
-      fullPath: '/verify-email'
-      preLoaderRoute: typeof authVerifyEmailRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(auth)/sign-up': {
-      id: '/(auth)/sign-up'
-      path: '/sign-up'
-      fullPath: '/sign-up'
-      preLoaderRoute: typeof authSignUpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(auth)/sign-in': {
-      id: '/(auth)/sign-in'
-      path: '/sign-in'
-      fullPath: '/sign-in'
-      preLoaderRoute: typeof authSignInRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(auth)/reset-password': {
-      id: '/(auth)/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof authResetPasswordRouteImport
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(auth)/forgot-password': {
@@ -585,6 +508,83 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/(auth)/reset-password': {
+      id: '/(auth)/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof authResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/sign-in': {
+      id: '/(auth)/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof authSignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/sign-up': {
+      id: '/(auth)/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof authSignUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/verify-email': {
+      id: '/(auth)/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof authVerifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authed/admin': {
+      id: '/_authed/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthedAdminRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/profile': {
+      id: '/_authed/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthedProfileRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/api/healthz': {
+      id: '/api/healthz'
+      path: '/api/healthz'
+      fullPath: '/api/healthz'
+      preLoaderRoute: typeof ApiHealthzRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/': {
+      id: '/inventory/'
+      path: '/inventory'
+      fullPath: '/inventory/'
+      preLoaderRoute: typeof InventoryIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/$itemId': {
+      id: '/inventory/$itemId'
+      path: '/inventory/$itemId'
+      fullPath: '/inventory/$itemId'
+      preLoaderRoute: typeof InventoryItemIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/': {
+      id: '/projects/'
+      path: '/projects'
+      fullPath: '/projects/'
+      preLoaderRoute: typeof ProjectsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/$projectId': {
+      id: '/projects/$projectId'
+      path: '/projects/$projectId'
+      fullPath: '/projects/$projectId'
+      preLoaderRoute: typeof ProjectsProjectIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authed/admin/': {
       id: '/_authed/admin/'
       path: '/'
@@ -592,39 +592,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminIndexRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
-    '/api/auth/$': {
-      id: '/api/auth/$'
-      path: '/api/auth/$'
-      fullPath: '/api/auth/$'
-      preLoaderRoute: typeof ApiAuthSplatRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_authed/admin/analytics': {
+      id: '/_authed/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AuthedAdminAnalyticsRouteImport
+      parentRoute: typeof AuthedAdminRoute
     }
-    '/_authed/projects/new': {
-      id: '/_authed/projects/new'
-      path: '/projects/new'
-      fullPath: '/projects/new'
-      preLoaderRoute: typeof AuthedProjectsNewRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/my/projects': {
-      id: '/_authed/my/projects'
-      path: '/my/projects'
-      fullPath: '/my/projects'
-      preLoaderRoute: typeof AuthedMyProjectsRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/my/items': {
-      id: '/_authed/my/items'
-      path: '/my/items'
-      fullPath: '/my/items'
-      preLoaderRoute: typeof AuthedMyItemsRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/my/bookmarks': {
-      id: '/_authed/my/bookmarks'
-      path: '/my/bookmarks'
-      fullPath: '/my/bookmarks'
-      preLoaderRoute: typeof AuthedMyBookmarksRouteImport
+    '/_authed/inventory/new': {
+      id: '/_authed/inventory/new'
+      path: '/inventory/new'
+      fullPath: '/inventory/new'
+      preLoaderRoute: typeof AuthedInventoryNewRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/inventory/request': {
@@ -634,46 +613,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedInventoryRequestRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/inventory/new': {
-      id: '/_authed/inventory/new'
-      path: '/inventory/new'
-      fullPath: '/inventory/new'
-      preLoaderRoute: typeof AuthedInventoryNewRouteImport
+    '/_authed/my/bookmarks': {
+      id: '/_authed/my/bookmarks'
+      path: '/my/bookmarks'
+      fullPath: '/my/bookmarks'
+      preLoaderRoute: typeof AuthedMyBookmarksRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/admin/analytics': {
-      id: '/_authed/admin/analytics'
-      path: '/analytics'
-      fullPath: '/admin/analytics'
-      preLoaderRoute: typeof AuthedAdminAnalyticsRouteImport
+    '/_authed/my/items': {
+      id: '/_authed/my/items'
+      path: '/my/items'
+      fullPath: '/my/items'
+      preLoaderRoute: typeof AuthedMyItemsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/my/projects': {
+      id: '/_authed/my/projects'
+      path: '/my/projects'
+      fullPath: '/my/projects'
+      preLoaderRoute: typeof AuthedMyProjectsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/projects/new': {
+      id: '/_authed/projects/new'
+      path: '/projects/new'
+      fullPath: '/projects/new'
+      preLoaderRoute: typeof AuthedProjectsNewRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authed/admin/categories/': {
+      id: '/_authed/admin/categories/'
+      path: '/categories'
+      fullPath: '/admin/categories/'
+      preLoaderRoute: typeof AuthedAdminCategoriesIndexRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
-    '/_authed/admin/users/': {
-      id: '/_authed/admin/users/'
-      path: '/users'
-      fullPath: '/admin/users/'
-      preLoaderRoute: typeof AuthedAdminUsersIndexRouteImport
-      parentRoute: typeof AuthedAdminRoute
-    }
-    '/_authed/admin/projects/': {
-      id: '/_authed/admin/projects/'
-      path: '/projects'
-      fullPath: '/admin/projects/'
-      preLoaderRoute: typeof AuthedAdminProjectsIndexRouteImport
-      parentRoute: typeof AuthedAdminRoute
-    }
-    '/_authed/admin/programs/': {
-      id: '/_authed/admin/programs/'
-      path: '/programs'
-      fullPath: '/admin/programs/'
-      preLoaderRoute: typeof AuthedAdminProgramsIndexRouteImport
-      parentRoute: typeof AuthedAdminRoute
-    }
-    '/_authed/admin/mentors/': {
-      id: '/_authed/admin/mentors/'
-      path: '/mentors'
-      fullPath: '/admin/mentors/'
-      preLoaderRoute: typeof AuthedAdminMentorsIndexRouteImport
+    '/_authed/admin/categories/$categoryId': {
+      id: '/_authed/admin/categories/$categoryId'
+      path: '/categories/$categoryId'
+      fullPath: '/admin/categories/$categoryId'
+      preLoaderRoute: typeof AuthedAdminCategoriesCategoryIdRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
     '/_authed/admin/inventory/': {
@@ -683,32 +669,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminInventoryIndexRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
-    '/_authed/admin/categories/': {
-      id: '/_authed/admin/categories/'
-      path: '/categories'
-      fullPath: '/admin/categories/'
-      preLoaderRoute: typeof AuthedAdminCategoriesIndexRouteImport
+    '/_authed/admin/inventory/requests': {
+      id: '/_authed/admin/inventory/requests'
+      path: '/inventory/requests'
+      fullPath: '/admin/inventory/requests'
+      preLoaderRoute: typeof AuthedAdminInventoryRequestsRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
-    '/_authed/projects/$projectId/edit': {
-      id: '/_authed/projects/$projectId/edit'
-      path: '/projects/$projectId/edit'
-      fullPath: '/projects/$projectId/edit'
-      preLoaderRoute: typeof AuthedProjectsProjectIdEditRouteImport
-      parentRoute: typeof AuthedRoute
+    '/_authed/admin/mentors/': {
+      id: '/_authed/admin/mentors/'
+      path: '/mentors'
+      fullPath: '/admin/mentors/'
+      preLoaderRoute: typeof AuthedAdminMentorsIndexRouteImport
+      parentRoute: typeof AuthedAdminRoute
     }
-    '/_authed/inventory/$itemId/edit': {
-      id: '/_authed/inventory/$itemId/edit'
-      path: '/inventory/$itemId/edit'
-      fullPath: '/inventory/$itemId/edit'
-      preLoaderRoute: typeof AuthedInventoryItemIdEditRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/admin/users/$userId': {
-      id: '/_authed/admin/users/$userId'
-      path: '/users/$userId'
-      fullPath: '/admin/users/$userId'
-      preLoaderRoute: typeof AuthedAdminUsersUserIdRouteImport
+    '/_authed/admin/programs/': {
+      id: '/_authed/admin/programs/'
+      path: '/programs'
+      fullPath: '/admin/programs/'
+      preLoaderRoute: typeof AuthedAdminProgramsIndexRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
     '/_authed/admin/programs/$programId': {
@@ -718,19 +697,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminProgramsProgramIdRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
-    '/_authed/admin/inventory/requests': {
-      id: '/_authed/admin/inventory/requests'
-      path: '/inventory/requests'
-      fullPath: '/admin/inventory/requests'
-      preLoaderRoute: typeof AuthedAdminInventoryRequestsRouteImport
+    '/_authed/admin/projects/': {
+      id: '/_authed/admin/projects/'
+      path: '/projects'
+      fullPath: '/admin/projects/'
+      preLoaderRoute: typeof AuthedAdminProjectsIndexRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
-    '/_authed/admin/categories/$categoryId': {
-      id: '/_authed/admin/categories/$categoryId'
-      path: '/categories/$categoryId'
-      fullPath: '/admin/categories/$categoryId'
-      preLoaderRoute: typeof AuthedAdminCategoriesCategoryIdRouteImport
+    '/_authed/admin/users/': {
+      id: '/_authed/admin/users/'
+      path: '/users'
+      fullPath: '/admin/users/'
+      preLoaderRoute: typeof AuthedAdminUsersIndexRouteImport
       parentRoute: typeof AuthedAdminRoute
+    }
+    '/_authed/admin/users/$userId': {
+      id: '/_authed/admin/users/$userId'
+      path: '/users/$userId'
+      fullPath: '/admin/users/$userId'
+      preLoaderRoute: typeof AuthedAdminUsersUserIdRouteImport
+      parentRoute: typeof AuthedAdminRoute
+    }
+    '/_authed/inventory/$itemId/edit': {
+      id: '/_authed/inventory/$itemId/edit'
+      path: '/inventory/$itemId/edit'
+      fullPath: '/inventory/$itemId/edit'
+      preLoaderRoute: typeof AuthedInventoryItemIdEditRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/projects/$projectId/edit': {
+      id: '/_authed/projects/$projectId/edit'
+      path: '/projects/$projectId/edit'
+      fullPath: '/projects/$projectId/edit'
+      preLoaderRoute: typeof AuthedProjectsProjectIdEditRouteImport
+      parentRoute: typeof AuthedRoute
     }
   }
 }

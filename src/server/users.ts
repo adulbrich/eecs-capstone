@@ -29,7 +29,7 @@ const searchUsersSchema = z.object({
 });
 
 export const searchUsers = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => searchUsersSchema.parse(data ?? {}))
+  .validator((data: unknown) => searchUsersSchema.parse(data ?? {}))
   .handler(async ({ data }) => {
     const { searchUsersForCurrentUser } = await import("./_internal/users");
     return searchUsersForCurrentUser(data);
@@ -40,7 +40,7 @@ const lookupUserByEmailSchema = z.object({
 });
 
 export const lookupUserByEmail = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => lookupUserByEmailSchema.parse(data ?? {}))
+  .validator((data: unknown) => lookupUserByEmailSchema.parse(data ?? {}))
   .handler(async ({ data }) => {
     const { lookupUserByEmailForCurrentUser } = await import(
       "./_internal/users"
@@ -66,14 +66,14 @@ export type BanUserInput = z.infer<typeof banUserSchema>;
 const unbanSchema = z.object({ userId: z.string() });
 
 export const listUsers = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => listUsersSchema.parse(data ?? {}))
+  .validator((data: unknown) => listUsersSchema.parse(data ?? {}))
   .handler(async ({ data }) => {
     const { listUsersForCurrentUser } = await import("./_internal/users");
     return listUsersForCurrentUser(data);
   });
 
 export const exportUsers = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     // page and pageSize carry the schema's defaults and are ignored:
     // exportUsersImpl reads neither. Reusing listUsersSchema rather than a
     // trimmed copy keeps the filter and sort rules in one place.
@@ -85,28 +85,28 @@ export const exportUsers = createServerFn({ method: "GET" })
   });
 
 export const getUser = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => idSchema.parse(data))
+  .validator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data }) => {
     const { getUserForCurrentUser } = await import("./_internal/users");
     return getUserForCurrentUser(data);
   });
 
 export const setUserRole = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => setUserRoleSchema.parse(data))
+  .validator((data: unknown) => setUserRoleSchema.parse(data))
   .handler(async ({ data }) => {
     const { setUserRoleForCurrentUser } = await import("./_internal/users");
     return setUserRoleForCurrentUser(data);
   });
 
 export const banUser = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => banUserSchema.parse(data))
+  .validator((data: unknown) => banUserSchema.parse(data))
   .handler(async ({ data }) => {
     const { banUserForCurrentUser } = await import("./_internal/users");
     return banUserForCurrentUser(data);
   });
 
 export const unbanUser = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => unbanSchema.parse(data))
+  .validator((data: unknown) => unbanSchema.parse(data))
   .handler(async ({ data }) => {
     const { unbanUserForCurrentUser } = await import("./_internal/users");
     return unbanUserForCurrentUser(data);
@@ -115,14 +115,14 @@ export const unbanUser = createServerFn({ method: "POST" })
 const listMentorsSchema = z.object({ q: z.string().default("") });
 
 export const listMentors = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => listMentorsSchema.parse(data))
+  .validator((data: unknown) => listMentorsSchema.parse(data))
   .handler(async ({ data }) => {
     const { listMentorsForCurrentUser } = await import("./_internal/users");
     return listMentorsForCurrentUser(data);
   });
 
 export const exportMentors = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => listMentorsSchema.parse(data ?? {}))
+  .validator((data: unknown) => listMentorsSchema.parse(data ?? {}))
   .handler(async ({ data }) => {
     const { exportMentorsForCurrentUser } = await import("./_internal/users");
     return exportMentorsForCurrentUser(data);
@@ -135,7 +135,7 @@ const setUserMentorStatusSchema = z.object({
 });
 
 export const setUserMentorStatus = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => setUserMentorStatusSchema.parse(data))
+  .validator((data: unknown) => setUserMentorStatusSchema.parse(data))
   .handler(async ({ data }) => {
     const { setUserMentorStatusForCurrentUser } = await import(
       "./_internal/users"
