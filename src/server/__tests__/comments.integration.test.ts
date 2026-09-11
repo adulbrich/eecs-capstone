@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "#/db";
 import { notifications, projectComments, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
@@ -307,5 +307,52 @@ describe("addCommentAs cross-user guard", () => {
       .from(projectComments)
       .where(eq(projectComments.projectId, projectId));
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe("comment emails", () => {
+  const ORIGINAL_ENV = { ...process.env };
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  it("emails the proposer on a staff comment, the staff inbox on a proposer reply, nobody on an internal one", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    process.env.EMAIL_STAFF_INBOX = "staff@oregonstate.edu";
+    const ownerEmail = `o-mail-${Date.now()}@x.com`;
+    const owner = await makeUser(ownerEmail, "user");
+    const admin = await makeUser(`a-mail-${Date.now()}@x.com`, "admin");
+    const { id: pid } = await createProjectAs(owner, baseProject());
+    await performTransitionAs(owner, pid, "submitted");
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    const { id: parentId } = await addCommentAs(
+      admin,
+      { projectId: pid, content: "Add a timeline.", isInternal: false },
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe(ownerEmail);
+    expect(send.mock.calls[0]?.[1].text).toContain(`#comment-${parentId}`);
+
+    send.mockClear();
+    await addCommentAs(
+      owner,
+      { projectId: pid, content: "Done.", parentId, isInternal: false },
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("staff@oregonstate.edu");
+    expect(send.mock.calls[0]?.[1].subject).toBe(
+      "Comment from the proposer: P"
+    );
+
+    send.mockClear();
+    await addCommentAs(
+      admin,
+      { projectId: pid, content: "Looks thin.", isInternal: true },
+      { send }
+    );
+    expect(send).not.toHaveBeenCalled();
   });
 });

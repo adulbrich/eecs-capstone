@@ -9,20 +9,26 @@ import { getEmailSender } from "#/lib/email/sender";
 import {
   projectApprovedEmail,
   projectChangesRequestedEmail,
+  projectCommentEmail,
   projectReturnedToDraftEmail,
   projectSubmittedEmail,
+  proposerCommentEmail,
   type RenderedEmail,
 } from "#/lib/email/templates";
 import type { ProjectStatus } from "#/lib/vocabularies";
 
 export type SendEmailFn = (to: string, email: RenderedEmail) => Promise<void>;
 
-export interface TransitionEmailProject {
-  description: string | null;
+/** The parts of a project every proposer-facing email reads. */
+export interface EmailProject {
   id: string;
   proposerEmail: string | null;
   proposerId: string | null;
   title: string;
+}
+
+export interface TransitionEmailProject extends EmailProject {
+  description: string | null;
 }
 
 async function lookupProposer(
@@ -57,6 +63,17 @@ export function resolveProposerAddress(
   return accountEmail ?? storedEmail;
 }
 
+/**
+ * Says so rather than returning silently: an unset staff inbox under the
+ * console transport means staff are never told, and nothing else in the app
+ * surfaces that. Under `ses` the app refuses to boot without one.
+ */
+function warnNoStaffInbox(what: string, projectId: string): void {
+  console.warn(
+    `EMAIL_STAFF_INBOX is unset, so no ${what} was sent for project ${projectId}`
+  );
+}
+
 async function sendSubmitted(
   project: TransitionEmailProject,
   url: string,
@@ -64,12 +81,7 @@ async function sendSubmitted(
   inbox: string | null
 ): Promise<void> {
   if (!inbox) {
-    // Say so rather than returning silently. An unset staff inbox means staff
-    // are never told a project was submitted, and nothing else in the app
-    // surfaces that: the transition succeeds and the queue fills up unwatched.
-    console.warn(
-      `EMAIL_STAFF_INBOX is unset, so no submission notice was sent for project ${project.id}`
-    );
+    warnNoStaffInbox("submission notice", project.id);
     return;
   }
   const account = await lookupProposer(project.proposerId);
@@ -191,5 +203,78 @@ export async function notifyTransitionByEmail(
     }
   } catch (error) {
     console.error(`Review email failed for project ${project.id}`, error);
+  }
+}
+
+export interface CommentEmailInput {
+  /** Staff comments reach the proposer; the proposer's own reach staff. */
+  authorIsStaff: boolean;
+  comment: { content: string; id: string; isInternal: boolean | null };
+  project: EmailProject;
+}
+
+/**
+ * Sends the email a committed comment owes. Never throws, for the reason
+ * `notifyTransitionByEmail` gives.
+ *
+ * Only staff and the proposer may comment (`addCommentAs`), so "not staff" is
+ * the proposer, and the two directions are the whole rule: staff to proposer,
+ * proposer to the staff inbox. An internal comment is staff talking among
+ * themselves and reaches no inbox, the same as it reaches no bell.
+ */
+export async function notifyCommentByEmail(
+  input: CommentEmailInput,
+  send?: SendEmailFn,
+  config: NotificationConfig = buildNotificationConfig()
+): Promise<void> {
+  const { authorIsStaff, comment, project } = input;
+  if (comment.isInternal) {
+    return;
+  }
+  try {
+    if (!config.appBaseUrl) {
+      throw new Error(
+        "BETTER_AUTH_URL is not set, so no comment email could be addressed"
+      );
+    }
+    const dispatch: SendEmailFn =
+      send ?? ((to, email) => getEmailSender().send(to, email));
+    const url = `${config.appBaseUrl}/projects/${project.id}#comment-${comment.id}`;
+    const account = await lookupProposer(project.proposerId);
+    const proposerAddress = resolveProposerAddress(
+      project.proposerEmail,
+      account.email
+    );
+
+    if (authorIsStaff) {
+      if (!proposerAddress) {
+        return;
+      }
+      await dispatch(
+        proposerAddress,
+        projectCommentEmail({
+          content: comment.content,
+          title: project.title,
+          url,
+        })
+      );
+      return;
+    }
+    if (!config.staffInbox) {
+      warnNoStaffInbox("proposer comment notice", project.id);
+      return;
+    }
+    await dispatch(
+      config.staffInbox,
+      proposerCommentEmail({
+        content: comment.content,
+        proposerEmail: proposerAddress,
+        proposerName: account.name,
+        title: project.title,
+        url,
+      })
+    );
+  } catch (error) {
+    console.error(`Comment email failed for project ${project.id}`, error);
   }
 }

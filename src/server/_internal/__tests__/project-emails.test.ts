@@ -13,7 +13,10 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("#/db", () => ({ db: {} }));
 
 import type { NotificationConfig } from "#/lib/email/config";
-import { notifyTransitionByEmail } from "../project-emails";
+import {
+  notifyCommentByEmail,
+  notifyTransitionByEmail,
+} from "../project-emails";
 
 // Config is passed as a literal now rather than poked into process.env, which
 // is the point of the seam: no mutation, no afterEach restore, and no way for
@@ -310,5 +313,80 @@ describe("notifyTransitionByEmail, returned to draft", () => {
     );
 
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("notifyCommentByEmail", () => {
+  const comment = {
+    content: "Please add a timeline.",
+    id: "c1",
+    isInternal: false as boolean | null,
+  };
+
+  it("emails the proposer when staff comment, linking to the comment", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyCommentByEmail(
+      { authorIsStaff: true, comment, project: PROJECT },
+      send,
+      CONFIG
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    const [to, email] = send.mock.calls[0] ?? [];
+    expect(to).toBe("alex@oregonstate.edu");
+    expect(email.subject).toBe("New comment on your project: Robot arm");
+    expect(email.text).toContain("Please add a timeline.");
+    expect(email.text).toContain("https://app/projects/p1#comment-c1");
+  });
+
+  it("emails the staff inbox when the proposer comments, and not the proposer", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyCommentByEmail(
+      { authorIsStaff: false, comment, project: PROJECT },
+      send,
+      CONFIG
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    const [to, email] = send.mock.calls[0] ?? [];
+    expect(to).toBe("review@oregonstate.edu");
+    expect(email.subject).toBe("Comment from the proposer: Robot arm");
+    expect(email.text).toContain("alex@oregonstate.edu");
+    expect(email.text).toContain("https://app/projects/p1#comment-c1");
+  });
+
+  it("emails nobody about an internal comment", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyCommentByEmail(
+      {
+        authorIsStaff: true,
+        comment: { ...comment, isInternal: true },
+        project: PROJECT,
+      },
+      send,
+      CONFIG
+    );
+
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("warns instead of throwing when the staff inbox is unset", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      notifyCommentByEmail(
+        { authorIsStaff: false, comment, project: PROJECT },
+        send,
+        NO_INBOX
+      )
+    ).resolves.toBeUndefined();
+
+    expect(send).not.toHaveBeenCalled();
+    expect(String(warn.mock.calls[0]?.[0])).toContain("EMAIL_STAFF_INBOX");
+    warn.mockRestore();
   });
 });

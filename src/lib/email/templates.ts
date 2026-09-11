@@ -24,20 +24,24 @@ export function escapeHtml(value: string): string {
   return value.replace(HTML_UNSAFE, (char) => HTML_ESCAPES[char] ?? char);
 }
 
-const DESCRIPTION_LIMIT = 600;
-const TRUNCATION_NOTE = "Open the project to read the full proposal.";
+const EXCERPT_LIMIT = 600;
+
+/** The first part of a long text, with a pointer at the rest. */
+function excerpt(text: string, truncationNote: string): string {
+  if (text.length <= EXCERPT_LIMIT) {
+    return text;
+  }
+  return `${text.slice(0, EXCERPT_LIMIT)}...
+
+${truncationNote}`;
+}
 
 function summarize(description: string | null): string {
   const trimmed = description?.trim() ?? "";
   if (!trimmed) {
     return "(No description provided.)";
   }
-  if (trimmed.length <= DESCRIPTION_LIMIT) {
-    return trimmed;
-  }
-  return `${trimmed.slice(0, DESCRIPTION_LIMIT)}...
-
-${TRUNCATION_NOTE}`;
+  return excerpt(trimmed, "Open the project to read the full proposal.");
 }
 
 function describeProposer(name: string | null, email: string | null): string {
@@ -119,6 +123,48 @@ export function projectApprovedEmail(input: {
   return {
     subject: `Your project was approved: ${input.title}`,
     ...layout(paragraphs, { label: "View your project", url: input.url }),
+  };
+}
+
+export function projectCommentEmail(input: {
+  content: string;
+  title: string;
+  url: string;
+}): RenderedEmail {
+  return {
+    subject: `New comment on your project: ${input.title}`,
+    ...layout(
+      [
+        `Staff commented on "${input.title}":`,
+        excerpt(input.content.trim(), "Open the project to read the rest."),
+      ],
+      { label: "Read and reply", url: input.url }
+    ),
+  };
+}
+
+/**
+ * The proposer replied, so staff are told. Addressed to the staff inbox, the
+ * same mailbox that receives submissions, because the reply is the next thing
+ * the review needs from staff and the bell reaches only the parent's author.
+ */
+export function proposerCommentEmail(input: {
+  content: string;
+  proposerEmail: string | null;
+  proposerName: string | null;
+  title: string;
+  url: string;
+}): RenderedEmail {
+  const who = describeProposer(input.proposerName, input.proposerEmail);
+  return {
+    subject: `Comment from the proposer: ${input.title}`,
+    ...layout(
+      [
+        `${who} commented on "${input.title}":`,
+        excerpt(input.content.trim(), "Open the project to read the rest."),
+      ],
+      { label: "Read and reply", url: input.url }
+    ),
   };
 }
 
