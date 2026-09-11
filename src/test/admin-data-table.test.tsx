@@ -338,7 +338,7 @@ describe("AdminDataTable", () => {
   });
 
   it("sorts an accented name among its unaccented peers, not after 'z'", () => {
-    // Differential: under TanStack's built-in "text" sortingFn
+    // Differential: under TanStack's built-in "text" sortFn
     // (compareBasic on lowercased strings), this would come out
     // ["Adam", "Zoe", "Émile"], because "é" (U+00E9) compares greater than
     // "z" (U+007A) by code point. Under localeCompare/Intl.Collator with

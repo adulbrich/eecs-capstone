@@ -308,7 +308,7 @@ function buildColumns(onDone: () => void, onOpen: (lineId: string) => void) {
       id: "requestedAt",
       // Dates, so not the default comparator: it compares String() forms,
       // which start with the weekday name and sort Friday before Monday.
-      sortingFn: "datetime",
+      sortFn: "datetime",
     },
     {
       accessorFn: (row) => row.note ?? "",

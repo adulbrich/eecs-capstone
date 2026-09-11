@@ -1,14 +1,18 @@
 import {
   type ColumnDef,
   type ColumnSort,
+  type ColumnVisibilityState,
+  columnVisibilityFeature,
+  createSortedRowModel,
   flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
   type Row,
-  type SortingFn,
+  type RowData,
+  rowSortingFeature,
   type SortingState,
-  useReactTable,
-  type VisibilityState,
+  sortFn_basic,
+  sortFn_datetime,
+  tableFeatures,
+  useTable,
 } from "@tanstack/react-table";
 import { ChevronDown, ChevronsUpDown, ChevronUp, Columns3 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
@@ -47,19 +51,55 @@ import {
 const collator = new Intl.Collator("en", { sensitivity: "base" });
 
 /**
- * The default sort for any column that does not set its own `sortingFn`.
+ * Everything TanStack stitches into every admin table: sorting and column
+ * visibility, the client-side sorted row model, and the two built-in
+ * comparators a column may name. Built once at module level, as the library
+ * recommends, and exported as a type only: a column definition is typed
+ * against the feature set it will render under, so every `AdminColumn`
+ * carries this one.
+ *
+ * The `sortFns` registry is what makes `sortFn: "datetime"` a valid string:
+ * its keys are the only names the column type accepts, so a typo fails to
+ * compile rather than falling back to alphanumeric. `basic` and `datetime`
+ * are the two the routes use; the text comparators are not registered
+ * because `localeCompareSortFn` below is the text default here. Nothing else
+ * is registered on purpose: filtering and pagination happen in the route
+ * loaders, not in the table.
+ */
+const features = tableFeatures({
+  columnVisibilityFeature,
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: { basic: sortFn_basic, datetime: sortFn_datetime },
+});
+
+/** The feature set every `AdminColumn` is typed against. */
+export type AdminTableFeatures = typeof features;
+
+/**
+ * The default sort for any column that does not set its own `sortFn`.
  * `localeCompare`-equivalent (via `Intl.Collator`) rather than TanStack's
  * built-in `"text"`, which lowercases and compares by code point: under that
  * scheme an accented name like "Émile" sorts after "z" because U+00E9 is
  * greater than U+007A. `sensitivity: "base"` keeps the case-insensitivity
  * `"text"` had, while ordering accented letters among their unaccented peers
  * the way a reader expects.
+ *
+ * Generic over the row rather than typed as `SortFn<AdminTableFeatures, T>`
+ * for one `T`: it only reads rows through `getValue`, so it works for every
+ * row type, and a generic call signature is assignable to any table's
+ * `SortFn` without the cast the v8 code needed.
  */
-const localeCompareSortingFn: SortingFn<unknown> = (rowA, rowB, columnId) =>
-  collator.compare(
+function localeCompareSortFn<T extends RowData>(
+  rowA: Row<AdminTableFeatures, T>,
+  rowB: Row<AdminTableFeatures, T>,
+  columnId: string
+): number {
+  return collator.compare(
     String(rowA.getValue(columnId)),
     String(rowB.getValue(columnId))
   );
+}
 
 /**
  * A column definition for an admin table.
@@ -80,7 +120,12 @@ const localeCompareSortingFn: SortingFn<unknown> = (rowA, rowB, columnId) =>
  * label would only squeeze the title into what is left of the row. At most
  * one column per table should set it.
  */
-export type AdminColumn<T> = ColumnDef<T, unknown> & AdminColumnExtras;
+export type AdminColumn<T extends RowData> = ColumnDef<
+  AdminTableFeatures,
+  T,
+  unknown
+> &
+  AdminColumnExtras;
 
 /** The fields `AdminColumn` adds on top of TanStack's `ColumnDef`. */
 interface AdminColumnExtras {
@@ -136,7 +181,10 @@ export interface AdminTableGroup<T> {
  * rule applied. Banning them costs nothing: no column under
  * `src/routes/_authed/admin/` uses either.
  */
-type TypedAdminColumn<T, TValue> = Omit<ColumnDef<T, unknown>, "accessorFn"> &
+type TypedAdminColumn<T extends RowData, TValue> = Omit<
+  ColumnDef<AdminTableFeatures, T, unknown>,
+  "accessorFn"
+> &
   AdminColumnExtras & {
     accessorFn?: (row: T, index: number) => TValue;
     accessorKey?: never;
@@ -150,11 +198,11 @@ type ColumnId<C> = C extends { id: infer TId } ? TId : never;
  * accessor returns, and to an error object naming the offending column
  * otherwise:
  *
- * 1. A column whose value is not text sets its own `sortingFn`, because the
- *    default comparator sorts `String(value)` (see `localeCompareSortingFn`).
+ * 1. A column whose value is not text sets its own `sortFn`, because the
+ *    default comparator sorts `String(value)` (see `localeCompareSortFn`).
  *    "Sets" means to a real comparator: the presence test is against
  *    `NonNullable<unknown>` rather than `unknown` because `undefined` is
- *    assignable to `unknown`, so an explicit `sortingFn: undefined` would
+ *    assignable to `unknown`, so an explicit `sortFn: undefined` would
  *    otherwise satisfy a rule it declares nothing about.
  * 2. An accessor returns `undefined`, never `null`, for a missing value.
  *    `sortUndefined` is the only knob TanStack offers for grouping empties,
@@ -175,9 +223,9 @@ type CheckedAdminColumn<C> = C extends {
     ? { ACCESSOR_RETURNS_NULL_USE_UNDEFINED: ColumnId<C> }
     : [TValue] extends [string | undefined]
       ? C
-      : C extends { sortingFn: NonNullable<unknown> }
+      : C extends { sortFn: NonNullable<unknown> }
         ? C
-        : { COLUMN_NEEDS_ITS_OWN_SORTING_FN: ColumnId<C> }
+        : { COLUMN_NEEDS_ITS_OWN_SORT_FN: ColumnId<C> }
   : C;
 
 type CheckedAdminColumns<C extends readonly unknown[]> = {
@@ -206,7 +254,7 @@ type CheckedAdminColumns<C extends readonly unknown[]> = {
  * then report as returning null. See `docs/QUIRKS.md`. Annotating the
  * returned array is merely redundant and still checks.
  */
-export function defineAdminColumns<T>() {
+export function defineAdminColumns<T extends RowData>() {
   return <const C extends readonly TypedAdminColumn<T, unknown>[]>(
     columns: C & CheckedAdminColumns<C>
   ): AdminColumn<T>[] =>
@@ -220,7 +268,7 @@ export function defineAdminColumns<T>() {
     columns as unknown as AdminColumn<T>[];
 }
 
-export interface AdminDataTableProps<T> {
+export interface AdminDataTableProps<T extends RowData> {
   /**
    * Controls rendered in the right-hand group, before the Columns menu.
    * A slot rather than an `onExport` callback: the export needs per-route
@@ -277,7 +325,7 @@ export interface AdminDataTableProps<T> {
    * by this id sequence (see `orderBySortedIds` in `#/lib/csv`) makes the
    * file's row order match the screen by construction, without a route
    * hand-copying this table's sort comparators (the default locale-aware
-   * one, a column's own `sortingFn`, or a custom order like status).
+   * one, a column's own `sortFn`, or a custom order like status).
    */
   onSortedIdsChange?: (ids: string[]) => void;
   /**
@@ -298,11 +346,11 @@ export interface AdminDataTableProps<T> {
  * Insertion order over the sorted model: a group is placed where its first
  * row lands, and every later row with the same key joins it there.
  */
-function groupRows<T>(
-  rows: Row<T>[],
+function groupRows<T extends RowData>(
+  rows: Row<AdminTableFeatures, T>[],
   keyOf: (row: T) => string
-): { key: string; rows: Row<T>[] }[] {
-  const byKey = new Map<string, Row<T>[]>();
+): { key: string; rows: Row<AdminTableFeatures, T>[] }[] {
+  const byKey = new Map<string, Row<AdminTableFeatures, T>[]>();
   for (const row of rows) {
     const key = keyOf(row.original);
     const bucket = byKey.get(key);
@@ -345,7 +393,7 @@ function SortIcon({ direction }: { direction: false | "asc" | "desc" }) {
  * caller, which keeps the URL as the single source of truth and lets this
  * render in tests without a router.
  */
-export function AdminDataTable<T>({
+export function AdminDataTable<T extends RowData>({
   actions,
   caption,
   columns,
@@ -417,20 +465,12 @@ export function AdminDataTable<T>({
 
   // TanStack auto-detects `alphanumeric` sorting for columns whose sample
   // values look numeric-ish; default every column without its own
-  // `sortingFn` to the locale-aware comparator above instead.
+  // `sortFn` to the locale-aware comparator above instead.
   const columnsWithSorting = useMemo(
     () =>
       columns.map(
         (column): AdminColumn<T> =>
-          column.sortingFn
-            ? column
-            : {
-                ...column,
-                // localeCompareSortingFn only reads its rows through
-                // `getValue`, so it works identically for every T; the cast
-                // just tells TanStack's contravariant SortingFn<T> that.
-                sortingFn: localeCompareSortingFn as SortingFn<T>,
-              }
+          column.sortFn ? column : { ...column, sortFn: localeCompareSortFn }
       ),
     [columns]
   );
@@ -439,17 +479,16 @@ export function AdminDataTable<T>({
     () => [{ desc: sort.desc, id: sort.id }],
     [sort.desc, sort.id]
   );
-  const columnVisibility: VisibilityState = useMemo(
+  const columnVisibility: ColumnVisibilityState = useMemo(
     () => Object.fromEntries(hidden.map((id) => [id, false])),
     [hidden]
   );
 
-  const table = useReactTable({
+  const table = useTable({
     columns: columnsWithSorting,
     data,
-    getCoreRowModel: getCoreRowModel(),
+    features,
     getRowId,
-    getSortedRowModel: getSortedRowModel(),
     manualSorting: serverSorted ?? false,
     onColumnVisibilityChange: (updater) => {
       const next =
@@ -539,7 +578,7 @@ export function AdminDataTable<T>({
     onHiddenChange(undefined);
   };
 
-  const renderRow = (row: Row<T>) => {
+  const renderRow = (row: Row<AdminTableFeatures, T>) => {
     const isHighlighted = !!highlightedRowId && row.id === highlightedRowId;
     return (
       <TableRow

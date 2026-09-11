@@ -106,7 +106,7 @@ const PROJECT_USAGE_COLUMN = {
   id: "usageCount" as const,
   // Numeric, not the locale-compare default, which would compare String(n)
   // and sort 10 before 2.
-  sortingFn: "basic",
+  sortFn: "basic",
 } satisfies AdminColumn<Row>;
 
 const INVENTORY_USAGE_COLUMN = {
@@ -134,7 +134,7 @@ const CREATED_COLUMN = {
   defaultHidden: true,
   header: "Created",
   id: "createdAt" as const,
-  sortingFn: "datetime",
+  sortFn: "datetime",
 } satisfies AdminColumn<Row>;
 
 const ACTIONS_COLUMN = {

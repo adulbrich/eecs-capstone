@@ -73,7 +73,7 @@ export const INVENTORY_TABLE_COLUMNS = defineAdminColumns<InventoryListRow>()([
     header: "Status",
     id: "status",
     // Numeric, not text: the locale-compare default would compare String(n).
-    sortingFn: "basic",
+    sortFn: "basic",
   },
   {
     cell: ({ row }) =>

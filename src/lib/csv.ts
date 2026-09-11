@@ -126,7 +126,7 @@ export function toCsv<T>(columns: CsvColumn<T>[], rows: T[]): string {
  * reports from its own sorted row model, via `onSortedIdsChange`. This is
  * what lets a CSV export's row order match the table on screen without a
  * route hand-copying the table's sort comparators (the default locale-aware
- * one, a column's `sortingFn: "datetime"`, or a custom status order):
+ * one, a column's `sortFn: "datetime"`, or a custom status order):
  * whatever order the table actually rendered is, by construction, the order
  * this function reproduces.
  *

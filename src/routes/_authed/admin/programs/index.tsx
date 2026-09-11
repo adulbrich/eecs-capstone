@@ -93,7 +93,7 @@ const COLUMNS = defineAdminColumns<Row>()([
     sortUndefined: "last",
   },
   {
-    // Sorted as text on the joined string, so no custom sortingFn; a program
+    // Sorted as text on the joined string, so no custom sortFn; a program
     // nobody teaches sorts last rather than as an empty string first.
     accessorFn: (row) =>
       row.instructorNames.length > 0
@@ -113,7 +113,7 @@ const COLUMNS = defineAdminColumns<Row>()([
     defaultHidden: true,
     header: "Created",
     id: "createdAt",
-    sortingFn: "datetime",
+    sortFn: "datetime",
   },
   {
     accessorFn: (row) => row.updatedAt,
@@ -121,7 +121,7 @@ const COLUMNS = defineAdminColumns<Row>()([
     defaultHidden: true,
     header: "Updated",
     id: "updatedAt",
-    sortingFn: "datetime",
+    sortFn: "datetime",
   },
   {
     cell: ({ row }) => (
