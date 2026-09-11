@@ -156,6 +156,7 @@ export function ImageUploader({
               disabled={busy || !crop}
               onClick={() => void onConfirmCrop()}
               size="sm"
+              type="button"
             >
               {busy ? "Processing..." : "Use image"}
             </Button>
@@ -163,6 +164,7 @@ export function ImageUploader({
               disabled={busy}
               onClick={onCancelCrop}
               size="sm"
+              type="button"
               variant="outline"
             >
               Cancel
@@ -185,6 +187,7 @@ export function ImageUploader({
             <Button
               onClick={() => fileInputRef.current?.click()}
               size="sm"
+              type="button"
               variant="outline"
             >
               {hasContent ? "Replace image" : "Upload image"}
@@ -194,6 +197,7 @@ export function ImageUploader({
                 className="border-destructive/30 text-destructive hover:bg-[var(--status-error-bg)] hover:text-destructive"
                 onClick={onRemove}
                 size="sm"
+                type="button"
                 variant="outline"
               >
                 <Trash2 className="h-4 w-4" /> Remove
