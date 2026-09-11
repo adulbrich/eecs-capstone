@@ -410,7 +410,7 @@ export function StaffProjectPanel({
               onConfirm={() => runDelete("softDelete")}
               title="Soft delete this project?"
             >
-              <Button size="sm" variant="outline">
+              <Button size="sm" type="button" variant="outline">
                 Soft delete
               </Button>
             </ConfirmDialog>
@@ -432,7 +432,7 @@ export function StaffProjectPanel({
               onConfirm={runHardDelete}
               title="Permanently delete this draft?"
             >
-              <Button size="sm" variant="destructive">
+              <Button size="sm" type="button" variant="destructive">
                 Hard delete
               </Button>
             </ConfirmDialog>

@@ -43,6 +43,15 @@ Import from `#/components/ui/button` (or `./ui/button` from inside `src/componen
 A raw `<button className="bg-brand ...">` misses the focus ring, the disabled state,
 and the dark-mode variants that `Button` carries.
 
+`type` is required: `type="submit"` on the one button that submits its form, and
+`type="button"` on everything else, inside a form or not. The HTML default for a
+typeless button is `submit`, which is how the image uploader's "Upload image" saved
+the project edit form on its way to the file picker (#305), and how the admin
+category and program pages' Delete buttons saved the form while opening their
+confirm dialog. `Button` does not default the prop, because a default of `"button"`
+would turn an implicit form submit into a no-op just as silently. An `asChild`
+`Button` takes no `type`; the child it renders is a link.
+
 | Variant | Use when |
 | --- | --- |
 | `default` | Primary CTA (Submit, Save, Create, Sign in, Sign up) |

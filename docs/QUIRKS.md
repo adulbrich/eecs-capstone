@@ -645,9 +645,9 @@ const NAME_COLUMN = {
 
 Below `md`, `src/styles.css` restacks `.admin-table` into cards: `thead` hidden, `tbody` a flex column, each `tr` a block card, each `td` a flex row. The `table` element keeps `display: table`, on purpose, so assistive tech still gets a table with a caption. That leaves the table's own width under auto table layout, which sizes the box to its content's intrinsic width rather than to the `w-full` it carries, and the restacked body reports an intrinsic width 37px past a 343px container. At 375px every card ran 21px past the viewport on `/projects` and `/inventory` and the page scrolled sideways (#300). `table-layout: fixed` inside the same media query is the whole fix: with no table-row or table-cell boxes left to size, all it does is honour the specified width. `display: block` on the table would also fix it and would stop it being a table. Do not touch `containerClassName` for this; the container was never the thing that was wide. The two signed-in scans in `user.a11y.test.ts` measure both views at 375px with `expectNoHorizontalOverflow`.
 
-### A `Button` inside a `<form>` submits it unless it says `type="button"`
+### `Button` requires a `type`
 
-`Button` in `src/components/ui/button.tsx` passes its props through and sets no `type`, and a `<button>` with no `type` inside a form is a submit button. Any action button rendered inside a form (a file picker trigger, a remove, a cancel) needs an explicit `type="button"`, or its click saves the form on the way. Biome's `useButtonType` only sees raw `<button>` elements, so nothing catches the omission; `src/test/image-uploader.test.tsx` is the shape of test that does, the real component inside a `<form onSubmit={spy}>`. This is how commit dfa35fb broke the project image upload in production (#305), and it stays a gotcha until the follow-up there flips the default.
+`src/components/ui/button.tsx` makes `type` a required prop on a rendered button and forbids it on an `asChild` one, so `npm run typecheck` fails on a `<Button>` that does not say whether it submits. Which value to pick is in `docs/UI-CONVENTIONS.md`, "Buttons and links". The history is #305 and #307.
 
 ### Path-by-path convention summary
 

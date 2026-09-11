@@ -253,7 +253,9 @@ function CategoriesAdmin() {
         <h1 className="font-semibold text-2xl">Categories</h1>
         <Dialog onOpenChange={setOpen} open={open}>
           <DialogTrigger asChild>
-            <Button size="sm">+ New category</Button>
+            <Button size="sm" type="button">
+              + New category
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>

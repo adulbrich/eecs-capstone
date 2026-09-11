@@ -221,7 +221,9 @@ function ProgramsAdmin() {
         <h1 className="font-semibold text-2xl">Programs</h1>
         <Dialog onOpenChange={setOpen} open={open}>
           <DialogTrigger asChild>
-            <Button size="sm">+ New program</Button>
+            <Button size="sm" type="button">
+              + New program
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>

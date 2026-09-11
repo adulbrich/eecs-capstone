@@ -115,10 +115,20 @@ function MentorControls({ mentor }: { mentor: Row }) {
         which is h-9. An h-8 button next to it reads as misaligned.
       */}
       <div className="flex gap-2">
-        <Button disabled={saving} onClick={() => save(true)} variant="outline">
+        <Button
+          disabled={saving}
+          onClick={() => save(true)}
+          type="button"
+          variant="outline"
+        >
           Save
         </Button>
-        <Button disabled={saving} onClick={() => save(false)} variant="outline">
+        <Button
+          disabled={saving}
+          onClick={() => save(false)}
+          type="button"
+          variant="outline"
+        >
           Remove
         </Button>
       </div>

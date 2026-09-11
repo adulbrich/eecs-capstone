@@ -138,7 +138,7 @@ function CategoryEdit() {
             onConfirm={onDelete}
             title={`Delete category "${category.name}"?`}
           >
-            <Button size="sm" variant="destructive">
+            <Button size="sm" type="button" variant="destructive">
               Delete
             </Button>
           </ConfirmDialog>

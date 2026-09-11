@@ -21,7 +21,9 @@ function setup(onConfirm: () => void) {
       onConfirm={onConfirm}
       title="Permanently delete this draft?"
     >
-      <Button variant="destructive">Delete</Button>
+      <Button type="button" variant="destructive">
+        Delete
+      </Button>
     </ConfirmDialog>
   );
 }

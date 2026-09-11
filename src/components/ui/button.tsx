@@ -42,16 +42,33 @@ const buttonVariants = cva(
   }
 );
 
+type ButtonBaseProps = Omit<React.ComponentProps<"button">, "type"> &
+  VariantProps<typeof buttonVariants>;
+
+/**
+ * `type` is required on a rendered button and forbidden on an `asChild` one.
+ *
+ * The HTML default for a typeless button is `submit`, so a `Button` inside a
+ * form saved it on click wherever a call site forgot the attribute (#305). A
+ * default of "button" here would hide the mirror-image bug, a form whose
+ * submit button relied on the implicit type and now does nothing, so the call
+ * site says which it is. `asChild` renders the child (a `Link`), which has no
+ * `type`.
+ */
+type ButtonProps =
+  | (ButtonBaseProps & {
+      asChild?: false;
+      type: "button" | "submit" | "reset";
+    })
+  | (ButtonBaseProps & { asChild: true; type?: never });
+
 function Button({
   className,
   variant = "default",
   size = "default",
   asChild = false,
   ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean;
-  }) {
+}: ButtonProps) {
   const Comp = asChild ? Slot.Root : "button";
 
   return (

@@ -303,6 +303,7 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
                 disabled={safePage <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 size="sm"
+                type="button"
                 variant="outline"
               >
                 Previous
@@ -314,6 +315,7 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
                 disabled={safePage >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 size="sm"
+                type="button"
                 variant="outline"
               >
                 Next
@@ -544,7 +546,12 @@ export function InventoryLifecyclePanel({
 
         <div className="mt-4 flex flex-wrap items-end gap-3">
           {rec && (
-            <Button disabled={busy} onClick={onRecommendedClick} size="sm">
+            <Button
+              disabled={busy}
+              onClick={onRecommendedClick}
+              size="sm"
+              type="button"
+            >
               {rec.label}
             </Button>
           )}
@@ -603,6 +610,7 @@ export function InventoryLifecyclePanel({
               setDelOpen(true);
             }}
             size="sm"
+            type="button"
             variant="destructive"
           >
             Hard delete item
@@ -674,11 +682,16 @@ export function InventoryLifecyclePanel({
             <Button
               disabled={busy}
               onClick={() => setDlgOpen(false)}
+              type="button"
               variant="outline"
             >
               Cancel
             </Button>
-            <Button disabled={busy} onClick={() => void onConfirmDialog()}>
+            <Button
+              disabled={busy}
+              onClick={() => void onConfirmDialog()}
+              type="button"
+            >
               {busy ? "Saving..." : "Confirm"}
             </Button>
           </DialogFooter>
@@ -721,6 +734,7 @@ export function InventoryLifecyclePanel({
             <Button
               disabled={busy || delConfirm !== item.name}
               onClick={() => void onHardDelete()}
+              type="button"
               variant="destructive"
             >
               {busy ? "Deleting..." : "Hard delete"}

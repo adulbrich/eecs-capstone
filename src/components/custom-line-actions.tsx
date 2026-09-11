@@ -70,7 +70,11 @@ export function CustomLineActions({
         open={open === "note"}
       >
         <PopoverTrigger asChild>
-          <Button size="sm" variant={sourcing ? "outline" : "default"}>
+          <Button
+            size="sm"
+            type="button"
+            variant={sourcing ? "outline" : "default"}
+          >
             {sourcing ? "Update note" : "Start sourcing"}
           </Button>
         </PopoverTrigger>
@@ -108,10 +112,17 @@ export function CustomLineActions({
                 )
               }
               size="sm"
+              type="button"
             >
               {busy ? "Saving..." : confirmLabel}
             </Button>
-            <Button disabled={busy} onClick={close} size="sm" variant="outline">
+            <Button
+              disabled={busy}
+              onClick={close}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
               Cancel
             </Button>
           </div>
@@ -125,7 +136,7 @@ export function CustomLineActions({
         open={open === "reject"}
       >
         <PopoverTrigger asChild>
-          <Button size="sm" variant="outline">
+          <Button size="sm" type="button" variant="outline">
             Reject
           </Button>
         </PopoverTrigger>
@@ -157,11 +168,18 @@ export function CustomLineActions({
                 );
               }}
               size="sm"
+              type="button"
               variant="destructive"
             >
               {busy ? "Saving..." : "Confirm reject"}
             </Button>
-            <Button disabled={busy} onClick={close} size="sm" variant="outline">
+            <Button
+              disabled={busy}
+              onClick={close}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
               Cancel
             </Button>
           </div>
@@ -214,6 +232,7 @@ export function StartSourcingAllButton({
           })()
         }
         size="sm"
+        type="button"
       >
         {busy ? "Saving..." : "Start sourcing all"}
       </Button>

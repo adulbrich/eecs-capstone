@@ -77,7 +77,9 @@ export function ApproveAllDialog({
       open={open}
     >
       <DialogTrigger asChild>
-        <Button size="sm">Approve all</Button>
+        <Button size="sm" type="button">
+          Approve all
+        </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -108,11 +110,16 @@ export function ApproveAllDialog({
           <Button
             disabled={busy}
             onClick={() => setOpen(false)}
+            type="button"
             variant="outline"
           >
             Cancel
           </Button>
-          <Button disabled={busy} onClick={() => void onConfirm()}>
+          <Button
+            disabled={busy}
+            onClick={() => void onConfirm()}
+            type="button"
+          >
             {busy ? "Saving..." : "Confirm approve all"}
           </Button>
         </DialogFooter>
