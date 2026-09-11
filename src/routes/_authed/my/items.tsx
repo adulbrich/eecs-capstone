@@ -344,7 +344,7 @@ export function buildColumns({ busy, onCancel, onOpen, onRemove }: Actions) {
       enableSorting: false,
       header: "Deadline",
       id: "deadline",
-      sortingFn: "datetime",
+      sortFn: "datetime",
     },
     {
       accessorFn: (row) => staffNote(row) ?? undefined,

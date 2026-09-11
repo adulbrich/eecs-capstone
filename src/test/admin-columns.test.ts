@@ -16,13 +16,13 @@ describe("defineAdminColumns", () => {
         accessorFn: (row) => row.createdAt,
         header: "Created",
         id: "createdAt",
-        sortingFn: "datetime",
+        sortFn: "datetime",
       },
       {
         accessorFn: (row) => row.usageCount,
         header: "Uses",
         id: "usageCount",
-        sortingFn: "basic",
+        sortFn: "basic",
       },
       {
         accessorFn: (row) => row.note ?? undefined,
@@ -50,9 +50,9 @@ describe("defineAdminColumns", () => {
   // could quietly degrade to a no-op without a single route failing.
   // `@ts-expect-error` inverts that: each directive turns into an "unused
   // '@ts-expect-error'" error the moment its line becomes legal again.
-  it("rejects a Date column with no sortingFn", () => {
+  it("rejects a Date column with no sortFn", () => {
     defineAdminColumns<Row>()([
-      // @ts-expect-error COLUMN_NEEDS_ITS_OWN_SORTING_FN: "createdAt"
+      // @ts-expect-error COLUMN_NEEDS_ITS_OWN_SORT_FN: "createdAt"
       {
         accessorFn: (row) => row.createdAt,
         header: "Created",
@@ -61,21 +61,21 @@ describe("defineAdminColumns", () => {
     ]);
   });
 
-  it("rejects a number column with no sortingFn", () => {
+  it("rejects a number column with no sortFn", () => {
     defineAdminColumns<Row>()([
-      // @ts-expect-error COLUMN_NEEDS_ITS_OWN_SORTING_FN: "usageCount"
+      // @ts-expect-error COLUMN_NEEDS_ITS_OWN_SORT_FN: "usageCount"
       { accessorFn: (row) => row.usageCount, header: "Uses", id: "usageCount" },
     ]);
   });
 
-  it("does not count an explicitly undefined sortingFn as setting one", () => {
+  it("does not count an explicitly undefined sortFn as setting one", () => {
     defineAdminColumns<Row>()([
-      // @ts-expect-error COLUMN_NEEDS_ITS_OWN_SORTING_FN: "createdAt"
+      // @ts-expect-error COLUMN_NEEDS_ITS_OWN_SORT_FN: "createdAt"
       {
         accessorFn: (row) => row.createdAt,
         header: "Created",
         id: "createdAt",
-        sortingFn: undefined,
+        sortFn: undefined,
       },
     ]);
   });

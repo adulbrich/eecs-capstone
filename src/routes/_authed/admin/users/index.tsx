@@ -130,7 +130,7 @@ const COLUMNS = defineAdminColumns<Row>()([
     header: "Banned",
     id: "banned",
     // Boolean, not text: the default comparator would sort String(value).
-    sortingFn: "basic",
+    sortFn: "basic",
   },
   {
     accessorFn: (row) => row.createdAt,
@@ -140,7 +140,7 @@ const COLUMNS = defineAdminColumns<Row>()([
     // the one column that explains the order rows are in.
     header: "Created",
     id: "createdAt",
-    sortingFn: "datetime",
+    sortFn: "datetime",
   },
   {
     cell: ({ row }) => (

@@ -147,7 +147,7 @@ const COLUMNS = defineAdminColumns<Row>()([
     // Numeric, not text: same reasoning as the Teams column below, and as
     // inventory's Status column. The "10" sorts before "2" trap is latent
     // until a tenth status exists.
-    sortingFn: "basic",
+    sortFn: "basic",
   },
   {
     // Sorts on the name alone (not a name-or-email fallback), so an unlinked
@@ -188,7 +188,7 @@ const COLUMNS = defineAdminColumns<Row>()([
     cell: ({ row }) => <LocalTime dateOnly value={row.original.updatedAt} />,
     header: "Updated",
     id: "updatedAt",
-    sortingFn: "datetime",
+    sortFn: "datetime",
   },
   {
     accessorFn: (row) => row.contactName ?? row.contactEmail ?? undefined,
@@ -207,7 +207,7 @@ const COLUMNS = defineAdminColumns<Row>()([
     id: "teams",
     // Numeric, not text: the locale-compare default would compare String(n),
     // where "10" sorts before "2".
-    sortingFn: "basic",
+    sortFn: "basic",
   },
   {
     accessorFn: (row) => row.createdAt,
@@ -215,7 +215,7 @@ const COLUMNS = defineAdminColumns<Row>()([
     defaultHidden: true,
     header: "Created",
     id: "createdAt",
-    sortingFn: "datetime",
+    sortFn: "datetime",
   },
   {
     accessorFn: (row) => row.publishedAt ?? undefined,
@@ -228,7 +228,7 @@ const COLUMNS = defineAdminColumns<Row>()([
     defaultHidden: true,
     header: "Published",
     id: "publishedAt",
-    sortingFn: "datetime",
+    sortFn: "datetime",
     sortUndefined: "last",
   },
   {

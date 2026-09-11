@@ -20,12 +20,6 @@ updates:
       # new redirect URI first (#278, docs/QUIRKS.md). Stay on the 1.6 line.
       - dependency-name: "better-auth"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      # react-table 9 replaces the row-model API that admin-data-table.tsx is
-      # built on; it is a migration, not a bump (#313).
-      - dependency-name: "@tanstack/react-table"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@tanstack/match-sorter-utils"
-        update-types: ["version-update:semver-major"]
       # TypeScript 7 ships no compiler API yet, and the server-function scanner
       # test needs one (#316).
       - dependency-name: "typescript"

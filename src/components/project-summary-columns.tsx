@@ -43,7 +43,7 @@ export function projectSummaryColumns<Row extends ProjectSummaryRow>() {
     id: "teams" as const,
     // Numeric, not text: the locale-compare default would compare String(n),
     // where "10" sorts before "2".
-    sortingFn: "basic",
+    sortFn: "basic",
   } satisfies AdminColumn<Row>;
 
   const accepting = {
@@ -59,7 +59,7 @@ export function projectSummaryColumns<Row extends ProjectSummaryRow>() {
     header: "Accepting applicants",
     id: "accepting" as const,
     // Boolean, not text: see the Teams column.
-    sortingFn: "basic",
+    sortFn: "basic",
   } satisfies AdminColumn<Row>;
 
   const nda = {
@@ -72,7 +72,7 @@ export function projectSummaryColumns<Row extends ProjectSummaryRow>() {
       ),
     header: "NDA/IP required",
     id: "nda" as const,
-    sortingFn: "basic",
+    sortFn: "basic",
   } satisfies AdminColumn<Row>;
 
   const mentorship = {
@@ -106,7 +106,7 @@ export function projectSummaryColumns<Row extends ProjectSummaryRow>() {
     },
     header: "Mentorship",
     id: "mentorship" as const,
-    sortingFn: "basic",
+    sortFn: "basic",
   } satisfies AdminColumn<Row>;
 
   return { accepting, mentorship, nda, program, teams };

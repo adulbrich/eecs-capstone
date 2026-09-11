@@ -111,7 +111,7 @@ export const BOOKMARK_TABLE_COLUMNS = defineAdminColumns<BookmarkRow>()([
     id: "savedAt",
     // Chronological, not text: the default would compare Date strings, which
     // begin with the weekday.
-    sortingFn: "datetime",
+    sortFn: "datetime",
   },
   {
     cell: ({ row }) => <RemoveBookmarkButton row={row.original} />,

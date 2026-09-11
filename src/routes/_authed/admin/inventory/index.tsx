@@ -227,7 +227,7 @@ export const COLUMNS = defineAdminColumns<Row>()([
     // Numeric, not text: the locale-compare default would compare String(n),
     // where "10" sorts before "2". Only single-digit ordinals plus a 99
     // sentinel exist today, so this is latent until a tenth status arrives.
-    sortingFn: "basic",
+    sortFn: "basic",
   },
   {
     // Email before label: a hold assigned to a bare address has no account to
@@ -325,9 +325,9 @@ export const COLUMNS = defineAdminColumns<Row>()([
     header: "Due",
     id: "dueAt",
     // Values arrive as Date instances (or ISO strings); the locale-compare
-    // default sortingFn would compare their String() forms, which starts
+    // default sortFn would compare their String() forms, which starts
     // with the weekday name and sorts nothing chronologically.
-    sortingFn: "datetime",
+    sortFn: "datetime",
     sortUndefined: "last",
   },
   {
@@ -338,7 +338,7 @@ export const COLUMNS = defineAdminColumns<Row>()([
     // the one column that explains the order rows are in.
     header: "Updated",
     id: "updatedAt",
-    sortingFn: "datetime",
+    sortFn: "datetime",
   },
   {
     accessorFn: (row) => row.createdAt,
@@ -346,7 +346,7 @@ export const COLUMNS = defineAdminColumns<Row>()([
     defaultHidden: true,
     header: "Created",
     id: "createdAt",
-    sortingFn: "datetime",
+    sortFn: "datetime",
   },
   {
     cell: ({ row }) => (

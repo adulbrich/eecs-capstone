@@ -1,6 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import type { CellContext } from "@tanstack/react-table";
-import { defineAdminColumns } from "#/components/admin-data-table";
+import {
+  type AdminTableFeatures,
+  defineAdminColumns,
+} from "#/components/admin-data-table";
 import { projectImageSrc } from "#/lib/project-image";
 import { stripMarkdown } from "#/lib/strip-markdown";
 import type { SortState } from "#/lib/table-state";
@@ -52,7 +55,9 @@ type TextField = {
  */
 function proseColumn(field: TextField, header: string) {
   return {
-    cell: ({ row }: CellContext<ProjectListRow, unknown>) => (
+    cell: ({
+      row,
+    }: CellContext<AdminTableFeatures, ProjectListRow, unknown>) => (
       <Prose text={row.original[field]} />
     ),
     defaultHidden: true,
@@ -151,7 +156,7 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     cell: ({ row }) => <LocalTime dateOnly value={row.original.updatedAt} />,
     header: "Updated",
     id: "updatedAt",
-    sortingFn: "datetime",
+    sortFn: "datetime",
   },
   proseColumn("description", "Description"),
   proseColumn("problemStatement", "Problem statement"),

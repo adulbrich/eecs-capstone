@@ -148,6 +148,57 @@ describe("AdminDataTable", () => {
     expect(onSortChange).toHaveBeenCalledWith({ desc: true, id: "name" });
   });
 
+  // The two TanStack defaults the column lists lean on, pinned here so a
+  // library upgrade that changes either shows up in this file rather than as
+  // a header that sorts the wrong way on one route. The Mentorship and Teams
+  // columns document the first; the fallback in `onSortingChange` is the
+  // second.
+  it("starts a numeric column descending on its first click", () => {
+    const onSortChange = vi.fn();
+    // Its own row and column list: a column def is invariant in its row type,
+    // so the shared `COLUMNS` cannot be spread into a wider row's list.
+    interface CountedRow {
+      id: string;
+      name: string;
+      uses: number;
+    }
+    const columns: AdminColumn<CountedRow>[] = [
+      { accessorFn: (row) => row.name, header: "Name", id: "name" },
+      {
+        accessorFn: (row) => row.uses,
+        header: "Uses",
+        id: "uses",
+        sortFn: "basic",
+      },
+    ];
+    render(
+      <AdminDataTable
+        caption="Test items"
+        columns={columns}
+        data={DATA.map(({ id, name }, index) => ({ id, name, uses: index }))}
+        defaultSort={DEFAULT_SORT}
+        emptyMessage="Nothing here."
+        getRowId={(row) => row.id}
+        hidden={[]}
+        onHiddenChange={vi.fn()}
+        onSortChange={onSortChange}
+        sort={DEFAULT_SORT}
+        storageKey="test"
+      />
+    );
+    screen.getByRole("button", { name: /Uses/ }).click();
+    expect(onSortChange).toHaveBeenCalledWith({ desc: true, id: "uses" });
+  });
+
+  it("returns to the page default when a click would clear the sort", () => {
+    const onSortChange = vi.fn();
+    // Text starts ascending, so descending is the end of the cycle and the
+    // next click is TanStack's "remove", which the table maps to the default.
+    renderTable({ onSortChange, sort: { desc: true, id: "name" } });
+    screen.getByRole("button", { name: /Name/ }).click();
+    expect(onSortChange).toHaveBeenCalledWith(DEFAULT_SORT);
+  });
+
   it("hides a column's header and every one of its cells", () => {
     renderTable();
     expect(screen.queryByRole("columnheader", { name: /Location/ })).toBeNull();
@@ -338,7 +389,7 @@ describe("AdminDataTable", () => {
   });
 
   it("sorts an accented name among its unaccented peers, not after 'z'", () => {
-    // Differential: under TanStack's built-in "text" sortingFn
+    // Differential: under TanStack's built-in "text" sortFn
     // (compareBasic on lowercased strings), this would come out
     // ["Adam", "Zoe", "Émile"], because "é" (U+00E9) compares greater than
     // "z" (U+007A) by code point. Under localeCompare/Intl.Collator with

@@ -496,7 +496,7 @@ const COLUMNS = defineAdminColumns<Row>()([
     cell: ({ row }) => <LocalTime dateOnly value={row.original.createdAt} />,
     header: "Created",
     id: "createdAt",
-    sortingFn: "datetime",
+    sortFn: "datetime",
   },
 ]);
 ```
@@ -505,12 +505,12 @@ The builder turns two rules about what an `accessorFn` returns into compile
 errors. Both used to be prose, and both fail the same way: the table renders,
 sorts, and looks fine, in the wrong order.
 
-**A column that is not text sets its own `sortingFn`.** `AdminDataTable` defaults
+**A column that is not text sets its own `sortFn`.** `AdminDataTable` defaults
 every column without one to a locale-aware **string** comparator, so whatever the
 accessor returns is sorted through `String(value)`. That is correct for text and
 wrong for everything else:
 
-| Column value | `sortingFn` | What the default does instead |
+| Column value | `sortFn` | What the default does instead |
 | --- | --- | --- |
 | `Date` | `"datetime"` | `String(date)` starts with the weekday name, so ascending reads Fri, Fri, Mon, Wed. |
 | number | `"basic"` | `"10"` sorts before `"2"`. |
@@ -527,7 +527,7 @@ time, so the column looks sorted until real data arrives. Two columns were
 already breaking a rule when the check landed, one of them the users table's
 Banned flag, which is nullable in the auth schema.
 
-The error names the column: `COLUMN_NEEDS_ITS_OWN_SORTING_FN: "createdAt"` or
+The error names the column: `COLUMN_NEEDS_ITS_OWN_SORT_FN: "createdAt"` or
 `ACCESSOR_RETURNS_NULL_USE_UNDEFINED: "note"`. `npm run typecheck`, not
 `npm test`, is what enforces it, and `src/test/admin-columns.test.ts` holds a
 `@ts-expect-error` per rejection case so the check cannot degrade to a no-op
