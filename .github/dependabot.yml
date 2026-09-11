@@ -26,6 +26,13 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@tanstack/match-sorter-utils"
         update-types: ["version-update:semver-major"]
+      # TypeScript 7 ships no compiler API yet, and the server-function scanner
+      # test needs one (#316).
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # @types/node tracks the Node major in .nvmrc, not the newest release.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       tanstack:
         patterns:
