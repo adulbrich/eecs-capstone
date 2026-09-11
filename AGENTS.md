@@ -31,9 +31,9 @@ push, so most of the time a red one is caught before it leaves your machine.
 and what catches a skip; `.github/workflows/ci.yml` is what CI actually does.
 
 `npm test` says nothing about the integration, smoke or accessibility suites, and
-CI's integration result does not block a merge. "Which suites to run yourself" in
-CONTRIBUTING.md says which one a change to the database layer, a covered flow or a
-scanned page needs before the PR, and what each needs running.
+all three block a merge. "Which suites to run yourself" in CONTRIBUTING.md says
+which one a change to the database layer, a covered flow or a scanned page needs
+before the PR, and what each needs running.
 
 ## Always
 
