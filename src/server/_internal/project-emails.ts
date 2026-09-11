@@ -11,6 +11,7 @@ import {
   projectChangesRequestedEmail,
   projectCommentEmail,
   projectDeletedEmail,
+  projectReassignedEmail,
   projectReturnedToDraftEmail,
   projectSubmittedEmail,
   proposerCommentEmail,
@@ -316,5 +317,55 @@ export async function notifyHardDeleteByEmail(
     await dispatch(address, projectDeletedEmail({ title: project.title }));
   } catch (error) {
     console.error(`Delete email failed for project ${project.id}`, error);
+  }
+}
+
+export interface ReassignEmailInput {
+  actorId: string;
+  /** The project as it stands after the write: the new proposer's fields. */
+  project: EmailProject;
+}
+
+/**
+ * Sends the email a reassignment owes the new proposer. Never throws.
+ *
+ * Unlinking (no address) tells nobody, and so does staff assigning a project
+ * to themselves. An address with no account is exactly who this exists for:
+ * the in-app row needs an account, the email does not.
+ */
+export async function notifyProposerReassignedByEmail(
+  input: ReassignEmailInput,
+  send?: SendEmailFn,
+  config: NotificationConfig = buildNotificationConfig()
+): Promise<void> {
+  const { actorId, project } = input;
+  if (project.proposerId === actorId) {
+    return;
+  }
+  try {
+    if (!config.appBaseUrl) {
+      throw new Error(
+        "BETTER_AUTH_URL is not set, so no reassignment email could be addressed"
+      );
+    }
+    const dispatch: SendEmailFn =
+      send ?? ((to, email) => getEmailSender().send(to, email));
+    const account = await lookupProposer(project.proposerId);
+    const address = resolveProposerAddress(
+      project.proposerEmail,
+      account.email
+    );
+    if (!address) {
+      return;
+    }
+    await dispatch(
+      address,
+      projectReassignedEmail({
+        title: project.title,
+        url: `${config.appBaseUrl}/projects/${project.id}`,
+      })
+    );
+  } catch (error) {
+    console.error(`Reassignment email failed for project ${project.id}`, error);
   }
 }

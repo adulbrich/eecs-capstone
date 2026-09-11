@@ -132,6 +132,23 @@ export function projectApprovedEmail(input: {
   };
 }
 
+/** Staff linked a project to a new proposer. */
+export function projectReassignedEmail(input: {
+  title: string;
+  url: string;
+}): RenderedEmail {
+  return {
+    subject: `A project was assigned to you: ${input.title}`,
+    ...layout(
+      [
+        `Staff made you the proposer of "${input.title}".`,
+        "You can edit it, follow its review, and reply to staff comments from the project page.",
+      ],
+      { label: "View the project", url: input.url }
+    ),
+  };
+}
+
 /** Staff hard-deleted a draft. No link: the row is gone. */
 export function projectDeletedEmail(input: { title: string }): RenderedEmail {
   return {

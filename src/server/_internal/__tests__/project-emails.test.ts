@@ -16,6 +16,7 @@ import type { NotificationConfig } from "#/lib/email/config";
 import {
   notifyCommentByEmail,
   notifyHardDeleteByEmail,
+  notifyProposerReassignedByEmail,
   notifyTransitionByEmail,
 } from "../project-emails";
 
@@ -417,6 +418,44 @@ describe("notifyHardDeleteByEmail", () => {
       {
         actorId: "u-proposer",
         project: { ...PROJECT, proposerId: "u-proposer" },
+      },
+      send,
+      CONFIG
+    );
+
+    expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("notifyProposerReassignedByEmail", () => {
+  it("emails the new proposer with a link to the project", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyProposerReassignedByEmail(
+      { actorId: STAFF, project: PROJECT },
+      send,
+      CONFIG
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    const [to, email] = send.mock.calls[0] ?? [];
+    expect(to).toBe("alex@oregonstate.edu");
+    expect(email.subject).toBe("A project was assigned to you: Robot arm");
+    expect(email.text).toContain("https://app/projects/p1");
+  });
+
+  it("emails nobody when staff assign a project to themselves, or unlink it", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyProposerReassignedByEmail(
+      { actorId: "u-self", project: { ...PROJECT, proposerId: "u-self" } },
+      send,
+      CONFIG
+    );
+    await notifyProposerReassignedByEmail(
+      {
+        actorId: STAFF,
+        project: { ...PROJECT, proposerEmail: null, proposerId: null },
       },
       send,
       CONFIG

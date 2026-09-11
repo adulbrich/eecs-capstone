@@ -25,11 +25,13 @@ import type {
   UpdateProjectInput,
 } from "../projects";
 import {
+  recordProposerReassignedNotification,
   recordSoftDeleteNotification,
   recordStatusChangeNotifications,
 } from "./notify";
 import {
   notifyHardDeleteByEmail,
+  notifyProposerReassignedByEmail,
   notifyTransitionByEmail,
   type SendEmailFn,
 } from "./project-emails";
@@ -269,14 +271,18 @@ export async function updateProjectAs(
  */
 export async function updateProjectProposerAs(
   viewer: Viewer,
-  data: ProposerInput
+  data: ProposerInput,
+  opts?: EmailOptions
 ): Promise<{ id: string; updated: boolean }> {
   assertStaff(viewer);
   const existing = await loadProjectOr404(data.id);
   const proposerEmail = normalizeEmailAddress(data.proposerEmail);
+  const proposerId = proposerEmail
+    ? await resolveProposerId(proposerEmail)
+    : null;
   const newValues: Partial<typeof projects.$inferSelect> = {
     proposerEmail,
-    proposerId: proposerEmail ? await resolveProposerId(proposerEmail) : null,
+    proposerId,
   };
   const { changedFields, newDiff, oldDiff } = diffRowFields(
     existing,
@@ -297,7 +303,27 @@ export async function updateProjectProposerAs(
       oldValues: oldDiff,
       newValues: newDiff,
     });
+    // The new proposer's bell. Nothing when the address has no account, and
+    // nothing on an unlink; the email below covers the first of those.
+    await recordProposerReassignedNotification(
+      tx,
+      { id: existing.id, title: existing.title, proposerId },
+      viewer.id
+    );
   });
+  // After the transaction, never inside it; swallows its own errors.
+  await notifyProposerReassignedByEmail(
+    {
+      actorId: viewer.id,
+      project: {
+        id: existing.id,
+        proposerEmail,
+        proposerId,
+        title: existing.title,
+      },
+    },
+    opts?.send
+  );
   return { id: existing.id, updated: true };
 }
 

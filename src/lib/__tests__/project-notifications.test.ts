@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   commentNotifications,
+  proposerReassignedNotification,
   softDeleteNotification,
   statusChangeNotification,
 } from "../project-notifications";
@@ -174,5 +175,24 @@ describe("commentNotifications", () => {
       null
     );
     expect(rows[0].message).toHaveLength(200);
+  });
+});
+
+describe("proposerReassignedNotification", () => {
+  it("tells the new proposer and links to the project", () => {
+    const row = proposerReassignedNotification(project, "u-staff");
+    expect(row?.userId).toBe("u-proposer");
+    expect(row?.type).toBe("proposer_reassigned");
+    expect(row?.link).toBe("/projects/p-1");
+  });
+
+  it("says nothing on an unlink, or when staff assign it to themselves", () => {
+    expect(
+      proposerReassignedNotification(
+        { ...project, proposerId: null },
+        "u-staff"
+      )
+    ).toBeNull();
+    expect(proposerReassignedNotification(project, "u-proposer")).toBeNull();
   });
 });

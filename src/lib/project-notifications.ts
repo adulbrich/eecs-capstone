@@ -96,6 +96,24 @@ export function softDeleteNotification(
   };
 }
 
+/** The notice a reassignment owes the new proposer, or none. */
+export function proposerReassignedNotification(
+  project: NotifiableProject,
+  actorId: string
+): NotificationRow | null {
+  const userId = proposerToTell(project, actorId);
+  if (!userId) {
+    return null;
+  }
+  return {
+    userId,
+    type: "proposer_reassigned",
+    title: `You are now the proposer of '${project.title}'`,
+    message: "Staff assigned this project to you.",
+    link: `/projects/${project.id}`,
+  };
+}
+
 /**
  * The notices a comment owes, deduped, in insertion order.
  *

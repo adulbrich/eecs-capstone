@@ -868,6 +868,44 @@ describe("review emails", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it("tells the new proposer in the bell and by email when staff reassign a project", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser("admin-reassign@x.edu", "admin");
+    const next = await makeUser("next-proposer@x.edu", "user");
+    const { id } = await createProjectAs(admin, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await updateProjectProposerAs(
+      admin,
+      { id, proposerEmail: "next-proposer@x.edu" },
+      { send }
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("next-proposer@x.edu");
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, next.id));
+    expect(rows.map((r) => r.type)).toEqual(["proposer_reassigned"]);
+    expect(rows[0]?.link).toBe(`/projects/${id}`);
+
+    // An address with no account gets the email and cannot get a row.
+    send.mockClear();
+    await updateProjectProposerAs(
+      admin,
+      { id, proposerEmail: "outsider-reassign@example.com" },
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("outsider-reassign@example.com");
+
+    // Unlinking tells nobody.
+    send.mockClear();
+    await updateProjectProposerAs(admin, { id, proposerEmail: "" }, { send });
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("does not roll back the transition when the email fails", async () => {
     process.env.BETTER_AUTH_URL = "https://app";
     const owner = await makeUser("owner-fail@x.edu", "user");
