@@ -82,9 +82,10 @@ export type InventoryCustomLineStatus =
  * scattered across `project-notifications.ts` and `inventory-notifications.ts`
  * with the column typed `text`, so a misspelled type was a row the bell could
  * not classify and nothing refused (#288). `proposer_reassigned` and
- * `projects_claimed` are the two events that gained a row in the same change.
- * Grouped by domain, project then inventory, in the order the decisions emit
- * them; nothing displays this list, so no reader's order competes.
+ * `projects_claimed` are listed ahead of the two events the second half of
+ * #288 gives a row, so the enum is created once rather than altered in a
+ * second migration. Grouped by domain, project then inventory; nothing
+ * displays this list, so no reader's order competes.
  */
 export const NOTIFICATION_TYPES = [
   "status_change",
