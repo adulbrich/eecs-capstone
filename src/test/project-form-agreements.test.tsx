@@ -76,6 +76,31 @@ describe("ProjectForm NDA/IP agreement", () => {
   });
 });
 
+describe("ProjectForm accepting applicants", () => {
+  it("says the box is about applying, not about being listed", () => {
+    // The flag is orthogonal to status: an unchecked box keeps the project
+    // listed. The label names the act (apply, never bid: CONTEXT.md
+    // Applicant) and the helper says what a student sees when it is off (#309).
+    renderForm();
+
+    expect(
+      screen.getByLabelText(/students can apply to join this project/i)
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/uncheck once you have the team you need/i)
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        /stays listed, but students see it is no longer taking applicants/i
+      )
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/students see this before they apply/i)
+    ).toBeTruthy();
+    expect(screen.queryByText(/\bbid/i)).toBeNull();
+  });
+});
+
 describe("ProjectForm sponsorship", () => {
   it("reflects an existing sponsored project", () => {
     // The round-trip guard. The edit page feeds these from the project, and

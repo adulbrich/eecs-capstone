@@ -194,7 +194,7 @@ export function projectDetailView(
     imageUrl: project.imageUrl,
     licenseRestrictions: project.licenseRestrictions,
     // Public by design: a student needs to know an agreement is involved
-    // before bidding, and this is what a catalog filter would key on.
+    // before applying, and this is what a catalog filter would key on.
     requiresNdaIp: project.requiresNdaIp,
     teamsSupported: project.teamsSupported,
     acceptingApplicants: project.acceptingApplicants,
