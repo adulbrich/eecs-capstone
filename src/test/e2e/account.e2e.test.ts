@@ -1,12 +1,15 @@
 import { readFile } from "node:fs/promises";
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { eq } from "drizzle-orm";
-// biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
-import * as schema from "../../db/schema";
 import { waitForHydration } from "../shared/playwright";
 import { SERVER_LOG } from "./constants";
-import { deleteFixtureUser, fixtureEmail, openDb } from "./fixtures";
+import {
+  deleteFixtureUser,
+  fixtureEmail,
+  openDb,
+  readUser,
+  userIdByEmail,
+} from "./fixtures";
 
 /**
  * The whole account lifecycle, driven through the real forms: sign up, prove
@@ -137,7 +140,7 @@ test.describe("account lifecycle", () => {
     // rather than removing it (ADR-0008), so the address on the row changes
     // and the prefix sweep can no longer find it: the id is read first and the
     // row is deleted by hand afterwards.
-    const userId = await userIdFor(email);
+    const userId = await withDb((db) => userIdByEmail(db, email));
     try {
       await page.goto("/profile");
       await waitForHydration(page);
@@ -158,42 +161,22 @@ test.describe("account lifecycle", () => {
       await page.getByLabel("Password").fill(secondPassword);
       await page.getByRole("button", { name: /sign in/i }).click();
       await expectRefused(page);
-      expect(await emailFor(userId)).toBe(`deleted-${userId}@invalid`);
+      expect((await withDb((db) => readUser(db, userId))).email).toBe(
+        `deleted-${userId}@invalid`
+      );
     } finally {
-      const { db, close } = openDb();
-      try {
-        await deleteFixtureUser(db, userId);
-      } finally {
-        await close();
-      }
+      await withDb((db) => deleteFixtureUser(db, userId));
     }
   });
 });
 
-async function userIdFor(email: string): Promise<string> {
+/** One query on a connection of its own, closed whether or not it throws. */
+async function withDb<T>(
+  query: (db: ReturnType<typeof openDb>["db"]) => Promise<T>
+): Promise<T> {
   const { db, close } = openDb();
   try {
-    const [row] = await db
-      .select({ id: schema.user.id })
-      .from(schema.user)
-      .where(eq(schema.user.email, email));
-    if (!row) {
-      throw new Error(`${email} has no row, so sign-up never wrote one`);
-    }
-    return row.id;
-  } finally {
-    await close();
-  }
-}
-
-async function emailFor(id: string): Promise<string | undefined> {
-  const { db, close } = openDb();
-  try {
-    const [row] = await db
-      .select({ email: schema.user.email })
-      .from(schema.user)
-      .where(eq(schema.user.id, id));
-    return row?.email;
+    return await query(db);
   } finally {
     await close();
   }

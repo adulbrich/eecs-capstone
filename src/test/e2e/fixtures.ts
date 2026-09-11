@@ -227,6 +227,24 @@ export async function createFixtureUser(
   return { id: row.id, email: row.email, name: row.name };
 }
 
+/** The columns the admin and account flows assert on after a write. */
+export async function readUser(db: Db, id: string) {
+  const [row] = await db
+    .select({
+      email: schema.user.email,
+      role: schema.user.role,
+      banned: schema.user.banned,
+      banReason: schema.user.banReason,
+      wantsToMentor: schema.user.wantsToMentor,
+    })
+    .from(schema.user)
+    .where(eq(schema.user.id, id));
+  if (!row) {
+    throw new Error(`user ${id} has no row`);
+  }
+  return row;
+}
+
 /**
  * For the row the account-deletion flow leaves behind. Deletion anonymizes
  * rather than removes (ADR-0008), and the anonymized address carries no
@@ -247,7 +265,11 @@ export async function createFixtureCategory(
   return { id: row.id, name: row.name };
 }
 
-/** A program, with one instructor attached when the flow needs one to remove. */
+/**
+ * A program, with one instructor attached when the flow needs one to remove.
+ * The instructor may be a seeded user: the junction row is the only write,
+ * it cascades away with the program, and the user's own row is untouched.
+ */
 export async function createFixtureProgram(
   db: Db,
   input: { instructorId?: string } = {}

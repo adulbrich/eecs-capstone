@@ -10,9 +10,10 @@ import {
   createFixtureUser,
   type Db,
   openDb,
+  readUser,
   userIdByEmail,
 } from "./fixtures";
-import { rowFor } from "./locators";
+import { rowFor, sectionNamed } from "./locators";
 import { confirmed } from "./waits";
 
 /**
@@ -80,9 +81,7 @@ test.describe("admin catalog deletes", () => {
       await staff.goto(`/admin/programs/${programId}`);
       await waitForHydration(staff);
 
-      const instructors = staff.locator("section").filter({
-        has: staff.getByRole("heading", { name: "Instructors" }),
-      });
+      const instructors = sectionNamed(staff, "Instructors");
       await confirmed(staff, () =>
         instructors.getByRole("button", { name: "Remove" }).click()
       );
@@ -143,11 +142,7 @@ test.describe("admin catalog deletes", () => {
 
       const { db: after, close: closeAfter } = openDb();
       try {
-        const [user] = await after
-          .select({ wantsToMentor: schema.user.wantsToMentor })
-          .from(schema.user)
-          .where(eq(schema.user.id, userId));
-        expect(user.wantsToMentor).toBe(false);
+        expect((await readUser(after, userId)).wantsToMentor).toBe(false);
       } finally {
         await closeAfter();
       }

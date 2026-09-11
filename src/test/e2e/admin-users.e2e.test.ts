@@ -1,10 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { eq } from "drizzle-orm";
-// biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
-import * as schema from "../../db/schema";
 import { waitForHydration } from "../shared/playwright";
 import { ADMIN_AUTH } from "./constants";
-import { createFixtureUser, openDb } from "./fixtures";
+import { createFixtureUser, openDb, readUser } from "./fixtures";
 import { confirmed } from "./waits";
 
 /**
@@ -43,7 +40,7 @@ test.describe("admin user role and ban", () => {
         staff.getByRole("button", { name: "Save", exact: true }).click()
       );
       await expect(role).toHaveText("instructor");
-      await expect(await readUser(userId)).toMatchObject({
+      await expect(await userRow(userId)).toMatchObject({
         role: "instructor",
       });
 
@@ -55,7 +52,7 @@ test.describe("admin user role and ban", () => {
         staff.getByRole("heading", { name: "Banned", exact: true })
       ).toBeVisible();
       await expect(staff.getByText("End-to-end ban")).toBeVisible();
-      await expect(await readUser(userId)).toMatchObject({
+      await expect(await userRow(userId)).toMatchObject({
         banned: true,
         banReason: "End-to-end ban",
       });
@@ -66,25 +63,17 @@ test.describe("admin user role and ban", () => {
       await expect(
         staff.getByRole("heading", { name: "Ban this user" })
       ).toBeVisible();
-      await expect(await readUser(userId)).toMatchObject({ banned: false });
+      await expect(await userRow(userId)).toMatchObject({ banned: false });
     } finally {
       await staffContext.close();
     }
   });
 });
 
-async function readUser(id: string) {
+async function userRow(id: string) {
   const { db, close } = openDb();
   try {
-    const [row] = await db
-      .select({
-        role: schema.user.role,
-        banned: schema.user.banned,
-        banReason: schema.user.banReason,
-      })
-      .from(schema.user)
-      .where(eq(schema.user.id, id));
-    return row;
+    return await readUser(db, id);
   } finally {
     await close();
   }
