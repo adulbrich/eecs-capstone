@@ -4,8 +4,8 @@ import { ADMIN_AUTH } from "./constants";
 import {
   createFixtureProject,
   fixtureName,
-  openDb,
   userIdByEmail,
+  withDb,
 } from "./fixtures";
 import { confirmed } from "./waits";
 
@@ -20,18 +20,13 @@ test.describe("project danger zone", () => {
     browser,
   }) => {
     const title = fixtureName("Project");
-    const { db, close } = openDb();
-    let projectId: string;
-    try {
-      const proposerId = await userIdByEmail(db, "user@example.com");
-      ({ id: projectId } = await createFixtureProject(db, {
+    const { id: projectId } = await withDb(async (db) =>
+      createFixtureProject(db, {
         title,
-        proposerId,
+        proposerId: await userIdByEmail(db, "user@example.com"),
         status: "published",
-      }));
-    } finally {
-      await close();
-    }
+      })
+    );
 
     const anonymous = await browser.newContext();
     const staffContext = await browser.newContext({ storageState: ADMIN_AUTH });
@@ -77,18 +72,13 @@ test.describe("project danger zone", () => {
 
   test("staff hard delete a draft", async ({ browser }) => {
     const title = fixtureName("Project");
-    const { db, close } = openDb();
-    let projectId: string;
-    try {
-      const proposerId = await userIdByEmail(db, "user@example.com");
-      ({ id: projectId } = await createFixtureProject(db, {
+    const { id: projectId } = await withDb(async (db) =>
+      createFixtureProject(db, {
         title,
-        proposerId,
+        proposerId: await userIdByEmail(db, "user@example.com"),
         status: "draft",
-      }));
-    } finally {
-      await close();
-    }
+      })
+    );
 
     const staffContext = await browser.newContext({ storageState: ADMIN_AUTH });
     try {

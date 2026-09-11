@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { waitForHydration } from "../shared/playwright";
 import { ADMIN_AUTH } from "./constants";
-import { createFixtureUser, openDb, readUser } from "./fixtures";
+import { createFixtureUser, readUser, withDb } from "./fixtures";
 import { confirmed } from "./waits";
 
 /**
@@ -18,13 +18,7 @@ test.describe("admin user role and ban", () => {
   test("staff change a role, ban with a reason, and unban", async ({
     browser,
   }) => {
-    const { db, close } = openDb();
-    let userId: string;
-    try {
-      ({ id: userId } = await createFixtureUser(db));
-    } finally {
-      await close();
-    }
+    const { id: userId } = await withDb((db) => createFixtureUser(db));
 
     const staffContext = await browser.newContext({ storageState: ADMIN_AUTH });
     try {
@@ -40,7 +34,7 @@ test.describe("admin user role and ban", () => {
         staff.getByRole("button", { name: "Save", exact: true }).click()
       );
       await expect(role).toHaveText("instructor");
-      await expect(await userRow(userId)).toMatchObject({
+      await expect(await withDb((db) => readUser(db, userId))).toMatchObject({
         role: "instructor",
       });
 
@@ -52,7 +46,7 @@ test.describe("admin user role and ban", () => {
         staff.getByRole("heading", { name: "Banned", exact: true })
       ).toBeVisible();
       await expect(staff.getByText("End-to-end ban")).toBeVisible();
-      await expect(await userRow(userId)).toMatchObject({
+      await expect(await withDb((db) => readUser(db, userId))).toMatchObject({
         banned: true,
         banReason: "End-to-end ban",
       });
@@ -63,18 +57,11 @@ test.describe("admin user role and ban", () => {
       await expect(
         staff.getByRole("heading", { name: "Ban this user" })
       ).toBeVisible();
-      await expect(await userRow(userId)).toMatchObject({ banned: false });
+      await expect(await withDb((db) => readUser(db, userId))).toMatchObject({
+        banned: false,
+      });
     } finally {
       await staffContext.close();
     }
   });
 });
-
-async function userRow(id: string) {
-  const { db, close } = openDb();
-  try {
-    return await readUser(db, id);
-  } finally {
-    await close();
-  }
-}

@@ -9,9 +9,9 @@ import {
   createFixtureProgram,
   createFixtureUser,
   type Db,
-  openDb,
   readUser,
   userIdByEmail,
+  withDb,
 } from "./fixtures";
 import { rowFor, sectionNamed } from "./locators";
 import { confirmed } from "./waits";
@@ -25,14 +25,9 @@ import { confirmed } from "./waits";
  */
 test.describe("admin catalog deletes", () => {
   test("staff delete a category", async ({ browser }) => {
-    const { db, close } = openDb();
-    let categoryId: string;
-    let name: string;
-    try {
-      ({ id: categoryId, name } = await createFixtureCategory(db));
-    } finally {
-      await close();
-    }
+    const { id: categoryId, name } = await withDb((db) =>
+      createFixtureCategory(db)
+    );
 
     const staffContext = await browser.newContext({ storageState: ADMIN_AUTH });
     try {
@@ -63,17 +58,11 @@ test.describe("admin catalog deletes", () => {
   test("staff remove a program's instructor, then delete the program", async ({
     browser,
   }) => {
-    const { db, close } = openDb();
-    let programId: string;
-    let courseName: string;
-    try {
-      const instructorId = await userIdByEmail(db, "admin@example.com");
-      ({ id: programId, courseName } = await createFixtureProgram(db, {
-        instructorId,
-      }));
-    } finally {
-      await close();
-    }
+    const { id: programId, courseName } = await withDb(async (db) =>
+      createFixtureProgram(db, {
+        instructorId: await userIdByEmail(db, "admin@example.com"),
+      })
+    );
 
     const staffContext = await browser.newContext({ storageState: ADMIN_AUTH });
     try {
@@ -116,16 +105,9 @@ test.describe("admin catalog deletes", () => {
   });
 
   test("staff take a volunteer off the mentor list", async ({ browser }) => {
-    const { db, close } = openDb();
-    let userId: string;
-    let name: string;
-    try {
-      ({ id: userId, name } = await createFixtureUser(db, {
-        wantsToMentor: true,
-      }));
-    } finally {
-      await close();
-    }
+    const { id: userId, name } = await withDb((db) =>
+      createFixtureUser(db, { wantsToMentor: true })
+    );
 
     const staffContext = await browser.newContext({ storageState: ADMIN_AUTH });
     try {
@@ -140,26 +122,18 @@ test.describe("admin catalog deletes", () => {
       );
       await expect(rowFor(staff, name)).toHaveCount(0);
 
-      const { db: after, close: closeAfter } = openDb();
-      try {
-        expect((await readUser(after, userId)).wantsToMentor).toBe(false);
-      } finally {
-        await closeAfter();
-      }
+      expect((await withDb((db) => readUser(db, userId))).wantsToMentor).toBe(
+        false
+      );
     } finally {
       await staffContext.close();
     }
   });
 });
 
-/** Rows matching a query, read on a connection of its own. */
+/** Rows matching a query, for the "the row is gone" assertions. */
 async function countWhere(
   query: (db: Db) => Promise<unknown[]>
 ): Promise<number> {
-  const { db, close } = openDb();
-  try {
-    return (await query(db)).length;
-  } finally {
-    await close();
-  }
+  return (await withDb(query)).length;
 }

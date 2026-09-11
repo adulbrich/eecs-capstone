@@ -50,6 +50,21 @@ export function openDb(): { db: Db; close: () => Promise<void> } {
   return { db: drizzle(pool, { schema }), close: () => pool.end() };
 }
 
+/**
+ * One unit of database work on a connection of its own, closed whether or
+ * not it throws. For a fixture written before the browser opens and a row
+ * read after a click; a test that needs several statements on one
+ * connection passes one function that runs them all.
+ */
+export async function withDb<T>(work: (db: Db) => Promise<T>): Promise<T> {
+  const { db, close } = openDb();
+  try {
+    return await work(db);
+  } finally {
+    await close();
+  }
+}
+
 /** A name no other run will collide with, swept by prefix on the next run. */
 export function fixtureName(label: string): string {
   return `${E2E_PREFIX}${label}-${randomUUID().slice(0, 8)}`;

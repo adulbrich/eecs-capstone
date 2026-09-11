@@ -6,9 +6,9 @@ import { SERVER_LOG } from "./constants";
 import {
   deleteFixtureUser,
   fixtureEmail,
-  openDb,
   readUser,
   userIdByEmail,
+  withDb,
 } from "./fixtures";
 
 /**
@@ -169,18 +169,6 @@ test.describe("account lifecycle", () => {
     }
   });
 });
-
-/** One query on a connection of its own, closed whether or not it throws. */
-async function withDb<T>(
-  query: (db: ReturnType<typeof openDb>["db"]) => Promise<T>
-): Promise<T> {
-  const { db, close } = openDb();
-  try {
-    return await query(db);
-  } finally {
-    await close();
-  }
-}
 
 /**
  * Asserts a sign-in attempt was refused.
