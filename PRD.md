@@ -351,9 +351,10 @@ that produced the planned matrix below; issue #288 is the work that ships it.
 ### In-app
 
 - [x] `notifications` table: user, type, title, message, optional link, read
-  flag, created at. `type` is free text; the fourteen values are string literals
-  in `src/lib/project-notifications.ts` and `src/lib/inventory-notifications.ts`,
-  not a vocabulary in `src/lib/vocabularies.ts`.
+  flag, created at. `type` is a `pgEnum` over `NOTIFICATION_TYPES` in
+  `src/lib/vocabularies.ts`, which the decisions in
+  `src/lib/project-notifications.ts` and `src/lib/inventory-notifications.ts`
+  emit.
 - [x] Bell in the site header, on desktop and in the mobile bar: unread count
   capped at 9+, the newest ten rows, click marks read and follows the link, mark
   all read. Polls every minute and on window focus. There is no notifications
@@ -414,7 +415,7 @@ that produced the planned matrix below; issue #288 is the work that ships it.
   way a missing `EMAIL_FROM` does.
 - [ ] Holders who have an address but no account receive the pickup and due
   emails at that address; an in-app row cannot reach them.
-- [ ] Notification types become a vocabulary tuple in `src/lib/vocabularies.ts`
+- [x] Notification types become a vocabulary tuple in `src/lib/vocabularies.ts`
   and the column is constrained to it.
 - [ ] The channel per event. The rule: email when the recipient must act away
   from the app, in-app only for confirmations and the audit trail.
