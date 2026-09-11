@@ -448,7 +448,7 @@ that produced the planned matrix below; issue #288 is the work that ships it.
 
 - [ ] Blocked by ADR 0005 until it is reopened with a scheduler: a due-soon
   warning, overdue by email, and any staff view of overdue items. An overdue
-  email triggered by the lazy scan would arrive only when the requester already
+  email triggered by the lazy scan would arrive only when the affected user already
   has the page open.
 - Deferred, not planned: a notifications page beyond the bell's ten rows, an
   outbound email log, per-staff fan-out of staff mail, digests.
