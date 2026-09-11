@@ -284,7 +284,7 @@ describe("StaffProjectPanel proposer block", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save proposer" }));
     await waitFor(() => expect(getProposerForEdit).toHaveBeenCalledTimes(2));
 
-    fireEvent.click(screen.getByTitle("Move to Approved"));
+    fireEvent.click(screen.getByTitle(/^Move to Approved\./));
     await waitFor(() =>
       expect(
         screen.getByText("Email the proposer (partner@example.com)")
@@ -335,7 +335,7 @@ describe("StaffProjectPanel proposer block", () => {
 describe("StaffProjectPanel review-email control", () => {
   it("shows the checkbox checked and names the address for the Approved dialog", async () => {
     renderPanel("submitted");
-    fireEvent.click(screen.getByTitle("Move to Approved"));
+    fireEvent.click(screen.getByTitle(/^Move to Approved\./));
 
     await waitFor(() =>
       expect(
@@ -349,7 +349,7 @@ describe("StaffProjectPanel review-email control", () => {
 
   it("shows no checkbox at all for the Published dialog", async () => {
     renderPanel("approved");
-    fireEvent.click(screen.getByTitle("Move to Published"));
+    fireEvent.click(screen.getByTitle(/^Move to Published\./));
 
     await waitFor(() =>
       expect(screen.getByText("Move to Published")).toBeTruthy()
@@ -364,7 +364,7 @@ describe("StaffProjectPanel review-email control", () => {
       email: "",
     });
     renderPanel("submitted");
-    fireEvent.click(screen.getByTitle("Move to Approved"));
+    fireEvent.click(screen.getByTitle(/^Move to Approved\./));
 
     await waitFor(() =>
       expect(
@@ -378,7 +378,7 @@ describe("StaffProjectPanel review-email control", () => {
 
   it("sends sendEmail: false when the checked box is unchecked before confirming", async () => {
     renderPanel("submitted");
-    fireEvent.click(screen.getByTitle("Move to Approved"));
+    fireEvent.click(screen.getByTitle(/^Move to Approved\./));
     await waitFor(() => expect(screen.getByRole("checkbox")).toBeTruthy());
 
     fireEvent.click(screen.getByRole("checkbox"));
@@ -406,7 +406,7 @@ describe("StaffProjectPanel review-email control", () => {
       email: "",
     });
     renderPanel("submitted");
-    fireEvent.click(screen.getByTitle("Move to Approved"));
+    fireEvent.click(screen.getByTitle(/^Move to Approved\./));
     await waitFor(() =>
       expect(
         screen.getByText("No address on file, no email will be sent")
@@ -437,7 +437,7 @@ describe("StaffProjectPanel review-email control", () => {
       email: "",
     });
     renderPanel("draft");
-    fireEvent.click(screen.getByTitle("Move to Submitted"));
+    fireEvent.click(screen.getByTitle(/^Move to Submitted\./));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy()
     );
@@ -665,7 +665,7 @@ describe("StaffProjectPanel transition dialog across a project change", () => {
     // across the rerender, and Confirm posts its target status with the
     // second project's id.
     const view = renderPanel("submitted");
-    fireEvent.click(screen.getByTitle("Move to Approved"));
+    fireEvent.click(screen.getByTitle(/^Move to Approved\./));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy()
     );
@@ -680,7 +680,7 @@ describe("StaffProjectPanel transition dialog across a project change", () => {
     expect(performTransition).not.toHaveBeenCalled();
     // The stepper now reflects the second project, so its dialog opens on a
     // fresh draft.
-    fireEvent.click(screen.getByTitle("Move to Submitted"));
+    fireEvent.click(screen.getByTitle(/^Move to Submitted\./));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy()
     );

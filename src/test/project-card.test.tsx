@@ -56,14 +56,14 @@ const base: ProjectSummary = {
 describe("ProjectCard", () => {
   it("hides the status badge when published", () => {
     const { queryByText } = render(<ProjectCard project={base} />);
-    expect(queryByText("published")).toBeNull();
+    expect(queryByText("Published")).toBeNull();
   });
 
   it("shows the status badge for archived projects", () => {
     const { getByText } = render(
       <ProjectCard project={{ ...base, status: "archived" }} />
     );
-    expect(getByText("archived")).toBeTruthy();
+    expect(getByText("Archived")).toBeTruthy();
   });
 
   it("falls back to the default image when the project has none", () => {

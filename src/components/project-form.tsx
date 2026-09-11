@@ -533,7 +533,7 @@ export function ProjectForm({
               className="mt-0.5 text-muted-foreground text-xs"
               id="programId-description"
             >
-              The course this project would run in. Staff can set or change it
+              The program this project would run in. Staff can set or change it
               during review.
             </p>
             <ProgramSelect

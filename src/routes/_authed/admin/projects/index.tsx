@@ -38,11 +38,15 @@ import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
 import { projectImageSrc } from "#/lib/project-image";
+import {
+  PROJECT_STATUS_DISPLAY_RANK,
+  PROJECT_STATUS_LABEL,
+} from "#/lib/project-workflow";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import { isStaff } from "#/lib/viewer";
-import { PROJECT_STATUSES } from "#/lib/vocabularies";
+import { PROJECT_STATUSES, type ProjectStatus } from "#/lib/vocabularies";
 import { listPrograms } from "#/server/programs";
 import {
   exportAdminProjects,
@@ -100,15 +104,6 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
 
 type Row = Awaited<ReturnType<typeof listAdminProjects>>["rows"][number];
 
-const STATUS_ORDER: Record<string, number> = {
-  draft: 0,
-  submitted: 1,
-  changes_requested: 2,
-  approved: 3,
-  published: 4,
-  archived: 5,
-};
-
 const DEFAULT_SORT: SortState = { desc: true, id: "updatedAt" };
 
 const COLUMNS = defineAdminColumns<Row>()([
@@ -140,7 +135,8 @@ const COLUMNS = defineAdminColumns<Row>()([
     id: "title",
   },
   {
-    accessorFn: (row) => STATUS_ORDER[row.status] ?? 99,
+    accessorFn: (row) =>
+      PROJECT_STATUS_DISPLAY_RANK[row.status as ProjectStatus] ?? 99,
     cell: ({ row }) => <StatusBadge status={row.original.status} />,
     header: "Status",
     id: "status",
@@ -413,8 +409,6 @@ function AdminProjects() {
   const proposerMissing =
     !!proposer && !proposers.some((p) => p.id === proposer);
 
-  const label = (s: string) => s.replace(/_/g, " ");
-
   return (
     <div className="px-4 py-6 md:px-8">
       <Breadcrumb>
@@ -497,7 +491,7 @@ function AdminProjects() {
                 <SelectContent>
                   {STATUSES.map((s) => (
                     <SelectItem key={s} value={s}>
-                      {s === "all" ? "All statuses" : label(s)}
+                      {s === "all" ? "All statuses" : PROJECT_STATUS_LABEL[s]}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -1,3 +1,4 @@
+import { PROJECT_STATUS_LABEL } from "#/lib/project-workflow";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import { Badge } from "./ui/badge";
 
@@ -29,9 +30,11 @@ export function StatusBadge({ status }: { status: string }) {
   // Callers hand over the wire's `string`, so the fallback stays reachable for
   // a value the enum does not have; the cast only picks the map's row type.
   const { fg, bg } = STATUS_STYLES[status as ProjectStatus] ?? FALLBACK;
+  const label =
+    PROJECT_STATUS_LABEL[status as ProjectStatus] ?? status.replace(/_/g, " ");
   return (
     <Badge style={{ backgroundColor: bg, color: fg }} variant="status">
-      {status.replace(/_/g, " ")}
+      {label}
     </Badge>
   );
 }

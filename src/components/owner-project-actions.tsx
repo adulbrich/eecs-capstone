@@ -1,5 +1,10 @@
 import { useState } from "react";
 import {
+  PROJECT_STATUS_DESCRIPTION,
+  PROJECT_STATUS_LABEL,
+} from "#/lib/project-workflow";
+import type { ProjectStatus } from "#/lib/vocabularies";
+import {
   hardDeleteProject,
   returnToDraft,
   submitProject,
@@ -82,14 +87,27 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
   ];
 
   const visible = buttons.filter((b) => b.show);
-  if (visible.length === 0 && !error) {
-    return null;
-  }
+  // The wire hands over a string; a value the vocabulary lacks gets no
+  // sentence rather than a crash, the same fallback the badge takes.
+  const status = project.status as ProjectStatus;
+  const description = PROJECT_STATUS_DESCRIPTION[status] as string | undefined;
 
+  // Rendered for every status, not only the ones with a button: the status
+  // sentence is the one place the proposer is told what "approved" or
+  // "submitted" means for them (#303), and those are exactly the statuses
+  // with nothing to click.
   return (
     <Card asChild className="mt-6 bg-secondary p-4">
       <section>
         <SectionHeading>Your actions</SectionHeading>
+        {description && (
+          <p className="mt-2 text-muted-foreground text-sm">
+            <span className="font-medium text-foreground">
+              {PROJECT_STATUS_LABEL[status]}
+            </span>
+            : {description}
+          </p>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           {visible.map((b) => (
             <Button
