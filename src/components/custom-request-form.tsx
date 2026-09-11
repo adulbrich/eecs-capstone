@@ -2,6 +2,7 @@ import { useForm } from "@tanstack/react-form";
 import { useState } from "react";
 import { z } from "zod";
 import { FieldError } from "#/components/ui/field";
+import { errorMessage } from "#/lib/error-message";
 import { submitCustomRequest } from "#/server/inventory-custom";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -82,7 +83,7 @@ export function CustomRequestForm({
         });
         onSubmitted(result.requestId);
       } catch (err) {
-        setFormError((err as Error)?.message || "Submit failed");
+        setFormError(errorMessage(err, "Submit failed"));
       }
     },
   });

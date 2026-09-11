@@ -1,6 +1,7 @@
 import { Download } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
+import { errorMessage } from "#/lib/error-message";
 
 interface Props {
   /** Base filename, no extension. The current date is appended. */
@@ -18,24 +19,6 @@ const BOM = "\uFEFF";
 /** Shown when a rejection carries no usable message of its own. */
 const DEFAULT_ERROR_MESSAGE = "Export failed. Try again.";
 
-/**
- * `load()` can reject with anything, not just an `Error`: a string, a plain
- * object, a Response-shaped failure from a future server function. An
- * unconditional `(err as Error).message` reads as `undefined` for all of
- * those, and `{error && ...}` then renders nothing at all, so the export
- * silently no-ops for the user. Every branch here returns a non-empty
- * string.
- */
-function errorMessage(err: unknown): string {
-  if (err instanceof Error && err.message) {
-    return err.message;
-  }
-  if (typeof err === "string" && err) {
-    return err;
-  }
-  return DEFAULT_ERROR_MESSAGE;
-}
-
 export function ExportCsvButton({ filename, load }: Props) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +29,7 @@ export function ExportCsvButton({ filename, load }: Props) {
   // (stale, still-false) `pending` and neither would see the other's write.
   // A ref is mutated synchronously and read back synchronously, so the
   // second click's check runs against the first click's write.
-  const pendingRef = useRef(false);
+  const pendingRef = useRef<boolean>(false);
 
   async function runExport() {
     if (pendingRef.current) {
@@ -81,7 +64,7 @@ export function ExportCsvButton({ filename, load }: Props) {
       // the table it sits above. Also announced through the live region,
       // the same way success is, so a screen reader user learns the export
       // failed instead of hearing nothing at all.
-      const message = errorMessage(err);
+      const message = errorMessage(err, DEFAULT_ERROR_MESSAGE);
       setError(message);
       setAnnouncement(`${filename} export failed: ${message}`);
     } finally {

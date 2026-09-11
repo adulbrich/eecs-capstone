@@ -102,7 +102,7 @@ export function SiteHeader() {
 function MobileMenu({
   signedIn,
   isPending,
-  isStaff,
+  isStaff: viewerIsStaff,
   user,
 }: {
   signedIn: boolean;
@@ -156,7 +156,7 @@ function MobileMenu({
           <NavItem onClick={close} to="/inventory">
             Inventory
           </NavItem>
-          {isStaff && (
+          {viewerIsStaff && (
             <NavItem onClick={close} to="/admin">
               Admin
             </NavItem>

@@ -64,8 +64,8 @@ export function buildStorageConfig(
 }
 
 export interface ObjectStorage {
-  delete(key: string): Promise<void>;
-  put(key: string, body: Buffer, contentType: string): Promise<void>;
+  delete: (key: string) => Promise<void>;
+  put: (key: string, body: Buffer, contentType: string) => Promise<void>;
 }
 
 class S3Storage implements ObjectStorage {
@@ -117,8 +117,8 @@ export function getObjectStorage(): ObjectStorage {
  * object means there is no second spelling to forget.
  */
 export interface KeySpace {
-  newKey(): string;
-  owns(key: string): boolean;
+  newKey: () => string;
+  owns: (key: string) => boolean;
   readonly prefix: string;
 }
 

@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
+import { errorMessage } from "#/lib/error-message";
 import { isOpenCustomLine } from "#/lib/inventory-custom-workflow";
 import type { DeadlineEntry } from "#/lib/inventory-deadlines";
 import { deadlineOf } from "#/lib/inventory-deadlines";
@@ -434,7 +435,7 @@ function MyItems() {
         await action();
         await Promise.all([qc.invalidateQueries(), router.invalidate()]);
       } catch (e) {
-        toast.error((e as Error)?.message || "That did not go through");
+        toast.error(errorMessage(e, "That did not go through"));
       } finally {
         setBusy(false);
       }

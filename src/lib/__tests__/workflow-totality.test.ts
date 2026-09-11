@@ -118,7 +118,7 @@ describe("the inventory rules are total", () => {
       return "allowed";
     } catch (e) {
       expect(
-        e?.constructor,
+        e instanceof Object ? e.constructor : undefined,
         `${input.nextStatus} threw ${String(e)} rather than refusing`
       ).toBe(Error);
       const { message } = e as Error;

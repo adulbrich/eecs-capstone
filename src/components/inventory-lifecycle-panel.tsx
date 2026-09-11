@@ -1,5 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import {
   formatHoldDetailed,
   formatHoldShort,
@@ -396,7 +397,7 @@ export function InventoryLifecyclePanel({
       });
       await router.invalidate();
     } catch (e) {
-      setError((e as Error)?.message || "Transition failed");
+      setError(errorMessage(e, "Transition failed"));
     } finally {
       setBusy(false);
     }
@@ -519,7 +520,7 @@ export function InventoryLifecyclePanel({
       // destination, and only staff can reach this button.
       await router.navigate({ to: "/admin/inventory" });
     } catch (e) {
-      setError((e as Error)?.message || "Delete failed");
+      setError(errorMessage(e, "Delete failed"));
     } finally {
       setBusy(false);
     }

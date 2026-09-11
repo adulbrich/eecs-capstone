@@ -48,7 +48,7 @@ export async function refreshProjectEmbedding(
       .select()
       .from(projects)
       .where(eq(projects.id, projectId));
-    if (!project || project.status !== "published" || project.deletedAt) {
+    if (project?.status !== "published" || project.deletedAt) {
       return "skipped";
     }
 

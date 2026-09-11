@@ -146,9 +146,9 @@ function destructiveRule(sub, args) {
   }
 }
 
-function ruleBroken(sub, args, branched) {
+function ruleBroken(sub, args, alreadyBranched) {
   const onMain =
-    sub === "commit" && !branched && currentBranch(cwd) === "main"
+    sub === "commit" && !alreadyBranched && currentBranch(cwd) === "main"
       ? "Never commit on main (AGENTS.md). Fetch, branch from origin/main, then commit."
       : null;
   return (

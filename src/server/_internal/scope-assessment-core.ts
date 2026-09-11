@@ -6,6 +6,7 @@ import {
   type ResponsesFn,
 } from "#/lib/_internal/bedrock-mantle";
 import type { ReviewOutcome } from "#/lib/ai-review-limits";
+import { errorMessage } from "#/lib/error-message";
 import { PROPOSAL_SCOPE_RULE, TERM_CALIBRATION } from "#/lib/proposal-guidance";
 import {
   SCOPE_RATIONALE_MAX_LENGTH,
@@ -131,8 +132,8 @@ export function parseScopeResponse(
     // over the cap is a failed assessment, not a fourth badge or a clipped
     // sentence. Function call arguments arrive as a JSON string.
     parsed = scopeAssessmentSchema.parse(JSON.parse(toolCall.arguments));
-  } catch {
-    throw new Error(FAILED);
+  } catch (error) {
+    throw new Error(FAILED, { cause: error });
   }
   return { ...parsed, model };
 }
@@ -181,7 +182,7 @@ export async function runScopeAssessment(
     return {
       ...base,
       outcome: "failed",
-      error: (error as Error)?.message || "Scope assessment failed",
+      error: errorMessage(error, "Scope assessment failed"),
       result: null,
     };
   }
@@ -203,7 +204,7 @@ export async function runScopeAssessment(
       ...base,
       usage,
       outcome: truncated ? "truncated" : "failed",
-      error: (error as Error)?.message || "Scope assessment failed",
+      error: errorMessage(error, "Scope assessment failed"),
       result: null,
     };
   }

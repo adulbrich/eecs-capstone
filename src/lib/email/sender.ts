@@ -4,7 +4,7 @@ import { createSesEmailSender } from "./ses-sender";
 import type { RenderedEmail } from "./templates";
 
 export interface EmailSender {
-  send(to: string, email: RenderedEmail): Promise<void>;
+  send: (to: string, email: RenderedEmail) => Promise<void>;
 }
 
 export function getEmailSender(

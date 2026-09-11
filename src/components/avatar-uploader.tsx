@@ -1,10 +1,7 @@
 import { useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import { clearAvatar, uploadAvatar } from "#/server/uploads";
 import { ImageUploader } from "./image-uploader";
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : "Save failed. Please try again.";
-}
 
 interface Props {
   currentKey: string | null;
@@ -28,7 +25,7 @@ export function AvatarUploader({ currentKey, onChanged }: Props) {
       }
       onChanged();
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(err, "Save failed. Please try again."));
     } finally {
       setBusy(false);
     }

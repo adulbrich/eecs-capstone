@@ -34,5 +34,4 @@ export function findUniqueViolation(
       return current;
     }
   }
-  return;
 }

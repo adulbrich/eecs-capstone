@@ -557,10 +557,12 @@ describe("listInventoryAs privacy", () => {
     });
 
     const view = await getInventoryItemDetailAs(null, { id: item.id });
-    expect(view).not.toBeNull();
-    expect(view?.viewerIsStaff).toBe(false);
-    expect(view?.history).toEqual([]);
-    expect("notes" in (view?.item as object)).toBe(false);
+    if (!view) {
+      throw new Error("view missing");
+    }
+    expect(view.viewerIsStaff).toBe(false);
+    expect(view.history).toEqual([]);
+    expect("notes" in (view.item as object)).toBe(false);
     expect(JSON.stringify(view)).not.toContain("ZQXNOTES");
   });
 
@@ -574,10 +576,13 @@ describe("listInventoryAs privacy", () => {
     });
 
     const view = await getInventoryItemDetailAs(student, { id: item.id });
-    expect(view?.viewerIsStaff).toBe(false);
-    expect(view?.history).toEqual([]);
-    expect("serial" in (view?.item as object)).toBe(false);
-    expect("location" in (view?.item as object)).toBe(false);
+    if (!view) {
+      throw new Error("view missing");
+    }
+    expect(view.viewerIsStaff).toBe(false);
+    expect(view.history).toEqual([]);
+    expect("serial" in (view.item as object)).toBe(false);
+    expect("location" in (view.item as object)).toBe(false);
   });
 
   it("gives staff the history and the staff fields", async () => {
@@ -589,9 +594,12 @@ describe("listInventoryAs privacy", () => {
     });
 
     const view = await getInventoryItemDetailAs(admin, { id: item.id });
-    expect(view?.viewerIsStaff).toBe(true);
-    expect(view?.history.length).toBeGreaterThan(0);
-    expect((view?.item as unknown as { notes: string }).notes).toBe(
+    if (!view) {
+      throw new Error("view missing");
+    }
+    expect(view.viewerIsStaff).toBe(true);
+    expect(view.history.length).toBeGreaterThan(0);
+    expect((view.item as unknown as { notes: string }).notes).toBe(
       "Locker B4, code ZQXNOTES."
     );
   });

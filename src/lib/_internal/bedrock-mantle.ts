@@ -70,7 +70,6 @@ export function findToolCall(
       return nested;
     }
   }
-  return;
 }
 
 /** Token counts as the Responses API reports them. */

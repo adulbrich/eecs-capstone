@@ -20,10 +20,10 @@ const GIT_TIMEOUT = 5000;
 const COMPOSE_TIMEOUT = 1500;
 
 /** The output, or "" for anything that went wrong, timeouts included. */
-function run(file, args, cwd, timeout) {
+function run(file, args, dir, timeout) {
   try {
     return execFileSync(file, args, {
-      cwd,
+      cwd: dir,
       encoding: "utf8",
       env: cleanEnv,
       stdio: ["ignore", "pipe", "ignore"],
@@ -43,7 +43,7 @@ function run(file, args, cwd, timeout) {
  * cold daemon. Telling a session to `docker compose up -d` when the stack is
  * already running is worse advice than admitting the check did not finish.
  */
-function composeLine(cwd) {
+function composeLine(dir) {
   const NOTHING =
     "Compose: nothing running. `docker compose up -d` before the integration, smoke or accessibility suites.";
   let out = "";
@@ -52,7 +52,7 @@ function composeLine(cwd) {
       "docker",
       ["compose", "ps", "--status", "running", "--format", "{{.Service}}"],
       {
-        cwd,
+        cwd: dir,
         encoding: "utf8",
         env: cleanEnv,
         stdio: ["ignore", "pipe", "ignore"],
@@ -61,7 +61,7 @@ function composeLine(cwd) {
     ).trim();
   } catch (error) {
     // Anything else (no docker on PATH, no daemon) really is nothing running.
-    return error?.code === "ETIMEDOUT"
+    return error.code === "ETIMEDOUT"
       ? `Compose: no answer in ${COMPOSE_TIMEOUT}ms. Check with \`docker compose ps\` before the integration, smoke or accessibility suites.`
       : NOTHING;
   }

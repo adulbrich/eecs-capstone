@@ -271,7 +271,7 @@ export async function listMyItemsAs(viewer: Viewer): Promise<MyItemsRow[]> {
     }
     const isViewer =
       collector.id === viewer.id ||
-      (account?.email != null && collector.email === account.email);
+      (typeof account?.email === "string" && collector.email === account.email);
     if (isViewer) {
       return null;
     }

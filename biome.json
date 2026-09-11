@@ -11,7 +11,8 @@
       "!**/src/routeTree.gen.ts",
       "!**/src/styles.css",
       "!**/scripts",
-      "!**/drizzle"
+      "!**/drizzle",
+      "!**/*.svg"
     ]
   },
   "linter": {
@@ -23,7 +24,16 @@
         "useImageSize": "off"
       },
       "suspicious": {
-        "noAlert": "on"
+        "noAlert": "on",
+        "noLeakedRender": "off"
+      },
+      "performance": {
+        "noAwaitInLoops": "off",
+        "noJsxPropsBind": "off"
+      },
+      "style": {
+        "noIncrementDecrement": "off",
+        "useDestructuring": "off"
       }
     }
   },
@@ -70,5 +80,14 @@
         }
       }
     }
-  ]
+  ],
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "useSortedKeys": "off",
+        "useSortedTypeFields": "off"
+      }
+    }
+  }
 }

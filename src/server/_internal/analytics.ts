@@ -405,7 +405,7 @@ async function flow(
   return { current, previous };
 }
 
-async function breakdowns(programId: string | null, isAdmin: boolean) {
+async function breakdowns(programId: string | null, viewerIsAdmin: boolean) {
   const live = and(
     isNull(projects.deletedAt),
     programId ? eq(projects.programId, programId) : undefined
@@ -462,7 +462,7 @@ async function breakdowns(programId: string | null, isAdmin: boolean) {
       .select({ key: inventoryRequestItems.status, count: countRows() })
       .from(inventoryRequestItems)
       .groupBy(inventoryRequestItems.status),
-    isAdmin
+    viewerIsAdmin
       ? db
           .select({ key: user.role, count: countRows() })
           .from(user)

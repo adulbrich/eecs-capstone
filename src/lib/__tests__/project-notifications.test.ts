@@ -85,20 +85,19 @@ describe("statusChangeNotification", () => {
 });
 
 describe("softDeleteNotification", () => {
-  it.each([
-    "soft-deleted",
-    "restored",
-    "hard-deleted",
-  ] as const)("names the action in both the title and the message: %s", (action) => {
-    const row = softDeleteNotification(project, action, "u-staff");
-    expect(row?.userId).toBe("u-proposer");
-    expect(row?.type).toBe("soft_delete");
-    expect(row?.title).toBe(
-      `Your project 'Fish ladder telemetry' was ${action} by staff`
-    );
-    expect(row?.message).toBe(`Staff performed: ${action}.`);
-    expect(row?.link).toBe("/projects/p-1");
-  });
+  it.each(["soft-deleted", "restored", "hard-deleted"] as const)(
+    "names the action in both the title and the message: %s",
+    (action) => {
+      const row = softDeleteNotification(project, action, "u-staff");
+      expect(row?.userId).toBe("u-proposer");
+      expect(row?.type).toBe("soft_delete");
+      expect(row?.title).toBe(
+        `Your project 'Fish ladder telemetry' was ${action} by staff`
+      );
+      expect(row?.message).toBe(`Staff performed: ${action}.`);
+      expect(row?.link).toBe("/projects/p-1");
+    }
+  );
 
   it("says nothing when the proposer is the one who acted", () => {
     expect(

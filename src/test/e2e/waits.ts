@@ -45,7 +45,7 @@ export async function confirmed(
   click: () => Promise<void>
 ): Promise<void> {
   const answered = page.waitForResponse(
-    (response) => isServerFunctionCall(response.request()),
+    (candidate) => isServerFunctionCall(candidate.request()),
     { timeout: 15_000 }
   );
   await click();

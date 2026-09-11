@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import { type DeletionPreview, deleteAccount } from "#/server/account";
 
 // Re-exported so the profile page can type the preview it holds without a
@@ -60,7 +61,7 @@ export function DeleteAccountDialog({
       await deleteAccount({ data: { confirmEmail: typed.trim() } });
       onDeleted();
     } catch (e) {
-      setError((e as Error)?.message || "Could not delete the account");
+      setError(errorMessage(e, "Could not delete the account"));
       setBusy(false);
     }
   }
