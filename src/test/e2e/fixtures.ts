@@ -41,9 +41,11 @@ export function fixtureEmail(): string {
 export type Db = NodePgDatabase<typeof schema>;
 
 /**
- * Callers are responsible for closing the pool. Tests open one per file rather
- * than sharing a module-level singleton, because Playwright runs each file in
- * its own worker process and a shared pool would leak a connection per worker.
+ * Callers are responsible for closing the pool. Opened per use rather than
+ * held in a module-level singleton, because Playwright runs each file in its
+ * own worker process and a shared pool would leak a connection per worker.
+ * `withDb` below is the shape most callers want; this is for the ones that
+ * hold a connection across several awaits of their own.
  */
 export function openDb(): { db: Db; close: () => Promise<void> } {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -52,9 +54,10 @@ export function openDb(): { db: Db; close: () => Promise<void> } {
 
 /**
  * One unit of database work on a connection of its own, closed whether or
- * not it throws. For a fixture written before the browser opens and a row
- * read after a click; a test that needs several statements on one
- * connection passes one function that runs them all.
+ * not it throws. Each call is one connection: a fixture written before the
+ * browser opens and a row read after a click are two calls. Several
+ * statements that belong together go in one function, which keeps them in
+ * order without a connection held open across the browser work between.
  */
 export async function withDb<T>(work: (db: Db) => Promise<T>): Promise<T> {
   const { db, close } = openDb();
