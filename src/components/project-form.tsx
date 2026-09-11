@@ -356,15 +356,16 @@ export function ProjectForm({
         The commitment the program actually requires of a proposer, stated
         where the proposal is written. Both cases are named because role
         cannot tell them apart: a student and an industry partner are both
-        role "user", and a student cannot mentor their own team.
+        role "user", and a student proposer may need to find a mentor outside
+        the team (#304 records how mentorship is tracked).
       */}
       <div className="rounded-md border border-border bg-muted/40 p-3 text-sm">
         <p className="font-medium">Before you propose</p>
         <p className="mt-1 text-muted-foreground">
           A team expects about one hour a week from a project partner or mentor
           once the project is accepted. If you are a student proposing a
-          project, line up a mentor who can give that hour, because you cannot
-          mentor your own team.
+          project, you may need to find an external project mentor. Your
+          instructor will provide guidance.
         </p>
         {/*
           The same scope bar is stated to the model as PROPOSAL_SCOPE_RULE in

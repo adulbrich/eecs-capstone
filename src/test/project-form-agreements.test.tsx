@@ -92,18 +92,24 @@ describe("ProjectForm sponsorship", () => {
 });
 
 describe("ProjectForm commitment notice", () => {
-  it("states the weekly commitment and that a student proposer needs a mentor", () => {
+  it("states the weekly commitment and that a student proposer may need an external mentor", () => {
     renderForm();
 
-    // A student may propose (the landing page says so) and cannot mentor their
-    // own team, so the notice has to name both cases. Role cannot distinguish
-    // them: a student and an industry partner are both role "user".
+    // A student may propose (the landing page says so) and may end up with an
+    // external mentor or the instructor's guidance (#304), so the notice has
+    // to name both cases. Role cannot distinguish them: a student and an
+    // industry partner are both role "user".
     expect(screen.getByText(/one hour a week/i)).toBeTruthy();
     // Specific, not /student/i: the NDA checkbox hint also says "Students",
     // and matching that would pass without the mentor sentence existing.
     expect(
       screen.getByText(/if you are a student proposing a project/i)
     ).toBeTruthy();
-    expect(screen.getByText(/cannot mentor your own team/i)).toBeTruthy();
+    expect(
+      screen.getByText(/may need to find an external project mentor/i)
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/your instructor will provide guidance/i)
+    ).toBeTruthy();
   });
 });
