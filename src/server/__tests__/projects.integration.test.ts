@@ -1032,7 +1032,7 @@ describe("sponsorship flag", () => {
       sendEmail: false,
     });
 
-    // A student needs this before bidding, so it is public by design.
+    // A student needs this before applying, so it is public by design.
     const anonView = await getProjectAs(null, { id });
     expect(anonView.project?.requiresNdaIp).toBe(true);
   });
