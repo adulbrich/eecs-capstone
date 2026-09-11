@@ -105,6 +105,17 @@ describe("ProjectCard", () => {
     expect(classes).not.toContain("self-stretch");
   });
 
+  it("letterboxes the image inside the fixed box instead of cropping it", () => {
+    // The box keeps card heights uniform; `object-contain` shows the whole
+    // image and the muted background makes the bars read as intentional
+    // (#314). `object-cover` cut off whatever did not fit the ratio.
+    const { container } = render(<ProjectCard project={base} />);
+    const classes = container.querySelector("img")?.className ?? "";
+    expect(classes).toContain("object-contain");
+    expect(classes).toContain("bg-muted");
+    expect(classes).not.toContain("object-cover");
+  });
+
   it("is a surface holding a link, not a link itself", () => {
     // The bookmark control is a sibling of the link (see
     // bookmark-toggle.test.tsx), so the card root cannot be the anchor.

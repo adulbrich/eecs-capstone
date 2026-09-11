@@ -3,8 +3,9 @@ import { getPublicUrl } from "./storage";
 /**
  * Shipped in `public/`, so it is a plain absolute path and must NOT be run
  * through `getPublicUrl` (that prefixes the object-storage base). Generated
- * from the OSU Capstone generic logo, padded to 16:9 to match the aspect ratio
- * every project image renders at.
+ * from the OSU Capstone generic logo, padded to 16:9, which is the box a
+ * listing card gives it below `md`; from `md` up the card's box is 3:2 and the
+ * image letterboxes inside it (`object-contain`), so nothing is cropped.
  */
 export const PROJECT_PLACEHOLDER_IMAGE = "/project-placeholder.webp";
 
