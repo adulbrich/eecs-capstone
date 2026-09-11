@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import { STAFF_PANEL_AUDIENCE_HINT } from "#/lib/private-notes";
 import {
   canTransition,
@@ -73,6 +74,7 @@ export function StaffProjectPanel({
   const [sendEmail, setSendEmail] = useState(true);
   // Null until loaded: the Proposer section keeps Save disabled until then.
   const [proposer, setProposer] = useState<ProposerForEdit | null>(null);
+  const [proposerError, setProposerError] = useState<string | null>(null);
   // The dialog's checkbox has always keyed off "is there an address at all",
   // so it keeps reading exactly that rather than the whole record.
   const proposerAddress = proposer?.email || null;
@@ -93,9 +95,12 @@ export function StaffProjectPanel({
       setProposer(
         await getProposerForEdit({ data: { projectId: project.id } })
       );
-    } catch {
-      // Staff-only endpoint; on failure the dialog degrades to "no address
-      // on file" and sends nothing, which is the safe direction.
+      setProposerError(null);
+    } catch (e) {
+      // Reported in the Proposer section, where Save stays disabled, the way
+      // the other sections report a failed load. The dialog degrades to "no
+      // address on file" and sends nothing, which is the safe direction.
+      setProposerError(errorMessage(e, "Could not load the proposer record"));
     }
   }, [project.id]);
 
@@ -398,6 +403,7 @@ export function StaffProjectPanel({
       )}
 
       <StaffProposerSection
+        loadError={proposerError}
         onSaved={onProposerSaved}
         projectId={project.id}
         proposer={proposer}

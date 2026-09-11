@@ -22,10 +22,13 @@ import { Button } from "./ui/button";
  * re-locks it against the new link, and drops a draft that no longer applies.
  */
 export function StaffProposerSection({
+  loadError,
   onSaved,
   projectId,
   proposer,
 }: {
+  /** Why the panel's load failed, if it did; shown in place of the draft. */
+  loadError: string | null;
   onSaved: () => Promise<void>;
   projectId: string;
   /** Null until the panel's load has answered. Save stays disabled until then. */
@@ -41,7 +44,15 @@ export function StaffProposerSection({
           proposer={proposer}
         />
       ) : (
-        <p className="text-muted-foreground text-sm">Loading the proposer...</p>
+        <p
+          className={
+            loadError
+              ? "text-destructive text-sm"
+              : "text-muted-foreground text-sm"
+          }
+        >
+          {loadError ?? "Loading the proposer..."}
+        </p>
       )}
     </PanelSection>
   );

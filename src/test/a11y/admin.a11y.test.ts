@@ -117,6 +117,13 @@ test("project detail (staff panel, scope assessment)", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Assess scope" })
   ).toBeVisible();
+  // The Proposer and Categories sections (#322) load through their own
+  // staff-gated reads and render a placeholder until then; scanning before
+  // they settle would miss the picker and the multi-select.
+  await expect(page.getByLabel("Proposer email")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Save categories" })
+  ).toBeEnabled();
   await checkA11y(page);
 });
 

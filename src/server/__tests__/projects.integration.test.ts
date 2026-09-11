@@ -204,10 +204,16 @@ describe("project workflow", () => {
 });
 
 describe("updateProjectProposerAs", () => {
-  it("links proposerId when the email matches an account, and logs one row", async () => {
+  it("reassigns a linked project to another account, and logs one row", async () => {
     const staff = await makeUser(`staff-${Date.now()}@x.com`, "admin");
     const target = await makeUser(`target-${Date.now()}@x.com`, "user");
     const { id } = await createProjectAs(staff, baseProject());
+    // Linked to the creator on create (#322), so this is account to account.
+    const [before] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, id));
+    expect(before.proposerId).toBe(staff.id);
 
     const result = await updateProjectProposerAs(staff, {
       id,

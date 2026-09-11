@@ -292,6 +292,14 @@ describe("StaffProjectPanel proposer block", () => {
     );
   });
 
+  it("reports a failed load in the section and offers no Save", async () => {
+    getProposerForEdit.mockRejectedValueOnce(new Error("Forbidden"));
+    renderPanel("submitted");
+    expect(await screen.findByText("Forbidden")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Save proposer" })).toBeNull();
+    expect(screen.queryByLabelText("Proposer email")).toBeNull();
+  });
+
   it("reports a failed save and keeps the draft", async () => {
     getProposerForEdit.mockResolvedValueOnce({
       accountLinked: false,
