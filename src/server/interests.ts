@@ -13,7 +13,7 @@ export const getMyInterests = createServerFn({ method: "GET" }).handler(
 );
 
 export const saveMyInterests = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => saveSchema.parse(data))
+  .validator((data: unknown) => saveSchema.parse(data))
   .handler(async ({ data }) => {
     const { saveMyInterestsForCurrentUser } = await import(
       "./_internal/interests"

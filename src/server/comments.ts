@@ -11,7 +11,7 @@ const addCommentSchema = z.object({
 export type AddCommentInput = z.infer<typeof addCommentSchema>;
 
 export const addComment = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => addCommentSchema.parse(data))
+  .validator((data: unknown) => addCommentSchema.parse(data))
   .handler(async ({ data }) => {
     const { addCommentForCurrentUser } = await import("./_internal/comments");
     return addCommentForCurrentUser(data);

@@ -43,14 +43,14 @@ export const listProgramsWithInstructors = createServerFn({
 });
 
 export const getProgram = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => idSchema.parse(data))
+  .validator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data }) => {
     const { getProgramForCurrentUser } = await import("./_internal/programs");
     return getProgramForCurrentUser(data);
   });
 
 export const createProgram = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => programSchema.parse(data))
+  .validator((data: unknown) => programSchema.parse(data))
   .handler(async ({ data }) => {
     const { createProgramForCurrentUser } = await import(
       "./_internal/programs"
@@ -59,7 +59,7 @@ export const createProgram = createServerFn({ method: "POST" })
   });
 
 export const updateProgram = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => programUpdateSchema.parse(data))
+  .validator((data: unknown) => programUpdateSchema.parse(data))
   .handler(async ({ data }) => {
     const { updateProgramForCurrentUser } = await import(
       "./_internal/programs"
@@ -68,7 +68,7 @@ export const updateProgram = createServerFn({ method: "POST" })
   });
 
 export const deleteProgram = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => idSchema.parse(data))
+  .validator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data }) => {
     const { deleteProgramForCurrentUser } = await import(
       "./_internal/programs"
@@ -77,7 +77,7 @@ export const deleteProgram = createServerFn({ method: "POST" })
   });
 
 export const addProgramInstructor = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => instructorPairSchema.parse(data))
+  .validator((data: unknown) => instructorPairSchema.parse(data))
   .handler(async ({ data }) => {
     const { addProgramInstructorForCurrentUser } = await import(
       "./_internal/programs"
@@ -86,7 +86,7 @@ export const addProgramInstructor = createServerFn({ method: "POST" })
   });
 
 export const removeProgramInstructor = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => instructorPairSchema.parse(data))
+  .validator((data: unknown) => instructorPairSchema.parse(data))
   .handler(async ({ data }) => {
     const { removeProgramInstructorForCurrentUser } = await import(
       "./_internal/programs"

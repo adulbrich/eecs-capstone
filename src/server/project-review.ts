@@ -29,7 +29,7 @@ const reviewInputSchema = z.object({
 });
 
 export const reviewProject = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => reviewInputSchema.parse(data))
+  .validator((data: unknown) => reviewInputSchema.parse(data))
   .handler(async ({ data }) => {
     const { reviewProjectForCurrentUser } = await import(
       "./_internal/project-review"

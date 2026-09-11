@@ -16,7 +16,7 @@ function expectFormData(data: unknown): FormData {
 }
 
 export const uploadInventoryImage = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => expectFormData(data))
+  .validator((data: unknown) => expectFormData(data))
   .handler(async ({ data }) => {
     const { uploadInventoryImageForCurrentUser } = await import(
       "./_internal/inventory-images"
@@ -44,7 +44,7 @@ const listInventorySchema = z.object({
 export type ListInventoryInput = z.infer<typeof listInventorySchema>;
 
 export const listInventory = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) => listInventorySchema.parse(d))
+  .validator((d: unknown) => listInventorySchema.parse(d))
   .handler(async ({ data }) => {
     const { listInventoryForCurrentUser } = await import(
       "./_internal/inventory-catalog"
@@ -66,7 +66,7 @@ const listAdminInventorySchema = z.object({
 export type ListAdminInventoryInput = z.infer<typeof listAdminInventorySchema>;
 
 export const listAdminInventory = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) => listAdminInventorySchema.parse(d))
+  .validator((d: unknown) => listAdminInventorySchema.parse(d))
   .handler(async ({ data }) => {
     const { listAdminInventoryForCurrentUser } = await import(
       "./_internal/inventory-catalog"
@@ -86,7 +86,7 @@ export const listInventoryCategories = createServerFn({
 const idOnlySchema = z.object({ id: z.string().uuid() });
 
 export const getInventoryItem = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) => idOnlySchema.parse(d))
+  .validator((d: unknown) => idOnlySchema.parse(d))
   .handler(async ({ data }) => {
     const { getInventoryItemForCurrentUser } = await import(
       "./_internal/inventory-catalog"
@@ -95,7 +95,7 @@ export const getInventoryItem = createServerFn({ method: "GET" })
   });
 
 export const getInventoryItemDetail = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) => idOnlySchema.parse(d))
+  .validator((d: unknown) => idOnlySchema.parse(d))
   .handler(async ({ data }) => {
     const { getInventoryItemDetailForCurrentUser } = await import(
       "./_internal/inventory-catalog"
@@ -104,9 +104,7 @@ export const getInventoryItemDetail = createServerFn({ method: "GET" })
   });
 
 export const listInventoryItemEditLog = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) =>
-    z.object({ itemId: z.string().uuid() }).parse(d)
-  )
+  .validator((d: unknown) => z.object({ itemId: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
     const { listInventoryItemEditLogForCurrentUser } = await import(
       "./_internal/inventory-catalog"
@@ -128,7 +126,7 @@ export const itemPayloadSchema = z.object({
 export type CreateInventoryItemInput = z.infer<typeof itemPayloadSchema>;
 
 export const createInventoryItem = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => itemPayloadSchema.parse(d))
+  .validator((d: unknown) => itemPayloadSchema.parse(d))
   .handler(async ({ data }) => {
     const { createInventoryItemForCurrentUser } = await import(
       "./_internal/inventory-catalog"
@@ -143,7 +141,7 @@ const updatePayloadSchema = itemPayloadSchema.extend({
 export type UpdateInventoryItemInput = z.infer<typeof updatePayloadSchema>;
 
 export const updateInventoryItem = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => updatePayloadSchema.parse(d))
+  .validator((d: unknown) => updatePayloadSchema.parse(d))
   .handler(async ({ data }) => {
     const { updateInventoryItemForCurrentUser } = await import(
       "./_internal/inventory-catalog"
@@ -157,7 +155,7 @@ const hardDeleteSchema = z.object({
 });
 
 export const hardDeleteInventoryItem = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => hardDeleteSchema.parse(d))
+  .validator((d: unknown) => hardDeleteSchema.parse(d))
   .handler(async ({ data }) => {
     const { hardDeleteInventoryItemForCurrentUser } = await import(
       "./_internal/inventory-catalog"
@@ -173,7 +171,7 @@ export const getCart = createServerFn({ method: "GET" }).handler(async () => {
 const addToCartSchema = z.object({ itemId: z.string().uuid() });
 
 export const addToCart = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => addToCartSchema.parse(d))
+  .validator((d: unknown) => addToCartSchema.parse(d))
   .handler(async ({ data }) => {
     const { addToCartForCurrentUser } = await import(
       "./_internal/inventory-cart"
@@ -182,7 +180,7 @@ export const addToCart = createServerFn({ method: "POST" })
   });
 
 export const removeFromCart = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => addToCartSchema.parse(d))
+  .validator((d: unknown) => addToCartSchema.parse(d))
   .handler(async ({ data }) => {
     const { removeFromCartForCurrentUser } = await import(
       "./_internal/inventory-cart"
@@ -195,7 +193,7 @@ const submitCartSchema = z.object({
 });
 
 export const submitCart = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => submitCartSchema.parse(d))
+  .validator((d: unknown) => submitCartSchema.parse(d))
   .handler(async ({ data }) => {
     const { submitCartForCurrentUser } = await import(
       "./_internal/inventory-cart"
@@ -209,7 +207,7 @@ const approveSchema = z.object({
 });
 
 export const approveRequestItem = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => approveSchema.parse(d))
+  .validator((d: unknown) => approveSchema.parse(d))
   .handler(async ({ data }) => {
     const { approveRequestItemForCurrentUser } = await import(
       "./_internal/inventory-requests"
@@ -223,7 +221,7 @@ const approveLinesSchema = z.object({
 });
 
 export const approveRequestLines = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => approveLinesSchema.parse(d))
+  .validator((d: unknown) => approveLinesSchema.parse(d))
   .handler(async ({ data }) => {
     const { approveRequestLinesForCurrentUser } = await import(
       "./_internal/inventory-requests"
@@ -237,7 +235,7 @@ const rejectSchema = z.object({
 });
 
 export const rejectRequestItem = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => rejectSchema.parse(d))
+  .validator((d: unknown) => rejectSchema.parse(d))
   .handler(async ({ data }) => {
     const { rejectRequestItemForCurrentUser } = await import(
       "./_internal/inventory-requests"
@@ -251,7 +249,7 @@ const cancelSchema = z.object({
 });
 
 export const cancelRequestItem = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => cancelSchema.parse(d))
+  .validator((d: unknown) => cancelSchema.parse(d))
   .handler(async ({ data }) => {
     const { cancelRequestItemForCurrentUser } = await import(
       "./_internal/inventory-requests"
@@ -295,7 +293,7 @@ const requestQueueSchema = z.object({
 export type InventoryRequestQueueFilter = z.infer<typeof requestQueueSchema>;
 
 export const listInventoryRequests = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) => requestQueueSchema.parse(d))
+  .validator((d: unknown) => requestQueueSchema.parse(d))
   .handler(async ({ data }) => {
     const { listInventoryRequestsForCurrentUser } = await import(
       "./_internal/inventory-holdings"
@@ -332,7 +330,7 @@ export const transitionSchema = z.object({
 });
 
 export const transitionInventoryItem = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => transitionSchema.parse(d))
+  .validator((d: unknown) => transitionSchema.parse(d))
   .handler(async ({ data }) => {
     const { requireUser } = await import("#/lib/_internal/auth-guards");
     const { transitionItem } = await import(

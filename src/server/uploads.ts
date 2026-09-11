@@ -8,7 +8,7 @@ function expectFormData(data: unknown): FormData {
 }
 
 export const uploadProjectImage = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => expectFormData(data))
+  .validator((data: unknown) => expectFormData(data))
   .handler(async ({ data }) => {
     const { uploadProjectImageForCurrentUser } = await import(
       "./_internal/uploads"
@@ -17,7 +17,7 @@ export const uploadProjectImage = createServerFn({ method: "POST" })
   });
 
 export const uploadAvatar = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => expectFormData(data))
+  .validator((data: unknown) => expectFormData(data))
   .handler(async ({ data }) => {
     const { uploadAvatarForCurrentUser } = await import("./_internal/uploads");
     return uploadAvatarForCurrentUser(data);

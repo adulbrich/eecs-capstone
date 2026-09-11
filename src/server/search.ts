@@ -23,7 +23,7 @@ const searchInputSchema = z.object({
 export type SearchProjectsInput = z.infer<typeof searchInputSchema>;
 
 export const searchProjects = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => searchInputSchema.parse(data ?? {}))
+  .validator((data: unknown) => searchInputSchema.parse(data ?? {}))
   .handler(async ({ data }) => {
     const { searchProjectsForRequest } = await import("./_internal/search");
     return searchProjectsForRequest(data);

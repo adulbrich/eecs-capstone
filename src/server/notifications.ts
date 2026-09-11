@@ -22,7 +22,7 @@ export const unreadCount = createServerFn({ method: "GET" }).handler(
 );
 
 export const markRead = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => idSchema.parse(data))
+  .validator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data }) => {
     const { markReadForCurrentUser } = await import(
       "./_internal/notifications"

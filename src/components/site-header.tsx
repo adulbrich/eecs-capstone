@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { Github, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { authClient } from "#/lib/auth-client";
 import { brand } from "#/lib/brand";
 import { getPublicUrl } from "#/lib/storage";
 import { isStaff, type Viewer } from "#/lib/viewer";
+import { GithubIcon } from "./github-icon";
 import { InstitutionLogo } from "./institution-logo";
 import { NotificationBell } from "./notification-bell";
 import { Button } from "./ui/button";
@@ -231,7 +232,7 @@ function SourceLink() {
       variant="ghost"
     >
       <a href={brand.repositoryUrl} rel="noopener noreferrer" target="_blank">
-        <Github aria-hidden="true" />
+        <GithubIcon aria-hidden="true" />
       </a>
     </Button>
   );
