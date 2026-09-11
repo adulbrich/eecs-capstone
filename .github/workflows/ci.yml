@@ -47,7 +47,7 @@ jobs:
   #
   # Required. Registered on the `main` ruleset as `integration / suite`, the
   # `<caller job> / <called job>` form the smoke comment below explains. It was
-  # advisory until 2026-09-03 because of a flake (#22) that never recurred in CI.
+  # advisory until 2026-09-03 because of a flake (#22) seen in local runs only.
   integration:
     uses: ./.github/workflows/stack-suite.yml
     with:
