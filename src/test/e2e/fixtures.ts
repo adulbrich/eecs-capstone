@@ -249,11 +249,14 @@ export async function createFixtureUser(
 export async function readUser(db: Db, id: string) {
   const [row] = await db
     .select({
+      name: schema.user.name,
       email: schema.user.email,
+      affiliation: schema.user.affiliation,
       role: schema.user.role,
       banned: schema.user.banned,
       banReason: schema.user.banReason,
       wantsToMentor: schema.user.wantsToMentor,
+      mentorTeamCount: schema.user.mentorTeamCount,
     })
     .from(schema.user)
     .where(eq(schema.user.id, id));
