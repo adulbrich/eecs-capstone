@@ -681,10 +681,10 @@ either does not silently change the other.
 It is a destination rather than a sender, so it needs no SES identity and no
 DKIM alignment. Under the `ses` transport it is required, and the app refuses
 to boot without it, the same way it refuses without `EMAIL_FROM`; under
-`console` an unset inbox only logs. It was `EMAIL_REVIEW_INBOX` until #288
-renamed it along with the Terraform variable `email_staff_inbox`, so the task
-definition has to be applied before an image that reads the new name is
-deployed, the same apply-then-deploy order as the transport cutover in 9.5.
+`console` an unset inbox only logs. #288 renamed it from its review-only name
+along with the Terraform variable `email_staff_inbox`, so the task definition
+has to be applied before an image that reads the new name is deployed, the
+same apply-then-deploy order as the transport cutover in 9.5.
 
 ### 9.8 SES console wizard
 
