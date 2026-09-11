@@ -30,13 +30,19 @@ import { confirmed } from "./waits";
  *
  * Every name typed into a form here carries the fixture prefix, including the
  * renamed ones, because the prefix is the only thing the sweep matches on.
+ * The created rows are also deleted at the end of their test rather than
+ * left for the sweep: a category is a checkbox on every item form and a
+ * program an option on every project form for the rest of the run, and a
+ * label that happens to contain another test's locator text (a "Renamed"
+ * category once matched `getByLabel("Name")`) fails that test instead.
  */
 test.describe("admin catalog creates and saves", () => {
   test("staff create an inventory category, then rename it", async ({
     browser,
   }) => {
     const name = fixtureName("Category");
-    const renamed = fixtureName("Renamed");
+    const renamed = fixtureName("Edited");
+    let createdId: string | null = null;
 
     const staffContext = await browser.newContext({ storageState: ADMIN_AUTH });
     try {
@@ -69,6 +75,7 @@ test.describe("admin catalog creates and saves", () => {
           .where(eq(schema.categories.name, name))
       );
       expect(created.domain).toBe("inventory");
+      createdId = created.id;
 
       await staff.goto(`/admin/categories/${created.id}`);
       await waitForHydration(staff);
@@ -87,6 +94,12 @@ test.describe("admin catalog creates and saves", () => {
       expect(saved.name).toBe(renamed);
     } finally {
       await staffContext.close();
+      if (createdId) {
+        const id = createdId;
+        await withDb((db) =>
+          db.delete(schema.categories).where(eq(schema.categories.id, id))
+        );
+      }
     }
   });
 
@@ -95,7 +108,8 @@ test.describe("admin catalog creates and saves", () => {
   }) => {
     const courseId = fixtureName("Course");
     const courseName = fixtureName("Program");
-    const renamed = fixtureName("Renamed");
+    const renamed = fixtureName("Edited");
+    let createdId: string | null = null;
     // A fixture instructor rather than the seeded admin, so the option picked
     // from the list is one no other run could have added already.
     const { id: instructorId, name: instructorName } = await withDb((db) =>
@@ -125,6 +139,7 @@ test.describe("admin catalog creates and saves", () => {
           .from(schema.programs)
           .where(eq(schema.programs.courseName, courseName))
       );
+      createdId = created.id;
 
       // Add before Save, because Save leaves the page.
       await staff.goto(`/admin/programs/${created.id}`);
@@ -163,6 +178,12 @@ test.describe("admin catalog creates and saves", () => {
       expect(saved.courseName).toBe(renamed);
     } finally {
       await staffContext.close();
+      if (createdId) {
+        const id = createdId;
+        await withDb((db) =>
+          db.delete(schema.programs).where(eq(schema.programs.id, id))
+        );
+      }
     }
   });
 
