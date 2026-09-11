@@ -203,6 +203,104 @@ export async function giveFixtureHold(
     .where(eq(schema.inventoryItems.id, input.itemId));
 }
 
+/**
+ * An account row with no credentials behind it, for the admin flows that act
+ * on someone else: role, ban, mentor status. Nothing signs in as it, so the
+ * `account` row Better Auth would want is not written. Swept by the email
+ * prefix like the signed-up accounts.
+ */
+export async function createFixtureUser(
+  db: Db,
+  input: { role?: string; wantsToMentor?: boolean } = {}
+): Promise<{ id: string; email: string; name: string }> {
+  const [row] = await db
+    .insert(schema.user)
+    .values({
+      id: randomUUID(),
+      name: fixtureName("User"),
+      email: fixtureEmail(),
+      emailVerified: true,
+      role: input.role ?? "user",
+      wantsToMentor: input.wantsToMentor ?? false,
+    })
+    .returning();
+  return { id: row.id, email: row.email, name: row.name };
+}
+
+/**
+ * For the row the account-deletion flow leaves behind. Deletion anonymizes
+ * rather than removes (ADR-0008), and the anonymized address carries no
+ * prefix, so the sweep cannot find it; the test that deleted it has to.
+ */
+export async function deleteFixtureUser(db: Db, id: string): Promise<void> {
+  await db.delete(schema.user).where(eq(schema.user.id, id));
+}
+
+/** An inventory category, which needs no `type`, unlike a project one. */
+export async function createFixtureCategory(
+  db: Db
+): Promise<{ id: string; name: string }> {
+  const [row] = await db
+    .insert(schema.categories)
+    .values({ name: fixtureName("Category"), domain: "inventory" })
+    .returning();
+  return { id: row.id, name: row.name };
+}
+
+/** A program, with one instructor attached when the flow needs one to remove. */
+export async function createFixtureProgram(
+  db: Db,
+  input: { instructorId?: string } = {}
+): Promise<{ id: string; courseName: string }> {
+  const [row] = await db
+    .insert(schema.programs)
+    .values({
+      courseId: fixtureName("Course"),
+      courseName: fixtureName("Program"),
+    })
+    .returning();
+  if (input.instructorId) {
+    await db
+      .insert(schema.programInstructors)
+      .values({ programId: row.id, userId: input.instructorId });
+  }
+  return { id: row.id, courseName: row.courseName };
+}
+
+/**
+ * A pending custom line in a request of its own. The line's name carries the
+ * prefix, which is what the sweep matches to find the request holding it.
+ */
+export async function createFixtureCustomLine(
+  db: Db,
+  input: { userId: string; name: string }
+): Promise<{ lineId: string; requestId: string }> {
+  const [request] = await db
+    .insert(schema.inventoryRequests)
+    .values({ userId: input.userId, note: "End-to-end suite fixture." })
+    .returning();
+  const [line] = await db
+    .insert(schema.inventoryCustomLines)
+    .values({
+      requestId: request.id,
+      name: input.name,
+      reason: "End-to-end suite fixture.",
+      quantity: 1,
+    })
+    .returning();
+  return { lineId: line.id, requestId: request.id };
+}
+
+/** An item on a student's borrow list. Cascades away with the item. */
+export async function addFixtureCartItem(
+  db: Db,
+  input: { userId: string; itemId: string }
+): Promise<void> {
+  await db
+    .insert(schema.inventoryCartItems)
+    .values({ userId: input.userId, itemId: input.itemId });
+}
+
 /** A date offset from now, for a deadline a flow needs on one side of it. */
 export function daysFromNow(days: number): Date {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
@@ -280,6 +378,30 @@ export async function sweepOrphans(db: Db): Promise<void> {
   await db
     .delete(schema.projects)
     .where(like(schema.projects.title, `${E2E_PREFIX}%`));
+
+  // Custom lines name what was asked for, so the prefix is on the line, and
+  // the request holding it is what gets deleted; the line cascades.
+  const staleCustom = await db
+    .select({ requestId: schema.inventoryCustomLines.requestId })
+    .from(schema.inventoryCustomLines)
+    .where(like(schema.inventoryCustomLines.name, `${E2E_PREFIX}%`));
+  if (staleCustom.length > 0) {
+    await db
+      .delete(schema.inventoryRequests)
+      .where(
+        inArray(schema.inventoryRequests.id, [
+          ...new Set(staleCustom.map((l) => l.requestId)),
+        ])
+      );
+  }
+
+  await db
+    .delete(schema.categories)
+    .where(like(schema.categories.name, `${E2E_PREFIX}%`));
+
+  await db
+    .delete(schema.programs)
+    .where(like(schema.programs.courseName, `${E2E_PREFIX}%`));
 
   await db
     .delete(schema.notifications)

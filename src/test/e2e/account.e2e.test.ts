@@ -1,13 +1,17 @@
 import { readFile } from "node:fs/promises";
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
+import { eq } from "drizzle-orm";
+// biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
+import * as schema from "../../db/schema";
 import { waitForHydration } from "../shared/playwright";
 import { SERVER_LOG } from "./constants";
-import { fixtureEmail } from "./fixtures";
+import { deleteFixtureUser, fixtureEmail, openDb } from "./fixtures";
 
 /**
  * The whole account lifecycle, driven through the real forms: sign up, prove
- * the address, sign out, forget the password, set a new one, sign back in.
+ * the address, sign out, forget the password, set a new one, sign back in,
+ * and finally close the account.
  *
  * Every other test in this suite starts from a storage state minted once in
  * global setup, so none of them would notice if verification or password reset
@@ -127,8 +131,73 @@ test.describe("account lifecycle", () => {
     });
     await page.goto("/my/projects");
     await expect(page).toHaveURL(/\/my\/projects/);
+
+    // Closing the account is the last thing the person can do, and the one
+    // write here with a typed gate in front of it. Deletion anonymizes the row
+    // rather than removing it (ADR-0008), so the address on the row changes
+    // and the prefix sweep can no longer find it: the id is read first and the
+    // row is deleted by hand afterwards.
+    const userId = await userIdFor(email);
+    try {
+      await page.goto("/profile");
+      await waitForHydration(page);
+      await page.getByRole("button", { name: "Delete account" }).click();
+      const dialog = page.getByRole("alertdialog");
+      await expect(dialog).toBeVisible();
+      await dialog.getByLabel("Confirm email").fill(email);
+      await dialog.getByRole("button", { name: "Delete my account" }).click();
+      await page.waitForURL((url) => url.pathname === "/", {
+        timeout: 15_000,
+      });
+
+      // The address no longer signs in, and the row says why: it is no longer
+      // that person's row.
+      await page.goto("/sign-in");
+      await waitForHydration(page, "form");
+      await page.getByLabel("Email").fill(email);
+      await page.getByLabel("Password").fill(secondPassword);
+      await page.getByRole("button", { name: /sign in/i }).click();
+      await expectRefused(page);
+      expect(await emailFor(userId)).toBe(`deleted-${userId}@invalid`);
+    } finally {
+      const { db, close } = openDb();
+      try {
+        await deleteFixtureUser(db, userId);
+      } finally {
+        await close();
+      }
+    }
   });
 });
+
+async function userIdFor(email: string): Promise<string> {
+  const { db, close } = openDb();
+  try {
+    const [row] = await db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .where(eq(schema.user.email, email));
+    if (!row) {
+      throw new Error(`${email} has no row, so sign-up never wrote one`);
+    }
+    return row.id;
+  } finally {
+    await close();
+  }
+}
+
+async function emailFor(id: string): Promise<string | undefined> {
+  const { db, close } = openDb();
+  try {
+    const [row] = await db
+      .select({ email: schema.user.email })
+      .from(schema.user)
+      .where(eq(schema.user.id, id));
+    return row?.email;
+  } finally {
+    await close();
+  }
+}
 
 /**
  * Asserts a sign-in attempt was refused.

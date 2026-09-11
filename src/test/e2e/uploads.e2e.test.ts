@@ -72,6 +72,21 @@ test.describe("project image upload", () => {
       const image = owner.locator(`img[src^="${storageBase()}/projects/"]`);
       await expect(image).toBeVisible();
       await expectDecoded(image);
+
+      // Remove is the uploader's other write, and like the upload it lands on
+      // Save rather than on the click. `exact`, because the proposer picker
+      // on the same form has a button whose name starts with the same word.
+      await owner.goto(`/projects/${projectId}/edit`);
+      await waitForHydration(owner, "form");
+      await owner.getByRole("button", { name: "Remove", exact: true }).click();
+      await expect(
+        owner.getByRole("button", { name: "Upload image" })
+      ).toBeVisible();
+      await owner.getByRole("button", { name: "Save" }).click();
+      await owner.waitForURL(new RegExp(`/projects/${projectId}$`), {
+        timeout: 15_000,
+      });
+      await expect(image).toHaveCount(0);
     } finally {
       await context.close();
     }
