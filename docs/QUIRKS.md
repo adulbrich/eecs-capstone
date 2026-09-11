@@ -217,7 +217,7 @@ If you change Better Auth plugins or `additionalFields` and re-run `npx @better-
 
 Note that `EMAIL_TRANSPORT=ses` requires `EMAIL_FROM`, and the failure is louder than it looks: `getEmailSender()` is called at module scope in `src/lib/auth.ts`, so `createSesEmailSender`'s throw happens during import and takes down the whole app rather than just email. The two are always set together by Terraform. See DEPLOYMENT.md §9.5.
 
-Every email renders through `src/lib/email/templates.ts`, which owns the HTML escaping. There are five render functions; the README's table shows four rows because it merges the approved and changes-requested outcomes. Interpolating a project title or staff comment into `html` without `escapeHtml` is an injection into the staff review inbox, so the templates are the only place that builds email markup.
+Every email renders through `src/lib/email/templates.ts`, which owns the HTML escaping. There are five render functions; the README's table shows four rows because it merges the approved and changes-requested outcomes. Interpolating a project title or staff comment into `html` without `escapeHtml` is an injection into the staff inbox, so the templates are the only place that builds email markup.
 
 ### `trustHost` is enabled in non-development
 
@@ -951,7 +951,7 @@ grep -rn 'insert(projectStatusHistory)' src --include='*.ts' | grep -v __tests__
 
 ### `sendEmail` is decided by role in `performTransitionAs`, not by the schema
 
-Skipping a transition's mail is a staff affordance. The decision is made from the `ActorRole` the function already derives, and a non-staff caller's `sendEmail: false` is ignored. The schema cannot be the gate, unlike inventory's `authority`: `performTransition` takes its target status from the request, so one validator serves staff and owners alike. What it protects: an owner reaching `submitted` mails `EMAIL_REVIEW_INBOX`, which is the **only** push telling staff a project arrived; the pull surface is the "Awaiting review" count on `/admin`. That email also fails quietly twice over: an unset inbox only warns, and `notifyTransitionByEmail` swallows its own errors so a failed send cannot undo an approval.
+Skipping a transition's mail is a staff affordance. The decision is made from the `ActorRole` the function already derives, and a non-staff caller's `sendEmail: false` is ignored. The schema cannot be the gate, unlike inventory's `authority`: `performTransition` takes its target status from the request, so one validator serves staff and owners alike. What it protects: an owner reaching `submitted` mails `EMAIL_STAFF_INBOX`, which is the **only** push telling staff a project arrived; the pull surface is the "Awaiting review" count on `/admin`. That email also fails quietly twice over: an unset inbox only warns, and `notifyTransitionByEmail` swallows its own errors so a failed send cannot undo an approval.
 
 ### An unset `BETTER_AUTH_URL` logs, it no longer just drops the mail
 

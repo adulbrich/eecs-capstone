@@ -99,3 +99,57 @@ describe("assertProductionConfig", () => {
     ).toThrow(/S3_BUCKET is not set/);
   });
 });
+
+describe("under the ses transport", () => {
+  // Gated on the transport rather than on NODE_ENV, to match the EMAIL_FROM
+  // throw in createSesEmailSender that fires whenever someone asks for SES.
+  // Before this, a missing staff inbox warned once per submission and dropped
+  // the only push that tells staff a project arrived.
+  it("requires EMAIL_FROM and EMAIL_STAFF_INBOX whatever NODE_ENV is", () => {
+    expect(
+      missingProductionConfig({ EMAIL_TRANSPORT: "ses" } as NodeJS.ProcessEnv)
+    ).toEqual(["EMAIL_FROM", "EMAIL_STAFF_INBOX"]);
+    expect(
+      missingProductionConfig({
+        EMAIL_TRANSPORT: "ses",
+        EMAIL_FROM: "noreply@example.test",
+        EMAIL_STAFF_INBOX: "   ",
+      } as NodeJS.ProcessEnv)
+    ).toEqual(["EMAIL_STAFF_INBOX"]);
+  });
+
+  it("is satisfied when both are set, and asks nothing of the console transport", () => {
+    expect(
+      missingProductionConfig({
+        EMAIL_TRANSPORT: "ses",
+        EMAIL_FROM: "noreply@example.test",
+        EMAIL_STAFF_INBOX: "staff@example.test",
+      } as NodeJS.ProcessEnv)
+    ).toEqual([]);
+    expect(
+      missingProductionConfig({
+        EMAIL_TRANSPORT: "console",
+      } as NodeJS.ProcessEnv)
+    ).toEqual([]);
+  });
+
+  it("lists the production variables first, then the email pair", () => {
+    expect(
+      missingProductionConfig({
+        ...complete,
+        S3_BUCKET: "",
+        EMAIL_TRANSPORT: "ses",
+        EMAIL_FROM: "noreply@example.test",
+      } as NodeJS.ProcessEnv)
+    ).toEqual(["S3_BUCKET", "EMAIL_STAFF_INBOX"]);
+  });
+
+  it("refuses to start without the staff inbox, naming it", () => {
+    expect(() =>
+      assertProductionConfig({
+        EMAIL_TRANSPORT: "ses",
+        EMAIL_FROM: "noreply@example.test",
+      } as NodeJS.ProcessEnv)
+    ).toThrow(/EMAIL_STAFF_INBOX is not set/);
+  });
+});

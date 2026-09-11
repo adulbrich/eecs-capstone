@@ -474,7 +474,7 @@ export async function performTransitionAs(
   // the schema instead: three owner-reachable endpoints carry it, and one of
   // them is `performTransition`, which takes its target status from the wire
   // and so serves staff and owners through the same validator. Without this a
-  // proposer could submit and suppress the notice to EMAIL_REVIEW_INBOX, which
+  // proposer could submit and suppress the notice to EMAIL_STAFF_INBOX, which
   // is the only push telling staff a project arrived.
   //
   // Ignored rather than rejected: an unexpected `false` is a client bug or a

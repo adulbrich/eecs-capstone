@@ -185,10 +185,11 @@ interests. A sort, not a separate list, and unavailable until the viewer has wri
 interests.
 _Avoid_: suggestion, match, personalization
 
-**Review inbox**:
-The staff mailbox that receives one email per submission. The only email a project
-ever sends to staff; every other staff signal is an in-app count.
-_Avoid_: admin email, notifications address
+**Staff inbox**:
+The one staff mailbox every email addressed to staff goes to, set by
+`EMAIL_STAFF_INBOX`. Today it receives one email per submission; every other staff
+signal is an in-app count.
+_Avoid_: review inbox (its old name), admin email, notifications address
 
 **Proposer email**:
 The address a project was proposed for, kept so the project can link to that

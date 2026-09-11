@@ -64,8 +64,8 @@ export interface NotificationConfig {
    * codebase is this one, to build project links.
    */
   appBaseUrl: string | null;
-  /** Who receives the "new project submitted" notice. */
-  reviewInbox: string | null;
+  /** The one mailbox every email addressed to staff goes to. */
+  staffInbox: string | null;
 }
 
 export function buildNotificationConfig(
@@ -73,7 +73,7 @@ export function buildNotificationConfig(
 ): NotificationConfig {
   return {
     appBaseUrl: blankToNull(env.BETTER_AUTH_URL),
-    reviewInbox: blankToNull(env.EMAIL_REVIEW_INBOX),
+    staffInbox: blankToNull(env.EMAIL_STAFF_INBOX),
   };
 }
 

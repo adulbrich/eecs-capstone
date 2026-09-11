@@ -63,11 +63,11 @@ async function sendSubmitted(
   inbox: string | null
 ): Promise<void> {
   if (!inbox) {
-    // Say so rather than returning silently. An unset review inbox means staff
+    // Say so rather than returning silently. An unset staff inbox means staff
     // are never told a project was submitted, and nothing else in the app
     // surfaces that: the transition succeeds and the queue fills up unwatched.
     console.warn(
-      `EMAIL_REVIEW_INBOX is unset, so no submission notice was sent for project ${project.id}`
+      `EMAIL_STAFF_INBOX is unset, so no submission notice was sent for project ${project.id}`
     );
     return;
   }
@@ -149,7 +149,7 @@ export async function notifyTransitionByEmail(
     const url = `${config.appBaseUrl}/projects/${project.id}`;
 
     if (target === "submitted") {
-      await sendSubmitted(project, url, dispatch, config.reviewInbox);
+      await sendSubmitted(project, url, dispatch, config.staffInbox);
       return;
     }
     if (target === "approved" || target === "changes_requested") {

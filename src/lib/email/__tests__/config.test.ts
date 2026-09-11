@@ -71,18 +71,18 @@ describe("buildEmailSenderConfig", () => {
 });
 
 describe("buildNotificationConfig", () => {
-  it("reports an unset app base url and review inbox as null", () => {
+  it("reports an unset app base url and staff inbox as null", () => {
     const config = buildNotificationConfig({} as NodeJS.ProcessEnv);
     expect(config.appBaseUrl).toBeNull();
-    expect(config.reviewInbox).toBeNull();
+    expect(config.staffInbox).toBeNull();
   });
 
   it("trims both, and treats blank as unset", () => {
     expect(
       buildNotificationConfig({
         BETTER_AUTH_URL: " https://app ",
-        EMAIL_REVIEW_INBOX: "  ",
+        EMAIL_STAFF_INBOX: "  ",
       } as NodeJS.ProcessEnv)
-    ).toEqual({ appBaseUrl: "https://app", reviewInbox: null });
+    ).toEqual({ appBaseUrl: "https://app", staffInbox: null });
   });
 });

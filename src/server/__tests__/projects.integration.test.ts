@@ -701,9 +701,9 @@ describe("review emails", () => {
     process.env = { ...ORIGINAL_ENV };
   });
 
-  it("emails the review inbox on submit, the proposer on approve, nobody on publish", async () => {
+  it("emails the staff inbox on submit, the proposer on approve, nobody on publish", async () => {
     process.env.BETTER_AUTH_URL = "https://app";
-    process.env.EMAIL_REVIEW_INBOX = "review@oregonstate.edu";
+    process.env.EMAIL_STAFF_INBOX = "review@oregonstate.edu";
     const owner = await makeUser("owner-mail@x.edu", "user");
     const admin = await makeUser("admin-mail@x.edu", "admin");
     const { id } = await createProjectAs(owner, baseProject());
@@ -776,7 +776,7 @@ describe("review emails", () => {
     // be looked at. `sendEmail` rides on schemas that three owner-reachable
     // endpoints share, so the gate has to be the role, not the field.
     process.env.BETTER_AUTH_URL = "https://app";
-    process.env.EMAIL_REVIEW_INBOX = "review@oregonstate.edu";
+    process.env.EMAIL_STAFF_INBOX = "review@oregonstate.edu";
     const owner = await makeUser("owner-noskip@x.edu", "user");
     const { id } = await createProjectAs(owner, baseProject());
     const send = vi.fn().mockResolvedValue(undefined);
