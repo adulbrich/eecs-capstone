@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
-import { projects, user } from "#/db/schema";
+import { notifications, projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
 import { captureConsoleEmail } from "#/test/shared/console-email";
@@ -140,5 +140,30 @@ describe("the verification boundary", () => {
 
     const [account] = await db.select().from(user).where(eq(user.email, email));
     expect((await statusOf(project.id)).proposerId).toBe(account.id);
+  });
+});
+
+describe("the claim notification", () => {
+  it("writes one row for the account when something was claimed, none otherwise", async () => {
+    const account = await makeAccount("claim-notif@x.edu");
+    await makeProject({ proposerEmail: "claim-notif@x.edu" });
+    await makeProject({ proposerEmail: "claim-notif@x.edu" });
+
+    await claimProjectsForVerifiedUser(account.id, "claim-notif@x.edu");
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, account.id));
+    expect(rows.map((r) => r.type)).toEqual(["projects_claimed"]);
+    expect(rows[0]?.title).toBe("2 projects were linked to your account");
+    expect(rows[0]?.link).toBe("/my/projects");
+
+    // Idempotent: the second pass claims nothing and tells nobody.
+    await claimProjectsForVerifiedUser(account.id, "claim-notif@x.edu");
+    const again = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, account.id));
+    expect(again).toHaveLength(1);
   });
 });

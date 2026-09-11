@@ -115,6 +115,26 @@ export function proposerReassignedNotification(
 }
 
 /**
+ * The notice a claim owes the account it linked projects to. One row for the
+ * batch, whatever the count: the account was just verified, and a bell with
+ * five identical rows says less than one that counts.
+ */
+export function projectsClaimedNotification(
+  userId: string,
+  count: number
+): NotificationRow {
+  const noun = count === 1 ? "project was" : "projects were";
+  return {
+    userId,
+    type: "projects_claimed",
+    title: `${count} ${noun} linked to your account`,
+    message:
+      "Projects proposed under your email address before you signed up are now yours to edit and follow.",
+    link: "/my/projects",
+  };
+}
+
+/**
  * The notices a comment owes, deduped, in insertion order.
  *
  * `parentAuthorId` is a parameter rather than something this module looks up,

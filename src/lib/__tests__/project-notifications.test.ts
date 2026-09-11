@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   commentNotifications,
+  projectsClaimedNotification,
   proposerReassignedNotification,
   softDeleteNotification,
   statusChangeNotification,
@@ -194,5 +195,21 @@ describe("proposerReassignedNotification", () => {
       )
     ).toBeNull();
     expect(proposerReassignedNotification(project, "u-proposer")).toBeNull();
+  });
+});
+
+describe("projectsClaimedNotification", () => {
+  it("counts the projects and links to the user's list", () => {
+    const row = projectsClaimedNotification("u-new", 2);
+    expect(row.userId).toBe("u-new");
+    expect(row.type).toBe("projects_claimed");
+    expect(row.title).toBe("2 projects were linked to your account");
+    expect(row.link).toBe("/my/projects");
+  });
+
+  it("uses the singular for one", () => {
+    expect(projectsClaimedNotification("u-new", 1).title).toBe(
+      "1 project was linked to your account"
+    );
   });
 });
