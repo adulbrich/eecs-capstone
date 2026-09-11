@@ -97,7 +97,9 @@ Each project carries:
   authors it on `/projects/new`; stripped from the payload for every other
   viewer, signed in or not, on published projects included.
 - [x] Project proposer (linked user account, resolved from email; nullable) and
-  a `proposerEmail` link key for proposers without an account yet.
+  a `proposerEmail` link key for proposers without an account yet. The creator
+  is the proposer on create; staff link, reassign or unlink from the Proposer
+  section of the staff panel on the project page, never from the form (#322).
 - [x] Program association.
 - [x] Teams supported: how many student teams the project can take on (1-5,
   default 1), set and edited by staff on the project form.
@@ -217,7 +219,7 @@ Each project carries:
   carry no type.
 - [x] Categories created/edited/deleted by admins (`/admin/categories`).
 - [x] Categories assigned by staff only, many per record, through a
-  multi-select on both the project form and the item form.
+  multi-select in the project page's staff panel (#322) and on the item form.
 - [ ] Partial: Multiple category types exist and can be filtered, but per-type faceted
   filtering on the public listing is not broken out into separate filters.
 - [x] The admin categories table shows a usage count per category: for the

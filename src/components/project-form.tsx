@@ -8,7 +8,6 @@ import { imageUrlToSave } from "#/lib/image-save";
 import {
   PRIVATE_NOTES_LABEL,
   PRIVATE_NOTES_PROJECT_HINT,
-  STAFF_FIELDS_PROJECT_HINT,
 } from "#/lib/private-notes";
 import {
   FIELD_MAX_LENGTHS,
@@ -16,18 +15,12 @@ import {
   IMPROVABLE_FIELDS,
   type ImprovableField,
 } from "#/lib/project-review-fields";
-import { setProjectCategories } from "#/server/categories";
 import { reviewProject } from "#/server/project-review";
 import { createProject, updateProject } from "#/server/projects";
-import type { ProposerForEdit } from "#/server/projects-queries";
 import { uploadProjectImage } from "#/server/uploads";
-import { CategoryMultiSelect } from "./category-multi-select";
 import { MarkdownField } from "./markdown-field";
-import { Panel, PanelHeader, PanelNote } from "./panel";
 import { ProgramSelect } from "./program-select";
 import { ProjectImageUploader } from "./project-image-uploader";
-import { ProposerPicker } from "./proposer-picker";
-import { ProposerSummary } from "./proposer-summary";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
@@ -71,57 +64,37 @@ export const projectFormSchema = z.object({
   // Not in FIELD_MAX_LENGTHS on purpose: notes are staff-private and never sent
   // to the model, so they do not belong in a map the review reads.
   notes: z.string().max(5000),
-  proposerEmail: optionalEmail,
   teamsSupported: z.number().int().min(1).max(5),
   acceptingApplicants: z.boolean(),
 });
 
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
 
+/**
+ * The form carries no staff-only control (#322). The proposer and the
+ * categories are set from the staff panel on the project page, each through
+ * its own writer, so nothing here decides what is sent by who is looking.
+ */
 interface Props {
   enableAiReview?: boolean;
   initial?: Partial<ProjectFormValues>;
-  initialCategoryIds?: string[];
-  /**
-   * Whether the viewer may write the staff-only fields. Separate from
-   * `showProposer` and `showCategories` on purpose, even though all three are
-   * the same boolean at both call sites today: those two decide what is drawn,
-   * this one decides what is sent. Collapsing them would make hiding a control
-   * silently change the payload, and the `proposerEmail` gate below is where
-   * that would stay invisible until it unlinked somebody's project.
-   *
-   * Required rather than optional for the same reason. Omitting it would draw
-   * the proposer input and silently discard whatever was typed into it.
-   */
-  isStaff: boolean;
   /** Called with the saved project's id, for the route to navigate with. */
   onSaved?: (projectId: string) => void;
   projectId?: string;
-  proposer?: ProposerForEdit;
-  showCategories: boolean;
   showNotes: boolean;
-  showProposer?: boolean;
   submitLabel: string;
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: TODO large form component, split into field groups in a follow-up
 export function ProjectForm({
   initial,
-  initialCategoryIds,
   showNotes,
-  showCategories,
   submitLabel,
   onSaved,
   enableAiReview,
-  isStaff,
   projectId,
-  proposer,
-  showProposer,
 }: Props) {
   const [formError, setFormError] = useState<string | null>(null);
-  const [categoryIds, setCategoryIds] = useState<string[]>(
-    initialCategoryIds ?? []
-  );
   // `undefined`: user did not touch the image. `File`: new file to upload on
   // submit. `null`: user clicked Remove, server should clear the image.
   const [pendingImage, setPendingImage] = useState<File | null | undefined>(
@@ -152,7 +125,6 @@ export function ProjectForm({
       isSponsored: initial?.isSponsored ?? false,
       programId: initial?.programId ?? "",
       notes: initial?.notes ?? "",
-      proposerEmail: initial?.proposerEmail ?? "",
       teamsSupported: initial?.teamsSupported ?? 1,
       acceptingApplicants: initial?.acceptingApplicants ?? true,
     } satisfies ProjectFormValues,
@@ -182,8 +154,7 @@ export function ProjectForm({
   });
 
   /**
-   * The write, both paths of it, and the one thing this component owes the
-   * server beyond the field values.
+   * The write, both paths of it.
    *
    * Declared after `useForm` and before the review helpers because
    * `form.onSubmit` above closes over it; a function declaration hoists, so
@@ -199,10 +170,6 @@ export function ProjectForm({
       programId: value.programId || null,
       notes: value.notes || null,
     };
-    // Kept out of `payload`: that object is the field values, and this is a
-    // permission decision about one of them.
-    const proposerEmail = isStaff ? value.proposerEmail || null : undefined;
-
     if (projectId) {
       // Upload before the row write, never after: see image-save.ts. A failed
       // upload must not leave the edit committed with the image change absent
@@ -218,26 +185,12 @@ export function ProjectForm({
           ...payload,
           id: projectId,
           imageUrl,
-          proposerEmail,
         },
       });
-      if (isStaff) {
-        // Unconditional, unlike create below: clearing every category on an
-        // edit has to reach the server, and an early return on an empty array
-        // would silently keep the old ones.
-        await setProjectCategories({
-          data: { projectId, categoryIds },
-        });
-      }
       return projectId;
     }
 
-    const { id } = await createProject({
-      data: {
-        ...payload,
-        proposerEmail,
-      },
-    });
+    const { id } = await createProject({ data: payload });
     // Create cannot upload first: the key is `projects/<id>/...` and the
     // upload guard loads the project to check the viewer, so there is nothing
     // to upload into until the row exists. Hence a second write here, unlike
@@ -254,19 +207,7 @@ export function ProjectForm({
           ...payload,
           id,
           imageUrl,
-          // Omitted on purpose, and not the same as sending null: this save is
-          // about the image, and an omitted proposer leaves the one create
-          // just set alone. The form's blank field would unlink it.
-          proposerEmail: undefined,
         },
-      });
-    }
-    if (isStaff && categoryIds.length > 0) {
-      // Guarded on a non-empty list, unlike edit above: a brand new project
-      // has no categories to clear, so an empty array is a write with nothing
-      // to say.
-      await setProjectCategories({
-        data: { projectId: id, categoryIds },
       });
     }
     return id;
@@ -660,8 +601,8 @@ export function ProjectForm({
           </div>
         )}
       </form.Field>
-      {/* Private notes stay outside the staff panel: the proposer writes and
-          reads them too, so they are not staff-only content. */}
+      {/* Private notes are not staff-only content: the proposer writes and
+          reads them too. */}
       {showNotes && (
         <Field
           description={PRIVATE_NOTES_PROJECT_HINT}
@@ -671,52 +612,6 @@ export function ProjectForm({
           rows={3}
           textarea
         />
-      )}
-
-      {/* The staff-only inputs, grouped and labelled the same way the project
-          page's staff panel is, so it is obvious while filling the form which
-          fields a proposer would never see. No PanelSection titles here: each
-          control already has its own label, and a section heading above a
-          field label would just say the same word twice. */}
-      {(showProposer || showCategories) && (
-        <Panel tone="staff">
-          <PanelHeader title="Staff panel" />
-          <PanelNote>{STAFF_FIELDS_PROJECT_HINT}</PanelNote>
-          <div className="mt-4 space-y-4">
-            {showProposer && proposer && (
-              // The same block the detail page's staff panel shows, so the two
-              // cannot disagree about whether this proposer has an account.
-              <ProposerSummary proposer={proposer} />
-            )}
-            {showProposer && (
-              <form.Field name="proposerEmail">
-                {(field: AnyForm) => (
-                  <div>
-                    <ProposerPicker
-                      accountLinked={proposer?.accountLinked ?? false}
-                      accountName={proposer?.accountName ?? null}
-                      onChange={(email) => field.handleChange(email)}
-                      value={field.state.value as string}
-                    />
-                    <FieldError errors={field.state.meta.errors} />
-                  </div>
-                )}
-              </form.Field>
-            )}
-            {showCategories && (
-              <div>
-                <Label>Categories</Label>
-                <div className="mt-1">
-                  <CategoryMultiSelect
-                    domain="project"
-                    onChange={setCategoryIds}
-                    value={categoryIds}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        </Panel>
       )}
 
       {formError && (

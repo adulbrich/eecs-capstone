@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import { STAFF_PANEL_AUDIENCE_HINT } from "#/lib/private-notes";
 import {
   canTransition,
@@ -21,9 +22,10 @@ import {
 import { ConfirmDialog } from "./confirm-dialog";
 import { type EditLogEntry, EditLogList } from "./edit-log-list";
 import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
-import { ProposerSummary } from "./proposer-summary";
 import { ScopeAssessmentSection } from "./scope-assessment-section";
+import { StaffCategoriesSection } from "./staff-categories-section";
 import { StaffMentorshipSection } from "./staff-mentorship-section";
+import { StaffProposerSection } from "./staff-proposer-section";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import {
@@ -70,40 +72,59 @@ export function StaffProjectPanel({
   const [busy, setBusy] = useState(false);
   const [editLog, setEditLog] = useState<EditLogEntry[]>([]);
   const [sendEmail, setSendEmail] = useState(true);
-  const [proposer, setProposer] = useState<ProposerForEdit>({
-    accountLinked: false,
-    accountName: null,
-    email: "",
-  });
+  // Null until loaded: the Proposer section keeps Save disabled until then.
+  const [proposer, setProposer] = useState<ProposerForEdit | null>(null);
+  const [proposerError, setProposerError] = useState<string | null>(null);
   // The dialog's checkbox has always keyed off "is there an address at all",
   // so it keeps reading exactly that rather than the whole record.
-  const proposerAddress = proposer.email || null;
+  const proposerAddress = proposer?.email || null;
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const { rows } = await listProjectEditLog({
-          data: { id: project.id },
-        });
-        setEditLog(rows as EditLogEntry[]);
-      } catch {
-        // ignored
-      }
-    })();
+  const loadEditLog = useCallback(async () => {
+    try {
+      const { rows } = await listProjectEditLog({
+        data: { id: project.id },
+      });
+      setEditLog(rows as EditLogEntry[]);
+    } catch {
+      // ignored
+    }
+  }, [project.id]);
+
+  const loadProposer = useCallback(async () => {
+    try {
+      setProposer(
+        await getProposerForEdit({ data: { projectId: project.id } })
+      );
+      setProposerError(null);
+    } catch (e) {
+      // Reported in the Proposer section, where Save stays disabled, the way
+      // the other sections report a failed load. The dialog degrades to "no
+      // address on file" and sends nothing, which is the safe direction.
+      setProposerError(errorMessage(e, "Could not load the proposer record"));
+    }
   }, [project.id]);
 
   useEffect(() => {
-    void (async () => {
-      try {
-        setProposer(
-          await getProposerForEdit({ data: { projectId: project.id } })
-        );
-      } catch {
-        // Staff-only endpoint; on failure the dialog degrades to "no address
-        // on file" and sends nothing, which is the safe direction.
-      }
-    })();
-  }, [project.id]);
+    void loadEditLog();
+  }, [loadEditLog]);
+
+  useEffect(() => {
+    void loadProposer();
+  }, [loadProposer]);
+
+  // A saved proposer has to reach the transition dialog's email checkbox
+  // without a reload, and the edit log below it, so the section hands the
+  // save back here rather than reloading a copy of its own.
+  async function onProposerSaved() {
+    await Promise.all([loadProposer(), loadEditLog()]);
+    onChanged();
+  }
+
+  // Same for the other writers in this panel: a save shows up in the log.
+  function onSectionChanged() {
+    void loadEditLog();
+    onChanged();
+  }
 
   const currentStatus = project.status as ProjectStatus;
 
@@ -198,12 +219,8 @@ export function StaffProjectPanel({
       />
       <PanelNote>{STAFF_PANEL_AUDIENCE_HINT}</PanelNote>
 
-      <PanelSection title="Proposer">
-        <ProposerSummary proposer={proposer} />
-      </PanelSection>
-
-      <StaffMentorshipSection onChanged={onChanged} projectId={project.id} />
-
+      {/* Section order is the one #322 asked for: Status, Proposer,
+          Mentorship, Scope assessment, Categories, Edit log, Danger zone. */}
       <PanelSection title="Status">
         {/* Status stepper: vertical on mobile, horizontal on md+ */}
         <div className="md:overflow-x-auto md:pb-1">
@@ -385,6 +402,18 @@ export function StaffProjectPanel({
         <p className="mt-2 text-destructive text-sm">{error}</p>
       )}
 
+      <StaffProposerSection
+        loadError={proposerError}
+        onSaved={onProposerSaved}
+        projectId={project.id}
+        proposer={proposer}
+      />
+
+      <StaffMentorshipSection
+        onChanged={onSectionChanged}
+        projectId={project.id}
+      />
+
       {/* Private notes render on the shared project page, above this panel:
           they are visible to the proposer as well, so they are not staff-only
           content and would be duplicated here. */}
@@ -394,6 +423,11 @@ export function StaffProjectPanel({
       <PanelSection title="Scope assessment">
         <ScopeAssessmentSection projectId={project.id} />
       </PanelSection>
+
+      <StaffCategoriesSection
+        onChanged={onSectionChanged}
+        projectId={project.id}
+      />
 
       <PanelSection title="Edit log">
         <EditLogList rows={editLog} />

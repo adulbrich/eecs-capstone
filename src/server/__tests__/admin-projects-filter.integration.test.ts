@@ -7,6 +7,7 @@ import {
   createProjectAs,
   performTransitionAs,
   softDeleteProjectAs,
+  updateProjectProposerAs,
 } from "#/server/_internal/projects";
 import {
   getProjectAs,
@@ -392,8 +393,12 @@ describe("admin project search reaches people, not just text", () => {
   it("falls back to the stored proposerEmail when the proposer account is deleted", async () => {
     const admin = await makeAdmin("staff@example.edu");
     const proposer = await makeAdmin("leaving2@example.edu");
-    await createProjectAs(admin, {
-      ...baseProject("Deleted Account Proposer", null),
+    const leaving = await createProjectAs(
+      admin,
+      baseProject("Deleted Account Proposer", null)
+    );
+    await updateProjectProposerAs(admin, {
+      id: leaving.id,
       proposerEmail: "leaving2@example.edu",
     });
     await db.delete(user).where(eq(user.id, proposer.id));
@@ -411,8 +416,12 @@ describe("admin project search reaches people, not just text", () => {
 
   it("reports the stored proposerEmail for a proposal that matches no account yet", async () => {
     const admin = await makeAdmin("staff@example.edu");
-    await createProjectAs(admin, {
-      ...baseProject("Unlinked Proposal", null),
+    const unlinked = await createProjectAs(
+      admin,
+      baseProject("Unlinked Proposal", null)
+    );
+    await updateProjectProposerAs(admin, {
+      id: unlinked.id,
       proposerEmail: "unregistered@example.edu",
     });
     const { rows } = await listAdminProjectsAs(admin, {

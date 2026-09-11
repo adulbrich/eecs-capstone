@@ -44,9 +44,7 @@ function renderForm() {
     <ProjectForm
       enableAiReview
       initial={{ title: "Old title", description: "Old description" }}
-      isStaff={false}
       projectId="00000000-0000-0000-0000-000000000001"
-      showCategories={false}
       showNotes={false}
       submitLabel="Save"
     />
@@ -134,9 +132,7 @@ describe("ProjectForm AI review without a project", () => {
     return render(
       <ProjectForm
         enableAiReview
-        isStaff={false}
         {...(initial ? { initial } : {})}
-        showCategories={false}
         showNotes={false}
         submitLabel="Create draft"
       />

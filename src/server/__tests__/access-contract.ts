@@ -298,7 +298,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/projects.ts:createProject": {
     level: "authenticated",
-    note: "Any signed-in user may propose. Staff creating one get a wider set of writable fields.",
+    note: "Any signed-in user may propose, and the creator is the proposer, staff included. Staff reassign afterwards through updateProjectProposer.",
   },
   "server/projects.ts:forceSetProjectStatus": {
     level: "staff",
@@ -334,7 +334,11 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/projects.ts:updateProject": { level: "owner-or-staff" },
   "server/projects.ts:updateProjectMentorship": {
     level: "staff",
-    note: "The only writer of studentProposed and mentorEmail. Neither key exists on ProjectInput, so updateProject cannot reach them; this endpoint is what keeps the pair staff-only.",
+    note: "The only writer of studentProposed, seekingMentor and mentorEmail. None of the keys exists on ProjectInput, so updateProject cannot reach them; this endpoint is what keeps them staff-only.",
+  },
+  "server/projects.ts:updateProjectProposer": {
+    level: "staff",
+    note: "The only writer of proposerEmail and proposerId after create. The key is not on ProjectInput, so updateProject cannot reach it; proposerId is derived from the address here, never taken from the client (ADR-0007).",
   },
 
   "server/search.ts:searchProjects": {
