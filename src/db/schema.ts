@@ -163,11 +163,17 @@ export const projects = pgTable(
     // Staff-only. OSU asks a submitter to say whether the project is
     // sponsored; the amount is a conversation, not a column.
     isSponsored: boolean("is_sponsored").notNull().default(false),
-    // Public. Marks a project as a student's own proposal, which is what makes
-    // "Seeking mentor" show while mentorEmail is null. Written by staff only,
-    // during review; a student has no reason to self-classify. Not derived
-    // from the proposer's role or affiliation, both of which drift. See #75.
+    // Public. Marks a project as a student's own proposal. Written by staff
+    // only, during review; a student has no reason to self-classify. Not
+    // derived from the proposer's role or affiliation, both of which drift.
+    // Says nothing about mentorship since #304: a student project may have a
+    // mentor, want one, or need none (the instructor mentors). See #75.
     studentProposed: boolean("student_proposed").notNull().default(false),
+    // Staff-set: the project is looking for a mentor. Public only through the
+    // derived `seekingMentor` (this AND mentor_email IS NULL), so a stale flag
+    // never shows a "Seeking mentor" badge beside a recorded address. Written
+    // by updateProjectMentorshipAs only, like the two columns around it. #304.
+    seekingMentor: boolean("seeking_mentor").notNull().default(false),
     // Staff-only, never in a public payload. Resolved to a name at read time
     // by a case-insensitive match on user.email. No FK and no mentor_id:
     // mentorship grants no permission, so an id would be a denormalization

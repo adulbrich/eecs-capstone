@@ -48,13 +48,16 @@ export const mentorNameSql = sql<string | null>`(
 )`;
 
 /**
- * "Needs a mentor" is derived, never stored, so it cannot drift from the
- * mentor being assigned. It lives here rather than in the client because the
- * public payload does not carry `mentorEmail`: without this flag a client
- * could not tell "no mentor" from "a mentor is lined up who has not signed up
- * yet", and the second must show nothing rather than "Seeking mentor".
+ * The public "Seeking mentor": staff said the project is looking for one and
+ * no address is on file yet. The address guard is what keeps a stale flag
+ * from showing a badge beside a recorded mentor, and it lives here rather
+ * than in the client because the public payload does not carry `mentorEmail`:
+ * without this a client could not tell "no mentor" from "a mentor is lined up
+ * who has not signed up yet", and the second must show nothing rather than
+ * "Seeking mentor". `studentProposed` is no input since #304: a student
+ * project may need no mentor, and a partner project may want one.
  */
-export const seekingMentorSql = sql<boolean>`(${projects.studentProposed} AND ${projects.mentorEmail} IS NULL)`;
+export const seekingMentorSql = sql<boolean>`(${projects.seekingMentor} AND ${projects.mentorEmail} IS NULL)`;
 
 /**
  * Column projection shared by every query that feeds the project card and

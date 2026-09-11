@@ -366,6 +366,8 @@ export interface ProjectMentorship {
   mentorEmail: string;
   /** The account at that address, if one exists. Null is "no account yet". */
   mentorName: string | null;
+  /** The stored flag, not the derived badge: true even while an address is on file. */
+  seekingMentor: boolean;
   studentProposed: boolean;
 }
 
@@ -383,6 +385,7 @@ export async function getProjectMentorshipAs(
     .select({
       mentorEmail: projects.mentorEmail,
       mentorName: mentorNameSql,
+      seekingMentor: projects.seekingMentor,
       studentProposed: projects.studentProposed,
     })
     .from(projects)
@@ -393,6 +396,7 @@ export async function getProjectMentorshipAs(
   return {
     mentorEmail: row.mentorEmail ?? "",
     mentorName: row.mentorName,
+    seekingMentor: row.seekingMentor,
     studentProposed: row.studentProposed,
   };
 }

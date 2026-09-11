@@ -278,10 +278,10 @@ export async function updateProjectAs(
 }
 
 /**
- * The only writer of `studentProposed` and `mentorEmail`.
+ * The only writer of `studentProposed`, `seekingMentor` and `mentorEmail`.
  *
- * Staff-only, and deliberately not part of `updateProjectAs`: neither key
- * exists on `ProjectInput`, so the shared form cannot carry them and a
+ * Staff-only, and deliberately not part of `updateProjectAs`: none of the
+ * keys exists on `ProjectInput`, so the shared form cannot carry them and a
  * proposer has no endpoint that accepts them. That is what makes "staff edit
  * these" structural rather than a check someone remembers to keep.
  *
@@ -294,7 +294,8 @@ export async function updateProjectAs(
  * `mentorNameSql` compares against `user.email`, which is Better Auth's
  * column rather than one of the four this app normalizes.
  *
- * No embedding refresh: neither column is part of the embedding source text.
+ * No embedding refresh: none of the columns is part of the embedding source
+ * text.
  */
 export async function updateProjectMentorshipAs(
   viewer: Viewer,
@@ -304,6 +305,7 @@ export async function updateProjectMentorshipAs(
   const existing = await loadProjectOr404(data.id);
   const newValues: Partial<typeof projects.$inferSelect> = {
     studentProposed: data.studentProposed,
+    seekingMentor: data.seekingMentor,
     mentorEmail: normalizeEmailAddress(data.mentorEmail),
   };
   const { changedFields, newDiff, oldDiff } = diffRowFields(
