@@ -149,6 +149,26 @@ export function projectReassignedEmail(input: {
   };
 }
 
+/**
+ * Staff named this address as the project's mentor. No account is needed to
+ * receive it; the catalog shows the mentor's name once one exists.
+ */
+export function mentorNamedEmail(input: {
+  title: string;
+  url: string;
+}): RenderedEmail {
+  return {
+    subject: `You were named as a mentor: ${input.title}`,
+    ...layout(
+      [
+        `Capstone staff listed you as the mentor for "${input.title}".`,
+        "If that is right, nothing is needed from you now; the team will be in touch once the project is assigned. If it is a mistake, reply to this email.",
+      ],
+      { label: "View the project", url: input.url }
+    ),
+  };
+}
+
 /** Staff hard-deleted a draft. No link: the row is gone. */
 export function projectDeletedEmail(input: { title: string }): RenderedEmail {
   return {

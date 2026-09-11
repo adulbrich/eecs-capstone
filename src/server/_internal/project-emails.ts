@@ -7,6 +7,7 @@ import {
 } from "#/lib/email/config";
 import { getEmailSender } from "#/lib/email/sender";
 import {
+  mentorNamedEmail,
   projectApprovedEmail,
   projectChangesRequestedEmail,
   projectCommentEmail,
@@ -367,5 +368,41 @@ export async function notifyProposerReassignedByEmail(
     );
   } catch (error) {
     console.error(`Reassignment email failed for project ${project.id}`, error);
+  }
+}
+
+export interface MentorEmailInput {
+  mentorEmail: string;
+  project: { id: string; title: string };
+}
+
+/**
+ * Sends the email a newly named mentor is owed. Never throws. The caller
+ * decides "newly": only a change to the address itself, to a non-null value,
+ * reaches here, so toggling the flags beside it mails nobody twice.
+ */
+export async function notifyMentorNamedByEmail(
+  input: MentorEmailInput,
+  send?: SendEmailFn,
+  config: NotificationConfig = buildNotificationConfig()
+): Promise<void> {
+  const { mentorEmail, project } = input;
+  try {
+    if (!config.appBaseUrl) {
+      throw new Error(
+        "BETTER_AUTH_URL is not set, so no mentor email could be addressed"
+      );
+    }
+    const dispatch: SendEmailFn =
+      send ?? ((to, email) => getEmailSender().send(to, email));
+    await dispatch(
+      mentorEmail,
+      mentorNamedEmail({
+        title: project.title,
+        url: `${config.appBaseUrl}/projects/${project.id}`,
+      })
+    );
+  } catch (error) {
+    console.error(`Mentor email failed for project ${project.id}`, error);
   }
 }

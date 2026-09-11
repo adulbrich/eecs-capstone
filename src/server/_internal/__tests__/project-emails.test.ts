@@ -16,6 +16,7 @@ import type { NotificationConfig } from "#/lib/email/config";
 import {
   notifyCommentByEmail,
   notifyHardDeleteByEmail,
+  notifyMentorNamedByEmail,
   notifyProposerReassignedByEmail,
   notifyTransitionByEmail,
 } from "../project-emails";
@@ -462,5 +463,26 @@ describe("notifyProposerReassignedByEmail", () => {
     );
 
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("notifyMentorNamedByEmail", () => {
+  it("emails the named address with a link to the project", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyMentorNamedByEmail(
+      {
+        mentorEmail: "mentor@example.edu",
+        project: { id: "p1", title: "Robot arm" },
+      },
+      send,
+      CONFIG
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    const [to, email] = send.mock.calls[0] ?? [];
+    expect(to).toBe("mentor@example.edu");
+    expect(email.subject).toBe("You were named as a mentor: Robot arm");
+    expect(email.text).toContain("https://app/projects/p1");
   });
 });

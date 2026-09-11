@@ -31,6 +31,7 @@ import {
 } from "./notify";
 import {
   notifyHardDeleteByEmail,
+  notifyMentorNamedByEmail,
   notifyProposerReassignedByEmail,
   notifyTransitionByEmail,
   type SendEmailFn,
@@ -354,7 +355,8 @@ export async function updateProjectProposerForCurrentUser(data: ProposerInput) {
  */
 export async function updateProjectMentorshipAs(
   viewer: Viewer,
-  data: MentorshipInput
+  data: MentorshipInput,
+  opts?: EmailOptions
 ): Promise<{ id: string; updated: boolean }> {
   assertStaff(viewer);
   const existing = await loadProjectOr404(data.id);
@@ -383,6 +385,18 @@ export async function updateProjectMentorshipAs(
       newValues: newDiff,
     });
   });
+  // Only a new address is news to anyone: the flags beside it change what
+  // the catalog shows, not who is involved. After the transaction, and it
+  // swallows its own errors.
+  if (changedFields.includes("mentorEmail") && newValues.mentorEmail) {
+    await notifyMentorNamedByEmail(
+      {
+        mentorEmail: newValues.mentorEmail,
+        project: { id: existing.id, title: existing.title },
+      },
+      opts?.send
+    );
+  }
   return { id: existing.id, updated: true };
 }
 
