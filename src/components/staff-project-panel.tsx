@@ -246,8 +246,9 @@ export function StaffProjectPanel({
                   "cursor-pointer border border-dashed border-border text-muted-foreground hover:border-foreground hover:text-foreground";
                 pillTitle = `Override: force to ${PROJECT_STATUS_LABEL[s]}`;
               }
-              // The action first, so `getByTitle("Move to Approved")` still
-              // finds the pill, then what the status means (#303).
+              // The action first, then what the status means (#303). Tests
+              // match the pill by the action with `/^Move to Approved\./`,
+              // since `getByTitle` with a string is an exact match.
               const pillTooltip = `${pillTitle}. ${PROJECT_STATUS_DESCRIPTION[s]}`;
               const pillClass = [
                 "rounded-full px-3 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",

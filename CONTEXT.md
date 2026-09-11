@@ -92,8 +92,7 @@ spells it. Closed to applicants and soft-deleted are not statuses.
 _Avoid_: pending (for submitted), in review, rejected (there is no rejected status;
 a project goes back to changes requested or to draft), active, live (for
 published), closed (for archived; see below), any abbreviation of a label such as
-"changes req." (the labels and one-line descriptions are `PROJECT_STATUS_LABEL` and
-`PROJECT_STATUS_DESCRIPTION` in `src/lib/project-workflow.ts`)
+"changes req."
 
 **Transition**:
 A change of a project's status by a person with the right to make it. The proposer
