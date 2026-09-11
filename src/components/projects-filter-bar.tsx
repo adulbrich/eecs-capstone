@@ -4,7 +4,6 @@ import type { z } from "zod";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import type { ViewMode } from "#/lib/view-preference";
 import { listCategories, type listSchema } from "#/server/categories";
-import { getMyInterests } from "#/server/interests";
 import { listPrograms } from "#/server/programs";
 import { FilterSwitch } from "./filter-switch";
 import { Card } from "./ui/card";
@@ -34,10 +33,20 @@ interface Program {
 interface Props {
   acceptingOnly: boolean;
   archivedOnly: boolean;
+  /**
+   * Whether the viewer has an interests vector, as the route loader read it
+   * from `searchProjects`. From the loader rather than an effect so the first
+   * paint is already right: an effect started at `false` and painted the
+   * "Add your interests" prompt for everyone, members with interests and
+   * visitors alike, until the answer came back (#321).
+   */
+  canRecommend: boolean;
   categories: string[];
   order: "relevance" | "newest" | "recommended";
   program: string | null;
   q: string;
+  /** Same source as `canRecommend`, and for the same reason. */
+  signedIn: boolean;
   view: ViewMode;
 }
 
@@ -47,13 +56,14 @@ export function ProjectsFilterBar({
   program,
   acceptingOnly,
   archivedOnly,
+  canRecommend,
   order,
+  signedIn,
   view,
 }: Props) {
   const navigate = useNavigate({ from: "/projects/" });
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [allPrograms, setAllPrograms] = useState<Program[]>([]);
-  const [canRecommend, setCanRecommend] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -69,12 +79,6 @@ export function ProjectsFilterBar({
         setAllPrograms(progs as Program[]);
       } catch {
         // ignored
-      }
-      try {
-        const interests = await getMyInterests();
-        setCanRecommend(interests.hasEmbedding);
-      } catch {
-        // Signed out, or the call failed: the option stays disabled.
       }
     })();
   }, []);
@@ -231,7 +235,25 @@ export function ProjectsFilterBar({
           </Link>
         </p>
       )}
-      {!canRecommend && (
+      {/*
+        Three states, one line each. A visitor is sent to sign in and back
+        here, not to /profile, which would bounce them to sign-in with the
+        profile as the return address. A member with no vector is sent to
+        write their interests. A member with one gets no prompt.
+      */}
+      {!(canRecommend || signedIn) && (
+        <p className="mt-2 text-muted-foreground text-xs">
+          <Link
+            className="text-brand hover:underline"
+            search={{ redirect: "/projects" }}
+            to="/sign-in"
+          >
+            Sign in to get recommendations
+          </Link>{" "}
+          sorted by how well projects match your interests.
+        </p>
+      )}
+      {signedIn && !canRecommend && (
         <p className="mt-2 text-muted-foreground text-xs">
           <Link className="text-brand hover:underline" to="/profile">
             Add your interests

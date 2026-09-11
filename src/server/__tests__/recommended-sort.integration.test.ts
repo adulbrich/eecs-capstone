@@ -137,12 +137,14 @@ describe("sort=recommended", () => {
       interestsText: "robotics with no vector",
     });
 
-    const { rows } = await searchProjectsImpl(
+    const { rows, viewer } = await searchProjectsImpl(
       { ...SEARCH_DEFAULTS, sort: "recommended" },
       admin.id
     );
     expect(rows.length).toBe(2);
     expect(rows.map((r) => r.title)).toEqual(["Second", "First"]);
+    // What the filter bar reads to show "Add your interests" (#321).
+    expect(viewer).toEqual({ signedIn: true, canRecommend: false });
   });
 
   it("falls back to relevance ordering for a signed-out viewer", async () => {
@@ -150,11 +152,31 @@ describe("sort=recommended", () => {
     await publishWithVector(admin, "First", unitVector(0));
     await publishWithVector(admin, "Second", unitVector(1));
 
-    const { rows } = await searchProjectsImpl(
+    const { rows, viewer } = await searchProjectsImpl(
       { ...SEARCH_DEFAULTS, sort: "recommended" },
       null
     );
     expect(rows.map((r) => r.title)).toEqual(["Second", "First"]);
+    expect(viewer).toEqual({ signedIn: false, canRecommend: false });
+  });
+
+  it("reports a viewer with a vector as able to sort by recommendation, whatever the sort", async () => {
+    const admin = await makeAdmin(`g-${Date.now()}@x.com`);
+    await publishWithVector(admin, "Only", unitVector(0));
+    await db.insert(userInterests).values({
+      userId: admin.id,
+      interestsText: "robotics",
+      embedding: unitVector(0),
+      embeddingSourceHash: "test",
+    });
+
+    // Read under the default sort: the listing decides whether to offer the
+    // recommended sort before anyone has picked it.
+    const { viewer } = await searchProjectsImpl(
+      { ...SEARCH_DEFAULTS, sort: "relevance" },
+      admin.id
+    );
+    expect(viewer).toEqual({ signedIn: true, canRecommend: true });
   });
 });
 

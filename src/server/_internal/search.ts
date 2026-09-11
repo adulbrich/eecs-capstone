@@ -57,21 +57,31 @@ export async function searchProjectsImpl(
     ? sql`ts_rank(${projects.searchVector}, websearch_to_tsquery('english', ${trimmed})) DESC, ${projects.publishedAt} DESC`
     : desc(projects.publishedAt);
 
+  // Read for every signed-in viewer, not only under `recommended`: the
+  // listing tells the reader whether the recommended sort is open to them,
+  // and reading that here, in the loader, is what stops the prompt flashing
+  // on first paint for someone who already has interests (#321). One indexed
+  // row per request.
+  const interestsVector = viewerId
+    ? ((
+        await db
+          .select({ embedding: userInterests.embedding })
+          .from(userInterests)
+          .where(eq(userInterests.userId, viewerId))
+      )[0]?.embedding ?? null)
+    : null;
+
   let orderBy = relevanceOrder;
   if (data.sort === "newest") {
     orderBy = desc(projects.publishedAt);
-  } else if (data.sort === "recommended" && viewerId) {
-    const [interests] = await db
-      .select({ embedding: userInterests.embedding })
-      .from(userInterests)
-      .where(eq(userInterests.userId, viewerId));
-    if (interests?.embedding) {
-      const probe = toSqlVector(interests.embedding);
-      // Null embeddings sort last rather than being filtered out: a project
-      // that failed to embed must stay reachable.
-      orderBy = sql`${projects.embedding} IS NULL, ${projects.embedding} <=> ${probe}::vector`;
-    }
+  } else if (data.sort === "recommended" && interestsVector) {
+    const probe = toSqlVector(interestsVector);
+    // Null embeddings sort last rather than being filtered out: a project
+    // that failed to embed must stay reachable.
+    orderBy = sql`${projects.embedding} IS NULL, ${projects.embedding} <=> ${probe}::vector`;
   }
+  // `recommended` with no vector falls through to relevance silently: a
+  // hand-typed `?order=recommended` still renders a page.
 
   const offset = (data.page - 1) * data.pageSize;
   const rows = await db
@@ -93,5 +103,14 @@ export async function searchProjectsImpl(
     total: count,
     page: data.page,
     pageSize: data.pageSize,
+    /**
+     * Whether the recommended sort is open to this viewer, and if not, why:
+     * the filter bar shows a sign-in prompt to a visitor and an add-your-
+     * interests prompt to a member with no vector. Never the vector itself.
+     */
+    viewer: {
+      signedIn: viewerId !== null,
+      canRecommend: interestsVector !== null,
+    },
   };
 }

@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { eq } from "drizzle-orm";
+// biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
+import * as schema from "../../db/schema";
 import { waitForHydration } from "../shared/playwright";
 import { ADMIN_AUTH, USER_AUTH } from "./constants";
-import { fixtureName } from "./fixtures";
+import { fixtureName, withDb } from "./fixtures";
 
 /**
  * Draft, submit, approve, publish. The two role switches use explicit contexts
@@ -55,6 +58,18 @@ test.describe("@smoke project lifecycle", () => {
           staff.getByRole("button", { name: status, exact: true })
         ).toBeDisabled();
       }
+
+      // This suite runs with Bedrock off (playwright.e2e.config.ts), so the
+      // publish that just landed wrote no vector, and the page still came up:
+      // that is the degraded path #321 asks for. The on path is the
+      // integration suite's, with an injected embedder.
+      const [published] = await withDb((db) =>
+        db
+          .select({ embedding: schema.projects.embedding })
+          .from(schema.projects)
+          .where(eq(schema.projects.title, title))
+      );
+      expect(published.embedding).toBeNull();
 
       // Published is the status that makes a project visible to students, so
       // the flow is not proven until an anonymous visitor can see it.

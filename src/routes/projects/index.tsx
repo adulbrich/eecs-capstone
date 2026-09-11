@@ -137,7 +137,7 @@ function ProjectCards({ rows }: { rows: ProjectListRow[] }) {
 }
 
 function ProjectsList() {
-  const { rows, total, page, pageSize } = Route.useLoaderData();
+  const { rows, total, page, pageSize, viewer } = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/projects/" });
   const view = search.view ?? "card";
@@ -176,10 +176,12 @@ function ProjectsList() {
           <ProjectsFilterBar
             acceptingOnly={search.acceptingOnly}
             archivedOnly={search.archivedOnly}
+            canRecommend={viewer.canRecommend}
             categories={search.categories}
             order={search.order}
             program={search.program}
             q={search.q}
+            signedIn={viewer.signedIn}
             view={view}
           />
         </div>
