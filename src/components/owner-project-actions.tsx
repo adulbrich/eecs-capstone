@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   hardDeleteProject,
@@ -15,11 +16,22 @@ interface Project {
 }
 
 interface Props {
+  /**
+   * What staff asked for the last time they sent the project back, or null
+   * when the status is not changes requested or the note is missing. The
+   * route reads it off the status history it already loads for the owner, so
+   * the block can say what to change beside the button that resubmits.
+   */
+  changeRequest: string | null;
   onChanged: () => void;
   project: Project;
 }
 
-export function OwnerProjectActions({ project, onChanged }: Props) {
+export function OwnerProjectActions({
+  changeRequest,
+  project,
+  onChanged,
+}: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -86,11 +98,43 @@ export function OwnerProjectActions({ project, onChanged }: Props) {
     return null;
   }
 
+  const sentBack = project.status === "changes_requested";
+
   return (
     <Card asChild className="mt-6 bg-secondary p-4">
       <section>
         <SectionHeading>Your actions</SectionHeading>
+        {/*
+          The staff note, in the box that asks for the resubmit, so the
+          proposer reads what to change before they are offered the button.
+          The status history further down keeps the full record; this is the
+          latest request only.
+        */}
+        {sentBack && (
+          <div className="mt-2 text-sm">
+            <p className="font-medium">Staff asked for changes</p>
+            {changeRequest ? (
+              <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
+                {changeRequest}
+              </p>
+            ) : (
+              <p className="mt-1 text-muted-foreground">
+                No note was left. Check the status history below or ask staff.
+              </p>
+            )}
+          </div>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
+          {sentBack && (
+            <Button asChild size="sm" variant="outline">
+              <Link
+                params={{ projectId: project.id }}
+                to="/projects/$projectId/edit"
+              >
+                Edit project
+              </Link>
+            </Button>
+          )}
           {visible.map((b) => (
             <Button
               disabled={busy}

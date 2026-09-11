@@ -69,10 +69,10 @@ test.describe("project changes-requested round trip", () => {
       await owner.goto(`/projects/${projectId}`);
       await waitForHydration(owner);
 
-      // The proposer's copy of the review. It reaches them through the private
-      // panel's status history, not through the staff panel, which they cannot
-      // see at all.
-      await expect(owner.getByText(comment)).toBeVisible();
+      // The proposer's copy of the review, twice: in the "Your actions" box
+      // beside the resubmit button, and in the private panel's status history.
+      // Never through the staff panel, which they cannot see at all.
+      await expect(owner.getByText(comment)).toHaveCount(2);
       await expect(
         owner.getByRole("heading", { name: "Staff panel", exact: true })
       ).toHaveCount(0);
