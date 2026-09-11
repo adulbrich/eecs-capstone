@@ -38,7 +38,7 @@ export function InventoryCard({ item, signedIn }: Props) {
         to="/inventory/$itemId"
       >
         <ImageOrFallback
-          className="aspect-[16/9] w-full object-cover md:aspect-[3/2] md:w-40 md:shrink-0 md:rounded-md"
+          className="aspect-[16/9] w-full bg-muted object-contain md:aspect-[3/2] md:w-40 md:shrink-0 md:rounded-md"
           src={src}
         />
         <div className="flex min-w-0 flex-1 flex-col p-4 md:p-0">

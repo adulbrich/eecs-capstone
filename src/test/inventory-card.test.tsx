@@ -49,6 +49,11 @@ describe("InventoryCard", () => {
     expect(classes).toContain("w-full");
     expect(classes).toContain("md:aspect-[3/2]");
     expect(classes).toContain("md:w-40");
+    // Same recipe as the project card (#314): the whole image inside the
+    // box, bars on the muted background, nothing cropped.
+    expect(classes).toContain("object-contain");
+    expect(classes).toContain("bg-muted");
+    expect(classes).not.toContain("object-cover");
   });
 
   it("links the whole image-and-text area", () => {

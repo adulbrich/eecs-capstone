@@ -197,7 +197,10 @@ are reserved for the rare case that genuinely needs a third tier.
 There is no card grid any more. The listing cards (`project-card.tsx`,
 `inventory-card.tsx`) are one component at both widths: image on top at 16:9
 below `md`, image on the left at 3:2 and `w-40` from `md` up, in a single column
-bounded to `max-w-4xl`. A five-tier grid ladder used to hold the mobile-shaped
+bounded to `max-w-4xl`. The image is letterboxed inside that box, `object-contain`
+on `bg-muted`, so the whole picture shows at every width and the bars read as
+part of the card; `object-cover` cropped anything that was not the box's ratio
+(#314). The detail page hero and the table thumbnails still crop. A five-tier grid ladder used to hold the mobile-shaped
 card at every width; it left with the two display modes on 2026-09-02, because a
 card that turns into a row at `md` cannot sit in a three-column grid.
 
