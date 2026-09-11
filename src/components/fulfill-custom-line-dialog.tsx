@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import { listAdminInventory } from "#/server/inventory";
 import { fulfillCustomLine } from "#/server/inventory-custom";
 import { Button } from "./ui/button";
@@ -128,7 +129,7 @@ export function FulfillCustomLineDialog({
       setOpen(false);
       onDone();
     } catch (e) {
-      setError((e as Error)?.message || "Fulfil failed");
+      setError(errorMessage(e, "Fulfil failed"));
     } finally {
       setBusy(false);
     }

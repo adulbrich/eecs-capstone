@@ -17,7 +17,23 @@
  * both forms now pass, produces `{ message }` issues; a hand-written validator
  * or a server error can produce a bare string. Rendering both is cheaper than
  * making every call site know which it has.
- *
+ */
+function errorText(e: unknown): string {
+  if (typeof e === "string") {
+    return e;
+  }
+  if (
+    typeof e === "object" &&
+    e !== null &&
+    "message" in e &&
+    typeof e.message === "string"
+  ) {
+    return e.message;
+  }
+  return String(e);
+}
+
+/**
  * Six `form.Field` render props displayed no errors at all before this existed,
  * so a failed validation greyed out the Save button and said nothing.
  */
@@ -27,13 +43,7 @@ function FieldError({ errors }: { errors: readonly unknown[] }) {
   }
   return (
     <p className="mt-1 text-destructive text-sm" data-slot="field-error">
-      {errors
-        .map((e: unknown) =>
-          typeof e === "string"
-            ? e
-            : ((e as { message?: string })?.message ?? String(e))
-        )
-        .join(", ")}
+      {errors.map(errorText).join(", ")}
     </p>
   );
 }

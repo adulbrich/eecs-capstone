@@ -74,20 +74,16 @@ describe("toCsv", () => {
     expect(csv).toContain('"line one\nline two"');
   });
 
-  it.each([
-    "=",
-    "+",
-    "-",
-    "@",
-    "\t",
-    "\r",
-  ])("prefixes a formula-injection lead character (%j) with an apostrophe", (lead) => {
-    const csv = toCsv(
-      [{ header: "Name", value: (r: Row) => r.name }],
-      [row({ name: `${lead}HYPERLINK("http://evil")` })]
-    );
-    expect(csv.split("\r\n")[1]).toContain(`'${lead}HYPERLINK`);
-  });
+  it.each(["=", "+", "-", "@", "\t", "\r"])(
+    "prefixes a formula-injection lead character (%j) with an apostrophe",
+    (lead) => {
+      const csv = toCsv(
+        [{ header: "Name", value: (r: Row) => r.name }],
+        [row({ name: `${lead}HYPERLINK("http://evil")` })]
+      );
+      expect(csv.split("\r\n")[1]).toContain(`'${lead}HYPERLINK`);
+    }
+  );
 
   it("puts the guard apostrophe inside the quotes when both apply", () => {
     const csv = toCsv(

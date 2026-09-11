@@ -31,7 +31,7 @@ export function LocalTime({
   dateOnly?: boolean;
   value: Date | string | null | undefined;
 }) {
-  const iso = value == null ? null : isoOf(value);
+  const iso = value === null || value === undefined ? null : isoOf(value);
   // `iso` is a primitive, so the effect's dependency is stable even when the
   // caller passes a fresh Date object on every render.
   const [text, setText] = useState(() => (iso ? utcText(iso, dateOnly) : ""));

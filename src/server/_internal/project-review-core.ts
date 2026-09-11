@@ -6,6 +6,7 @@ import {
   type ResponsesFn,
 } from "#/lib/_internal/bedrock-mantle";
 import type { ReviewOutcome } from "#/lib/ai-review-limits";
+import { errorMessage } from "#/lib/error-message";
 import {
   FIELD_LABELS,
   FIELD_MAX_LENGTHS,
@@ -169,8 +170,10 @@ export function parseReviewResponse(
   try {
     // Function call arguments arrive as a JSON string, not an object.
     parsed = reviewToolInputSchema.parse(JSON.parse(toolCall.arguments));
-  } catch {
-    throw new Error("Couldn't generate suggestions, please try again.");
+  } catch (error) {
+    throw new Error("Couldn't generate suggestions, please try again.", {
+      cause: error,
+    });
   }
 
   const suggestions: ReviewResult["suggestions"] = {};
@@ -256,7 +259,7 @@ export async function runProjectReview(
       ...emptyRun(),
       called: true,
       outcome: "failed",
-      error: (error as Error)?.message || "AI review failed",
+      error: errorMessage(error, "AI review failed"),
     };
   }
 
@@ -282,7 +285,7 @@ export async function runProjectReview(
     return {
       ...base,
       outcome: truncated ? "truncated" : "failed",
-      error: (error as Error)?.message || "AI review failed",
+      error: errorMessage(error, "AI review failed"),
       result: { suggestions: {}, model: MODEL_ID, reviewedFields: [] },
     };
   }

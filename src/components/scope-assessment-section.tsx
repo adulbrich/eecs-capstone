@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import {
   confidenceLabel,
   SCOPE_VERDICT_LABELS,
@@ -69,7 +70,7 @@ export function ScopeAssessmentSection({ projectId }: { projectId: string }) {
     try {
       setView(await assessProjectScope({ data: { projectId } }));
     } catch (e) {
-      setError((e as Error)?.message || "Scope assessment failed");
+      setError(errorMessage(e, "Scope assessment failed"));
     } finally {
       setBusy(false);
     }

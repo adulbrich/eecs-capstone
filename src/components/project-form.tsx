@@ -3,6 +3,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { FieldError } from "#/components/ui/field";
 import { applyServerErrors } from "#/lib/apply-server-errors";
+import { errorMessage } from "#/lib/error-message";
 import { imageUrlToSave } from "#/lib/image-save";
 import {
   PRIVATE_NOTES_LABEL,
@@ -174,7 +175,7 @@ export function ProjectForm({
           err
         );
         if (!handled) {
-          setFormError((err as Error)?.message || "Save failed");
+          setFormError(errorMessage(err, "Save failed"));
         }
       }
     },
@@ -311,7 +312,7 @@ export function ProjectForm({
         Object.keys(result.suggestions).length === 0 ? "empty" : "idle"
       );
     } catch (err) {
-      setReviewError((err as Error)?.message || "AI review failed");
+      setReviewError(errorMessage(err, "AI review failed"));
       setReviewState("idle");
     }
   }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import { approveRequestLines } from "#/server/inventory";
 import { Button } from "./ui/button";
 import {
@@ -60,7 +61,7 @@ export function ApproveAllDialog({
       setOpen(false);
       onDone();
     } catch (e) {
-      setError((e as Error)?.message || "Approve failed");
+      setError(errorMessage(e, "Approve failed"));
     } finally {
       setBusy(false);
     }

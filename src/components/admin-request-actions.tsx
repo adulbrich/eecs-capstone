@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import { approveRequestItem, rejectRequestItem } from "#/server/inventory";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -54,7 +55,7 @@ export function AdminRequestActions({ lineId, onDone, status }: Props) {
       close();
       onDone();
     } catch (e) {
-      setError((e as Error)?.message || "Approve failed");
+      setError(errorMessage(e, "Approve failed"));
     } finally {
       setBusy(false);
     }
@@ -75,7 +76,7 @@ export function AdminRequestActions({ lineId, onDone, status }: Props) {
       close();
       onDone();
     } catch (e) {
-      setError((e as Error)?.message || "Reject failed");
+      setError(errorMessage(e, "Reject failed"));
     } finally {
       setBusy(false);
     }

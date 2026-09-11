@@ -3,6 +3,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { FieldError } from "#/components/ui/field";
 import { applyServerErrors } from "#/lib/apply-server-errors";
+import { errorMessage } from "#/lib/error-message";
 import { imageUrlToSave } from "#/lib/image-save";
 import {
   PRIVATE_NOTES_INVENTORY_HINT,
@@ -138,7 +139,7 @@ export function InventoryForm({
           err
         );
         if (!handled) {
-          setFormError((err as Error)?.message || "Save failed");
+          setFormError(errorMessage(err, "Save failed"));
         }
       }
     },

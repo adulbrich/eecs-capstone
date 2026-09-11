@@ -554,7 +554,7 @@ Linting and formatting run through **Ultracite** (a strict Biome preset). `biome
 - 2-space indent.
 - Double quotes for JS / TS strings.
 - Imports auto-sorted by the Biome assist organize-imports rule. Don't fight it.
-- Everything is checked except generated / tool-managed paths excluded in `biome.json`: `src/routeTree.gen.ts`, `src/styles.css`, `scripts/`, and `drizzle/`. (Biome respects `.gitignore` via `vcs.useIgnoreFile`, so `playwright-report/` etc. are skipped too.)
+- Everything is checked except generated / tool-managed paths excluded in `biome.json`: `src/routeTree.gen.ts`, `src/styles.css`, `scripts/`, `drizzle/` and `**/*.svg`. (Biome respects `.gitignore` via `vcs.useIgnoreFile`, so `playwright-report/` etc. are skipped too.)
 - `npm run check` must be clean before committing. Run `npm run format` (or `npx ultracite fix`) to auto-fix.
 
 ### The git hooks
@@ -588,6 +588,8 @@ Tuned in `biome.json` rather than fought file-by-file:
 - **Disabled (idiom / framework conflict):** `noVoid` (intentional fire-and-forget `void promise()`), `useFilenamingConvention` under `src/routes/**` (TanStack `$param` / `__root` files), plus inline ignores for `noNamespaceImport` (drizzle `import * as schema`, shadcn) and `noBarrelFile` (the schema re-export).
 - **Relaxed in tests** (`*.test.ts(x)`, `__tests__/`, `src/test/`): `useTopLevelRegex`, `noEmptyBlockStatements`, `useAwait`, `noNonNullAssertion`.
 - **Deferred (needs real a11y/UX work, tracked as a finding):** `useImageSize` (add intrinsic image dimensions). Re-enable when addressed.
+- **Turned off 2026-09-10, when ultracite 7.11 switched them on:** `noJsxPropsBind` (an inline arrow in a JSX prop is the idiom this codebase and React 19 use, and the render-cost argument behind the rule predates the compiler), `noLeakedRender` (the strict types already make `cond && <X />` a boolean in all but a handful of places, and the rule wanted `Boolean()` around 121 of them), `noAwaitInLoops` (the seeds, the migration script and the Bedrock callers await in sequence on purpose, to keep one connection or one request in flight), `noIncrementDecrement` and `useDestructuring` (style with no defect behind it). Two assists went off with them: `useSortedKeys` and `useSortedTypeFields`, because object literals here are ordered by meaning (form fields in display order, a status map in workflow order, a select projection in the order the row reads) and 1224 alphabetical rewrites would have erased that for nothing. `useSortedPackageJson` stays on.
+- **`**/*.svg` is excluded.** Biome 2.5 parses SVG as HTML, wanted to reflow the two logo files, and asked `logo-institution.svg` for a `<title>`. They are assets, not source.
 - **Re-enabled 2026-08-22:** `noAlert`. It was off while the app still used native `alert()`/`confirm()`; those are now `ConfirmDialog` and `sonner` toasts, so the rule passes and catches a regression at edit time. `src/test/no-native-modals.test.ts` guards the same thing at test time, including the `window.`-prefixed forms the linter also sees.
 
 ### Do not run `biome check --write --unsafe` blindly

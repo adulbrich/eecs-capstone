@@ -124,7 +124,7 @@ function calledFactory(
   names: ReadonlySet<string>
 ): ts.Identifier | undefined {
   let current: ts.Node = node;
-  while (true) {
+  for (;;) {
     if (ts.isCallExpression(current)) {
       if (
         ts.isIdentifier(current.expression) &&

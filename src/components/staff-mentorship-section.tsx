@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import { updateProjectMentorship } from "#/server/projects";
 import {
   getProjectMentorship,
@@ -68,7 +69,7 @@ export function StaffMentorshipSection({
       setStudentProposed(saved.studentProposed);
     } catch (e) {
       // Reported, not swallowed, and Save stays disabled: see the gate below.
-      setError((e as Error)?.message || "Could not load the mentorship record");
+      setError(errorMessage(e, "Could not load the mentorship record"));
     }
   }, [projectId]);
 
@@ -90,7 +91,7 @@ export function StaffMentorshipSection({
       await load();
       onChanged();
     } catch (e) {
-      setError((e as Error)?.message || "Save failed");
+      setError(errorMessage(e, "Save failed"));
     } finally {
       setBusy(false);
     }

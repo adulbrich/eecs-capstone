@@ -220,12 +220,16 @@ describe("compareByDeadline", () => {
 describe("attentionSummary", () => {
   const now = new Date("2026-09-03T12:00:00Z");
   const day = (offset: number) => new Date(now.getTime() + offset * 86_400_000);
-  const hold = (status: string, dueAt: Date | null, pickupBy: Date | null) =>
+  const holdEntry = (
+    status: string,
+    dueAt: Date | null,
+    pickupBy: Date | null
+  ) =>
     ({
       kind: "hold" as const,
       item: { status, dueAt, pickupBy, updatedAt: now },
     }) satisfies DeadlineEntry;
-  const request = (
+  const requestEntry = (
     itemStatus: string,
     dueAt: Date | null,
     pickupBy: Date | null
@@ -239,12 +243,12 @@ describe("attentionSummary", () => {
   it("counts what is overdue and what is due within three days, from both arms", () => {
     const summary = attentionSummary(
       [
-        hold("checked_out", day(-2), null),
-        request("checked_out", day(2), null),
-        request("reserved", null, day(-1)),
-        hold("reserved", null, day(3)),
-        hold("checked_out", day(10), null),
-        request("requested", null, null),
+        holdEntry("checked_out", day(-2), null),
+        requestEntry("checked_out", day(2), null),
+        requestEntry("reserved", null, day(-1)),
+        holdEntry("reserved", null, day(3)),
+        holdEntry("checked_out", day(10), null),
+        requestEntry("requested", null, null),
       ],
       now
     );
@@ -265,7 +269,9 @@ describe("attentionSummary", () => {
     });
     expect(needsAttention(attentionSummary([], now))).toBe(false);
     expect(
-      needsAttention(attentionSummary([hold("checked_out", day(1), null)], now))
+      needsAttention(
+        attentionSummary([holdEntry("checked_out", day(1), null)], now)
+      )
     ).toBe(true);
   });
 });

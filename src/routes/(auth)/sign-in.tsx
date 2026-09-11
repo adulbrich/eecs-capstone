@@ -37,7 +37,7 @@ export const Route = createFileRoute("/(auth)/sign-in")({
 
 function SignIn() {
   const navigate = useNavigate();
-  const { redirect, error: oauthError } = useSearch({
+  const { redirect: redirectTo, error: oauthError } = useSearch({
     from: "/(auth)/sign-in",
   });
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +69,7 @@ function SignIn() {
       );
       return;
     }
-    navigate({ to: redirect ?? "/" });
+    navigate({ to: redirectTo ?? "/" });
   }
 
   return (
@@ -117,7 +117,7 @@ function SignIn() {
           onClick={() =>
             authClient.signIn.oauth2({
               providerId: "onid",
-              callbackURL: redirect ?? "/",
+              callbackURL: redirectTo ?? "/",
               errorCallbackURL: "/sign-in",
             })
           }
@@ -130,7 +130,7 @@ function SignIn() {
           onClick={() =>
             authClient.signIn.social({
               provider: "github",
-              callbackURL: redirect ?? "/",
+              callbackURL: redirectTo ?? "/",
             })
           }
           type="button"

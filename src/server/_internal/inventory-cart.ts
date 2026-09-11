@@ -102,7 +102,7 @@ export async function submitCartAs(
         .from(inventoryItems)
         .where(eq(inventoryItems.id, row.itemId))
         .for("update");
-      if (!locked || locked.status !== "available") {
+      if (locked?.status !== "available") {
         skipped.push({ itemId: row.itemId, reason: "no_longer_available" });
         continue;
       }

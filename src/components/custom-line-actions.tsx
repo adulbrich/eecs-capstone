@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import { isOpenCustomLine } from "#/lib/inventory-custom-workflow";
 import {
   rejectCustomLine,
@@ -57,7 +58,7 @@ export function CustomLineActions({
       close();
       onDone();
     } catch (e) {
-      setError((e as Error)?.message || failure);
+      setError(errorMessage(e, failure));
     } finally {
       setBusy(false);
     }
@@ -225,7 +226,7 @@ export function StartSourcingAllButton({
               }
               onDone();
             } catch (e) {
-              setError((e as Error)?.message || "Sourcing failed");
+              setError(errorMessage(e, "Sourcing failed"));
             } finally {
               setBusy(false);
             }

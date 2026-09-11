@@ -9,19 +9,19 @@ afterEach(cleanup);
 const MAILTO = `mailto:${brand.supportEmail}`;
 
 describe("OAuthErrorBanner", () => {
-  it.each([
-    "email_is_missing",
-    "user_info_is_missing",
-  ])("names the capstone office as a mailto link for %s", (code) => {
-    render(<OAuthErrorBanner code={code} />);
-    const alert = screen.getByRole("alert");
-    // Inside the alert, so a screen reader announces the address with the
-    // refusal rather than as a separate link somewhere on the page.
-    const link = within(alert).getByRole("link", {
-      name: brand.supportEmail,
-    });
-    expect(link.getAttribute("href")).toBe(MAILTO);
-  });
+  it.each(["email_is_missing", "user_info_is_missing"])(
+    "names the capstone office as a mailto link for %s",
+    (code) => {
+      render(<OAuthErrorBanner code={code} />);
+      const alert = screen.getByRole("alert");
+      // Inside the alert, so a screen reader announces the address with the
+      // refusal rather than as a separate link somewhere on the page.
+      const link = within(alert).getByRole("link", {
+        name: brand.supportEmail,
+      });
+      expect(link.getAttribute("href")).toBe(MAILTO);
+    }
+  );
 
   it("carries the link on the fallback for a code it does not know", () => {
     render(<OAuthErrorBanner code="something_better_auth_added" />);

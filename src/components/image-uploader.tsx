@@ -5,13 +5,10 @@ import ReactCrop, {
   centerCrop,
   makeAspectCrop,
 } from "react-image-crop";
+import { errorMessage } from "#/lib/error-message";
 import { IMAGE_FILE_ACCEPT } from "#/lib/image-upload-policy";
 import { getPublicUrl } from "#/lib/storage";
 import { Button } from "./ui/button";
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : "Image processing failed.";
-}
 
 interface Props {
   aspect?: number;
@@ -113,7 +110,7 @@ export function ImageUploader({
       setCrop(null);
       onChange(file);
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(err, "Image processing failed."));
     } finally {
       setBusy(false);
     }

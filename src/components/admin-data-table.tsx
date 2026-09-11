@@ -660,9 +660,9 @@ export function AdminDataTable<T>({
         >
           <TableCaption className="sr-only">{caption}</TableCaption>
           <TableHeader>
-            {table.getHeaderGroups().map((group) => (
-              <TableRow key={group.id}>
-                {group.headers.map((header) => {
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
                   const direction = header.column.getIsSorted();
                   const label = labels.get(header.column.id) ?? "";
                   const canSort = header.column.getCanSort();

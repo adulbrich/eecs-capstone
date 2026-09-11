@@ -287,7 +287,7 @@ describe("statusRank", () => {
 });
 
 describe("custom line views", () => {
-  const row = {
+  const customLine = {
     id: "custom-1",
     requestId: "req-2",
     name: "Thermal camera",
@@ -305,7 +305,7 @@ describe("custom line views", () => {
   };
 
   it("gives the requester what was asked, where it is, both notes and the dates", () => {
-    expect(Object.keys(myCustomLineView(row)).sort()).toEqual([
+    expect(Object.keys(myCustomLineView(customLine)).sort()).toEqual([
       "closedAt",
       "createdAt",
       "id",
@@ -323,13 +323,13 @@ describe("custom line views", () => {
   it("gives the requester the date the line was decided, for the timeline", () => {
     // The decided event has nothing to sit on without it; the identity of
     // who decided stays with staff.
-    const view = myCustomLineView(row);
+    const view = myCustomLineView(customLine);
     expect(view.reviewedAt).toEqual(new Date("2026-02-02"));
     expect(view.closedAt).toBeNull();
   });
 
   it("keeps the identities for staff", () => {
-    const view = staffCustomLineView(row);
+    const view = staffCustomLineView(customLine);
     expect(view.reviewedBy).toBe("u-staff");
     expect(view.closedBy).toBeNull();
     expect(Object.keys(view)).not.toContain("requestId");

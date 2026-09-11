@@ -81,17 +81,15 @@ describe("InventoryLifecyclePanel: the hard delete gate", () => {
     [false, true].map((hasRequestHistory) => ({ status, hasRequestHistory }))
   );
 
-  it.each(
-    cases
-  )("offers hard delete for $status with request history $hasRequestHistory only when both allow it", ({
-    status,
-    hasRequestHistory,
-  }) => {
-    renderPanel({ status, hasRequestHistory });
-    const allowed =
-      (status === "available" || status === "retired") && !hasRequestHistory;
-    expect(hardDeleteTrigger()).toHaveProperty("disabled", !allowed);
-  });
+  it.each(cases)(
+    "offers hard delete for $status with request history $hasRequestHistory only when both allow it",
+    ({ status, hasRequestHistory }) => {
+      renderPanel({ status, hasRequestHistory });
+      const allowed =
+        (status === "available" || status === "retired") && !hasRequestHistory;
+      expect(hardDeleteTrigger()).toHaveProperty("disabled", !allowed);
+    }
+  );
 
   it("shows the server's refusal beside the disabled button, and only then", () => {
     const { unmount } = renderPanel({ hasRequestHistory: true });
@@ -132,30 +130,29 @@ describe("InventoryLifecyclePanel: the recommended transition per status", () =>
       const entry = recommended[status];
       return entry ? [{ status, ...entry }] : [];
     })
-  )("$status offers $label, and asks who holds the item exactly when the rules say the target needs a holder", async ({
-    status,
-    label,
-    next,
-  }) => {
-    renderPanel({ status });
-    fireEvent.click(screen.getByRole("button", { name: label }));
+  )(
+    "$status offers $label, and asks who holds the item exactly when the rules say the target needs a holder",
+    async ({ status, label, next }) => {
+      renderPanel({ status });
+      fireEvent.click(screen.getByRole("button", { name: label }));
 
-    if (needsHolder(next)) {
-      // Reserving or checking out names a person or a label first. The
-      // dialog is that question; nothing is sent until it is answered.
-      expect(await screen.findByRole("dialog")).toBeDefined();
-      expect(server.transitionInventoryItem).not.toHaveBeenCalled();
-    } else {
-      await waitFor(() =>
-        expect(server.transitionInventoryItem).toHaveBeenCalledTimes(1)
-      );
-      expect(server.transitionInventoryItem).toHaveBeenCalledWith({
-        data: expect.objectContaining({ itemId: "item-1", nextStatus: next }),
-      });
-      expect(screen.queryByRole("dialog")).toBeNull();
-      expect(router.invalidate).toHaveBeenCalledTimes(1);
+      if (needsHolder(next)) {
+        // Reserving or checking out names a person or a label first. The
+        // dialog is that question; nothing is sent until it is answered.
+        expect(await screen.findByRole("dialog")).toBeDefined();
+        expect(server.transitionInventoryItem).not.toHaveBeenCalled();
+      } else {
+        await waitFor(() =>
+          expect(server.transitionInventoryItem).toHaveBeenCalledTimes(1)
+        );
+        expect(server.transitionInventoryItem).toHaveBeenCalledWith({
+          data: expect.objectContaining({ itemId: "item-1", nextStatus: next }),
+        });
+        expect(screen.queryByRole("dialog")).toBeNull();
+        expect(router.invalidate).toHaveBeenCalledTimes(1);
+      }
     }
-  });
+  );
 });
 
 describe("InventoryLifecyclePanel: the status override", () => {
@@ -186,26 +183,27 @@ describe("InventoryLifecyclePanel: the status override", () => {
     STATUSES.filter((s) => s !== "requested" && s !== "available").map(
       (next) => ({ next })
     )
-  )("overriding to $next asks who holds the item exactly when the rules say the target needs a holder", async ({
-    next,
-  }) => {
-    renderPanel({ status: "available" });
-    await pickOverride(next);
+  )(
+    "overriding to $next asks who holds the item exactly when the rules say the target needs a holder",
+    async ({ next }) => {
+      renderPanel({ status: "available" });
+      await pickOverride(next);
 
-    if (needsHolder(next)) {
-      expect(await screen.findByRole("dialog")).toBeDefined();
-      expect(server.transitionInventoryItem).not.toHaveBeenCalled();
-    } else {
-      await waitFor(() =>
-        expect(server.transitionInventoryItem).toHaveBeenCalledTimes(1)
-      );
-      expect(server.transitionInventoryItem).toHaveBeenCalledWith({
-        data: expect.objectContaining({ itemId: "item-1", nextStatus: next }),
-      });
-      expect(screen.queryByRole("dialog")).toBeNull();
-      expect(router.invalidate).toHaveBeenCalledTimes(1);
+      if (needsHolder(next)) {
+        expect(await screen.findByRole("dialog")).toBeDefined();
+        expect(server.transitionInventoryItem).not.toHaveBeenCalled();
+      } else {
+        await waitFor(() =>
+          expect(server.transitionInventoryItem).toHaveBeenCalledTimes(1)
+        );
+        expect(server.transitionInventoryItem).toHaveBeenCalledWith({
+          data: expect.objectContaining({ itemId: "item-1", nextStatus: next }),
+        });
+        expect(screen.queryByRole("dialog")).toBeNull();
+        expect(router.invalidate).toHaveBeenCalledTimes(1);
+      }
     }
-  });
+  );
 
   it("refuses 'requested' with its own message and sends nothing", async () => {
     renderPanel({ status: "available" });
