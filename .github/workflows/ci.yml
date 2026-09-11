@@ -44,6 +44,10 @@ jobs:
   # behavior in this repo, and until PR #21 it ran by hand. That is how a flaky
   # test survived unnoticed and how bookmarks.integration.test.ts drifted into
   # testing Postgres instead of the bookmark path. It takes about two minutes.
+  #
+  # Required. Registered on the `main` ruleset as `integration / suite`, the
+  # `<caller job> / <called job>` form the smoke comment below explains. It was
+  # advisory until 2026-09-03 because of a flake (#22) that never recurred in CI.
   integration:
     uses: ./.github/workflows/stack-suite.yml
     with:

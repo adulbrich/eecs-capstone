@@ -51,12 +51,12 @@ first column is what stops you locally; the last is what stops the merge.
 | Biome clean | `pre-commit`, staged files | `after-edit.mjs` | `verify` |
 | Typecheck and unit suite green | `pre-push` | | `verify` |
 | Browser smoke and accessibility smoke green | you, when a covered flow changes | | `smoke / suite`, `accessibility-smoke / suite`, required |
-| Integration suite green | you, when the database layer changes | | `integration / suite`, advisory until #22 is settled |
+| Integration suite green | you, when the database layer changes | | `integration / suite`, required |
 
 Skipping locally: `LEFTHOOK=0 git commit` or `--no-verify`. The Claude Code hooks and
 CI catch what was skipped, so skipping moves the failure rather than removing it.
 
-The three checks that block a merge are registered on the `main` ruleset. The list
+The checks that block a merge are registered on the `main` ruleset. The list
 endpoint does not carry the rules, so it takes two calls:
 
 ```bash
@@ -70,8 +70,9 @@ gh api repos/adulbrich/eecs-capstone/rulesets/<id> --jq '.rules[] | select(.type
 ## Which suites to run yourself
 
 `npm test` is the unit suite and runs at push. The others are yours to run when the
-change reaches them, because CI's integration result does not block and the
-browser suites are slow:
+change reaches them: every one of them blocks the merge, and a PR that reaches CI
+red costs a round trip that the local run would have saved. The browser suites are
+slow, so run the one the change touches:
 
 - `npm run test:integration` when the database layer changes. Needs `docker compose
   up -d` and `npm run db:migrate`. It truncates the dev database; reseed with
