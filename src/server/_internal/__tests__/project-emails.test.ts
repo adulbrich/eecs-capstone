@@ -24,6 +24,10 @@ const CONFIG: NotificationConfig = {
 };
 const NO_INBOX: NotificationConfig = { ...CONFIG, staffInbox: null };
 
+// Nobody in these cases is the proposer, so the actor is always staff unless a
+// test says otherwise; the owner-withdrawal case below passes the proposer.
+const STAFF = "u-staff";
+
 const PROJECT = {
   description: "A robot arm.",
   id: "p1",
@@ -37,10 +41,13 @@ describe("notifyTransitionByEmail", () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
     await notifyTransitionByEmail(
-      PROJECT,
-      "submitted",
-      null,
-      true,
+      {
+        actorId: STAFF,
+        comment: null,
+        project: PROJECT,
+        sendEmail: true,
+        target: "submitted",
+      },
       send,
       CONFIG
     );
@@ -56,18 +63,24 @@ describe("notifyTransitionByEmail", () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
     await notifyTransitionByEmail(
-      PROJECT,
-      "approved",
-      null,
-      true,
+      {
+        actorId: STAFF,
+        comment: null,
+        project: PROJECT,
+        sendEmail: true,
+        target: "approved",
+      },
       send,
       CONFIG
     );
     await notifyTransitionByEmail(
-      PROJECT,
-      "changes_requested",
-      "Add objectives.",
-      true,
+      {
+        actorId: STAFF,
+        comment: "Add objectives.",
+        project: PROJECT,
+        sendEmail: true,
+        target: "changes_requested",
+      },
       send,
       CONFIG
     );
@@ -80,8 +93,18 @@ describe("notifyTransitionByEmail", () => {
   it("sends nothing for statuses that are not part of review", async () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
-    for (const target of ["draft", "published", "archived"] as const) {
-      await notifyTransitionByEmail(PROJECT, target, null, true, send, CONFIG);
+    for (const target of ["published", "archived"] as const) {
+      await notifyTransitionByEmail(
+        {
+          actorId: STAFF,
+          comment: null,
+          project: PROJECT,
+          sendEmail: true,
+          target,
+        },
+        send,
+        CONFIG
+      );
     }
 
     expect(send).not.toHaveBeenCalled();
@@ -91,10 +114,13 @@ describe("notifyTransitionByEmail", () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
     await notifyTransitionByEmail(
-      PROJECT,
-      "approved",
-      null,
-      false,
+      {
+        actorId: STAFF,
+        comment: null,
+        project: PROJECT,
+        sendEmail: false,
+        target: "approved",
+      },
       send,
       CONFIG
     );
@@ -107,10 +133,13 @@ describe("notifyTransitionByEmail", () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
     await notifyTransitionByEmail(
-      PROJECT,
-      "submitted",
-      null,
-      true,
+      {
+        actorId: STAFF,
+        comment: null,
+        project: PROJECT,
+        sendEmail: true,
+        target: "submitted",
+      },
       send,
       NO_INBOX
     );
@@ -123,10 +152,13 @@ describe("notifyTransitionByEmail", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     await notifyTransitionByEmail(
-      PROJECT,
-      "submitted",
-      null,
-      true,
+      {
+        actorId: STAFF,
+        comment: null,
+        project: PROJECT,
+        sendEmail: true,
+        target: "submitted",
+      },
       vi.fn().mockResolvedValue(undefined),
       NO_INBOX
     );
@@ -153,10 +185,20 @@ describe("notifyTransitionByEmail", () => {
     // this after the transition is committed, so an escaping error would undo
     // nothing but would surface as a failed request on a succeeded approval.
     await expect(
-      notifyTransitionByEmail(PROJECT, "submitted", null, true, send, {
-        ...CONFIG,
-        appBaseUrl: null,
-      })
+      notifyTransitionByEmail(
+        {
+          actorId: STAFF,
+          comment: null,
+          project: PROJECT,
+          sendEmail: true,
+          target: "submitted",
+        },
+        send,
+        {
+          ...CONFIG,
+          appBaseUrl: null,
+        }
+      )
     ).resolves.toBeUndefined();
 
     expect(send).not.toHaveBeenCalled();
@@ -193,10 +235,13 @@ describe("notifyTransitionByEmail", () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
     await notifyTransitionByEmail(
-      { ...PROJECT, proposerEmail: null, proposerId: null },
-      "approved",
-      null,
-      true,
+      {
+        actorId: STAFF,
+        comment: null,
+        project: { ...PROJECT, proposerEmail: null, proposerId: null },
+        sendEmail: true,
+        target: "approved",
+      },
       send,
       CONFIG
     );
@@ -208,7 +253,62 @@ describe("notifyTransitionByEmail", () => {
     const send = vi.fn().mockRejectedValue(new Error("SES is down"));
 
     await expect(
-      notifyTransitionByEmail(PROJECT, "approved", null, true, send, CONFIG)
+      notifyTransitionByEmail(
+        {
+          actorId: STAFF,
+          comment: null,
+          project: PROJECT,
+          sendEmail: true,
+          target: "approved",
+        },
+        send,
+        CONFIG
+      )
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("notifyTransitionByEmail, returned to draft", () => {
+  it("emails the proposer with the staff comment when staff return it", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyTransitionByEmail(
+      {
+        actorId: STAFF,
+        comment: "Scope this to one term.",
+        project: PROJECT,
+        sendEmail: true,
+        target: "draft",
+      },
+      send,
+      CONFIG
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    const [to, email] = send.mock.calls[0] ?? [];
+    expect(to).toBe("alex@oregonstate.edu");
+    expect(email.subject).toBe("Returned to draft: Robot arm");
+    expect(email.text).toContain("Scope this to one term.");
+    expect(email.text).toContain("https://app/projects/p1");
+  });
+
+  it("emails nobody when the proposer withdraws their own submission", async () => {
+    // The same silence rule as the in-app row: the only person to tell is the
+    // one who clicked. Owner withdrawal is submitted -> draft by the owner.
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyTransitionByEmail(
+      {
+        actorId: "u-proposer",
+        comment: null,
+        project: { ...PROJECT, proposerId: "u-proposer" },
+        sendEmail: true,
+        target: "draft",
+      },
+      send,
+      CONFIG
+    );
+
+    expect(send).not.toHaveBeenCalled();
   });
 });

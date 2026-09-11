@@ -441,15 +441,18 @@ async function commitTransition(
   // approval. notifyTransitionByEmail swallows its own errors.
   await notifyTransitionByEmail(
     {
-      description: project.description,
-      id: project.id,
-      proposerEmail: project.proposerEmail,
-      proposerId: project.proposerId,
-      title: project.title,
+      actorId,
+      comment,
+      project: {
+        description: project.description,
+        id: project.id,
+        proposerEmail: project.proposerEmail,
+        proposerId: project.proposerId,
+        title: project.title,
+      },
+      sendEmail: opts?.sendEmail ?? true,
+      target,
     },
-    target,
-    comment,
-    opts?.sendEmail ?? true,
     opts?.send
   );
 

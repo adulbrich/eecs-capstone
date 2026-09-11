@@ -122,6 +122,31 @@ export function projectApprovedEmail(input: {
   };
 }
 
+/**
+ * Staff sent a submission back to draft. Unlike changes requested, the project
+ * leaves review entirely, so the message says what to do next rather than what
+ * to fix, and carries the staff comment when there is one (the server requires
+ * one from staff, the force path does not).
+ */
+export function projectReturnedToDraftEmail(input: {
+  comment: string | null;
+  title: string;
+  url: string;
+}): RenderedEmail {
+  const paragraphs = [
+    `Your project "${input.title}" was returned to draft by staff.`,
+  ];
+  const note = input.comment?.trim();
+  if (note) {
+    paragraphs.push(`Why: ${note}`);
+  }
+  paragraphs.push("Update the project and submit it again when it is ready.");
+  return {
+    subject: `Returned to draft: ${input.title}`,
+    ...layout(paragraphs, { label: "Revise your project", url: input.url }),
+  };
+}
+
 export function projectChangesRequestedEmail(input: {
   comment: string;
   title: string;

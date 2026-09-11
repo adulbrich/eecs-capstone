@@ -9,6 +9,7 @@ import { getEmailSender } from "#/lib/email/sender";
 import {
   projectApprovedEmail,
   projectChangesRequestedEmail,
+  projectReturnedToDraftEmail,
   projectSubmittedEmail,
   type RenderedEmail,
 } from "#/lib/email/templates";
@@ -87,9 +88,33 @@ async function sendSubmitted(
   );
 }
 
+function proposerEmailFor(
+  target: "approved" | "changes_requested" | "draft",
+  comment: string | null,
+  title: string,
+  url: string
+): RenderedEmail {
+  switch (target) {
+    case "approved":
+      return projectApprovedEmail({ comment, title, url });
+    case "changes_requested":
+      return projectChangesRequestedEmail({
+        comment: comment ?? "",
+        title,
+        url,
+      });
+    case "draft":
+      return projectReturnedToDraftEmail({ comment, title, url });
+    default: {
+      const unhandled: never = target;
+      throw new Error(`No proposer email for ${String(unhandled)}`);
+    }
+  }
+}
+
 async function sendToProposer(
   project: TransitionEmailProject,
-  target: "approved" | "changes_requested",
+  target: "approved" | "changes_requested" | "draft",
   comment: string | null,
   url: string,
   send: SendEmailFn
@@ -99,15 +124,17 @@ async function sendToProposer(
   if (!to) {
     return;
   }
-  const email =
-    target === "approved"
-      ? projectApprovedEmail({ comment, title: project.title, url })
-      : projectChangesRequestedEmail({
-          comment: comment ?? "",
-          title: project.title,
-          url,
-        });
-  await send(to, email);
+  await send(to, proposerEmailFor(target, comment, project.title, url));
+}
+
+export interface TransitionEmailInput {
+  /** Who moved the project. A proposer moving their own project is told nothing. */
+  actorId: string;
+  comment: string | null;
+  project: TransitionEmailProject;
+  /** The staff per-action skip. Already forced true for non-staff callers. */
+  sendEmail: boolean;
+  target: ProjectStatus;
 }
 
 /**
@@ -118,13 +145,11 @@ async function sendToProposer(
  * shape of `refreshProjectEmbedding`.
  */
 export async function notifyTransitionByEmail(
-  project: TransitionEmailProject,
-  target: ProjectStatus,
-  comment: string | null,
-  sendEmail: boolean,
+  input: TransitionEmailInput,
   send?: SendEmailFn,
   config: NotificationConfig = buildNotificationConfig()
 ): Promise<void> {
+  const { actorId, comment, project, sendEmail, target } = input;
   if (!sendEmail) {
     return;
   }
@@ -154,6 +179,15 @@ export async function notifyTransitionByEmail(
     }
     if (target === "approved" || target === "changes_requested") {
       await sendToProposer(project, target, comment, url, dispatch);
+      return;
+    }
+    // Returned to draft. The owner reaches the same target by withdrawing
+    // their own submission, and the only person to tell is then the one who
+    // clicked: the same silence rule `proposerToTell` applies to the in-app
+    // row. Approve and changes-requested skip the check because an owner
+    // cannot reach either.
+    if (target === "draft" && project.proposerId !== actorId) {
+      await sendToProposer(project, "draft", comment, url, dispatch);
     }
   } catch (error) {
     console.error(`Review email failed for project ${project.id}`, error);
