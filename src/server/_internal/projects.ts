@@ -28,7 +28,11 @@ import {
   recordSoftDeleteNotification,
   recordStatusChangeNotifications,
 } from "./notify";
-import { notifyTransitionByEmail, type SendEmailFn } from "./project-emails";
+import {
+  notifyHardDeleteByEmail,
+  notifyTransitionByEmail,
+  type SendEmailFn,
+} from "./project-emails";
 import { refreshProjectEmbedding } from "./project-embeddings";
 
 export interface AuthUser {
@@ -562,9 +566,15 @@ export async function restoreProjectAs(
   return { id };
 }
 
+export interface EmailOptions {
+  /** Test seam. Production callers omit it and the notifier resolves its own transport. */
+  send?: SendEmailFn;
+}
+
 export async function hardDeleteProjectAs(
   viewer: AuthUser,
-  id: string
+  id: string,
+  opts?: EmailOptions
 ): Promise<{ id: string }> {
   const project = await loadProjectOr404(id);
   if (project.status !== "draft") {
@@ -584,6 +594,20 @@ export async function hardDeleteProjectAs(
     );
     await deleteOwnedObject(project.imageUrl, projectImageKeys(id));
   }
+  // The proposer's in-app row would link to a page that now 404s, so the
+  // only channel left is email. Sent last, and it swallows its own errors.
+  await notifyHardDeleteByEmail(
+    {
+      actorId: viewer.id,
+      project: {
+        id: project.id,
+        proposerEmail: project.proposerEmail,
+        proposerId: project.proposerId,
+        title: project.title,
+      },
+    },
+    opts?.send
+  );
   return { id };
 }
 

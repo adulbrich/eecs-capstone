@@ -10,6 +10,7 @@ import {
   projectApprovedEmail,
   projectChangesRequestedEmail,
   projectCommentEmail,
+  projectDeletedEmail,
   projectReturnedToDraftEmail,
   projectSubmittedEmail,
   proposerCommentEmail,
@@ -276,5 +277,44 @@ export async function notifyCommentByEmail(
     );
   } catch (error) {
     console.error(`Comment email failed for project ${project.id}`, error);
+  }
+}
+
+export interface HardDeleteEmailInput {
+  actorId: string;
+  project: EmailProject;
+}
+
+/**
+ * Sends the one email a hard delete owes. Never throws.
+ *
+ * Hard delete is drafts only, by the owner or by staff. The owner deleting
+ * their own draft is told nothing (the silence rule); staff deleting somebody
+ * else's is the case that needs an email, because the row is gone and no
+ * in-app link can point at it any more. No base URL is needed for the same
+ * reason.
+ */
+export async function notifyHardDeleteByEmail(
+  input: HardDeleteEmailInput,
+  send?: SendEmailFn
+): Promise<void> {
+  const { actorId, project } = input;
+  if (project.proposerId === actorId) {
+    return;
+  }
+  try {
+    const dispatch: SendEmailFn =
+      send ?? ((to, email) => getEmailSender().send(to, email));
+    const account = await lookupProposer(project.proposerId);
+    const address = resolveProposerAddress(
+      project.proposerEmail,
+      account.email
+    );
+    if (!address) {
+      return;
+    }
+    await dispatch(address, projectDeletedEmail({ title: project.title }));
+  } catch (error) {
+    console.error(`Delete email failed for project ${project.id}`, error);
   }
 }

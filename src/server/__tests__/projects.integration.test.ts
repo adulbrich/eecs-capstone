@@ -850,6 +850,24 @@ describe("review emails", () => {
     expect(row.status).toBe("draft");
   });
 
+  it("emails the proposer when staff hard-delete their draft, and nobody when the owner does", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const owner = await makeUser("owner-hd@x.edu", "user");
+    const admin = await makeUser("admin-hd@x.edu", "admin");
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    const staffDeleted = await createProjectAs(owner, baseProject());
+    await hardDeleteProjectAs(admin, staffDeleted.id, { send });
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("owner-hd@x.edu");
+    expect(send.mock.calls[0]?.[1].subject).toBe("Your draft was deleted: P");
+
+    send.mockClear();
+    const ownerDeleted = await createProjectAs(owner, baseProject());
+    await hardDeleteProjectAs(owner, ownerDeleted.id, { send });
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("does not roll back the transition when the email fails", async () => {
     process.env.BETTER_AUTH_URL = "https://app";
     const owner = await makeUser("owner-fail@x.edu", "user");

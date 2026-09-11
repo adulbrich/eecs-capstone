@@ -15,6 +15,7 @@ vi.mock("#/db", () => ({ db: {} }));
 import type { NotificationConfig } from "#/lib/email/config";
 import {
   notifyCommentByEmail,
+  notifyHardDeleteByEmail,
   notifyTransitionByEmail,
 } from "../project-emails";
 
@@ -388,5 +389,39 @@ describe("notifyCommentByEmail", () => {
     expect(send).not.toHaveBeenCalled();
     expect(String(warn.mock.calls[0]?.[0])).toContain("EMAIL_STAFF_INBOX");
     warn.mockRestore();
+  });
+});
+
+describe("notifyHardDeleteByEmail", () => {
+  it("emails the proposer when staff delete their draft, with no link", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyHardDeleteByEmail(
+      { actorId: STAFF, project: PROJECT },
+      send,
+      CONFIG
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    const [to, email] = send.mock.calls[0] ?? [];
+    expect(to).toBe("alex@oregonstate.edu");
+    expect(email.subject).toBe("Your draft was deleted: Robot arm");
+    // The row is gone, so there is nothing to link to.
+    expect(email.text).not.toContain("https://app/projects/p1");
+  });
+
+  it("emails nobody when the owner deletes their own draft", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyHardDeleteByEmail(
+      {
+        actorId: "u-proposer",
+        project: { ...PROJECT, proposerId: "u-proposer" },
+      },
+      send,
+      CONFIG
+    );
+
+    expect(send).not.toHaveBeenCalled();
   });
 });

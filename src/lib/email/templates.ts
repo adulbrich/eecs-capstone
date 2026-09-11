@@ -55,13 +55,19 @@ function describeProposer(name: string | null, email: string | null): string {
  * Renders the shared shell: paragraphs then a single call to action. Every
  * paragraph is escaped for the HTML alternative because callers pass
  * user-supplied titles, descriptions, and staff comments through here.
+ *
+ * The call to action is optional for the one message about a row that no
+ * longer exists (`projectDeletedEmail`); everything else has a page to open.
  */
 function layout(
   paragraphs: string[],
-  cta: { label: string; url: string }
+  cta: { label: string; url: string } | null
 ): { html: string; text: string } {
-  const text = `${paragraphs.join("\n\n")}\n\n${cta.label}: ${cta.url}\n`;
   const body = paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join("");
+  if (!cta) {
+    return { html: body, text: `${paragraphs.join("\n\n")}\n` };
+  }
+  const text = `${paragraphs.join("\n\n")}\n\n${cta.label}: ${cta.url}\n`;
   const link = `<p><a href="${escapeHtml(cta.url)}">${escapeHtml(cta.label)}</a></p>`;
   return { html: `${body}${link}`, text };
 }
@@ -123,6 +129,20 @@ export function projectApprovedEmail(input: {
   return {
     subject: `Your project was approved: ${input.title}`,
     ...layout(paragraphs, { label: "View your project", url: input.url }),
+  };
+}
+
+/** Staff hard-deleted a draft. No link: the row is gone. */
+export function projectDeletedEmail(input: { title: string }): RenderedEmail {
+  return {
+    subject: `Your draft was deleted: ${input.title}`,
+    ...layout(
+      [
+        `Your draft project "${input.title}" was deleted by staff.`,
+        "Drafts are deleted outright rather than archived, so it cannot be restored. Reply to this email if that was a mistake.",
+      ],
+      null
+    ),
   };
 }
 
