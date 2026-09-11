@@ -375,6 +375,26 @@ function assertChangesRequestedHasComment(
 }
 
 /**
+ * Staff sending a submission back to draft owe the proposer a reason, the
+ * same as changes requested: the proposer is emailed, and a message that
+ * says only "returned to draft" tells them nothing. Role-gated here rather
+ * than in `commitTransition` because the owner reaches the same target by
+ * withdrawing, and nobody owes themselves an explanation. `forceTransitionAs`
+ * skips it on purpose: it is the escape hatch, and the email it sends
+ * tolerates a missing comment.
+ */
+function assertStaffReturnToDraftHasComment(
+  target: ProjectStatus,
+  comment: string | null
+): void {
+  if (target === "draft" && !comment?.trim()) {
+    throw new Error(
+      "A comment explaining why the project was returned to draft is required so the proposer knows what to change."
+    );
+  }
+}
+
+/**
  * Everything a status transition does once someone is allowed to make it.
  *
  * The two public transitions differ only in who may act and which targets are
@@ -472,6 +492,9 @@ export async function performTransitionAs(
   }
   const role: ActorRole = isStaff(viewer) ? "staff" : "owner";
   assertTransitionAllowed(project.status as ProjectStatus, target, role);
+  if (role === "staff") {
+    assertStaffReturnToDraftHasComment(target, comment ?? null);
+  }
   // Skipping the mail is a staff affordance, so the decision is made here from
   // the role rather than read off the request. `sendEmail` cannot be gated by
   // the schema instead: three owner-reachable endpoints carry it, and one of

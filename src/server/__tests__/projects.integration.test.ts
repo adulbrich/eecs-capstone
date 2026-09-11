@@ -811,6 +811,45 @@ describe("review emails", () => {
     expect(send.mock.calls[0]?.[0]).toBe("outsider@example.com");
   });
 
+  it("refuses a staff return to draft without a comment, then emails the proposer with one", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const owner = await makeUser("owner-draft@x.edu", "user");
+    const admin = await makeUser("admin-draft@x.edu", "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await performTransitionAs(owner, id, "submitted", undefined, { send });
+    send.mockClear();
+    await expect(
+      performTransitionAs(admin, id, "draft", undefined, { send })
+    ).rejects.toThrow(/comment/);
+    expect(send).not.toHaveBeenCalled();
+
+    await performTransitionAs(admin, id, "draft", "Scope this to one term.", {
+      send,
+    });
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("owner-draft@x.edu");
+    expect(send.mock.calls[0]?.[1].subject).toBe("Returned to draft: P");
+    expect(send.mock.calls[0]?.[1].text).toContain("Scope this to one term.");
+  });
+
+  it("emails nobody when the owner withdraws their own submission to draft", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const owner = await makeUser("owner-withdraw@x.edu", "user");
+    const { id } = await createProjectAs(owner, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await performTransitionAs(owner, id, "submitted", undefined, { send });
+    send.mockClear();
+    await performTransitionAs(owner, id, "draft", undefined, { send });
+
+    expect(send).not.toHaveBeenCalled();
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.status).toBe("draft");
+  });
+
   it("does not roll back the transition when the email fails", async () => {
     process.env.BETTER_AUTH_URL = "https://app";
     const owner = await makeUser("owner-fail@x.edu", "user");
