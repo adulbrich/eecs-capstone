@@ -1,4 +1,7 @@
-import { PROJECT_STATUS_LABEL } from "#/lib/project-workflow";
+import {
+  PROJECT_STATUS_DESCRIPTION,
+  PROJECT_STATUS_LABEL,
+} from "#/lib/project-workflow";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import { Badge } from "./ui/badge";
 
@@ -32,8 +35,18 @@ export function StatusBadge({ status }: { status: string }) {
   const { fg, bg } = STATUS_STYLES[status as ProjectStatus] ?? FALLBACK;
   const label =
     PROJECT_STATUS_LABEL[status as ProjectStatus] ?? status.replace(/_/g, " ");
+  // The one-line meaning as a native tooltip, the way the staff stepper's
+  // pills carry theirs: a hover on the badge answers "what does approved
+  // mean for me" without a block of copy on the page (#303).
+  const description = PROJECT_STATUS_DESCRIPTION[status as ProjectStatus] as
+    | string
+    | undefined;
   return (
-    <Badge style={{ backgroundColor: bg, color: fg }} variant="status">
+    <Badge
+      style={{ backgroundColor: bg, color: fg }}
+      title={description}
+      variant="status"
+    >
       {label}
     </Badge>
   );
