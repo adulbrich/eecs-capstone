@@ -81,6 +81,7 @@ export function NotificationBell() {
           aria-label="Notifications"
           className="relative"
           size="sm"
+          type="button"
           variant="ghost"
         >
           {unread > 0 ? (

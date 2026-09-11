@@ -118,7 +118,12 @@ function MobileMenu({
   return (
     <Sheet onOpenChange={setOpen} open={open}>
       <SheetTrigger asChild>
-        <Button aria-label="Open navigation" size="icon-sm" variant="ghost">
+        <Button
+          aria-label="Open navigation"
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
           <Menu />
         </Button>
       </SheetTrigger>
@@ -135,6 +140,7 @@ function MobileMenu({
             <Button
               aria-label="Close navigation"
               size="icon-sm"
+              type="button"
               variant="ghost"
             >
               <X className="h-4 w-4" />

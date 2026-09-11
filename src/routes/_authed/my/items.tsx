@@ -362,6 +362,7 @@ export function buildColumns({ busy, onCancel, onOpen, onRemove }: Actions) {
               <Button
                 onClick={() => onOpen(rowId(entry))}
                 size="sm"
+                type="button"
                 variant="outline"
               >
                 Details
@@ -372,6 +373,7 @@ export function buildColumns({ busy, onCancel, onOpen, onRemove }: Actions) {
                 disabled={busy}
                 onClick={() => onRemove(entry.itemId)}
                 size="sm"
+                type="button"
                 variant="ghost"
               >
                 Remove
@@ -382,6 +384,7 @@ export function buildColumns({ busy, onCancel, onOpen, onRemove }: Actions) {
                 disabled={busy}
                 onClick={() => onCancel(entry)}
                 size="sm"
+                type="button"
                 variant="outline"
               >
                 Cancel
@@ -557,6 +560,7 @@ function MyItems() {
                 setOpenId(null);
                 void cancel(openRow);
               }}
+              type="button"
               variant="outline"
             >
               Cancel request

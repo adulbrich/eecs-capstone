@@ -32,7 +32,7 @@ export function SubmitBorrowListDialog({
   return (
     <Dialog onOpenChange={setOpen} open={open}>
       <DialogTrigger asChild>
-        <Button disabled={busy} size="sm">
+        <Button disabled={busy} size="sm" type="button">
           Submit
         </Button>
       </DialogTrigger>
@@ -59,6 +59,7 @@ export function SubmitBorrowListDialog({
           <Button
             disabled={busy}
             onClick={() => setOpen(false)}
+            type="button"
             variant="outline"
           >
             Cancel
@@ -70,6 +71,7 @@ export function SubmitBorrowListDialog({
               setNote("");
               setOpen(false);
             }}
+            type="button"
           >
             {busy ? "Submitting..." : "Submit request"}
           </Button>

@@ -336,6 +336,7 @@ function buildColumns(onDone: () => void, onOpen: (lineId: string) => void) {
           <Button
             onClick={() => onOpen(ctx.row.original.line.id)}
             size="sm"
+            type="button"
             variant="outline"
           >
             Details

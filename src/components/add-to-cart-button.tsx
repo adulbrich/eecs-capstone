@@ -61,6 +61,7 @@ export function AddToCartButton({
         className={className}
         disabled
         size={size}
+        type="button"
         // aria-disabled would keep it focusable, but there is nothing left to
         // do here and the borrow list count on the page is the next step.
         variant={variant}
@@ -77,6 +78,7 @@ export function AddToCartButton({
       disabled={isPending}
       onClick={() => mutate()}
       size={size}
+      type="button"
       variant={variant}
     >
       {isPending && (

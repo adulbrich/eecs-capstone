@@ -604,7 +604,7 @@ export function AdminDataTable<T>({
                 h-9. An h-8 button beside them reads as misaligned rather
                 than compact.
               */}
-                  <Button variant="outline">
+                  <Button type="button" variant="outline">
                     <Columns3 aria-hidden className="size-4" />
                     Columns
                   </Button>

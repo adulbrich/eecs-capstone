@@ -139,7 +139,9 @@ export function FulfillCustomLineDialog({
       open={open}
     >
       <DialogTrigger asChild>
-        <Button size="sm">Fulfil</Button>
+        <Button size="sm" type="button">
+          Fulfil
+        </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -175,6 +177,7 @@ export function FulfillCustomLineDialog({
                   <Button
                     onClick={() => setChosen([...chosen, match])}
                     size="sm"
+                    type="button"
                     variant="outline"
                   >
                     Add
@@ -202,6 +205,7 @@ export function FulfillCustomLineDialog({
                       setChosen(chosen.filter((c) => c.id !== item.id))
                     }
                     size="sm"
+                    type="button"
                     variant="ghost"
                   >
                     Remove
@@ -250,11 +254,16 @@ export function FulfillCustomLineDialog({
           <Button
             disabled={busy}
             onClick={() => setOpen(false)}
+            type="button"
             variant="outline"
           >
             Cancel
           </Button>
-          <Button disabled={busy} onClick={() => void onConfirm()}>
+          <Button
+            disabled={busy}
+            onClick={() => void onConfirm()}
+            type="button"
+          >
             {busy ? "Saving..." : "Confirm fulfil"}
           </Button>
         </DialogFooter>

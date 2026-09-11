@@ -187,7 +187,7 @@ function ProgramEdit() {
             onConfirm={onDelete}
             title={`Delete program "${program.courseName}"?`}
           >
-            <Button size="sm" variant="destructive">
+            <Button size="sm" type="button" variant="destructive">
               Delete
             </Button>
           </ConfirmDialog>

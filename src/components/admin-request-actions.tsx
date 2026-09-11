@@ -88,7 +88,9 @@ export function AdminRequestActions({ lineId, onDone, status }: Props) {
         open={open === "approve"}
       >
         <PopoverTrigger asChild>
-          <Button size="sm">Approve</Button>
+          <Button size="sm" type="button">
+            Approve
+          </Button>
         </PopoverTrigger>
         <PopoverContent className="w-64 space-y-2">
           <Label htmlFor={`pickup-${lineId}`}>Pickup by (optional)</Label>
@@ -100,10 +102,21 @@ export function AdminRequestActions({ lineId, onDone, status }: Props) {
           />
           {error && <p className="text-destructive text-sm">{error}</p>}
           <div className="flex gap-2">
-            <Button disabled={busy} onClick={() => void onApprove()} size="sm">
+            <Button
+              disabled={busy}
+              onClick={() => void onApprove()}
+              size="sm"
+              type="button"
+            >
               {busy ? "Saving..." : "Confirm approve"}
             </Button>
-            <Button disabled={busy} onClick={close} size="sm" variant="outline">
+            <Button
+              disabled={busy}
+              onClick={close}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
               Cancel
             </Button>
           </div>
@@ -115,7 +128,7 @@ export function AdminRequestActions({ lineId, onDone, status }: Props) {
         open={open === "reject"}
       >
         <PopoverTrigger asChild>
-          <Button size="sm" variant="outline">
+          <Button size="sm" type="button" variant="outline">
             Reject
           </Button>
         </PopoverTrigger>
@@ -133,11 +146,18 @@ export function AdminRequestActions({ lineId, onDone, status }: Props) {
               disabled={busy}
               onClick={() => void onReject()}
               size="sm"
+              type="button"
               variant="destructive"
             >
               {busy ? "Saving..." : "Confirm reject"}
             </Button>
-            <Button disabled={busy} onClick={close} size="sm" variant="outline">
+            <Button
+              disabled={busy}
+              onClick={close}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
               Cancel
             </Button>
           </div>

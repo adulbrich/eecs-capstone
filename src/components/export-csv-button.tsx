@@ -108,6 +108,7 @@ export function ExportCsvButton({ filename, load }: Props) {
         aria-busy={pending}
         aria-disabled={pending}
         onClick={runExport}
+        type="button"
         variant="outline"
       >
         <Download aria-hidden className="size-4" />
