@@ -101,6 +101,37 @@ describe("ApproveAllDialog", () => {
     expect(onDone).not.toHaveBeenCalled();
   });
 
+  it("closes on Cancel without approving anything", async () => {
+    render(<ApproveAllDialog lines={lines} onDone={vi.fn()} />);
+    openDialog();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(approveRequestLines).not.toHaveBeenCalled();
+  });
+
+  it("forgets the server's refusal when cancelled and reopened", async () => {
+    vi.mocked(approveRequestLines).mockRejectedValue(
+      new Error("Oscilloscope is no longer pending")
+    );
+    render(<ApproveAllDialog lines={lines} onDone={vi.fn()} />);
+    openDialog();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm approve all" })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText("Oscilloscope is no longer pending")
+      ).toBeDefined()
+    );
+
+    // The refusal was about the attempt, not the lines; a fresh opening
+    // starts clean rather than showing a stale reason.
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    openDialog();
+    expect(screen.queryByText("Oscilloscope is no longer pending")).toBeNull();
+  });
+
   it("renders nothing when every line is decided", () => {
     render(
       <ApproveAllDialog

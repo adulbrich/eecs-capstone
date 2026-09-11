@@ -97,6 +97,16 @@ export function FulfillCustomLineDialog({
     setError(null);
   }
 
+  // One close path for Escape, the overlay and the Cancel button alike. A
+  // Cancel that only set `open` skipped the reset, and the links built for
+  // one line were waiting in the dialog when it was opened on the next.
+  function onOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) {
+      reset();
+    }
+  }
+
   async function onConfirm() {
     if (chosen.length === 0) {
       setError("Link at least one item");
@@ -129,15 +139,7 @@ export function FulfillCustomLineDialog({
   );
 
   return (
-    <Dialog
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) {
-          reset();
-        }
-      }}
-      open={open}
-    >
+    <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogTrigger asChild>
         <Button size="sm" type="button">
           Fulfil
@@ -253,7 +255,7 @@ export function FulfillCustomLineDialog({
         <DialogFooter>
           <Button
             disabled={busy}
-            onClick={() => setOpen(false)}
+            onClick={() => onOpenChange(false)}
             type="button"
             variant="outline"
           >

@@ -66,16 +66,18 @@ export function ApproveAllDialog({
     }
   }
 
+  // One close path for Escape, the overlay and the Cancel button alike. A
+  // Cancel that only set `open` skipped this, and a refusal from one attempt
+  // was still on screen when the dialog was next opened.
+  function onOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) {
+      setError(null);
+    }
+  }
+
   return (
-    <Dialog
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) {
-          setError(null);
-        }
-      }}
-      open={open}
-    >
+    <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogTrigger asChild>
         <Button size="sm" type="button">
           Approve all
@@ -109,7 +111,7 @@ export function ApproveAllDialog({
         <DialogFooter>
           <Button
             disabled={busy}
-            onClick={() => setOpen(false)}
+            onClick={() => onOpenChange(false)}
             type="button"
             variant="outline"
           >
