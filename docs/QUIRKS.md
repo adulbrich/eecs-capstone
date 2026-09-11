@@ -406,6 +406,10 @@ Vitest's default `testTimeout` is 5000ms, which was also the cap `.claude/hooks/
 
 `start` is bare `node .output/server/index.mjs`, while the dev server gets `.env.local` through Vite. `playwright.e2e.config.ts` calls `loadDotenv` at module scope for this reason, and Playwright passes its `process.env` down to `webServer`; remove that call and you get the 500-on-every-route behaviour above. Related: `VITE_STORAGE_PUBLIC_BASE` is inlined at build time and `src/lib/storage.ts` falls back to `/storage`, so a build without it produces working-looking relative URLs against an origin that serves nothing. The CI job writes `.env.local` before the build.
 
+### A Playwright bump needs its browser installed before the browser suites run
+
+`@playwright/test` pins a browser build per version. After a bump, `npm run test:smoke` and `npm run test:accessibility:smoke` both fail before the first test with `Executable doesn't exist at .../ms-playwright/chromium_headless_shell-<n>`, which reads like a broken suite. Run `npx playwright install chromium` once per machine and rerun. CI installs it in the workflow, so a green PR says nothing about your checkout.
+
 ### The smoke suite runs on port 3001 and never reuses a server
 
 `reuseExistingServer: false` unconditionally, because a dev server left on 3000 would substitute the dev build for the production build the suite exists to exercise, and report green. Port 3001 keeps both runnable at once. `BETTER_AUTH_URL` moves with it, because Better Auth checks the request origin and a mismatch fails sign-in for a reason that looks nothing like a port problem.
