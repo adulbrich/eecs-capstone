@@ -3,11 +3,18 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { waitForHydration } from "../shared/playwright";
 import { SERVER_LOG } from "./constants";
-import { fixtureEmail } from "./fixtures";
+import {
+  deleteFixtureUser,
+  fixtureEmail,
+  readUser,
+  userIdByEmail,
+  withDb,
+} from "./fixtures";
 
 /**
  * The whole account lifecycle, driven through the real forms: sign up, prove
- * the address, sign out, forget the password, set a new one, sign back in.
+ * the address, sign out, forget the password, set a new one, sign back in,
+ * and finally close the account.
  *
  * Every other test in this suite starts from a storage state minted once in
  * global setup, so none of them would notice if verification or password reset
@@ -127,6 +134,39 @@ test.describe("account lifecycle", () => {
     });
     await page.goto("/my/projects");
     await expect(page).toHaveURL(/\/my\/projects/);
+
+    // Closing the account is the last thing the person can do, and the one
+    // write here with a typed gate in front of it. Deletion anonymizes the row
+    // rather than removing it (ADR-0008), so the address on the row changes
+    // and the prefix sweep can no longer find it: the id is read first and the
+    // row is deleted by hand afterwards.
+    const userId = await withDb((db) => userIdByEmail(db, email));
+    try {
+      await page.goto("/profile");
+      await waitForHydration(page);
+      await page.getByRole("button", { name: "Delete account" }).click();
+      const dialog = page.getByRole("alertdialog");
+      await expect(dialog).toBeVisible();
+      await dialog.getByLabel("Confirm email").fill(email);
+      await dialog.getByRole("button", { name: "Delete my account" }).click();
+      await page.waitForURL((url) => url.pathname === "/", {
+        timeout: 15_000,
+      });
+
+      // The address no longer signs in, and the row says why: it is no longer
+      // that person's row.
+      await page.goto("/sign-in");
+      await waitForHydration(page, "form");
+      await page.getByLabel("Email").fill(email);
+      await page.getByLabel("Password").fill(secondPassword);
+      await page.getByRole("button", { name: /sign in/i }).click();
+      await expectRefused(page);
+      expect((await withDb((db) => readUser(db, userId))).email).toBe(
+        `deleted-${userId}@invalid`
+      );
+    } finally {
+      await withDb((db) => deleteFixtureUser(db, userId));
+    }
   });
 });
 

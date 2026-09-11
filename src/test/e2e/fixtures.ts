@@ -41,13 +41,31 @@ export function fixtureEmail(): string {
 export type Db = NodePgDatabase<typeof schema>;
 
 /**
- * Callers are responsible for closing the pool. Tests open one per file rather
- * than sharing a module-level singleton, because Playwright runs each file in
- * its own worker process and a shared pool would leak a connection per worker.
+ * Callers are responsible for closing the pool. Opened per use rather than
+ * held in a module-level singleton, because Playwright runs each file in its
+ * own worker process and a shared pool would leak a connection per worker.
+ * `withDb` below is the shape most callers want; this is for the ones that
+ * hold a connection across several awaits of their own.
  */
 export function openDb(): { db: Db; close: () => Promise<void> } {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   return { db: drizzle(pool, { schema }), close: () => pool.end() };
+}
+
+/**
+ * One unit of database work on a connection of its own, closed whether or
+ * not it throws. Each call is one connection: a fixture written before the
+ * browser opens and a row read after a click are two calls. Several
+ * statements that belong together go in one function, which keeps them in
+ * order without a connection held open across the browser work between.
+ */
+export async function withDb<T>(work: (db: Db) => Promise<T>): Promise<T> {
+  const { db, close } = openDb();
+  try {
+    return await work(db);
+  } finally {
+    await close();
+  }
 }
 
 /** A name no other run will collide with, swept by prefix on the next run. */
@@ -203,6 +221,126 @@ export async function giveFixtureHold(
     .where(eq(schema.inventoryItems.id, input.itemId));
 }
 
+/**
+ * An account row with no credentials behind it, for the admin flows that act
+ * on someone else: role, ban, mentor status. Nothing signs in as it, so the
+ * `account` row Better Auth would want is not written. Swept by the email
+ * prefix like the signed-up accounts.
+ */
+export async function createFixtureUser(
+  db: Db,
+  input: { role?: string; wantsToMentor?: boolean } = {}
+): Promise<{ id: string; email: string; name: string }> {
+  const [row] = await db
+    .insert(schema.user)
+    .values({
+      id: randomUUID(),
+      name: fixtureName("User"),
+      email: fixtureEmail(),
+      emailVerified: true,
+      role: input.role ?? "user",
+      wantsToMentor: input.wantsToMentor ?? false,
+    })
+    .returning();
+  return { id: row.id, email: row.email, name: row.name };
+}
+
+/** The columns the admin and account flows assert on after a write. */
+export async function readUser(db: Db, id: string) {
+  const [row] = await db
+    .select({
+      email: schema.user.email,
+      role: schema.user.role,
+      banned: schema.user.banned,
+      banReason: schema.user.banReason,
+      wantsToMentor: schema.user.wantsToMentor,
+    })
+    .from(schema.user)
+    .where(eq(schema.user.id, id));
+  if (!row) {
+    throw new Error(`user ${id} has no row`);
+  }
+  return row;
+}
+
+/**
+ * For the row the account-deletion flow leaves behind. Deletion anonymizes
+ * rather than removes (ADR-0008), and the anonymized address carries no
+ * prefix, so the sweep cannot find it; the test that deleted it has to.
+ */
+export async function deleteFixtureUser(db: Db, id: string): Promise<void> {
+  await db.delete(schema.user).where(eq(schema.user.id, id));
+}
+
+/** An inventory category, which needs no `type`, unlike a project one. */
+export async function createFixtureCategory(
+  db: Db
+): Promise<{ id: string; name: string }> {
+  const [row] = await db
+    .insert(schema.categories)
+    .values({ name: fixtureName("Category"), domain: "inventory" })
+    .returning();
+  return { id: row.id, name: row.name };
+}
+
+/**
+ * A program, with one instructor attached when the flow needs one to remove.
+ * The instructor may be a seeded user: the junction row is the only write,
+ * it cascades away with the program, and the user's own row is untouched.
+ */
+export async function createFixtureProgram(
+  db: Db,
+  input: { instructorId?: string } = {}
+): Promise<{ id: string; courseName: string }> {
+  const [row] = await db
+    .insert(schema.programs)
+    .values({
+      courseId: fixtureName("Course"),
+      courseName: fixtureName("Program"),
+    })
+    .returning();
+  if (input.instructorId) {
+    await db
+      .insert(schema.programInstructors)
+      .values({ programId: row.id, userId: input.instructorId });
+  }
+  return { id: row.id, courseName: row.courseName };
+}
+
+/**
+ * A pending custom line in a request of its own. The line's name carries the
+ * prefix, which is what the sweep matches to find the request holding it.
+ */
+export async function createFixtureCustomLine(
+  db: Db,
+  input: { userId: string; name: string }
+): Promise<{ lineId: string; requestId: string }> {
+  const [request] = await db
+    .insert(schema.inventoryRequests)
+    .values({ userId: input.userId, note: "End-to-end suite fixture." })
+    .returning();
+  const [line] = await db
+    .insert(schema.inventoryCustomLines)
+    .values({
+      requestId: request.id,
+      name: input.name,
+      reason: "End-to-end suite fixture.",
+      quantity: 1,
+    })
+    .returning();
+  return { lineId: line.id, requestId: request.id };
+}
+
+/** An item on a student's borrow list. Cascades away with the item. */
+export async function addFixtureCartItem(
+  db: Db,
+  input: { userId: string; itemId: string }
+): Promise<void> {
+  await db
+    .insert(schema.inventoryCartItems)
+    .values({ userId: input.userId, itemId: input.itemId });
+}
+
 /** A date offset from now, for a deadline a flow needs on one side of it. */
 export function daysFromNow(days: number): Date {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
@@ -280,6 +418,30 @@ export async function sweepOrphans(db: Db): Promise<void> {
   await db
     .delete(schema.projects)
     .where(like(schema.projects.title, `${E2E_PREFIX}%`));
+
+  // Custom lines name what was asked for, so the prefix is on the line, and
+  // the request holding it is what gets deleted; the line cascades.
+  const staleCustom = await db
+    .select({ requestId: schema.inventoryCustomLines.requestId })
+    .from(schema.inventoryCustomLines)
+    .where(like(schema.inventoryCustomLines.name, `${E2E_PREFIX}%`));
+  if (staleCustom.length > 0) {
+    await db
+      .delete(schema.inventoryRequests)
+      .where(
+        inArray(schema.inventoryRequests.id, [
+          ...new Set(staleCustom.map((l) => l.requestId)),
+        ])
+      );
+  }
+
+  await db
+    .delete(schema.categories)
+    .where(like(schema.categories.name, `${E2E_PREFIX}%`));
+
+  await db
+    .delete(schema.programs)
+    .where(like(schema.programs.courseName, `${E2E_PREFIX}%`));
 
   await db
     .delete(schema.notifications)

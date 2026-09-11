@@ -60,7 +60,16 @@ export function groupFor(page: Page, text: string): Locator {
  * `exact` keeps this off the neighbouring "Status history" section.
  */
 export function statusSection(page: Page): Locator {
+  return sectionNamed(page, "Status");
+}
+
+/**
+ * A `section` by the exact heading it carries. The admin program page has
+ * one per concern (the form, the instructors), and a "Remove" inside one of
+ * them is not the "Remove" inside another.
+ */
+export function sectionNamed(page: Page, heading: string): Locator {
   return page.locator("section").filter({
-    has: page.getByRole("heading", { name: "Status", exact: true }),
+    has: page.getByRole("heading", { name: heading, exact: true }),
   });
 }
