@@ -651,7 +651,7 @@ Below `md`, `src/styles.css` restacks `.admin-table` into cards: `thead` hidden,
 
 ### A Cancel button that sets `open` itself skips the dialog's `onOpenChange`
 
-Radix fires `onOpenChange` for the closes it initiates (Escape, the overlay, a `DialogClose`), not for a controlled `open` prop the component changes on its own. A dialog that does its cleanup in `onOpenChange`, then gives its Cancel button `onClick={() => setOpen(false)}`, cleans up on Escape and not on Cancel. `ApproveAllDialog` kept a stale server refusal that way and `FulfillCustomLineDialog` kept the links built for one line when opened on the next, until #310 gave each one `onOpenChange` function that both the `Dialog` and the button call. The rule: when a dialog has close-time cleanup, every control that closes it goes through the same function. `src/test/approve-all-dialog.test.tsx` and `src/test/custom-line-actions.test.tsx` hold the reopen-after-Cancel checks.
+Radix fires `onOpenChange` for the closes it initiates (Escape, the overlay, a `DialogClose`), not for a controlled `open` prop the component changes on its own. A dialog that does its cleanup in `onOpenChange`, then gives its Cancel button `onClick={() => setOpen(false)}`, cleans up on Escape and not on Cancel. `ApproveAllDialog` kept a stale server refusal that way and `FulfillCustomLineDialog` kept the links built for one line when opened on the next, until #310 gave each one an `onOpenChange` function that both the `Dialog` and the button call. The rule: when a dialog has close-time cleanup, every control that closes it goes through the same function. `src/test/approve-all-dialog.test.tsx` and `src/test/custom-line-actions.test.tsx` hold the reopen-after-Cancel checks.
 
 ### Path-by-path convention summary
 

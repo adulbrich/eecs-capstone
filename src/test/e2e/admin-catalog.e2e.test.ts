@@ -188,7 +188,7 @@ test.describe("admin catalog creates and saves", () => {
       // server function and differ only in the flag they send, so the row is
       // what tells the two apart.
       await expect(row).toBeVisible();
-      await expect(await withDb((db) => readUser(db, userId))).toMatchObject({
+      expect(await withDb((db) => readUser(db, userId))).toMatchObject({
         wantsToMentor: true,
         mentorTeamCount: 3,
       });
