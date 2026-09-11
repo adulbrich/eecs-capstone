@@ -274,7 +274,7 @@ describe("deleteAccountAs", () => {
       .values({ itemId: item.id, userId: u.id });
     await db.insert(notifications).values({
       userId: u.id,
-      type: "t",
+      type: "status_change",
       title: "x",
       message: "y",
     });

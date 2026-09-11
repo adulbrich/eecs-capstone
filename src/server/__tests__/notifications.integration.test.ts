@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { notifications, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
+import type { NotificationType } from "#/lib/vocabularies";
 import {
   listMyNotificationsAs,
   markAllReadAs,
@@ -39,7 +40,7 @@ async function notify(
     .insert(notifications)
     .values({
       userId,
-      type: "test",
+      type: "status_change",
       title,
       message: title,
       link: null,
@@ -124,5 +125,30 @@ describe("notifications are scoped to their recipient", () => {
     expect(await readFlag(b1.id)).toBe(false);
     expect((await unreadCountAs(alice)).count).toBe(0);
     expect((await unreadCountAs(bob)).count).toBe(1);
+  });
+});
+
+describe("the type column", () => {
+  it("rejects a type outside NOTIFICATION_TYPES at the database", async () => {
+    // The vocabulary is anchored twice, in the tuple and in the pgEnum, the
+    // way the status vocabularies are: a literal the app cannot name is a row
+    // the bell cannot classify, and the column is what refuses it.
+    const { id } = await makeUser("enum-notif@x.edu");
+    await expect(
+      db.insert(notifications).values({
+        userId: id,
+        // The cast is the point: a value the union forbids, at the column.
+        type: "not_a_notification_type" as unknown as NotificationType,
+        title: "bogus",
+        message: "bogus",
+      })
+      // Drizzle wraps the driver error, so the enum's own message is the cause.
+    ).rejects.toMatchObject({
+      cause: expect.objectContaining({
+        message: expect.stringContaining(
+          "invalid input value for enum notification_type"
+        ),
+      }),
+    });
   });
 });

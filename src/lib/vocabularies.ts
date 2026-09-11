@@ -78,6 +78,36 @@ export type InventoryCustomLineStatus =
   (typeof INVENTORY_CUSTOM_LINE_STATUSES)[number];
 
 /**
+ * What a notification row is about. The first fourteen were string literals
+ * scattered across `project-notifications.ts` and `inventory-notifications.ts`
+ * with the column typed `text`, so a misspelled type was a row the bell could
+ * not classify and nothing refused (#288). `proposer_reassigned` and
+ * `projects_claimed` are the two events that gained a row in the same change.
+ * Grouped by domain, project then inventory, in the order the decisions emit
+ * them; nothing displays this list, so no reader's order competes.
+ */
+export const NOTIFICATION_TYPES = [
+  "status_change",
+  "soft_delete",
+  "comment",
+  "proposer_reassigned",
+  "projects_claimed",
+  "inventory_request_approved",
+  "inventory_request_rejected",
+  "inventory_item_checked_out",
+  "inventory_item_returned",
+  "inventory_request_closed",
+  "inventory_custom_sourcing",
+  "inventory_custom_sourcing_note",
+  "inventory_custom_fulfilled",
+  "inventory_custom_rejected",
+  "inventory_pickup_overdue",
+  "inventory_checkout_overdue",
+] as const;
+
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+/**
  * The roles an account can hold, in ascending order of what they may do.
  *
  * This was written out five times in `src/`, in two orders, with nothing
