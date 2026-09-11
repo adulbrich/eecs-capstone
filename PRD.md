@@ -382,10 +382,9 @@ that produced the planned matrix below; issue #288 is the work that ships it.
 - [x] Transport behind the `EmailSender` interface in `src/lib/email/`:
   `console` writes every message to stderr (the default, used in dev and by
   every test suite), `ses` sends through SES v2. Configured by `EMAIL_TRANSPORT`,
-  `EMAIL_FROM`, `EMAIL_REPLY_TO`, `EMAIL_REVIEW_INBOX` and `SES_REGION`. The
-  sender is built at module scope in `src/lib/auth.ts`, so `ses` without
-  `EMAIL_FROM` fails boot; a missing review inbox only logs a warning and drops
-  the submission notice.
+  `EMAIL_FROM`, `EMAIL_REPLY_TO`, `EMAIL_REVIEW_INBOX` and `SES_REGION`. A
+  misconfigured `ses` transport fails boot (README, "Email transport"); a
+  missing review inbox only logs a warning and drops the submission notice.
 - [x] Four messages, six triggers. Two for accounts: verification on sign-up
   and again when an unverified account is refused sign-in, and password reset.
   Two for project review: a notice to the capstone review inbox when a project
@@ -412,8 +411,8 @@ that produced the planned matrix below; issue #288 is the work that ships it.
 - [ ] One shared staff inbox for every staff-facing message, replacing the
   review-only name; under the `ses` transport a missing inbox fails boot the
   way a missing `EMAIL_FROM` does.
-- [ ] Inventory holders who have an address but no account receive the pickup
-  and due emails, which is the one case where email is the only channel.
+- [ ] Holders who have an address but no account receive the pickup and due
+  emails at that address; an in-app row cannot reach them.
 - [ ] Notification types become a vocabulary tuple in `src/lib/vocabularies.ts`
   and the column is constrained to it.
 - [ ] The channel per event. The rule: email when the recipient must act away
@@ -435,24 +434,24 @@ that produced the planned matrix below; issue #288 is the work that ships it.
   | Staff inbox | Project submitted or resubmitted | no | yes |
   | Staff inbox | Cart submitted | tile | planned |
   | Staff inbox | Custom request submitted | tile | planned |
-  | Staff inbox | Non-staff comment on a project | parent author only | planned |
+  | Staff inbox | Non-staff comment on a project | no | planned |
   | Staff inbox | New account | no | no |
-  | Borrower | Request approved, pick up by date | yes | planned |
-  | Borrower | Request rejected | yes | planned |
-  | Borrower | Checked out, due date | yes | planned |
-  | Borrower | Returned, closed by staff | yes | no |
-  | Borrower | Custom line fulfilled or rejected | yes | planned |
-  | Borrower | Custom line sourcing started or note edited | yes | no |
+  | Holder | Request approved, pick up by date | yes | planned |
+  | Requester | Request rejected | yes | planned |
+  | Holder | Checked out, due date | yes | planned |
+  | Holder | Returned, closed by staff | yes | no |
+  | Requester | Custom line fulfilled or rejected | yes | planned |
+  | Requester | Custom line sourcing started or note edited | yes | no |
   | User | Role changed | no | planned |
   | User | Banned | no | planned |
   | User | Unbanned, mentor status, account deletion | no | no |
 
 - [ ] Blocked by ADR 0005 until it is reopened with a scheduler: a due-soon
   warning, overdue by email, and any staff view of overdue items. An overdue
-  email triggered by the lazy scan would arrive only when the borrower already
+  email triggered by the lazy scan would arrive only when the requester already
   has the page open.
 - Deferred, not planned: a notifications page beyond the bell's ten rows, an
-  outbound email log, per-staff fan-out of staff mail.
+  outbound email log, per-staff fan-out of staff mail, digests.
 
 ### Where the rest is written
 
