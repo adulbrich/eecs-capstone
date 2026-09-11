@@ -645,7 +645,10 @@ async function main() {
       `project vector: "${title}" (${vectored ? "written" : "exists"}, rank ${rank})`
     );
   }
-  await db
+  // Same rule as the projects above: a row with a vector is left alone, a
+  // row without one (interests saved on /profile with Bedrock off) gets the
+  // seed's, so the recommended-order test holds on any machine.
+  const [interestsWritten] = await db
     .insert(userInterests)
     .values({
       userId: u.student.id,
@@ -654,8 +657,19 @@ async function main() {
       embeddingSourceHash: "seed",
       embeddingUpdatedAt: now,
     })
-    .onConflictDoNothing({ target: userInterests.userId });
-  console.log(`interests: ${USERS.student.email} (upserted with a vector)`);
+    .onConflictDoUpdate({
+      target: userInterests.userId,
+      set: {
+        embedding: seedInterestsVector(),
+        embeddingSourceHash: "seed",
+        embeddingUpdatedAt: now,
+      },
+      setWhere: isNull(userInterests.embedding),
+    })
+    .returning({ userId: userInterests.userId });
+  console.log(
+    `interests vector: ${USERS.student.email} (${interestsWritten ? "written" : "exists"})`
+  );
 
   // Inventory items. All fields populated. Holder fields set for held statuses.
   //
