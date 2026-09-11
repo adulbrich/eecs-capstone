@@ -4,6 +4,8 @@ import { errorMessage } from "#/lib/error-message";
 import { STAFF_PANEL_AUDIENCE_HINT } from "#/lib/private-notes";
 import {
   canTransition,
+  PROJECT_STATUS_DESCRIPTION,
+  PROJECT_STATUS_LABEL,
   PROJECT_STATUSES_IN_DISPLAY_ORDER,
 } from "#/lib/project-workflow";
 import type { ProjectStatus } from "#/lib/vocabularies";
@@ -40,15 +42,6 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
 const WORKFLOW = PROJECT_STATUSES_IN_DISPLAY_ORDER;
-
-const STATUS_LABEL: Record<ProjectStatus, string> = {
-  draft: "Draft",
-  submitted: "Submitted",
-  changes_requested: "Changes Req.",
-  approved: "Approved",
-  published: "Published",
-  archived: "Archived",
-};
 
 interface Project {
   deletedAt: Date | string | null;
@@ -247,12 +240,16 @@ export function StaffProjectPanel({
                 // Tailwind alias, so it stays a var().
                 pillState =
                   "cursor-pointer border-2 border-brand text-brand-dark hover:bg-[var(--brand-primary-tint)]";
-                pillTitle = `Move to ${STATUS_LABEL[s]}`;
+                pillTitle = `Move to ${PROJECT_STATUS_LABEL[s]}`;
               } else {
                 pillState =
                   "cursor-pointer border border-dashed border-border text-muted-foreground hover:border-foreground hover:text-foreground";
-                pillTitle = `Override: force to ${STATUS_LABEL[s]}`;
+                pillTitle = `Override: force to ${PROJECT_STATUS_LABEL[s]}`;
               }
+              // The action first, then what the status means (#303). Tests
+              // match the pill by the action with `/^Move to Approved\./`,
+              // since `getByTitle` with a string is an exact match.
+              const pillTooltip = `${pillTitle}. ${PROJECT_STATUS_DESCRIPTION[s]}`;
               const pillClass = [
                 "rounded-full px-3 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                 pillState,
@@ -282,10 +279,10 @@ export function StaffProjectPanel({
                     className={pillClass}
                     disabled={isCurrent}
                     onClick={() => openTransition(s, !isNormal)}
-                    title={pillTitle}
+                    title={pillTooltip}
                     type="button"
                   >
-                    {STATUS_LABEL[s]}
+                    {PROJECT_STATUS_LABEL[s]}
                   </button>
                 </div>
               );
@@ -307,6 +304,16 @@ export function StaffProjectPanel({
             Override
           </span>
         </div>
+        {/*
+          The current status in words, for the reader who does not hover a
+          pill. Same record the pill tooltips read.
+        */}
+        <p className="mt-2 text-muted-foreground text-xs">
+          <span className="font-medium text-foreground">
+            {PROJECT_STATUS_LABEL[currentStatus]}
+          </span>
+          : {PROJECT_STATUS_DESCRIPTION[currentStatus]}
+        </p>
       </PanelSection>
 
       {/* Status-change confirmation modal (normal + override) */}
@@ -322,7 +329,7 @@ export function StaffProjectPanel({
           <DialogHeader>
             <DialogTitle>
               {pending?.force ? "Override to " : "Move to "}
-              {pending ? STATUS_LABEL[pending.target] : ""}
+              {pending ? PROJECT_STATUS_LABEL[pending.target] : ""}
             </DialogTitle>
             <DialogDescription>
               {(() => {

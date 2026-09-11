@@ -22,11 +22,11 @@ import {
 import { slotsHint } from "#/lib/analytics-copy";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { PROJECT_STATUS_LABEL } from "#/lib/project-workflow";
 import { isStaff } from "#/lib/viewer";
 import type {
   InventoryRequestItemStatus,
   ItemStatus,
-  ProjectStatus,
   UserRole,
 } from "#/lib/vocabularies";
 import { getAnalytics } from "#/server/analytics";
@@ -94,15 +94,8 @@ export const Route = createFileRoute("/_authed/admin/analytics")({
 
 // Keyed by the vocabulary, not by string, so a status added to the tuple and
 // not here fails to compile rather than drawing a row labelled with its raw
-// key (#286).
-const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
-  draft: "Draft",
-  submitted: "Submitted",
-  changes_requested: "Changes requested",
-  approved: "Approved",
-  published: "Published",
-  archived: "Archived",
-};
+// key (#286). The project labels come from `project-workflow.ts`, shared with
+// the badge and the stepper (#303); the inventory ones are still local.
 
 const ITEM_STATUS_LABEL: Record<ItemStatus, string> = {
   available: "Available",

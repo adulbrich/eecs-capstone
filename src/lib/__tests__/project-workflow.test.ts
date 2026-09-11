@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { ProjectStatus } from "#/lib/vocabularies";
+import { PROJECT_STATUSES, type ProjectStatus } from "#/lib/vocabularies";
 import {
   type ActorRole,
   assertTransitionAllowed,
   canTransition,
+  PROJECT_STATUS_DESCRIPTION,
+  PROJECT_STATUS_DISPLAY_RANK,
+  PROJECT_STATUS_LABEL,
+  PROJECT_STATUSES_IN_DISPLAY_ORDER,
 } from "../project-workflow";
 
 const allowedCases: [ProjectStatus, ProjectStatus, ActorRole][] = [
@@ -62,5 +66,40 @@ describe("assertTransitionAllowed", () => {
     expect(() =>
       assertTransitionAllowed("draft", "published", "owner")
     ).toThrow(/draft.*published.*owner/);
+  });
+});
+
+describe("status copy", () => {
+  it("labels every status once, in sentence case, with no abbreviation", () => {
+    const labels = PROJECT_STATUSES.map((s) => PROJECT_STATUS_LABEL[s]);
+    expect(new Set(labels).size).toBe(PROJECT_STATUSES.length);
+    for (const label of labels) {
+      expect(label).toMatch(/^[A-Z][a-z]+( [a-z]+)*$/);
+    }
+    // The spelling the glossary uses, which three components used to disagree
+    // on: the badge said "changes requested", the stepper "Changes Req.".
+    expect(PROJECT_STATUS_LABEL.changes_requested).toBe("Changes requested");
+  });
+
+  it("describes every status in one sentence or two, ending in a full stop", () => {
+    for (const s of PROJECT_STATUSES) {
+      expect(PROJECT_STATUS_DESCRIPTION[s]).toMatch(/^[A-Z].*\.$/);
+    }
+  });
+
+  it("ranks every status for display, with changes requested beside submitted", () => {
+    expect(PROJECT_STATUSES_IN_DISPLAY_ORDER).toEqual([
+      "draft",
+      "submitted",
+      "changes_requested",
+      "approved",
+      "published",
+      "archived",
+    ]);
+    for (const s of PROJECT_STATUSES) {
+      expect(PROJECT_STATUS_DISPLAY_RANK[s]).toBe(
+        PROJECT_STATUSES_IN_DISPLAY_ORDER.indexOf(s)
+      );
+    }
   });
 });

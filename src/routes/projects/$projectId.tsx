@@ -144,6 +144,16 @@ function ProjectDetail() {
 
       {viewerIsOwner && !viewerIsStaff && (
         <OwnerProjectActions
+          // History is oldest first, so the last changes-requested row is the
+          // request the proposer is answering now.
+          changeRequest={
+            project.status === "changes_requested"
+              ? ([...history]
+                  .reverse()
+                  .find((row) => row.newStatus === "changes_requested")
+                  ?.comment ?? null)
+              : null
+          }
           onChanged={() => {
             void router.invalidate();
           }}

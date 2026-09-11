@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { pageTitle } from "#/lib/page-title";
+import { PROJECT_STATUS_LABEL } from "#/lib/project-workflow";
 import { PROJECT_STATUSES } from "#/lib/vocabularies";
 import { listMyProjects } from "#/server/projects-queries";
 
@@ -35,8 +36,6 @@ function MyProjects() {
   const { rows, teamCapacity } = Route.useLoaderData();
   const { status } = Route.useSearch();
   const navigate = useNavigate();
-
-  const label = (s: string) => s.replace(/_/g, " ");
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:p-8">
@@ -72,7 +71,7 @@ function MyProjects() {
           <SelectContent>
             {STATUSES.map((s) => (
               <SelectItem key={s} value={s}>
-                {s === "all" ? "All statuses" : label(s)}
+                {s === "all" ? "All statuses" : PROJECT_STATUS_LABEL[s]}
               </SelectItem>
             ))}
           </SelectContent>

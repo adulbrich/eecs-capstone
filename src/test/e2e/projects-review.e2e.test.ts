@@ -47,10 +47,10 @@ test.describe("project changes-requested round trip", () => {
       await waitForHydration(staff);
 
       await staff
-        .getByRole("button", { name: "Changes Req.", exact: true })
+        .getByRole("button", { name: "Changes requested", exact: true })
         .click();
       const dialog = staff.getByRole("dialog");
-      await expect(dialog.getByText("Move to Changes Req.")).toBeVisible();
+      await expect(dialog.getByText("Move to Changes requested")).toBeVisible();
 
       // The one status whose comment is mandatory, which the dialog enforces by
       // disabling Confirm rather than by rejecting the submission. Worth
@@ -62,17 +62,17 @@ test.describe("project changes-requested round trip", () => {
       await dialog.getByLabel("What needs to change? (required)").fill(comment);
       await dialog.getByRole("button", { name: "Confirm" }).click();
       await expect(
-        staff.getByRole("button", { name: "Changes Req.", exact: true })
+        staff.getByRole("button", { name: "Changes requested", exact: true })
       ).toBeDisabled();
 
       const owner = await ownerContext.newPage();
       await owner.goto(`/projects/${projectId}`);
       await waitForHydration(owner);
 
-      // The proposer's copy of the review. It reaches them through the private
-      // panel's status history, not through the staff panel, which they cannot
-      // see at all.
-      await expect(owner.getByText(comment)).toBeVisible();
+      // The proposer's copy of the review, twice: in the "Your actions" box
+      // beside the resubmit button, and in the private panel's status history.
+      // Never through the staff panel, which they cannot see at all.
+      await expect(owner.getByText(comment)).toHaveCount(2);
       await expect(
         owner.getByRole("heading", { name: "Staff panel", exact: true })
       ).toHaveCount(0);
