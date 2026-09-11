@@ -6,6 +6,7 @@ import {
   type DeletionPreview,
 } from "#/components/delete-account-dialog";
 import { MentorFields } from "#/components/mentor-fields";
+import { RecommendedProjectsLink } from "#/components/recommended-projects-link";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
@@ -260,10 +261,7 @@ function Profile() {
         <output className="mt-2 block text-sm">
           {interestsStatus === "saved" && (
             <span className="text-muted-foreground">
-              Saved.{" "}
-              <Link search={{ sort: "recommended" }} to="/projects">
-                See your recommended projects
-              </Link>
+              Saved. <RecommendedProjectsLink />
             </span>
           )}
           {interestsStatus === "degraded" && (
