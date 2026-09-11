@@ -21,6 +21,7 @@ import type { ProjectStatus } from "#/lib/vocabularies";
 import type {
   MentorshipInput,
   ProjectInput,
+  ProposerInput,
   UpdateProjectInput,
 } from "../projects";
 import {
@@ -108,20 +109,13 @@ export async function createProjectAs(
   viewer: AuthUser,
   data: ProjectInput
 ): Promise<{ id: string }> {
-  const staff = isStaff(viewer);
-  const proposerEmail = staff
-    ? normalizeEmailAddress(data.proposerEmail)
-    : null;
-  // On create a blank proposer email defaults the proposer to the creator, so a
-  // new project always has an owner. Staff link a different proposer by entering
-  // their email. On edit, clearing the field is instead an explicit unlink.
-  const proposerId = proposerEmail
-    ? await resolveProposerId(proposerEmail)
-    : viewer.id;
+  // The creator is the proposer, staff included (#322): a new project always
+  // has an owner, and `ProjectInput` has no room for a different one. Staff
+  // reassign from the project page through `updateProjectProposerAs`.
+  const proposerId = viewer.id;
   // Private notes belong to staff and the proposer jointly. On create the
-  // writer is always one of the two by construction (only staff may name a
-  // different proposer; everyone else becomes the proposer), so there is
-  // nothing to gate here. The update path re-checks per project.
+  // writer is the proposer by construction, so there is nothing to gate here.
+  // The update path re-checks per project.
   const allowedNotes = data.notes ?? null;
 
   assertNoImageKeyOnCreate(data.imageUrl);
@@ -146,7 +140,7 @@ export async function createProjectAs(
       programId: data.programId ?? null,
       notes: allowedNotes,
       proposerId,
-      proposerEmail,
+      proposerEmail: null,
       status: "draft",
       teamsSupported: data.teamsSupported ?? 1,
       acceptingApplicants: data.acceptingApplicants ?? true,
@@ -158,16 +152,17 @@ export async function createProjectAs(
 /**
  * What this edit writes, given who is making it.
  *
- * Server-side rather than in `src/lib/` beside the diff: the staff branch
- * resolves a proposer address to an account id, which is a database read. It
- * exists to keep `updateProjectAs` to four steps, not to be tested alone; the
- * integration suite already covers both branches.
+ * Every key is `data.x ?? null`, so a caller that omits one clears it: this
+ * object is the one statement of which columns an edit touches, and it is not
+ * a partial-update facility. The proposer used to be the one three-state
+ * exception here; since #322 it has its own writer, `updateProjectProposerAs`,
+ * and `UpdateProjectInput` has no key for it, so this cannot reach it.
  */
-async function buildProjectValues(
+function buildProjectValues(
   data: UpdateProjectInput,
   existing: Awaited<ReturnType<typeof loadProjectOr404>>,
   viewer: Viewer
-): Promise<Partial<typeof projects.$inferSelect>> {
+): Partial<typeof projects.$inferSelect> {
   // Typed against the table rather than as a loose record, because this object
   // is the only statement of which columns an edit may touch. `diffRowFields`
   // reads its keys, and `.set()` writes them, so a key that is not a column has
@@ -192,26 +187,6 @@ async function buildProjectValues(
   if (canWritePrivateNotes(existing, viewer)) {
     newValues.notes = data.notes ?? null;
   }
-  // Omitted and cleared are different asks, and only staff may make either.
-  // An empty string is the explicit unlink the edit form sends when a staff
-  // member clears the field. `undefined` is "this save is not about the
-  // proposer", which is what the new-project route means when it saves an
-  // uploaded image key. Treating the two alike is what made omission silently
-  // destructive, and it cost a spurious "proposer changed" row in the edit log
-  // the one time a caller had to round-trip the address to avoid it.
-  //
-  // Only this field is three-state, and that is deliberate: every other key in
-  // `newValues` is `data.x ?? null`, so a caller that omits one clears it.
-  // Making them all three-state would cost the property the type comment above
-  // depends on, that this object is the one statement of which columns an edit
-  // touches. This is not a general partial-update facility.
-  if (isStaff(viewer) && data.proposerEmail !== undefined) {
-    const proposerEmail = normalizeEmailAddress(data.proposerEmail);
-    newValues.proposerEmail = proposerEmail;
-    newValues.proposerId = proposerEmail
-      ? await resolveProposerId(proposerEmail)
-      : null;
-  }
   return newValues;
 }
 
@@ -224,7 +199,7 @@ export async function updateProjectAs(
   if (!canEditProject(existing, viewer)) {
     throw new Error("Forbidden");
   }
-  const newValues = await buildProjectValues(data, existing, viewer);
+  const newValues = buildProjectValues(data, existing, viewer);
 
   const { changedFields, newDiff, oldDiff } = diffRowFields(
     existing,
@@ -275,6 +250,56 @@ export async function updateProjectAs(
   }
 
   return { id: existing.id, updated: true };
+}
+
+/**
+ * The only writer of `proposerEmail` and `proposerId` after create (#322).
+ *
+ * Staff-only, and deliberately not part of `updateProjectAs`: the key is not
+ * on `ProjectInput`, so the shared form cannot carry it and a proposer has no
+ * endpoint that reassigns their own project. An address links or reassigns;
+ * an empty string or null unlinks, leaving an external proposer with no
+ * account and no address. `proposerId` is derived from the address here and
+ * never taken from the client (ADR-0007). One edit-log row per change, and a
+ * save that changes nothing writes none, the same as mentorship.
+ */
+export async function updateProjectProposerAs(
+  viewer: Viewer,
+  data: ProposerInput
+): Promise<{ id: string; updated: boolean }> {
+  assertStaff(viewer);
+  const existing = await loadProjectOr404(data.id);
+  const proposerEmail = normalizeEmailAddress(data.proposerEmail);
+  const newValues: Partial<typeof projects.$inferSelect> = {
+    proposerEmail,
+    proposerId: proposerEmail ? await resolveProposerId(proposerEmail) : null,
+  };
+  const { changedFields, newDiff, oldDiff } = diffRowFields(
+    existing,
+    newValues
+  );
+  if (changedFields.length === 0) {
+    return { id: existing.id, updated: false };
+  }
+  await db.transaction(async (tx) => {
+    await tx
+      .update(projects)
+      .set({ ...newValues, updatedAt: new Date() })
+      .where(eq(projects.id, existing.id));
+    await tx.insert(projectEditLog).values({
+      projectId: existing.id,
+      editorId: viewer.id,
+      changedFields,
+      oldValues: oldDiff,
+      newValues: newDiff,
+    });
+  });
+  return { id: existing.id, updated: true };
+}
+
+export async function updateProjectProposerForCurrentUser(data: ProposerInput) {
+  const viewer = await requireUser();
+  return updateProjectProposerAs(viewer, data);
 }
 
 /**

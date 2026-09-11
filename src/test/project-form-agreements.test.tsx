@@ -36,15 +36,7 @@ beforeAll(installResizeObserver);
 afterEach(cleanup);
 
 function renderForm(initial?: Record<string, unknown>) {
-  render(
-    <ProjectForm
-      initial={initial}
-      isStaff={false}
-      showCategories
-      showNotes
-      submitLabel="Save"
-    />
-  );
+  render(<ProjectForm initial={initial} showNotes submitLabel="Save" />);
 }
 
 describe("ProjectForm NDA/IP agreement", () => {

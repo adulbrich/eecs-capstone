@@ -24,13 +24,6 @@ const projectInputSchema = z.object({
   isSponsored: z.boolean().optional(),
   programId: z.string().uuid().nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
-  proposerEmail: z
-    .string()
-    .email()
-    .max(200)
-    .nullable()
-    .optional()
-    .or(z.literal("")),
   teamsSupported: z.number().int().min(1).max(5).optional(),
   acceptingApplicants: z.boolean().optional(),
 });
@@ -53,6 +46,16 @@ export const mentorshipSchema = z.object({
 });
 
 export type MentorshipInput = z.infer<typeof mentorshipSchema>;
+
+export const proposerSchema = z.object({
+  id: z.string().uuid(),
+  // The link key (ADR-0007). An address links or reassigns; an empty string
+  // or null unlinks, and the impl folds both to a null column. Never on
+  // ProjectInput: the form cannot carry it and only this endpoint writes it.
+  proposerEmail: z.string().email().max(200).nullable().or(z.literal("")),
+});
+
+export type ProposerInput = z.infer<typeof proposerSchema>;
 
 // Defaults true so a partial caller sends mail rather than silently swallowing
 // it. Staff opt out per action from the transition dialog.
@@ -91,6 +94,15 @@ export const updateProjectMentorship = createServerFn({ method: "POST" })
       "./_internal/projects"
     );
     return updateProjectMentorshipForCurrentUser(data);
+  });
+
+export const updateProjectProposer = createServerFn({ method: "POST" })
+  .validator((data: unknown) => proposerSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { updateProjectProposerForCurrentUser } = await import(
+      "./_internal/projects"
+    );
+    return updateProjectProposerForCurrentUser(data);
   });
 
 export const submitProject = createServerFn({ method: "POST" })

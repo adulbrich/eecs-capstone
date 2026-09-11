@@ -40,13 +40,12 @@ export const STAFF_PANEL_AUDIENCE_HINT =
   "Only visible to staff (instructors and admins). Never shown publicly.";
 
 /**
- * The same idea on a *form* rather than a detail page. The panel line above
- * describes content a reader can see; on the project form these are controls
- * the proposer cannot use at all, and "never shown publicly" would be the
- * wrong claim for a field like Categories, which is public once set.
+ * Shown to staff above the new-project form. The creator is the proposer on
+ * create, staff included, and the form has no staff-only control since #322:
+ * the proposer and the categories are set from the staff panel afterwards.
  */
-export const STAFF_FIELDS_PROJECT_HINT =
-  "These settings are only available to staff (instructors and admins). Not to the project proposer.";
+export const STAFF_CREATE_PROJECT_NOTE =
+  "You will be listed as the proposer. Reassign it, and set categories, from the staff panel on the project page after saving.";
 
 /**
  * Per-field version, for the inventory form's staff-only inputs. Only staff

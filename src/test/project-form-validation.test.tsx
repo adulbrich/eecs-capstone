@@ -42,15 +42,7 @@ beforeAll(installResizeObserver);
 afterEach(cleanup);
 
 function renderForm() {
-  render(
-    <ProjectForm
-      isStaff={false}
-      showCategories
-      showNotes
-      showProposer
-      submitLabel="Save"
-    />
-  );
+  render(<ProjectForm showNotes submitLabel="Save" />);
   // Submit the form rather than clicking Save. Once a value fails validation
   // the button is disabled, so a click stops driving anything, which is the
   // state this test exists to describe rather than work around.
@@ -60,10 +52,11 @@ function renderForm() {
 }
 
 describe("ProjectForm validation", () => {
-  it("shows the message when the proposer address is not an address", async () => {
-    // The bug this guards: validation failed, canSubmit flipped false so Save
-    // greyed out, and nothing said why, because this field renders
-    // ProposerPicker and had no error output of its own.
+  it("shows the message when the contact address is not an address", async () => {
+    // The bug this guarded on the proposer field before #322 moved it off
+    // the form: validation failed, canSubmit flipped false so Save greyed
+    // out, and nothing said why, because the field had no error output of
+    // its own. The address rule now has one field on the form.
     const form = renderForm();
 
     // Absent first, so a string that was always on the page cannot pass this.
@@ -72,7 +65,7 @@ describe("ProjectForm validation", () => {
     fireEvent.change(screen.getByLabelText("Title"), {
       target: { value: "A project" },
     });
-    fireEvent.change(screen.getByLabelText("Proposer email"), {
+    fireEvent.change(screen.getByLabelText("Contact email"), {
       target: { value: "notanemail" },
     });
     fireEvent.submit(form);

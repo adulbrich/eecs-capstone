@@ -17,6 +17,7 @@ import {
   restoreProjectAs,
   softDeleteProjectAs,
   updateProjectAs,
+  updateProjectProposerAs,
 } from "#/server/_internal/projects";
 import {
   getProjectAs,
@@ -202,43 +203,95 @@ describe("project workflow", () => {
   });
 });
 
-describe("staff proposer linking by email", () => {
-  it("links proposerId when the email matches an account", async () => {
+describe("updateProjectProposerAs", () => {
+  it("links proposerId when the email matches an account, and logs one row", async () => {
     const staff = await makeUser(`staff-${Date.now()}@x.com`, "admin");
     const target = await makeUser(`target-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(staff, baseProject());
 
-    const { id } = await createProjectAs(staff, {
-      title: "Linked",
-      proposerEmail: target.email,
-    } as never);
+    const result = await updateProjectProposerAs(staff, {
+      id,
+      proposerEmail: target.email.toUpperCase(),
+    });
+    expect(result.updated).toBe(true);
 
     const [row] = await db.select().from(projects).where(eq(projects.id, id));
     expect(row.proposerId).toBe(target.id);
+    // Lowercased on write (#249); the account still resolves.
     expect(row.proposerEmail).toBe(target.email);
+    const log = await db
+      .select()
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
+    expect(log).toHaveLength(1);
+    expect(log[0].changedFields).toEqual(["proposerEmail", "proposerId"]);
   });
 
   it("keeps proposerId null when the email matches no account", async () => {
     const staff = await makeUser(`staff2-${Date.now()}@x.com`, "admin");
-    const { id } = await createProjectAs(staff, {
-      title: "Pending",
+    const { id } = await createProjectAs(staff, baseProject());
+    await updateProjectProposerAs(staff, {
+      id,
       proposerEmail: "noaccount@example.edu",
-    } as never);
+    });
 
     const [row] = await db.select().from(projects).where(eq(projects.id, id));
     expect(row.proposerId).toBeNull();
     expect(row.proposerEmail).toBe("noaccount@example.edu");
   });
 
-  it("ignores proposerEmail from a non-staff creator", async () => {
+  it("unlinks on an empty string and on null, and an unchanged save logs nothing", async () => {
+    const staff = await makeUser(`staff3-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(staff, baseProject());
+    expect(
+      (await updateProjectProposerAs(staff, { id, proposerEmail: "" })).updated
+    ).toBe(true);
+    let [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.proposerId).toBeNull();
+    expect(row.proposerEmail).toBeNull();
+
+    expect(
+      (await updateProjectProposerAs(staff, { id, proposerEmail: null }))
+        .updated
+    ).toBe(false);
+    [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.proposerId).toBeNull();
+    const log = await db
+      .select()
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
+    expect(log).toHaveLength(1);
+  });
+
+  it("refuses a non-staff viewer, the proposer included", async () => {
     const plain = await makeUser(`plain-${Date.now()}@x.com`, "user");
     const other = await makeUser(`other-${Date.now()}@x.com`, "user");
-    const { id } = await createProjectAs(plain, {
-      title: "Self",
-      proposerEmail: other.email,
-    } as never);
-
+    const { id } = await createProjectAs(plain, baseProject());
+    await expect(
+      updateProjectProposerAs(plain, { id, proposerEmail: other.email })
+    ).rejects.toThrow("Forbidden");
     const [row] = await db.select().from(projects).where(eq(projects.id, id));
     expect(row.proposerId).toBe(plain.id);
+  });
+
+  it("is the only way in: create and update ignore a smuggled proposerEmail, staff included", async () => {
+    const staff = await makeUser(`smug-${Date.now()}@x.com`, "admin");
+    const other = await makeUser(`smug-o-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(staff, {
+      ...baseProject(),
+      proposerEmail: other.email,
+    } as never);
+    let [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.proposerId).toBe(staff.id);
+    expect(row.proposerEmail).toBeNull();
+
+    await updateProjectAs(staff, {
+      id,
+      ...baseProject(),
+      proposerEmail: other.email,
+    } as never);
+    [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.proposerId).toBe(staff.id);
     expect(row.proposerEmail).toBeNull();
   });
 });
@@ -335,6 +388,9 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
     const { id } = await createProjectAs(admin, {
       ...baseProject(),
       notes: "internal staff note",
+    });
+    await updateProjectProposerAs(admin, {
+      id,
       proposerEmail: "proposer@example.edu",
     });
     await forceTransitionAs(admin, id, "published");
@@ -499,15 +555,11 @@ describe("private notes", () => {
     const owner = await makeUser(`pn-o4-${Date.now()}@x.com`, "user");
     const admin = await makeUser(`pn-a4-${Date.now()}@x.com`, "admin");
     const { id } = await createProjectAs(owner, baseProject());
-    // The staff edit form prefills proposerEmail from getProposerForEdit, so a
-    // staff save always sends it back. Sent explicitly here because that is
-    // what the form does; omitting it would now leave the proposer alone
-    // rather than unlink, so this no longer depends on remembering to.
+    // A staff save carries no proposer since #322, so it cannot unlink one.
     await updateProjectAs(admin, {
       id,
       ...baseProject(),
       notes: "staff context",
-      proposerEmail: owner.email,
     });
 
     // The proposer sees the notes now, so an untouched save round-trips them.
@@ -580,12 +632,10 @@ describe("private notes", () => {
     expect(log[0].editorId).toBe(owner.id);
   });
 
-  it("a staff save that omits proposerEmail leaves the proposer alone", async () => {
-    // Omitted and cleared are different asks. The new-project route creates,
-    // uploads, then updates to save the image key, and that update is not about
-    // the proposer at all. Before this distinction existed, omitting the field
-    // unlinked the proposer, and round-tripping the address to avoid that wrote
-    // a "proposer changed" row into the edit log that no one had asked for.
+  it("a staff save leaves the proposer alone, and the log says only what changed", async () => {
+    // The proposer has its own writer since #322, so an ordinary edit, such
+    // as the image save the new-project route makes right after create,
+    // cannot touch it and writes no "proposer changed" row.
     const admin = await makeUser(`prop-a-${Date.now()}@x.com`, "admin");
     const { id } = await createProjectAs(admin, baseProject());
     const [afterCreate] = await db
@@ -606,24 +656,12 @@ describe("private notes", () => {
       .where(eq(projects.id, id));
     expect(afterUpdate.proposerId).toBe(admin.id);
 
-    // And the log says only what changed.
     const log = await db
       .select()
       .from(projectEditLog)
       .where(eq(projectEditLog.projectId, id));
     expect(log).toHaveLength(1);
     expect(log[0].changedFields).toEqual(["imageUrl"]);
-  });
-
-  it("a staff save that clears proposerEmail still unlinks the proposer", async () => {
-    const admin = await makeUser(`prop-b-${Date.now()}@x.com`, "admin");
-    const { id } = await createProjectAs(admin, baseProject());
-
-    await updateProjectAs(admin, { id, ...baseProject(), proposerEmail: "" });
-
-    const [row] = await db.select().from(projects).where(eq(projects.id, id));
-    expect(row.proposerId).toBeNull();
-    expect(row.proposerEmail).toBeNull();
   });
 
   it("never returns proposerEmail to anyone, staff included", async () => {
@@ -635,8 +673,8 @@ describe("private notes", () => {
     const { id } = await createProjectAs(admin, {
       ...baseProject(),
       notes: "n",
-      proposerEmail: owner.email,
     });
+    await updateProjectProposerAs(admin, { id, proposerEmail: owner.email });
 
     const ownerView = await getProjectAs(owner, { id });
     expect(ownerView.project?.notes).toBe("n");
@@ -752,8 +790,9 @@ describe("review emails", () => {
   it("emails a proposer who has an address but no account", async () => {
     process.env.BETTER_AUTH_URL = "https://app";
     const admin = await makeUser("admin-noacct@x.edu", "admin");
-    const { id } = await createProjectAs(admin, {
-      ...baseProject(),
+    const { id } = await createProjectAs(admin, baseProject());
+    await updateProjectProposerAs(admin, {
+      id,
       proposerEmail: "outsider@example.com",
     });
     const send = vi.fn().mockResolvedValue(undefined);
@@ -812,8 +851,9 @@ describe("getProposerForEditImpl", () => {
 
   it("reports an external proposer as unlinked", async () => {
     const staff = await makeUser("staff-pfe2@x.edu", "admin");
-    const { id } = await createProjectAs(staff, {
-      ...baseProject(),
+    const { id } = await createProjectAs(staff, baseProject());
+    await updateProjectProposerAs(staff, {
+      id,
       proposerEmail: "outsider@example.com",
     });
 

@@ -7,8 +7,7 @@ import {
 import { ProjectForm } from "#/components/project-form";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
-import { listProjectCategories } from "#/server/categories";
-import { getProject, getProposerForEdit } from "#/server/projects-queries";
+import { getProject } from "#/server/projects-queries";
 
 export const Route = createFileRoute("/_authed/projects/$projectId/edit")({
   head: () => ({ meta: [{ title: pageTitle("Edit Project") }] }),
@@ -26,25 +25,16 @@ export const Route = createFileRoute("/_authed/projects/$projectId/edit")({
         params: { projectId: params.projectId },
       });
     }
-    const { rows: categoryRows } = await listProjectCategories({
-      data: { projectId: params.projectId },
-    });
-    const proposer = data.viewerIsStaff
-      ? await getProposerForEdit({ data: { projectId: params.projectId } })
-      : { accountLinked: false, accountName: null, email: "" };
-    return {
-      ...data,
-      categoryIds: categoryRows.map((c) => c.id),
-      proposer,
-    };
+    // The proposer and the categories are not loaded here: the form has no
+    // staff-only control since #322, and both are set from the project page.
+    return data;
   },
   component: EditProject,
 });
 
 function EditProject() {
   const navigate = useNavigate();
-  const { project, viewerIsStaff, categoryIds, proposer } =
-    Route.useLoaderData();
+  const { project } = Route.useLoaderData();
   if (!project) {
     return null;
   }
@@ -73,20 +63,14 @@ function EditProject() {
             isSponsored: project.isSponsored ?? false,
             programId: project.programId ?? "",
             notes: project.notes ?? "",
-            proposerEmail: proposer.email,
             teamsSupported: project.teamsSupported ?? 1,
             acceptingApplicants: project.acceptingApplicants,
           }}
-          initialCategoryIds={categoryIds}
-          isStaff={viewerIsStaff}
           onSaved={() => {
             navigate({ to: "/projects/$projectId", params: { projectId } });
           }}
           projectId={projectId}
-          proposer={proposer}
-          showCategories={viewerIsStaff}
           showNotes
-          showProposer={viewerIsStaff}
           submitLabel="Save"
         />
       </div>

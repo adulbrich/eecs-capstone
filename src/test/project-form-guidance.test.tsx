@@ -48,9 +48,7 @@ beforeAll(installResizeObserver);
 afterEach(cleanup);
 
 function renderForm() {
-  render(
-    <ProjectForm isStaff={false} showCategories showNotes submitLabel="Save" />
-  );
+  render(<ProjectForm showNotes submitLabel="Save" />);
 }
 
 /**
