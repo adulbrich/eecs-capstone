@@ -158,7 +158,97 @@ describe("StartSourcingAllButton", () => {
   });
 });
 
+describe("CustomLineActions: cancelling a popover", () => {
+  it("closes the sourcing popover without writing, and keeps the note", async () => {
+    render(<CustomLineActions line={pending} onDone={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Start sourcing" }));
+    fireEvent.change(
+      screen.getByLabelText("Note for the requester (optional)"),
+      { target: { value: "Half typed" } }
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByLabelText("Note for the requester (optional)")
+      ).toBeNull()
+    );
+    expect(startSourcingCustomLine).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start sourcing" }));
+    expect(
+      (
+        screen.getByLabelText(
+          "Note for the requester (optional)"
+        ) as HTMLTextAreaElement
+      ).value
+    ).toBe("Half typed");
+  });
+
+  it("closes the reject popover without writing", async () => {
+    render(<CustomLineActions line={pending} onDone={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    fireEvent.change(screen.getByLabelText("Reason (sent to requester)"), {
+      target: { value: "Not stocked" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByLabelText("Reason (sent to requester)")).toBeNull()
+    );
+    expect(rejectCustomLine).not.toHaveBeenCalled();
+  });
+});
+
 describe("FulfillCustomLineDialog", () => {
+  /** Opens the dialog, searches, and links the first match. */
+  async function linkFirstMatch() {
+    vi.mocked(listAdminInventory).mockResolvedValue({
+      rows: [
+        { id: "i-1", name: "FLIR One" },
+        { id: "i-2", name: "FLIR Two" },
+      ],
+    } as never);
+    fireEvent.click(screen.getByRole("button", { name: "Fulfil" }));
+    fireEvent.change(screen.getByLabelText("Find an available item"), {
+      target: { value: "FLIR" },
+    });
+    await waitFor(() => expect(screen.getByText("FLIR One")).toBeDefined());
+    fireEvent.click(screen.getAllByRole("button", { name: "Add" })[0]);
+    expect(
+      screen.getByRole("list", { name: "Linked items" }).textContent
+    ).toContain("FLIR One");
+  }
+
+  it("unlinks an item and offers it again", async () => {
+    render(<FulfillCustomLineDialog line={pending} onDone={vi.fn()} />);
+    await linkFirstMatch();
+    // Linking takes the item out of the matches; the Add buttons left are
+    // for the others.
+    expect(screen.getAllByRole("button", { name: "Add" })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove FLIR One" }));
+    expect(screen.queryByRole("list", { name: "Linked items" })).toBeNull();
+    expect(screen.getByText("Nothing linked yet.")).toBeDefined();
+    expect(screen.getAllByRole("button", { name: "Add" })).toHaveLength(2);
+    expect(fulfillCustomLine).not.toHaveBeenCalled();
+  });
+
+  it("closes on Cancel without writing, and starts over when reopened", async () => {
+    render(<FulfillCustomLineDialog line={pending} onDone={vi.fn()} />);
+    await linkFirstMatch();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(fulfillCustomLine).not.toHaveBeenCalled();
+
+    // Unlike the other dialogs, this one resets on close: a half-built link
+    // set is not something to find again on a later line.
+    fireEvent.click(screen.getByRole("button", { name: "Fulfil" }));
+    expect(screen.getByText("Nothing linked yet.")).toBeDefined();
+    expect(
+      (screen.getByLabelText("Find an available item") as HTMLInputElement)
+        .value
+    ).toBe("");
+  });
+
   it("finds available items, links the chosen ones, and reserves by default", async () => {
     vi.mocked(listAdminInventory).mockResolvedValue({
       rows: [

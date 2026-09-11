@@ -40,6 +40,18 @@ test.describe("custom line rejection", () => {
       await waitForHydration(staff);
 
       const row = rowFor(staff, name);
+
+      // Details opens the sheet staff act from. The sheet is modal, so it is
+      // closed again before the row's own Reject is reachable.
+      await row.getByRole("button", { name: "Details" }).click();
+      const sheet = staff.getByRole("dialog");
+      await expect(
+        sheet.getByRole("heading", { name, exact: true })
+      ).toBeVisible();
+      await expect(sheet.getByText(/^Requested by/)).toBeVisible();
+      await staff.keyboard.press("Escape");
+      await expect(sheet).toBeHidden();
+
       await row.getByRole("button", { name: "Reject" }).click();
       await staff.getByLabel("Reason (sent to requester)").fill("Not stocked");
       await confirmed(staff, () =>

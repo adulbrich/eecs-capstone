@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as React from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -81,5 +87,25 @@ describe("SiteHeader source link", () => {
     expect(link.getAttribute("href")).toBe(brand.repositoryUrl);
     const items = Array.from(sheet.querySelectorAll("nav a"));
     expect(items.at(-1)).toBe(link);
+  });
+});
+
+describe("SiteHeader mobile navigation", () => {
+  it("closes from its own close button", async () => {
+    render(<SiteHeader />);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Open navigation" })
+    );
+    const sheet = await screen.findByRole("dialog");
+    // The sheet's X is its only close control: SheetContent renders none of
+    // its own, so this button going missing would leave the sheet closable
+    // only by Escape or the overlay.
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "Close navigation" })
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(
+      screen.getByRole("button", { name: "Open navigation" })
+    ).toBeTruthy();
   });
 });

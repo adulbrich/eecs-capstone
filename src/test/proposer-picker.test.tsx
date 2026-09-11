@@ -195,6 +195,29 @@ describe("ProposerPicker when an account is linked", () => {
     expect(onChange).toHaveBeenCalledWith("");
   });
 
+  it("keeps the link when the re-assign dialog is cancelled", async () => {
+    const onChange = vi.fn();
+    const { getByLabelText, getByText, queryByRole } = render(
+      <ProposerPicker
+        accountLinked
+        accountName="Alex Kim"
+        onChange={onChange}
+        value="alex@oregonstate.edu"
+      />
+    );
+
+    fireEvent.click(getByText("Re-assign"));
+    fireEvent.click(getByText("Cancel"));
+
+    // The contrast with the button beside it: that one calls onChange("")
+    // and unlocks the field; Cancel touches neither.
+    await waitFor(() => expect(queryByRole("dialog")).toBeNull());
+    expect(onChange).not.toHaveBeenCalled();
+    const input = getByLabelText("Proposer email") as HTMLInputElement;
+    expect(input.readOnly).toBe(true);
+    expect(getByText("Re-assign")).toBeTruthy();
+  });
+
   it("leaves the field editable when no account is linked", () => {
     const { getByLabelText, getByText } = render(
       <ProposerPicker

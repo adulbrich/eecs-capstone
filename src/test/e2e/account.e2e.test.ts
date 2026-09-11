@@ -1,6 +1,9 @@
 import { readFile } from "node:fs/promises";
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
+import { eq } from "drizzle-orm";
+// biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
+import * as schema from "../../db/schema";
 import { waitForHydration } from "../shared/playwright";
 import { SERVER_LOG } from "./constants";
 import {
@@ -10,11 +13,13 @@ import {
   userIdByEmail,
   withDb,
 } from "./fixtures";
+import { confirmed } from "./waits";
 
 /**
  * The whole account lifecycle, driven through the real forms: sign up, prove
  * the address, sign out, forget the password, set a new one, sign back in,
- * and finally close the account.
+ * edit the profile, change the password from it, sign out from it, sign back
+ * in once more, and finally close the account.
  *
  * Every other test in this suite starts from a storage state minted once in
  * global setup, so none of them would notice if verification or password reset
@@ -46,6 +51,7 @@ test.describe("account lifecycle", () => {
     const email = fixtureEmail();
     const firstPassword = "e2e-first-password";
     const secondPassword = "e2e-second-password";
+    const thirdPassword = "e2e-third-password";
 
     await page.goto("/sign-up");
     await waitForHydration(page, "form");
@@ -135,13 +141,83 @@ test.describe("account lifecycle", () => {
     await page.goto("/my/projects");
     await expect(page).toHaveURL(/\/my\/projects/);
 
-    // Closing the account is the last thing the person can do, and the one
-    // write here with a typed gate in front of it. Deletion anonymizes the row
-    // rather than removing it (ADR-0008), so the address on the row changes
-    // and the prefix sweep can no longer find it: the id is read first and the
-    // row is deleted by hand afterwards.
+    // The profile page's own writes run against this account rather than a
+    // seeded one, because one of them is a password change: done to a seeded
+    // user it would lock every later run and the accessibility suite out.
+    // Deletion below anonymizes the row rather than removing it (ADR-0008), so
+    // the address on the row changes and the prefix sweep can no longer find
+    // it: the id is read first and the row is deleted by hand afterwards.
     const userId = await withDb((db) => userIdByEmail(db, email));
     try {
+      await page.goto("/profile");
+      await waitForHydration(page);
+
+      const profileForm = page.locator("form").filter({
+        has: page.getByRole("button", { name: "Save profile" }),
+      });
+      await profileForm.getByLabel("Name").fill("End To End Edited");
+      await profileForm.getByLabel("Affiliation").fill("E2E Lab");
+      await confirmed(page, () =>
+        profileForm.getByRole("button", { name: "Save profile" }).click()
+      );
+      await expect(profileForm.getByRole("status")).toHaveText("Saved.");
+      expect(await withDb((db) => readUser(db, userId))).toMatchObject({
+        name: "End To End Edited",
+        affiliation: "E2E Lab",
+      });
+
+      // Embeddings are off in this suite's server, so the save lands on the
+      // "saved, but no recommendations" branch; both branches begin with the
+      // same word. Scoped to its form because the profile form above has just
+      // printed "Saved." of its own.
+      const interestsForm = page.locator("form").filter({
+        has: page.getByLabel("Interests"),
+      });
+      await interestsForm.getByLabel("Interests").fill("Robots and sensors.");
+      await confirmed(page, () =>
+        interestsForm.getByRole("button", { name: "Save interests" }).click()
+      );
+      await expect(interestsForm.getByRole("status")).toHaveText(/^Saved/);
+      const [interests] = await withDb((db) =>
+        db
+          .select({ text: schema.userInterests.interestsText })
+          .from(schema.userInterests)
+          .where(eq(schema.userInterests.userId, userId))
+      );
+      expect(interests.text).toBe("Robots and sensors.");
+
+      // Better Auth's own endpoint, not a server function, so there is no
+      // response for `confirmed` to wait on; the feedback line is the signal,
+      // and the sign-in further down is the proof.
+      const passwordForm = page.locator("form").filter({
+        has: page.getByRole("button", { name: "Change password" }),
+      });
+      await passwordForm.getByLabel("Current password").fill(secondPassword);
+      await passwordForm.getByLabel("New password").fill(thirdPassword);
+      await passwordForm
+        .getByRole("button", { name: "Change password" })
+        .click();
+      await expect(passwordForm.getByRole("status")).toHaveText(
+        "Password changed."
+      );
+
+      // The profile page's own Sign out, which is a different control from
+      // the header menu item pressed earlier in this flow.
+      await page.getByRole("button", { name: "Sign out" }).click();
+      await page.waitForURL(/\/sign-in/, { timeout: 15_000 });
+      await waitForHydration(page, "form");
+      await page.getByLabel("Email").fill(email);
+      await page.getByLabel("Password").fill(secondPassword);
+      await page.getByRole("button", { name: /sign in/i }).click();
+      await expectRefused(page);
+      await page.getByLabel("Password").fill(thirdPassword);
+      await page.getByRole("button", { name: /sign in/i }).click();
+      await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"), {
+        timeout: 15_000,
+      });
+
+      // Closing the account is the last thing the person can do, and the one
+      // write here with a typed gate in front of it.
       await page.goto("/profile");
       await waitForHydration(page);
       await page.getByRole("button", { name: "Delete account" }).click();
@@ -158,7 +234,7 @@ test.describe("account lifecycle", () => {
       await page.goto("/sign-in");
       await waitForHydration(page, "form");
       await page.getByLabel("Email").fill(email);
-      await page.getByLabel("Password").fill(secondPassword);
+      await page.getByLabel("Password").fill(thirdPassword);
       await page.getByRole("button", { name: /sign in/i }).click();
       await expectRefused(page);
       expect((await withDb((db) => readUser(db, userId))).email).toBe(

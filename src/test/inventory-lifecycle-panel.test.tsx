@@ -31,7 +31,10 @@ vi.mock("#/server/users", () => ({
 }));
 vi.mock("@tanstack/react-router", () => ({ useRouter: () => router }));
 
-import { InventoryLifecyclePanel } from "#/components/inventory-lifecycle-panel";
+import {
+  type HistoryRow,
+  InventoryLifecyclePanel,
+} from "#/components/inventory-lifecycle-panel";
 import {
   HARD_DELETE_HISTORY_REFUSAL,
   needsHolder,
@@ -45,12 +48,16 @@ afterEach(() => {
 const STATUSES: ItemStatus[] = [...INVENTORY_ITEM_STATUSES];
 
 function renderPanel(
-  overrides: { status?: ItemStatus; hasRequestHistory?: boolean } = {}
+  overrides: {
+    status?: ItemStatus;
+    hasRequestHistory?: boolean;
+    history?: HistoryRow[];
+  } = {}
 ) {
   return render(
     <InventoryLifecyclePanel
       hasRequestHistory={overrides.hasRequestHistory ?? false}
-      history={[]}
+      history={overrides.history ?? []}
       item={{
         id: "item-1",
         name: "Oscilloscope",
@@ -310,5 +317,64 @@ describe("InventoryLifecyclePanel: the hard delete confirmation", () => {
     server.hardDeleteInventoryItem.mockRejectedValueOnce({});
     fireEvent.click(confirm);
     expect(await dialog.findByText("Delete failed")).toBeDefined();
+  });
+});
+
+describe("InventoryLifecyclePanel: the status history", () => {
+  /** `count` rows, each carrying its own number in the comment. */
+  function historyOf(count: number): HistoryRow[] {
+    return Array.from({ length: count }, (_, i) => ({
+      changedByEmail: "staff@example.com",
+      changedByName: "Staff",
+      comment: `entry ${i + 1}`,
+      createdAt: new Date(2026, 0, 1, 0, i),
+      holderEmail: null,
+      holderId: null,
+      holderLabel: null,
+      holderName: null,
+      holderProgram: null,
+      id: `h-${i + 1}`,
+      newStatus: "available",
+      oldStatus: "checked_out",
+    }));
+  }
+
+  it("offers no paging when the history fits one page", () => {
+    renderPanel({ history: historyOf(10) });
+    expect(screen.getByText("entry 10")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
+  });
+
+  it("pages forward and back, stopping at either end", () => {
+    renderPanel({ history: historyOf(12) });
+    const next = screen.getByRole("button", { name: "Next" });
+    const previous = screen.getByRole("button", { name: "Previous" });
+    expect(screen.getByText("Page 1 of 2")).toBeDefined();
+    expect(screen.getByText("entry 1")).toBeDefined();
+    expect(screen.queryByText("entry 11")).toBeNull();
+    expect(previous).toHaveProperty("disabled", true);
+
+    fireEvent.click(next);
+    expect(screen.getByText("Page 2 of 2")).toBeDefined();
+    expect(screen.getByText("entry 11")).toBeDefined();
+    expect(screen.queryByText("entry 1")).toBeNull();
+    expect(next).toHaveProperty("disabled", true);
+
+    fireEvent.click(previous);
+    expect(screen.getByText("Page 1 of 2")).toBeDefined();
+    expect(screen.getByText("entry 1")).toBeDefined();
+  });
+});
+
+describe("InventoryLifecyclePanel: the checkout dialog", () => {
+  it("closes on Cancel without transitioning", async () => {
+    renderPanel({ status: "available" });
+    fireEvent.click(screen.getByRole("button", { name: "Check out" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(server.transitionInventoryItem).not.toHaveBeenCalled();
+    expect(router.invalidate).not.toHaveBeenCalled();
   });
 });

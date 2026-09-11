@@ -61,7 +61,9 @@ test.describe("inventory item administration", () => {
       const staff = await context.newPage();
       await staff.goto("/inventory/new");
       await waitForHydration(staff, "form");
-      await staff.getByLabel("Name").fill(itemName);
+      // Exact, because every inventory category is a checkbox on this form
+      // and a category's name is that checkbox's label.
+      await staff.getByLabel("Name", { exact: true }).fill(itemName);
       await staff.getByRole("button", { name: "Create item" }).click();
 
       // The form navigates to the item it just made, so the URL is where the
