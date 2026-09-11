@@ -132,5 +132,15 @@ describe("ProjectCard mentorship", () => {
     const { queryByText } = render(<ProjectCard project={base} />);
     expect(queryByText("Student proposed")).toBeNull();
     expect(queryByText("Seeking mentor")).toBeNull();
+    expect(queryByText(/^Mentor:/)).toBeNull();
+  });
+
+  it("names the mentor once the summary carries a resolved name", () => {
+    // The Decisions table on #304 lists the name for the card as well as the
+    // table and the page. It is a name only: the address stays on staff reads.
+    const { getByText } = render(
+      <ProjectCard project={{ ...base, mentorName: "Dana Lee" }} />
+    );
+    expect(getByText("Mentor: Dana Lee")).toBeTruthy();
   });
 });

@@ -15,6 +15,8 @@ interface ProjectSummary {
   description: string | null;
   id: string;
   imageUrl?: string | null;
+  /** The resolved account's name, never the address. Null until they sign up. */
+  mentorName?: string | null;
   programCourseId?: string | null;
   programCourseName?: string | null;
   seekingMentor: boolean;
@@ -91,6 +93,13 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
             seekingMentor={project.seekingMentor}
             studentProposed={project.studentProposed}
           />
+          {/* The table and the page show the name too (#304); the address
+              never reaches this payload, so there is nothing else to show. */}
+          {project.mentorName && (
+            <p className="mt-2 text-muted-foreground text-sm">
+              Mentor: {project.mentorName}
+            </p>
+          )}
           <ApplicantsBadge
             acceptingApplicants={project.acceptingApplicants}
             className="mt-2"
