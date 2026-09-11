@@ -507,6 +507,10 @@ Same root cause from the other direction: locally the value is present because t
 
 `vitest.integration.config.ts` sets `BEDROCK_EMBEDDINGS_ENABLED=false` in its `env` block, and `src/test/setup.integration.ts` throws at collection if that did not arrive. Unset counts as enabled, because `embeddingsEnabled()` treats anything but that exact string as on, so a deleted config line trips it. Fix the config, not your environment: `test.env` beats the shell. [ADR-0012](./adr/0012-bedrock-mantle-by-sigv4-embeddings-behind-a-flag.md) says why the flag exists; the switch lives in `src/lib/_internal/embeddings-flag.ts` rather than beside the adapter, so reading it costs no `@aws-sdk/client-bedrock-runtime` import.
 
+### The browser suites get their vectors from the seed, never from Bedrock
+
+`playwright.e2e.config.ts` runs the built server with `BEDROCK_EMBEDDINGS_ENABLED=false`, and the only fake the embedding writers accept is the `EmbedFn` parameter, which nothing can inject across HTTP into that server. So a project published in a browser test has a null `projects.embedding`, and `projects.e2e.test.ts` asserts exactly that as the degraded path. What the recommended sort needs comes from `npm run db:seed:dev` instead: `scripts/seed-recommendations.ts` holds an interest vector for `user@example.com` and one vector per published seed project at increasing cosine distance, and the seed writes them straight into the two `embedding` columns with `embedding_source_hash = 'seed'`, the same shape `recommended-sort.integration.test.ts` uses. `recommendations.e2e.test.ts` imports the title list from that module, so the order the seed encodes and the order the test expects cannot drift. A reseed leaves a row that already has a vector alone; a real backfill replaces the seed's because its hash never matches. The integration suite, with an injected embedder, is what proves the writers themselves (#321).
+
 ### Vitest 4 `poolOptions` moved
 
 Older docs show `test.poolOptions.forks.singleFork: true`. Vitest 4 removed that path. Use top-level `test.fileParallelism: false` instead.

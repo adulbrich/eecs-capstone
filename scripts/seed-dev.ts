@@ -16,6 +16,7 @@ import {
   projectCategories,
   projects,
   user,
+  userInterests,
 } from "../src/db/schema";
 import { auth } from "../src/lib/auth";
 import type { UserRole } from "../src/lib/vocabularies";
@@ -33,6 +34,12 @@ import {
   submitCustomRequestAs,
 } from "../src/server/_internal/inventory-custom";
 import { transitionItem } from "../src/server/_internal/inventory-transitions";
+import {
+  SEED_INTERESTS_TEXT,
+  SEED_RECOMMENDED_TITLES,
+  seedInterestsVector,
+  seedProjectVector,
+} from "./seed-recommendations";
 
 const PASSWORD = "password";
 
@@ -618,6 +625,51 @@ async function main() {
     );
   }
   console.log(`projects: ${created} created, ${PROJECTS.length} total defined`);
+
+  // Vectors for the recommended sort, written straight to the columns rather
+  // than through `refreshProjectEmbedding`: the seed runs with Bedrock off, and
+  // the browser suites assert the order these produce (#321,
+  // scripts/seed-recommendations.ts). A row that already carries a vector is
+  // left alone, so a real backfill is not undone by a reseed.
+  for (const [rank, title] of SEED_RECOMMENDED_TITLES.entries()) {
+    const [vectored] = await db
+      .update(projects)
+      .set({
+        embedding: seedProjectVector(rank),
+        embeddingSourceHash: "seed",
+        embeddingUpdatedAt: now,
+      })
+      .where(and(eq(projects.title, title), isNull(projects.embedding)))
+      .returning({ id: projects.id });
+    console.log(
+      `project vector: "${title}" (${vectored ? "written" : "exists"}, rank ${rank})`
+    );
+  }
+  // Same rule as the projects above: a row with a vector is left alone, a
+  // row without one (interests saved on /profile with Bedrock off) gets the
+  // seed's, so the recommended-order test holds on any machine.
+  const [interestsWritten] = await db
+    .insert(userInterests)
+    .values({
+      userId: u.student.id,
+      interestsText: SEED_INTERESTS_TEXT,
+      embedding: seedInterestsVector(),
+      embeddingSourceHash: "seed",
+      embeddingUpdatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: userInterests.userId,
+      set: {
+        embedding: seedInterestsVector(),
+        embeddingSourceHash: "seed",
+        embeddingUpdatedAt: now,
+      },
+      setWhere: isNull(userInterests.embedding),
+    })
+    .returning({ userId: userInterests.userId });
+  console.log(
+    `interests vector: ${USERS.student.email} (${interestsWritten ? "written" : "exists"})`
+  );
 
   // Inventory items. All fields populated. Holder fields set for held statuses.
   //
