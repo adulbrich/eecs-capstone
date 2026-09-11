@@ -94,6 +94,7 @@ beforeEach(() => {
   getProjectMentorship.mockResolvedValue({
     mentorEmail: "",
     mentorName: null,
+    seekingMentor: false,
     studentProposed: false,
   });
   getProposerForEdit.mockResolvedValue({
@@ -281,10 +282,11 @@ describe("StaffProjectPanel review-email control", () => {
 });
 
 describe("StaffProjectPanel mentorship block", () => {
-  it("prefills the saved record and says which account the address matches", async () => {
+  it("prefills the saved record and shows the mentor's account like the proposer's", async () => {
     getProjectMentorship.mockResolvedValue({
       mentorEmail: "mentor@x.test",
       mentorName: "Dana Lee",
+      seekingMentor: false,
       studentProposed: true,
     });
     renderPanel("submitted");
@@ -293,7 +295,10 @@ describe("StaffProjectPanel mentorship block", () => {
       "Mentor email"
     )) as HTMLInputElement;
     expect(input.value).toBe("mentor@x.test");
-    expect(await screen.findByText("Account: Dana Lee")).toBeTruthy();
+    // Same shape as the Proposer section (#304): name, link pill, address.
+    expect(await screen.findByText("Dana Lee")).toBeTruthy();
+    expect(screen.getAllByText("Account linked")).toHaveLength(2);
+    expect(screen.getByText("mentor@x.test")).toBeTruthy();
     expect(
       (
         screen.getByRole("checkbox", {
@@ -301,27 +306,68 @@ describe("StaffProjectPanel mentorship block", () => {
         }) as HTMLElement
       ).getAttribute("aria-checked")
     ).toBe("true");
+    expect(
+      (
+        screen.getByRole("checkbox", {
+          name: "Looking for a mentor",
+        }) as HTMLElement
+      ).getAttribute("aria-checked")
+    ).toBe("false");
   });
 
-  it("says the catalog shows seeking when a student project has no address", async () => {
+  it("says an address has no account yet, and that the catalog shows no mentor", async () => {
+    getProjectMentorship.mockResolvedValue({
+      mentorEmail: "mentor@x.test",
+      mentorName: null,
+      seekingMentor: false,
+      studentProposed: false,
+    });
+    renderPanel("submitted");
+    expect(await screen.findByText("No account yet")).toBeTruthy();
+    expect(
+      screen.getByText(/catalog shows no mentor until they sign up/)
+    ).toBeTruthy();
+  });
+
+  it("says the catalog shows seeking when the flag is on and no address is on file", async () => {
+    // Independent of student-proposed since #304: a partner project can
+    // want a mentor too.
     getProjectMentorship.mockResolvedValue({
       mentorEmail: "",
       mentorName: null,
-      studentProposed: true,
+      seekingMentor: true,
+      studentProposed: false,
     });
     renderPanel("submitted");
     expect(
       await screen.findByText(/shows this project as seeking a mentor/)
     ).toBeTruthy();
+    expect(screen.getByText("Mentor:", { exact: false })).toBeTruthy();
   });
 
-  it("saves the draft through the server function and reloads the record", async () => {
+  it("warns when the flag is on but an address hides the badge", async () => {
+    getProjectMentorship.mockResolvedValue({
+      mentorEmail: "mentor@x.test",
+      mentorName: null,
+      seekingMentor: true,
+      studentProposed: true,
+    });
+    renderPanel("submitted");
+    expect(
+      await screen.findByText(/shows no badge while an address is on file/)
+    ).toBeTruthy();
+  });
+
+  it("saves all three fields through the server function and reloads the record", async () => {
     renderPanel("submitted");
     const input = (await screen.findByLabelText(
       "Mentor email"
     )) as HTMLInputElement;
     fireEvent.change(input, { target: { value: " other@x.test " } });
     fireEvent.click(screen.getByRole("checkbox", { name: "Student proposed" }));
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Looking for a mentor" })
+    );
     fireEvent.click(screen.getByRole("button", { name: "Save mentorship" }));
 
     await waitFor(() =>
@@ -329,6 +375,7 @@ describe("StaffProjectPanel mentorship block", () => {
         data: {
           id: PROJECT_ID,
           mentorEmail: "other@x.test",
+          seekingMentor: true,
           studentProposed: true,
         },
       })
@@ -343,6 +390,7 @@ describe("StaffProjectPanel mentorship save gate", () => {
     let resolveLoad: (value: {
       mentorEmail: string;
       mentorName: string | null;
+      seekingMentor: boolean;
       studentProposed: boolean;
     }) => void = () => {
       // replaced below
@@ -362,6 +410,7 @@ describe("StaffProjectPanel mentorship save gate", () => {
     resolveLoad({
       mentorEmail: "mentor@x.test",
       mentorName: null,
+      seekingMentor: false,
       studentProposed: false,
     });
     await waitFor(() => expect(save.hasAttribute("disabled")).toBe(false));
@@ -415,6 +464,7 @@ describe("StaffProjectPanel mentorship across a project change", () => {
     getProjectMentorship.mockResolvedValueOnce({
       mentorEmail: "first@x.test",
       mentorName: null,
+      seekingMentor: false,
       studentProposed: true,
     });
     const view = renderPanel("submitted");

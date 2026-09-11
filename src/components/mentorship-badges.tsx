@@ -6,9 +6,10 @@ import { Badge } from "./ui/badge";
  *
  * Two flags rather than the mentor's address because the address never
  * reaches a public payload. `seekingMentor` is derived on the server as
- * "student proposed with no address on file", which is what lets a project
- * whose mentor has not signed up yet show nothing rather than a false
- * "Seeking mentor". See #75.
+ * "staff marked it as looking for a mentor and no address is on file", which
+ * is what lets a project whose mentor has not signed up yet show nothing
+ * rather than a false "Seeking mentor". The two flags are independent since
+ * #304: either badge can show alone. See #75.
  *
  * Rendered by the card, the detail page and the shared table column in
  * `project-summary-columns.tsx`, so no surface computes the badges its own

@@ -48,6 +48,7 @@ export const mentorshipSchema = z.object({
   // A string in transit, null only in the column: empty is the form clearing
   // the field, and the impl folds it to null. Same ceiling as contactEmail.
   mentorEmail: z.string().email().max(200).or(z.literal("")),
+  seekingMentor: z.boolean(),
   studentProposed: z.boolean(),
 });
 

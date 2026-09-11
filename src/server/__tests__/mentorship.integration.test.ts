@@ -50,6 +50,7 @@ async function columns(id: string) {
   const [row] = await db
     .select({
       mentorEmail: projects.mentorEmail,
+      seekingMentor: projects.seekingMentor,
       studentProposed: projects.studentProposed,
     })
     .from(projects)
@@ -65,28 +66,32 @@ describe("updateProjectMentorshipAs", () => {
       updateProjectMentorshipAs(owner, {
         id,
         mentorEmail: "m@x.com",
+        seekingMentor: true,
         studentProposed: true,
       })
     ).rejects.toThrow("Forbidden");
     expect(await columns(id)).toEqual({
       mentorEmail: null,
+      seekingMentor: false,
       studentProposed: false,
     });
   });
 
-  it("writes both columns and one edit log row, and an unchanged save writes none", async () => {
+  it("writes all three columns and one edit log row, and an unchanged save writes none", async () => {
     const admin = await makeUser(`ma-${Date.now()}@x.com`, "admin");
     const { id } = await createProjectAs(admin, baseProject());
 
     const first = await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: "  Mentor@X.com ",
+      seekingMentor: true,
       studentProposed: true,
     });
     expect(first.updated).toBe(true);
     // Trimmed and lowercased, since #249 chose to normalize on write.
     expect(await columns(id)).toEqual({
       mentorEmail: "mentor@x.com",
+      seekingMentor: true,
       studentProposed: true,
     });
 
@@ -96,6 +101,7 @@ describe("updateProjectMentorshipAs", () => {
     const again = await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: "MENTOR@x.com",
+      seekingMentor: true,
       studentProposed: true,
     });
     expect(again.updated).toBe(false);
@@ -106,7 +112,11 @@ describe("updateProjectMentorshipAs", () => {
       .where(eq(projectEditLog.projectId, id));
     expect(log).toHaveLength(1);
     expect(log[0].editorId).toBe(admin.id);
-    expect(log[0].changedFields).toEqual(["studentProposed", "mentorEmail"]);
+    expect(log[0].changedFields).toEqual([
+      "studentProposed",
+      "seekingMentor",
+      "mentorEmail",
+    ]);
   });
 
   it("clears the address when given an empty string", async () => {
@@ -115,11 +125,13 @@ describe("updateProjectMentorshipAs", () => {
     await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: "m@x.com",
+      seekingMentor: false,
       studentProposed: false,
     });
     await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: "",
+      seekingMentor: false,
       studentProposed: false,
     });
     expect((await columns(id)).mentorEmail).toBeNull();
@@ -134,17 +146,19 @@ describe("updateProjectMentorshipAs", () => {
       ...baseProject(),
       id,
       mentorEmail: "smuggled@x.com",
+      seekingMentor: true,
       studentProposed: true,
     };
     await updateProjectAs(admin, smuggled);
     expect(await columns(id)).toEqual({
       mentorEmail: null,
+      seekingMentor: false,
       studentProposed: false,
     });
   });
 });
 
-describe("the three public states", () => {
+describe("the six public states", () => {
   async function publishedProject() {
     const admin = await makeUser(
       `mp-${Date.now()}-${Math.random()}@x.com`,
@@ -157,21 +171,70 @@ describe("the three public states", () => {
     return { admin, id };
   }
 
-  it("shows seeking only for a student-proposed project with no address", async () => {
-    const { admin, id } = await publishedProject();
-    let { project } = await getProjectAs(null, { id });
+  // The Decisions table on #304, one row per combination staff can record.
+  // The address rows say "recorded, no account": the name is a separate
+  // test below. `seekingMentor` is the derived badge, never the stored flag.
+  it.each([
+    {
+      studentProposed: true,
+      seekingMentor: true,
+      mentorEmail: "",
+      badge: true,
+    },
+    {
+      studentProposed: true,
+      seekingMentor: true,
+      mentorEmail: "m@x.com",
+      badge: false,
+    },
+    {
+      studentProposed: true,
+      seekingMentor: false,
+      mentorEmail: "",
+      badge: false,
+    },
+    {
+      studentProposed: false,
+      seekingMentor: true,
+      mentorEmail: "",
+      badge: true,
+    },
+    {
+      studentProposed: false,
+      seekingMentor: true,
+      mentorEmail: "m@x.com",
+      badge: false,
+    },
+    {
+      studentProposed: false,
+      seekingMentor: false,
+      mentorEmail: "",
+      badge: false,
+    },
+  ])(
+    "student $studentProposed, seeking $seekingMentor, address '$mentorEmail' shows the seeking badge: $badge",
+    async ({ studentProposed, seekingMentor, mentorEmail, badge }) => {
+      const { admin, id } = await publishedProject();
+      await updateProjectMentorshipAs(admin, {
+        id,
+        mentorEmail,
+        seekingMentor,
+        studentProposed,
+      });
+      const { project } = await getProjectAs(null, { id });
+      expect(project?.studentProposed).toBe(studentProposed);
+      expect(project?.seekingMentor).toBe(badge);
+      expect(project?.mentorName).toBeNull();
+      expect("mentorEmail" in (project ?? {})).toBe(false);
+      expect("seekingMentor" in (project ?? {})).toBe(true);
+    }
+  );
+
+  it("starts with nothing set", async () => {
+    const { id } = await publishedProject();
+    const { project } = await getProjectAs(null, { id });
     expect(project?.studentProposed).toBe(false);
     expect(project?.seekingMentor).toBe(false);
-    expect(project?.mentorName).toBeNull();
-
-    await updateProjectMentorshipAs(admin, {
-      id,
-      mentorEmail: "",
-      studentProposed: true,
-    });
-    ({ project } = await getProjectAs(null, { id }));
-    expect(project?.studentProposed).toBe(true);
-    expect(project?.seekingMentor).toBe(true);
     expect(project?.mentorName).toBeNull();
   });
 
@@ -181,6 +244,7 @@ describe("the three public states", () => {
     await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: `Mentor-${stamp}@X.com`,
+      seekingMentor: true,
       studentProposed: true,
     });
     let { project } = await getProjectAs(null, { id });
@@ -199,6 +263,7 @@ describe("the three public states", () => {
     await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: "",
+      seekingMentor: true,
       studentProposed: true,
     });
     const [row] = await db
@@ -219,6 +284,7 @@ describe("the three public states", () => {
     await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: "private@x.com",
+      seekingMentor: false,
       studentProposed: false,
     });
     const { project } = await getProjectAs(owner, { id });
@@ -236,20 +302,25 @@ describe("getProjectMentorshipAs", () => {
     expect(await getProjectMentorshipAs(admin, { projectId: id })).toEqual({
       mentorEmail: "",
       mentorName: null,
+      seekingMentor: false,
       studentProposed: false,
     });
 
     // Typed with capitals, stored without them, and the name still resolves:
     // mentorNameSql matches the normalized column against user.email, which
     // Better Auth lowercases on every path that creates an account (#249).
+    // The staff read carries the stored flag even while an address is on
+    // file; only the public badge is guarded by the address.
     await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: owner.email.toUpperCase(),
+      seekingMentor: true,
       studentProposed: true,
     });
     expect(await getProjectMentorshipAs(admin, { projectId: id })).toEqual({
       mentorEmail: owner.email,
       mentorName: owner.name,
+      seekingMentor: true,
       studentProposed: true,
     });
 

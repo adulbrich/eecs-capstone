@@ -146,18 +146,22 @@ _Avoid_: sizing, feasibility, review (it is not one)
 
 **Student proposed**:
 A project that a student proposed rather than an industry partner or faculty member.
-Marked by staff during review, shown publicly as a badge.
-_Avoid_: student project, student-led, self-proposed
+Marked by staff during review, shown publicly as a badge. Says nothing about
+mentorship: a student-proposed project may have a mentor, be seeking one, or need
+none because the instructor mentors it.
+_Avoid_: student project, student-led, self-proposed, student team managed
 
 **Seeking mentor**:
-A student-proposed project with no mentor recorded yet. Derived, never stored, and
-shown as a badge; a mentor who has not signed up yet counts as recorded, so the
-badge goes away before the name appears.
+A project staff have marked as looking for a mentor, with none recorded yet. Stored
+as a flag, shown as a badge only while no address is on file; a mentor who has not
+signed up yet counts as recorded, so the badge goes away before the name appears.
+Independent of student proposed.
 _Avoid_: unmentored, needs mentor, open for mentors
 
 **Mentorship**:
-The link between a project and its mentor. A recorded address and a derived name,
-granting no permission over the project.
+The link between a project and its mentor: a recorded address, a derived name, and
+the seeking-mentor flag, granting no permission over the project. Staff edit all
+three from one section of the staff panel.
 _Avoid_: assignment, sponsorship
 
 **Teams supported**:

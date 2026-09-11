@@ -9,6 +9,7 @@ describe("mentorshipSchema", () => {
       mentorshipSchema.parse({
         id: ID,
         mentorEmail: "Mentor@Example.edu",
+        seekingMentor: false,
         studentProposed: true,
       }).mentorEmail
     ).toBe("Mentor@Example.edu");
@@ -16,9 +17,22 @@ describe("mentorshipSchema", () => {
       mentorshipSchema.parse({
         id: ID,
         mentorEmail: "",
+        seekingMentor: false,
         studentProposed: false,
       }).mentorEmail
     ).toBe("");
+  });
+
+  it("requires the seeking flag, so a stale client cannot silently clear it", () => {
+    // Every writer sends all three fields (#304); a payload without the
+    // flag is refused rather than defaulted, or an old form would reset it.
+    expect(
+      mentorshipSchema.safeParse({
+        id: ID,
+        mentorEmail: "",
+        studentProposed: false,
+      }).success
+    ).toBe(false);
   });
 
   it("rejects null, a non-address, and an address over the shared ceiling", () => {
@@ -27,6 +41,7 @@ describe("mentorshipSchema", () => {
       mentorshipSchema.safeParse({
         id: ID,
         mentorEmail: null,
+        seekingMentor: false,
         studentProposed: false,
       }).success
     ).toBe(false);
@@ -34,6 +49,7 @@ describe("mentorshipSchema", () => {
       mentorshipSchema.safeParse({
         id: ID,
         mentorEmail: "not an address",
+        seekingMentor: false,
         studentProposed: false,
       }).success
     ).toBe(false);
@@ -45,12 +61,14 @@ describe("mentorshipSchema", () => {
       mentorshipSchema.safeParse({
         id: ID,
         mentorEmail: atCeiling,
+        seekingMentor: false,
         studentProposed: false,
       }).success
     ).toBe(true);
     const over = mentorshipSchema.safeParse({
       id: ID,
       mentorEmail: `a${atCeiling}`,
+      seekingMentor: false,
       studentProposed: false,
     });
     expect(over.success).toBe(false);
