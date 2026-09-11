@@ -32,4 +32,24 @@ describe("ViewToggle", () => {
     table.click();
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  // The other half of the pair. Card view is the default, so it is the one a
+  // reader comes back to, and it stores and reports the same way.
+  it("switches back to cards, storing and reporting the choice", () => {
+    const onChange = vi.fn();
+    render(<ViewToggle current="table" onChange={onChange} />);
+    screen.getByRole("button", { name: "Card view" }).click();
+    expect(readStoredView()).toBe("card");
+    expect(onChange).toHaveBeenCalledWith("card");
+  });
+
+  it("marks card view pressed when current, and ignores a click on it", () => {
+    const onChange = vi.fn();
+    render(<ViewToggle current="card" onChange={onChange} />);
+    const card = screen.getByRole("button", { name: "Card view" });
+    expect(card.getAttribute("aria-pressed")).toBe("true");
+    card.click();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(readStoredView()).toBeNull();
+  });
 });

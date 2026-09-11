@@ -59,6 +59,31 @@ describe("SubmitBorrowListDialog", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(null));
   });
 
+  it("closes on Cancel without submitting, and keeps the typed note", async () => {
+    const onSubmit = vi.fn();
+    render(
+      <SubmitBorrowListDialog busy={false} count={1} onSubmit={onSubmit} />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    fireEvent.change(screen.getByLabelText("Note for staff (optional)"), {
+      target: { value: "Half typed" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    // Only a successful submit clears the note, so a Cancel is a pause rather
+    // than a discard.
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(
+      (
+        screen.getByLabelText(
+          "Note for staff (optional)"
+        ) as HTMLTextAreaElement
+      ).value
+    ).toBe("Half typed");
+  });
+
   it("is disabled while the page is busy", () => {
     render(<SubmitBorrowListDialog busy={true} count={1} onSubmit={vi.fn()} />);
     expect(

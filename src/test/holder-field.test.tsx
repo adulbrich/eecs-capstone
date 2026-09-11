@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { installResizeObserver } from "./radix-jsdom";
 
 vi.mock("#/server/users", () => ({
   lookupUserByEmail: vi.fn(),
@@ -12,6 +19,16 @@ import { lookupUserByEmail, searchUsers } from "#/server/users";
 
 const mockedLookup = vi.mocked(lookupUserByEmail);
 const mockedSearch = vi.mocked(searchUsers);
+
+// The account search is a Radix Popover around a cmdk list; both read DOM
+// APIs jsdom omits. Same stub set as proposer-picker.test.tsx.
+beforeAll(() => {
+  installResizeObserver();
+  Element.prototype.scrollIntoView = vi.fn();
+  Element.prototype.hasPointerCapture = vi.fn();
+  Element.prototype.setPointerCapture = vi.fn();
+  Element.prototype.releasePointerCapture = vi.fn();
+});
 
 afterEach(() => {
   cleanup();
@@ -102,6 +119,35 @@ describe("HolderField", () => {
     ).toBeTruthy();
     expect(screen.queryByLabelText(/^name$/i)).toBeNull();
     expect(screen.queryByLabelText(/program/i)).toBeNull();
+  });
+
+  it("opens the account search on demand and fills the address from a pick", async () => {
+    resolvesTo(null);
+    mockedSearch.mockResolvedValue([
+      { email: "ada@x.test", id: "u1", name: "Ada Lovelace" },
+    ] as never);
+    const onEmailChange = vi.fn();
+    renderField({ onEmailChange });
+
+    // Closed until asked: the search list is not part of the form.
+    expect(
+      screen.queryByPlaceholderText("Search by name or email...")
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Search accounts" }));
+    fireEvent.change(
+      await screen.findByPlaceholderText("Search by name or email..."),
+      { target: { value: "ada" } }
+    );
+    await waitFor(() => expect(screen.getByText("Ada Lovelace")).toBeTruthy());
+    expect(mockedSearch).toHaveBeenCalledWith({ data: { q: "ada" } });
+
+    fireEvent.click(screen.getByText("Ada Lovelace"));
+    expect(onEmailChange).toHaveBeenCalledWith("ada@x.test");
+    await waitFor(() =>
+      expect(
+        screen.queryByPlaceholderText("Search by name or email...")
+      ).toBeNull()
+    );
   });
 
   it("keeps the inputs closed until the lookup answers, then opens them", async () => {
