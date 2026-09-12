@@ -17,6 +17,10 @@ import { ImageOrFallback } from "#/components/image-or-fallback";
 import { ListingLayout } from "#/components/listing-layout";
 import { LocalTime } from "#/components/local-time";
 import { programLabel } from "#/components/project-card";
+import {
+  type FilterProgram,
+  PROJECT_SWITCH_LABEL,
+} from "#/components/projects-filters";
 import { StatusBadge } from "#/components/status-badge";
 import {
   Breadcrumb,
@@ -157,12 +161,6 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
 });
 
 type Row = Awaited<ReturnType<typeof listAdminProjects>>["rows"][number];
-
-const SWITCH_LABEL = {
-  acceptingOnly: "Accepting applicants",
-  seekingMentorOnly: "Seeking a mentor",
-  studentProposedOnly: "Student-proposed",
-} as const;
 
 const DEFAULT_SORT: SortState = { desc: true, id: "updatedAt" };
 
@@ -428,18 +426,22 @@ const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
 function AdminProjectsFilters({
   programs,
   proposers,
-  resolved,
-  search,
-  setStatuses,
 }: {
-  programs: { courseId: string; courseName: string; id: string }[];
+  programs: FilterProgram[];
   proposers: { email: string; id: string; name: string }[];
-  resolved: ReturnType<typeof resolveAdminFilter>;
-  search: Search;
-  setStatuses: (statuses: ProjectStatus[]) => void;
 }) {
   const uid = useId();
   const navigate = useNavigate({ from: "/admin/projects/" });
+  const search = Route.useSearch();
+  const resolved = resolveAdminFilter(search);
+  // The default set travels as an absent param, any other set in full.
+  const setStatuses = (statuses: ProjectStatus[]) =>
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        status: isDefaultStatusSelection(statuses) ? undefined : statuses,
+      }),
+    });
   const {
     acceptingOnly,
     includeSoftDeleted,
@@ -633,7 +635,7 @@ function AdminProjectsFilters({
           <FilterSwitch
             checked={acceptingOnly}
             id={`${uid}-accepting-only`}
-            label={SWITCH_LABEL.acceptingOnly}
+            label={PROJECT_SWITCH_LABEL.acceptingOnly}
             onCheckedChange={(checked) =>
               void navigate({
                 search: (prev) => ({ ...prev, acceptingOnly: checked }),
@@ -643,7 +645,7 @@ function AdminProjectsFilters({
           <FilterSwitch
             checked={studentProposedOnly}
             id={`${uid}-student-proposed-only`}
-            label={SWITCH_LABEL.studentProposedOnly}
+            label={PROJECT_SWITCH_LABEL.studentProposedOnly}
             onCheckedChange={(checked) =>
               void navigate({
                 search: (prev) => ({ ...prev, studentProposedOnly: checked }),
@@ -653,7 +655,7 @@ function AdminProjectsFilters({
           <FilterSwitch
             checked={seekingMentorOnly}
             id={`${uid}-seeking-mentor-only`}
-            label={SWITCH_LABEL.seekingMentorOnly}
+            label={PROJECT_SWITCH_LABEL.seekingMentorOnly}
             onCheckedChange={(checked) =>
               void navigate({
                 search: (prev) => ({ ...prev, seekingMentorOnly: checked }),
@@ -730,15 +732,6 @@ function AdminProjects() {
   );
   const [queryDraft, setQueryDraft] = useDebouncedDraft(q, commitQuery);
 
-  // The default set travels as an absent param, any other set in full.
-  const setStatuses = (statuses: ProjectStatus[]) =>
-    void navigate({
-      search: (prev) => ({
-        ...prev,
-        status: isDefaultStatusSelection(statuses) ? undefined : statuses,
-      }),
-    });
-
   const { orderRows, tableProps } = useAdminTable({
     columns: COLUMNS,
     defaultSort: DEFAULT_SORT,
@@ -751,13 +744,7 @@ function AdminProjects() {
     <ListingLayout
       activeFilterCount={activeFilterCount}
       filters={
-        <AdminProjectsFilters
-          programs={programs}
-          proposers={proposers}
-          resolved={resolved}
-          search={search}
-          setStatuses={setStatuses}
-        />
+        <AdminProjectsFilters programs={programs} proposers={proposers} />
       }
       search={
         <>

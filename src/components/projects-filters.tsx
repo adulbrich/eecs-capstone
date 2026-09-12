@@ -3,6 +3,7 @@ import { useCallback, useId } from "react";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import type { ViewMode } from "#/lib/view-preference";
 import { FilterSwitch } from "./filter-switch";
+import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -27,6 +28,19 @@ export interface FilterProgram {
 }
 
 export type ProjectsOrder = "relevance" | "newest" | "recommended";
+
+/**
+ * The switch labels, one line each under the legend "Only show projects that
+ * are". Shared with `/admin/projects`, which carries three of the four under
+ * the same params (#340), so the two listings cannot drift apart and the
+ * accessibility tests name one string.
+ */
+export const PROJECT_SWITCH_LABEL = {
+  acceptingOnly: "Accepting applicants",
+  archivedOnly: "Archived",
+  seekingMentorOnly: "Seeking a mentor",
+  studentProposedOnly: "Student-proposed",
+} as const;
 
 /** The narrowing params of `/projects`, as the route's search carries them. */
 export interface ProjectsFilterState {
@@ -126,9 +140,8 @@ export function ProjectsSearchBar({
   canRecommend,
   order,
   q,
-  signedIn,
   view,
-}: SearchBarProps) {
+}: Omit<SearchBarProps, "signedIn">) {
   const { commitQuery, setOrder, setView } = useProjectsFilterNavigation();
   const [queryDraft, setQueryDraft] = useDebouncedDraft(q, commitQuery);
   return (
@@ -154,11 +167,26 @@ export function ProjectsSearchBar({
         </SelectContent>
       </Select>
       <ViewToggle current={view} onChange={setView} />
-      {/* order-last: the prompt line takes a full row, and ListingLayout
-          renders its Filters button after this fragment, so without it the
-          button would wrap under the prompt at md. DOM order is unchanged. */}
+    </>
+  );
+}
+
+/**
+ * The line under the search row about recommendations. Rendered by the route
+ * as the first thing in the results column, not inside `ProjectsSearchBar`:
+ * the search row is a flex-wrap row that ends with ListingLayout's Filters
+ * button, and a paragraph in the middle of it put the prompt's link between
+ * the view toggle and that button in the tab order.
+ */
+export function RecommendationPrompt({
+  canRecommend,
+  order,
+  signedIn,
+}: Pick<SearchBarProps, "canRecommend" | "order" | "signedIn">) {
+  return (
+    <>
       {order === "recommended" && canRecommend && (
-        <p className="order-last basis-full text-muted-foreground text-xs">
+        <p className="mt-2 text-muted-foreground text-xs">
           Ranked by your interests.{" "}
           <Link className="text-brand hover:underline" to="/profile">
             Edit your interests
@@ -172,7 +200,7 @@ export function ProjectsSearchBar({
         write their interests. A member with one gets no prompt.
       */}
       {!(canRecommend || signedIn) && (
-        <p className="order-last basis-full text-muted-foreground text-xs">
+        <p className="mt-2 text-muted-foreground text-xs">
           <Link
             className="text-brand hover:underline"
             search={{ redirect: "/projects" }}
@@ -184,7 +212,7 @@ export function ProjectsSearchBar({
         </p>
       )}
       {signedIn && !canRecommend && (
-        <p className="order-last basis-full text-muted-foreground text-xs">
+        <p className="mt-2 text-muted-foreground text-xs">
           <Link className="text-brand hover:underline" to="/profile">
             Add your interests
           </Link>{" "}
@@ -277,25 +305,25 @@ export function ProjectsFilters({
           <FilterSwitch
             checked={acceptingOnly}
             id={`${uid}-accepting-only`}
-            label="Accepting applicants"
+            label={PROJECT_SWITCH_LABEL.acceptingOnly}
             onCheckedChange={(v) => setFilter("acceptingOnly", v)}
           />
           <FilterSwitch
             checked={archivedOnly}
             id={`${uid}-archived-only`}
-            label="Archived"
+            label={PROJECT_SWITCH_LABEL.archivedOnly}
             onCheckedChange={(v) => setFilter("archivedOnly", v)}
           />
           <FilterSwitch
             checked={studentProposedOnly}
             id={`${uid}-student-proposed-only`}
-            label="Student-proposed"
+            label={PROJECT_SWITCH_LABEL.studentProposedOnly}
             onCheckedChange={(v) => setFilter("studentProposedOnly", v)}
           />
           <FilterSwitch
             checked={seekingMentorOnly}
             id={`${uid}-seeking-mentor-only`}
-            label="Seeking a mentor"
+            label={PROJECT_SWITCH_LABEL.seekingMentorOnly}
             onCheckedChange={(v) => setFilter("seekingMentorOnly", v)}
           />
         </div>
@@ -328,13 +356,15 @@ export function ProjectsFilters({
       )}
 
       {active > 0 && (
-        <button
-          className="text-brand text-sm outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        <Button
+          className="h-auto p-0"
           onClick={clearAll}
+          size="sm"
           type="button"
+          variant="link"
         >
           Clear all
-        </button>
+        </Button>
       )}
     </div>
   );

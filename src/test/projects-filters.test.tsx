@@ -26,18 +26,16 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
 }));
 
-import { ProjectsSearchBar } from "#/components/projects-filter-bar";
+import { RecommendationPrompt } from "#/components/projects-filters";
 
 afterEach(cleanup);
 
 function renderBar(viewer: { canRecommend: boolean; signedIn: boolean }) {
   return render(
-    <ProjectsSearchBar
+    <RecommendationPrompt
       canRecommend={viewer.canRecommend}
       order="relevance"
-      q=""
       signedIn={viewer.signedIn}
-      view="card"
     />
   );
 }
@@ -48,7 +46,7 @@ function renderBar(viewer: { canRecommend: boolean; signedIn: boolean }) {
  * once the select is open, which the browser suite covers; here the prompts
  * are what is pinned, since they decide where a reader is sent.
  */
-describe("ProjectsSearchBar recommendation prompt", () => {
+describe("RecommendationPrompt", () => {
   it("sends a visitor to sign in, with the listing as the return address", () => {
     renderBar({ canRecommend: false, signedIn: false });
     const link = screen.getByRole("link", {

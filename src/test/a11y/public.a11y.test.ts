@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import {
   closeMenu,
+  expectNoHorizontalOverflow,
   toggleColumnOn,
   waitForHydration,
   waitForSurfaceSettled,
@@ -127,14 +128,27 @@ test("@smoke projects list, filters sheet at 375px", async ({ page }) => {
   const sheet = page.getByRole("dialog", { name: "Filters" });
   const accepting = sheet.getByRole("switch", { name: "Accepting applicants" });
   await expect(accepting).toBeVisible();
+  // Focus lands inside the sheet on open, and the page under it does not
+  // grow sideways for the overlay.
+  await expect(sheet.locator(":focus")).toHaveCount(1);
+  await expectNoHorizontalOverflow(page);
   await checkA11y(page);
   await accepting.click();
   await expect(page).toHaveURL(/acceptingOnly=true/);
   await expect(sheet).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
-  // The button now carries the count of what was turned on.
-  await expect(page.getByRole("button", { name: "Filters 1" })).toBeVisible();
+  // Focus returns to the button, which now carries the count of what was
+  // turned on. Tab from the search reaches it with nothing in between: the
+  // recommendation prompt renders under the row, not inside it. Four
+  // stops: the sort, the two view toggle buttons, the Filters button.
+  const button = page.getByRole("button", { name: "Filters 1" });
+  await expect(button).toBeFocused();
+  await page.getByRole("searchbox", { name: "Search projects" }).focus();
+  for (let i = 0; i < 4; i += 1) {
+    await page.keyboard.press("Tab");
+  }
+  await expect(button).toBeFocused();
 });
 
 test("@smoke projects list, table mode", async ({ page }) => {

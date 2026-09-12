@@ -19,7 +19,8 @@ import {
   type FilterProgram,
   ProjectsFilters,
   ProjectsSearchBar,
-} from "#/components/projects-filter-bar";
+  RecommendationPrompt,
+} from "#/components/projects-filters";
 import { Button } from "#/components/ui/button";
 import {
   Pagination,
@@ -205,7 +206,6 @@ function ProjectsList() {
           canRecommend={viewer.canRecommend}
           order={search.order}
           q={search.q}
-          signedIn={viewer.signedIn}
           view={view}
         />
       }
@@ -232,6 +232,11 @@ function ProjectsList() {
         </div>
       }
     >
+      <RecommendationPrompt
+        canRecommend={viewer.canRecommend}
+        order={search.order}
+        signedIn={viewer.signedIn}
+      />
       <BookmarkSetProvider>
         {view === "table" ? (
           <ProjectTable rows={rows} search={search} />
