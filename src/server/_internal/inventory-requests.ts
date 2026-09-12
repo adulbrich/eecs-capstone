@@ -8,11 +8,9 @@ import {
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { InventoryNotice } from "#/lib/inventory-notifications";
 import { assertStaff, type Viewer } from "#/lib/viewer";
-import {
-  notifyInventoryBatchByEmail,
-  notifyInventoryByEmail,
-} from "./inventory-emails";
-import type { TransitionEmailOptions, Tx } from "./inventory-transitions";
+import type { EmailOptions } from "./email-dispatch";
+import { notifyInventoryByEmail } from "./inventory-emails";
+import type { Tx } from "./inventory-transitions";
 
 const DEFAULT_PICKUP_DAYS = 7;
 
@@ -93,7 +91,7 @@ async function approveLineInTx(
 export async function approveRequestItemAs(
   viewer: Viewer,
   data: { requestItemId: string; pickupBy: Date | null },
-  opts?: TransitionEmailOptions
+  opts?: EmailOptions
 ) {
   assertStaff(viewer);
   const pickupBy = data.pickupBy ?? defaultPickupBy();
@@ -121,7 +119,7 @@ export async function approveRequestItemAs(
 export async function approveRequestLinesAs(
   viewer: Viewer,
   data: { requestItemIds: string[]; pickupBy: Date | null },
-  opts?: TransitionEmailOptions
+  opts?: EmailOptions
 ) {
   assertStaff(viewer);
   const ids = [...new Set(data.requestItemIds)].sort();
@@ -140,14 +138,16 @@ export async function approveRequestLinesAs(
   });
   // One email per line, matching the one bell row per line. A cart of six
   // items is six emails; coalescing them is a later change if it grates.
-  await notifyInventoryBatchByEmail(notices, opts?.send);
+  for (const notice of notices) {
+    await notifyInventoryByEmail(notice, opts?.send);
+  }
   return { approved: ids };
 }
 
 export async function rejectRequestItemAs(
   viewer: Viewer,
   data: { requestItemId: string; reviewComment: string },
-  opts?: TransitionEmailOptions
+  opts?: EmailOptions
 ) {
   assertStaff(viewer);
   if (!data.reviewComment.trim()) {

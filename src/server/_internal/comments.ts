@@ -4,23 +4,19 @@ import { projectComments, projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { isStaff } from "#/lib/viewer";
 import type { AddCommentInput } from "../comments";
+import type { EmailOptions } from "./email-dispatch";
 import { recordCommentNotifications } from "./notify";
-import { notifyCommentByEmail, type SendEmailFn } from "./project-emails";
+import { notifyCommentByEmail } from "./project-emails";
 
 export interface AuthUser {
   id: string;
   role?: string | null | undefined;
 }
 
-export interface CommentOptions {
-  /** Test seam. Production callers omit it and the notifier resolves its own transport. */
-  send?: SendEmailFn;
-}
-
 export async function addCommentAs(
   viewer: AuthUser,
   data: AddCommentInput,
-  opts?: CommentOptions
+  opts?: EmailOptions
 ): Promise<{ id: string }> {
   const [project] = await db
     .select()

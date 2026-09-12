@@ -24,6 +24,7 @@ import type {
   ProposerInput,
   UpdateProjectInput,
 } from "../projects";
+import type { EmailOptions, SendEmailFn } from "./email-dispatch";
 import {
   recordProposerReassignedNotification,
   recordSoftDeleteNotification,
@@ -34,7 +35,6 @@ import {
   notifyMentorNamedByEmail,
   notifyProposerReassignedByEmail,
   notifyTransitionByEmail,
-  type SendEmailFn,
 } from "./project-emails";
 import { refreshProjectEmbedding } from "./project-embeddings";
 
@@ -604,11 +604,6 @@ export async function restoreProjectAs(
     );
   });
   return { id };
-}
-
-export interface EmailOptions {
-  /** Test seam. Production callers omit it and the notifier resolves its own transport. */
-  send?: SendEmailFn;
 }
 
 export async function hardDeleteProjectAs(

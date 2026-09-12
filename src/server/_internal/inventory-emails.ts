@@ -2,7 +2,6 @@ import {
   buildNotificationConfig,
   type NotificationConfig,
 } from "#/lib/email/config";
-import { getEmailSender } from "#/lib/email/sender";
 import {
   inventoryRequestSubmittedEmail,
   notificationEmail,
@@ -11,7 +10,7 @@ import {
   EMAILED_INVENTORY_TYPES,
   type InventoryNotice,
 } from "#/lib/inventory-notifications";
-import type { SendEmailFn } from "./project-emails";
+import { emailDispatch, type SendEmailFn } from "./email-dispatch";
 
 /**
  * Sends the email an inventory notice owes, if it owes one. Never throws, for
@@ -42,8 +41,7 @@ export async function notifyInventoryByEmail(
         "BETTER_AUTH_URL is not set, so no inventory email could be addressed"
       );
     }
-    const dispatch: SendEmailFn =
-      send ?? ((to, email) => getEmailSender().send(to, email));
+    const dispatch = emailDispatch(send);
     await dispatch(
       address,
       notificationEmail({
@@ -54,16 +52,6 @@ export async function notifyInventoryByEmail(
     );
   } catch (error) {
     console.error(`Inventory email failed (${notice.type})`, error);
-  }
-}
-
-/** Sends each notice's email in turn. The batch approve path collects several. */
-export async function notifyInventoryBatchByEmail(
-  notices: (InventoryNotice | null)[],
-  send?: SendEmailFn
-): Promise<void> {
-  for (const notice of notices) {
-    await notifyInventoryByEmail(notice, send);
   }
 }
 
@@ -98,8 +86,7 @@ export async function notifyRequestSubmittedByEmail(
         "BETTER_AUTH_URL is not set, so no request notice could be addressed"
       );
     }
-    const dispatch: SendEmailFn =
-      send ?? ((to, email) => getEmailSender().send(to, email));
+    const dispatch = emailDispatch(send);
     await dispatch(
       config.staffInbox,
       inventoryRequestSubmittedEmail({

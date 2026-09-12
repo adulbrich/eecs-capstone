@@ -14,12 +14,7 @@ import {
   notifyBannedByEmail,
   notifyRoleChangedByEmail,
 } from "./account-emails";
-import type { SendEmailFn } from "./project-emails";
-
-export interface AccountEmailOptions {
-  /** Test seam. Production callers omit it and the notifier resolves its own transport. */
-  send?: SendEmailFn;
-}
+import type { EmailOptions } from "./email-dispatch";
 
 /** The address an account email goes to, or null for an id that names nobody. */
 async function addressOf(userId: string): Promise<string | null> {
@@ -303,7 +298,7 @@ export async function getUserForCurrentUser(data: { id: string }) {
 export async function setUserRoleAs(
   viewer: AuthUser,
   data: SetUserRoleInput,
-  opts?: AccountEmailOptions
+  opts?: EmailOptions
 ) {
   assertAdmin(viewer);
   assertNotSelf(viewer, data.userId, "change the role of");
@@ -327,7 +322,7 @@ export async function setUserRoleForCurrentUser(data: SetUserRoleInput) {
 export async function banUserAs(
   viewer: AuthUser,
   data: BanUserInput,
-  opts?: AccountEmailOptions
+  opts?: EmailOptions
 ) {
   assertAdmin(viewer);
   assertNotSelf(viewer, data.userId, "ban");

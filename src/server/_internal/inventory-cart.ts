@@ -9,8 +9,8 @@ import {
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { Viewer } from "#/lib/viewer";
+import type { EmailOptions } from "./email-dispatch";
 import { notifyRequestSubmittedByEmail } from "./inventory-emails";
-import type { TransitionEmailOptions } from "./inventory-transitions";
 
 export async function getCartAs(viewer: Viewer) {
   if (!viewer) {
@@ -73,7 +73,7 @@ export async function removeFromCartAs(
 export async function submitCartAs(
   viewer: Viewer,
   data: { note: string | null },
-  opts?: TransitionEmailOptions
+  opts?: EmailOptions
 ) {
   if (!viewer) {
     throw new Error("Sign in required");

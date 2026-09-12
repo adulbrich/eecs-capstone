@@ -25,15 +25,10 @@ import {
   type TransitionInput,
 } from "#/lib/inventory-workflow";
 import type { ItemStatus } from "#/lib/vocabularies";
+import type { EmailOptions } from "./email-dispatch";
 import { notifyInventoryByEmail } from "./inventory-emails";
-import type { SendEmailFn } from "./project-emails";
 
 export type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
-
-export interface TransitionEmailOptions {
-  /** Test seam. Production callers omit it and the notifier resolves its own transport. */
-  send?: SendEmailFn;
-}
 
 /**
  * The statuses a request line can be in while an item still points at it.
@@ -172,7 +167,7 @@ export async function transitionItem(
   viewer: TransitionActor,
   input: TransitionInput,
   externalTx?: Tx,
-  opts?: TransitionEmailOptions
+  opts?: EmailOptions
 ): Promise<InventoryNotice | null> {
   assertTransitionAllowed(viewer, input);
 

@@ -19,12 +19,13 @@ import {
   toNotificationRow,
 } from "#/lib/inventory-notifications";
 import type { Viewer } from "#/lib/viewer";
+import type { EmailOptions } from "./email-dispatch";
 import {
   notifyInventoryByEmail,
   notifyRequestSubmittedByEmail,
 } from "./inventory-emails";
 import { defaultPickupBy } from "./inventory-requests";
-import type { TransitionEmailOptions, Tx } from "./inventory-transitions";
+import type { Tx } from "./inventory-transitions";
 
 /**
  * Custom requests: asks for equipment the inventory does not hold.
@@ -49,7 +50,7 @@ export interface CustomLineInput {
 export async function submitCustomRequestAs(
   viewer: Viewer,
   data: { lines: CustomLineInput[]; note: string | null },
-  opts?: TransitionEmailOptions
+  opts?: EmailOptions
 ) {
   if (!viewer) {
     throw new Error("Sign in required");
@@ -220,7 +221,7 @@ export async function updateSourcingNoteAs(
 export async function rejectCustomLineAs(
   viewer: Viewer,
   data: { customLineId: string; outcomeNote: string },
-  opts?: TransitionEmailOptions
+  opts?: EmailOptions
 ) {
   if (!data.outcomeNote.trim()) {
     throw new Error("Reject reason required");
@@ -272,7 +273,7 @@ export async function fulfillCustomLineAs(
     pickupBy: Date | null;
     reserve: boolean;
   },
-  opts?: TransitionEmailOptions
+  opts?: EmailOptions
 ) {
   const itemIds = [...new Set(data.itemIds)].sort();
   if (itemIds.length === 0) {

@@ -2,9 +2,8 @@ import {
   buildNotificationConfig,
   type NotificationConfig,
 } from "#/lib/email/config";
-import { getEmailSender } from "#/lib/email/sender";
 import { accountSuspendedEmail, roleChangedEmail } from "#/lib/email/templates";
-import type { SendEmailFn } from "./project-emails";
+import { emailDispatch, type SendEmailFn } from "./email-dispatch";
 
 /**
  * The two account emails, both mandatory for their recipient and both sent
@@ -22,8 +21,7 @@ export async function notifyRoleChangedByEmail(
         "BETTER_AUTH_URL is not set, so no role email could be addressed"
       );
     }
-    const dispatch: SendEmailFn =
-      send ?? ((to, email) => getEmailSender().send(to, email));
+    const dispatch = emailDispatch(send);
     await dispatch(
       input.to,
       roleChangedEmail({ role: input.role, url: config.appBaseUrl })
@@ -38,8 +36,7 @@ export async function notifyBannedByEmail(
   send?: SendEmailFn
 ): Promise<void> {
   try {
-    const dispatch: SendEmailFn =
-      send ?? ((to, email) => getEmailSender().send(to, email));
+    const dispatch = emailDispatch(send);
     await dispatch(
       input.to,
       accountSuspendedEmail({

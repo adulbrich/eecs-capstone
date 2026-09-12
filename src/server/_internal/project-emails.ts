@@ -5,7 +5,6 @@ import {
   buildNotificationConfig,
   type NotificationConfig,
 } from "#/lib/email/config";
-import { getEmailSender } from "#/lib/email/sender";
 import {
   mentorNamedEmail,
   projectApprovedEmail,
@@ -19,8 +18,7 @@ import {
   type RenderedEmail,
 } from "#/lib/email/templates";
 import type { ProjectStatus } from "#/lib/vocabularies";
-
-export type SendEmailFn = (to: string, email: RenderedEmail) => Promise<void>;
+import { emailDispatch, type SendEmailFn } from "./email-dispatch";
 
 /** The parts of a project every proposer-facing email reads. */
 export interface EmailProject {
@@ -184,8 +182,7 @@ export async function notifyTransitionByEmail(
         "BETTER_AUTH_URL is not set, so no transition email could be addressed"
       );
     }
-    const dispatch: SendEmailFn =
-      send ?? ((to, email) => getEmailSender().send(to, email));
+    const dispatch = emailDispatch(send);
     const url = `${config.appBaseUrl}/projects/${project.id}`;
 
     if (target === "submitted") {
@@ -248,8 +245,7 @@ export async function notifyCommentByEmail(
         "BETTER_AUTH_URL is not set, so no comment email could be addressed"
       );
     }
-    const dispatch: SendEmailFn =
-      send ?? ((to, email) => getEmailSender().send(to, email));
+    const dispatch = emailDispatch(send);
     const url = `${config.appBaseUrl}/projects/${project.id}#comment-${comment.id}`;
     const account = await lookupProposer(project.proposerId);
     const proposerAddress = resolveProposerAddress(
@@ -316,8 +312,7 @@ export async function notifyHardDeleteByEmail(
     return;
   }
   try {
-    const dispatch: SendEmailFn =
-      send ?? ((to, email) => getEmailSender().send(to, email));
+    const dispatch = emailDispatch(send);
     const account = await lookupProposer(project.proposerId);
     const address = resolveProposerAddress(
       project.proposerEmail,
@@ -360,8 +355,7 @@ export async function notifyProposerReassignedByEmail(
         "BETTER_AUTH_URL is not set, so no reassignment email could be addressed"
       );
     }
-    const dispatch: SendEmailFn =
-      send ?? ((to, email) => getEmailSender().send(to, email));
+    const dispatch = emailDispatch(send);
     const account = await lookupProposer(project.proposerId);
     const address = resolveProposerAddress(
       project.proposerEmail,
@@ -404,8 +398,7 @@ export async function notifyMentorNamedByEmail(
         "BETTER_AUTH_URL is not set, so no mentor email could be addressed"
       );
     }
-    const dispatch: SendEmailFn =
-      send ?? ((to, email) => getEmailSender().send(to, email));
+    const dispatch = emailDispatch(send);
     await dispatch(
       mentorEmail,
       mentorNamedEmail({
