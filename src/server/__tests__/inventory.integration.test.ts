@@ -3831,12 +3831,53 @@ describe("inventory emails", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it("emails once per line when a batch is approved", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser(`a-batch-mail-${Date.now()}@x.com`, "admin");
+    const studentEmail = `s-batch-mail-${Date.now()}@x.com`;
+    const student = await makeUser(studentEmail, "user");
+    const first = await makeItem();
+    const second = await makeItem();
+    const { line: firstLine } = await makeRequestLine(student.id, first.id);
+    const { line: secondLine } = await makeRequestLine(student.id, second.id);
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await approveRequestLinesAs(
+      admin,
+      { requestItemIds: [firstLine.id, secondLine.id], pickupBy: null },
+      { send }
+    );
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls.map((c) => c[0])).toEqual([
+      studentEmail,
+      studentEmail,
+    ]);
+  });
+
   it("emails a walk-in holder at the address, though no bell row can exist", async () => {
     process.env.BETTER_AUTH_URL = "https://app";
     const admin = await makeUser(`a-walkin-${Date.now()}@x.com`, "admin");
     const item = await makeItem();
     const send = vi.fn().mockResolvedValue(undefined);
 
+    await transitionItem(
+      admin,
+      {
+        itemId: item.id,
+        nextStatus: "reserved",
+        holderEmail: "walkin@example.com",
+        holderName: "Walk In",
+        pickupBy: new Date(Date.now() + 7 * 86_400_000),
+      },
+      undefined,
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("walkin@example.com");
+    expect(send.mock.calls[0]?.[1].subject).toContain("Pick up by");
+
+    send.mockClear();
     await transitionItem(
       admin,
       {

@@ -321,10 +321,30 @@ describe("notifyTransitionByEmail, returned to draft", () => {
 
 describe("notifyCommentByEmail", () => {
   const comment = {
+    authorId: STAFF,
     content: "Please add a timeline.",
     id: "c1",
     isInternal: false as boolean | null,
   };
+
+  it("emails nobody when the author is the proposer, staff or not", async () => {
+    // Staff can propose their own projects, and then their comment is the
+    // proposer's: the actor is never told, and staff are not told about a
+    // note one of them left on their own project.
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyCommentByEmail(
+      {
+        authorIsStaff: true,
+        comment: { ...comment, authorId: "u-staff-owner" },
+        project: { ...PROJECT, proposerId: "u-staff-owner" },
+      },
+      send,
+      CONFIG
+    );
+
+    expect(send).not.toHaveBeenCalled();
+  });
 
   it("emails the proposer when staff comment, linking to the comment", async () => {
     const send = vi.fn().mockResolvedValue(undefined);

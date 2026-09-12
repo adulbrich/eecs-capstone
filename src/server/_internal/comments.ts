@@ -95,7 +95,12 @@ export async function addCommentAs(
   await notifyCommentByEmail(
     {
       authorIsStaff: isStaff(viewer),
-      comment: { content: row.content, id: row.id, isInternal: row.isInternal },
+      comment: {
+        authorId: row.authorId,
+        content: row.content,
+        id: row.id,
+        isInternal: row.isInternal,
+      },
       project: {
         id: project.id,
         proposerEmail: project.proposerEmail,

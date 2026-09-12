@@ -417,7 +417,7 @@ catalogue that decided the matrix below; #288 shipped it.
   | Account | Reset password | no | yes |
   | Proposer | Changes requested | yes | yes |
   | Proposer | Approved | yes | yes |
-  | Proposer | Returned to draft by staff | yes | yes, comment required |
+  | Proposer | Returned to draft by staff | yes | yes, comment required (the force override is exempt) |
   | Proposer | Published, archived, restored from archive | yes | no |
   | Proposer | Soft deleted, restored | yes | no |
   | Proposer | Hard deleted by staff | no | yes, no link |

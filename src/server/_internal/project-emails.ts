@@ -212,7 +212,12 @@ export async function notifyTransitionByEmail(
 export interface CommentEmailInput {
   /** Staff comments reach the proposer; the proposer's own reach staff. */
   authorIsStaff: boolean;
-  comment: { content: string; id: string; isInternal: boolean | null };
+  comment: {
+    authorId: string;
+    content: string;
+    id: string;
+    isInternal: boolean | null;
+  };
   project: EmailProject;
 }
 
@@ -223,7 +228,10 @@ export interface CommentEmailInput {
  * Only staff and the proposer may comment (`addCommentAs`), so "not staff" is
  * the proposer, and the two directions are the whole rule: staff to proposer,
  * proposer to the staff inbox. An internal comment is staff talking among
- * themselves and reaches no inbox, the same as it reaches no bell.
+ * themselves and reaches no inbox, the same as it reaches no bell. Staff can
+ * be the proposer of their own project (#322), and then their comment is the
+ * proposer's: nobody is emailed their own words, and the staff inbox is not
+ * told about a note a staff member left themselves.
  */
 export async function notifyCommentByEmail(
   input: CommentEmailInput,
@@ -250,7 +258,10 @@ export async function notifyCommentByEmail(
     );
 
     if (authorIsStaff) {
-      if (!proposerAddress) {
+      // A staff proposer commenting on their own project: nobody is emailed
+      // their own words, and the staff inbox is not told about a note one of
+      // them left themselves.
+      if (!proposerAddress || comment.authorId === project.proposerId) {
         return;
       }
       await dispatch(
