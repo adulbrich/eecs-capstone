@@ -178,6 +178,47 @@ export function inventoryRequestSubmittedEmail(input: {
   };
 }
 
+/** An admin changed what the account may do. */
+export function roleChangedEmail(input: {
+  role: string;
+  url: string;
+}): RenderedEmail {
+  return {
+    subject: `Your role is now ${input.role}`,
+    ...layout(
+      [
+        `An administrator changed your capstone account's role to ${input.role}.`,
+        "Sign out and back in if the change does not show yet.",
+      ],
+      { label: "Open the capstone app", url: input.url }
+    ),
+  };
+}
+
+/**
+ * An admin banned the account. No link: a banned account cannot sign in, so
+ * the only thing to offer is the reason and, when there is one, the end date.
+ */
+export function accountSuspendedEmail(input: {
+  expiresAt: Date | null;
+  reason: string;
+}): RenderedEmail {
+  const until = input.expiresAt
+    ? `until ${new Date(input.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+    : "until an administrator lifts it";
+  return {
+    subject: "Your account was suspended",
+    ...layout(
+      [
+        `An administrator suspended your capstone account ${until}.`,
+        `Reason: ${input.reason}`,
+        "Reply to this email if you think this is a mistake.",
+      ],
+      null
+    ),
+  };
+}
+
 /** Staff linked a project to a new proposer. */
 export function projectReassignedEmail(input: {
   title: string;

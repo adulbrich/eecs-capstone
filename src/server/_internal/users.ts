@@ -10,6 +10,25 @@ import {
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { assertAdmin, assertStaff } from "#/lib/viewer";
 import type { BanUserInput, ListUsersInput, SetUserRoleInput } from "../users";
+import {
+  notifyBannedByEmail,
+  notifyRoleChangedByEmail,
+} from "./account-emails";
+import type { SendEmailFn } from "./project-emails";
+
+export interface AccountEmailOptions {
+  /** Test seam. Production callers omit it and the notifier resolves its own transport. */
+  send?: SendEmailFn;
+}
+
+/** The address an account email goes to, or null for an id that names nobody. */
+async function addressOf(userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ email: user.email })
+    .from(user)
+    .where(eq(user.id, userId));
+  return row?.email ?? null;
+}
 
 interface AuthUser {
   id: string;
@@ -281,13 +300,22 @@ export async function getUserForCurrentUser(data: { id: string }) {
   return getUserImpl(data);
 }
 
-export async function setUserRoleAs(viewer: AuthUser, data: SetUserRoleInput) {
+export async function setUserRoleAs(
+  viewer: AuthUser,
+  data: SetUserRoleInput,
+  opts?: AccountEmailOptions
+) {
   assertAdmin(viewer);
   assertNotSelf(viewer, data.userId, "change the role of");
   await db
     .update(user)
     .set({ role: data.role, updatedAt: new Date() })
     .where(eq(user.id, data.userId));
+  // After the write; swallows its own errors.
+  const to = await addressOf(data.userId);
+  if (to) {
+    await notifyRoleChangedByEmail({ role: data.role, to }, opts?.send);
+  }
   return { id: data.userId, role: data.role };
 }
 
@@ -296,7 +324,11 @@ export async function setUserRoleForCurrentUser(data: SetUserRoleInput) {
   return setUserRoleAs(viewer, data);
 }
 
-export async function banUserAs(viewer: AuthUser, data: BanUserInput) {
+export async function banUserAs(
+  viewer: AuthUser,
+  data: BanUserInput,
+  opts?: AccountEmailOptions
+) {
   assertAdmin(viewer);
   assertNotSelf(viewer, data.userId, "ban");
   await db.transaction(async (tx) => {
@@ -311,6 +343,15 @@ export async function banUserAs(viewer: AuthUser, data: BanUserInput) {
       .where(eq(user.id, data.userId));
     await tx.delete(session).where(eq(session.userId, data.userId));
   });
+  // After the transaction, never inside it: a failed email must not undo a
+  // ban. The account can no longer sign in, so email is the only channel.
+  const to = await addressOf(data.userId);
+  if (to) {
+    await notifyBannedByEmail(
+      { expiresAt: data.expiresAt, reason: data.reason, to },
+      opts?.send
+    );
+  }
   return { id: data.userId, banned: true as const };
 }
 

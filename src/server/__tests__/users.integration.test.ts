@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "#/db";
 import { session, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
@@ -173,5 +173,47 @@ describe("banUserAs / unbanUserAs", () => {
     expect(updated.banned).toBe(false);
     expect(updated.banReason).toBeNull();
     expect(updated.banExpires).toBeNull();
+  });
+});
+
+describe("account emails", () => {
+  const ORIGINAL_ENV = { ...process.env };
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  it("emails a user when their role changes and when they are banned, not on unban", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser(
+      `admin-acct-mail-${Date.now()}@x.com`,
+      "admin"
+    );
+    const targetEmail = `target-acct-mail-${Date.now()}@x.com`;
+    const target = await makeUser(targetEmail, "user");
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await setUserRoleAs(
+      admin,
+      { userId: target.id, role: "instructor" },
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe(targetEmail);
+    expect(send.mock.calls[0]?.[1].subject).toBe("Your role is now instructor");
+
+    send.mockClear();
+    await banUserAs(
+      admin,
+      { userId: target.id, reason: "Repeated misuse", expiresAt: null },
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe(targetEmail);
+    expect(send.mock.calls[0]?.[1].subject).toBe("Your account was suspended");
+    expect(send.mock.calls[0]?.[1].text).toContain("Repeated misuse");
+
+    send.mockClear();
+    await unbanUserAs(admin, { userId: target.id });
+    expect(send).not.toHaveBeenCalled();
   });
 });
