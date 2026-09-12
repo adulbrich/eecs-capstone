@@ -185,8 +185,11 @@ Each project carries:
 - [x] Staff project list (`/admin/projects`) with a status set (a multi-select
   that opens on every status but archived and never empties), a date range on
   Created, Published or Updated read as Pacific calendar days, program and
-  proposer filters, and a show-soft-deleted switch, all held in URL search
-  params; the CSV export follows the same filter (#335). The range only helps
+  proposer filters, a show-soft-deleted switch, and the public listing's three
+  switches under the same param names (accepting applicants, student-proposed,
+  seeking a mentor as the derived badge value), all held in URL search params;
+  the CSV export and the proposer dropdown follow the same filter (#335, #340).
+  The range only helps
   on legacy rows if the import (#216) writes real dates: `publishedAt` as the
   start of the term the project ran and `archivedAt` as its end, with
   `createdAt` free to be the import time. That is why Published is the

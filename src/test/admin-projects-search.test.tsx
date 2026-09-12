@@ -40,6 +40,25 @@ describe("/admin/projects search", () => {
     expect(resolved).toMatchObject({ from: null, to: null });
   });
 
+  it("opens with every switch off and carries an on switch through to the filter", () => {
+    const off = resolveAdminFilter(searchSchema.parse({}));
+    expect(off).toMatchObject({
+      acceptingOnly: false,
+      includeSoftDeleted: false,
+      seekingMentorOnly: false,
+      studentProposedOnly: false,
+    });
+    // The same param names as /projects, so a pasted link narrows here too.
+    const on = resolveAdminFilter(
+      searchSchema.parse({ seekingMentorOnly: true, studentProposedOnly: true })
+    );
+    expect(on).toMatchObject({
+      acceptingOnly: false,
+      seekingMentorOnly: true,
+      studentProposedOnly: true,
+    });
+  });
+
   it("carries an explicit status set in full", () => {
     const parsed = searchSchema.parse({ status: ["archived"] });
     expect(parsed.status).toEqual(["archived"]);

@@ -51,13 +51,16 @@ function baseProject(title: string) {
 }
 
 const ALL_PROJECTS = {
+  acceptingOnly: false,
   dateField: "published" as const,
   from: null,
   includeSoftDeleted: false,
   program: null,
   proposer: null,
   q: "",
+  seekingMentorOnly: false,
   statuses: [...PROJECT_STATUSES],
+  studentProposedOnly: false,
   to: null,
 };
 
