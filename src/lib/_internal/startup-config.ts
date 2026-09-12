@@ -3,10 +3,11 @@
  *
  * Called from `src/nitro/config-check.ts` and nowhere else; the TanStack Start
  * section of docs/QUIRKS.md says why a Nitro plugin is the one home that
- * refuses to boot and why `auth.ts` and the server entry are not. Production
- * only: outside it every variable here fails closed or at first use, as it
- * always has. Names, never values: three of these are secrets, and the message
- * reaches a log group.
+ * refuses to boot and why `auth.ts` and the server entry are not. Two gates:
+ * the production list applies under `NODE_ENV=production`, the email pair
+ * under `EMAIL_TRANSPORT=ses`; outside both, every variable here fails closed
+ * or at first use, as it always has. Names, never values: three of these are
+ * secrets, and the message reaches a log group.
  */
 
 /**
@@ -14,10 +15,32 @@
  * `.env.example` order. `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are not
  * here on purpose: `infra/variables.tf` defaults the id to empty, so GitHub
  * sign-in is optional and `warnUnconfiguredProviders` names it instead.
+ *
+ * Two lists, two gates. The production list is gated on `NODE_ENV`. The email
+ * pair is gated on the transport instead, to match the `EMAIL_FROM` throw in
+ * `createSesEmailSender` that fires whenever someone asks for SES: a staff
+ * inbox missing under `ses` used to warn once per submission and drop the only
+ * push that tells staff a project arrived, which is a boot failure that had
+ * been demoted to a log line.
  */
 export function missingProductionConfig(
   env: NodeJS.ProcessEnv = process.env
 ): string[] {
+  return [...missingInProduction(env), ...missingUnderSes(env)];
+}
+
+function missingUnderSes(env: NodeJS.ProcessEnv): string[] {
+  if (env.EMAIL_TRANSPORT !== "ses") {
+    return [];
+  }
+  const values = {
+    EMAIL_FROM: env.EMAIL_FROM,
+    EMAIL_STAFF_INBOX: env.EMAIL_STAFF_INBOX,
+  };
+  return unsetNames(values);
+}
+
+function missingInProduction(env: NodeJS.ProcessEnv): string[] {
   if (env.NODE_ENV !== "production") {
     return [];
   }
@@ -34,6 +57,10 @@ export function missingProductionConfig(
     ONID_CLIENT_SECRET: env.ONID_CLIENT_SECRET,
     S3_BUCKET: env.S3_BUCKET,
   };
+  return unsetNames(values);
+}
+
+function unsetNames(values: Record<string, string | undefined>): string[] {
   return Object.entries(values)
     .filter(([, value]) => !value?.trim())
     .map(([name]) => name);
@@ -51,6 +78,6 @@ export function assertProductionConfig(
     return;
   }
   throw new Error(
-    `Refusing to start: ${missing.join(", ")} ${missing.length === 1 ? "is" : "are"} not set. Every one of these is required when NODE_ENV is production; see the runtime environment list in DEPLOYMENT.md.`
+    `Refusing to start: ${missing.join(", ")} ${missing.length === 1 ? "is" : "are"} not set. Every one of these is required when NODE_ENV is production or EMAIL_TRANSPORT is ses; see the runtime environment list in DEPLOYMENT.md.`
   );
 }

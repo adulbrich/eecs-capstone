@@ -426,7 +426,7 @@ describe("StaffProjectPanel review-email control", () => {
     });
   });
 
-  it("sends sendEmail: true on a Submitted transition, which emails the review inbox", async () => {
+  it("sends sendEmail: true on a Submitted transition, which emails the staff inbox", async () => {
     // No checkbox renders for this transition, so nothing in the UI could ever
     // set the flag false. Every other assertion in this suite checks for
     // false, which is how a panel that always muted mail passed the whole

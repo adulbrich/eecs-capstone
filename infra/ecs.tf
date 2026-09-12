@@ -128,10 +128,12 @@ resource "aws_ecs_task_definition" "app" {
         # and sits on oregonstate.edu rather than the sending domain. The app
         # treats "" as unset and omits the header entirely.
         { name = "EMAIL_REPLY_TO", value = var.email_reply_to },
-        # Recipient of the project submission notice. Unlike EMAIL_FROM this is
-        # a destination, so it needs no SES identity, and unlike EMAIL_REPLY_TO
-        # it is read by the app rather than stamped on outgoing headers.
-        { name = "EMAIL_REVIEW_INBOX", value = var.email_review_inbox },
+        # The one mailbox every email addressed to staff goes to. Unlike
+        # EMAIL_FROM this is a destination, so it needs no SES identity, and
+        # unlike EMAIL_REPLY_TO it is read by the app rather than stamped on
+        # outgoing headers. Required under ses like EMAIL_FROM: the app refuses
+        # to boot without it, so it ships in the same revision as the transport.
+        { name = "EMAIL_STAFF_INBOX", value = var.email_staff_inbox },
         # src/lib/email/config.ts falls back to us-east-1. The identity
         # lives in var.region, and the mismatch surfaces only as an opaque
         # "email address not verified" error, so pin it explicitly.

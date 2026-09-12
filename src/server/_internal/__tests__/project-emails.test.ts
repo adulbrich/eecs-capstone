@@ -20,9 +20,9 @@ import { notifyTransitionByEmail } from "../project-emails";
 // one case to leak a variable into the next.
 const CONFIG: NotificationConfig = {
   appBaseUrl: "https://app",
-  reviewInbox: "review@oregonstate.edu",
+  staffInbox: "review@oregonstate.edu",
 };
-const NO_INBOX: NotificationConfig = { ...CONFIG, reviewInbox: null };
+const NO_INBOX: NotificationConfig = { ...CONFIG, staffInbox: null };
 
 const PROJECT = {
   description: "A robot arm.",
@@ -33,7 +33,7 @@ const PROJECT = {
 };
 
 describe("notifyTransitionByEmail", () => {
-  it("emails the review inbox when a project is submitted", async () => {
+  it("emails the staff inbox when a project is submitted", async () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
     await notifyTransitionByEmail(
@@ -102,7 +102,7 @@ describe("notifyTransitionByEmail", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("skips the submission email when the review inbox is unset", async () => {
+  it("skips the submission email when the staff inbox is unset", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const send = vi.fn().mockResolvedValue(undefined);
 
@@ -119,7 +119,7 @@ describe("notifyTransitionByEmail", () => {
     warn.mockRestore();
   });
 
-  it("warns when the review inbox is unset rather than failing silently", async () => {
+  it("warns when the staff inbox is unset rather than failing silently", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     await notifyTransitionByEmail(
@@ -135,7 +135,7 @@ describe("notifyTransitionByEmail", () => {
     // was submitted, the transition still succeeds, and nothing else in the app
     // surfaces the gap. The warning is the only signal that exists.
     expect(warn).toHaveBeenCalledOnce();
-    expect(String(warn.mock.calls[0]?.[0])).toContain("EMAIL_REVIEW_INBOX");
+    expect(String(warn.mock.calls[0]?.[0])).toContain("EMAIL_STAFF_INBOX");
     warn.mockRestore();
   });
 

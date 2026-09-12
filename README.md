@@ -183,7 +183,7 @@ The app sends four emails, all through `src/lib/email/templates.ts`:
 |---|---|---|
 | Verify your email | Sign-up | The new account |
 | Reset your password | Forgot-password form | The account |
-| New project submitted | A project moves to `submitted` | `EMAIL_REVIEW_INBOX` |
+| New project submitted | A project moves to `submitted` | `EMAIL_STAFF_INBOX` |
 | Approved / Changes requested | Staff review a project | The proposer |
 
 Everything else the app notifies about is in-app only, a row in `notifications`

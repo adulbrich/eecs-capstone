@@ -21,6 +21,7 @@ import {
   INVENTORY_CUSTOM_LINE_STATUSES,
   INVENTORY_ITEM_STATUSES,
   INVENTORY_REQUEST_ITEM_STATUSES,
+  NOTIFICATION_TYPES,
   PROJECT_STATUSES,
 } from "#/lib/vocabularies";
 
@@ -40,6 +41,11 @@ const tsvector = customType<{ data: string; driverData: string }>({
 
 // Enums
 export const projectStatusEnum = pgEnum("project_status", PROJECT_STATUSES);
+
+export const notificationTypeEnum = pgEnum(
+  "notification_type",
+  NOTIFICATION_TYPES
+);
 
 export const categoryDomainEnum = pgEnum("category_domain", [
   "project",
@@ -707,7 +713,7 @@ export const notifications = pgTable(
     userId: text("user_id")
       .references(() => user.id, { onDelete: "cascade" })
       .notNull(),
-    type: text("type").notNull(),
+    type: notificationTypeEnum("type").notNull(),
     title: text("title").notNull(),
     message: text("message").notNull(),
     link: text("link"),

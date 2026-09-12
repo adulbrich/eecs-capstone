@@ -351,9 +351,10 @@ that produced the planned matrix below; issue #288 is the work that ships it.
 ### In-app
 
 - [x] `notifications` table: user, type, title, message, optional link, read
-  flag, created at. `type` is free text; the fourteen values are string literals
-  in `src/lib/project-notifications.ts` and `src/lib/inventory-notifications.ts`,
-  not a vocabulary in `src/lib/vocabularies.ts`.
+  flag, created at. `type` is a `pgEnum` over `NOTIFICATION_TYPES` in
+  `src/lib/vocabularies.ts`, which the decisions in
+  `src/lib/project-notifications.ts` and `src/lib/inventory-notifications.ts`
+  emit.
 - [x] Bell in the site header, on desktop and in the mobile bar: unread count
   capped at 9+, the newest ten rows, click marks read and follows the link, mark
   all read. Polls every minute and on window focus. There is no notifications
@@ -382,12 +383,13 @@ that produced the planned matrix below; issue #288 is the work that ships it.
 - [x] Transport behind the `EmailSender` interface in `src/lib/email/`:
   `console` writes every message to stderr (the default, used in dev and by
   every test suite), `ses` sends through SES v2. Configured by `EMAIL_TRANSPORT`,
-  `EMAIL_FROM`, `EMAIL_REPLY_TO`, `EMAIL_REVIEW_INBOX` and `SES_REGION`. A
-  misconfigured `ses` transport fails boot (README, "Email transport"); a
-  missing review inbox only logs a warning and drops the submission notice.
+  `EMAIL_FROM`, `EMAIL_REPLY_TO`, `EMAIL_STAFF_INBOX` and `SES_REGION`. A
+  misconfigured `ses` transport fails boot (README, "Email transport"),
+  including a missing staff inbox; under `console` a missing inbox only logs
+  a warning and drops the submission notice.
 - [x] Four messages, six triggers. Two for accounts: verification on sign-up
   and again when an unverified account is refused sign-in, and password reset.
-  Two for project review: a notice to the capstone review inbox when a project
+  Two for project review: a notice to the staff inbox when a project
   is submitted, carrying the title, the proposer, the description and a link;
   and the outcome to the proposer when staff approve or request changes,
   carrying the staff note. The approval message says the project will be
@@ -408,12 +410,12 @@ that produced the planned matrix below; issue #288 is the work that ships it.
 
 - [ ] Every email is mandatory for its recipient. There are no notification
   preferences and none are planned. The staff per-action skip stays.
-- [ ] One shared staff inbox for every staff-facing message, replacing the
+- [x] One shared staff inbox for every staff-facing message, replacing the
   review-only name; under the `ses` transport a missing inbox fails boot the
   way a missing `EMAIL_FROM` does.
 - [ ] Holders who have an address but no account receive the pickup and due
   emails at that address; an in-app row cannot reach them.
-- [ ] Notification types become a vocabulary tuple in `src/lib/vocabularies.ts`
+- [x] Notification types become a vocabulary tuple in `src/lib/vocabularies.ts`
   and the column is constrained to it.
 - [ ] The channel per event. The rule: email when the recipient must act away
   from the app, in-app only for confirmations and the audit trail.
@@ -457,7 +459,7 @@ that produced the planned matrix below; issue #288 is the work that ships it.
 
 - [`README.md`](./README.md), "Email transport": operator setup, the four-email
   table, and the SES production state.
-- [`CONTEXT.md`](./CONTEXT.md): the entries for Notification, Review inbox,
+- [`CONTEXT.md`](./CONTEXT.md): the entries for Notification, Staff inbox,
   Proposer email and Submitted.
 - [`docs/QUIRKS.md`](./docs/QUIRKS.md): the console transport in dev, the five
   render functions behind four messages, the two notification rules that look

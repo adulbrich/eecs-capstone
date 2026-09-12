@@ -670,16 +670,21 @@ authenticated header. So it needs no SES verification and need not live on
 `capstone.eecs.oregonstate.edu` at all. An ordinary OSU mailbox or a shared
 alias is fine, and is the point: replies should reach a person.
 
-### 9.7 Review inbox
+### 9.7 Staff inbox
 
-`EMAIL_REVIEW_INBOX` receives the notice when a proposer submits a project. It
-holds the same address as `EMAIL_REPLY_TO` today but means something different:
-one is where replies land, the other is who reviews submissions. Keeping them
-separate means changing either does not silently change the other.
+`EMAIL_STAFF_INBOX` receives every email addressed to staff, which today is the
+notice when a proposer submits a project. It holds the same address as
+`EMAIL_REPLY_TO` but means something different: one is where replies land, the
+other is who acts on what the app reports. Keeping them separate means changing
+either does not silently change the other.
 
 It is a destination rather than a sender, so it needs no SES identity and no
-DKIM alignment. Unset, submissions email nobody and the app logs it; nothing
-else degrades.
+DKIM alignment. Under the `ses` transport it is required, and the app refuses
+to boot without it, the same way it refuses without `EMAIL_FROM`; under
+`console` an unset inbox only logs. #288 renamed it from its review-only name
+along with the Terraform variable `email_staff_inbox`, so the task definition
+has to be applied before an image that reads the new name is deployed, the
+same apply-then-deploy order as the transport cutover in 9.5.
 
 ### 9.8 SES console wizard
 
@@ -802,7 +807,7 @@ this config; delete it manually if you are done with the project.
 `BEDROCK_EMBEDDING_DIMENSIONS`, `AI_REVIEW_LIMIT_PER_HOUR`,
 `AI_REVIEW_LIMIT_PER_DAY`, `BEDROCK_SCOPE_REASONING_EFFORT`,
 `AI_SCOPE_LIMIT_PER_HOUR`, `AI_SCOPE_LIMIT_PER_DAY`, `EMAIL_TRANSPORT=ses`, `EMAIL_FROM`,
-`EMAIL_REPLY_TO`, `EMAIL_REVIEW_INBOX`, `SES_REGION`, plus secrets
+`EMAIL_REPLY_TO`, `EMAIL_STAFF_INBOX`, `SES_REGION`, plus secrets
 `DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`,
 `ONID_CLIENT_SECRET`. In production, S3 and Bedrock use the task role, so no
 access keys and no `S3_ENDPOINT` are set; `BEDROCK_EMBEDDINGS_ENABLED` is
