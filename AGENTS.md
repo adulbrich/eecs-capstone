@@ -133,6 +133,11 @@ Single context: the glossary is `CONTEXT.md` at the root and the decisions are o
 paragraph each under `docs/adr/`. See
 [`docs/agents/domain.md`](./docs/agents/domain.md).
 
+### Code review
+
+One delta: a UI change carries screenshots at both widths, and the reviewer checks
+for the second one. See [`docs/agents/code-review.md`](./docs/agents/code-review.md).
+
 ## Reference docs
 
 Read the matching doc before you start; each one is the source of truth for its area.

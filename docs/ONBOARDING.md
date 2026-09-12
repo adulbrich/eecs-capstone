@@ -75,7 +75,7 @@ execute:
 | --- | --- | --- |
 | `session-context.mjs` | session start | Prints the branch, working tree, Node against `.nvmrc`, and the running compose services. |
 | `guard-git.mjs` | before a `git` command | Refuses `add -A`, `commit -a`, a commit on `main`, a force push at `main`, `reset --hard`, `checkout .`, `restore .`, `clean -f`, `branch -D`, and a commit message that fails the commit check. |
-| `guard-gh.mjs` | before a `gh` command | Refuses PR or issue text with an emdash, an emoji, a session link, or a title that is not a Conventional Commits subject. |
+| `guard-gh.mjs` | before a `gh` command | Refuses PR or issue text with an emdash, an emoji, a session link, or a title that is not a Conventional Commits subject. Warns, without refusing, when a `gh pr create` or `gh pr edit` body has no screenshot for a branch that changes a UI path (#342). |
 | `guard-edits.mjs` | before an edit | Refuses edits to the generated and personal files: the route tree, the auth schema, `CLAUDE.md`, `.env` and `.env.local`. |
 | `after-edit.mjs` | after an edit | Reports Biome and the prose rule on the edited file. |
 

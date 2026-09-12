@@ -30,7 +30,9 @@ claim it        fix/ feat/ ...                                           review 
    Commits with a lowercase imperative: `fix(projects): stop the proposer field
    lying about pending changes`. `AGENTS.md` has the full rule and the reason.
 4. **Push and open a pull request.** The template asks for the closing issue, what
-   changed, what ran locally, the review passes, and the docs touched.
+   changed, what ran locally, screenshots when a page changed (desktop and
+   375px, or the opt-out line with a reason), the review passes, and the docs
+   touched.
 5. **Run the review loop.** `mattpocock-skills:code-review` until a pass raises
    nothing unanswered, then merge. No approving review is required by GitHub, so
    this loop is the review. Record the pass count in the PR.
@@ -45,6 +47,7 @@ first column is what stops you locally; the last is what stops the merge.
 | Conventional subject; no emdash, emoji or session link in the message | `commit-msg` | `guard-git.mjs` reads the `-m` text first | `verify` walks the PR's commits; `pr-text` checks the title and body |
 | No emdash or emoji in tracked prose and code | `pre-commit`, staged files | `after-edit.mjs` on the edited file | `verify`: `npm run check:prose` |
 | No session link in PR or issue text | (never sees it) | `guard-gh.mjs` refuses the command | `pr-text`, for the PR title and body; issue text has no CI gate |
+| A UI change carries a screenshot in the PR body, or the opt-out line with a reason | | `guard-gh.mjs` warns on `gh pr create` and `gh pr edit` | `pr-text`, over the changed files and the body |
 | Stage by name; never commit on `main` | `pre-commit` branch check | `guard-git.mjs` refuses `add -A`, `commit -a`, a commit on `main` | ruleset rejects a push to `main` |
 | No force push at `main`, `reset --hard`, `clean -f`, `branch -D` | | `guard-git.mjs` | ruleset (force push) |
 | Generated and personal files are not hand-edited | | `guard-edits.mjs` | |
