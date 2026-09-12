@@ -8,7 +8,9 @@
 #
 # Required: registered on the `main` ruleset as `pr-text` on 2026-09-03, after
 # its first report on #215 (the ruleset picker needs a check to have run once
-# before it offers the name).
+# before it offers the name). The screenshots rule (#342) is a second step in
+# the same job, so the required check name stays `pr-text` and `edited`
+# re-runs it when a body gains its image.
 name: pr-text
 
 on:
@@ -17,6 +19,8 @@ on:
 
 permissions:
   contents: read
+  # The screenshots step lists the pull request's changed files.
+  pull-requests: read
 
 jobs:
   pr-text:
@@ -35,3 +39,13 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: printf '%s\n\n%s\n' "$PR_TITLE" "$PR_BODY" | node scripts/check-commit-message.mjs --stdin
+      # A pull request that touches a UI path carries a screenshot or says
+      # why not. The file list comes from the API, paginated, so a large
+      # diff is not truncated; the body arrives through env, as above.
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename' \
+            | node scripts/check-pr-screenshots.mjs --files-stdin --body "$RUNNER_TEMP/pr-body.md"

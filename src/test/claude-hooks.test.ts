@@ -316,6 +316,71 @@ describe("guard-gh", () => {
   });
 });
 
+describe("guard-gh screenshots warning", () => {
+  /**
+   * A fixture branch one commit past `origin/main`, touching the paths the
+   * argument names, so the hook's `git diff origin/main...HEAD` has an answer
+   * that does not depend on what this checkout happens to be on.
+   */
+  function branchTouching(paths: string[]) {
+    const dir = repoOn("feat/shots");
+    const git = (...args: string[]) =>
+      spawnSync("git", ["-C", dir, ...args], { encoding: "utf8", env });
+    git("update-ref", "refs/remotes/origin/main", "HEAD");
+    for (const path of paths) {
+      mkdirSync(join(dir, path, ".."), { recursive: true });
+      writeFileSync(join(dir, path), "x");
+      git("add", path);
+    }
+    git("commit", "-q", "-m", "feat(x): touch");
+    return dir;
+  }
+  const ui = branchTouching(["src/components/foo.tsx"]);
+  const server = branchTouching(["src/server/x.ts"]);
+  const create = (body: string, from: string) =>
+    bash("guard-gh", `gh pr create --title "feat(x): y" --body "${body}"`, {
+      cwd: from,
+    });
+
+  it("warns, without blocking, when a UI change has no screenshots section", () => {
+    const result = create("Closes #1", ui);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("pr-text will fail");
+    expect(result.stdout).toContain("## Screenshots");
+    expect(JSON.parse(result.stdout).hookSpecificOutput.hookEventName).toBe(
+      "PreToolUse"
+    );
+  });
+
+  it("stays quiet for an image, the opt-out line, or a change outside the UI", () => {
+    expect(
+      create("## Screenshots\n![a](https://x.test/a.png)", ui).stdout
+    ).toBe("");
+    expect(
+      create("## Screenshots\nScreenshots: none, because copy only.", ui).stdout
+    ).toBe("");
+    expect(create("Closes #1", server).stdout).toBe("");
+  });
+
+  it("reads a body file, and lets a missing one through", () => {
+    writeFileSync(join(ui, "body.md"), "Closes #1\n");
+    const fromFile = bash(
+      "guard-gh",
+      'gh pr create --title "feat(x): y" --body-file body.md',
+      { cwd: ui }
+    );
+    expect(fromFile.status).toBe(0);
+    expect(fromFile.stdout).toContain("pr-text will fail");
+    const missing = bash(
+      "guard-gh",
+      "gh pr edit 5 --body-file not-written-yet.md",
+      { cwd: ui }
+    );
+    expect(missing.status).toBe(0);
+    expect(missing.stdout).toBe("");
+  });
+});
+
 describe("guard-edits", () => {
   const edit = (file: string, from = cwd) =>
     hook("guard-edits", {

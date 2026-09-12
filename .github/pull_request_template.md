@@ -14,6 +14,17 @@ Closes #
 - `npm run test:smoke` (a covered flow touched)
 - `npm run test:accessibility:smoke` (a scanned page touched)
 
+## Screenshots
+
+<!-- Required when the diff touches src/routes/, src/components/ or
+     src/styles.css (scripts/check-pr-screenshots.mjs, run by pr-text). One
+     image per changed page at desktop and at 375px, or the opt-out line.
+     Keep one of the two lines below, delete the other. -->
+
+![page at desktop](url) ![page at 375px](url)
+
+Screenshots: none, because ...
+
 ## Review loop
 
 <!-- AGENTS.md: mattpocock-skills:code-review until a pass raises nothing

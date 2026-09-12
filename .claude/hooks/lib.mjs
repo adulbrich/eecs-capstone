@@ -64,17 +64,31 @@ export function repoRelative(root, path) {
 }
 
 /**
+ * The files a branch changes against `origin/main`, for the rules that read
+ * the diff. Empty when git cannot answer (no remote, a detached checkout).
+ */
+export function changedFiles(cwd) {
+  return git(cwd, ["diff", "--name-only", "origin/main...HEAD"])
+    .split("\n")
+    .filter(Boolean);
+}
+
+/**
  * The repo's own rule scripts, loaded from the session's checkout so a
  * worktree checks against the code it carries. A session outside this repo
  * has no scripts and nothing to enforce, so the hook lets the call through.
+ * The screenshots script is newer than the other two (#342); a checkout
+ * without it gets that rule skipped rather than a crash.
  */
 export async function loadRuleScripts(root) {
   if (!existsSync(`${root}/scripts/check-prose.mjs`)) {
     process.exit(0);
   }
-  const [prose, commit] = await Promise.all([
+  const screenshotsPath = `${root}/scripts/check-pr-screenshots.mjs`;
+  const [prose, commit, screenshots] = await Promise.all([
     import(`${root}/scripts/check-prose.mjs`),
     import(`${root}/scripts/check-commit-message.mjs`),
+    existsSync(screenshotsPath) ? import(screenshotsPath) : {},
   ]);
-  return { ...prose, ...commit };
+  return { ...prose, ...commit, ...screenshots };
 }
