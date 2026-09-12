@@ -138,7 +138,7 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
 });
 ```
 
-An `.optional()` param without a default (`from`, `to`) is the exception: `undefined` removes it, which is what the date inputs rely on.
+An `.optional()` param without a default (`from`, `to`, `status`) is the exception: `undefined` removes it, which is what the date inputs and the default status set rely on.
 
 ### Single canonical URL per resource
 
