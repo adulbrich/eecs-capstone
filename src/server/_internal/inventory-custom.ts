@@ -19,7 +19,10 @@ import {
   toNotificationRow,
 } from "#/lib/inventory-notifications";
 import type { Viewer } from "#/lib/viewer";
-import { notifyInventoryByEmail } from "./inventory-emails";
+import {
+  notifyInventoryByEmail,
+  notifyRequestSubmittedByEmail,
+} from "./inventory-emails";
 import { defaultPickupBy } from "./inventory-requests";
 import type { TransitionEmailOptions, Tx } from "./inventory-transitions";
 
@@ -45,7 +48,8 @@ export interface CustomLineInput {
 
 export async function submitCustomRequestAs(
   viewer: Viewer,
-  data: { lines: CustomLineInput[]; note: string | null }
+  data: { lines: CustomLineInput[]; note: string | null },
+  opts?: TransitionEmailOptions
 ) {
   if (!viewer) {
     throw new Error("Sign in required");
@@ -53,7 +57,7 @@ export async function submitCustomRequestAs(
   if (data.lines.length === 0) {
     throw new Error("A request needs at least one line");
   }
-  return await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     // The envelope is the same table a borrow list submits to, and holds
     // only custom lines: nothing here touches inventory_request_items.
     const [request] = await tx
@@ -72,10 +76,33 @@ export async function submitCustomRequestAs(
         }))
       )
       .returning({ id: inventoryCustomLines.id });
-    // No notification: staff read the admin overview tile, which counts
-    // envelopes with a pending line of either kind.
-    return { requestId: request.id, lineIds: lines.map((line) => line.id) };
+    // No bell row: staff read the admin overview tile, which counts
+    // envelopes with a pending line of either kind. The email below is the
+    // push beside that pull.
+    const [requester] = await tx
+      .select({ email: user.email, name: user.name })
+      .from(user)
+      .where(eq(user.id, viewer.id));
+    return {
+      requestId: request.id,
+      lineIds: lines.map((line) => line.id),
+      requester: {
+        email: requester?.email ?? null,
+        name: requester?.name ?? null,
+      },
+    };
   });
+  // After the commit, never inside it; swallows its own errors.
+  await notifyRequestSubmittedByEmail(
+    {
+      id: result.requestId,
+      lines: data.lines.map((line) => line.name),
+      requester: result.requester,
+    },
+    "custom",
+    opts?.send
+  );
+  return { requestId: result.requestId, lineIds: result.lineIds };
 }
 
 /** The line and who asked for it, locked for the rest of the transaction. */

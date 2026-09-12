@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { NotificationConfig } from "#/lib/email/config";
 import type { InventoryNotice } from "#/lib/inventory-notifications";
-import { notifyInventoryByEmail } from "../inventory-emails";
+import {
+  notifyInventoryByEmail,
+  notifyRequestSubmittedByEmail,
+} from "../inventory-emails";
 
 const CONFIG: NotificationConfig = {
   appBaseUrl: "https://app",
@@ -72,5 +75,53 @@ describe("notifyInventoryByEmail", () => {
 
     expect(error).toHaveBeenCalledOnce();
     error.mockRestore();
+  });
+});
+
+describe("notifyRequestSubmittedByEmail", () => {
+  const request = {
+    id: "req-1",
+    lines: ["Oculus Quest 3", "Raspberry Pi 5"],
+    requester: { email: "student@oregonstate.edu", name: "Sam Student" },
+  };
+
+  it("tells the staff inbox what was asked for and by whom, linking to the queue", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyRequestSubmittedByEmail(request, "cart", send, CONFIG);
+
+    expect(send).toHaveBeenCalledOnce();
+    const [to, email] = send.mock.calls[0] ?? [];
+    expect(to).toBe("staff@oregonstate.edu");
+    expect(email.subject).toBe("Borrow list submitted: Sam Student");
+    expect(email.text).toContain("Oculus Quest 3");
+    expect(email.text).toContain("Raspberry Pi 5");
+    expect(email.text).toContain("https://app/admin/inventory/requests");
+  });
+
+  it("names a custom request as one", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyRequestSubmittedByEmail(request, "custom", send, CONFIG);
+
+    expect(send.mock.calls[0]?.[1].subject).toBe(
+      "Custom request submitted: Sam Student"
+    );
+  });
+
+  it("warns instead of throwing when the staff inbox is unset", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      notifyRequestSubmittedByEmail(request, "cart", send, {
+        ...CONFIG,
+        staffInbox: null,
+      })
+    ).resolves.toBeUndefined();
+
+    expect(send).not.toHaveBeenCalled();
+    expect(String(warn.mock.calls[0]?.[0])).toContain("EMAIL_STAFF_INBOX");
+    warn.mockRestore();
   });
 });

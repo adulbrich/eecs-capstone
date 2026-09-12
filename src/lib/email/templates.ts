@@ -151,6 +151,33 @@ export function notificationEmail(input: {
   };
 }
 
+/**
+ * A student asked for equipment. To the staff inbox, beside the admin tile,
+ * because the tile is a pull and the queue fills up unwatched without a push.
+ */
+export function inventoryRequestSubmittedEmail(input: {
+  kind: "cart" | "custom";
+  lines: string[];
+  requesterEmail: string | null;
+  requesterName: string | null;
+  url: string;
+}): RenderedEmail {
+  const who = describeProposer(input.requesterName, input.requesterEmail);
+  const shortName =
+    input.requesterName ?? input.requesterEmail ?? "Unknown requester";
+  const what = input.kind === "cart" ? "Borrow list" : "Custom request";
+  return {
+    subject: `${what} submitted: ${shortName}`,
+    ...layout(
+      [
+        `${who} submitted a ${what.toLowerCase()}:`,
+        input.lines.map((line) => `- ${line}`).join("\n"),
+      ],
+      { label: "Open the request queue", url: input.url }
+    ),
+  };
+}
+
 /** Staff linked a project to a new proposer. */
 export function projectReassignedEmail(input: {
   title: string;

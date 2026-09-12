@@ -696,3 +696,46 @@ describe("custom line emails", () => {
     expect(send.mock.calls[0]?.[1].subject).toBe("Request denied: Lidar");
   });
 });
+
+describe("request submission emails", () => {
+  const ORIGINAL_ENV = { ...process.env };
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  it("tells the staff inbox about a borrow list and about a custom request", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    process.env.EMAIL_STAFF_INBOX = "staff@oregonstate.edu";
+    const stamp = Date.now();
+    const student = await makeUser(`sub-mail-${stamp}@x.com`, "user");
+    const item = await makeItem(`Carted mail ${stamp}`);
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await addToCartAs(student, { itemId: item.id });
+    await submitCartAs(student, { note: null }, { send });
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("staff@oregonstate.edu");
+    expect(send.mock.calls[0]?.[1].subject).toContain("Borrow list submitted");
+    expect(send.mock.calls[0]?.[1].text).toContain(`Carted mail ${stamp}`);
+    expect(send.mock.calls[0]?.[1].text).toContain(
+      "https://app/admin/inventory/requests"
+    );
+
+    send.mockClear();
+    await submitCustomRequestAs(
+      student,
+      {
+        lines: [
+          { name: "Oscilloscope", reason: "Lab", quantity: 1, link: null },
+        ],
+        note: null,
+      },
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[1].subject).toContain(
+      "Custom request submitted"
+    );
+    expect(send.mock.calls[0]?.[1].text).toContain("Oscilloscope");
+  });
+});

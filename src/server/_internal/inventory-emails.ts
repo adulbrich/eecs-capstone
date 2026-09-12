@@ -3,7 +3,10 @@ import {
   type NotificationConfig,
 } from "#/lib/email/config";
 import { getEmailSender } from "#/lib/email/sender";
-import { notificationEmail } from "#/lib/email/templates";
+import {
+  inventoryRequestSubmittedEmail,
+  notificationEmail,
+} from "#/lib/email/templates";
 import {
   EMAILED_INVENTORY_TYPES,
   type InventoryNotice,
@@ -61,5 +64,53 @@ export async function notifyInventoryBatchByEmail(
 ): Promise<void> {
   for (const notice of notices) {
     await notifyInventoryByEmail(notice, send);
+  }
+}
+
+export interface SubmittedRequest {
+  id: string;
+  /** What was asked for: item names, or custom line names. */
+  lines: string[];
+  requester: { email: string | null; name: string | null };
+}
+
+/**
+ * Tells the staff inbox a request arrived. Never throws. The admin overview
+ * tile stays as the in-app signal; nothing writes staff a bell row. Under the
+ * console transport an unset inbox warns and drops it, the same as the
+ * project submission notice; under `ses` the app refuses to boot without one.
+ */
+export async function notifyRequestSubmittedByEmail(
+  request: SubmittedRequest,
+  kind: "cart" | "custom",
+  send?: SendEmailFn,
+  config: NotificationConfig = buildNotificationConfig()
+): Promise<void> {
+  try {
+    if (!config.staffInbox) {
+      console.warn(
+        `EMAIL_STAFF_INBOX is unset, so no ${kind} request notice was sent for request ${request.id}`
+      );
+      return;
+    }
+    if (!config.appBaseUrl) {
+      throw new Error(
+        "BETTER_AUTH_URL is not set, so no request notice could be addressed"
+      );
+    }
+    const dispatch: SendEmailFn =
+      send ?? ((to, email) => getEmailSender().send(to, email));
+    await dispatch(
+      config.staffInbox,
+      inventoryRequestSubmittedEmail({
+        kind,
+        lines: request.lines,
+        requesterEmail: request.requester.email,
+        requesterName: request.requester.name,
+        url: `${config.appBaseUrl}/admin/inventory/requests`,
+      })
+    );
+  } catch (error) {
+    console.error(`Request notice failed for request ${request.id}`, error);
   }
 }
