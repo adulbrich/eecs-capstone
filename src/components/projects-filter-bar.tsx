@@ -154,8 +154,11 @@ export function ProjectsSearchBar({
         </SelectContent>
       </Select>
       <ViewToggle current={view} onChange={setView} />
+      {/* order-last: the prompt line takes a full row, and ListingLayout
+          renders its Filters button after this fragment, so without it the
+          button would wrap under the prompt at md. DOM order is unchanged. */}
       {order === "recommended" && canRecommend && (
-        <p className="basis-full text-muted-foreground text-xs">
+        <p className="order-last basis-full text-muted-foreground text-xs">
           Ranked by your interests.{" "}
           <Link className="text-brand hover:underline" to="/profile">
             Edit your interests
@@ -169,7 +172,7 @@ export function ProjectsSearchBar({
         write their interests. A member with one gets no prompt.
       */}
       {!(canRecommend || signedIn) && (
-        <p className="basis-full text-muted-foreground text-xs">
+        <p className="order-last basis-full text-muted-foreground text-xs">
           <Link
             className="text-brand hover:underline"
             search={{ redirect: "/projects" }}
@@ -181,7 +184,7 @@ export function ProjectsSearchBar({
         </p>
       )}
       {signedIn && !canRecommend && (
-        <p className="basis-full text-muted-foreground text-xs">
+        <p className="order-last basis-full text-muted-foreground text-xs">
           <Link className="text-brand hover:underline" to="/profile">
             Add your interests
           </Link>{" "}
