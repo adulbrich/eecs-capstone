@@ -47,8 +47,9 @@ interface Props {
  * The shell of a listing page: search on top at every width, the narrowing
  * filters in a left aside from `xl` and in a left `Sheet` below it.
  *
- * This is the one place `xl:` is allowed (UI-CONVENTIONS, "Mobile-first
- * layout"). The aside is 18rem because 288 + 32 gap + 896 card column + 64
+ * This is the one component that carries `xl:` layout classes; a route
+ * passes at most its width pair through `className` (UI-CONVENTIONS,
+ * "Mobile-first layout"). The aside is 18rem because 288 + 32 gap + 896 card column + 64
  * page padding is exactly 1280, so the sidebar tier starts where the card
  * list no longer has to shrink to make room for it.
  */

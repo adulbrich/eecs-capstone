@@ -149,6 +149,14 @@ test("@smoke projects list, filters sheet at 375px", async ({ page }) => {
     await page.keyboard.press("Tab");
   }
   await expect(button).toBeFocused();
+  // Enter opens it from the keyboard, and Clear all (a link-variant Button,
+  // visible now that a filter is on) is what the dark scan measures.
+  await page.keyboard.press("Enter");
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Clear all" })).toBeVisible();
+  await checkA11y(page);
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
 });
 
 test("@smoke projects list, table mode", async ({ page }) => {

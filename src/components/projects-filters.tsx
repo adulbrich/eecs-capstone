@@ -68,9 +68,9 @@ export function countActiveFilters(state: ProjectsFilterState): number {
 }
 
 /**
- * The navigations the two halves of the bar share. Every change goes back to
- * page one, because the page number stops meaning anything once the set of
- * matching rows changes.
+ * The navigations the search row and the filters share. Every change goes
+ * back to page one, because the page number stops meaning anything once the
+ * set of matching rows changes.
  */
 function useProjectsFilterNavigation() {
   const navigate = useNavigate({ from: "/projects/" });
@@ -115,7 +115,7 @@ function useProjectsFilterNavigation() {
   };
 }
 
-interface SearchBarProps {
+interface SearchProps {
   /**
    * Whether the viewer has an interests vector, as the route loader read it
    * from `searchProjects`. From the loader rather than an effect so the first
@@ -141,7 +141,7 @@ export function ProjectsSearchBar({
   order,
   q,
   view,
-}: Omit<SearchBarProps, "signedIn">) {
+}: Omit<SearchProps, "signedIn">) {
   const { commitQuery, setOrder, setView } = useProjectsFilterNavigation();
   const [queryDraft, setQueryDraft] = useDebouncedDraft(q, commitQuery);
   return (
@@ -182,7 +182,7 @@ export function RecommendationPrompt({
   canRecommend,
   order,
   signedIn,
-}: Pick<SearchBarProps, "canRecommend" | "order" | "signedIn">) {
+}: Pick<SearchProps, "canRecommend" | "order" | "signedIn">) {
   return (
     <>
       {order === "recommended" && canRecommend && (
@@ -359,7 +359,6 @@ export function ProjectsFilters({
         <Button
           className="h-auto p-0"
           onClick={clearAll}
-          size="sm"
           type="button"
           variant="link"
         >

@@ -30,7 +30,7 @@ import { RecommendationPrompt } from "#/components/projects-filters";
 
 afterEach(cleanup);
 
-function renderBar(viewer: { canRecommend: boolean; signedIn: boolean }) {
+function renderPrompt(viewer: { canRecommend: boolean; signedIn: boolean }) {
   return render(
     <RecommendationPrompt
       canRecommend={viewer.canRecommend}
@@ -48,7 +48,7 @@ function renderBar(viewer: { canRecommend: boolean; signedIn: boolean }) {
  */
 describe("RecommendationPrompt", () => {
   it("sends a visitor to sign in, with the listing as the return address", () => {
-    renderBar({ canRecommend: false, signedIn: false });
+    renderPrompt({ canRecommend: false, signedIn: false });
     const link = screen.getByRole("link", {
       name: "Sign in to get recommendations",
     });
@@ -59,7 +59,7 @@ describe("RecommendationPrompt", () => {
   });
 
   it("sends a member without interests to the profile", () => {
-    renderBar({ canRecommend: false, signedIn: true });
+    renderPrompt({ canRecommend: false, signedIn: true });
     expect(
       screen
         .getByRole("link", { name: "Add your interests" })
@@ -71,7 +71,7 @@ describe("RecommendationPrompt", () => {
   });
 
   it("shows no prompt to a member who already has interests", () => {
-    renderBar({ canRecommend: true, signedIn: true });
+    renderPrompt({ canRecommend: true, signedIn: true });
     expect(
       screen.queryByRole("link", { name: "Add your interests" })
     ).toBeNull();
