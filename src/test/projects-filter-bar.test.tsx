@@ -48,7 +48,9 @@ function renderBar(viewer: { canRecommend: boolean; signedIn: boolean }) {
       order="relevance"
       program={null}
       q=""
+      seekingMentorOnly={false}
       signedIn={viewer.signedIn}
+      studentProposedOnly={false}
       view="card"
     />
   );

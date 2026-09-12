@@ -218,6 +218,7 @@ describe("updateProjectProposerAs", () => {
     const result = await updateProjectProposerAs(staff, {
       id,
       proposerEmail: target.email.toUpperCase(),
+      studentProposed: false,
     });
     expect(result.updated).toBe(true);
 
@@ -239,6 +240,7 @@ describe("updateProjectProposerAs", () => {
     await updateProjectProposerAs(staff, {
       id,
       proposerEmail: "noaccount@example.edu",
+      studentProposed: false,
     });
 
     const [row] = await db.select().from(projects).where(eq(projects.id, id));
@@ -250,15 +252,26 @@ describe("updateProjectProposerAs", () => {
     const staff = await makeUser(`staff3-${Date.now()}@x.com`, "admin");
     const { id } = await createProjectAs(staff, baseProject());
     expect(
-      (await updateProjectProposerAs(staff, { id, proposerEmail: "" })).updated
+      (
+        await updateProjectProposerAs(staff, {
+          id,
+          proposerEmail: "",
+          studentProposed: false,
+        })
+      ).updated
     ).toBe(true);
     let [row] = await db.select().from(projects).where(eq(projects.id, id));
     expect(row.proposerId).toBeNull();
     expect(row.proposerEmail).toBeNull();
 
     expect(
-      (await updateProjectProposerAs(staff, { id, proposerEmail: null }))
-        .updated
+      (
+        await updateProjectProposerAs(staff, {
+          id,
+          proposerEmail: null,
+          studentProposed: false,
+        })
+      ).updated
     ).toBe(false);
     [row] = await db.select().from(projects).where(eq(projects.id, id));
     expect(row.proposerId).toBeNull();
@@ -274,7 +287,11 @@ describe("updateProjectProposerAs", () => {
     const other = await makeUser(`other-${Date.now()}@x.com`, "user");
     const { id } = await createProjectAs(plain, baseProject());
     await expect(
-      updateProjectProposerAs(plain, { id, proposerEmail: other.email })
+      updateProjectProposerAs(plain, {
+        id,
+        proposerEmail: other.email,
+        studentProposed: false,
+      })
     ).rejects.toThrow("Forbidden");
     const [row] = await db.select().from(projects).where(eq(projects.id, id));
     expect(row.proposerId).toBe(plain.id);
@@ -345,7 +362,6 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
       "imageUrl",
       "isSponsored",
       "licenseRestrictions",
-      "mentorName",
       "minQualifications",
       "notes",
       "objectives",
@@ -398,6 +414,7 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
     await updateProjectProposerAs(admin, {
       id,
       proposerEmail: "proposer@example.edu",
+      studentProposed: false,
     });
     await forceTransitionAs(admin, id, "published");
 
@@ -680,7 +697,11 @@ describe("private notes", () => {
       ...baseProject(),
       notes: "n",
     });
-    await updateProjectProposerAs(admin, { id, proposerEmail: owner.email });
+    await updateProjectProposerAs(admin, {
+      id,
+      proposerEmail: owner.email,
+      studentProposed: false,
+    });
 
     const ownerView = await getProjectAs(owner, { id });
     expect(ownerView.project?.notes).toBe("n");
@@ -800,6 +821,7 @@ describe("review emails", () => {
     await updateProjectProposerAs(admin, {
       id,
       proposerEmail: "outsider@example.com",
+      studentProposed: false,
     });
     const send = vi.fn().mockResolvedValue(undefined);
 
@@ -877,7 +899,7 @@ describe("review emails", () => {
 
     await updateProjectProposerAs(
       admin,
-      { id, proposerEmail: "next-proposer@x.edu" },
+      { id, proposerEmail: "next-proposer@x.edu", studentProposed: false },
       { send }
     );
 
@@ -894,7 +916,11 @@ describe("review emails", () => {
     send.mockClear();
     await updateProjectProposerAs(
       admin,
-      { id, proposerEmail: "outsider-reassign@example.com" },
+      {
+        id,
+        proposerEmail: "outsider-reassign@example.com",
+        studentProposed: false,
+      },
       { send }
     );
     expect(send).toHaveBeenCalledOnce();
@@ -902,7 +928,11 @@ describe("review emails", () => {
 
     // Unlinking tells nobody.
     send.mockClear();
-    await updateProjectProposerAs(admin, { id, proposerEmail: "" }, { send });
+    await updateProjectProposerAs(
+      admin,
+      { id, proposerEmail: "", studentProposed: false },
+      { send }
+    );
     expect(send).not.toHaveBeenCalled();
   });
 
@@ -956,6 +986,7 @@ describe("getProposerForEditImpl", () => {
     await updateProjectProposerAs(staff, {
       id,
       proposerEmail: "outsider@example.com",
+      studentProposed: false,
     });
 
     const result = await getProposerForEditAs(staff, { projectId: id });

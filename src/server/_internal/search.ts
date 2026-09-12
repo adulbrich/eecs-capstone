@@ -9,7 +9,7 @@ import {
 import { readSession } from "#/lib/_internal/auth-guards";
 import type { SearchProjectsInput } from "../search";
 import { toSqlVector } from "./project-embeddings";
-import { projectSummarySelect } from "./project-summary";
+import { projectSummarySelect, seekingMentorSql } from "./project-summary";
 
 /**
  * Request entry point: resolves the viewer, then delegates. Tests call
@@ -53,6 +53,14 @@ export async function searchProjectsImpl(
   }
   if (data.acceptingOnly) {
     conditions.push(eq(projects.acceptingApplicants, true));
+  }
+  if (data.studentProposedOnly) {
+    conditions.push(eq(projects.studentProposed, true));
+  }
+  if (data.seekingMentorOnly) {
+    // The derived value, not the raw flag: a project with a mentor lined up
+    // shows no badge and must not match the filter either.
+    conditions.push(seekingMentorSql);
   }
   if (data.categoryIds.length > 0) {
     const matchingProjectIds = db

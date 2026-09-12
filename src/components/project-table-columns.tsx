@@ -123,7 +123,6 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
   shared.teams,
   shared.accepting,
   shared.nda,
-  shared.mentorship,
   {
     accessorFn: (row) => row.contactName ?? undefined,
     cell: ({ row }) => row.original.contactName ?? "-",

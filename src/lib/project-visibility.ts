@@ -116,7 +116,6 @@ export interface ProjectRow extends VisibleProject {
   isSponsored: boolean;
   licenseRestrictions: string | null;
   mentorEmail: string | null;
-  mentorName: string | null;
   minQualifications: string | null;
   notes: string | null;
   objectives: string | null;
@@ -143,8 +142,6 @@ export interface ProjectDetailView {
   /** Staff and the proposer see the value; everyone else sees null. */
   isSponsored: boolean | null;
   licenseRestrictions: string | null;
-  /** The resolved account's name. Null when unset or when nobody has signed up at that address. */
-  mentorName: string | null;
   minQualifications: string | null;
   notes: string | null;
   objectives: string | null;
@@ -214,15 +211,15 @@ export function projectDetailView(
     isSponsored: canSeePrivateNotes(project, viewer)
       ? project.isSponsored
       : null,
-    // Public by design, all three: the marker a student browsing the catalog
-    // is looking for, the seeking badge, and the mentor as a name only.
-    // `mentorEmail` is not named here and must not be. It is an address staff
-    // typed, which the person may never have chosen to publish, and it stays
-    // on the staff read in projects-queries.ts. The raw `seeking_mentor` flag
-    // stays there too; the public sees only the derived badge. See #75, #304.
+    // Public by design, both: the marker a student browsing the catalog is
+    // looking for, and the seeking badge. Nothing about the mentor is named
+    // here and nothing must be: the address is one staff typed, which the
+    // person may never have chosen to publish, and the name follows it
+    // (#336). Both stay on the staff read in projects-queries.ts, with the
+    // raw `seeking_mentor` flag; the public sees only the derived badge. See
+    // #75, #304.
     studentProposed: project.studentProposed,
     seekingMentor: project.seekingMentor,
-    mentorName: project.mentorName,
   };
 }
 

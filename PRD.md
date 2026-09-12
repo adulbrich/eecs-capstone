@@ -103,16 +103,19 @@ Each project carries:
 - [x] Program association.
 - [x] Teams supported: how many student teams the project can take on (1-5,
   default 1), set and edited by staff on the project form.
-- [x] Student-proposed marker and mentor: staff mark a project as student-proposed,
-  mark it as looking for a mentor, and record a mentor's email, all from one
-  section of the staff panel. The two marks are independent: a student project
-  may have a mentor, want one, or need none. The public sees a "Student
-  proposed" badge, a "Seeking mentor" badge while the flag is on and no address
-  is on file, and the mentor's name once that address has an account. The
-  address and the raw flag never leave staff reads. (#75, #304)
+- [x] Student-proposed marker and mentor: staff mark a project as student-proposed
+  from the Proposer section of the staff panel, saved with the link, and mark it
+  as looking for a mentor or record a mentor's email from the Mentor section,
+  which previews what the public listing will show for the draft as typed. The
+  two marks are independent: a student project may have a mentor, want one, or
+  need none. The public sees a "Student proposed" badge and a "Seeking mentor"
+  badge while the flag is on and no address is on file, on the card and the
+  project page only, and can filter the listing on either. Nothing about the
+  mentor is public: the address, the raw flag and the resolved name stay on
+  staff reads, the staff list and the CSV export. (#75, #304, #336)
 - [x] `/my/bookmarks` is a small decision table: title with thumbnail, program,
-  status, accepting applicants, teams supported, NDA/IP, origin (student
-  proposed and mentor state in one cell), saved-on date, and a remove button.
+  status, accepting applicants, teams supported, NDA/IP, saved-on date, and a
+  remove button; the two marks are read on the card or the page (#336).
   Sorted newest save first, no view toggle and no column picker. Visibility is
   re-checked on read, and one line says how many saved projects dropped out
   rather than letting the list shrink silently. (#106)

@@ -384,6 +384,7 @@ describe("admin project search reaches people, not just text", () => {
     await updateProjectProposerAs(admin, {
       id: leaving.id,
       proposerEmail: "leaving2@example.edu",
+      studentProposed: false,
     });
     await db.delete(user).where(eq(user.id, proposer.id));
     const { rows } = await listAdminProjectsAs(admin, filter({ q: "" }));
@@ -401,6 +402,7 @@ describe("admin project search reaches people, not just text", () => {
     await updateProjectProposerAs(admin, {
       id: unlinked.id,
       proposerEmail: "unregistered@example.edu",
+      studentProposed: false,
     });
     const { rows } = await listAdminProjectsAs(admin, filter({ q: "" }));
     const row = rows.find((r) => r.title === "Unlinked Proposal");

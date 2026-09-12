@@ -95,12 +95,12 @@ export const projectSummarySelect = {
   programCourseId: programs.courseId,
   programCourseName: programs.courseName,
   categories: projectCategoriesList,
-  // Public by design, all three. The address itself is not here and must not
-  // be: it is staff information, see `adminProjectSummarySelect`'s note on
-  // proposerEmail for the same distinction.
+  // Public by design, both. Nothing about the mentor is: not the address,
+  // and since #336 not the name either, which `adminProjectSummarySelect`
+  // adds back on the staff path. See the note on proposerEmail there for
+  // the same distinction.
   studentProposed: projects.studentProposed,
   seekingMentor: seekingMentorSql,
-  mentorName: mentorNameSql,
 };
 
 /**
@@ -112,6 +112,9 @@ export const projectSummarySelect = {
  */
 export const adminProjectSummarySelect = {
   ...projectSummarySelect,
+  // Staff only: the resolved mentor name, for the staff list and the CSV
+  // export. It left the public projection in #336.
+  mentorName: mentorNameSql,
   createdAt: projects.createdAt,
   deletedAt: projects.deletedAt,
   programId: projects.programId,

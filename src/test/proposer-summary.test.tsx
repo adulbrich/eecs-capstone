@@ -13,6 +13,7 @@ describe("ProposerSummary", () => {
           accountLinked: true,
           accountName: "Jane Doe",
           email: "jane@oregonstate.edu",
+          studentProposed: false,
         }}
       />
     );
@@ -31,6 +32,7 @@ describe("ProposerSummary", () => {
           accountLinked: false,
           accountName: null,
           email: "jane@x.com",
+          studentProposed: false,
         }}
       />
     );
@@ -42,7 +44,12 @@ describe("ProposerSummary", () => {
   it("says none on file when there is no address at all", () => {
     const { getByText, queryByText } = render(
       <ProposerSummary
-        proposer={{ accountLinked: false, accountName: null, email: "" }}
+        proposer={{
+          accountLinked: false,
+          accountName: null,
+          email: "",
+          studentProposed: false,
+        }}
       />
     );
     expect(getByText("None on file")).toBeTruthy();

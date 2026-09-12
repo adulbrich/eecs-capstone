@@ -1,18 +1,14 @@
 import type { AdminColumn } from "#/components/admin-data-table";
 import { ApplicantsBadge } from "./applicants-badge";
-import { MentorshipBadges } from "./mentorship-badges";
 import { programLabel } from "./project-card";
 import { Badge } from "./ui/badge";
 
 /** The fields of `projectSummarySelect` these columns read. */
 export interface ProjectSummaryRow {
   acceptingApplicants: boolean;
-  mentorName: string | null;
   programCourseId: string | null;
   programCourseName: string | null;
   requiresNdaIp: boolean;
-  seekingMentor: boolean;
-  studentProposed: boolean;
   teamsSupported: number;
 }
 
@@ -75,39 +71,7 @@ export function projectSummaryColumns<Row extends ProjectSummaryRow>() {
     sortFn: "basic",
   } satisfies AdminColumn<Row>;
 
-  const mentorship = {
-    // Seeking a mentor ranks highest, then student proposed, then the rest.
-    // TanStack starts a numeric column descending, so the first header click
-    // puts the projects a prospective mentor is looking for at the top.
-    accessorFn: (row) => {
-      if (row.seekingMentor) {
-        return 2;
-      }
-      return row.studentProposed ? 1 : 0;
-    },
-    // Both of #75's public facts in one cell. Mentor state only means
-    // anything on a student-proposed project, so a column of its own would
-    // be blank on most rows; combined, blank honestly means "an ordinary
-    // proposal" rather than looking like missing data.
-    cell: ({ row }) => {
-      const { mentorName, seekingMentor, studentProposed } = row.original;
-      if (!(studentProposed || seekingMentor || mentorName)) {
-        return "-";
-      }
-      return (
-        <div className="flex flex-col gap-1">
-          <MentorshipBadges
-            seekingMentor={seekingMentor}
-            studentProposed={studentProposed}
-          />
-          {mentorName && <span className="text-sm">{mentorName}</span>}
-        </div>
-      );
-    },
-    header: "Mentorship",
-    id: "mentorship" as const,
-    sortFn: "basic",
-  } satisfies AdminColumn<Row>;
-
-  return { accepting, mentorship, nda, program, teams };
+  // No mentorship column: the two badges stay on the card and the detail
+  // page, and the public listing filters on them instead (#336).
+  return { accepting, nda, program, teams };
 }

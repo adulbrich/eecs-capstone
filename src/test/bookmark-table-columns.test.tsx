@@ -52,7 +52,6 @@ function bookmark(
     description: null,
     imageUrl: null,
     licenseRestrictions: null,
-    mentorName: null,
     minQualifications: null,
     objectives: null,
     prefQualifications: null,
@@ -94,7 +93,6 @@ const ROWS: BookmarkRow[] = [
     teamsSupported: 3,
     bookmarkedAt: new Date("2026-04-05T00:00:00.000Z"), // Sunday
     studentProposed: true,
-    mentorName: "Sam Mentor",
   }),
   bookmark({
     id: "Four",
@@ -165,32 +163,22 @@ describe("the bookmarks table", () => {
       "Accepting applicants",
       "Teams supported",
       "NDA/IP required",
-      "Origin",
       "Saved on",
       "Remove",
     ]);
     expect(screen.queryByRole("button", { name: /Columns/ })).toBeNull();
   });
 
-  it("carries both mentorship facts in one Origin cell", () => {
+  it("shows neither badge: the card and the page carry them, the table does not", () => {
+    // #336 took the Origin column out with the public table's Mentorship
+    // column, so a saved project's marks are read on its card or its page.
     renderTable();
     const two = screen.getByRole("link", { name: "Two" }).closest("tr");
-    const three = screen.getByRole("link", { name: "Three" }).closest("tr");
-    const ten = screen.getByRole("link", { name: "Ten" }).closest("tr");
-    if (!(two && three && ten)) {
+    if (!two) {
       throw new Error("no row");
     }
-    expect(within(two).getByText("Student proposed")).toBeTruthy();
-    expect(within(two).getByText("Seeking mentor")).toBeTruthy();
-    expect(within(three).getByText("Student proposed")).toBeTruthy();
-    expect(within(three).getByText("Sam Mentor")).toBeTruthy();
-    expect(within(ten).queryByText("Student proposed")).toBeNull();
-    const four = screen.getByRole("link", { name: "Four" }).closest("tr");
-    if (!four) {
-      throw new Error("no row");
-    }
-    expect(within(four).getByText("Student proposed")).toBeTruthy();
-    expect(within(four).queryByText("Seeking mentor")).toBeNull();
+    expect(within(two).queryByText("Student proposed")).toBeNull();
+    expect(within(two).queryByText("Seeking mentor")).toBeNull();
   });
 
   it("marks a closed roster and an NDA, and removes through the loader", async () => {

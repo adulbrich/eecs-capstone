@@ -54,7 +54,6 @@ const ROWS: ProjectListRow[] = [
     id: "p1",
     imageUrl: "projects/p1/a.webp",
     licenseRestrictions: "OSU owns it",
-    mentorName: "Sam Mentor",
     minQualifications: null,
     objectives: null,
     prefQualifications: null,
@@ -79,7 +78,6 @@ const ROWS: ProjectListRow[] = [
     id: "p2",
     imageUrl: null,
     licenseRestrictions: null,
-    mentorName: null,
     minQualifications: null,
     objectives: null,
     prefQualifications: null,
@@ -136,7 +134,7 @@ function rowFor(title: string) {
 }
 
 describe("the public project table", () => {
-  it("shows the nine scannable columns and hides the prose by default", () => {
+  it("shows the eight scannable columns and hides the prose by default", () => {
     // The literal lists come from the issue's column table, not from the
     // module, so a column added on the wrong side of the line fails here.
     expect([...DEFAULT_HIDDEN].sort()).toEqual([
@@ -159,21 +157,19 @@ describe("the public project table", () => {
       "Teams supported",
       "Accepting applicants",
       "NDA/IP required",
-      "Mentorship",
       "Contact name",
       "Updated",
     ]);
   });
 
-  it("shows the mentorship state and the mentor's name, and a dash for neither", () => {
-    // #75 landed while this table was built: the two public flags and the
-    // resolved name join the table, per #78. The address never does.
+  it("shows nothing about mentorship or the proposer's kind", () => {
+    // Both badges stay on the card and the detail page, and the listing
+    // filters on the two facts instead; the table carries neither (#336).
     renderTable(DEFAULT_HIDDEN);
     const row = rowFor("Rover Telemetry");
-    expect(row.getByText("Student proposed")).toBeTruthy();
-    expect(row.getByText("Sam Mentor")).toBeTruthy();
+    expect(row.queryByText("Student proposed")).toBeNull();
+    expect(row.queryByText("Seeking mentor")).toBeNull();
     expect(row.queryByText(/@/)).toBeNull();
-    expect(rowFor("Bare Minimum").getAllByText("-").length).toBeGreaterThan(0);
   });
 
   it("renders categories as name-only chips with the facet on hover, and a dash for none", () => {

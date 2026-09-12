@@ -11,9 +11,9 @@ import { Badge } from "./ui/badge";
  * rather than a false "Seeking mentor". The two flags are independent since
  * #304: either badge can show alone. See #75.
  *
- * Rendered by the card, the detail page and the shared table column in
- * `project-summary-columns.tsx`, so no surface computes the badges its own
- * way.
+ * Rendered by the card and the detail page, so no surface computes the
+ * badges its own way. The tables show neither; the public listing filters on
+ * the same two facts instead (#336).
  */
 export function MentorshipBadges({
   className,
