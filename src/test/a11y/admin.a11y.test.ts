@@ -10,6 +10,7 @@ import { Pool } from "pg";
 import * as schema from "../../db/schema";
 import {
   closeMenu,
+  expectNoHorizontalOverflow,
   toggleColumnOn,
   waitForHydration,
   waitForSurfaceSettled,
@@ -169,8 +170,27 @@ test("admin inventory requests", async ({ page }) => {
 });
 
 test("@smoke admin projects list", async ({ page }) => {
-  await page.goto("/admin/projects");
-  await checkA11y(page);
+  // The four switches are one group on the toolbar (#340): at desktop they
+  // read as one line, at 375px they stack without pushing the page wider
+  // than the viewport or truncating a label.
+  const switches = [
+    "Only show projects accepting applicants",
+    "Only show student-proposed projects",
+    "Only show projects seeking a mentor",
+    "Show soft-deleted",
+  ];
+  async function scanWithSwitches() {
+    await page.goto("/admin/projects");
+    await waitForHydration(page);
+    for (const name of switches) {
+      await expect(page.getByRole("switch", { name })).toBeVisible();
+    }
+    await expectNoHorizontalOverflow(page);
+    await checkA11y(page);
+  }
+  await scanWithSwitches();
+  await page.setViewportSize({ width: 375, height: 812 });
+  await scanWithSwitches();
 });
 
 test("admin users list", async ({ page }) => {

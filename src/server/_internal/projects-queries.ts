@@ -23,7 +23,6 @@ import {
   user,
 } from "#/db/schema";
 import { readSession } from "#/lib/_internal/auth-guards";
-import type { AdminDateField } from "#/lib/admin-project-filters";
 import { dayRange } from "#/lib/day-range";
 import {
   canEditProject,
@@ -34,6 +33,7 @@ import {
 } from "#/lib/project-visibility";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type { ProjectStatus } from "#/lib/vocabularies";
+import type { AdminProjectsFilter } from "../projects-queries";
 import {
   adminProjectSummarySelect,
   mentorNameSql,
@@ -98,17 +98,6 @@ export async function listMyProjectsImpl(data: { status: StatusFilter }) {
   return { rows, teamCapacity: capacity?.teamCapacity ?? 0 };
 }
 
-interface AdminProjectsFilter {
-  dateField: AdminDateField;
-  from: string | null;
-  includeSoftDeleted: boolean;
-  program: string | null;
-  proposer: string | null;
-  q: string;
-  statuses: ProjectStatus[];
-  to: string | null;
-}
-
 /** The column each From and To pair narrows on. */
 const ADMIN_DATE_COLUMN = {
   created: projects.createdAt,
@@ -118,10 +107,10 @@ const ADMIN_DATE_COLUMN = {
 
 /**
  * The scope the proposer dropdown is built from: the status set, the date
- * range, program and the soft-delete switch, but NOT the search text or the
- * proposer choice itself. Excluding the proposer keeps the option you picked
- * from being the only one left; excluding `q` keeps typing in the search box
- * from emptying the dropdown underneath you.
+ * range, program, the soft-delete switch and the three flag switches, but NOT
+ * the search text or the proposer choice itself. Excluding the proposer keeps
+ * the option you picked from being the only one left; excluding `q` keeps
+ * typing in the search box from emptying the dropdown underneath you.
  *
  * The range is a plain comparison on the chosen column, so a range on
  * `publishedAt` excludes rows that were never published; the field selector
@@ -142,6 +131,20 @@ function buildAdminProjectScope(data: AdminProjectsFilter): SQL[] {
   }
   if (end) {
     scope.push(lt(column, end));
+  }
+  // The same three conditions the public listing applies under the same
+  // param names (#340), so a link moved between the two pages narrows the
+  // same way.
+  if (data.acceptingOnly) {
+    scope.push(eq(projects.acceptingApplicants, true));
+  }
+  if (data.studentProposedOnly) {
+    scope.push(eq(projects.studentProposed, true));
+  }
+  if (data.seekingMentorOnly) {
+    // The derived value, not the raw flag: a project with a mentor lined up
+    // shows no badge and must not match the filter either.
+    scope.push(seekingMentorSql);
   }
   return scope;
 }
