@@ -99,6 +99,44 @@ test("@smoke projects list, paginated", async ({ page }) => {
   await checkA11y(page);
 });
 
+test("@smoke projects list, filters aside at xl", async ({ page }) => {
+  // The suite runs at 1280, which is where the aside appears (#350): the
+  // program select and the switches are in it, and the Filters button that
+  // opens the sheet is gone.
+  await page.goto("/projects");
+  await waitForHydration(page);
+  const aside = page.getByRole("complementary", { name: "Filters" });
+  await expect(aside.getByRole("combobox", { name: "Program" })).toBeVisible();
+  await expect(
+    aside.getByRole("switch", { name: "Accepting applicants" })
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Filters" })).toBeHidden();
+  await checkA11y(page);
+});
+
+test("@smoke projects list, filters sheet at 375px", async ({ page }) => {
+  // Below xl the same form opens in a left sheet; a change made there keeps
+  // the sheet open, since it is a navigation on the same route.
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/projects");
+  await waitForHydration(page);
+  await expect(
+    page.getByRole("complementary", { name: "Filters" })
+  ).toBeHidden();
+  await page.getByRole("button", { name: "Filters" }).click();
+  const sheet = page.getByRole("dialog", { name: "Filters" });
+  const accepting = sheet.getByRole("switch", { name: "Accepting applicants" });
+  await expect(accepting).toBeVisible();
+  await checkA11y(page);
+  await accepting.click();
+  await expect(page).toHaveURL(/acceptingOnly=true/);
+  await expect(sheet).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  // The button now carries the count of what was turned on.
+  await expect(page.getByRole("button", { name: "Filters 1" })).toBeVisible();
+});
+
 test("@smoke projects list, table mode", async ({ page }) => {
   await page.goto("/projects?view=table");
   await expect(page.locator(".admin-table")).toBeVisible();
