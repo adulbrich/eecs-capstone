@@ -29,6 +29,8 @@ const TITLED = /\bgh\s+pr\s+(?:create|edit|merge)\b/;
 const TITLE_FLAG =
   /(?:^|\s)(?:-t|--title|--subject)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/;
 const BODIED = /\bgh\s+pr\s+(?:create|edit)\b/;
+// Quoted values only, like TITLE_FLAG: a bare `--body word` is legal but a
+// body worth checking has spaces, and a miss here is a warning not given.
 const BODY_FLAG =
   /(?:^|\s)(?:-b|--body)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/;
 const BODY_FILE_FLAG =

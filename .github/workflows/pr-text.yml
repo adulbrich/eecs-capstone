@@ -41,7 +41,9 @@ jobs:
         run: printf '%s\n\n%s\n' "$PR_TITLE" "$PR_BODY" | node scripts/check-commit-message.mjs --stdin
       # A pull request that touches a UI path carries a screenshot or says
       # why not. The file list comes from the API, paginated, so a large
-      # diff is not truncated; the body arrives through env, as above.
+      # diff is not truncated; the body arrives through env, as above. The
+      # repository slug and the PR number are interpolated: GitHub sets
+      # both, nobody types them, so they are not the text the rule guards.
       - env:
           GH_TOKEN: ${{ github.token }}
           PR_BODY: ${{ github.event.pull_request.body }}

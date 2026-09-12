@@ -28,7 +28,9 @@
 import { readFileSync } from "node:fs";
 
 const UI_PATH = /^(?:src\/routes\/|src\/components\/|src\/styles\.css$)/;
-const EXCLUDED = /(?:^src\/test\/|\/__tests__\/|\.test\.[^/]+$)/;
+// `src/test/**` is excluded too, by never matching UI_PATH in the first
+// place, so only the two forms that can sit under a UI root are named here.
+const EXCLUDED = /(?:\/__tests__\/|\.test\.[^/]+$)/;
 
 /** Whether a changed file is one whose change a reader should look at. */
 export function isUiPath(path) {

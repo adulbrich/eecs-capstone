@@ -47,7 +47,7 @@ first column is what stops you locally; the last is what stops the merge.
 | Conventional subject; no emdash, emoji or session link in the message | `commit-msg` | `guard-git.mjs` reads the `-m` text first | `verify` walks the PR's commits; `pr-text` checks the title and body |
 | No emdash or emoji in tracked prose and code | `pre-commit`, staged files | `after-edit.mjs` on the edited file | `verify`: `npm run check:prose` |
 | No session link in PR or issue text | (never sees it) | `guard-gh.mjs` refuses the command | `pr-text`, for the PR title and body; issue text has no CI gate |
-| A UI change carries a screenshot in the PR body, or the opt-out line with a reason | (never sees it) | `guard-gh.mjs` warns on `gh pr create` and `gh pr edit` | `pr-text`, over the changed files and the body |
+| A UI change carries a screenshot in the PR body, or the opt-out line with a reason | | `guard-gh.mjs` warns on `gh pr create` and `gh pr edit` | `pr-text`, over the changed files and the body |
 | Stage by name; never commit on `main` | `pre-commit` branch check | `guard-git.mjs` refuses `add -A`, `commit -a`, a commit on `main` | ruleset rejects a push to `main` |
 | No force push at `main`, `reset --hard`, `clean -f`, `branch -D` | | `guard-git.mjs` | ruleset (force push) |
 | Generated and personal files are not hand-edited | | `guard-edits.mjs` | |

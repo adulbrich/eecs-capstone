@@ -352,6 +352,16 @@ describe("guard-gh screenshots warning", () => {
     );
   });
 
+  it("warns on a pr edit that sends a body inline, the other shape the issue names", () => {
+    const result = bash(
+      "guard-gh",
+      'gh pr edit 5 --title "feat(x): y" --body "Closes #1"',
+      { cwd: ui }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("pr-text will fail");
+  });
+
   it("stays quiet for an image, the opt-out line, or a change outside the UI", () => {
     expect(
       create("## Screenshots\n![a](https://x.test/a.png)", ui).stdout
