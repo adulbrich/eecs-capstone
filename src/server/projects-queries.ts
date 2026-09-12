@@ -1,5 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import {
+  ADMIN_DATE_FIELDS,
+  DEFAULT_ADMIN_STATUSES,
+} from "#/lib/admin-project-filters";
 import { PROJECT_STATUSES } from "#/lib/vocabularies";
 
 // Re-exported so components can type the shape `getProposerForEdit` returns
@@ -18,14 +22,31 @@ const myProjectsSchema = z.object({
   status: z.enum(STATUS_FILTER_VALUES).default("all"),
 });
 
-const adminListSchema = z.object({
-  status: z.enum(STATUS_FILTER_VALUES).default("all"),
-  includeSoftDeleted: z.boolean().default(false),
-  program: z.string().uuid().nullable().default(null),
-  // Better Auth user ids are text, not UUIDs, so this cannot be `.uuid()`.
-  proposer: z.string().max(255).nullable().default(null),
-  q: z.string().max(200).default(""),
-});
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+const adminListSchema = z
+  .object({
+    // A set, never empty: the route refuses to uncheck the last status, and
+    // an absent set is the default view, every status but archived (#335).
+    statuses: z
+      .array(z.enum(PROJECT_STATUSES))
+      .min(1)
+      .max(PROJECT_STATUSES.length)
+      .default([...DEFAULT_ADMIN_STATUSES]),
+    // Calendar days in the office's zone, both inclusive, on the chosen
+    // timestamp; either bound absent leaves that side open.
+    dateField: z.enum(ADMIN_DATE_FIELDS).default("published"),
+    from: z.string().regex(DAY).nullable().default(null),
+    to: z.string().regex(DAY).nullable().default(null),
+    includeSoftDeleted: z.boolean().default(false),
+    program: z.string().uuid().nullable().default(null),
+    // Better Auth user ids are text, not UUIDs, so this cannot be `.uuid()`.
+    proposer: z.string().max(255).nullable().default(null),
+    q: z.string().max(200).default(""),
+  })
+  .refine((v) => !(v.from && v.to) || v.from <= v.to, {
+    message: "from must not be after to",
+  });
 
 const projectIdSchema = z.object({ id: z.string().uuid() });
 

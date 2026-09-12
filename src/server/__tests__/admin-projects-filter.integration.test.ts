@@ -2,7 +2,9 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { programs, projects, user } from "#/db/schema";
+import { DEFAULT_ADMIN_STATUSES } from "#/lib/admin-project-filters";
 import { auth } from "#/lib/auth";
+import { PROJECT_STATUSES } from "#/lib/vocabularies";
 import {
   createProjectAs,
   performTransitionAs,
@@ -62,7 +64,10 @@ function filter(
   overrides: Partial<Parameters<typeof listAdminProjectsAs>[1]> = {}
 ): Parameters<typeof listAdminProjectsAs>[1] {
   return {
-    status: "all",
+    statuses: [...PROJECT_STATUSES],
+    dateField: "published",
+    from: null,
+    to: null,
     includeSoftDeleted: false,
     program: null,
     proposer: null,
@@ -124,7 +129,7 @@ describe("admin projects program filter", () => {
 
     const { rows } = await listAdminProjectsAs(
       admin,
-      filter({ status: "published", program: cs461 })
+      filter({ statuses: ["published"], program: cs461 })
     );
 
     expect(rows.map((r) => r.title)).toEqual(["Live"]);
@@ -251,7 +256,7 @@ describe("admin projects search", () => {
 
     const { rows } = await listAdminProjectsAs(
       admin,
-      filter({ q: "sensor", status: "submitted" })
+      filter({ q: "sensor", statuses: ["submitted"] })
     );
     expect(rows.map((r) => r.title)).toEqual(["Sensor Draft"]);
   });
@@ -294,7 +299,7 @@ describe("admin projects proposer filter", () => {
     // status filter narrows. This is the behaviour the dropdown depends on.
     const published = await listAdminProjectsAs(
       admin,
-      filter({ status: "published" })
+      filter({ statuses: ["published"] })
     );
     expect(published.proposers.map((p) => p.id)).toEqual([alice.id]);
   });
@@ -331,13 +336,10 @@ describe("admin project search reaches people, not just text", () => {
     const admin = await makeAdmin("staff@example.edu");
     const proposer = await makeAdmin("rivera@example.edu");
     await createProjectAs(proposer, baseProject("Trail Mapper", null));
-    const { rows } = await listAdminProjectsAs(admin, {
-      includeSoftDeleted: false,
-      program: null,
-      proposer: null,
-      q: "rivera@example.edu",
-      status: "all",
-    });
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ q: "rivera@example.edu" })
+    );
     expect(rows.map((r) => r.title)).toEqual(["Trail Mapper"]);
   });
 
@@ -347,13 +349,7 @@ describe("admin project search reaches people, not just text", () => {
       ...baseProject("Weather Station", null),
       contactName: "Priya Raman",
     });
-    const { rows } = await listAdminProjectsAs(admin, {
-      includeSoftDeleted: false,
-      program: null,
-      proposer: null,
-      q: "Priya",
-      status: "all",
-    });
+    const { rows } = await listAdminProjectsAs(admin, filter({ q: "Priya" }));
     expect(rows.map((r) => r.title)).toEqual(["Weather Station"]);
   });
 
@@ -362,13 +358,7 @@ describe("admin project search reaches people, not just text", () => {
     const proposer = await makeAdmin("leaving@example.edu");
     await createProjectAs(proposer, baseProject("Orphan Project", null));
     await db.delete(user).where(eq(user.id, proposer.id));
-    const { rows } = await listAdminProjectsAs(admin, {
-      includeSoftDeleted: false,
-      program: null,
-      proposer: null,
-      q: "",
-      status: "all",
-    });
+    const { rows } = await listAdminProjectsAs(admin, filter({ q: "" }));
     expect(rows.map((r) => r.title)).toContain("Orphan Project");
   });
 
@@ -378,13 +368,7 @@ describe("admin project search reaches people, not just text", () => {
       ...baseProject("Rich Row", null),
       contactEmail: "contact@example.edu",
     });
-    const { rows } = await listAdminProjectsAs(admin, {
-      includeSoftDeleted: false,
-      program: null,
-      proposer: null,
-      q: "",
-      status: "all",
-    });
+    const { rows } = await listAdminProjectsAs(admin, filter({ q: "" }));
     expect(rows[0].proposerEmail).toBe("staff@example.edu");
     expect(rows[0].contactEmail).toBe("contact@example.edu");
     expect(rows[0].teamsSupported).toBe(1);
@@ -402,13 +386,7 @@ describe("admin project search reaches people, not just text", () => {
       proposerEmail: "leaving2@example.edu",
     });
     await db.delete(user).where(eq(user.id, proposer.id));
-    const { rows } = await listAdminProjectsAs(admin, {
-      includeSoftDeleted: false,
-      program: null,
-      proposer: null,
-      q: "",
-      status: "all",
-    });
+    const { rows } = await listAdminProjectsAs(admin, filter({ q: "" }));
     const row = rows.find((r) => r.title === "Deleted Account Proposer");
     expect(row?.proposerId).toBeNull();
     expect(row?.proposerEmail).toBe("leaving2@example.edu");
@@ -424,15 +402,211 @@ describe("admin project search reaches people, not just text", () => {
       id: unlinked.id,
       proposerEmail: "unregistered@example.edu",
     });
-    const { rows } = await listAdminProjectsAs(admin, {
-      includeSoftDeleted: false,
-      program: null,
-      proposer: null,
-      q: "",
-      status: "all",
-    });
+    const { rows } = await listAdminProjectsAs(admin, filter({ q: "" }));
     const row = rows.find((r) => r.title === "Unlinked Proposal");
     expect(row?.proposerId).toBeNull();
     expect(row?.proposerEmail).toBe("unregistered@example.edu");
+  });
+});
+
+async function publish(admin: { id: string; role: string }, id: string) {
+  await performTransitionAs(admin, id, "submitted");
+  await performTransitionAs(admin, id, "approved");
+  await performTransitionAs(admin, id, "published");
+}
+
+/** Writes the three timestamps the range can narrow on, past the writers. */
+async function stamp(
+  id: string,
+  at: { createdAt?: Date; publishedAt?: Date | null; updatedAt?: Date }
+) {
+  await db.update(projects).set(at).where(eq(projects.id, id));
+}
+
+describe("admin projects status set", () => {
+  it("lists every status but archived by default, and archived alone on request", async () => {
+    const admin = await makeAdmin(`s-${Date.now()}@x.com`);
+    const draft = await createProjectAs(admin, baseProject("Draft", null));
+    const live = await createProjectAs(admin, baseProject("Live", null));
+    await publish(admin, live.id);
+    const old = await createProjectAs(admin, baseProject("Old", null));
+    await publish(admin, old.id);
+    await performTransitionAs(admin, old.id, "archived");
+
+    const byDefault = await listAdminProjectsAs(
+      admin,
+      filter({ statuses: [...DEFAULT_ADMIN_STATUSES] })
+    );
+    expect(byDefault.rows.map((r) => r.title).sort()).toEqual([
+      "Draft",
+      "Live",
+    ]);
+    expect(byDefault.rows.map((r) => r.id)).not.toContain(old.id);
+
+    const archivedOnly = await listAdminProjectsAs(
+      admin,
+      filter({ statuses: ["archived"] })
+    );
+    expect(archivedOnly.rows.map((r) => r.title)).toEqual(["Old"]);
+
+    const everything = await listAdminProjectsAs(
+      admin,
+      filter({ statuses: [...PROJECT_STATUSES] })
+    );
+    expect(everything.rows.map((r) => r.id).sort()).toEqual(
+      [draft.id, live.id, old.id].sort()
+    );
+  });
+
+  it("takes any explicit set", async () => {
+    const admin = await makeAdmin(`s2-${Date.now()}@x.com`);
+    await createProjectAs(admin, baseProject("Draft", null));
+    const live = await createProjectAs(admin, baseProject("Live", null));
+    await publish(admin, live.id);
+    const waiting = await createProjectAs(admin, baseProject("Waiting", null));
+    await performTransitionAs(admin, waiting.id, "submitted");
+
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ statuses: ["submitted", "published"] })
+    );
+    expect(rows.map((r) => r.title).sort()).toEqual(["Live", "Waiting"]);
+  });
+});
+
+describe("admin projects date range", () => {
+  // 10pm Pacific on June 30th is 05:00Z on July 1st: the row every naive
+  // UTC reading of "2026-06-30" puts in the wrong month.
+  const lateJune = new Date("2026-07-01T05:00:00.000Z");
+  const midJuly = new Date("2026-07-15T19:00:00.000Z");
+
+  it("narrows on the chosen timestamp, and only that one", async () => {
+    const admin = await makeAdmin(`d-${Date.now()}@x.com`);
+    const a = await createProjectAs(admin, baseProject("A", null));
+    const b = await createProjectAs(admin, baseProject("B", null));
+    await publish(admin, a.id);
+    await publish(admin, b.id);
+    // A: created in June, published in July, updated in June.
+    await stamp(a.id, {
+      createdAt: lateJune,
+      publishedAt: midJuly,
+      updatedAt: lateJune,
+    });
+    // B: created in July, published in June, updated in July.
+    await stamp(b.id, {
+      createdAt: midJuly,
+      publishedAt: lateJune,
+      updatedAt: midJuly,
+    });
+    const june = { from: "2026-06-01", to: "2026-06-30" };
+
+    const created = await listAdminProjectsAs(
+      admin,
+      filter({ ...june, dateField: "created" })
+    );
+    expect(created.rows.map((r) => r.title)).toEqual(["A"]);
+    const published = await listAdminProjectsAs(
+      admin,
+      filter({ ...june, dateField: "published" })
+    );
+    expect(published.rows.map((r) => r.title)).toEqual(["B"]);
+    const updated = await listAdminProjectsAs(
+      admin,
+      filter({ ...june, dateField: "updated" })
+    );
+    expect(updated.rows.map((r) => r.title)).toEqual(["A"]);
+  });
+
+  it("keeps the whole of the last day in Pacific time", async () => {
+    const admin = await makeAdmin(`d2-${Date.now()}@x.com`);
+    const late = await createProjectAs(admin, baseProject("Late", null));
+    await publish(admin, late.id);
+    await stamp(late.id, { publishedAt: lateJune });
+
+    const onThe30th = await listAdminProjectsAs(
+      admin,
+      filter({ from: "2026-06-30", to: "2026-06-30" })
+    );
+    expect(onThe30th.rows.map((r) => r.title)).toEqual(["Late"]);
+    const onThe1st = await listAdminProjectsAs(
+      admin,
+      filter({ from: "2026-07-01", to: "2026-07-01" })
+    );
+    expect(onThe1st.rows).toEqual([]);
+  });
+
+  it("leaves an open side open", async () => {
+    const admin = await makeAdmin(`d3-${Date.now()}@x.com`);
+    const late = await createProjectAs(admin, baseProject("Late", null));
+    await publish(admin, late.id);
+    await stamp(late.id, { publishedAt: lateJune });
+
+    const since = await listAdminProjectsAs(
+      admin,
+      filter({ from: "2026-06-30" })
+    );
+    expect(since.rows.map((r) => r.title)).toEqual(["Late"]);
+    const until = await listAdminProjectsAs(
+      admin,
+      filter({ to: "2026-06-29" })
+    );
+    expect(until.rows).toEqual([]);
+  });
+
+  it("excludes never-published rows on Published and keeps them on Created", async () => {
+    const admin = await makeAdmin(`d4-${Date.now()}@x.com`);
+    const draft = await createProjectAs(admin, baseProject("Draft", null));
+    await stamp(draft.id, { createdAt: midJuly, publishedAt: null });
+    const july = { from: "2026-07-01", to: "2026-07-31" };
+
+    const onPublished = await listAdminProjectsAs(
+      admin,
+      filter({ ...july, dateField: "published" })
+    );
+    expect(onPublished.rows).toEqual([]);
+    const onCreated = await listAdminProjectsAs(
+      admin,
+      filter({ ...july, dateField: "created" })
+    );
+    expect(onCreated.rows.map((r) => r.title)).toEqual(["Draft"]);
+  });
+
+  it("composes with the status set and the program, for the rows and the proposer dropdown", async () => {
+    const admin = await makeAdmin(`d5-${Date.now()}@x.com`);
+    const other = await makeProposer(`d5p-${Date.now()}@x.com`);
+    const cs461 = await makeProgram("CS 461");
+    const inRange = await createProjectAs(admin, baseProject("In", cs461));
+    await publish(admin, inRange.id);
+    await stamp(inRange.id, { publishedAt: midJuly });
+    const wrongStatus = await createProjectAs(
+      admin,
+      baseProject("Archived", cs461)
+    );
+    await publish(admin, wrongStatus.id);
+    await performTransitionAs(admin, wrongStatus.id, "archived");
+    await stamp(wrongStatus.id, { publishedAt: midJuly });
+    const wrongProgram = await createProjectAs(
+      other,
+      baseProject("Elsewhere", null)
+    );
+    await publish(admin, wrongProgram.id);
+    await stamp(wrongProgram.id, { publishedAt: midJuly });
+    const wrongMonth = await createProjectAs(other, baseProject("June", cs461));
+    await publish(admin, wrongMonth.id);
+    await stamp(wrongMonth.id, { publishedAt: lateJune });
+
+    const { proposers, rows } = await listAdminProjectsAs(
+      admin,
+      filter({
+        from: "2026-07-01",
+        program: cs461,
+        statuses: ["published"],
+        to: "2026-07-31",
+      })
+    );
+    expect(rows.map((r) => r.title)).toEqual(["In"]);
+    // The dropdown is scoped by the range too: the other proposer's projects
+    // are outside it, so their name is not offered.
+    expect(proposers.map((p) => p.id)).toEqual([admin.id]);
   });
 });

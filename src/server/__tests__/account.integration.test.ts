@@ -22,7 +22,7 @@ import {
   userInterests,
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
-import type { UserRole } from "#/lib/vocabularies";
+import { PROJECT_STATUSES, type UserRole } from "#/lib/vocabularies";
 import {
   CASCADE_TABLES,
   deleteAccountAs,
@@ -375,11 +375,14 @@ describe("deleteAccountAs", () => {
     // "attributes to Deleted user" is asserted there rather than on a join
     // the test wrote for itself.
     const listed = await listAdminProjectsAs(admin, {
+      dateField: "published",
+      from: null,
       includeSoftDeleted: false,
       program: null,
       proposer: null,
       q: "",
-      status: "all",
+      statuses: [...PROJECT_STATUSES],
+      to: null,
     });
     const mine = listed.rows.find((r) => r.id === id);
     expect(mine?.proposerName).toBe("Deleted user");

@@ -14,6 +14,7 @@ import {
   user,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
+import { dayRange, daysInclusive, shiftDay } from "#/lib/day-range";
 import { PROJECT_STATUSES_IN_DISPLAY_ORDER } from "#/lib/project-workflow";
 import { assertStaff, isAdmin, type Viewer } from "#/lib/viewer";
 import {
@@ -98,12 +99,6 @@ export interface AnalyticsView {
   program: { id: string; label: string } | null;
 }
 
-const DAY_MS = 86_400_000;
-
-function isoDay(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
 /**
  * The range as half-open instants, and the period of the same length that
  * ends the day before it. Previous period rather than same point last cycle:
@@ -111,21 +106,23 @@ function isoDay(d: Date): string {
  * does not add.
  */
 function periods(input: AnalyticsInput) {
-  const start = new Date(`${input.from}T00:00:00Z`);
-  const end = new Date(new Date(`${input.to}T00:00:00Z`).getTime() + DAY_MS);
-  const length = end.getTime() - start.getTime();
-  const previousStart = new Date(start.getTime() - length);
+  // Office days, the same reading `/admin/projects` gives a date (#335). The
+  // previous period is the same number of calendar days ending the day
+  // before `from`, counted on the calendar rather than in milliseconds so a
+  // range across a DST change still starts at midnight.
+  const current = dayRange(input.from, input.to);
+  const previousTo = shiftDay(input.from, -1);
+  const previousFrom = shiftDay(
+    previousTo,
+    1 - daysInclusive(input.from, input.to)
+  );
+  const previous = dayRange(previousFrom, previousTo);
   return {
-    start,
-    end,
-    previousStart,
-    previousEnd: start,
-    range: {
-      from: input.from,
-      to: input.to,
-      previousFrom: isoDay(previousStart),
-      previousTo: isoDay(new Date(start.getTime() - DAY_MS)),
-    },
+    start: current.start as Date,
+    end: current.end as Date,
+    previousStart: previous.start as Date,
+    previousEnd: previous.end as Date,
+    range: { from: input.from, to: input.to, previousFrom, previousTo },
   };
 }
 
