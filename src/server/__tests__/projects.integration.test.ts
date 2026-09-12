@@ -811,6 +811,101 @@ describe("review emails", () => {
     expect(send.mock.calls[0]?.[0]).toBe("outsider@example.com");
   });
 
+  it("refuses a staff return to draft without a comment, then emails the proposer with one", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const owner = await makeUser("owner-draft@x.edu", "user");
+    const admin = await makeUser("admin-draft@x.edu", "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await performTransitionAs(owner, id, "submitted", undefined, { send });
+    send.mockClear();
+    await expect(
+      performTransitionAs(admin, id, "draft", undefined, { send })
+    ).rejects.toThrow(/comment/);
+    expect(send).not.toHaveBeenCalled();
+
+    await performTransitionAs(admin, id, "draft", "Scope this to one term.", {
+      send,
+    });
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("owner-draft@x.edu");
+    expect(send.mock.calls[0]?.[1].subject).toBe("Returned to draft: P");
+    expect(send.mock.calls[0]?.[1].text).toContain("Scope this to one term.");
+  });
+
+  it("emails nobody when the owner withdraws their own submission to draft", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const owner = await makeUser("owner-withdraw@x.edu", "user");
+    const { id } = await createProjectAs(owner, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await performTransitionAs(owner, id, "submitted", undefined, { send });
+    send.mockClear();
+    await performTransitionAs(owner, id, "draft", undefined, { send });
+
+    expect(send).not.toHaveBeenCalled();
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.status).toBe("draft");
+  });
+
+  it("emails the proposer when staff hard-delete their draft, and nobody when the owner does", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const owner = await makeUser("owner-hd@x.edu", "user");
+    const admin = await makeUser("admin-hd@x.edu", "admin");
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    const staffDeleted = await createProjectAs(owner, baseProject());
+    await hardDeleteProjectAs(admin, staffDeleted.id, { send });
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("owner-hd@x.edu");
+    expect(send.mock.calls[0]?.[1].subject).toBe("Your draft was deleted: P");
+
+    send.mockClear();
+    const ownerDeleted = await createProjectAs(owner, baseProject());
+    await hardDeleteProjectAs(owner, ownerDeleted.id, { send });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("tells the new proposer in the bell and by email when staff reassign a project", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser("admin-reassign@x.edu", "admin");
+    const next = await makeUser("next-proposer@x.edu", "user");
+    const { id } = await createProjectAs(admin, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await updateProjectProposerAs(
+      admin,
+      { id, proposerEmail: "next-proposer@x.edu" },
+      { send }
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("next-proposer@x.edu");
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, next.id));
+    expect(rows.map((r) => r.type)).toEqual(["proposer_reassigned"]);
+    expect(rows[0]?.link).toBe(`/projects/${id}`);
+
+    // An address with no account gets the email and cannot get a row.
+    send.mockClear();
+    await updateProjectProposerAs(
+      admin,
+      { id, proposerEmail: "outsider-reassign@example.com" },
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("outsider-reassign@example.com");
+
+    // Unlinking tells nobody.
+    send.mockClear();
+    await updateProjectProposerAs(admin, { id, proposerEmail: "" }, { send });
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("does not roll back the transition when the email fails", async () => {
     process.env.BETTER_AUTH_URL = "https://app";
     const owner = await makeUser("owner-fail@x.edu", "user");

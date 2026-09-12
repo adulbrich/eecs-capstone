@@ -347,6 +347,25 @@ describe("StaffProjectPanel review-email control", () => {
     expect(checkbox.hasAttribute("disabled")).toBe(false);
   });
 
+  it("shows the checkbox for the Draft dialog and holds Confirm until a comment is typed", async () => {
+    // Returning a submission to draft emails the proposer like changes
+    // requested does, so the staff skip applies and the comment is required.
+    renderPanel("submitted");
+    fireEvent.click(screen.getByTitle(/^Move to Draft\./));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("Email the proposer (proposer@example.com)")
+      ).toBeTruthy()
+    );
+    const confirm = screen.getByRole("button", { name: "Confirm" });
+    expect(confirm.hasAttribute("disabled")).toBe(true);
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "Scope this to one term." },
+    });
+    expect(confirm.hasAttribute("disabled")).toBe(false);
+  });
+
   it("shows no checkbox at all for the Published dialog", async () => {
     renderPanel("approved");
     fireEvent.click(screen.getByTitle(/^Move to Published\./));

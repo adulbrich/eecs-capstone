@@ -5,6 +5,7 @@ import {
   commentNotifications,
   type NotifiableComment,
   type NotifiableProject,
+  proposerReassignedNotification,
   softDeleteNotification,
   statusChangeNotification,
 } from "#/lib/project-notifications";
@@ -32,6 +33,17 @@ export async function recordSoftDeleteNotification(
   actorId: string
 ): Promise<void> {
   const row = softDeleteNotification(project, action, actorId);
+  if (row) {
+    await tx.insert(notifications).values(row);
+  }
+}
+
+export async function recordProposerReassignedNotification(
+  tx: Tx,
+  project: NotifiableProject,
+  actorId: string
+): Promise<void> {
+  const row = proposerReassignedNotification(project, actorId);
   if (row) {
     await tx.insert(notifications).values(row);
   }

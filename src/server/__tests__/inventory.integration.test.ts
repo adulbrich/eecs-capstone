@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { db } from "#/db";
 import {
@@ -3749,5 +3749,154 @@ describe("listInventoryItemEditLogAs", () => {
 
     const { rows } = await listInventoryItemEditLogAs(admin, { itemId: b.id });
     expect(rows).toEqual([]);
+  });
+});
+
+describe("inventory emails", () => {
+  const ORIGINAL_ENV = { ...process.env };
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  it("emails the requester on approval and on denial, and nobody on a return", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser(`a-mail-${Date.now()}@x.com`, "admin");
+    const studentEmail = `s-mail-${Date.now()}@x.com`;
+    const student = await makeUser(studentEmail, "user");
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    const approvedItem = await makeItem();
+    const { line: approvedLine } = await makeRequestLine(
+      student.id,
+      approvedItem.id
+    );
+    await approveRequestItemAs(
+      admin,
+      { requestItemId: approvedLine.id, pickupBy: null },
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe(studentEmail);
+    expect(send.mock.calls[0]?.[1].subject).toContain("Reserved:");
+    expect(send.mock.calls[0]?.[1].text).toContain(
+      "https://app/my/items?filter=open"
+    );
+
+    send.mockClear();
+    const deniedItem = await makeItem();
+    const { line: deniedLine } = await makeRequestLine(
+      student.id,
+      deniedItem.id
+    );
+    // A denial is a release, so the item has to hold the line first, the way
+    // submitCartAs leaves it.
+    await transitionItem(student, {
+      itemId: deniedItem.id,
+      nextStatus: "requested",
+      requestItemId: deniedLine.id,
+      holderId: student.id,
+      authority: "self_request",
+    });
+    await rejectRequestItemAs(
+      admin,
+      { requestItemId: deniedLine.id, reviewComment: "Out of scope" },
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe(studentEmail);
+    expect(send.mock.calls[0]?.[1].subject).toContain("Request denied:");
+
+    send.mockClear();
+    await transitionItem(
+      admin,
+      {
+        itemId: approvedItem.id,
+        nextStatus: "checked_out",
+        holderId: student.id,
+        dueAt: new Date(Date.now() + 14 * 86_400_000),
+      },
+      undefined,
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[1].subject).toContain("Checked out:");
+
+    send.mockClear();
+    await transitionItem(
+      admin,
+      { itemId: approvedItem.id, nextStatus: "available" },
+      undefined,
+      { send }
+    );
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("emails once per line when a batch is approved", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser(`a-batch-mail-${Date.now()}@x.com`, "admin");
+    const studentEmail = `s-batch-mail-${Date.now()}@x.com`;
+    const student = await makeUser(studentEmail, "user");
+    const first = await makeItem();
+    const second = await makeItem();
+    const { line: firstLine } = await makeRequestLine(student.id, first.id);
+    const { line: secondLine } = await makeRequestLine(student.id, second.id);
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await approveRequestLinesAs(
+      admin,
+      { requestItemIds: [firstLine.id, secondLine.id], pickupBy: null },
+      { send }
+    );
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls.map((c) => c[0])).toEqual([
+      studentEmail,
+      studentEmail,
+    ]);
+  });
+
+  it("emails a walk-in holder at the address, though no bell row can exist", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser(`a-walkin-${Date.now()}@x.com`, "admin");
+    const item = await makeItem();
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await transitionItem(
+      admin,
+      {
+        itemId: item.id,
+        nextStatus: "reserved",
+        holderEmail: "walkin@example.com",
+        holderName: "Walk In",
+        pickupBy: new Date(Date.now() + 7 * 86_400_000),
+      },
+      undefined,
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("walkin@example.com");
+    expect(send.mock.calls[0]?.[1].subject).toContain("Pick up by");
+
+    send.mockClear();
+    await transitionItem(
+      admin,
+      {
+        itemId: item.id,
+        nextStatus: "checked_out",
+        holderEmail: "walkin@example.com",
+        holderName: "Walk In",
+        dueAt: new Date("2026-10-01T00:00:00Z"),
+      },
+      undefined,
+      { send }
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("walkin@example.com");
+    expect(send.mock.calls[0]?.[1].subject).toMatch(/Due (Sep 30|Oct 1), 2026/);
+    const rows = await db.select().from(notifications);
+    expect(rows.some((r) => r.type === "inventory_item_checked_out")).toBe(
+      false
+    );
   });
 });

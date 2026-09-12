@@ -13,7 +13,13 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("#/db", () => ({ db: {} }));
 
 import type { NotificationConfig } from "#/lib/email/config";
-import { notifyTransitionByEmail } from "../project-emails";
+import {
+  notifyCommentByEmail,
+  notifyHardDeleteByEmail,
+  notifyMentorNamedByEmail,
+  notifyProposerReassignedByEmail,
+  notifyTransitionByEmail,
+} from "../project-emails";
 
 // Config is passed as a literal now rather than poked into process.env, which
 // is the point of the seam: no mutation, no afterEach restore, and no way for
@@ -23,6 +29,10 @@ const CONFIG: NotificationConfig = {
   staffInbox: "review@oregonstate.edu",
 };
 const NO_INBOX: NotificationConfig = { ...CONFIG, staffInbox: null };
+
+// Nobody in these cases is the proposer, so the actor is always staff unless a
+// test says otherwise; the owner-withdrawal case below passes the proposer.
+const STAFF = "u-staff";
 
 const PROJECT = {
   description: "A robot arm.",
@@ -37,10 +47,13 @@ describe("notifyTransitionByEmail", () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
     await notifyTransitionByEmail(
-      PROJECT,
-      "submitted",
-      null,
-      true,
+      {
+        actorId: STAFF,
+        comment: null,
+        project: PROJECT,
+        sendEmail: true,
+        target: "submitted",
+      },
       send,
       CONFIG
     );
@@ -56,18 +69,24 @@ describe("notifyTransitionByEmail", () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
     await notifyTransitionByEmail(
-      PROJECT,
-      "approved",
-      null,
-      true,
+      {
+        actorId: STAFF,
+        comment: null,
+        project: PROJECT,
+        sendEmail: true,
+        target: "approved",
+      },
       send,
       CONFIG
     );
     await notifyTransitionByEmail(
-      PROJECT,
-      "changes_requested",
-      "Add objectives.",
-      true,
+      {
+        actorId: STAFF,
+        comment: "Add objectives.",
+        project: PROJECT,
+        sendEmail: true,
+        target: "changes_requested",
+      },
       send,
       CONFIG
     );
@@ -80,8 +99,18 @@ describe("notifyTransitionByEmail", () => {
   it("sends nothing for statuses that are not part of review", async () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
-    for (const target of ["draft", "published", "archived"] as const) {
-      await notifyTransitionByEmail(PROJECT, target, null, true, send, CONFIG);
+    for (const target of ["published", "archived"] as const) {
+      await notifyTransitionByEmail(
+        {
+          actorId: STAFF,
+          comment: null,
+          project: PROJECT,
+          sendEmail: true,
+          target,
+        },
+        send,
+        CONFIG
+      );
     }
 
     expect(send).not.toHaveBeenCalled();
@@ -91,10 +120,13 @@ describe("notifyTransitionByEmail", () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
     await notifyTransitionByEmail(
-      PROJECT,
-      "approved",
-      null,
-      false,
+      {
+        actorId: STAFF,
+        comment: null,
+        project: PROJECT,
+        sendEmail: false,
+        target: "approved",
+      },
       send,
       CONFIG
     );
@@ -107,10 +139,13 @@ describe("notifyTransitionByEmail", () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
     await notifyTransitionByEmail(
-      PROJECT,
-      "submitted",
-      null,
-      true,
+      {
+        actorId: STAFF,
+        comment: null,
+        project: PROJECT,
+        sendEmail: true,
+        target: "submitted",
+      },
       send,
       NO_INBOX
     );
@@ -123,10 +158,13 @@ describe("notifyTransitionByEmail", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     await notifyTransitionByEmail(
-      PROJECT,
-      "submitted",
-      null,
-      true,
+      {
+        actorId: STAFF,
+        comment: null,
+        project: PROJECT,
+        sendEmail: true,
+        target: "submitted",
+      },
       vi.fn().mockResolvedValue(undefined),
       NO_INBOX
     );
@@ -153,10 +191,20 @@ describe("notifyTransitionByEmail", () => {
     // this after the transition is committed, so an escaping error would undo
     // nothing but would surface as a failed request on a succeeded approval.
     await expect(
-      notifyTransitionByEmail(PROJECT, "submitted", null, true, send, {
-        ...CONFIG,
-        appBaseUrl: null,
-      })
+      notifyTransitionByEmail(
+        {
+          actorId: STAFF,
+          comment: null,
+          project: PROJECT,
+          sendEmail: true,
+          target: "submitted",
+        },
+        send,
+        {
+          ...CONFIG,
+          appBaseUrl: null,
+        }
+      )
     ).resolves.toBeUndefined();
 
     expect(send).not.toHaveBeenCalled();
@@ -193,10 +241,13 @@ describe("notifyTransitionByEmail", () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
     await notifyTransitionByEmail(
-      { ...PROJECT, proposerEmail: null, proposerId: null },
-      "approved",
-      null,
-      true,
+      {
+        actorId: STAFF,
+        comment: null,
+        project: { ...PROJECT, proposerEmail: null, proposerId: null },
+        sendEmail: true,
+        target: "approved",
+      },
       send,
       CONFIG
     );
@@ -208,7 +259,245 @@ describe("notifyTransitionByEmail", () => {
     const send = vi.fn().mockRejectedValue(new Error("SES is down"));
 
     await expect(
-      notifyTransitionByEmail(PROJECT, "approved", null, true, send, CONFIG)
+      notifyTransitionByEmail(
+        {
+          actorId: STAFF,
+          comment: null,
+          project: PROJECT,
+          sendEmail: true,
+          target: "approved",
+        },
+        send,
+        CONFIG
+      )
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("notifyTransitionByEmail, returned to draft", () => {
+  it("emails the proposer with the staff comment when staff return it", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyTransitionByEmail(
+      {
+        actorId: STAFF,
+        comment: "Scope this to one term.",
+        project: PROJECT,
+        sendEmail: true,
+        target: "draft",
+      },
+      send,
+      CONFIG
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    const [to, email] = send.mock.calls[0] ?? [];
+    expect(to).toBe("alex@oregonstate.edu");
+    expect(email.subject).toBe("Returned to draft: Robot arm");
+    expect(email.text).toContain("Scope this to one term.");
+    expect(email.text).toContain("https://app/projects/p1");
+  });
+
+  it("emails nobody when the proposer withdraws their own submission", async () => {
+    // The same silence rule as the in-app row: the only person to tell is the
+    // one who clicked. Owner withdrawal is submitted -> draft by the owner.
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyTransitionByEmail(
+      {
+        actorId: "u-proposer",
+        comment: null,
+        project: { ...PROJECT, proposerId: "u-proposer" },
+        sendEmail: true,
+        target: "draft",
+      },
+      send,
+      CONFIG
+    );
+
+    expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("notifyCommentByEmail", () => {
+  const comment = {
+    authorId: STAFF,
+    content: "Please add a timeline.",
+    id: "c1",
+    isInternal: false as boolean | null,
+  };
+
+  it("emails nobody when the author is the proposer, staff or not", async () => {
+    // Staff can propose their own projects, and then their comment is the
+    // proposer's: the actor is never told, and staff are not told about a
+    // note one of them left on their own project.
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyCommentByEmail(
+      {
+        authorIsStaff: true,
+        comment: { ...comment, authorId: "u-staff-owner" },
+        project: { ...PROJECT, proposerId: "u-staff-owner" },
+      },
+      send,
+      CONFIG
+    );
+
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("emails the proposer when staff comment, linking to the comment", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyCommentByEmail(
+      { authorIsStaff: true, comment, project: PROJECT },
+      send,
+      CONFIG
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    const [to, email] = send.mock.calls[0] ?? [];
+    expect(to).toBe("alex@oregonstate.edu");
+    expect(email.subject).toBe("New comment on your project: Robot arm");
+    expect(email.text).toContain("Please add a timeline.");
+    expect(email.text).toContain("https://app/projects/p1#comment-c1");
+  });
+
+  it("emails the staff inbox when the proposer comments, and not the proposer", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyCommentByEmail(
+      { authorIsStaff: false, comment, project: PROJECT },
+      send,
+      CONFIG
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    const [to, email] = send.mock.calls[0] ?? [];
+    expect(to).toBe("review@oregonstate.edu");
+    expect(email.subject).toBe("Comment from the proposer: Robot arm");
+    expect(email.text).toContain("alex@oregonstate.edu");
+    expect(email.text).toContain("https://app/projects/p1#comment-c1");
+  });
+
+  it("emails nobody about an internal comment", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyCommentByEmail(
+      {
+        authorIsStaff: true,
+        comment: { ...comment, isInternal: true },
+        project: PROJECT,
+      },
+      send,
+      CONFIG
+    );
+
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("warns instead of throwing when the staff inbox is unset", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      notifyCommentByEmail(
+        { authorIsStaff: false, comment, project: PROJECT },
+        send,
+        NO_INBOX
+      )
+    ).resolves.toBeUndefined();
+
+    expect(send).not.toHaveBeenCalled();
+    expect(String(warn.mock.calls[0]?.[0])).toContain("EMAIL_STAFF_INBOX");
+    warn.mockRestore();
+  });
+});
+
+describe("notifyHardDeleteByEmail", () => {
+  it("emails the proposer when staff delete their draft, with no link", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyHardDeleteByEmail({ actorId: STAFF, project: PROJECT }, send);
+
+    expect(send).toHaveBeenCalledOnce();
+    const [to, email] = send.mock.calls[0] ?? [];
+    expect(to).toBe("alex@oregonstate.edu");
+    expect(email.subject).toBe("Your draft was deleted: Robot arm");
+    // The row is gone, so there is nothing to link to.
+    expect(email.text).not.toContain("https://app/projects/p1");
+  });
+
+  it("emails nobody when the owner deletes their own draft", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyHardDeleteByEmail(
+      {
+        actorId: "u-proposer",
+        project: { ...PROJECT, proposerId: "u-proposer" },
+      },
+      send
+    );
+
+    expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("notifyProposerReassignedByEmail", () => {
+  it("emails the new proposer with a link to the project", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyProposerReassignedByEmail(
+      { actorId: STAFF, project: PROJECT },
+      send,
+      CONFIG
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    const [to, email] = send.mock.calls[0] ?? [];
+    expect(to).toBe("alex@oregonstate.edu");
+    expect(email.subject).toBe("A project was assigned to you: Robot arm");
+    expect(email.text).toContain("https://app/projects/p1");
+  });
+
+  it("emails nobody when staff assign a project to themselves, or unlink it", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyProposerReassignedByEmail(
+      { actorId: "u-self", project: { ...PROJECT, proposerId: "u-self" } },
+      send,
+      CONFIG
+    );
+    await notifyProposerReassignedByEmail(
+      {
+        actorId: STAFF,
+        project: { ...PROJECT, proposerEmail: null, proposerId: null },
+      },
+      send,
+      CONFIG
+    );
+
+    expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("notifyMentorNamedByEmail", () => {
+  it("emails the named address with a link to the project", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyMentorNamedByEmail(
+      {
+        mentorEmail: "mentor@example.edu",
+        project: { id: "p1", title: "Robot arm" },
+      },
+      send,
+      CONFIG
+    );
+
+    expect(send).toHaveBeenCalledOnce();
+    const [to, email] = send.mock.calls[0] ?? [];
+    expect(to).toBe("mentor@example.edu");
+    expect(email.subject).toBe("You were named as a mentor: Robot arm");
+    expect(email.text).toContain("https://app/projects/p1");
   });
 });

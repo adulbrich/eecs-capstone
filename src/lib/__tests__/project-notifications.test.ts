@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   commentNotifications,
+  projectsClaimedNotification,
+  proposerReassignedNotification,
   softDeleteNotification,
   statusChangeNotification,
 } from "../project-notifications";
@@ -174,5 +176,40 @@ describe("commentNotifications", () => {
       null
     );
     expect(rows[0].message).toHaveLength(200);
+  });
+});
+
+describe("proposerReassignedNotification", () => {
+  it("tells the new proposer and links to the project", () => {
+    const row = proposerReassignedNotification(project, "u-staff");
+    expect(row?.userId).toBe("u-proposer");
+    expect(row?.type).toBe("proposer_reassigned");
+    expect(row?.link).toBe("/projects/p-1");
+  });
+
+  it("says nothing on an unlink, or when staff assign it to themselves", () => {
+    expect(
+      proposerReassignedNotification(
+        { ...project, proposerId: null },
+        "u-staff"
+      )
+    ).toBeNull();
+    expect(proposerReassignedNotification(project, "u-proposer")).toBeNull();
+  });
+});
+
+describe("projectsClaimedNotification", () => {
+  it("counts the projects and links to the user's list", () => {
+    const row = projectsClaimedNotification("u-new", 2);
+    expect(row.userId).toBe("u-new");
+    expect(row.type).toBe("projects_claimed");
+    expect(row.title).toBe("2 projects were linked to your account");
+    expect(row.link).toBe("/my/projects");
+  });
+
+  it("uses the singular for one", () => {
+    expect(projectsClaimedNotification("u-new", 1).title).toBe(
+      "1 project was linked to your account"
+    );
   });
 });

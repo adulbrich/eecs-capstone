@@ -5,23 +5,31 @@ import {
   buildNotificationConfig,
   type NotificationConfig,
 } from "#/lib/email/config";
-import { getEmailSender } from "#/lib/email/sender";
 import {
+  mentorNamedEmail,
   projectApprovedEmail,
   projectChangesRequestedEmail,
+  projectCommentEmail,
+  projectDeletedEmail,
+  projectReassignedEmail,
+  projectReturnedToDraftEmail,
   projectSubmittedEmail,
+  proposerCommentEmail,
   type RenderedEmail,
 } from "#/lib/email/templates";
 import type { ProjectStatus } from "#/lib/vocabularies";
+import { emailDispatch, type SendEmailFn } from "./email-dispatch";
 
-export type SendEmailFn = (to: string, email: RenderedEmail) => Promise<void>;
-
-export interface TransitionEmailProject {
-  description: string | null;
+/** The parts of a project every proposer-facing email reads. */
+export interface EmailProject {
   id: string;
   proposerEmail: string | null;
   proposerId: string | null;
   title: string;
+}
+
+export interface TransitionEmailProject extends EmailProject {
+  description: string | null;
 }
 
 async function lookupProposer(
@@ -56,6 +64,17 @@ export function resolveProposerAddress(
   return accountEmail ?? storedEmail;
 }
 
+/**
+ * Says so rather than returning silently: an unset staff inbox under the
+ * console transport means staff are never told, and nothing else in the app
+ * surfaces that. Under `ses` the app refuses to boot without one.
+ */
+function warnNoStaffInbox(what: string, projectId: string): void {
+  console.warn(
+    `EMAIL_STAFF_INBOX is unset, so no ${what} was sent for project ${projectId}`
+  );
+}
+
 async function sendSubmitted(
   project: TransitionEmailProject,
   url: string,
@@ -63,12 +82,7 @@ async function sendSubmitted(
   inbox: string | null
 ): Promise<void> {
   if (!inbox) {
-    // Say so rather than returning silently. An unset staff inbox means staff
-    // are never told a project was submitted, and nothing else in the app
-    // surfaces that: the transition succeeds and the queue fills up unwatched.
-    console.warn(
-      `EMAIL_STAFF_INBOX is unset, so no submission notice was sent for project ${project.id}`
-    );
+    warnNoStaffInbox("submission notice", project.id);
     return;
   }
   const account = await lookupProposer(project.proposerId);
@@ -87,9 +101,33 @@ async function sendSubmitted(
   );
 }
 
+function proposerEmailFor(
+  target: "approved" | "changes_requested" | "draft",
+  comment: string | null,
+  title: string,
+  url: string
+): RenderedEmail {
+  switch (target) {
+    case "approved":
+      return projectApprovedEmail({ comment, title, url });
+    case "changes_requested":
+      return projectChangesRequestedEmail({
+        comment: comment ?? "",
+        title,
+        url,
+      });
+    case "draft":
+      return projectReturnedToDraftEmail({ comment, title, url });
+    default: {
+      const unhandled: never = target;
+      throw new Error(`No proposer email for ${String(unhandled)}`);
+    }
+  }
+}
+
 async function sendToProposer(
   project: TransitionEmailProject,
-  target: "approved" | "changes_requested",
+  target: "approved" | "changes_requested" | "draft",
   comment: string | null,
   url: string,
   send: SendEmailFn
@@ -99,15 +137,17 @@ async function sendToProposer(
   if (!to) {
     return;
   }
-  const email =
-    target === "approved"
-      ? projectApprovedEmail({ comment, title: project.title, url })
-      : projectChangesRequestedEmail({
-          comment: comment ?? "",
-          title: project.title,
-          url,
-        });
-  await send(to, email);
+  await send(to, proposerEmailFor(target, comment, project.title, url));
+}
+
+export interface TransitionEmailInput {
+  /** Who moved the project. A proposer moving their own project is told nothing. */
+  actorId: string;
+  comment: string | null;
+  project: TransitionEmailProject;
+  /** The staff per-action skip. Already forced true for non-staff callers. */
+  sendEmail: boolean;
+  target: ProjectStatus;
 }
 
 /**
@@ -118,13 +158,11 @@ async function sendToProposer(
  * shape of `refreshProjectEmbedding`.
  */
 export async function notifyTransitionByEmail(
-  project: TransitionEmailProject,
-  target: ProjectStatus,
-  comment: string | null,
-  sendEmail: boolean,
+  input: TransitionEmailInput,
   send?: SendEmailFn,
   config: NotificationConfig = buildNotificationConfig()
 ): Promise<void> {
+  const { actorId, comment, project, sendEmail, target } = input;
   if (!sendEmail) {
     return;
   }
@@ -144,8 +182,7 @@ export async function notifyTransitionByEmail(
         "BETTER_AUTH_URL is not set, so no transition email could be addressed"
       );
     }
-    const dispatch: SendEmailFn =
-      send ?? ((to, email) => getEmailSender().send(to, email));
+    const dispatch = emailDispatch(send);
     const url = `${config.appBaseUrl}/projects/${project.id}`;
 
     if (target === "submitted") {
@@ -154,8 +191,222 @@ export async function notifyTransitionByEmail(
     }
     if (target === "approved" || target === "changes_requested") {
       await sendToProposer(project, target, comment, url, dispatch);
+      return;
+    }
+    // Returned to draft. The owner reaches the same target by withdrawing
+    // their own submission, and the only person to tell is then the one who
+    // clicked: the same silence rule `proposerToTell` applies to the in-app
+    // row. Approve and changes-requested skip the check because an owner
+    // cannot reach either.
+    if (target === "draft" && project.proposerId !== actorId) {
+      await sendToProposer(project, "draft", comment, url, dispatch);
     }
   } catch (error) {
     console.error(`Review email failed for project ${project.id}`, error);
+  }
+}
+
+export interface CommentEmailInput {
+  /** Staff comments reach the proposer; the proposer's own reach staff. */
+  authorIsStaff: boolean;
+  comment: {
+    authorId: string;
+    content: string;
+    id: string;
+    isInternal: boolean | null;
+  };
+  project: EmailProject;
+}
+
+/**
+ * Sends the email a committed comment owes. Never throws, for the reason
+ * `notifyTransitionByEmail` gives.
+ *
+ * Only staff and the proposer may comment (`addCommentAs`), so "not staff" is
+ * the proposer, and the two directions are the whole rule: staff to proposer,
+ * proposer to the staff inbox. An internal comment is staff talking among
+ * themselves and reaches no inbox, the same as it reaches no bell. Staff can
+ * be the proposer of their own project (#322), and then their comment is the
+ * proposer's: nobody is emailed their own words, and the staff inbox is not
+ * told about a note a staff member left themselves.
+ */
+export async function notifyCommentByEmail(
+  input: CommentEmailInput,
+  send?: SendEmailFn,
+  config: NotificationConfig = buildNotificationConfig()
+): Promise<void> {
+  const { authorIsStaff, comment, project } = input;
+  if (comment.isInternal) {
+    return;
+  }
+  try {
+    if (!config.appBaseUrl) {
+      throw new Error(
+        "BETTER_AUTH_URL is not set, so no comment email could be addressed"
+      );
+    }
+    const dispatch = emailDispatch(send);
+    const url = `${config.appBaseUrl}/projects/${project.id}#comment-${comment.id}`;
+    const account = await lookupProposer(project.proposerId);
+    const proposerAddress = resolveProposerAddress(
+      project.proposerEmail,
+      account.email
+    );
+
+    if (authorIsStaff) {
+      // A staff proposer commenting on their own project: nobody is emailed
+      // their own words, and the staff inbox is not told about a note one of
+      // them left themselves.
+      if (!proposerAddress || comment.authorId === project.proposerId) {
+        return;
+      }
+      await dispatch(
+        proposerAddress,
+        projectCommentEmail({
+          content: comment.content,
+          title: project.title,
+          url,
+        })
+      );
+      return;
+    }
+    if (!config.staffInbox) {
+      warnNoStaffInbox("proposer comment notice", project.id);
+      return;
+    }
+    await dispatch(
+      config.staffInbox,
+      proposerCommentEmail({
+        content: comment.content,
+        proposerEmail: proposerAddress,
+        proposerName: account.name,
+        title: project.title,
+        url,
+      })
+    );
+  } catch (error) {
+    console.error(`Comment email failed for project ${project.id}`, error);
+  }
+}
+
+export interface HardDeleteEmailInput {
+  actorId: string;
+  project: EmailProject;
+}
+
+/**
+ * Sends the one email a hard delete owes. Never throws.
+ *
+ * Hard delete is drafts only, by the owner or by staff. The owner deleting
+ * their own draft is told nothing (the silence rule); staff deleting somebody
+ * else's is the case that needs an email, because the row is gone and no
+ * in-app link can point at it any more. No base URL is needed for the same
+ * reason.
+ */
+export async function notifyHardDeleteByEmail(
+  input: HardDeleteEmailInput,
+  send?: SendEmailFn
+): Promise<void> {
+  const { actorId, project } = input;
+  if (project.proposerId === actorId) {
+    return;
+  }
+  try {
+    const dispatch = emailDispatch(send);
+    const account = await lookupProposer(project.proposerId);
+    const address = resolveProposerAddress(
+      project.proposerEmail,
+      account.email
+    );
+    if (!address) {
+      return;
+    }
+    await dispatch(address, projectDeletedEmail({ title: project.title }));
+  } catch (error) {
+    console.error(`Delete email failed for project ${project.id}`, error);
+  }
+}
+
+export interface ReassignEmailInput {
+  actorId: string;
+  /** The project as it stands after the write: the new proposer's fields. */
+  project: EmailProject;
+}
+
+/**
+ * Sends the email a reassignment owes the new proposer. Never throws.
+ *
+ * Unlinking (no address) tells nobody, and so does staff assigning a project
+ * to themselves. An address with no account is exactly who this exists for:
+ * the in-app row needs an account, the email does not.
+ */
+export async function notifyProposerReassignedByEmail(
+  input: ReassignEmailInput,
+  send?: SendEmailFn,
+  config: NotificationConfig = buildNotificationConfig()
+): Promise<void> {
+  const { actorId, project } = input;
+  if (project.proposerId === actorId) {
+    return;
+  }
+  try {
+    if (!config.appBaseUrl) {
+      throw new Error(
+        "BETTER_AUTH_URL is not set, so no reassignment email could be addressed"
+      );
+    }
+    const dispatch = emailDispatch(send);
+    const account = await lookupProposer(project.proposerId);
+    const address = resolveProposerAddress(
+      project.proposerEmail,
+      account.email
+    );
+    if (!address) {
+      return;
+    }
+    await dispatch(
+      address,
+      projectReassignedEmail({
+        title: project.title,
+        url: `${config.appBaseUrl}/projects/${project.id}`,
+      })
+    );
+  } catch (error) {
+    console.error(`Reassignment email failed for project ${project.id}`, error);
+  }
+}
+
+export interface MentorEmailInput {
+  mentorEmail: string;
+  project: { id: string; title: string };
+}
+
+/**
+ * Sends the email a newly named mentor is owed. Never throws. The caller
+ * decides "newly": only a change to the address itself, to a non-null value,
+ * reaches here, so toggling the flags beside it mails nobody twice.
+ */
+export async function notifyMentorNamedByEmail(
+  input: MentorEmailInput,
+  send?: SendEmailFn,
+  config: NotificationConfig = buildNotificationConfig()
+): Promise<void> {
+  const { mentorEmail, project } = input;
+  try {
+    if (!config.appBaseUrl) {
+      throw new Error(
+        "BETTER_AUTH_URL is not set, so no mentor email could be addressed"
+      );
+    }
+    const dispatch = emailDispatch(send);
+    await dispatch(
+      mentorEmail,
+      mentorNamedEmail({
+        title: project.title,
+        url: `${config.appBaseUrl}/projects/${project.id}`,
+      })
+    );
+  } catch (error) {
+    console.error(`Mentor email failed for project ${project.id}`, error);
   }
 }

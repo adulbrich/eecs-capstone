@@ -187,8 +187,9 @@ _Avoid_: suggestion, match, personalization
 
 **Staff inbox**:
 The one staff mailbox every email addressed to staff goes to, set by
-`EMAIL_STAFF_INBOX`. Today it receives one email per submission; every other staff
-signal is an in-app count.
+`EMAIL_STAFF_INBOX`: a project submitted or resubmitted, a borrow list or custom
+request submitted, and a comment from a proposer. Never fanned out per staff member
+(ADR-0019). Every other staff signal is an in-app count.
 _Avoid_: review inbox (its old name), admin email, notifications address
 
 **Proposer email**:
@@ -234,9 +235,10 @@ _Avoid_: history (that is status history), changelog, audit trail
 
 **Notification**:
 An in-app message to one user, rendered by the bell. Projects notify the proposer of
-transitions, deletions and comments; inventory notifies requesters and holders.
-Never an email; the few emails the app sends are a separate, fixed set the README
-lists.
+transitions, deletions, comments and reassignment; inventory notifies requesters and
+holders. Some events also go by email, to the same person or to the staff inbox; the
+table in PRD section 13 says which, and every email is mandatory for its recipient
+(ADR-0019). An email is not a notification: the word here means the bell row.
 _Avoid_: alert, push, email (for an in-app row), message
 
 ## Inventory

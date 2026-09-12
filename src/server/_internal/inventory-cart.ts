@@ -9,6 +9,8 @@ import {
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { Viewer } from "#/lib/viewer";
+import type { EmailOptions } from "./email-dispatch";
+import { notifyRequestSubmittedByEmail } from "./inventory-emails";
 
 export async function getCartAs(viewer: Viewer) {
   if (!viewer) {
@@ -70,13 +72,14 @@ export async function removeFromCartAs(
 
 export async function submitCartAs(
   viewer: Viewer,
-  data: { note: string | null }
+  data: { note: string | null },
+  opts?: EmailOptions
 ) {
   if (!viewer) {
     throw new Error("Sign in required");
   }
 
-  return await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     const cartRows = await tx
       .select({
         itemId: inventoryCartItems.itemId,
@@ -95,7 +98,7 @@ export async function submitCartAs(
     // below would otherwise silently overwrite that other party's hold.
     // Mirrors the overwrite guard in transitionItem.
     const skipped: { itemId: string; reason: "no_longer_available" }[] = [];
-    const survivors: { itemId: string }[] = [];
+    const survivors: { itemId: string; name: string }[] = [];
     for (const row of cartRows) {
       const [locked] = await tx
         .select()
@@ -106,10 +109,10 @@ export async function submitCartAs(
         skipped.push({ itemId: row.itemId, reason: "no_longer_available" });
         continue;
       }
-      // Only the id survives. The previous status was carried for the inline
-      // history insert that used to live below; transitionItem reads it from
-      // the row it locks itself.
-      survivors.push({ itemId: row.itemId });
+      // The id and the name survive: the name is for the staff notice below.
+      // The previous status was carried for the inline history insert that
+      // used to live here; transitionItem reads it from the row it locks.
+      survivors.push({ itemId: row.itemId, name: locked.name });
     }
 
     // Cart is always cleared once we have processed it.
@@ -118,7 +121,7 @@ export async function submitCartAs(
       .where(eq(inventoryCartItems.userId, viewer.id));
 
     if (survivors.length === 0) {
-      return { requestId: null, submitted: [], skipped };
+      return { requestId: null, submitted: [], skipped, notice: null };
     }
 
     // A guard, not a lookup. transitionItem derives the address from the
@@ -131,7 +134,7 @@ export async function submitCartAs(
     // route reaches the throw, because a live session implies the row it
     // points at. Do not delete this as a redundant read.
     const [requester] = await tx
-      .select({ email: user.email })
+      .select({ email: user.email, name: user.name })
       .from(user)
       .where(eq(user.id, viewer.id));
     if (!requester) {
@@ -187,8 +190,20 @@ export async function submitCartAs(
       requestId: req.id,
       submitted: lines.map((l) => l.itemId),
       skipped,
+      notice: {
+        id: req.id,
+        lines: survivors.map((s) => s.name),
+        requester: { email: requester.email, name: requester.name },
+      },
     };
   });
+  // After the commit, never inside it. The requester gets no email of their
+  // own (they just clicked the button); staff do, beside the admin tile.
+  if (result.notice) {
+    await notifyRequestSubmittedByEmail(result.notice, "cart", opts?.send);
+  }
+  const { notice: _notice, ...submitted } = result;
+  return submitted;
 }
 
 export async function getCartForCurrentUser() {

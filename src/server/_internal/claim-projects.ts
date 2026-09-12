@@ -1,6 +1,7 @@
 import { and, isNull, sql } from "drizzle-orm";
 import { db } from "#/db";
-import { projects } from "#/db/schema";
+import { notifications, projects } from "#/db/schema";
+import { projectsClaimedNotification } from "#/lib/project-notifications";
 
 /**
  * Links every unclaimed project whose proposer email matches `email` to
@@ -43,5 +44,13 @@ export async function claimProjectsForVerifiedUser(
       )
     )
     .returning({ id: projects.id });
+  // In-app only: the person just proved they own this address by reading an
+  // email at it, so another one would tell them what they already know. The
+  // `proposer_id is null` guard above is what keeps this from repeating.
+  if (claimed.length > 0) {
+    await db
+      .insert(notifications)
+      .values(projectsClaimedNotification(userId, claimed.length));
+  }
   return claimed.length;
 }

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "#/db";
 import { programs, projectEditLog, projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
@@ -330,5 +330,53 @@ describe("getProjectMentorshipAs", () => {
     await expect(
       getProjectMentorshipAs(null, { projectId: id })
     ).rejects.toThrow("Forbidden");
+  });
+});
+
+describe("mentor email", () => {
+  const ORIGINAL_ENV = { ...process.env };
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  it("emails the address when it is named, and not when only the flags change", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser("admin-mentor-mail@x.edu", "admin");
+    const { id } = await createProjectAs(admin, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await updateProjectMentorshipAs(
+      admin,
+      {
+        id,
+        mentorEmail: "Mentor@Example.edu",
+        seekingMentor: false,
+        studentProposed: false,
+      },
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("mentor@example.edu");
+    expect(send.mock.calls[0]?.[1].subject).toBe(
+      "You were named as a mentor: P"
+    );
+
+    send.mockClear();
+    await updateProjectMentorshipAs(
+      admin,
+      {
+        id,
+        mentorEmail: "mentor@example.edu",
+        seekingMentor: true,
+        studentProposed: false,
+      },
+      { send }
+    );
+    await updateProjectMentorshipAs(
+      admin,
+      { id, mentorEmail: "", seekingMentor: true, studentProposed: false },
+      { send }
+    );
+    expect(send).not.toHaveBeenCalled();
   });
 });

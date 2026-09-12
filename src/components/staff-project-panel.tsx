@@ -49,6 +49,50 @@ interface Project {
   status: string;
 }
 
+/**
+ * Only these three transitions email the proposer. Publishing is deliberately
+ * silent, which is what the approval email promises.
+ */
+const PROPOSER_EMAIL_TARGETS: ReadonlySet<ProjectStatus> = new Set([
+  "approved",
+  "changes_requested",
+  "draft",
+]);
+
+interface PendingTransition {
+  force: boolean;
+  target: ProjectStatus;
+}
+
+/**
+ * Changes requested and a staff return to draft both email the proposer, and
+ * a message with no reason tells them nothing, so the dialog holds Confirm
+ * until one is typed. The force path is exempt on the server too.
+ */
+function commentRequired(pending: PendingTransition | null): boolean {
+  return (
+    pending?.target === "changes_requested" ||
+    (pending?.target === "draft" && !pending.force)
+  );
+}
+
+function emailsProposer(pending: PendingTransition | null): boolean {
+  return pending !== null && PROPOSER_EMAIL_TARGETS.has(pending.target);
+}
+
+function dialogDescription(pending: PendingTransition | null): string {
+  if (pending?.target === "changes_requested") {
+    return "Tell the proposer what needs to change. A comment is required and they will be notified.";
+  }
+  if (pending?.target === "draft" && !pending.force) {
+    return "Tell the proposer why this is going back to draft. A comment is required and they will be notified.";
+  }
+  if (pending?.force) {
+    return "This overrides the workflow and bypasses the normal review process.";
+  }
+  return "Add a comment to record why you made this change.";
+}
+
 export function StaffProjectPanel({
   project,
   onChanged,
@@ -58,10 +102,7 @@ export function StaffProjectPanel({
 }) {
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState<{
-    target: ProjectStatus;
-    force: boolean;
-  } | null>(null);
+  const [pending, setPending] = useState<PendingTransition | null>(null);
   const [busy, setBusy] = useState(false);
   const [editLog, setEditLog] = useState<EditLogEntry[]>([]);
   const [sendEmail, setSendEmail] = useState(true);
@@ -190,12 +231,8 @@ export function StaffProjectPanel({
     }
   }
 
-  const isChangesRequested = pending?.target === "changes_requested";
-
-  // Only these two transitions email anyone. Publishing is deliberately silent,
-  // which is what the approval email promises.
-  const emailsProposer =
-    pending?.target === "approved" || pending?.target === "changes_requested";
+  const needsComment = commentRequired(pending);
+  const proposerEmailed = emailsProposer(pending);
 
   return (
     <Panel tone="staff">
@@ -331,21 +368,11 @@ export function StaffProjectPanel({
               {pending?.force ? "Override to " : "Move to "}
               {pending ? PROJECT_STATUS_LABEL[pending.target] : ""}
             </DialogTitle>
-            <DialogDescription>
-              {(() => {
-                if (isChangesRequested) {
-                  return "Tell the proposer what needs to change. A comment is required and they will be notified.";
-                }
-                if (pending?.force) {
-                  return "This overrides the workflow and bypasses the normal review process.";
-                }
-                return "Add a comment to record why you made this change.";
-              })()}
-            </DialogDescription>
+            <DialogDescription>{dialogDescription(pending)}</DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
             <Label htmlFor="staff-comment">
-              {isChangesRequested
+              {needsComment
                 ? "What needs to change? (required)"
                 : "Comment (optional)"}
             </Label>
@@ -353,7 +380,7 @@ export function StaffProjectPanel({
               id="staff-comment"
               onChange={(e) => setComment(e.target.value)}
               placeholder={
-                isChangesRequested
+                needsComment
                   ? "Describe what the proposer needs to change"
                   : "Explain the action"
               }
@@ -364,7 +391,7 @@ export function StaffProjectPanel({
               The project proposer can see this comment.
             </p>
           </div>
-          {emailsProposer && (
+          {proposerEmailed && (
             <div className="space-y-1">
               <Label className="font-normal">
                 <Checkbox
@@ -394,7 +421,7 @@ export function StaffProjectPanel({
               Cancel
             </Button>
             <Button
-              disabled={busy || (isChangesRequested && !comment.trim())}
+              disabled={busy || (needsComment && !comment.trim())}
               onClick={() => void confirmTransition()}
               type="button"
               variant={pending?.force ? "destructive" : "default"}

@@ -96,6 +96,44 @@ export function softDeleteNotification(
   };
 }
 
+/** The notice a reassignment owes the new proposer, or none. */
+export function proposerReassignedNotification(
+  project: NotifiableProject,
+  actorId: string
+): NotificationRow | null {
+  const userId = proposerToTell(project, actorId);
+  if (!userId) {
+    return null;
+  }
+  return {
+    userId,
+    type: "proposer_reassigned",
+    title: `You are now the proposer of '${project.title}'`,
+    message: "Staff assigned this project to you.",
+    link: `/projects/${project.id}`,
+  };
+}
+
+/**
+ * The notice a claim owes the account it linked projects to. One row for the
+ * batch, whatever the count: the account was just verified, and a bell with
+ * five identical rows says less than one that counts.
+ */
+export function projectsClaimedNotification(
+  userId: string,
+  count: number
+): NotificationRow {
+  const noun = count === 1 ? "project was" : "projects were";
+  return {
+    userId,
+    type: "projects_claimed",
+    title: `${count} ${noun} linked to your account`,
+    message:
+      "Projects proposed under your email address before you signed up are now yours to edit and follow.",
+    link: "/my/projects",
+  };
+}
+
 /**
  * The notices a comment owes, deduped, in insertion order.
  *

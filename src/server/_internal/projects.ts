@@ -24,11 +24,18 @@ import type {
   ProposerInput,
   UpdateProjectInput,
 } from "../projects";
+import type { EmailOptions, SendEmailFn } from "./email-dispatch";
 import {
+  recordProposerReassignedNotification,
   recordSoftDeleteNotification,
   recordStatusChangeNotifications,
 } from "./notify";
-import { notifyTransitionByEmail, type SendEmailFn } from "./project-emails";
+import {
+  notifyHardDeleteByEmail,
+  notifyMentorNamedByEmail,
+  notifyProposerReassignedByEmail,
+  notifyTransitionByEmail,
+} from "./project-emails";
 import { refreshProjectEmbedding } from "./project-embeddings";
 
 export interface AuthUser {
@@ -265,14 +272,18 @@ export async function updateProjectAs(
  */
 export async function updateProjectProposerAs(
   viewer: Viewer,
-  data: ProposerInput
+  data: ProposerInput,
+  opts?: EmailOptions
 ): Promise<{ id: string; updated: boolean }> {
   assertStaff(viewer);
   const existing = await loadProjectOr404(data.id);
   const proposerEmail = normalizeEmailAddress(data.proposerEmail);
+  const proposerId = proposerEmail
+    ? await resolveProposerId(proposerEmail)
+    : null;
   const newValues: Partial<typeof projects.$inferSelect> = {
     proposerEmail,
-    proposerId: proposerEmail ? await resolveProposerId(proposerEmail) : null,
+    proposerId,
   };
   const { changedFields, newDiff, oldDiff } = diffRowFields(
     existing,
@@ -293,7 +304,27 @@ export async function updateProjectProposerAs(
       oldValues: oldDiff,
       newValues: newDiff,
     });
+    // The new proposer's bell. Nothing when the address has no account, and
+    // nothing on an unlink; the email below covers the first of those.
+    await recordProposerReassignedNotification(
+      tx,
+      { id: existing.id, title: existing.title, proposerId },
+      viewer.id
+    );
   });
+  // After the transaction, never inside it; swallows its own errors.
+  await notifyProposerReassignedByEmail(
+    {
+      actorId: viewer.id,
+      project: {
+        id: existing.id,
+        proposerEmail,
+        proposerId,
+        title: existing.title,
+      },
+    },
+    opts?.send
+  );
   return { id: existing.id, updated: true };
 }
 
@@ -324,7 +355,8 @@ export async function updateProjectProposerForCurrentUser(data: ProposerInput) {
  */
 export async function updateProjectMentorshipAs(
   viewer: Viewer,
-  data: MentorshipInput
+  data: MentorshipInput,
+  opts?: EmailOptions
 ): Promise<{ id: string; updated: boolean }> {
   assertStaff(viewer);
   const existing = await loadProjectOr404(data.id);
@@ -353,6 +385,18 @@ export async function updateProjectMentorshipAs(
       newValues: newDiff,
     });
   });
+  // Only a new address is news to anyone: the flags beside it change what
+  // the catalog shows, not who is involved. After the transaction, and it
+  // swallows its own errors.
+  if (changedFields.includes("mentorEmail") && newValues.mentorEmail) {
+    await notifyMentorNamedByEmail(
+      {
+        mentorEmail: newValues.mentorEmail,
+        project: { id: existing.id, title: existing.title },
+      },
+      opts?.send
+    );
+  }
   return { id: existing.id, updated: true };
 }
 
@@ -370,6 +414,26 @@ function assertChangesRequestedHasComment(
   if (target === "changes_requested" && !comment?.trim()) {
     throw new Error(
       "A comment describing the requested changes is required so the proposer knows what to change."
+    );
+  }
+}
+
+/**
+ * Staff sending a submission back to draft owe the proposer a reason, the
+ * same as changes requested: the proposer is emailed, and a message that
+ * says only "returned to draft" tells them nothing. Role-gated here rather
+ * than in `commitTransition` because the owner reaches the same target by
+ * withdrawing, and nobody owes themselves an explanation. `forceTransitionAs`
+ * skips it on purpose: it is the escape hatch, and the email it sends
+ * tolerates a missing comment.
+ */
+function assertStaffReturnToDraftHasComment(
+  target: ProjectStatus,
+  comment: string | null
+): void {
+  if (target === "draft" && !comment?.trim()) {
+    throw new Error(
+      "A comment explaining why the project was returned to draft is required so the proposer knows what to change."
     );
   }
 }
@@ -441,15 +505,18 @@ async function commitTransition(
   // approval. notifyTransitionByEmail swallows its own errors.
   await notifyTransitionByEmail(
     {
-      description: project.description,
-      id: project.id,
-      proposerEmail: project.proposerEmail,
-      proposerId: project.proposerId,
-      title: project.title,
+      actorId,
+      comment,
+      project: {
+        description: project.description,
+        id: project.id,
+        proposerEmail: project.proposerEmail,
+        proposerId: project.proposerId,
+        title: project.title,
+      },
+      sendEmail: opts?.sendEmail ?? true,
+      target,
     },
-    target,
-    comment,
-    opts?.sendEmail ?? true,
     opts?.send
   );
 
@@ -469,6 +536,9 @@ export async function performTransitionAs(
   }
   const role: ActorRole = isStaff(viewer) ? "staff" : "owner";
   assertTransitionAllowed(project.status as ProjectStatus, target, role);
+  if (role === "staff") {
+    assertStaffReturnToDraftHasComment(target, comment ?? null);
+  }
   // Skipping the mail is a staff affordance, so the decision is made here from
   // the role rather than read off the request. `sendEmail` cannot be gated by
   // the schema instead: three owner-reachable endpoints carry it, and one of
@@ -538,7 +608,8 @@ export async function restoreProjectAs(
 
 export async function hardDeleteProjectAs(
   viewer: AuthUser,
-  id: string
+  id: string,
+  opts?: EmailOptions
 ): Promise<{ id: string }> {
   const project = await loadProjectOr404(id);
   if (project.status !== "draft") {
@@ -558,6 +629,20 @@ export async function hardDeleteProjectAs(
     );
     await deleteOwnedObject(project.imageUrl, projectImageKeys(id));
   }
+  // The proposer's in-app row would link to a page that now 404s, so the
+  // only channel left is email. Sent last, and it swallows its own errors.
+  await notifyHardDeleteByEmail(
+    {
+      actorId: viewer.id,
+      project: {
+        id: project.id,
+        proposerEmail: project.proposerEmail,
+        proposerId: project.proposerId,
+        title: project.title,
+      },
+    },
+    opts?.send
+  );
   return { id };
 }
 

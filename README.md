@@ -177,18 +177,28 @@ version, this file could return to CLI generation; until then, edit it directly.
   `EMAIL_REPLY_TO` is optional: set it and every message carries that
   `Reply-To`, leave it blank and the header is omitted.
 
-The app sends four emails, all through `src/lib/email/templates.ts`:
+Every email renders through `src/lib/email/templates.ts`. Every one is mandatory
+for its recipient; there are no notification preferences (ADR-0019).
 
 | Email | Trigger | Recipient |
 |---|---|---|
-| Verify your email | Sign-up | The new account |
+| Verify your email | Sign-up, or a refused unverified sign-in | The account |
 | Reset your password | Forgot-password form | The account |
 | New project submitted | A project moves to `submitted` | `EMAIL_STAFF_INBOX` |
-| Approved / Changes requested | Staff review a project | The proposer |
+| Approved / Changes requested / Returned to draft | Staff review a project | The proposer |
+| New comment on your project | Staff comment, not internal | The proposer |
+| Comment from the proposer | The proposer comments | `EMAIL_STAFF_INBOX` |
+| A project was assigned to you | Staff reassign the proposer | The new proposer |
+| You were named as a mentor | Staff set a mentor address | The mentor |
+| Your draft was deleted | Staff hard-delete a draft | The proposer |
+| Borrow list / Custom request submitted | A student submits | `EMAIL_STAFF_INBOX` |
+| Reserved / Request denied / Checked out | Staff decide a request line | The requester or holder, an address-only walk-in included |
+| Fulfilled / Request denied (custom line) | Staff close a custom line | The requester |
+| Your role is now ... / Your account was suspended | An admin changes a role or bans | The account |
 
-Everything else the app notifies about is in-app only, a row in `notifications`
-rendered by the bell, and never reaches an inbox. Staff can skip either review
-email per action from the transition dialog.
+The full channel table, in-app beside email, is PRD section 13. Everything not in
+it is in-app only or silent. Staff can skip the proposer email per action from
+the transition dialog; the server ignores that flag from anyone else.
 
 Production runs `ses` and has done since task definition revision 22: the domain
 identity verifies with DKIM `SUCCESS`, the account has production access (so the

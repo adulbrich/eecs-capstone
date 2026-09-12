@@ -4,7 +4,9 @@ import { projectComments, projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { isStaff } from "#/lib/viewer";
 import type { AddCommentInput } from "../comments";
+import type { EmailOptions } from "./email-dispatch";
 import { recordCommentNotifications } from "./notify";
+import { notifyCommentByEmail } from "./project-emails";
 
 export interface AuthUser {
   id: string;
@@ -13,7 +15,8 @@ export interface AuthUser {
 
 export async function addCommentAs(
   viewer: AuthUser,
-  data: AddCommentInput
+  data: AddCommentInput,
+  opts?: EmailOptions
 ): Promise<{ id: string }> {
   const [project] = await db
     .select()
@@ -59,9 +62,8 @@ export async function addCommentAs(
     }
   }
 
-  let createdId = "";
-  await db.transaction(async (tx) => {
-    const [row] = await tx
+  const row = await db.transaction(async (tx) => {
+    const [inserted] = await tx
       .insert(projectComments)
       .values({
         projectId: data.projectId,
@@ -71,20 +73,40 @@ export async function addCommentAs(
         isInternal,
       })
       .returning();
-    createdId = row.id;
     await recordCommentNotifications(
       tx,
       { id: project.id, title: project.title, proposerId: project.proposerId },
       {
-        id: row.id,
-        authorId: row.authorId,
-        parentId: row.parentId,
-        isInternal: row.isInternal,
-        content: row.content,
+        id: inserted.id,
+        authorId: inserted.authorId,
+        parentId: inserted.parentId,
+        isInternal: inserted.isInternal,
+        content: inserted.content,
       }
     );
+    return inserted;
   });
-  return { id: createdId };
+  // After the transaction, never inside it: a failed email must not undo a
+  // comment. notifyCommentByEmail swallows its own errors.
+  await notifyCommentByEmail(
+    {
+      authorIsStaff: isStaff(viewer),
+      comment: {
+        authorId: row.authorId,
+        content: row.content,
+        id: row.id,
+        isInternal: row.isInternal,
+      },
+      project: {
+        id: project.id,
+        proposerEmail: project.proposerEmail,
+        proposerId: project.proposerId,
+        title: project.title,
+      },
+    },
+    opts?.send
+  );
+  return { id: row.id };
 }
 
 export async function addCommentForCurrentUser(data: AddCommentInput) {
