@@ -749,6 +749,42 @@ describe("admin projects flag switches", () => {
     expect(rows.map((r) => r.title)).toEqual(["Match"]);
   });
 
+  it("composes the seeking switch with the status set and the program", async () => {
+    const admin = await makeAdmin(`f7-${Date.now()}@x.com`);
+    const cs461 = await makeProgram("CS 461");
+    const ece441 = await makeProgram("ECE 441");
+    const match = await createProjectAs(admin, baseProject("Match", cs461));
+    await flag(match.id, { seekingMentor: true });
+    await publish(admin, match.id);
+    const draft = await createProjectAs(admin, baseProject("Draft", cs461));
+    await flag(draft.id, { seekingMentor: true });
+    const elsewhere = await createProjectAs(
+      admin,
+      baseProject("Elsewhere", ece441)
+    );
+    await flag(elsewhere.id, { seekingMentor: true });
+    await publish(admin, elsewhere.id);
+    const mentored = await createProjectAs(
+      admin,
+      baseProject("Mentored", cs461)
+    );
+    await flag(mentored.id, {
+      mentorEmail: "mentor@example.edu",
+      seekingMentor: true,
+    });
+    await publish(admin, mentored.id);
+
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({
+        program: cs461,
+        seekingMentorOnly: true,
+        statuses: ["published"],
+      })
+    );
+    expect(rows.map((r) => r.title)).toEqual(["Match"]);
+  });
+
   it("composes the seeking switch with the proposer and the search text", async () => {
     const admin = await makeAdmin(`f6-${Date.now()}@x.com`);
     const alice = await makeProposer(`f6-alice-${Date.now()}@x.com`);

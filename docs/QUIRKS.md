@@ -122,6 +122,24 @@ export const Route = createFileRoute("/projects/")({
 
 Search-driven loaders need `loaderDeps` so navigation with a new search param re-runs the loader.
 
+### A defaulted search param is written back to the URL as its default
+
+`navigate({ search: (prev) => ({ ...prev, acceptingOnly: checked }) })` receives the validated `prev`, so every `.default()` in the schema is spread back and serialized (`acceptingOnly=false&program=null&q=`). Setting the key to `undefined` does not remove it either: the result is validated again and the default reapplied. To keep a default out of the URL, name it in a `stripSearchParams` middleware on the route, as `/admin/projects` does for its four switches (#340):
+
+```ts
+const SWITCH_DEFAULTS = { acceptingOnly: false, includeSoftDeleted: false };
+const searchSchema = z.object({
+  acceptingOnly: z.boolean().default(SWITCH_DEFAULTS.acceptingOnly),
+  includeSoftDeleted: z.boolean().default(SWITCH_DEFAULTS.includeSoftDeleted),
+});
+export const Route = createFileRoute("/_authed/admin/projects/")({
+  validateSearch: searchSchema,
+  search: { middlewares: [stripSearchParams(SWITCH_DEFAULTS)] },
+});
+```
+
+An `.optional()` param without a default (`from`, `to`) is the exception: `undefined` removes it, which is what the date inputs rely on.
+
 ### Single canonical URL per resource
 
 One detail URL per project and per item, staff sections rendered conditionally on it. [ADR-0010](./adr/0010-single-canonical-url-per-resource.md).
