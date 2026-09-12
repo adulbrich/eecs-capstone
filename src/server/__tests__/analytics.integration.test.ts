@@ -325,27 +325,35 @@ describe("seeking a mentor", () => {
     const flaggedToo = await createProjectAs(admin, baseProject());
     const studentOnly = await createProjectAs(admin, baseProject());
     const flaggedWithMentor = await createProjectAs(admin, baseProject());
-    // Written as columns rather than through the staff endpoint, so the
-    // figure is pinned to the badge's rule and not to whichever section of
-    // the staff panel happens to own each flag.
+    // Written as columns rather than through `updateProjectMentorshipAs`:
+    // the figure is a rule over three columns, and #336 moves one of them to
+    // the proposer endpoint, so the test stays pinned to the columns rather
+    // than to whichever wrapper writes each.
+    const mentorship = (
+      id: string,
+      columns: {
+        mentorEmail: string | null;
+        seekingMentor: boolean;
+        studentProposed: boolean;
+      }
+    ) => db.update(projects).set(columns).where(eq(projects.id, id));
     for (const id of [flagged.id, flaggedToo.id]) {
-      await db
-        .update(projects)
-        .set({ seekingMentor: true, studentProposed: false, mentorEmail: null })
-        .where(eq(projects.id, id));
-    }
-    await db
-      .update(projects)
-      .set({ seekingMentor: false, studentProposed: true, mentorEmail: null })
-      .where(eq(projects.id, studentOnly.id));
-    await db
-      .update(projects)
-      .set({
+      await mentorship(id, {
+        mentorEmail: null,
         seekingMentor: true,
-        studentProposed: true,
-        mentorEmail: "mentor@x.test",
-      })
-      .where(eq(projects.id, flaggedWithMentor.id));
+        studentProposed: false,
+      });
+    }
+    await mentorship(studentOnly.id, {
+      mentorEmail: null,
+      seekingMentor: false,
+      studentProposed: true,
+    });
+    await mentorship(flaggedWithMentor.id, {
+      mentorEmail: "mentor@x.test",
+      seekingMentor: true,
+      studentProposed: true,
+    });
 
     const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
     expect(view.headline.seekingMentor).toBe(2);

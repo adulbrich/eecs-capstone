@@ -198,8 +198,9 @@ async function headline(programId: string | null) {
         ${programId ? sql`and p.program_id = ${programId}` : sql``}
     `),
     db
-      // The same rule as the "Seeking mentor" badge and the catalog filter,
-      // so the tile counts the projects a visitor sees flagged.
+      // The badge's rule, over the live scope the tile always had: every
+      // status, not only published, so staff see flagged proposals before
+      // they reach the catalog.
       .select({ seeking: countRows() })
       .from(projects)
       .where(and(live, seekingMentorSql)),
