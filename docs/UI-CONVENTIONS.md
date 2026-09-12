@@ -460,7 +460,13 @@ widens it (`includeSoftDeleted` on projects, `includeBanned` on users): an empty
 with a widening switch on is still nothing at all. A default that narrows counts as a
 filter: the request queue opens on `pending`, and a staff member with no pending
 requests still wants the status select and the headers rather than a bare message.
-A route with no filters (programs, categories, bookmarks, My Items) never sets it.
+The one exception is the status set on `/admin/projects`, which opens on every status
+but archived and reports itself unfiltered (#335): that set is what the listing is,
+not a search over it, and archived rows are the bulk the legacy import adds. The cost
+is that a program with nothing but archived projects sees the bare message; a
+reader who wants the archive follows the link from `/admin/analytics` or edits the
+URL. A route with no filters (programs, categories, bookmarks, My Items) never sets
+it.
 
 ```tsx
 const filtered = q !== "" || status !== null || categories.length > 0;
