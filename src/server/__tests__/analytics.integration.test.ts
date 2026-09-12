@@ -314,3 +314,40 @@ describe("bookmarks since publication", () => {
     expect(view.headline.publishedWithoutBookmarks).toBe(1);
   });
 });
+
+describe("seeking a mentor", () => {
+  it("counts the projects that show the badge: flagged by staff with no address on file", async () => {
+    const admin = await makeUser(`an-m-${Date.now()}@x.com`, "admin");
+    // Two flagged and not student proposed, one the other way round, so the
+    // old rule (student proposed, no address) and the badge's rule (flagged,
+    // no address) give different counts: 1 against 2.
+    const flagged = await createProjectAs(admin, baseProject());
+    const flaggedToo = await createProjectAs(admin, baseProject());
+    const studentOnly = await createProjectAs(admin, baseProject());
+    const flaggedWithMentor = await createProjectAs(admin, baseProject());
+    // Written as columns rather than through the staff endpoint, so the
+    // figure is pinned to the badge's rule and not to whichever section of
+    // the staff panel happens to own each flag.
+    for (const id of [flagged.id, flaggedToo.id]) {
+      await db
+        .update(projects)
+        .set({ seekingMentor: true, studentProposed: false, mentorEmail: null })
+        .where(eq(projects.id, id));
+    }
+    await db
+      .update(projects)
+      .set({ seekingMentor: false, studentProposed: true, mentorEmail: null })
+      .where(eq(projects.id, studentOnly.id));
+    await db
+      .update(projects)
+      .set({
+        seekingMentor: true,
+        studentProposed: true,
+        mentorEmail: "mentor@x.test",
+      })
+      .where(eq(projects.id, flaggedWithMentor.id));
+
+    const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
+    expect(view.headline.seekingMentor).toBe(2);
+  });
+});

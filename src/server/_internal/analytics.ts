@@ -23,6 +23,7 @@ import {
 } from "#/lib/vocabularies";
 import type { AnalyticsInput } from "../analytics";
 import { countPendingRequests, countRows, countSubmitted } from "./admin";
+import { seekingMentorSql } from "./project-summary";
 
 export interface Flow {
   current: number;
@@ -197,15 +198,11 @@ async function headline(programId: string | null) {
         ${programId ? sql`and p.program_id = ${programId}` : sql``}
     `),
     db
+      // The same rule as the "Seeking mentor" badge and the catalog filter,
+      // so the tile counts the projects a visitor sees flagged.
       .select({ seeking: countRows() })
       .from(projects)
-      .where(
-        and(
-          live,
-          eq(projects.studentProposed, true),
-          isNull(projects.mentorEmail)
-        )
-      ),
+      .where(and(live, seekingMentorSql)),
     db
       .select({ mentored: countRows() })
       .from(projects)
