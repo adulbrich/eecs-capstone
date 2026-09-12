@@ -156,7 +156,6 @@ const DETAIL_KEYS = [
   "imageUrl",
   "isSponsored",
   "licenseRestrictions",
-  "mentorName",
   "minQualifications",
   "notes",
   "objectives",
@@ -189,7 +188,6 @@ function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
     teamsSupported: 2,
     programId: "prog-1",
     mentorEmail: "mentor@x.test",
-    mentorName: null,
     seekingMentor: false,
     studentProposed: false,
     acceptingApplicants: true,
@@ -225,7 +223,7 @@ describe("projectDetailView", () => {
     );
   });
 
-  it("carries the mentor name and the seeking flag for every viewer, never the address", () => {
+  it("carries the two marks for every viewer, and nothing about the mentor", () => {
     const seeking = row({
       mentorEmail: null,
       seekingMentor: true,
@@ -235,11 +233,11 @@ describe("projectDetailView", () => {
       const view = projectDetailView(seeking, viewer);
       expect(view.studentProposed).toBe(true);
       expect(view.seekingMentor).toBe(true);
-      expect(view.mentorName).toBeNull();
+      // Neither the address nor the name (#336): staff read both through
+      // getProjectMentorship, and the admin projection adds the name back.
       expect("mentorEmail" in view).toBe(false);
+      expect("mentorName" in view).toBe(false);
     }
-    const named = row({ mentorName: "Dana Lee" });
-    expect(projectDetailView(named, anon).mentorName).toBe("Dana Lee");
   });
 
   it("omits the private link key and the machine columns, staff included", () => {

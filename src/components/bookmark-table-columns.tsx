@@ -100,9 +100,6 @@ export const BOOKMARK_TABLE_COLUMNS = defineAdminColumns<BookmarkRow>()([
   { ...shared.accepting, enableHiding: false },
   { ...shared.teams, enableHiding: false },
   { ...shared.nda, enableHiding: false },
-  // Named for what it answers here, "where did this project come from",
-  // which is the same two facts /projects files under Mentorship.
-  { ...shared.mentorship, enableHiding: false, header: "Origin" },
   {
     accessorFn: (row) => row.bookmarkedAt,
     cell: ({ row }) => <LocalTime dateOnly value={row.original.bookmarkedAt} />,

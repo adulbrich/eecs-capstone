@@ -6,6 +6,8 @@ import { auth } from "#/lib/auth";
 import {
   createProjectAs,
   performTransitionAs,
+  updateProjectMentorshipAs,
+  updateProjectProposerAs,
 } from "#/server/_internal/projects";
 import { searchProjectsImpl } from "#/server/_internal/search";
 
@@ -62,6 +64,8 @@ const SEARCH_DEFAULTS = {
   programId: null,
   archivedOnly: false,
   acceptingOnly: false,
+  studentProposedOnly: false,
+  seekingMentorOnly: false,
   page: 1,
   pageSize: 20,
   sort: "relevance" as const,
@@ -158,7 +162,6 @@ describe("searchProjects", () => {
       "id",
       "imageUrl",
       "licenseRestrictions",
-      "mentorName",
       "minQualifications",
       "objectives",
       "prefQualifications",
@@ -176,5 +179,67 @@ describe("searchProjects", () => {
     ]);
     // An array, never null: the chips map over it without a guard.
     expect(rows[0].categories).toEqual([]);
+  });
+});
+
+describe("the two mark filters", () => {
+  it("narrows to student-proposed projects on the raw flag", async () => {
+    const admin = await makeAdmin(`sp-${Date.now()}@x.com`);
+    const student = await publish(admin, "Student one");
+    const partner = await publish(admin, "Partner one");
+    await updateProjectProposerAs(admin, {
+      id: student,
+      proposerEmail: `sp-${Date.now()}@x.com`,
+      studentProposed: true,
+    });
+
+    const all = await searchProjectsImpl({ ...SEARCH_DEFAULTS, pageSize: 50 });
+    expect(all.rows.map((r) => r.id)).toEqual(
+      expect.arrayContaining([student, partner])
+    );
+    const only = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      pageSize: 50,
+      studentProposedOnly: true,
+    });
+    expect(only.rows.map((r) => r.id)).toEqual([student]);
+    expect(only.total).toBe(1);
+  });
+
+  it("narrows to seeking projects on the badge's rule, not the raw flag", async () => {
+    const admin = await makeAdmin(`sm-${Date.now()}@x.com`);
+    const seeking = await publish(admin, "Seeking");
+    const lined = await publish(admin, "Lined up");
+    const quiet = await publish(admin, "Quiet");
+    await updateProjectMentorshipAs(admin, {
+      id: seeking,
+      mentorEmail: "",
+      seekingMentor: true,
+    });
+    // Flag on but an address on file: no badge, so no match either.
+    await updateProjectMentorshipAs(admin, {
+      id: lined,
+      mentorEmail: "mentor@x.test",
+      seekingMentor: true,
+    });
+
+    const only = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      pageSize: 50,
+      seekingMentorOnly: true,
+    });
+    expect(only.rows.map((r) => r.id)).toEqual([seeking]);
+    expect(only.rows[0]?.seekingMentor).toBe(true);
+    expect(only.rows.map((r) => r.id)).not.toContain(lined);
+    expect(only.rows.map((r) => r.id)).not.toContain(quiet);
+
+    // Both switches compose.
+    const both = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      pageSize: 50,
+      seekingMentorOnly: true,
+      studentProposedOnly: true,
+    });
+    expect(both.rows).toEqual([]);
   });
 });

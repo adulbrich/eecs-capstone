@@ -10,6 +10,10 @@ const searchInputSchema = z.object({
   // Off by default: hiding closed projects would make them vanish from a
   // catalog that is meant to be browsable. See #72.
   acceptingOnly: z.boolean().default(false),
+  // The two public marks as filters (#336). Seeking is the derived value,
+  // the same rule as the badge, so the filter and the badge always agree.
+  studentProposedOnly: z.boolean().default(false),
+  seekingMentorOnly: z.boolean().default(false),
   page: z.number().int().min(1).default(1),
   pageSize: z
     .number()

@@ -260,7 +260,9 @@ export async function updateProjectAs(
 }
 
 /**
- * The only writer of `proposerEmail` and `proposerId` after create (#322).
+ * The only writer of `proposerEmail` and `proposerId` after create (#322),
+ * and of `studentProposed`, which says who proposed the project and so
+ * belongs with the link rather than with mentorship (#336).
  *
  * Staff-only, and deliberately not part of `updateProjectAs`: the key is not
  * on `ProjectInput`, so the shared form cannot carry it and a proposer has no
@@ -284,6 +286,7 @@ export async function updateProjectProposerAs(
   const newValues: Partial<typeof projects.$inferSelect> = {
     proposerEmail,
     proposerId,
+    studentProposed: data.studentProposed,
   };
   const { changedFields, newDiff, oldDiff } = diffRowFields(
     existing,
@@ -334,7 +337,7 @@ export async function updateProjectProposerForCurrentUser(data: ProposerInput) {
 }
 
 /**
- * The only writer of `studentProposed`, `seekingMentor` and `mentorEmail`.
+ * The only writer of `seekingMentor` and `mentorEmail`.
  *
  * Staff-only, and deliberately not part of `updateProjectAs`: none of the
  * keys exists on `ProjectInput`, so the shared form cannot carry them and a
@@ -361,7 +364,6 @@ export async function updateProjectMentorshipAs(
   assertStaff(viewer);
   const existing = await loadProjectOr404(data.id);
   const newValues: Partial<typeof projects.$inferSelect> = {
-    studentProposed: data.studentProposed,
     seekingMentor: data.seekingMentor,
     mentorEmail: normalizeEmailAddress(data.mentorEmail),
   };

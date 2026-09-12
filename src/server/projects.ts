@@ -42,7 +42,6 @@ export const mentorshipSchema = z.object({
   // the field, and the impl folds it to null. Same ceiling as contactEmail.
   mentorEmail: z.string().email().max(200).or(z.literal("")),
   seekingMentor: z.boolean(),
-  studentProposed: z.boolean(),
 });
 
 export type MentorshipInput = z.infer<typeof mentorshipSchema>;
@@ -53,6 +52,10 @@ export const proposerSchema = z.object({
   // or null unlinks, and the impl folds both to a null column. Never on
   // ProjectInput: the form cannot carry it and only this endpoint writes it.
   proposerEmail: z.string().email().max(200).nullable().or(z.literal("")),
+  // Who proposed the project is a fact about the proposer, so it is saved
+  // with the link rather than with mentorship (#336). Required, never
+  // defaulted, or a stale client would silently clear it.
+  studentProposed: z.boolean(),
 });
 
 export type ProposerInput = z.infer<typeof proposerSchema>;

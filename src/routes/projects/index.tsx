@@ -33,6 +33,8 @@ export const searchSchema = z.object({
   program: z.string().uuid().nullable().default(null),
   archivedOnly: z.boolean().default(false),
   acceptingOnly: z.boolean().default(false),
+  studentProposedOnly: z.boolean().default(false),
+  seekingMentorOnly: z.boolean().default(false),
   page: z.number().int().min(1).default(1),
   // The server's ordering, which also decides which twenty rows make up the
   // page. Named `order` because `sort` and `dir` are the table's, below.
@@ -61,6 +63,8 @@ export const Route = createFileRoute("/projects/")({
     page: search.page,
     program: search.program,
     q: search.q,
+    seekingMentorOnly: search.seekingMentorOnly,
+    studentProposedOnly: search.studentProposedOnly,
   }),
   loader: async ({ deps }) =>
     await searchProjects({
@@ -70,6 +74,8 @@ export const Route = createFileRoute("/projects/")({
         programId: deps.program,
         archivedOnly: deps.archivedOnly,
         acceptingOnly: deps.acceptingOnly,
+        studentProposedOnly: deps.studentProposedOnly,
+        seekingMentorOnly: deps.seekingMentorOnly,
         page: deps.page,
         pageSize: PAGE_SIZE_DEFAULT,
         sort: deps.order,
@@ -109,7 +115,9 @@ function ProjectTable({
     search.categories.length > 0 ||
     search.program !== null ||
     search.archivedOnly ||
-    search.acceptingOnly;
+    search.acceptingOnly ||
+    search.studentProposedOnly ||
+    search.seekingMentorOnly;
   return (
     <AdminDataTable
       caption="Projects"
@@ -181,7 +189,9 @@ function ProjectsList() {
             order={search.order}
             program={search.program}
             q={search.q}
+            seekingMentorOnly={search.seekingMentorOnly}
             signedIn={viewer.signedIn}
+            studentProposedOnly={search.studentProposedOnly}
             view={view}
           />
         </div>

@@ -259,23 +259,16 @@ export async function exportAdminProjectsImpl(data: AdminProjectsFilter) {
  * convention used by the mutation helpers.
  */
 export async function getProjectAs(viewer: Viewer, data: { id: string }) {
-  // The row plus the two read-time mentor fields. Selected here rather than
-  // joined by the view, because the view is pure and this is the only place
-  // a project row is read for the detail page.
+  // The row plus the derived seeking badge. Selected here rather than joined
+  // by the view, because the view is pure and this is the only place a
+  // project row is read for the detail page. The mentor's name is not read:
+  // nothing about the mentor is public (#336).
   const [row] = await db
-    .select({
-      project: projects,
-      mentorName: mentorNameSql,
-      seekingMentor: seekingMentorSql,
-    })
+    .select({ project: projects, seekingMentor: seekingMentorSql })
     .from(projects)
     .where(eq(projects.id, data.id));
   const project = row
-    ? {
-        ...row.project,
-        mentorName: row.mentorName,
-        seekingMentor: row.seekingMentor,
-      }
+    ? { ...row.project, seekingMentor: row.seekingMentor }
     : undefined;
   if (!project) {
     return {
@@ -345,6 +338,8 @@ export interface ProposerForEdit {
   accountLinked: boolean;
   accountName: string | null;
   email: string;
+  /** Saved with the link (#336): the Proposer section's checkbox reads it from here. */
+  studentProposed: boolean;
 }
 
 export async function getProposerForEditAs(
@@ -356,11 +351,17 @@ export async function getProposerForEditAs(
     .select({
       proposerId: projects.proposerId,
       proposerEmail: projects.proposerEmail,
+      studentProposed: projects.studentProposed,
     })
     .from(projects)
     .where(eq(projects.id, data.projectId));
   if (!project) {
-    return { accountLinked: false, accountName: null, email: "" };
+    return {
+      accountLinked: false,
+      accountName: null,
+      email: "",
+      studentProposed: false,
+    };
   }
   // proposerId is canonical: when the project is linked to an account, prefill
   // that account's current email so an untouched staff save re-resolves to the
@@ -375,6 +376,7 @@ export async function getProposerForEditAs(
         accountLinked: true,
         accountName: account.name ?? null,
         email: account.email,
+        studentProposed: project.studentProposed,
       };
     }
   }
@@ -382,6 +384,7 @@ export async function getProposerForEditAs(
     accountLinked: false,
     accountName: null,
     email: project.proposerEmail ?? "",
+    studentProposed: project.studentProposed,
   };
 }
 
@@ -392,13 +395,12 @@ export interface ProjectMentorship {
   mentorName: string | null;
   /** The stored flag, not the derived badge: true even while an address is on file. */
   seekingMentor: boolean;
-  studentProposed: boolean;
 }
 
 /**
- * The staff read of the mentor address. The public payload carries only the
- * resolved name; this is the one endpoint that returns the address, and it
- * must not widen, for the same reason `getProposerForEditAs` does not.
+ * The staff read of the mentor. Nothing about the mentor is public (#336):
+ * this is the one endpoint that returns the address and the resolved name,
+ * and it must not widen, for the same reason `getProposerForEditAs` does not.
  */
 export async function getProjectMentorshipAs(
   viewer: Viewer,
@@ -410,7 +412,6 @@ export async function getProjectMentorshipAs(
       mentorEmail: projects.mentorEmail,
       mentorName: mentorNameSql,
       seekingMentor: projects.seekingMentor,
-      studentProposed: projects.studentProposed,
     })
     .from(projects)
     .where(eq(projects.id, data.projectId));
@@ -421,7 +422,6 @@ export async function getProjectMentorshipAs(
     mentorEmail: row.mentorEmail ?? "",
     mentorName: row.mentorName,
     seekingMentor: row.seekingMentor,
-    studentProposed: row.studentProposed,
   };
 }
 

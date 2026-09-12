@@ -137,12 +137,12 @@ beforeEach(() => {
     mentorEmail: "",
     mentorName: null,
     seekingMentor: false,
-    studentProposed: false,
   });
   getProposerForEdit.mockResolvedValue({
     accountLinked: true,
     accountName: "proposer@example.com",
     email: "proposer@example.com",
+    studentProposed: false,
   });
 });
 
@@ -180,7 +180,7 @@ describe("StaffProjectPanel section order", () => {
     expect(titles).toEqual([
       "Status",
       "Proposer",
-      "Mentorship",
+      "Mentor",
       "Scope assessment",
       "Categories",
       "Edit log",
@@ -220,11 +220,39 @@ describe("StaffProjectPanel proposer block", () => {
     await waitFor(() => expect(save.disabled).toBe(false));
   });
 
+  it("saves the student-proposed mark with the link, and enables Save on the mark alone", async () => {
+    renderPanel("submitted");
+    const save = (await screen.findByRole("button", {
+      name: "Save proposer",
+    })) as HTMLButtonElement;
+    const mark = screen.getByRole("checkbox", { name: "Student proposed" });
+    expect(mark.getAttribute("aria-checked")).toBe("false");
+    expect(
+      screen.getByText("Shown as a badge on the card and project page.")
+    ).toBeTruthy();
+    expect(save.disabled).toBe(true);
+    fireEvent.click(mark);
+    await waitFor(() => expect(save.disabled).toBe(false));
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(updateProjectProposer).toHaveBeenCalledWith({
+        data: {
+          id: PROJECT_ID,
+          proposerEmail: "proposer@example.com",
+          studentProposed: true,
+        },
+      })
+    );
+    // One save, one reload of the record, as with the address.
+    await waitFor(() => expect(getProposerForEdit).toHaveBeenCalledTimes(2));
+  });
+
   it("links an external address with one save and reloads the record", async () => {
     getProposerForEdit.mockResolvedValueOnce({
       accountLinked: false,
       accountName: null,
       email: "",
+      studentProposed: false,
     });
     renderPanel("submitted");
     const input = (await screen.findByLabelText(
@@ -235,7 +263,11 @@ describe("StaffProjectPanel proposer block", () => {
 
     await waitFor(() =>
       expect(updateProjectProposer).toHaveBeenCalledWith({
-        data: { id: PROJECT_ID, proposerEmail: "partner@example.com" },
+        data: {
+          id: PROJECT_ID,
+          proposerEmail: "partner@example.com",
+          studentProposed: false,
+        },
       })
     );
     // Once on mount, once after the save, and the log alongside it.
@@ -256,7 +288,7 @@ describe("StaffProjectPanel proposer block", () => {
 
     await waitFor(() =>
       expect(updateProjectProposer).toHaveBeenCalledWith({
-        data: { id: PROJECT_ID, proposerEmail: "" },
+        data: { id: PROJECT_ID, proposerEmail: "", studentProposed: false },
       })
     );
   });
@@ -305,6 +337,7 @@ describe("StaffProjectPanel proposer block", () => {
       accountLinked: false,
       accountName: null,
       email: "",
+      studentProposed: false,
     });
     updateProjectProposer.mockRejectedValueOnce(new Error("Forbidden"));
     renderPanel("submitted");
@@ -323,6 +356,7 @@ describe("StaffProjectPanel proposer block", () => {
       accountLinked: false,
       accountName: null,
       email: "external@x.com",
+      studentProposed: false,
     });
     renderPanel("submitted");
 
@@ -381,6 +415,7 @@ describe("StaffProjectPanel review-email control", () => {
       accountLinked: false,
       accountName: null,
       email: "",
+      studentProposed: false,
     });
     renderPanel("submitted");
     fireEvent.click(screen.getByTitle(/^Move to Approved\./));
@@ -423,6 +458,7 @@ describe("StaffProjectPanel review-email control", () => {
       accountLinked: false,
       accountName: null,
       email: "",
+      studentProposed: false,
     });
     renderPanel("submitted");
     fireEvent.click(screen.getByTitle(/^Move to Approved\./));
@@ -454,6 +490,7 @@ describe("StaffProjectPanel review-email control", () => {
       accountLinked: false,
       accountName: null,
       email: "",
+      studentProposed: false,
     });
     renderPanel("draft");
     fireEvent.click(screen.getByTitle(/^Move to Submitted\./));
@@ -476,13 +513,12 @@ describe("StaffProjectPanel review-email control", () => {
   });
 });
 
-describe("StaffProjectPanel mentorship block", () => {
+describe("StaffProjectPanel mentor block", () => {
   it("prefills the saved record and shows the mentor's account like the proposer's", async () => {
     getProjectMentorship.mockResolvedValue({
       mentorEmail: "mentor@x.test",
       mentorName: "Dana Lee",
       seekingMentor: false,
-      studentProposed: true,
     });
     renderPanel("submitted");
 
@@ -497,73 +533,83 @@ describe("StaffProjectPanel mentorship block", () => {
     expect(
       (
         screen.getByRole("checkbox", {
-          name: "Student proposed",
-        }) as HTMLElement
-      ).getAttribute("aria-checked")
-    ).toBe("true");
-    expect(
-      (
-        screen.getByRole("checkbox", {
           name: "Looking for a mentor",
         }) as HTMLElement
       ).getAttribute("aria-checked")
     ).toBe("false");
+    // Student proposed lives in the Proposer section now (#336), not here.
+    expect(screen.getByText("Public listing shows:")).toBeTruthy();
+    expect(screen.getByText("nothing about mentorship")).toBeTruthy();
   });
 
-  it("says an address has no account yet, and that the catalog shows no mentor", async () => {
+  it("says an address has no account yet, with the proposer's wording", async () => {
     getProjectMentorship.mockResolvedValue({
       mentorEmail: "mentor@x.test",
       mentorName: null,
       seekingMentor: false,
-      studentProposed: false,
     });
     renderPanel("submitted");
     expect(await screen.findByText("No account yet")).toBeTruthy();
     expect(
-      screen.getByText(/catalog shows no mentor until they sign up/)
-    ).toBeTruthy();
+      screen.getAllByText(
+        "Links automatically when they sign up with this address."
+      ).length
+    ).toBeGreaterThan(0);
   });
 
-  it("says the catalog shows seeking when the flag is on and no address is on file", async () => {
-    // Independent of student-proposed since #304: a partner project can
-    // want a mentor too.
+  it("previews the badge from the draft, before anything is saved", async () => {
     getProjectMentorship.mockResolvedValue({
       mentorEmail: "",
       mentorName: null,
-      seekingMentor: true,
-      studentProposed: false,
+      seekingMentor: false,
     });
     renderPanel("submitted");
+    expect(await screen.findByText("Mentor:", { exact: false })).toBeTruthy();
+    expect(screen.getByText("nothing about mentorship")).toBeTruthy();
+    expect(screen.queryByText("Seeking mentor")).toBeNull();
+
+    // Checking the box flips the preview to the rendered badge at once.
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Looking for a mentor" })
+    );
+    expect(screen.getByText("Seeking mentor")).toBeTruthy();
+    expect(screen.queryByText("nothing about mentorship")).toBeNull();
+    expect(updateProjectMentorship).not.toHaveBeenCalled();
+
+    // Typing an address takes the badge away again and explains why.
+    fireEvent.change(screen.getByLabelText("Mentor email"), {
+      target: { value: "mentor@x.test" },
+    });
+    expect(screen.queryByText("Seeking mentor")).toBeNull();
+    expect(screen.getByText("nothing about mentorship")).toBeTruthy();
     expect(
-      await screen.findByText(/shows this project as seeking a mentor/)
+      screen.getByText(/shows no badge while an address is on file/)
     ).toBeTruthy();
-    expect(screen.getByText("Mentor:", { exact: false })).toBeTruthy();
   });
 
-  it("warns when the flag is on but an address hides the badge", async () => {
+  it("warns from the saved record too when the flag is on but an address hides the badge", async () => {
     getProjectMentorship.mockResolvedValue({
       mentorEmail: "mentor@x.test",
       mentorName: null,
       seekingMentor: true,
-      studentProposed: true,
     });
     renderPanel("submitted");
     expect(
       await screen.findByText(/shows no badge while an address is on file/)
     ).toBeTruthy();
+    expect(screen.getByText("nothing about mentorship")).toBeTruthy();
   });
 
-  it("saves all three fields through the server function and reloads the record", async () => {
+  it("saves both fields through the server function and reloads the record", async () => {
     renderPanel("submitted");
     const input = (await screen.findByLabelText(
       "Mentor email"
     )) as HTMLInputElement;
     fireEvent.change(input, { target: { value: " other@x.test " } });
-    fireEvent.click(screen.getByRole("checkbox", { name: "Student proposed" }));
     fireEvent.click(
       screen.getByRole("checkbox", { name: "Looking for a mentor" })
     );
-    fireEvent.click(screen.getByRole("button", { name: "Save mentorship" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
 
     await waitFor(() =>
       expect(updateProjectMentorship).toHaveBeenCalledWith({
@@ -571,7 +617,6 @@ describe("StaffProjectPanel mentorship block", () => {
           id: PROJECT_ID,
           mentorEmail: "other@x.test",
           seekingMentor: true,
-          studentProposed: true,
         },
       })
     );
@@ -580,13 +625,12 @@ describe("StaffProjectPanel mentorship block", () => {
   });
 });
 
-describe("StaffProjectPanel mentorship save gate", () => {
+describe("StaffProjectPanel mentor save gate", () => {
   it("keeps Save disabled until the record has loaded, so blank drafts cannot clear a mentor", async () => {
     let resolveLoad: (value: {
       mentorEmail: string;
       mentorName: string | null;
       seekingMentor: boolean;
-      studentProposed: boolean;
     }) => void = () => {
       // replaced below
     };
@@ -597,7 +641,7 @@ describe("StaffProjectPanel mentorship save gate", () => {
     );
     renderPanel("submitted");
 
-    const save = screen.getByRole("button", { name: "Save mentorship" });
+    const save = screen.getByRole("button", { name: "Save mentor" });
     expect(save.hasAttribute("disabled")).toBe(true);
     fireEvent.click(save);
     expect(updateProjectMentorship).not.toHaveBeenCalled();
@@ -606,7 +650,6 @@ describe("StaffProjectPanel mentorship save gate", () => {
       mentorEmail: "mentor@x.test",
       mentorName: null,
       seekingMentor: false,
-      studentProposed: false,
     });
     await waitFor(() => expect(save.hasAttribute("disabled")).toBe(false));
   });
@@ -617,7 +660,7 @@ describe("StaffProjectPanel mentorship save gate", () => {
     expect(await screen.findByText("Forbidden")).toBeTruthy();
     expect(
       screen
-        .getByRole("button", { name: "Save mentorship" })
+        .getByRole("button", { name: "Save mentor" })
         .hasAttribute("disabled")
     ).toBe(true);
   });
@@ -709,13 +752,12 @@ describe("StaffProjectPanel transition dialog across a project change", () => {
   });
 });
 
-describe("StaffProjectPanel mentorship across a project change", () => {
+describe("StaffProjectPanel mentor across a project change", () => {
   it("drops the previous project's drafts and disables Save while the next record loads", async () => {
     getProjectMentorship.mockResolvedValueOnce({
       mentorEmail: "first@x.test",
       mentorName: null,
       seekingMentor: false,
-      studentProposed: true,
     });
     const view = renderPanel("submitted");
     expect(
@@ -729,7 +771,7 @@ describe("StaffProjectPanel mentorship across a project change", () => {
     expect(input.value).toBe("");
     expect(
       screen
-        .getByRole("button", { name: "Save mentorship" })
+        .getByRole("button", { name: "Save mentor" })
         .hasAttribute("disabled")
     ).toBe(true);
   });

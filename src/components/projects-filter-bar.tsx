@@ -45,8 +45,11 @@ interface Props {
   order: "relevance" | "newest" | "recommended";
   program: string | null;
   q: string;
+  /** The derived badge value, the same rule as the card (#336). */
+  seekingMentorOnly: boolean;
   /** Same source as `canRecommend`, and for the same reason. */
   signedIn: boolean;
+  studentProposedOnly: boolean;
   view: ViewMode;
 }
 
@@ -58,7 +61,9 @@ export function ProjectsFilterBar({
   archivedOnly,
   canRecommend,
   order,
+  seekingMentorOnly,
   signedIn,
+  studentProposedOnly,
   view,
 }: Props) {
   const navigate = useNavigate({ from: "/projects/" });
@@ -121,6 +126,8 @@ export function ProjectsFilterBar({
         program: null,
         acceptingOnly: false,
         archivedOnly: false,
+        studentProposedOnly: false,
+        seekingMentorOnly: false,
         order: "relevance",
         page: 1,
       }),
@@ -139,6 +146,18 @@ export function ProjectsFilterBar({
     });
   }
 
+  function setStudentProposedOnly(value: boolean) {
+    void navigate({
+      search: (prev) => ({ ...prev, studentProposedOnly: value, page: 1 }),
+    });
+  }
+
+  function setSeekingMentorOnly(value: boolean) {
+    void navigate({
+      search: (prev) => ({ ...prev, seekingMentorOnly: value, page: 1 }),
+    });
+  }
+
   const grouped = new Map<string, Category[]>();
   for (const c of allCategories) {
     const arr = grouped.get(c.type) ?? [];
@@ -152,6 +171,8 @@ export function ProjectsFilterBar({
     program ||
     acceptingOnly ||
     archivedOnly ||
+    studentProposedOnly ||
+    seekingMentorOnly ||
     order !== "relevance";
 
   return (
@@ -224,6 +245,18 @@ export function ProjectsFilterBar({
           id="filter-archived-only"
           label="Only show archived projects"
           onCheckedChange={setArchivedOnly}
+        />
+        <FilterSwitch
+          checked={studentProposedOnly}
+          id="filter-student-proposed-only"
+          label="Only show student-proposed projects"
+          onCheckedChange={setStudentProposedOnly}
+        />
+        <FilterSwitch
+          checked={seekingMentorOnly}
+          id="filter-seeking-mentor-only"
+          label="Only show projects seeking a mentor"
+          onCheckedChange={setSeekingMentorOnly}
         />
       </div>
 

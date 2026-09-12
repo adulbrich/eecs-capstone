@@ -66,6 +66,8 @@ const SEARCH_DEFAULTS = {
   programId: null,
   archivedOnly: false,
   acceptingOnly: false,
+  studentProposedOnly: false,
+  seekingMentorOnly: false,
   page: 1,
   pageSize: 20,
 };

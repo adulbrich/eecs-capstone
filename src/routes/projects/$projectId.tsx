@@ -192,7 +192,6 @@ function ProjectDetail() {
         label="Preferred qualifications"
       />
       <ContactSection email={project.contactEmail} name={project.contactName} />
-      <MentorSection name={project.mentorName} />
       <AgreementSection
         body={project.licenseRestrictions}
         required={project.requiresNdaIp}
@@ -302,23 +301,6 @@ function ContactSection({
           </a>
         )}
       </p>
-    </section>
-  );
-}
-
-/**
- * The mentor as a name only. When the address on file matches no account this
- * renders nothing, by design: the email would publish a person who has not
- * signed up, and "Seeking mentor" would be false. See #75.
- */
-function MentorSection({ name }: { name: string | null }) {
-  if (!name) {
-    return null;
-  }
-  return (
-    <section className="mt-8">
-      <SectionHeading>Mentor</SectionHeading>
-      <p className="mt-2">{name}</p>
     </section>
   );
 }
