@@ -749,6 +749,41 @@ describe("admin projects flag switches", () => {
     expect(rows.map((r) => r.title)).toEqual(["Match"]);
   });
 
+  it("composes the seeking switch with the proposer and the search text", async () => {
+    const admin = await makeAdmin(`f6-${Date.now()}@x.com`);
+    const alice = await makeProposer(`f6-alice-${Date.now()}@x.com`);
+    const bob = await makeProposer(`f6-bob-${Date.now()}@x.com`);
+    const match = await createProjectAs(
+      alice,
+      baseProject("Glacier sensors", null)
+    );
+    await flag(match.id, { seekingMentor: true });
+    const mentored = await createProjectAs(
+      alice,
+      baseProject("Glacier drones", null)
+    );
+    await flag(mentored.id, {
+      mentorEmail: "mentor@example.edu",
+      seekingMentor: true,
+    });
+    const otherText = await createProjectAs(
+      alice,
+      baseProject("River sensors", null)
+    );
+    await flag(otherText.id, { seekingMentor: true });
+    const otherProposer = await createProjectAs(
+      bob,
+      baseProject("Glacier mapping", null)
+    );
+    await flag(otherProposer.id, { seekingMentor: true });
+
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ proposer: alice.id, q: "glacier", seekingMentorOnly: true })
+    );
+    expect(rows.map((r) => r.title)).toEqual(["Glacier sensors"]);
+  });
+
   it("narrows the proposer dropdown, the way the status set does", async () => {
     const admin = await makeAdmin(`f4-${Date.now()}@x.com`);
     const alice = await makeProposer(`f4-alice-${Date.now()}@x.com`);

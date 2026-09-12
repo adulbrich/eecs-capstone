@@ -2,6 +2,7 @@ import {
   createFileRoute,
   Link,
   redirect,
+  stripSearchParams,
   useNavigate,
 } from "@tanstack/react-router";
 import { ChevronDown } from "lucide-react";
@@ -74,10 +75,23 @@ import {
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * The four switches, off. Stripped from the URL when they match, so a shared
+ * link carries only what is on (#340): the router writes every validated
+ * default back on navigation otherwise, and a `false` written by the spread
+ * of `prev` would survive a switch set to `undefined`.
+ */
+const SWITCH_DEFAULTS = {
+  acceptingOnly: false,
+  includeSoftDeleted: false,
+  seekingMentorOnly: false,
+  studentProposedOnly: false,
+};
+
 export const searchSchema = z.object({
   cols: z.string().optional(),
   dir: z.enum(["asc", "desc"]).optional(),
-  includeSoftDeleted: z.boolean().default(false),
+  includeSoftDeleted: z.boolean().default(SWITCH_DEFAULTS.includeSoftDeleted),
   program: z.string().uuid().nullable().default(null),
   // Better Auth user ids are text, not UUIDs.
   proposer: z.string().max(255).nullable().default(null),
@@ -92,9 +106,9 @@ export const searchSchema = z.object({
   dateField: z.enum(ADMIN_DATE_FIELDS).catch("published").default("published"),
   // The public listing's three switches under the same names, so a link
   // pasted from /projects narrows this page the same way (#340).
-  acceptingOnly: z.boolean().default(false),
-  studentProposedOnly: z.boolean().default(false),
-  seekingMentorOnly: z.boolean().default(false),
+  acceptingOnly: z.boolean().default(SWITCH_DEFAULTS.acceptingOnly),
+  studentProposedOnly: z.boolean().default(SWITCH_DEFAULTS.studentProposedOnly),
+  seekingMentorOnly: z.boolean().default(SWITCH_DEFAULTS.seekingMentorOnly),
 });
 
 type Search = z.infer<typeof searchSchema>;
@@ -123,6 +137,7 @@ export function resolveAdminFilter(search: Search) {
 
 export const Route = createFileRoute("/_authed/admin/projects/")({
   validateSearch: searchSchema,
+  search: { middlewares: [stripSearchParams(SWITCH_DEFAULTS)] },
   head: () => ({ meta: [{ title: pageTitle("Projects") }] }),
   beforeLoad: async () => {
     const session = await getSession();
@@ -713,7 +728,9 @@ function AdminProjects() {
               The four switches as one group on a line of their own, so at
               1280px none is stranded at the end of the select row, and at
               375px each wraps cleanly under the previous one (#340). Labels
-              and ids mirror the public bar.
+              mirror the public bar; ids take the admin- prefix of the
+              soft-deleted switch. An off switch leaves the URL: see
+              SWITCH_DEFAULTS.
             */}
             <div className="flex basis-full flex-wrap gap-x-6 gap-y-3">
               <FilterSwitch
@@ -722,7 +739,10 @@ function AdminProjects() {
                 label="Only show projects accepting applicants"
                 onCheckedChange={(checked) =>
                   void navigate({
-                    search: (prev) => ({ ...prev, acceptingOnly: checked }),
+                    search: (prev) => ({
+                      ...prev,
+                      acceptingOnly: checked,
+                    }),
                   })
                 }
               />
@@ -745,7 +765,10 @@ function AdminProjects() {
                 label="Only show projects seeking a mentor"
                 onCheckedChange={(checked) =>
                   void navigate({
-                    search: (prev) => ({ ...prev, seekingMentorOnly: checked }),
+                    search: (prev) => ({
+                      ...prev,
+                      seekingMentorOnly: checked,
+                    }),
                   })
                 }
               />

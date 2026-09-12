@@ -179,22 +179,18 @@ test("@smoke admin projects list", async ({ page }) => {
     "Only show projects seeking a mentor",
     "Show soft-deleted",
   ];
-  await page.goto("/admin/projects");
-  await waitForHydration(page);
-  for (const name of switches) {
-    await expect(page.getByRole("switch", { name })).toBeVisible();
+  async function scanWithSwitches() {
+    await page.goto("/admin/projects");
+    await waitForHydration(page);
+    for (const name of switches) {
+      await expect(page.getByRole("switch", { name })).toBeVisible();
+    }
+    await expectNoHorizontalOverflow(page);
+    await checkA11y(page);
   }
-  await expectNoHorizontalOverflow(page);
-  await checkA11y(page);
-
+  await scanWithSwitches();
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto("/admin/projects");
-  await waitForHydration(page);
-  for (const name of switches) {
-    await expect(page.getByRole("switch", { name })).toBeVisible();
-  }
-  await expectNoHorizontalOverflow(page);
-  await checkA11y(page);
+  await scanWithSwitches();
 });
 
 test("admin users list", async ({ page }) => {

@@ -23,7 +23,6 @@ import {
   user,
 } from "#/db/schema";
 import { readSession } from "#/lib/_internal/auth-guards";
-import type { AdminDateField } from "#/lib/admin-project-filters";
 import { dayRange } from "#/lib/day-range";
 import {
   canEditProject,
@@ -34,6 +33,7 @@ import {
 } from "#/lib/project-visibility";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type { ProjectStatus } from "#/lib/vocabularies";
+import type { AdminProjectsFilter } from "../projects-queries";
 import {
   adminProjectSummarySelect,
   mentorNameSql,
@@ -96,21 +96,6 @@ export async function listMyProjectsImpl(data: { status: StatusFilter }) {
       ),
   ]);
   return { rows, teamCapacity: capacity?.teamCapacity ?? 0 };
-}
-
-interface AdminProjectsFilter {
-  acceptingOnly: boolean;
-  dateField: AdminDateField;
-  from: string | null;
-  includeSoftDeleted: boolean;
-  program: string | null;
-  proposer: string | null;
-  q: string;
-  /** The derived badge value, the same rule as the public filter (#340). */
-  seekingMentorOnly: boolean;
-  statuses: ProjectStatus[];
-  studentProposedOnly: boolean;
-  to: string | null;
 }
 
 /** The column each From and To pair narrows on. */

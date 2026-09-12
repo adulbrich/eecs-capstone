@@ -44,6 +44,7 @@ const adminListSchema = z
     proposer: z.string().max(255).nullable().default(null),
     q: z.string().max(200).default(""),
     // The public listing's three switches, under the same names (#340).
+    // Seeking a mentor is the derived badge value, the same rule as there.
     acceptingOnly: z.boolean().default(false),
     studentProposedOnly: z.boolean().default(false),
     seekingMentorOnly: z.boolean().default(false),
@@ -51,6 +52,13 @@ const adminListSchema = z
   .refine((v) => !(v.from && v.to) || v.from <= v.to, {
     message: "from must not be after to",
   });
+
+/**
+ * The staff listing's filter, as the wrapper validates it: `listAdminProjects`
+ * and `exportAdminProjects` take it and the impl imports it type-only, so the
+ * two cannot drift (docs/QUIRKS.md, "An impl imports its input types back").
+ */
+export type AdminProjectsFilter = z.infer<typeof adminListSchema>;
 
 const projectIdSchema = z.object({ id: z.string().uuid() });
 
