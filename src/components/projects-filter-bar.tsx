@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useId } from "react";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import type { ViewMode } from "#/lib/view-preference";
 import { FilterSwitch } from "./filter-switch";
@@ -201,7 +201,7 @@ interface FiltersProps extends ProjectsFilterState {
  * The narrowing controls, stacked for a column: `ListingLayout` puts them in
  * the aside from `xl` and in the sheet below it. The switch labels are one
  * line each under a legend that carries the "only show" so that each fits
- * a 18rem column beside its switch; the full sentence wrapped to two lines.
+ * an 18rem column beside its switch; the full sentence wrapped to two lines.
  */
 export function ProjectsFilters({
   acceptingOnly,
@@ -214,6 +214,10 @@ export function ProjectsFilters({
   studentProposedOnly,
 }: FiltersProps) {
   const { clearAll, setFilter } = useProjectsFilterNavigation();
+  // ListingLayout mounts this form twice, in the aside and in the sheet, so
+  // a literal id would be duplicated and every label would resolve to the
+  // hidden aside copy. useId gives each mount its own set.
+  const uid = useId();
 
   function toggleCategory(id: string) {
     setFilter(
@@ -243,12 +247,12 @@ export function ProjectsFilters({
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
-        <Label htmlFor="filter-program">Program</Label>
+        <Label htmlFor={`${uid}-program`}>Program</Label>
         <Select
           onValueChange={(v) => setFilter("program", v === "_all_" ? null : v)}
           value={program ?? "_all_"}
         >
-          <SelectTrigger className="w-full" id="filter-program">
+          <SelectTrigger className="w-full" id={`${uid}-program`}>
             <SelectValue placeholder="All programs" />
           </SelectTrigger>
           <SelectContent>
@@ -269,25 +273,25 @@ export function ProjectsFilters({
         <div className="mt-1">
           <FilterSwitch
             checked={acceptingOnly}
-            id="filter-accepting-only"
+            id={`${uid}-accepting-only`}
             label="Accepting applicants"
             onCheckedChange={(v) => setFilter("acceptingOnly", v)}
           />
           <FilterSwitch
             checked={archivedOnly}
-            id="filter-archived-only"
+            id={`${uid}-archived-only`}
             label="Archived"
             onCheckedChange={(v) => setFilter("archivedOnly", v)}
           />
           <FilterSwitch
             checked={studentProposedOnly}
-            id="filter-student-proposed-only"
+            id={`${uid}-student-proposed-only`}
             label="Student-proposed"
             onCheckedChange={(v) => setFilter("studentProposedOnly", v)}
           />
           <FilterSwitch
             checked={seekingMentorOnly}
-            id="filter-seeking-mentor-only"
+            id={`${uid}-seeking-mentor-only`}
             label="Seeking a mentor"
             onCheckedChange={(v) => setFilter("seekingMentorOnly", v)}
           />

@@ -31,9 +31,10 @@ interface Props {
   /**
    * The narrowing controls. Rendered twice, in the aside from `xl` and in
    * the sheet below it, so pass the same element; only one copy is ever
-   * displayed. The sheet mounts its copy while open, so ids collide only
-   * while the sheet is open below `xl`, where the aside is `display: none`
-   * and out of the accessibility tree.
+   * displayed. Both copies are mounted while the sheet is open, so every
+   * id inside must come from `useId`: a literal id is duplicated and its
+   * label resolves to the hidden aside copy, leaving the sheet's control
+   * unnamed.
    */
   filters: ReactNode;
   /** The search input and whatever orders or displays the results. */

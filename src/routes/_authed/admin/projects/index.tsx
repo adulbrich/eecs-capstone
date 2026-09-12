@@ -5,7 +5,7 @@ import {
   stripSearchParams,
   useNavigate,
 } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useId } from "react";
 import { z } from "zod";
 import {
   AdminDataTable,
@@ -419,6 +419,264 @@ const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
   { header: "Updated", key: "updatedAt", value: (row) => row.updatedAt },
 ]);
 
+/**
+ * The narrowing form. Its own component, not JSX built in the route, because
+ * ListingLayout mounts it twice (aside and sheet) and each mount needs its
+ * own `useId` set: one id set built in the parent is duplicated across both
+ * copies, and every label then resolves to the hidden aside copy.
+ */
+function AdminProjectsFilters({
+  programs,
+  proposers,
+  resolved,
+  search,
+  setStatuses,
+}: {
+  programs: { courseId: string; courseName: string; id: string }[];
+  proposers: { email: string; id: string; name: string }[];
+  resolved: ReturnType<typeof resolveAdminFilter>;
+  search: Search;
+  setStatuses: (statuses: ProjectStatus[]) => void;
+}) {
+  const uid = useId();
+  const navigate = useNavigate({ from: "/admin/projects/" });
+  const {
+    acceptingOnly,
+    includeSoftDeleted,
+    program,
+    proposer,
+    seekingMentorOnly,
+    studentProposedOnly,
+  } = search;
+  // The chosen proposer can fall outside the current status/program/deleted
+  // scope, which would leave the Select showing a blank trigger. Keep the row
+  // count honest by surfacing it as a still-selected option.
+  const proposerMissing =
+    !!proposer && !proposers.some((p) => p.id === proposer);
+
+  return (
+    <div className="space-y-4">
+      <fieldset>
+        <legend className="font-medium text-muted-foreground text-xs">
+          Status
+        </legend>
+        <p className="mt-0.5 text-muted-foreground text-xs">
+          {statusSelectionLabel(resolved.statuses)}
+        </p>
+        <div className="mt-1 space-y-1">
+          {PROJECT_STATUSES.map((s) => {
+            const checked = resolved.statuses.includes(s);
+            return (
+              <Label className="min-h-7 font-normal" key={s}>
+                <Checkbox
+                  checked={checked}
+                  // The last checked status cannot be unchecked, so the
+                  // empty set never exists.
+                  disabled={checked && resolved.statuses.length === 1}
+                  onCheckedChange={() =>
+                    setStatuses(toggleStatus(resolved.statuses, s))
+                  }
+                />
+                {PROJECT_STATUS_LABEL[s]}
+              </Label>
+            );
+          })}
+        </div>
+      </fieldset>
+      <div className="space-y-1.5">
+        <Label htmlFor={`${uid}-program`}>Program</Label>
+        <Select
+          onValueChange={(v) =>
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                program: v === "_all_" ? null : v,
+              }),
+            })
+          }
+          value={program ?? "_all_"}
+        >
+          <SelectTrigger className="w-full" id={`${uid}-program`}>
+            <SelectValue placeholder="All programs" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all_">All programs</SelectItem>
+            {programs.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.courseId} {p.courseName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`${uid}-proposer`}>Proposer</Label>
+        <Select
+          onValueChange={(v) =>
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                proposer: v === "_all_" ? null : v,
+              }),
+            })
+          }
+          value={proposer ?? "_all_"}
+        >
+          <SelectTrigger className="w-full" id={`${uid}-proposer`}>
+            <SelectValue placeholder="All proposers" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all_">All proposers</SelectItem>
+            {proposers.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name} ({p.email})
+              </SelectItem>
+            ))}
+            {proposerMissing && proposer && (
+              <SelectItem value={proposer}>
+                Selected proposer (outside current filters)
+              </SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`${uid}-date-field`}>Date</Label>
+        <Select
+          onValueChange={(v) =>
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                dateField: v as AdminDateField,
+              }),
+            })
+          }
+          value={resolved.dateField}
+        >
+          <SelectTrigger className="w-full" id={`${uid}-date-field`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ADMIN_DATE_FIELDS.map((f) => (
+              <SelectItem key={f} value={f}>
+                {ADMIN_DATE_FIELD_LABEL[f]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor={`${uid}-from`}>From</Label>
+          <Input
+            className="w-full"
+            id={`${uid}-from`}
+            onChange={(e) =>
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  from: e.target.value || undefined,
+                }),
+              })
+            }
+            type="date"
+            value={resolved.from ?? ""}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`${uid}-to`}>To</Label>
+          <Input
+            className="w-full"
+            id={`${uid}-to`}
+            onChange={(e) =>
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  to: e.target.value || undefined,
+                }),
+              })
+            }
+            type="date"
+            value={resolved.to ?? ""}
+          />
+        </div>
+      </div>
+      {(resolved.from !== null || resolved.to !== null) && (
+        <Button
+          onClick={() =>
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                from: undefined,
+                to: undefined,
+              }),
+            })
+          }
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
+          Clear dates
+        </Button>
+      )}
+      <fieldset>
+        {/*
+          The three switches the public listing has, under the same params, so
+          a link pasted from /projects narrows this page the same way (#340).
+          Labels are one line each under the legend, so each fits the aside
+          beside its switch. An off switch leaves the URL: see SWITCH_DEFAULTS.
+        */}
+        <legend className="font-medium text-muted-foreground text-xs">
+          Only show projects that are
+        </legend>
+        <div className="mt-1">
+          <FilterSwitch
+            checked={acceptingOnly}
+            id={`${uid}-accepting-only`}
+            label={SWITCH_LABEL.acceptingOnly}
+            onCheckedChange={(checked) =>
+              void navigate({
+                search: (prev) => ({ ...prev, acceptingOnly: checked }),
+              })
+            }
+          />
+          <FilterSwitch
+            checked={studentProposedOnly}
+            id={`${uid}-student-proposed-only`}
+            label={SWITCH_LABEL.studentProposedOnly}
+            onCheckedChange={(checked) =>
+              void navigate({
+                search: (prev) => ({ ...prev, studentProposedOnly: checked }),
+              })
+            }
+          />
+          <FilterSwitch
+            checked={seekingMentorOnly}
+            id={`${uid}-seeking-mentor-only`}
+            label={SWITCH_LABEL.seekingMentorOnly}
+            onCheckedChange={(checked) =>
+              void navigate({
+                search: (prev) => ({ ...prev, seekingMentorOnly: checked }),
+              })
+            }
+          />
+        </div>
+      </fieldset>
+      {/* Outside the legend: it widens the view rather than narrowing it. */}
+      <FilterSwitch
+        checked={includeSoftDeleted}
+        id={`${uid}-include-soft-deleted`}
+        label="Show soft-deleted"
+        onCheckedChange={(checked) =>
+          void navigate({
+            search: (prev) => ({ ...prev, includeSoftDeleted: checked }),
+          })
+        }
+      />
+    </div>
+  );
+}
+
 function AdminProjects() {
   const { rows, proposers, programs } = Route.useLoaderData();
   // The whole search object goes to the hook, which reads cols/dir/sort.
@@ -489,238 +747,18 @@ function AdminProjects() {
     storageKey: "projects",
   });
 
-  // The chosen proposer can fall outside the current status/program/deleted
-  // scope, which would leave the Select showing a blank trigger. Keep the row
-  // count honest by surfacing it as a still-selected option.
-  const proposerMissing =
-    !!proposer && !proposers.some((p) => p.id === proposer);
-
-  const filters = (
-    <div className="space-y-4">
-      <fieldset>
-        <legend className="font-medium text-muted-foreground text-xs">
-          Status
-        </legend>
-        <p className="mt-0.5 text-muted-foreground text-xs">
-          {statusSelectionLabel(resolved.statuses)}
-        </p>
-        <div className="mt-1 space-y-1">
-          {PROJECT_STATUSES.map((s) => {
-            const checked = resolved.statuses.includes(s);
-            return (
-              <Label className="min-h-7 font-normal" key={s}>
-                <Checkbox
-                  checked={checked}
-                  // The last checked status cannot be unchecked, so the
-                  // empty set never exists.
-                  disabled={checked && resolved.statuses.length === 1}
-                  onCheckedChange={() =>
-                    setStatuses(toggleStatus(resolved.statuses, s))
-                  }
-                />
-                {PROJECT_STATUS_LABEL[s]}
-              </Label>
-            );
-          })}
-        </div>
-      </fieldset>
-      <div className="space-y-1.5">
-        <Label htmlFor="admin-filter-program">Program</Label>
-        <Select
-          onValueChange={(v) =>
-            void navigate({
-              search: (prev) => ({
-                ...prev,
-                program: v === "_all_" ? null : v,
-              }),
-            })
-          }
-          value={program ?? "_all_"}
-        >
-          <SelectTrigger className="w-full" id="admin-filter-program">
-            <SelectValue placeholder="All programs" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all_">All programs</SelectItem>
-            {programs.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.courseId} {p.courseName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="admin-filter-proposer">Proposer</Label>
-        <Select
-          onValueChange={(v) =>
-            void navigate({
-              search: (prev) => ({
-                ...prev,
-                proposer: v === "_all_" ? null : v,
-              }),
-            })
-          }
-          value={proposer ?? "_all_"}
-        >
-          <SelectTrigger className="w-full" id="admin-filter-proposer">
-            <SelectValue placeholder="All proposers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all_">All proposers</SelectItem>
-            {proposers.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name} ({p.email})
-              </SelectItem>
-            ))}
-            {proposerMissing && proposer && (
-              <SelectItem value={proposer}>
-                Selected proposer (outside current filters)
-              </SelectItem>
-            )}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="admin-filter-date-field">Date</Label>
-        <Select
-          onValueChange={(v) =>
-            void navigate({
-              search: (prev) => ({
-                ...prev,
-                dateField: v as AdminDateField,
-              }),
-            })
-          }
-          value={resolved.dateField}
-        >
-          <SelectTrigger className="w-full" id="admin-filter-date-field">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ADMIN_DATE_FIELDS.map((f) => (
-              <SelectItem key={f} value={f}>
-                {ADMIN_DATE_FIELD_LABEL[f]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="admin-filter-from">From</Label>
-          <Input
-            className="w-full"
-            id="admin-filter-from"
-            onChange={(e) =>
-              void navigate({
-                search: (prev) => ({
-                  ...prev,
-                  from: e.target.value || undefined,
-                }),
-              })
-            }
-            type="date"
-            value={resolved.from ?? ""}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="admin-filter-to">To</Label>
-          <Input
-            className="w-full"
-            id="admin-filter-to"
-            onChange={(e) =>
-              void navigate({
-                search: (prev) => ({
-                  ...prev,
-                  to: e.target.value || undefined,
-                }),
-              })
-            }
-            type="date"
-            value={resolved.to ?? ""}
-          />
-        </div>
-      </div>
-      {(resolved.from !== null || resolved.to !== null) && (
-        <Button
-          onClick={() =>
-            void navigate({
-              search: (prev) => ({
-                ...prev,
-                from: undefined,
-                to: undefined,
-              }),
-            })
-          }
-          size="sm"
-          type="button"
-          variant="ghost"
-        >
-          Clear dates
-        </Button>
-      )}
-      <fieldset>
-        {/*
-          The three switches the public listing has, under the same params, so
-          a link pasted from /projects narrows this page the same way (#340).
-          Labels are one line each under the legend, so each fits the aside
-          beside its switch. An off switch leaves the URL: see SWITCH_DEFAULTS.
-        */}
-        <legend className="font-medium text-muted-foreground text-xs">
-          Only show projects that are
-        </legend>
-        <div className="mt-1">
-          <FilterSwitch
-            checked={acceptingOnly}
-            id="admin-accepting-only"
-            label={SWITCH_LABEL.acceptingOnly}
-            onCheckedChange={(checked) =>
-              void navigate({
-                search: (prev) => ({ ...prev, acceptingOnly: checked }),
-              })
-            }
-          />
-          <FilterSwitch
-            checked={studentProposedOnly}
-            id="admin-student-proposed-only"
-            label={SWITCH_LABEL.studentProposedOnly}
-            onCheckedChange={(checked) =>
-              void navigate({
-                search: (prev) => ({ ...prev, studentProposedOnly: checked }),
-              })
-            }
-          />
-          <FilterSwitch
-            checked={seekingMentorOnly}
-            id="admin-seeking-mentor-only"
-            label={SWITCH_LABEL.seekingMentorOnly}
-            onCheckedChange={(checked) =>
-              void navigate({
-                search: (prev) => ({ ...prev, seekingMentorOnly: checked }),
-              })
-            }
-          />
-        </div>
-      </fieldset>
-      {/* Outside the legend: it widens the view rather than narrowing it. */}
-      <FilterSwitch
-        checked={includeSoftDeleted}
-        id="admin-include-soft-deleted"
-        label="Show soft-deleted"
-        onCheckedChange={(checked) =>
-          void navigate({
-            search: (prev) => ({ ...prev, includeSoftDeleted: checked }),
-          })
-        }
-      />
-    </div>
-  );
-
   return (
     <ListingLayout
       activeFilterCount={activeFilterCount}
-      filters={filters}
+      filters={
+        <AdminProjectsFilters
+          programs={programs}
+          proposers={proposers}
+          resolved={resolved}
+          search={search}
+          setStatuses={setStatuses}
+        />
+      }
       search={
         <>
           <Label className="sr-only" htmlFor="admin-search">
