@@ -27,9 +27,9 @@ import { useSignedIn } from "#/lib/use-signed-in";
 import type { ViewMode } from "#/lib/view-preference";
 import { searchProjects } from "#/server/search";
 
-const searchSchema = z.object({
+export const searchSchema = z.object({
   q: z.string().default(""),
-  categories: z.array(z.string().uuid()).default([]),
+  categories: z.array(z.string().uuid()).max(20).catch([]).default([]),
   program: z.string().uuid().nullable().default(null),
   archivedOnly: z.boolean().default(false),
   acceptingOnly: z.boolean().default(false),
