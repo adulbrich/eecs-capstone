@@ -183,7 +183,11 @@ Each project carries:
   that opens on every status but archived and never empties), a date range on
   Created, Published or Updated read as Pacific calendar days, program and
   proposer filters, and a show-soft-deleted switch, all held in URL search
-  params; the CSV export follows the same filter (#335).
+  params; the CSV export follows the same filter (#335). The range only helps
+  on legacy rows if the import (#216) writes real dates: `publishedAt` as the
+  start of the term the project ran and `archivedAt` as its end, with
+  `createdAt` free to be the import time. That is why Published is the
+  default field.
 - [x] Consistent list presentation: fixed-ratio thumbnails, boolean filters
   rendered as switches aligned with the adjacent inputs, status dropdowns
   (including an "All statuses" option), and a shared centered empty state across
