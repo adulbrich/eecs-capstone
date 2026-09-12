@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "#/db";
 import {
   inventoryCustomLineItems,
@@ -635,5 +635,64 @@ describe("custom requests on my items", () => {
 
     // Nobody else sees any of it.
     expect(await listMyItemsAs(stranger)).toEqual([]);
+  });
+});
+
+describe("custom line emails", () => {
+  const ORIGINAL_ENV = { ...process.env };
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  it("emails the requester when a line is fulfilled or rejected, and not while sourcing", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser(`a-cl-mail-${Date.now()}@x.com`, "admin");
+    const requesterEmail = `r-cl-mail-${Date.now()}@x.com`;
+    const requester = await makeUser(requesterEmail, "user");
+    const send = vi.fn().mockResolvedValue(undefined);
+    const { lineIds } = await submitCustomRequestAs(requester, {
+      lines: [
+        {
+          name: "Thermal camera",
+          reason: "Field work",
+          quantity: 1,
+          link: null,
+        },
+        { name: "Lidar", reason: "Mapping", quantity: 1, link: null },
+      ],
+      note: null,
+    });
+
+    await startSourcingCustomLineAs(admin, {
+      customLineId: lineIds[0],
+      sourcingNote: "Ordering",
+    });
+    expect(send).not.toHaveBeenCalled();
+
+    const item = await makeItem(`Thermal-${Date.now()}`);
+    await fulfillCustomLineAs(
+      admin,
+      {
+        customLineId: lineIds[0],
+        itemIds: [item.id],
+        outcomeNote: "Arrived",
+        pickupBy: null,
+        reserve: true,
+      },
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe(requesterEmail);
+    expect(send.mock.calls[0]?.[1].subject).toBe("Fulfilled: Thermal camera");
+
+    send.mockClear();
+    await rejectCustomLineAs(
+      admin,
+      { customLineId: lineIds[1], outcomeNote: "No budget" },
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe(requesterEmail);
+    expect(send.mock.calls[0]?.[1].subject).toBe("Request denied: Lidar");
   });
 });

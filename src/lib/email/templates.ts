@@ -132,6 +132,25 @@ export function projectApprovedEmail(input: {
   };
 }
 
+/**
+ * A bell row, mailed. The inventory notices already say the one thing the
+ * recipient must do (pick up by a date, return by a date, ask again), so the
+ * email carries the same words rather than a second copy that would drift.
+ */
+export function notificationEmail(input: {
+  message: string;
+  title: string;
+  url: string;
+}): RenderedEmail {
+  return {
+    subject: input.title,
+    ...layout([input.message], {
+      label: "Open in the capstone app",
+      url: input.url,
+    }),
+  };
+}
+
 /** Staff linked a project to a new proposer. */
 export function projectReassignedEmail(input: {
   title: string;

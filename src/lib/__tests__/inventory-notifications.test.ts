@@ -4,9 +4,11 @@ import {
   customLineNotification,
   notificationFor,
   overdueNotifications,
+  toNotificationRow,
 } from "../inventory-notifications";
 
 const item = {
+  currentHolderEmail: null as string | null,
   currentHolderId: null as string | null,
   currentRequestItemId: null as string | null,
   id: "i-1",
@@ -22,10 +24,10 @@ describe("notificationFor", () => {
     const row = notificationFor(
       { ...item, currentHolderId: "u-teammate" },
       { nextStatus: "available", comment: "Out of scope this term" },
-      "u-teammate",
-      { outcome: "rejected", requesterId: "u-requester" }
+      { accountId: "u-teammate", email: null },
+      { outcome: "rejected", requesterId: "u-requester", requesterEmail: null }
     );
-    expect(row?.userId).toBe("u-requester");
+    expect(row?.recipient.accountId).toBe("u-requester");
     expect(row?.type).toBe("inventory_request_rejected");
     expect(row?.message).toBe("Out of scope this term");
   });
@@ -37,9 +39,9 @@ describe("notificationFor", () => {
       { ...item, currentHolderId: null },
       { nextStatus: "available" },
       null,
-      { outcome: "rejected", requesterId: "u-requester" }
+      { outcome: "rejected", requesterId: "u-requester", requesterEmail: null }
     );
-    expect(row?.userId).toBe("u-requester");
+    expect(row?.recipient.accountId).toBe("u-requester");
   });
 
   it("says nothing for a rejection with no resolved requester", () => {
@@ -47,6 +49,7 @@ describe("notificationFor", () => {
       notificationFor(item, { nextStatus: "available" }, null, {
         outcome: "rejected",
         requesterId: null,
+        requesterEmail: null,
       })
     ).toBeNull();
   });
@@ -56,7 +59,7 @@ describe("notificationFor", () => {
       notificationFor(
         item,
         { nextStatus: "available", authority: "self_cancel" },
-        "u-holder",
+        { accountId: "u-holder", email: null },
         null
       )
     ).toBeNull();
@@ -72,7 +75,7 @@ describe("notificationFor", () => {
     const withDate = notificationFor(
       item,
       { nextStatus: "reserved", pickupBy: new Date("2026-09-01") },
-      "u-holder",
+      { accountId: "u-holder", email: null },
       null
     );
     expect(withDate?.type).toBe("inventory_request_approved");
@@ -81,7 +84,7 @@ describe("notificationFor", () => {
     const without = notificationFor(
       item,
       { nextStatus: "reserved" },
-      "u-holder",
+      { accountId: "u-holder", email: null },
       null
     );
     expect(without?.title).not.toContain("Pick up by");
@@ -93,7 +96,7 @@ describe("notificationFor", () => {
     const row = notificationFor(
       item,
       { nextStatus: "checked_out", dueAt: new Date("2026-09-01T12:00:00Z") },
-      "u-holder",
+      { accountId: "u-holder", email: null },
       null
     );
     expect(row?.type).toBe("inventory_item_checked_out");
@@ -105,7 +108,7 @@ describe("notificationFor", () => {
     const row = notificationFor(
       item,
       { nextStatus: "checked_out" },
-      "u-holder",
+      { accountId: "u-holder", email: null },
       null
     );
     expect(row?.title).toContain("soon");
@@ -135,12 +138,48 @@ describe("notificationFor", () => {
     expect(closed?.type).toBe("inventory_request_closed");
   });
 
+  it("names a walk-in holder by address, which yields an email and no row", () => {
+    // A hold on an address with no account is exactly who email exists for:
+    // the bell needs an account id, the inbox does not.
+    const notice = notificationFor(
+      item,
+      { nextStatus: "reserved", pickupBy: new Date("2026-09-20T00:00:00Z") },
+      { accountId: null, email: "walkin@oregonstate.edu" },
+      null
+    );
+    expect(notice?.type).toBe("inventory_request_approved");
+    expect(notice?.recipient).toEqual({
+      accountId: null,
+      email: "walkin@oregonstate.edu",
+    });
+    expect(toNotificationRow(notice)).toBeNull();
+  });
+
+  it("reaches the previous holder's address on a release", () => {
+    const returned = notificationFor(
+      {
+        ...item,
+        currentHolderEmail: "holder@oregonstate.edu",
+        currentHolderId: "u-holder",
+        status: "checked_out" as ItemStatus,
+      },
+      { nextStatus: "available" },
+      null,
+      null
+    );
+    expect(returned?.recipient).toEqual({
+      accountId: "u-holder",
+      email: "holder@oregonstate.edu",
+    });
+    expect(toNotificationRow(returned)?.userId).toBe("u-holder");
+  });
+
   it("says nothing when a release was not from a hold", () => {
     expect(
       notificationFor(
         item,
         { nextStatus: "available", requestItemId: "line-1" },
-        "u-holder",
+        { accountId: "u-holder", email: null },
         null
       )
     ).toBeNull();
@@ -205,7 +244,7 @@ describe("notificationFor: silent", () => {
           pickupBy: new Date("2026-10-01T00:00:00Z"),
           silent: true,
         },
-        "u-requester",
+        { accountId: "u-requester", email: null },
         null
       )
     ).toBeNull();
@@ -213,7 +252,12 @@ describe("notificationFor: silent", () => {
 });
 
 describe("customLineNotification", () => {
-  const base = { name: "Thermal camera", note: null, requesterId: "u-req" };
+  const base = {
+    name: "Thermal camera",
+    note: null,
+    requesterEmail: "req@oregonstate.edu",
+    requesterId: "u-req",
+  };
 
   it("says staff are sourcing, carrying the note verbatim when there is one", () => {
     const withNote = customLineNotification("sourcing", {
@@ -221,7 +265,7 @@ describe("customLineNotification", () => {
       note: "Ordered from the vendor, two weeks",
     });
     expect(withNote).toEqual({
-      userId: "u-req",
+      recipient: { accountId: "u-req", email: "req@oregonstate.edu" },
       type: "inventory_custom_sourcing",
       title: "Sourcing: Thermal camera",
       message: "Ordered from the vendor, two weeks",

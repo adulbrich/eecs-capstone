@@ -6,8 +6,13 @@ import {
   inventoryRequests,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
+import type { InventoryNotice } from "#/lib/inventory-notifications";
 import { assertStaff, type Viewer } from "#/lib/viewer";
-import type { Tx } from "./inventory-transitions";
+import {
+  notifyInventoryBatchByEmail,
+  notifyInventoryByEmail,
+} from "./inventory-emails";
+import type { TransitionEmailOptions, Tx } from "./inventory-transitions";
 
 const DEFAULT_PICKUP_DAYS = 7;
 
@@ -30,7 +35,7 @@ async function approveLineInTx(
   viewer: NonNullable<Viewer>,
   requestItemId: string,
   pickupBy: Date
-) {
+): Promise<InventoryNotice | null> {
   const { transitionItem } = await import("./inventory-transitions");
   // Lock the line before reading and updating it so a concurrent cancel
   // cannot move it out of 'pending' between this read and the transition.
@@ -70,8 +75,9 @@ async function approveLineInTx(
     .where(eq(inventoryRequestItems.id, requestItemId));
   // Pass the open transaction so transitionItem joins the same atomic
   // unit; syncRequestItem will flip the line to 'approved' under the
-  // same lock we already hold.
-  await transitionItem(
+  // same lock we already hold. The notice comes back for the caller to mail
+  // once that transaction has committed.
+  return await transitionItem(
     viewer,
     {
       itemId: line.itemId,
@@ -86,14 +92,18 @@ async function approveLineInTx(
 
 export async function approveRequestItemAs(
   viewer: Viewer,
-  data: { requestItemId: string; pickupBy: Date | null }
+  data: { requestItemId: string; pickupBy: Date | null },
+  opts?: TransitionEmailOptions
 ) {
   assertStaff(viewer);
   const pickupBy = data.pickupBy ?? defaultPickupBy();
-  return await db.transaction(async (tx) => {
-    await approveLineInTx(tx, viewer, data.requestItemId, pickupBy);
-    return { ok: true as const };
-  });
+  const notice = await db.transaction((tx) =>
+    approveLineInTx(tx, viewer, data.requestItemId, pickupBy)
+  );
+  // After the commit, never inside it: a failed email must not undo an
+  // approval, and a slow one must not hold the item's lock.
+  await notifyInventoryByEmail(notice, opts?.send);
+  return { ok: true as const };
 }
 
 /**
@@ -110,7 +120,8 @@ export async function approveRequestItemAs(
  */
 export async function approveRequestLinesAs(
   viewer: Viewer,
-  data: { requestItemIds: string[]; pickupBy: Date | null }
+  data: { requestItemIds: string[]; pickupBy: Date | null },
+  opts?: TransitionEmailOptions
 ) {
   assertStaff(viewer);
   const ids = [...new Set(data.requestItemIds)].sort();
@@ -120,23 +131,29 @@ export async function approveRequestLinesAs(
   // One date for the batch: a fallback computed per line would drift by
   // milliseconds across the group.
   const pickupBy = data.pickupBy ?? defaultPickupBy();
-  return await db.transaction(async (tx) => {
+  const notices = await db.transaction(async (tx) => {
+    const collected: (InventoryNotice | null)[] = [];
     for (const id of ids) {
-      await approveLineInTx(tx, viewer, id, pickupBy);
+      collected.push(await approveLineInTx(tx, viewer, id, pickupBy));
     }
-    return { approved: ids };
+    return collected;
   });
+  // One email per line, matching the one bell row per line. A cart of six
+  // items is six emails; coalescing them is a later change if it grates.
+  await notifyInventoryBatchByEmail(notices, opts?.send);
+  return { approved: ids };
 }
 
 export async function rejectRequestItemAs(
   viewer: Viewer,
-  data: { requestItemId: string; reviewComment: string }
+  data: { requestItemId: string; reviewComment: string },
+  opts?: TransitionEmailOptions
 ) {
   assertStaff(viewer);
   if (!data.reviewComment.trim()) {
     throw new Error("Reject reason required");
   }
-  return await db.transaction(async (tx) => {
+  const notice = await db.transaction(async (tx) => {
     // Locks the line and reads the item it belongs to. The requester is not
     // read here any more: transitionItem looks it up when it closes the line,
     // so that the denial reaches whoever asked even on a path that did not
@@ -160,7 +177,7 @@ export async function rejectRequestItemAs(
     // happen inside transitionItem now. This function keeps only what is its
     // own: who may reject, and which line is eligible.
     const { transitionItem } = await import("./inventory-transitions");
-    await transitionItem(
+    return await transitionItem(
       viewer,
       {
         itemId: line.itemId,
@@ -170,8 +187,9 @@ export async function rejectRequestItemAs(
       },
       tx
     );
-    return { ok: true as const };
   });
+  await notifyInventoryByEmail(notice, opts?.send);
+  return { ok: true as const };
 }
 
 export async function cancelRequestItemAs(

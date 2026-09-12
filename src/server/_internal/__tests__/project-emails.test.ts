@@ -398,11 +398,7 @@ describe("notifyHardDeleteByEmail", () => {
   it("emails the proposer when staff delete their draft, with no link", async () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
-    await notifyHardDeleteByEmail(
-      { actorId: STAFF, project: PROJECT },
-      send,
-      CONFIG
-    );
+    await notifyHardDeleteByEmail({ actorId: STAFF, project: PROJECT }, send);
 
     expect(send).toHaveBeenCalledOnce();
     const [to, email] = send.mock.calls[0] ?? [];
@@ -420,8 +416,7 @@ describe("notifyHardDeleteByEmail", () => {
         actorId: "u-proposer",
         project: { ...PROJECT, proposerId: "u-proposer" },
       },
-      send,
-      CONFIG
+      send
     );
 
     expect(send).not.toHaveBeenCalled();

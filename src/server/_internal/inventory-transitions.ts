@@ -10,7 +10,12 @@ import {
   user,
 } from "#/db/schema";
 import { type Hold, holdFromInput, holdToColumns } from "#/lib/hold";
-import { notificationFor } from "#/lib/inventory-notifications";
+import {
+  type InventoryNotice,
+  type NoticeRecipient,
+  notificationFor,
+  toNotificationRow,
+} from "#/lib/inventory-notifications";
 import {
   assertTransitionAllowed,
   type RequestLineDecision,
@@ -20,8 +25,15 @@ import {
   type TransitionInput,
 } from "#/lib/inventory-workflow";
 import type { ItemStatus } from "#/lib/vocabularies";
+import { notifyInventoryByEmail } from "./inventory-emails";
+import type { SendEmailFn } from "./project-emails";
 
 export type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
+
+export interface TransitionEmailOptions {
+  /** Test seam. Production callers omit it and the notifier resolves its own transport. */
+  send?: SendEmailFn;
+}
 
 /**
  * The statuses a request line can be in while an item still points at it.
@@ -127,9 +139,20 @@ async function resolveHold(tx: Tx, input: TransitionInput): Promise<Hold> {
   return holdFromInput(loose, { accountId: null, accountName: null });
 }
 
-/** The account behind a hold, when there is one. Notifications need an id. */
-function holdAccountId(hold: Hold): string | null {
-  return hold.kind === "account" ? hold.accountId : null;
+/**
+ * Who the hold is for, as a notice recipient: the account and its address, a
+ * walk-in's address alone, or nobody for a label or an empty hold. The bell
+ * needs the id and the inbox needs the address, so both travel.
+ */
+function holdRecipient(hold: Hold): NoticeRecipient | null {
+  switch (hold.kind) {
+    case "account":
+      return { accountId: hold.accountId, email: hold.email };
+    case "walk_in":
+      return { accountId: null, email: hold.email };
+    default:
+      return null;
+  }
 }
 
 /**
@@ -148,27 +171,35 @@ function holdAccountId(hold: Hold): string | null {
 export async function transitionItem(
   viewer: TransitionActor,
   input: TransitionInput,
-  externalTx?: Tx
-) {
+  externalTx?: Tx,
+  opts?: TransitionEmailOptions
+): Promise<InventoryNotice | null> {
   assertTransitionAllowed(viewer, input);
 
   // If the caller already has an open transaction (e.g. approveRequestItemAs
   // locks the request line before calling here), reuse it instead of opening
   // a fresh one. Drizzle's nested db.transaction would otherwise run on a
   // separate connection and break atomicity.
+  //
+  // The notice comes back either way. Email is sent after the transaction and
+  // never inside it (a slow SES call must not hold the item's row lock, and a
+  // failed email must not undo a checkout), so when the transaction is the
+  // caller's, the caller sends after its own commit; when it is ours, we do.
   if (externalTx) {
     return await transitionItemInTx(externalTx, viewer, input);
   }
-  return await db.transaction(async (tx) =>
+  const notice = await db.transaction(async (tx) =>
     transitionItemInTx(tx, viewer, input)
   );
+  await notifyInventoryByEmail(notice, opts?.send);
+  return notice;
 }
 
 async function transitionItemInTx(
   tx: Tx,
   viewer: TransitionActor,
   input: TransitionInput
-) {
+): Promise<InventoryNotice | null> {
   if (input.requestItemId) {
     await lockAttachableRequestLine(tx, input.requestItemId, input.itemId);
   }
@@ -264,10 +295,12 @@ async function transitionItemInTx(
     );
   }
 
-  const notice = notificationFor(current, input, holdAccountId(hold), closed);
-  if (notice) {
-    await tx.insert(notifications).values(notice);
+  const notice = notificationFor(current, input, holdRecipient(hold), closed);
+  const row = toNotificationRow(notice);
+  if (row) {
+    await tx.insert(notifications).values(row);
   }
+  return notice;
 }
 
 async function syncRequestItem(tx: Tx, input: TransitionInput) {
@@ -301,6 +334,8 @@ async function syncRequestItem(tx: Tx, input: TransitionInput) {
 /** What was written to the line, and who asked for it in the first place. */
 interface ClosedLine {
   outcome: RequestLineOutcome;
+  /** The requester's address, looked up beside the id. */
+  requesterEmail: string | null;
   /** The account that submitted the request, when one was looked up. */
   requesterId: string | null;
 }
@@ -321,6 +356,7 @@ async function closeRequestItemOnRelease(
   const now = new Date();
 
   let requesterId: string | null = null;
+  let requesterEmail: string | null = null;
   if (lineStatus === "rejected") {
     // The same precondition rejectRequestItemAs has always enforced. Without
     // it a release could stamp "rejected" over an approved or returned line
@@ -336,12 +372,14 @@ async function closeRequestItemOnRelease(
       .select({
         status: inventoryRequestItems.status,
         requesterId: inventoryRequests.userId,
+        requesterEmail: user.email,
       })
       .from(inventoryRequestItems)
       .innerJoin(
         inventoryRequests,
         eq(inventoryRequestItems.requestId, inventoryRequests.id)
       )
+      .innerJoin(user, eq(inventoryRequests.userId, user.id))
       .where(eq(inventoryRequestItems.id, requestItemId))
       .for("update");
     if (!line) {
@@ -351,6 +389,7 @@ async function closeRequestItemOnRelease(
       throw new Error("Only pending lines can be rejected");
     }
     requesterId = line.requesterId;
+    requesterEmail = line.requesterEmail;
   }
 
   await tx
@@ -369,5 +408,5 @@ async function closeRequestItemOnRelease(
         : {}),
     })
     .where(eq(inventoryRequestItems.id, requestItemId));
-  return { outcome: lineStatus, requesterId };
+  return { outcome: lineStatus, requesterEmail, requesterId };
 }

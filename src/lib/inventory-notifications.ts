@@ -19,10 +19,64 @@
 
 import { overdueFlags } from "./inventory-deadlines";
 import type { NotificationRow } from "./notification-row";
-import type { ItemStatus } from "./vocabularies";
+import type { ItemStatus, NotificationType } from "./vocabularies";
+
+/**
+ * Who a notice is for: an account, an address, or both. A walk-in hold has an
+ * address and no account, which is why this is not a bare user id: the bell
+ * needs the id, the inbox needs the address, and a notice decides its
+ * recipient once for both channels.
+ */
+export interface NoticeRecipient {
+  accountId: string | null;
+  email: string | null;
+}
+
+/** One notice, before it is split into a bell row and an email. */
+export interface InventoryNotice {
+  link: string;
+  message: string;
+  recipient: NoticeRecipient;
+  title: string;
+  type: NotificationType;
+}
+
+/** Someone is there to tell: an account, an address, or both. */
+function reachable(
+  recipient: NoticeRecipient | null
+): recipient is NoticeRecipient {
+  return Boolean(recipient?.accountId || recipient?.email);
+}
+
+/** The bell row a notice becomes, or none when the recipient has no account. */
+export function toNotificationRow(
+  notice: InventoryNotice | null
+): NotificationRow | null {
+  const accountId = notice?.recipient.accountId;
+  if (!(notice && accountId)) {
+    return null;
+  }
+  const { recipient: _recipient, ...rest } = notice;
+  return { ...rest, userId: accountId };
+}
+
+/**
+ * The inventory notices that also go by email: the ones whose recipient must
+ * act away from the app (a pickup window, a due date, a refusal). The rest are
+ * confirmations and stay in the bell. PRD section 13 is the table.
+ */
+export const EMAILED_INVENTORY_TYPES: ReadonlySet<NotificationType> =
+  new Set<NotificationType>([
+    "inventory_request_approved",
+    "inventory_request_rejected",
+    "inventory_item_checked_out",
+    "inventory_custom_fulfilled",
+    "inventory_custom_rejected",
+  ]);
 
 /** The item as it stood before the transition. */
 export interface TransitionSubject {
+  currentHolderEmail: string | null;
   currentHolderId: string | null;
   currentRequestItemId: string | null;
   id: string;
@@ -45,6 +99,8 @@ export interface TransitionNotice {
 /** A request line closed by the transition, if one was. */
 export interface ClosedLineOutcome {
   outcome: string;
+  /** The requester's address, looked up beside the id. */
+  requesterEmail: string | null;
   /** The account that submitted the request, when one was looked up. */
   requesterId: string | null;
 }
@@ -65,15 +121,17 @@ function formatDate(d: Date | null | undefined): string {
 /**
  * The one notification a status transition owes someone, or none.
  *
- * At most one row: no branch here has ever produced two. Multi-row lives in
- * `overdueNotifications` below.
+ * At most one notice: no branch here has ever produced two. Multi-row lives in
+ * `overdueNotifications` below. `holder` is the hold the transition assigns,
+ * as an account, an address, or neither; a release reads the previous holder
+ * off the item instead.
  */
 export function notificationFor(
   prev: TransitionSubject,
   input: TransitionNotice,
-  holderId: string | null,
+  holder: NoticeRecipient | null,
   closed: ClosedLineOutcome | null
-): NotificationRow | null {
+): InventoryNotice | null {
   // Before everything, including the denial: the one caller that sets this
   // is fulfilling a custom line, which never closes a request line and
   // writes its own single notice afterwards.
@@ -89,16 +147,20 @@ export function notificationFor(
   // holds the item, and a hold on a bare label answers nobody, which would
   // silently swallow the denial owed to the person who asked.
   if (closed?.outcome === "rejected") {
-    if (closed.requesterId) {
-      return {
-        userId: closed.requesterId,
-        type: "inventory_request_rejected",
-        title: `Request denied: ${prev.name}`,
-        message: input.comment ?? `Your request for ${prev.name} was denied.`,
-        link: "/my/items?filter=closed",
-      };
+    const requester = {
+      accountId: closed.requesterId,
+      email: closed.requesterEmail,
+    };
+    if (!reachable(requester)) {
+      return null;
     }
-    return null;
+    return {
+      recipient: requester,
+      type: "inventory_request_rejected",
+      title: `Request denied: ${prev.name}`,
+      message: input.comment ?? `Your request for ${prev.name} was denied.`,
+      link: "/my/items?filter=closed",
+    };
   }
 
   // Identify a "release-from-hold" path: no new request context provided AND
@@ -109,9 +171,8 @@ export function notificationFor(
     !input.requestItemId &&
     (!!prev.currentRequestItemId || !!prev.currentHolderId);
 
-  const recipientId =
-    holderId ?? (isReleaseFromHold ? prev.currentHolderId : null);
-  if (!recipientId) {
+  const recipient = holder ?? (isReleaseFromHold ? previousHolder(prev) : null);
+  if (!reachable(recipient)) {
     return null;
   }
 
@@ -130,7 +191,7 @@ export function notificationFor(
         ? `Reserved: ${prev.name}. Pick up by ${formatDate(input.pickupBy)}.`
         : `Reserved: ${prev.name}.`;
       return {
-        userId: recipientId,
+        recipient,
         type: "inventory_request_approved",
         title,
         message: `Your request for ${prev.name} was approved.`,
@@ -139,7 +200,7 @@ export function notificationFor(
     }
     case "checked_out": {
       return {
-        userId: recipientId,
+        recipient,
         type: "inventory_item_checked_out",
         title: `Checked out: ${prev.name}. Due ${formatDate(input.dueAt)}.`,
         message: `${prev.name} is now in your hands.`,
@@ -154,7 +215,7 @@ export function notificationFor(
       }
       if (prev.status === "checked_out" && input.nextStatus === "available") {
         return {
-          userId: recipientId,
+          recipient,
           type: "inventory_item_returned",
           title: `Returned: ${prev.name}`,
           message: `Thanks for returning ${prev.name}.`,
@@ -162,7 +223,7 @@ export function notificationFor(
         };
       }
       return {
-        userId: recipientId,
+        recipient,
         type: "inventory_request_closed",
         title: `Request closed: ${prev.name}`,
         message:
@@ -173,6 +234,11 @@ export function notificationFor(
     default:
       return null;
   }
+}
+
+/** The person the item was held for, as the item row remembers them. */
+function previousHolder(prev: TransitionSubject): NoticeRecipient {
+  return { accountId: prev.currentHolderId, email: prev.currentHolderEmail };
 }
 
 /** The four things a custom line can tell its requester. */
@@ -190,24 +256,30 @@ export interface CustomLineNotice {
   note: string | null;
   /** Set when a fulfillment reserved the items; null when it did not. */
   pickupBy?: Date | null;
+  requesterEmail: string | null;
   requesterId: string;
 }
 
 /**
- * The one notification a custom line event owes its requester. In-app only,
- * none by email; each carries the note it belongs to verbatim when it is
- * non-empty. One row per fulfill, whatever the item count. Staff get nothing
- * on submit: the admin overview tile is the signal.
+ * The one notification a custom line event owes its requester. Each carries
+ * the note it belongs to verbatim when it is non-empty. One notice per
+ * fulfill, whatever the item count. Fulfilled and rejected also go by email
+ * (`EMAILED_INVENTORY_TYPES`); the staff side is told of a submission by
+ * email too, from `inventory-emails.ts`, beside the admin overview tile.
  */
 export function customLineNotification(
   event: CustomLineEvent,
   notice: CustomLineNotice
-): NotificationRow {
+): InventoryNotice {
   const note = notice.note?.trim() ? notice.note : null;
+  const recipient: NoticeRecipient = {
+    accountId: notice.requesterId,
+    email: notice.requesterEmail,
+  };
   switch (event) {
     case "sourcing":
       return {
-        userId: notice.requesterId,
+        recipient,
         type: "inventory_custom_sourcing",
         title: `Sourcing: ${notice.name}`,
         message: note ?? `Staff are getting ${notice.name}.`,
@@ -215,7 +287,7 @@ export function customLineNotification(
       };
     case "sourcing_note":
       return {
-        userId: notice.requesterId,
+        recipient,
         type: "inventory_custom_sourcing_note",
         title: `Update on ${notice.name}`,
         message: note ?? `The plan for ${notice.name} changed.`,
@@ -227,7 +299,7 @@ export function customLineNotification(
         ? `${names} reserved for you. Pick up by ${formatDate(notice.pickupBy)}.`
         : `${names} now in the inventory.`;
       return {
-        userId: notice.requesterId,
+        recipient,
         type: "inventory_custom_fulfilled",
         title: `Fulfilled: ${notice.name}`,
         message: note ? `${reserved} ${note}` : reserved,
@@ -240,7 +312,7 @@ export function customLineNotification(
     }
     case "rejected":
       return {
-        userId: notice.requesterId,
+        recipient,
         type: "inventory_custom_rejected",
         title: `Request denied: ${notice.name}`,
         message: note ?? `Your request for ${notice.name} was denied.`,

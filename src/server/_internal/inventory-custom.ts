@@ -6,16 +6,22 @@ import {
   inventoryItems,
   inventoryRequests,
   notifications,
+  user,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import {
   assertCustomLineTransition,
   assertSourcingNoteEditable,
 } from "#/lib/inventory-custom-workflow";
-import { customLineNotification } from "#/lib/inventory-notifications";
+import {
+  customLineNotification,
+  type InventoryNotice,
+  toNotificationRow,
+} from "#/lib/inventory-notifications";
 import type { Viewer } from "#/lib/viewer";
+import { notifyInventoryByEmail } from "./inventory-emails";
 import { defaultPickupBy } from "./inventory-requests";
-import type { Tx } from "./inventory-transitions";
+import type { TransitionEmailOptions, Tx } from "./inventory-transitions";
 
 /**
  * Custom requests: asks for equipment the inventory does not hold.
@@ -78,6 +84,7 @@ async function lockLine(tx: Tx, customLineId: string) {
     .select({
       id: inventoryCustomLines.id,
       name: inventoryCustomLines.name,
+      requesterEmail: user.email,
       requesterId: inventoryRequests.userId,
       reviewedAt: inventoryCustomLines.reviewedAt,
       reviewedBy: inventoryCustomLines.reviewedBy,
@@ -88,12 +95,21 @@ async function lockLine(tx: Tx, customLineId: string) {
       inventoryRequests,
       eq(inventoryCustomLines.requestId, inventoryRequests.id)
     )
+    .innerJoin(user, eq(inventoryRequests.userId, user.id))
     .where(eq(inventoryCustomLines.id, customLineId))
     .for("update");
   if (!line) {
     throw new Error("Custom line not found");
   }
   return line;
+}
+
+/** Writes the bell row a notice owes. The requester always has an account. */
+async function insertNotice(tx: Tx, notice: InventoryNotice): Promise<void> {
+  const row = toNotificationRow(notice);
+  if (row) {
+    await tx.insert(notifications).values(row);
+  }
 }
 
 /**
@@ -128,10 +144,12 @@ export async function startSourcingCustomLineAs(
         ...firstDecision(line, viewer.id, now),
       })
       .where(eq(inventoryCustomLines.id, line.id));
-    await tx.insert(notifications).values(
+    await insertNotice(
+      tx,
       customLineNotification("sourcing", {
         name: line.name,
         note: data.sourcingNote,
+        requesterEmail: line.requesterEmail,
         requesterId: line.requesterId,
       })
     );
@@ -159,10 +177,12 @@ export async function updateSourcingNoteAs(
       .update(inventoryCustomLines)
       .set({ sourcingNote: data.sourcingNote })
       .where(eq(inventoryCustomLines.id, line.id));
-    await tx.insert(notifications).values(
+    await insertNotice(
+      tx,
       customLineNotification("sourcing_note", {
         name: line.name,
         note: data.sourcingNote,
+        requesterEmail: line.requesterEmail,
         requesterId: line.requesterId,
       })
     );
@@ -172,12 +192,13 @@ export async function updateSourcingNoteAs(
 
 export async function rejectCustomLineAs(
   viewer: Viewer,
-  data: { customLineId: string; outcomeNote: string }
+  data: { customLineId: string; outcomeNote: string },
+  opts?: TransitionEmailOptions
 ) {
   if (!data.outcomeNote.trim()) {
     throw new Error("Reject reason required");
   }
-  return await db.transaction(async (tx) => {
+  const notice = await db.transaction(async (tx) => {
     const line = await lockLine(tx, data.customLineId);
     assertCustomLineTransition(viewer, line, "reject");
     const now = new Date();
@@ -191,15 +212,18 @@ export async function rejectCustomLineAs(
         closedAt: now,
       })
       .where(eq(inventoryCustomLines.id, line.id));
-    await tx.insert(notifications).values(
-      customLineNotification("rejected", {
-        name: line.name,
-        note: data.outcomeNote,
-        requesterId: line.requesterId,
-      })
-    );
-    return { ok: true as const };
+    const rejected = customLineNotification("rejected", {
+      name: line.name,
+      note: data.outcomeNote,
+      requesterEmail: line.requesterEmail,
+      requesterId: line.requesterId,
+    });
+    await insertNotice(tx, rejected);
+    return rejected;
   });
+  // After the commit, never inside it; swallows its own errors.
+  await notifyInventoryByEmail(notice, opts?.send);
+  return { ok: true as const };
 }
 
 /**
@@ -220,14 +244,15 @@ export async function fulfillCustomLineAs(
     outcomeNote: string | null;
     pickupBy: Date | null;
     reserve: boolean;
-  }
+  },
+  opts?: TransitionEmailOptions
 ) {
   const itemIds = [...new Set(data.itemIds)].sort();
   if (itemIds.length === 0) {
     throw new Error("Link at least one item");
   }
   const { transitionItem } = await import("./inventory-transitions");
-  return await db.transaction(async (tx) => {
+  const { notice, linked } = await db.transaction(async (tx) => {
     const line = await lockLine(tx, data.customLineId);
     assertCustomLineTransition(viewer, line, "fulfill");
 
@@ -285,18 +310,23 @@ export async function fulfillCustomLineAs(
         closedAt: now,
       })
       .where(eq(inventoryCustomLines.id, line.id));
-    await tx.insert(notifications).values(
-      customLineNotification("fulfilled", {
-        // Named in name order: the id order above is for the locks.
-        items: [...items].sort((a, b) => a.name.localeCompare(b.name)),
-        name: line.name,
-        note: data.outcomeNote,
-        pickupBy,
-        requesterId: line.requesterId,
-      })
-    );
-    return { ok: true as const, itemIds: items.map((item) => item.id) };
+    const fulfilled = customLineNotification("fulfilled", {
+      // Named in name order: the id order above is for the locks.
+      items: [...items].sort((a, b) => a.name.localeCompare(b.name)),
+      name: line.name,
+      note: data.outcomeNote,
+      pickupBy,
+      requesterEmail: line.requesterEmail,
+      requesterId: line.requesterId,
+    });
+    await insertNotice(tx, fulfilled);
+    return { notice: fulfilled, linked: items.map((item) => item.id) };
   });
+  // After the commit, never inside it; swallows its own errors. The per-item
+  // reservations inside were silent, so this is the one email the requester
+  // gets, matching the one bell row.
+  await notifyInventoryByEmail(notice, opts?.send);
+  return { ok: true as const, itemIds: linked };
 }
 
 /**
