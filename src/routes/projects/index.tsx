@@ -6,13 +6,20 @@ import { AdminDataTable } from "#/components/admin-data-table";
 import { BookmarkSetProvider } from "#/components/bookmark-set";
 import { BookmarksButton } from "#/components/bookmarks-button";
 import { EmptyState } from "#/components/empty-state";
+import { ListingLayout } from "#/components/listing-layout";
 import { ProjectCard } from "#/components/project-card";
 import {
   PROJECT_TABLE_COLUMNS,
   PROJECT_TABLE_DEFAULT_SORT,
   type ProjectListRow,
 } from "#/components/project-table-columns";
-import { ProjectsFilterBar } from "#/components/projects-filter-bar";
+import {
+  countActiveFilters,
+  type FilterCategory,
+  type FilterProgram,
+  ProjectsFilters,
+  ProjectsSearchBar,
+} from "#/components/projects-filter-bar";
 import { Button } from "#/components/ui/button";
 import {
   Pagination,
@@ -25,6 +32,8 @@ import { useAdminTable } from "#/lib/use-admin-table";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
 import { useSignedIn } from "#/lib/use-signed-in";
 import type { ViewMode } from "#/lib/view-preference";
+import { listCategories } from "#/server/categories";
+import { listPrograms } from "#/server/programs";
 import { searchProjects } from "#/server/search";
 
 export const searchSchema = z.object({
@@ -66,21 +75,35 @@ export const Route = createFileRoute("/projects/")({
     seekingMentorOnly: search.seekingMentorOnly,
     studentProposedOnly: search.studentProposedOnly,
   }),
-  loader: async ({ deps }) =>
-    await searchProjects({
-      data: {
-        query: deps.q,
-        categoryIds: deps.categories,
-        programId: deps.program,
-        archivedOnly: deps.archivedOnly,
-        acceptingOnly: deps.acceptingOnly,
-        studentProposedOnly: deps.studentProposedOnly,
-        seekingMentorOnly: deps.seekingMentorOnly,
-        page: deps.page,
-        pageSize: PAGE_SIZE_DEFAULT,
-        sort: deps.order,
-      },
-    }),
+  // The two option lists load with the rows rather than in a mount effect,
+  // so the filters aside paints complete and the sheet does not grow after
+  // it opens. Both are small tables read on every visit anyway.
+  loader: async ({ deps }) => {
+    const [result, { rows: categories }, { rows: programs }] =
+      await Promise.all([
+        searchProjects({
+          data: {
+            query: deps.q,
+            categoryIds: deps.categories,
+            programId: deps.program,
+            archivedOnly: deps.archivedOnly,
+            acceptingOnly: deps.acceptingOnly,
+            studentProposedOnly: deps.studentProposedOnly,
+            seekingMentorOnly: deps.seekingMentorOnly,
+            page: deps.page,
+            pageSize: PAGE_SIZE_DEFAULT,
+            sort: deps.order,
+          },
+        }),
+        listCategories({ data: { domain: "project" } }),
+        listPrograms(),
+      ]);
+    return {
+      ...result,
+      categories: categories as FilterCategory[],
+      programs: programs as FilterProgram[],
+    };
+  },
   component: ProjectsList,
 });
 
@@ -136,7 +159,7 @@ function ProjectCards({ rows }: { rows: ProjectListRow[] }) {
     return <EmptyState>No projects matched your search.</EmptyState>;
   }
   return (
-    <div className="mx-auto mt-6 flex max-w-4xl flex-col gap-3">
+    <div className="mt-6 flex max-w-4xl flex-col gap-3">
       {rows.map((project) => (
         <ProjectCard key={project.id} project={project} />
       ))}
@@ -145,7 +168,8 @@ function ProjectCards({ rows }: { rows: ProjectListRow[] }) {
 }
 
 function ProjectsList() {
-  const { rows, total, page, pageSize, viewer } = Route.useLoaderData();
+  const { rows, total, page, pageSize, viewer, categories, programs } =
+    Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/projects/" });
   const view = search.view ?? "card";
@@ -157,12 +181,38 @@ function ProjectsList() {
   useSeedViewFromStorage(search.view, seedView);
   const signedIn = useSignedIn();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const filterState = {
+    acceptingOnly: search.acceptingOnly,
+    archivedOnly: search.archivedOnly,
+    categories: search.categories,
+    program: search.program,
+    seekingMentorOnly: search.seekingMentorOnly,
+    studentProposedOnly: search.studentProposedOnly,
+  };
   return (
-    <div className="px-4 py-6 md:p-8">
-      <div className="mx-auto max-w-4xl">
-        {/* flex-wrap and ml-auto: at a phone width the two buttons drop
-            under the heading, right-aligned, rather than pushing the page
-            wider than the viewport (#280). */}
+    <ListingLayout
+      activeFilterCount={countActiveFilters(filterState)}
+      className="mx-auto max-w-4xl xl:max-w-7xl"
+      filters={
+        <ProjectsFilters
+          allCategories={categories}
+          allPrograms={programs}
+          {...filterState}
+        />
+      }
+      search={
+        <ProjectsSearchBar
+          canRecommend={viewer.canRecommend}
+          order={search.order}
+          q={search.q}
+          signedIn={viewer.signedIn}
+          view={view}
+        />
+      }
+      title={
+        /* flex-wrap and ml-auto: at a phone width the two buttons drop
+           under the heading, right-aligned, rather than pushing the page
+           wider than the viewport (#280). */
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="font-semibold text-2xl">Projects</h1>
           <div className="ml-auto flex items-center gap-2">
@@ -180,22 +230,8 @@ function ProjectsList() {
             <BookmarksButton />
           </div>
         </div>
-        <div className="mt-4">
-          <ProjectsFilterBar
-            acceptingOnly={search.acceptingOnly}
-            archivedOnly={search.archivedOnly}
-            canRecommend={viewer.canRecommend}
-            categories={search.categories}
-            order={search.order}
-            program={search.program}
-            q={search.q}
-            seekingMentorOnly={search.seekingMentorOnly}
-            signedIn={viewer.signedIn}
-            studentProposedOnly={search.studentProposedOnly}
-            view={view}
-          />
-        </div>
-      </div>
+      }
+    >
       <BookmarkSetProvider>
         {view === "table" ? (
           <ProjectTable rows={rows} search={search} />
@@ -203,7 +239,7 @@ function ProjectsList() {
           <ProjectCards rows={rows} />
         )}
       </BookmarkSetProvider>
-      <Pagination className="mx-auto max-w-4xl">
+      <Pagination className="max-w-4xl">
         {page <= 1 ? (
           <PaginationLink disabled>Previous</PaginationLink>
         ) : (
@@ -237,6 +273,6 @@ function ProjectsList() {
           </PaginationLink>
         )}
       </Pagination>
-    </div>
+    </ListingLayout>
   );
 }

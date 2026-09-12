@@ -2,14 +2,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// The bar lists categories and programs through two server functions on
-// mount; neither matters to the recommendation gate, so both answer empty.
-vi.mock("#/server/categories", () => ({
-  listCategories: vi.fn().mockResolvedValue({ rows: [] }),
-}));
-vi.mock("#/server/programs", () => ({
-  listPrograms: vi.fn().mockResolvedValue({ rows: [] }),
-}));
 vi.mock("@tanstack/react-router", () => ({
   // `to` becomes the href so the anchor has the link role. `search` is
   // serialised by hand for the one link that carries it, so the assertion
@@ -34,23 +26,17 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
 }));
 
-import { ProjectsFilterBar } from "#/components/projects-filter-bar";
+import { ProjectsSearchBar } from "#/components/projects-filter-bar";
 
 afterEach(cleanup);
 
 function renderBar(viewer: { canRecommend: boolean; signedIn: boolean }) {
   return render(
-    <ProjectsFilterBar
-      acceptingOnly={false}
-      archivedOnly={false}
+    <ProjectsSearchBar
       canRecommend={viewer.canRecommend}
-      categories={[]}
       order="relevance"
-      program={null}
       q=""
-      seekingMentorOnly={false}
       signedIn={viewer.signedIn}
-      studentProposedOnly={false}
       view="card"
     />
   );
@@ -62,7 +48,7 @@ function renderBar(viewer: { canRecommend: boolean; signedIn: boolean }) {
  * once the select is open, which the browser suite covers; here the prompts
  * are what is pinned, since they decide where a reader is sent.
  */
-describe("ProjectsFilterBar recommendation prompt", () => {
+describe("ProjectsSearchBar recommendation prompt", () => {
   it("sends a visitor to sign in, with the listing as the return address", () => {
     renderBar({ canRecommend: false, signedIn: false });
     const link = screen.getByRole("link", {
