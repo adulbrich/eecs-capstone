@@ -314,3 +314,48 @@ describe("bookmarks since publication", () => {
     expect(view.headline.publishedWithoutBookmarks).toBe(1);
   });
 });
+
+describe("seeking a mentor", () => {
+  it("counts the projects that show the badge: flagged by staff with no address on file", async () => {
+    const admin = await makeUser(`an-m-${Date.now()}@x.com`, "admin");
+    // Two flagged and not student proposed, one the other way round, so the
+    // old rule (student proposed, no address) and the badge's rule (flagged,
+    // no address) give different counts: 1 against 2.
+    const flagged = await createProjectAs(admin, baseProject());
+    const flaggedToo = await createProjectAs(admin, baseProject());
+    const studentOnly = await createProjectAs(admin, baseProject());
+    const flaggedWithMentor = await createProjectAs(admin, baseProject());
+    // Written as columns rather than through `updateProjectMentorshipAs`:
+    // the figure is a rule over three columns, and #336 moves one of them to
+    // the proposer endpoint, so the test stays pinned to the columns rather
+    // than to whichever wrapper writes each.
+    const mentorship = (
+      id: string,
+      columns: {
+        mentorEmail: string | null;
+        seekingMentor: boolean;
+        studentProposed: boolean;
+      }
+    ) => db.update(projects).set(columns).where(eq(projects.id, id));
+    for (const id of [flagged.id, flaggedToo.id]) {
+      await mentorship(id, {
+        mentorEmail: null,
+        seekingMentor: true,
+        studentProposed: false,
+      });
+    }
+    await mentorship(studentOnly.id, {
+      mentorEmail: null,
+      seekingMentor: false,
+      studentProposed: true,
+    });
+    await mentorship(flaggedWithMentor.id, {
+      mentorEmail: "mentor@x.test",
+      seekingMentor: true,
+      studentProposed: true,
+    });
+
+    const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
+    expect(view.headline.seekingMentor).toBe(2);
+  });
+});

@@ -526,9 +526,10 @@ catalogue that decided the matrix below; #288 shipped it.
 - [x] Staff dashboard at `/admin/analytics` over the app's own data (#34):
   headline stocks as of now (published team slots against each program's
   `expected_teams`, submitted projects and the age of the oldest wait,
-  projects needing a mentor, mentor capacity offered and unassigned, overdue
-  items and pending request lines with the age of the oldest, published
-  projects with no bookmark since publication), flows over a date range with
+  projects seeking a mentor (flagged by staff, no address on file), mentor
+  capacity offered and unassigned, overdue items and pending request lines
+  with the age of the oldest, published projects with no bookmark since
+  publication), flows over a date range with
   a previous-period comparison (submitted, published, inventory requests,
   and new users for admins), and breakdowns by status, program and category.
   A program selector governs the figures marked per program; every card
