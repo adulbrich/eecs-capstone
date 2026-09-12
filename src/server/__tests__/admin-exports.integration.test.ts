@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { user } from "#/db/schema";
 import { auth } from "#/lib/auth";
-import type { UserRole } from "#/lib/vocabularies";
+import { PROJECT_STATUSES, type UserRole } from "#/lib/vocabularies";
 import {
   createCategoryAs,
   setProjectCategoriesAs,
@@ -51,11 +51,14 @@ function baseProject(title: string) {
 }
 
 const ALL_PROJECTS = {
+  dateField: "published" as const,
+  from: null,
   includeSoftDeleted: false,
   program: null,
   proposer: null,
   q: "",
-  status: "all" as const,
+  statuses: [...PROJECT_STATUSES],
+  to: null,
 };
 
 describe("admin project export", () => {

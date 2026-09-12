@@ -179,8 +179,15 @@ Each project carries:
   user's own created/proposed/submitted projects.
 - [x] Authenticated project create (`/projects/new`) and edit
   (`/projects/$id/edit`).
-- [x] Staff project list (`/admin/projects`) with status and program filters and
-  a show-soft-deleted switch, all held in URL search params.
+- [x] Staff project list (`/admin/projects`) with a status set (a multi-select
+  that opens on every status but archived and never empties), a date range on
+  Created, Published or Updated read as Pacific calendar days, program and
+  proposer filters, and a show-soft-deleted switch, all held in URL search
+  params; the CSV export follows the same filter (#335). The range only helps
+  on legacy rows if the import (#216) writes real dates: `publishedAt` as the
+  start of the term the project ran and `archivedAt` as its end, with
+  `createdAt` free to be the import time. That is why Published is the
+  default field.
 - [x] Consistent list presentation: fixed-ratio thumbnails, boolean filters
   rendered as switches aligned with the adjacent inputs, status dropdowns
   (including an "All statuses" option), and a shared centered empty state across
@@ -477,7 +484,7 @@ catalogue that decided the matrix below; #288 shipped it.
 - [x] Admin overview (`/admin`): project, published, awaiting-review, inventory
   request, and user counts. The "Awaiting review" and "Inventory requests"
   tiles turn into colored, clickable alerts that deep-link to the filtered work
-  queues (`/admin/projects?status=submitted`,
+  queues (`/admin/projects` with the status set narrowed to submitted,
   `/admin/inventory/requests?tab=pending`) when items are pending.
 - [x] Admin-only user list at `/admin/users` (instructors are redirected to
   `/admin`).

@@ -4,6 +4,7 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
+import { ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 import {
@@ -24,6 +25,15 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
+import { Button } from "#/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "#/components/ui/dropdown-menu";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
@@ -34,6 +44,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
+import {
+  ADMIN_DATE_FIELD_LABEL,
+  ADMIN_DATE_FIELDS,
+  type AdminDateField,
+  DEFAULT_ADMIN_STATUSES,
+  isDefaultStatusSelection,
+  statusSelectionLabel,
+  toggleStatus,
+} from "#/lib/admin-project-filters";
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
@@ -53,10 +72,9 @@ import {
   listAdminProjects,
 } from "#/server/projects-queries";
 
-/** The vocabulary plus the sentinel this filter adds for "no filter". */
-const STATUSES = ["all", ...PROJECT_STATUSES] as const;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-const searchSchema = z.object({
+export const searchSchema = z.object({
   cols: z.string().optional(),
   dir: z.enum(["asc", "desc"]).optional(),
   includeSoftDeleted: z.boolean().default(false),
@@ -65,8 +83,35 @@ const searchSchema = z.object({
   proposer: z.string().max(255).nullable().default(null),
   q: z.string().max(200).default(""),
   sort: z.string().optional(),
-  status: z.enum(STATUSES).default("all"),
+  // Absent is the default set, every status but archived; any explicit
+  // choice is spelled out in full. `.catch` on the four so a stale or
+  // hand-edited link degrades to the default rather than a route error.
+  status: z.array(z.enum(PROJECT_STATUSES)).min(1).optional().catch(undefined),
+  from: z.string().regex(DAY).optional().catch(undefined),
+  to: z.string().regex(DAY).optional().catch(undefined),
+  dateField: z.enum(ADMIN_DATE_FIELDS).catch("published").default("published"),
 });
+
+type Search = z.infer<typeof searchSchema>;
+
+/**
+ * The filter the loader and the export send, from the URL: the status set
+ * resolved from its absent default, and a reversed date pair swapped, as
+ * `/admin/analytics` does.
+ */
+export function resolveAdminFilter(search: Search) {
+  const reversed = search.from && search.to && search.from > search.to;
+  return {
+    dateField: search.dateField,
+    from: (reversed ? search.to : search.from) ?? null,
+    includeSoftDeleted: search.includeSoftDeleted,
+    program: search.program,
+    proposer: search.proposer,
+    q: search.q,
+    statuses: search.status ?? [...DEFAULT_ADMIN_STATUSES],
+    to: (reversed ? search.from : search.to) ?? null,
+  };
+}
 
 export const Route = createFileRoute("/_authed/admin/projects/")({
   validateSearch: searchSchema,
@@ -82,23 +127,8 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
   },
   // Only the filter fields: sort and column visibility are client state and
   // must not re-run the loader.
-  loaderDeps: ({ search }) => ({
-    includeSoftDeleted: search.includeSoftDeleted,
-    program: search.program,
-    proposer: search.proposer,
-    q: search.q,
-    status: search.status,
-  }),
-  loader: async ({ deps }) =>
-    await listAdminProjects({
-      data: {
-        includeSoftDeleted: deps.includeSoftDeleted,
-        program: deps.program,
-        proposer: deps.proposer,
-        q: deps.q,
-        status: deps.status,
-      },
-    }),
+  loaderDeps: ({ search }) => resolveAdminFilter(search),
+  loader: async ({ deps }) => await listAdminProjects({ data: deps }),
   component: AdminProjects,
 });
 
@@ -363,11 +393,19 @@ function AdminProjects() {
   const { rows, proposers } = Route.useLoaderData();
   // The whole search object goes to the hook, which reads cols/dir/sort.
   const search = Route.useSearch();
-  const { includeSoftDeleted, program, proposer, q, status } = search;
+  const { includeSoftDeleted, program, proposer, q } = search;
+  const resolved = resolveAdminFilter(search);
   // Narrowing only: the soft-deleted switch widens the view, so an empty
-  // result with it on is still "nothing at all".
+  // result with it on is still "nothing at all". The default status set
+  // is the listing, not a filter (#335), and the date field alone narrows
+  // nothing until a bound is set.
   const filtered =
-    q !== "" || status !== "all" || program !== null || proposer !== null;
+    q !== "" ||
+    !isDefaultStatusSelection(resolved.statuses) ||
+    resolved.from !== null ||
+    resolved.to !== null ||
+    program !== null ||
+    proposer !== null;
   const navigate = useNavigate({ from: "/admin/projects/" });
   const [allPrograms, setAllPrograms] = useState<
     { courseId: string; courseName: string; id: string }[]
@@ -394,6 +432,15 @@ function AdminProjects() {
     [navigate]
   );
   const [queryDraft, setQueryDraft] = useDebouncedDraft(q, commitQuery);
+
+  // The default set travels as an absent param, any other set in full.
+  const setStatuses = (statuses: ProjectStatus[]) =>
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        status: isDefaultStatusSelection(statuses) ? undefined : statuses,
+      }),
+    });
 
   const { orderRows, tableProps } = useAdminTable({
     columns: COLUMNS,
@@ -431,14 +478,10 @@ function AdminProjects() {
           <ExportCsvButton
             filename="projects"
             load={async () => {
+              // The same resolved filter the loader sent, so the file can
+              // never disagree with the table about which rows match.
               const { rows: exportRows } = await exportAdminProjects({
-                data: {
-                  includeSoftDeleted: search.includeSoftDeleted,
-                  program: search.program,
-                  proposer: search.proposer,
-                  q: search.q,
-                  status: search.status,
-                },
+                data: resolved,
               });
               // The export's rows are a wider projection of the same
               // records the table lists under the same filters, keyed by
@@ -474,28 +517,41 @@ function AdminProjects() {
             </div>
             <div>
               <Label htmlFor="admin-filter-status">Status</Label>
-              <Select
-                onValueChange={(s) =>
-                  void navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      status: s as (typeof STATUSES)[number],
-                    }),
-                  })
-                }
-                value={status}
-              >
-                <SelectTrigger className="mt-1 w-48" id="admin-filter-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s === "all" ? "All statuses" : PROJECT_STATUS_LABEL[s]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    className="mt-1 w-48 justify-between font-normal"
+                    id="admin-filter-status"
+                    type="button"
+                    variant="outline"
+                  >
+                    {statusSelectionLabel(resolved.statuses)}
+                    <ChevronDown aria-hidden className="size-4 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" tabIndex={0}>
+                  <DropdownMenuLabel>Statuses</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {PROJECT_STATUSES.map((s) => {
+                    const checked = resolved.statuses.includes(s);
+                    return (
+                      <DropdownMenuCheckboxItem
+                        checked={checked}
+                        // The last checked status cannot be unchecked, so
+                        // the empty set never exists.
+                        disabled={checked && resolved.statuses.length === 1}
+                        key={s}
+                        onCheckedChange={() =>
+                          setStatuses(toggleStatus(resolved.statuses, s))
+                        }
+                        onSelect={(event) => event.preventDefault()}
+                      >
+                        {PROJECT_STATUS_LABEL[s]}
+                      </DropdownMenuCheckboxItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div>
               <Label htmlFor="admin-filter-program">Program</Label>
@@ -554,6 +610,86 @@ function AdminProjects() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label htmlFor="admin-filter-date-field">Date</Label>
+              <Select
+                onValueChange={(v) =>
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      dateField: v as AdminDateField,
+                    }),
+                  })
+                }
+                value={resolved.dateField}
+              >
+                <SelectTrigger
+                  className="mt-1 w-36"
+                  id="admin-filter-date-field"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ADMIN_DATE_FIELDS.map((f) => (
+                    <SelectItem key={f} value={f}>
+                      {ADMIN_DATE_FIELD_LABEL[f]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="admin-filter-from">From</Label>
+              <Input
+                className="mt-1 w-40"
+                id="admin-filter-from"
+                onChange={(e) =>
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      from: e.target.value || undefined,
+                    }),
+                  })
+                }
+                type="date"
+                value={resolved.from ?? ""}
+              />
+            </div>
+            <div>
+              <Label htmlFor="admin-filter-to">To</Label>
+              <Input
+                className="mt-1 w-40"
+                id="admin-filter-to"
+                onChange={(e) =>
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      to: e.target.value || undefined,
+                    }),
+                  })
+                }
+                type="date"
+                value={resolved.to ?? ""}
+              />
+            </div>
+            {(resolved.from !== null || resolved.to !== null) && (
+              <Button
+                className="self-end"
+                onClick={() =>
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      from: undefined,
+                      to: undefined,
+                    }),
+                  })
+                }
+                type="button"
+                variant="ghost"
+              >
+                Clear dates
+              </Button>
+            )}
             <FilterSwitch
               checked={includeSoftDeleted}
               id="admin-include-soft-deleted"

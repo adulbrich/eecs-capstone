@@ -116,7 +116,7 @@ function AdminHome() {
               search={{
                 includeSoftDeleted: false,
                 program: null,
-                status: "submitted",
+                status: ["submitted"],
               }}
               style={ALERT_CARD_STYLE}
               to="/admin/projects"

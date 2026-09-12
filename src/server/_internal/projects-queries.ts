@@ -3,8 +3,11 @@ import {
   asc,
   desc,
   eq,
+  gte,
   ilike,
+  inArray,
   isNull,
+  lt,
   ne,
   or,
   type SQL,
@@ -20,6 +23,8 @@ import {
   user,
 } from "#/db/schema";
 import { readSession } from "#/lib/_internal/auth-guards";
+import type { AdminDateField } from "#/lib/admin-project-filters";
+import { dayRange } from "#/lib/day-range";
 import {
   canEditProject,
   canSeeProject,
@@ -94,30 +99,49 @@ export async function listMyProjectsImpl(data: { status: StatusFilter }) {
 }
 
 interface AdminProjectsFilter {
+  dateField: AdminDateField;
+  from: string | null;
   includeSoftDeleted: boolean;
   program: string | null;
   proposer: string | null;
   q: string;
-  status: StatusFilter;
+  statuses: ProjectStatus[];
+  to: string | null;
 }
 
+/** The column each From and To pair narrows on. */
+const ADMIN_DATE_COLUMN = {
+  created: projects.createdAt,
+  published: projects.publishedAt,
+  updated: projects.updatedAt,
+} as const;
+
 /**
- * The scope the proposer dropdown is built from: status, program and the
- * soft-delete switch, but NOT the search text or the proposer choice itself.
- * Excluding the proposer keeps the option you picked from being the only one
- * left; excluding `q` keeps typing in the search box from emptying the
- * dropdown underneath you.
+ * The scope the proposer dropdown is built from: the status set, the date
+ * range, program and the soft-delete switch, but NOT the search text or the
+ * proposer choice itself. Excluding the proposer keeps the option you picked
+ * from being the only one left; excluding `q` keeps typing in the search box
+ * from emptying the dropdown underneath you.
+ *
+ * The range is a plain comparison on the chosen column, so a range on
+ * `publishedAt` excludes rows that were never published; the field selector
+ * on the page is where that shows (#335).
  */
 function buildAdminProjectScope(data: AdminProjectsFilter): SQL[] {
-  const scope: SQL[] = [];
-  if (data.status !== "all") {
-    scope.push(eq(projects.status, data.status as ProjectStatus));
-  }
+  const scope: SQL[] = [inArray(projects.status, data.statuses)];
   if (!data.includeSoftDeleted) {
     scope.push(isNull(projects.deletedAt));
   }
   if (data.program) {
     scope.push(eq(projects.programId, data.program));
+  }
+  const column = ADMIN_DATE_COLUMN[data.dateField];
+  const { start, end } = dayRange(data.from, data.to);
+  if (start) {
+    scope.push(gte(column, start));
+  }
+  if (end) {
+    scope.push(lt(column, end));
   }
   return scope;
 }

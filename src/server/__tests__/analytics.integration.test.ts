@@ -220,6 +220,41 @@ describe("the date range", () => {
     expect(narrow.headline.submittedAwaiting).toBe(2);
     expect(narrow.flows.range.previousTo < narrow.flows.range.from).toBe(true);
   });
+
+  it("reads a day as the office does: 10pm Pacific on the 30th is still the 30th", async () => {
+    const admin = await makeUser(`an-tz-${Date.now()}@x.com`, "admin");
+    const project = await createProjectAs(admin, baseProject());
+    await forceTransitionAs(admin, project.id, "published", undefined, {
+      sendEmail: false,
+    });
+    // 2026-07-01T05:00Z is 22:00 Pacific Daylight Time on June 30th. Read
+    // as UTC days, as the range was before #335, this lands in July.
+    await db
+      .update(projectStatusHistory)
+      .set({ createdAt: new Date("2026-07-01T05:00:00.000Z") })
+      .where(eq(projectStatusHistory.projectId, project.id));
+
+    const june = await getAnalyticsAs(admin, {
+      from: "2026-06-30",
+      to: "2026-06-30",
+      programId: null,
+    });
+    expect(june.flows.published.current).toBe(1);
+    expect(june.flows.range).toEqual({
+      from: "2026-06-30",
+      to: "2026-06-30",
+      previousFrom: "2026-06-29",
+      previousTo: "2026-06-29",
+    });
+    const july = await getAnalyticsAs(admin, {
+      from: "2026-07-01",
+      to: "2026-07-01",
+      programId: null,
+    });
+    expect(july.flows.published.current).toBe(0);
+    // The previous period is the day before, where the publish now sits.
+    expect(july.flows.published.previous).toBe(1);
+  });
 });
 
 describe("who sees the user figures", () => {
