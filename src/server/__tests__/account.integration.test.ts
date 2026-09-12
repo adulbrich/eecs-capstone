@@ -375,13 +375,16 @@ describe("deleteAccountAs", () => {
     // "attributes to Deleted user" is asserted there rather than on a join
     // the test wrote for itself.
     const listed = await listAdminProjectsAs(admin, {
+      acceptingOnly: false,
       dateField: "published",
       from: null,
       includeSoftDeleted: false,
       program: null,
       proposer: null,
       q: "",
+      seekingMentorOnly: false,
       statuses: [...PROJECT_STATUSES],
+      studentProposedOnly: false,
       to: null,
     });
     const mine = listed.rows.find((r) => r.id === id);

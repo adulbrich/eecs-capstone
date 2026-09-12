@@ -99,13 +99,17 @@ export async function listMyProjectsImpl(data: { status: StatusFilter }) {
 }
 
 interface AdminProjectsFilter {
+  acceptingOnly: boolean;
   dateField: AdminDateField;
   from: string | null;
   includeSoftDeleted: boolean;
   program: string | null;
   proposer: string | null;
   q: string;
+  /** The derived badge value, the same rule as the public filter (#340). */
+  seekingMentorOnly: boolean;
   statuses: ProjectStatus[];
+  studentProposedOnly: boolean;
   to: string | null;
 }
 
@@ -118,10 +122,10 @@ const ADMIN_DATE_COLUMN = {
 
 /**
  * The scope the proposer dropdown is built from: the status set, the date
- * range, program and the soft-delete switch, but NOT the search text or the
- * proposer choice itself. Excluding the proposer keeps the option you picked
- * from being the only one left; excluding `q` keeps typing in the search box
- * from emptying the dropdown underneath you.
+ * range, program, the soft-delete switch and the three flag switches, but NOT
+ * the search text or the proposer choice itself. Excluding the proposer keeps
+ * the option you picked from being the only one left; excluding `q` keeps
+ * typing in the search box from emptying the dropdown underneath you.
  *
  * The range is a plain comparison on the chosen column, so a range on
  * `publishedAt` excludes rows that were never published; the field selector
@@ -142,6 +146,20 @@ function buildAdminProjectScope(data: AdminProjectsFilter): SQL[] {
   }
   if (end) {
     scope.push(lt(column, end));
+  }
+  // The same three conditions the public listing applies under the same
+  // param names (#340), so a link moved between the two pages narrows the
+  // same way.
+  if (data.acceptingOnly) {
+    scope.push(eq(projects.acceptingApplicants, true));
+  }
+  if (data.studentProposedOnly) {
+    scope.push(eq(projects.studentProposed, true));
+  }
+  if (data.seekingMentorOnly) {
+    // The derived value, not the raw flag: a project with a mentor lined up
+    // shows no badge and must not match the filter either.
+    scope.push(seekingMentorSql);
   }
   return scope;
 }

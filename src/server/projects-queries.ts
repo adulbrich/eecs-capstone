@@ -43,6 +43,10 @@ const adminListSchema = z
     // Better Auth user ids are text, not UUIDs, so this cannot be `.uuid()`.
     proposer: z.string().max(255).nullable().default(null),
     q: z.string().max(200).default(""),
+    // The public listing's three switches, under the same names (#340).
+    acceptingOnly: z.boolean().default(false),
+    studentProposedOnly: z.boolean().default(false),
+    seekingMentorOnly: z.boolean().default(false),
   })
   .refine((v) => !(v.from && v.to) || v.from <= v.to, {
     message: "from must not be after to",

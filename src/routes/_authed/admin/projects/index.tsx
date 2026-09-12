@@ -90,6 +90,11 @@ export const searchSchema = z.object({
   from: z.string().regex(DAY).optional().catch(undefined),
   to: z.string().regex(DAY).optional().catch(undefined),
   dateField: z.enum(ADMIN_DATE_FIELDS).catch("published").default("published"),
+  // The public listing's three switches under the same names, so a link
+  // pasted from /projects narrows this page the same way (#340).
+  acceptingOnly: z.boolean().default(false),
+  studentProposedOnly: z.boolean().default(false),
+  seekingMentorOnly: z.boolean().default(false),
 });
 
 type Search = z.infer<typeof searchSchema>;
@@ -102,13 +107,16 @@ type Search = z.infer<typeof searchSchema>;
 export function resolveAdminFilter(search: Search) {
   const reversed = search.from && search.to && search.from > search.to;
   return {
+    acceptingOnly: search.acceptingOnly,
     dateField: search.dateField,
     from: (reversed ? search.to : search.from) ?? null,
     includeSoftDeleted: search.includeSoftDeleted,
     program: search.program,
     proposer: search.proposer,
     q: search.q,
+    seekingMentorOnly: search.seekingMentorOnly,
     statuses: search.status ?? [...DEFAULT_ADMIN_STATUSES],
+    studentProposedOnly: search.studentProposedOnly,
     to: (reversed ? search.from : search.to) ?? null,
   };
 }
@@ -393,7 +401,15 @@ function AdminProjects() {
   const { rows, proposers } = Route.useLoaderData();
   // The whole search object goes to the hook, which reads cols/dir/sort.
   const search = Route.useSearch();
-  const { includeSoftDeleted, program, proposer, q } = search;
+  const {
+    acceptingOnly,
+    includeSoftDeleted,
+    program,
+    proposer,
+    q,
+    seekingMentorOnly,
+    studentProposedOnly,
+  } = search;
   const resolved = resolveAdminFilter(search);
   // Narrowing only: the soft-deleted switch widens the view, so an empty
   // result with it on is still "nothing at all". The default status set
@@ -405,7 +421,10 @@ function AdminProjects() {
     resolved.from !== null ||
     resolved.to !== null ||
     program !== null ||
-    proposer !== null;
+    proposer !== null ||
+    acceptingOnly ||
+    studentProposedOnly ||
+    seekingMentorOnly;
   const navigate = useNavigate({ from: "/admin/projects/" });
   const [allPrograms, setAllPrograms] = useState<
     { courseId: string; courseName: string; id: string }[]
@@ -690,16 +709,60 @@ function AdminProjects() {
                 Clear dates
               </Button>
             )}
-            <FilterSwitch
-              checked={includeSoftDeleted}
-              id="admin-include-soft-deleted"
-              label="Show soft-deleted"
-              onCheckedChange={(checked) =>
-                void navigate({
-                  search: (prev) => ({ ...prev, includeSoftDeleted: checked }),
-                })
-              }
-            />
+            {/*
+              The four switches as one group on a line of their own, so at
+              1280px none is stranded at the end of the select row, and at
+              375px each wraps cleanly under the previous one (#340). Labels
+              and ids mirror the public bar.
+            */}
+            <div className="flex basis-full flex-wrap gap-x-6 gap-y-3">
+              <FilterSwitch
+                checked={acceptingOnly}
+                id="admin-accepting-only"
+                label="Only show projects accepting applicants"
+                onCheckedChange={(checked) =>
+                  void navigate({
+                    search: (prev) => ({ ...prev, acceptingOnly: checked }),
+                  })
+                }
+              />
+              <FilterSwitch
+                checked={studentProposedOnly}
+                id="admin-student-proposed-only"
+                label="Only show student-proposed projects"
+                onCheckedChange={(checked) =>
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      studentProposedOnly: checked,
+                    }),
+                  })
+                }
+              />
+              <FilterSwitch
+                checked={seekingMentorOnly}
+                id="admin-seeking-mentor-only"
+                label="Only show projects seeking a mentor"
+                onCheckedChange={(checked) =>
+                  void navigate({
+                    search: (prev) => ({ ...prev, seekingMentorOnly: checked }),
+                  })
+                }
+              />
+              <FilterSwitch
+                checked={includeSoftDeleted}
+                id="admin-include-soft-deleted"
+                label="Show soft-deleted"
+                onCheckedChange={(checked) =>
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      includeSoftDeleted: checked,
+                    }),
+                  })
+                }
+              />
+            </div>
           </>
         }
       />

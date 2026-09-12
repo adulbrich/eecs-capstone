@@ -12,6 +12,7 @@ import {
   updateProjectProposerAs,
 } from "#/server/_internal/projects";
 import {
+  exportAdminProjectsAs,
   getProjectAs,
   listAdminProjectsAs,
 } from "#/server/_internal/projects-queries";
@@ -65,6 +66,7 @@ function filter(
 ): Parameters<typeof listAdminProjectsAs>[1] {
   return {
     statuses: [...PROJECT_STATUSES],
+    acceptingOnly: false,
     dateField: "published",
     from: null,
     to: null,
@@ -72,6 +74,8 @@ function filter(
     program: null,
     proposer: null,
     q: "",
+    seekingMentorOnly: false,
+    studentProposedOnly: false,
     ...overrides,
   };
 }
@@ -610,5 +614,186 @@ describe("admin projects date range", () => {
     // The dropdown is scoped by the range too: the other proposer's projects
     // are outside it, so their name is not offered.
     expect(proposers.map((p) => p.id)).toEqual([admin.id]);
+  });
+});
+
+/**
+ * Writes the flags the three switches narrow on, past the form writers: the
+ * project form carries `acceptingApplicants`, and the Proposer and Mentor
+ * sections carry the other three, but the rule under test is the query's.
+ */
+async function flag(
+  id: string,
+  set: {
+    acceptingApplicants?: boolean;
+    mentorEmail?: string | null;
+    seekingMentor?: boolean;
+    studentProposed?: boolean;
+  }
+) {
+  await db.update(projects).set(set).where(eq(projects.id, id));
+}
+
+describe("admin projects flag switches", () => {
+  it("each switch alone narrows to the rows carrying its flag, and all off is the whole list", async () => {
+    const admin = await makeAdmin(`f-${Date.now()}@x.com`);
+    await createProjectAs(admin, baseProject("Open", null));
+    const student = await createProjectAs(admin, baseProject("Student", null));
+    await flag(student.id, {
+      acceptingApplicants: false,
+      studentProposed: true,
+    });
+    const seeking = await createProjectAs(admin, baseProject("Seeking", null));
+    await flag(seeking.id, { acceptingApplicants: false, seekingMentor: true });
+
+    const all = await listAdminProjectsAs(admin, filter());
+    expect(all.rows.map((r) => r.title).sort()).toEqual([
+      "Open",
+      "Seeking",
+      "Student",
+    ]);
+
+    const accepting = await listAdminProjectsAs(
+      admin,
+      filter({ acceptingOnly: true })
+    );
+    expect(accepting.rows.map((r) => r.title)).toEqual(["Open"]);
+
+    const proposed = await listAdminProjectsAs(
+      admin,
+      filter({ studentProposedOnly: true })
+    );
+    expect(proposed.rows.map((r) => r.title)).toEqual(["Student"]);
+
+    const mentorless = await listAdminProjectsAs(
+      admin,
+      filter({ seekingMentorOnly: true })
+    );
+    expect(mentorless.rows.map((r) => r.title)).toEqual(["Seeking"]);
+  });
+
+  it("seeking a mentor means the flag on and no address on file, the public badge's rule", async () => {
+    const admin = await makeAdmin(`f2-${Date.now()}@x.com`);
+    const offNoAddress = await createProjectAs(
+      admin,
+      baseProject("Off, no address", null)
+    );
+    await flag(offNoAddress.id, { mentorEmail: null, seekingMentor: false });
+    const offWithAddress = await createProjectAs(
+      admin,
+      baseProject("Off, address", null)
+    );
+    await flag(offWithAddress.id, {
+      mentorEmail: "mentor@example.edu",
+      seekingMentor: false,
+    });
+    const onNoAddress = await createProjectAs(
+      admin,
+      baseProject("On, no address", null)
+    );
+    await flag(onNoAddress.id, { mentorEmail: null, seekingMentor: true });
+    // The flag still set with an address on file: the badge is gone, so the
+    // switch must not find it either.
+    const onWithAddress = await createProjectAs(
+      admin,
+      baseProject("On, address", null)
+    );
+    await flag(onWithAddress.id, {
+      mentorEmail: "mentor@example.edu",
+      seekingMentor: true,
+    });
+
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ seekingMentorOnly: true })
+    );
+    expect(rows.map((r) => r.title)).toEqual(["On, no address"]);
+  });
+
+  it("composes with each other, the status set and the program", async () => {
+    const admin = await makeAdmin(`f3-${Date.now()}@x.com`);
+    const cs461 = await makeProgram("CS 461");
+    const ece441 = await makeProgram("ECE 441");
+    const match = await createProjectAs(admin, baseProject("Match", cs461));
+    await flag(match.id, { studentProposed: true });
+    await publish(admin, match.id);
+    const notStudent = await createProjectAs(
+      admin,
+      baseProject("Not student", cs461)
+    );
+    await publish(admin, notStudent.id);
+    const closed = await createProjectAs(admin, baseProject("Closed", cs461));
+    await flag(closed.id, {
+      acceptingApplicants: false,
+      studentProposed: true,
+    });
+    await publish(admin, closed.id);
+    const draft = await createProjectAs(admin, baseProject("Draft", cs461));
+    await flag(draft.id, { studentProposed: true });
+    const elsewhere = await createProjectAs(
+      admin,
+      baseProject("Elsewhere", ece441)
+    );
+    await flag(elsewhere.id, { studentProposed: true });
+    await publish(admin, elsewhere.id);
+
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({
+        acceptingOnly: true,
+        program: cs461,
+        statuses: ["published"],
+        studentProposedOnly: true,
+      })
+    );
+    expect(rows.map((r) => r.title)).toEqual(["Match"]);
+  });
+
+  it("narrows the proposer dropdown, the way the status set does", async () => {
+    const admin = await makeAdmin(`f4-${Date.now()}@x.com`);
+    const alice = await makeProposer(`f4-alice-${Date.now()}@x.com`);
+    const bob = await makeProposer(`f4-bob-${Date.now()}@x.com`);
+    await createProjectAs(alice, baseProject("Alice open", null));
+    const bobs = await createProjectAs(bob, baseProject("Bob closed", null));
+    await flag(bobs.id, { acceptingApplicants: false });
+
+    const all = await listAdminProjectsAs(admin, filter());
+    expect(all.proposers.map((p) => p.id).sort()).toEqual(
+      [alice.id, bob.id].sort()
+    );
+
+    // Bob has nothing accepting applicants, so the dropdown stops offering
+    // him once the switch is on.
+    const accepting = await listAdminProjectsAs(
+      admin,
+      filter({ acceptingOnly: true })
+    );
+    expect(accepting.rows.map((r) => r.title)).toEqual(["Alice open"]);
+    expect(accepting.proposers.map((p) => p.id)).toEqual([alice.id]);
+  });
+
+  it("is followed by the CSV export", async () => {
+    const admin = await makeAdmin(`f5-${Date.now()}@x.com`);
+    const both = await createProjectAs(admin, baseProject("Both", null));
+    await flag(both.id, { seekingMentor: true });
+    const onlyOpen = await createProjectAs(
+      admin,
+      baseProject("Only open", null)
+    );
+    const onlySeeking = await createProjectAs(
+      admin,
+      baseProject("Only seeking", null)
+    );
+    await flag(onlySeeking.id, {
+      acceptingApplicants: false,
+      seekingMentor: true,
+    });
+    const switches = filter({ acceptingOnly: true, seekingMentorOnly: true });
+
+    const table = await listAdminProjectsAs(admin, switches);
+    const exported = await exportAdminProjectsAs(admin, switches);
+    expect(table.rows.map((r) => r.id)).toEqual([both.id]);
+    expect(exported.rows.map((r) => r.id)).toEqual(table.rows.map((r) => r.id));
+    expect(exported.rows.map((r) => r.id)).not.toContain(onlyOpen.id);
   });
 });
