@@ -344,9 +344,9 @@ Each project carries:
 ## 13. Notifications
 
 Two channels: an in-app row rendered by the bell, and outbound email through
-SES. This section is the one page that says what fires today, what is planned,
-and where the operator and developer detail lives. Issue #289 is the catalogue
-that produced the planned matrix below; issue #288 is the work that ships it.
+SES. This section is the one page that says what fires on each, what is silent
+on purpose, and where the operator and developer detail lives. #289 was the
+catalogue that decided the matrix below; #288 shipped it.
 
 ### In-app
 
@@ -360,23 +360,26 @@ that produced the planned matrix below; issue #288 is the work that ships it.
   all read. Polls every minute and on window focus. There is no notifications
   page, no pagination and no delete.
 - [x] Project events to the proposer: every status change, soft delete and
-  restore, and a non-internal comment on the project (a reply also notifies the
-  parent comment's author). Skipped when the project has no linked account or
-  when the proposer is the actor. Internal comments notify nobody.
+  restore, a non-internal comment on the project (a reply also notifies the
+  parent comment's author), being made the proposer of a project by staff, and
+  the projects linked to a newly verified account. Skipped when the project has
+  no linked account or when the proposer is the actor. Internal comments notify
+  nobody.
 - [x] Inventory events to the requester or holder: request approved (with the
   pickup-by date), rejected, checked out (with the due date), returned, closed
   by staff; on a custom line, sourcing started, sourcing note edited, rejected,
-  fulfilled. Cart submission, custom request submission and self-cancel notify
-  nobody; the admin overview tile is the staff signal.
+  fulfilled. Cart submission, custom request submission and self-cancel write
+  no row; the admin overview tile is the staff signal in the app, and the staff
+  inbox gets the email.
 - [x] Overdue and past-pickup notices, written lazily on read rather than by a
   scheduler, and deduplicated so a re-read does not repeat one. When a
   request and the hold on its item name two different people, both are
   notified: the requester is accountable for the request, and the collector
   is the one holding the thing. The scan runs only when the affected user opens
   their own items page (ADR 0005).
-- [x] Silent, by omission rather than decision: hard delete, proposer
-  reassignment, a mentor named on a project, projects claimed on email
-  verification, role change, ban and unban, new account, AI review completion.
+- [x] Silent on purpose: AI review completion (it is synchronous in the form),
+  new accounts, unban, mentor status, account deletion. Hard delete writes no
+  row because the link would point at nothing; it is email only.
 
 ### Email
 
@@ -386,88 +389,88 @@ that produced the planned matrix below; issue #288 is the work that ships it.
   `EMAIL_FROM`, `EMAIL_REPLY_TO`, `EMAIL_STAFF_INBOX` and `SES_REGION`. A
   misconfigured `ses` transport fails boot (README, "Email transport"),
   including a missing staff inbox; under `console` a missing inbox only logs
-  a warning and drops the submission notice.
-- [x] Four messages, six triggers. Two for accounts: verification on sign-up
-  and again when an unverified account is refused sign-in, and password reset.
-  Two for project review: a notice to the staff inbox when a project
-  is submitted, carrying the title, the proposer, the description and a link;
-  and the outcome to the proposer when staff approve or request changes,
-  carrying the staff note. The approval message says the project will be
-  published later and that no further email follows, which is true because
-  publishing deliberately emails nobody.
+  a warning and drops the staff-facing message.
+- [x] Every email is mandatory for its recipient. There are no notification
+  preferences, no unsubscribe link and none planned; every message is
+  transactional (ADR 0019). Staff can still skip the proposer email per action
+  from the transition dialog, which names the recipient so the decision is
+  visible rather than implicit; the server ignores that flag from a non-staff
+  actor.
+- [x] One shared staff inbox for every staff-facing message: project submitted
+  or resubmitted, a borrow list or custom request submitted, and a comment
+  from the proposer. No per-staff fan-out.
 - [x] The proposer address is the linked account's email, else the stored
-  proposer email, else nothing is sent.
-- [x] Staff can skip the proposer email per action from the transition dialog,
-  which names the recipient so the decision is visible rather than implicit.
-  The server ignores the flag from a non-staff actor.
-- [x] Email is sent after the transaction commits, never inside it, and its
-  failure is swallowed. A rejected email must not undo an approval.
-- [x] No preferences, no unsubscribe link, no digest, no scheduler. Every
-  message is transactional. Every event not named above is in-app only or
-  silent.
-
-### Planned
-
-- [ ] Every email is mandatory for its recipient. There are no notification
-  preferences and none are planned. The staff per-action skip stays.
-- [x] One shared staff inbox for every staff-facing message, replacing the
-  review-only name; under the `ses` transport a missing inbox fails boot the
-  way a missing `EMAIL_FROM` does.
-- [ ] Holders who have an address but no account receive the pickup and due
-  emails at that address; an in-app row cannot reach them.
-- [x] Notification types become a vocabulary tuple in `src/lib/vocabularies.ts`
-  and the column is constrained to it.
-- [ ] The channel per event. The rule: email when the recipient must act away
-  from the app, in-app only for confirmations and the audit trail.
+  proposer email, else nothing is sent. An inventory holder with an address
+  and no account receives the pickup and due emails at that address, which is
+  the one case where email is the only channel that can reach them.
+- [x] Every email is sent after the transaction commits, never inside it, and
+  its failure is swallowed and logged. A rejected email must not undo an
+  approval, and a slow one must not hold an item's row lock.
+- [x] The channel per event. The rule: email when the recipient must act away
+  from the app, in-app only for confirmations and the audit trail. Every row
+  is covered by an integration test through the `send` seam on the `*As`
+  function.
 
   | Recipient | Event | In-app | Email |
   | --- | --- | --- | --- |
+  | Account | Verify email (sign-up, refused unverified sign-in) | no | yes |
+  | Account | Reset password | no | yes |
   | Proposer | Changes requested | yes | yes |
   | Proposer | Approved | yes | yes |
-  | Proposer | Returned to draft by staff | yes | planned, comment required |
+  | Proposer | Returned to draft by staff | yes | yes, comment required |
   | Proposer | Published, archived, restored from archive | yes | no |
   | Proposer | Soft deleted, restored | yes | no |
-  | Proposer | Hard deleted | no | planned, no link |
-  | New proposer | Proposer reassigned | planned | planned |
-  | Mentor | Named on a project | no account needed | planned |
-  | Proposer | Non-internal comment on the project | yes | planned |
-  | Proposer | Projects claimed on verification | planned | no |
+  | Proposer | Hard deleted by staff | no | yes, no link |
+  | New proposer | Proposer reassigned | yes | yes |
+  | Mentor | Named on a project | no account needed | yes |
+  | Proposer | Non-internal staff comment on the project | yes | yes |
+  | Proposer | Projects claimed on verification | yes | no |
   | Proposer | AI review completed | no | no |
   | Staff inbox | Project submitted or resubmitted | no | yes |
-  | Staff inbox | Cart submitted | tile | planned |
-  | Staff inbox | Custom request submitted | tile | planned |
-  | Staff inbox | Non-staff comment on a project | no | planned |
+  | Staff inbox | Borrow list submitted | tile | yes |
+  | Staff inbox | Custom request submitted | tile | yes |
+  | Staff inbox | Comment from the proposer | no | yes |
   | Staff inbox | New account | no | no |
-  | Holder | Request approved, pick up by date | yes | planned |
-  | Requester | Request rejected | yes | planned |
-  | Holder | Checked out, due date | yes | planned |
+  | Holder | Request approved, pick up by date | yes | yes |
+  | Requester | Request rejected | yes | yes |
+  | Holder | Checked out, due date | yes | yes |
   | Holder | Returned, closed by staff | yes | no |
-  | Requester | Custom line fulfilled or rejected | yes | planned |
+  | Requester | Custom line fulfilled or rejected | yes | yes |
   | Requester | Custom line sourcing started or note edited | yes | no |
-  | User | Role changed | no | planned |
-  | User | Banned | no | planned |
+  | User | Role changed | no | yes |
+  | User | Banned | no | yes |
   | User | Unbanned, mentor status, account deletion | no | no |
+
+  The actor is never told: a proposer withdrawing their own submission, or
+  deleting their own draft, or staff assigning a project to themselves, emails
+  nobody. Approving a cart of six lines sends six emails, one per line, the
+  same as the bell.
+
+### Planned
 
 - [ ] Blocked by ADR 0005 until it is reopened with a scheduler: a due-soon
   warning, overdue by email, and any staff view of overdue items. An overdue
-  email triggered by the lazy scan would arrive only when the affected user already
-  has the page open.
+  email triggered by the lazy scan would arrive only when the affected user
+  already has the page open.
 - Deferred, not planned: a notifications page beyond the bell's ten rows, an
-  outbound email log, per-staff fan-out of staff mail, digests.
+  outbound email log, per-staff fan-out of staff mail, digests, coalescing a
+  batch approval into one email.
 
 ### Where the rest is written
 
-- [`README.md`](./README.md), "Email transport": operator setup, the four-email
+- [`README.md`](./README.md), "Email transport": operator setup, the email
   table, and the SES production state.
 - [`CONTEXT.md`](./CONTEXT.md): the entries for Notification, Staff inbox,
   Proposer email and Submitted.
-- [`docs/QUIRKS.md`](./docs/QUIRKS.md): the console transport in dev, the five
-  render functions behind four messages, the two notification rules that look
+- [`docs/QUIRKS.md`](./docs/QUIRKS.md): the console transport in dev, the
+  render functions and their escaping, the two notification rules that look
   wrong, and the custom-line transition table.
 - [`DEPLOYMENT.md`](./DEPLOYMENT.md), section 9: SES identity, DKIM, sandbox exit
   and cutover.
 - [`docs/adr/0005-lazy-deadlines-no-scheduler.md`](./docs/adr/0005-lazy-deadlines-no-scheduler.md):
   why overdue is lazy and there is no cron.
+- [`docs/adr/0019-every-email-is-mandatory-and-staff-share-one-inbox.md`](./docs/adr/0019-every-email-is-mandatory-and-staff-share-one-inbox.md):
+  why there are no preferences and no per-staff fan-out.
 
 ## 14. User Administration
 
