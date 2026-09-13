@@ -122,7 +122,18 @@ export async function userIdByEmail(db: Db, email: string): Promise<string> {
  */
 export async function createFixtureProject(
   db: Db,
-  input: { title: string; proposerId: string; status?: ProjectStatus }
+  input: {
+    /**
+     * The column defaults to true and the seed never sets it, so every seeded
+     * project accepts applicants; a listing test that turns on "Accepting
+     * applicants" needs one published row with this off to see the list
+     * narrow at all.
+     */
+    acceptingApplicants?: boolean;
+    proposerId: string;
+    status?: ProjectStatus;
+    title: string;
+  }
 ): Promise<{ id: string; title: string }> {
   const status = input.status ?? "draft";
   const [project] = await db
@@ -133,6 +144,7 @@ export async function createFixtureProject(
       proposerId: input.proposerId,
       status,
       publishedAt: status === "published" ? new Date() : null,
+      acceptingApplicants: input.acceptingApplicants ?? true,
     })
     .returning();
   return { id: project.id, title: project.title };
