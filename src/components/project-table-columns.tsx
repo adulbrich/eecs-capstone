@@ -135,7 +135,7 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     cell: ({ row }) =>
       row.original.contactEmail ? (
         <a
-          className="text-brand hover:underline"
+          className="text-brand-dark hover:underline"
           href={`mailto:${row.original.contactEmail}`}
         >
           {row.original.contactEmail}
@@ -168,7 +168,7 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     cell: ({ row }) =>
       row.original.url ? (
         <a
-          className="text-brand hover:underline"
+          className="text-brand-dark hover:underline"
           href={row.original.url}
           rel="noreferrer"
           target="_blank"
