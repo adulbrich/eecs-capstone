@@ -111,7 +111,7 @@ test.describe("@smoke listing filters sheet", () => {
       // so the inverse click is what restores the default set, and the URL
       // dropping the key is what proves the set is the default again.
       await reopenSheet(staff, sheet);
-      await sheet.getByRole("checkbox", { name: "Published" }).click();
+      await published.click();
       await expect(staff).not.toHaveURL(/[?&]status=/);
       await expectRestored(staff, sheet, before);
     } finally {
@@ -176,7 +176,7 @@ async function expectNarrowed(
   ).toBeVisible();
 }
 
-/** Reopens the sheet by its counted name, after one filter went on. */
+/** Reopens the sheet by its counted name, while it counts one filter. */
 async function reopenSheet(page: Page, sheet: Locator): Promise<void> {
   await page.getByRole("button", { name: "Filters 1", exact: true }).click();
   await expect(sheet).toBeVisible();
