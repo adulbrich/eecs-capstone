@@ -5,8 +5,8 @@ import { ADMIN_AUTH } from "./constants";
 import {
   createFixtureProject,
   fixtureName,
-  openDb,
   userIdByEmail,
+  withDb,
 } from "./fixtures";
 
 /**
@@ -24,25 +24,21 @@ import {
  * assertion is relative (fewer than before, back to before) because the
  * local database drifts between runs (QUIRKS, "The smoke and accessibility
  * suites share one local database"). The one row a test creates is the
- * published project with "Accepting applicants" off: the column defaults on
- * and the seed never turns it off, so without that row the switch would
- * narrow nothing.
+ * published project with "Accepting applicants" off; `createFixtureProject`
+ * says why the seed cannot supply it.
  */
 test.describe("@smoke listing filters sheet", () => {
   test("projects: Accepting applicants narrows the list, Clear all restores it", async ({
     page,
   }) => {
-    const { db, close } = openDb();
-    try {
-      await createFixtureProject(db, {
+    await withDb(async (db) =>
+      createFixtureProject(db, {
         acceptingApplicants: false,
         proposerId: await userIdByEmail(db, "user@example.com"),
         status: "published",
         title: fixtureName("Project"),
-      });
-    } finally {
-      await close();
-    }
+      })
+    );
 
     const before = await openListing(page, "/projects");
     const sheet = await openSheet(page);
@@ -114,8 +110,7 @@ test.describe("@smoke listing filters sheet", () => {
       // Rechecked rather than cleared: this listing has no Clear all (#355),
       // so the inverse click is what restores the default set, and the URL
       // dropping the key is what proves the set is the default again.
-      await staff.getByRole("button", { name: "Filters 1" }).click();
-      await expect(sheet).toBeVisible();
+      await reopenSheet(staff, sheet);
       await sheet.getByRole("checkbox", { name: "Published" }).click();
       await expect(staff).not.toHaveURL(/[?&]status=/);
       await expectRestored(staff, sheet, before);
@@ -181,10 +176,15 @@ async function expectNarrowed(
   ).toBeVisible();
 }
 
-/** Reopens the sheet by its counted name and clicks Clear all inside it. */
-async function clearAll(page: Page, sheet: Locator): Promise<void> {
+/** Reopens the sheet by its counted name, after one filter went on. */
+async function reopenSheet(page: Page, sheet: Locator): Promise<void> {
   await page.getByRole("button", { name: "Filters 1", exact: true }).click();
   await expect(sheet).toBeVisible();
+}
+
+/** Reopens the sheet and clicks Clear all inside it. */
+async function clearAll(page: Page, sheet: Locator): Promise<void> {
+  await reopenSheet(page, sheet);
   await sheet.getByRole("button", { name: "Clear all" }).click();
 }
 
