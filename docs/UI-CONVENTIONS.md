@@ -171,7 +171,8 @@ in both modes. Keep the class rather than dropping it and trusting the global `a
 rule: that rule's hover state switches back to `--brand-primary`, and a utility
 outranks it. Table cells were the first case (#357) and the rest followed in
 #358, so `text-brand` on a link is a regression. `text-brand` stays for icons
-and decoration, where no contrast ratio applies.
+and decoration, where no contrast ratio applies; each such file is named in
+`src/test/brand-link-scan.test.ts`, which fails on any other.
 
 Status colors have no Tailwind alias, so reference the variable directly:
 

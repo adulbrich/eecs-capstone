@@ -19,6 +19,10 @@ const DECORATIVE_USES = new Set([
 ]);
 
 const SRC_DIR = join(process.cwd(), "src");
+// Compared by full path, not by name, for the reason `vocabulary-scan.ts`
+// gives: a bare-name check would exempt any directory called `test` anywhere
+// under `src/`, a production one included, and would do so silently.
+const TEST_DIR = join(SRC_DIR, "test");
 
 /** `text-brand` on its own: `text-brand-dark` and `text-brand-light` pass. */
 const BARE_BRAND = /\btext-brand\b(?!-)/;
@@ -27,7 +31,7 @@ function* componentFiles(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name !== "test") {
+      if (path !== TEST_DIR && entry.name !== "__tests__") {
         yield* componentFiles(path);
       }
     } else if (entry.name.endsWith(".tsx")) {
