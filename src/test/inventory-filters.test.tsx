@@ -30,6 +30,7 @@ function renderFilters(
     <InventoryFilters
       categories={[]}
       onCategoriesChange={() => {}}
+      onClear={() => {}}
       onStatusChange={() => {}}
       selectedCategories={[]}
       status={null}
@@ -133,5 +134,23 @@ describe("InventoryFilters", () => {
     ]);
     fireEvent.click(getByLabelText("Cameras"));
     expect(onCategoriesChange).toHaveBeenCalledWith([]);
+  });
+
+  it("offers Clear all only while something narrows, and calls onClear", () => {
+    const onClear = vi.fn();
+    const { queryByRole, rerender, getByRole } = renderFilters({ onClear });
+    expect(queryByRole("button", { name: "Clear all" })).toBeNull();
+    rerender(
+      <InventoryFilters
+        categories={[]}
+        onCategoriesChange={() => {}}
+        onClear={onClear}
+        onStatusChange={() => {}}
+        selectedCategories={[]}
+        status="available"
+      />
+    );
+    fireEvent.click(getByRole("button", { name: "Clear all" }));
+    expect(onClear).toHaveBeenCalledTimes(1);
   });
 });

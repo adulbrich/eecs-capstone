@@ -196,6 +196,11 @@ function InventoryIndex() {
           onCategoriesChange={(categories) =>
             navigate({ search: (s) => ({ ...s, categories, page: 1 }) })
           }
+          onClear={() =>
+            navigate({
+              search: (s) => ({ ...s, categories: [], status: null, page: 1 }),
+            })
+          }
           onStatusChange={(status) =>
             navigate({ search: (s) => ({ ...s, status, page: 1 }) })
           }

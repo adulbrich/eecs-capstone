@@ -14,7 +14,10 @@ import { CategoryChip } from "#/components/category-chip";
 import { CategoryFilterCombobox } from "#/components/category-filter-combobox";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
-import { INVENTORY_STATUS_LABEL } from "#/components/inventory-filters";
+import {
+  INVENTORY_STATUS_OPTIONS,
+  type InventoryFilterCategory,
+} from "#/components/inventory-filters";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { ListingLayout } from "#/components/listing-layout";
 import { LocalTime } from "#/components/local-time";
@@ -435,7 +438,7 @@ const EXPORT_COLUMNS = defineCsvColumns<Row>()([
 function AdminInventoryFilters({
   categories,
 }: {
-  categories: { id: string; name: string }[];
+  categories: InventoryFilterCategory[];
 }) {
   const uid = useId();
   const navigate = useNavigate({ from: "/admin/inventory/" });
@@ -445,6 +448,12 @@ function AdminInventoryFilters({
     retiredOnly,
     status,
   } = Route.useSearch();
+  const active = [
+    status !== null,
+    selectedCategories.length > 0,
+    retiredOnly,
+    overdueOnly,
+  ].filter(Boolean).length;
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
@@ -470,9 +479,9 @@ function AdminInventoryFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="_all_">All statuses</SelectItem>
-            {ACTIVE_STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {INVENTORY_STATUS_LABEL[s]}
+            {INVENTORY_STATUS_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -529,6 +538,26 @@ function AdminInventoryFilters({
           }
         />
       </div>
+      {active > 0 && (
+        <Button
+          className="h-auto p-0"
+          onClick={() =>
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                categories: [],
+                overdueOnly: false,
+                retiredOnly: false,
+                status: null,
+              }),
+            })
+          }
+          type="button"
+          variant="link"
+        >
+          Clear all
+        </Button>
+      )}
     </div>
   );
 }

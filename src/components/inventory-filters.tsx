@@ -2,6 +2,7 @@ import { useId } from "react";
 import { ACTIVE_STATUSES, type ActiveStatus } from "#/lib/inventory-visibility";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import type { ViewMode } from "#/lib/view-preference";
+import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -15,7 +16,12 @@ import {
 import { ViewToggle } from "./view-toggle";
 
 /** The working set, or null for no filter: retired is not offered here. */
-export type StatusFilter = ActiveStatus | null;
+type StatusFilter = ActiveStatus | null;
+
+export interface InventoryFilterCategory {
+  id: string;
+  name: string;
+}
 
 // A label per status, keyed by the union so a new one cannot reach the
 // dropdown unlabelled, and ordered by the vocabulary rather than by hand.
@@ -27,7 +33,8 @@ export const INVENTORY_STATUS_LABEL: Record<ActiveStatus, string> = {
   maintenance: "Maintenance",
 };
 
-const STATUS_OPTIONS = ACTIVE_STATUSES.map((value) => ({
+/** The status select's options, shared with the admin listing. */
+export const INVENTORY_STATUS_OPTIONS = ACTIVE_STATUSES.map((value) => ({
   label: INVENTORY_STATUS_LABEL[value],
   value,
 }));
@@ -80,8 +87,10 @@ export function InventorySearchBar({
 }
 
 interface FiltersProps {
-  categories: { id: string; name: string }[];
+  categories: InventoryFilterCategory[];
   onCategoriesChange: (next: string[]) => void;
+  /** Clear all: every narrowing filter off in one navigation. */
+  onClear: () => void;
   onStatusChange: (s: StatusFilter) => void;
   selectedCategories: string[];
   status: StatusFilter;
@@ -95,11 +104,16 @@ interface FiltersProps {
 export function InventoryFilters({
   categories,
   onCategoriesChange,
+  onClear,
   onStatusChange,
   selectedCategories,
   status,
 }: FiltersProps) {
   const uid = useId();
+  const active = countActiveInventoryFilters({
+    categories: selectedCategories,
+    status,
+  });
 
   function toggleCategory(id: string) {
     onCategoriesChange(
@@ -124,7 +138,7 @@ export function InventoryFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="_all_">All statuses</SelectItem>
-            {STATUS_OPTIONS.map((opt) => (
+            {INVENTORY_STATUS_OPTIONS.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
                 {opt.label}
               </SelectItem>
@@ -150,6 +164,17 @@ export function InventoryFilters({
             ))}
           </div>
         </fieldset>
+      )}
+
+      {active > 0 && (
+        <Button
+          className="h-auto p-0"
+          onClick={onClear}
+          type="button"
+          variant="link"
+        >
+          Clear all
+        </Button>
       )}
     </div>
   );

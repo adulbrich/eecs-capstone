@@ -201,7 +201,7 @@ taste: the card column is `max-w-4xl` (896px), the aside is 18rem (288px), the
 gap 2rem and the page padding 4rem, and 288 + 32 + 896 + 64 is 1280. At `lg`
 the cards would have to shrink to make room. The `xl:` layout classes live in
 that one component; a route passes at most its width pair through `className`
-(`mx-auto max-w-4xl xl:max-w-7xl` on `/projects`). Any other `xl:` still needs
+(`mx-auto max-w-4xl xl:max-w-7xl` on `/projects` and `/inventory`). Any other `xl:` still needs
 a reason this paragraph does not already give (#350).
 
 There is no card grid any more. The listing cards (`project-card.tsx`,

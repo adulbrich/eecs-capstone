@@ -101,6 +101,7 @@ test("@smoke admin inventory list", async ({ page }) => {
   await expect(
     aside.getByRole("switch", { name: "Show only overdue" })
   ).toBeVisible();
+  await expectNoHorizontalOverflow(page);
   await checkA11y(page);
 
   await page.setViewportSize({ width: 375, height: 812 });
@@ -113,6 +114,7 @@ test("@smoke admin inventory list", async ({ page }) => {
     sheet.getByRole("switch", { name: "Show only retired" })
   ).toBeVisible();
   await expect(sheet.getByRole("combobox", { name: "Status" })).toBeVisible();
+  await expect(sheet.locator(":focus")).toHaveCount(1);
   await expectNoHorizontalOverflow(page);
   await checkA11y(page);
   await page.keyboard.press("Escape");
