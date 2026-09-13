@@ -4,7 +4,7 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useId } from "react";
 import { z } from "zod";
 import {
   AdminDataTable,
@@ -14,7 +14,9 @@ import { CategoryChip } from "#/components/category-chip";
 import { CategoryFilterCombobox } from "#/components/category-filter-combobox";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
+import { INVENTORY_STATUS_LABEL } from "#/components/inventory-filters";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
+import { ListingLayout } from "#/components/listing-layout";
 import { LocalTime } from "#/components/local-time";
 import { OverdueBadge } from "#/components/overdue-badge";
 import {
@@ -426,6 +428,111 @@ const EXPORT_COLUMNS = defineCsvColumns<Row>()([
   { header: "Updated", key: "updatedAt", value: (row) => row.updatedAt },
 ]);
 
+/**
+ * The narrowing form. Its own component because ListingLayout mounts it
+ * twice (aside and sheet) and each mount needs its own `useId` set.
+ */
+function AdminInventoryFilters({
+  categories,
+}: {
+  categories: { id: string; name: string }[];
+}) {
+  const uid = useId();
+  const navigate = useNavigate({ from: "/admin/inventory/" });
+  const {
+    categories: selectedCategories,
+    overdueOnly,
+    retiredOnly,
+    status,
+  } = Route.useSearch();
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1.5">
+        <Label htmlFor={`${uid}-status`}>Status</Label>
+        {/* Disabled while retired-only is on. Retired cannot co-occur
+            with any status this offers, so leaving it live would let
+            staff set a filter that is silently ignored, or express an
+            intersection that was never going to match. */}
+        <Select
+          disabled={retiredOnly}
+          onValueChange={(v) =>
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                status: (v === "_all_" ? null : v) as ActiveStatus | null,
+              }),
+            })
+          }
+          value={status ?? "_all_"}
+        >
+          <SelectTrigger className="w-full" id={`${uid}-status`}>
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all_">All statuses</SelectItem>
+            {ACTIVE_STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {INVENTORY_STATUS_LABEL[s]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`${uid}-category`}>
+          Categories (matches all selected)
+        </Label>
+        <CategoryFilterCombobox
+          categories={categories}
+          id={`${uid}-category`}
+          onChange={(next) =>
+            void navigate({
+              search: (prev) => ({ ...prev, categories: next }),
+            })
+          }
+          value={selectedCategories}
+        />
+      </div>
+      <div>
+        <FilterSwitch
+          checked={retiredOnly}
+          id={`${uid}-retired-only`}
+          label="Show only retired"
+          onCheckedChange={(next) =>
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                // Clearing the status keeps the URL honest about what is
+                // actually filtering, rather than carrying a value the
+                // disabled control no longer applies.
+                // Overdue goes with it: nothing retired is reserved or
+                // checked out, so the pair can only ever match nothing.
+                overdueOnly: next ? false : prev.overdueOnly,
+                retiredOnly: next,
+                status: next ? null : prev.status,
+              }),
+            })
+          }
+        />
+        {/* Nothing retired can be overdue: a retired item is neither
+            reserved nor checked out, which is what the two deadlines
+            belong to. Leaving both on would always show an empty table. */}
+        <FilterSwitch
+          checked={overdueOnly}
+          disabled={retiredOnly}
+          id={`${uid}-overdue-only`}
+          label="Show only overdue"
+          onCheckedChange={(next) =>
+            void navigate({
+              search: (prev) => ({ ...prev, overdueOnly: next }),
+            })
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
 function AdminInventory() {
   const navigate = useNavigate({ from: "/admin/inventory/" });
   const { categories, rows } = Route.useLoaderData();
@@ -444,6 +551,14 @@ function AdminInventory() {
     selectedCategories.length > 0 ||
     retiredOnly ||
     overdueOnly;
+  // What the Filters button counts below xl: every control in the aside
+  // that is on, the search excluded since it sits beside the button.
+  const activeFilterCount = [
+    status !== null,
+    selectedCategories.length > 0,
+    retiredOnly,
+    overdueOnly,
+  ].filter(Boolean).length;
   // The only filter applied here rather than in the loader. Everything below
   // reads `visible`, so the count, the table and the export agree on what the
   // switch left.
@@ -468,32 +583,53 @@ function AdminInventory() {
   });
 
   return (
-    <div className="px-4 py-6 md:px-8">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/admin">Admin</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Inventory</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="font-semibold text-2xl">Inventory</h1>
-        <div className="flex gap-2">
-          <Button asChild size="sm" variant="outline">
-            <Link to="/admin/inventory/requests">Request queue</Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link to="/inventory/new">+ New item</Link>
-          </Button>
-        </div>
-      </div>
-
+    <ListingLayout
+      activeFilterCount={activeFilterCount}
+      filters={<AdminInventoryFilters categories={categories} />}
+      search={
+        <>
+          <Label className="sr-only" htmlFor="inv-search">
+            Search
+          </Label>
+          <Input
+            className="min-w-0 flex-1 basis-64"
+            id="inv-search"
+            onChange={(e) => setQDraft(e.target.value)}
+            placeholder="Name, description, serial, label, location, or holder"
+            type="search"
+            value={qDraft}
+          />
+        </>
+      }
+      title={
+        <>
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link to="/admin">Admin</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Inventory</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <h1 className="font-semibold text-2xl">Inventory</h1>
+            <div className="flex gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link to="/admin/inventory/requests">Request queue</Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link to="/inventory/new">+ New item</Link>
+              </Button>
+            </div>
+          </div>
+        </>
+      }
+    >
       <AdminDataTable
         actions={
           <ExportCsvButton
@@ -515,105 +651,8 @@ function AdminInventory() {
         getRowId={(row) => row.id}
         noMatchMessage="No items in this view."
         {...tableProps}
-        toolbar={
-          <>
-            <div>
-              <Label htmlFor="inv-search">Search</Label>
-              <Input
-                className="mt-1 w-64"
-                id="inv-search"
-                onChange={(e) => setQDraft(e.target.value)}
-                placeholder="Name, description, serial, label, location, or holder"
-                type="search"
-                value={qDraft}
-              />
-            </div>
-            <div>
-              <Label htmlFor="inv-status">Status</Label>
-              {/* Disabled while retired-only is on. Retired cannot co-occur
-                  with any status this offers, so leaving it live would let
-                  staff set a filter that is silently ignored, or express an
-                  intersection that was never going to match. */}
-              <Select
-                disabled={retiredOnly}
-                onValueChange={(v) =>
-                  void navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      status: (v === "_all_" ? null : v) as ActiveStatus | null,
-                    }),
-                  })
-                }
-                value={status ?? "_all_"}
-              >
-                <SelectTrigger className="mt-1 w-40" id="inv-status">
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all_">All statuses</SelectItem>
-                  {ACTIVE_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s.replace(/_/g, " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <FilterSwitch
-              checked={retiredOnly}
-              id="inv-retired-only"
-              label="Show only retired"
-              onCheckedChange={(next) =>
-                void navigate({
-                  search: (prev) => ({
-                    ...prev,
-                    // Clearing the status keeps the URL honest about what is
-                    // actually filtering, rather than carrying a value the
-                    // disabled control no longer applies.
-                    // Overdue goes with it: nothing retired is reserved or
-                    // checked out, so the pair can only ever match nothing.
-                    overdueOnly: next ? false : prev.overdueOnly,
-                    retiredOnly: next,
-                    status: next ? null : prev.status,
-                  }),
-                })
-              }
-            />
-            {/* Nothing retired can be overdue: a retired item is neither
-                reserved nor checked out, which is what the two deadlines
-                belong to. Leaving both on would always show an empty table. */}
-            <FilterSwitch
-              checked={overdueOnly}
-              disabled={retiredOnly}
-              id="inv-overdue-only"
-              label="Show only overdue"
-              onCheckedChange={(next) =>
-                void navigate({
-                  search: (prev) => ({ ...prev, overdueOnly: next }),
-                })
-              }
-            />
-            <div>
-              <Label htmlFor="inv-category">
-                Categories (matches all selected)
-              </Label>
-              <div className="mt-1 w-56">
-                <CategoryFilterCombobox
-                  categories={categories}
-                  id="inv-category"
-                  onChange={(next) =>
-                    void navigate({
-                      search: (prev) => ({ ...prev, categories: next }),
-                    })
-                  }
-                  value={selectedCategories}
-                />
-              </div>
-            </div>
-          </>
-        }
       />
       <ListCount count={visible.length} />
-    </div>
+    </ListingLayout>
   );
 }

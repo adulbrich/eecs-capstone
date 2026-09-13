@@ -5,12 +5,17 @@ import { AdminDataTable } from "#/components/admin-data-table";
 import { BorrowListButton } from "#/components/borrow-list-button";
 import { EmptyState } from "#/components/empty-state";
 import { InventoryCard } from "#/components/inventory-card";
-import { InventoryFilterBar } from "#/components/inventory-filter-bar";
+import {
+  countActiveInventoryFilters,
+  InventoryFilters,
+  InventorySearchBar,
+} from "#/components/inventory-filters";
 import {
   INVENTORY_TABLE_COLUMNS,
   INVENTORY_TABLE_DEFAULT_SORT,
   type InventoryListRow,
 } from "#/components/inventory-table-columns";
+import { ListingLayout } from "#/components/listing-layout";
 import { Button } from "#/components/ui/button";
 import {
   Pagination,
@@ -143,7 +148,7 @@ function InventoryCards({
     );
   }
   return (
-    <div className="mx-auto mt-6 flex max-w-4xl flex-col gap-3">
+    <div className="mt-6 flex max-w-4xl flex-col gap-3">
       {rows.map((it) => (
         <InventoryCard
           item={{ ...it, status: it.status as ActiveStatus }}
@@ -179,11 +184,39 @@ function InventoryIndex() {
 
   const totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
   return (
-    <div className="px-4 py-6 md:p-8">
-      <div className="mx-auto max-w-4xl">
-        {/* flex-wrap and ml-auto, as on /projects: at a phone width the two
-            buttons drop under the heading, right-aligned, rather than
-            pushing the page wider than the viewport (#297). */}
+    <ListingLayout
+      activeFilterCount={countActiveInventoryFilters({
+        categories: search.categories,
+        status: search.status,
+      })}
+      className="mx-auto max-w-4xl xl:max-w-7xl"
+      filters={
+        <InventoryFilters
+          categories={data.categories}
+          onCategoriesChange={(categories) =>
+            navigate({ search: (s) => ({ ...s, categories, page: 1 }) })
+          }
+          onStatusChange={(status) =>
+            navigate({ search: (s) => ({ ...s, status, page: 1 }) })
+          }
+          selectedCategories={search.categories}
+          status={search.status}
+        />
+      }
+      search={
+        <InventorySearchBar
+          onQChange={onQChange}
+          onViewChange={(next) =>
+            navigate({ search: (s) => ({ ...s, view: next }) })
+          }
+          q={search.q}
+          view={view}
+        />
+      }
+      title={
+        /* flex-wrap and ml-auto, as on /projects: at a phone width the two
+           buttons drop under the heading, right-aligned, rather than
+           pushing the page wider than the viewport (#297). */
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="font-semibold text-2xl">Inventory</h1>
           <div className="ml-auto flex items-center gap-2">
@@ -196,32 +229,14 @@ function InventoryIndex() {
             <BorrowListButton />
           </div>
         </div>
-        <div className="mt-4">
-          <InventoryFilterBar
-            categories={data.categories}
-            onCategoriesChange={(categories) =>
-              navigate({ search: (s) => ({ ...s, categories, page: 1 }) })
-            }
-            onQChange={onQChange}
-            onStatusChange={(status) =>
-              navigate({ search: (s) => ({ ...s, status, page: 1 }) })
-            }
-            onViewChange={(next) =>
-              navigate({ search: (s) => ({ ...s, view: next }) })
-            }
-            q={search.q}
-            selectedCategories={search.categories}
-            status={search.status}
-            view={view}
-          />
-        </div>
-      </div>
+      }
+    >
       {view === "table" ? (
         <InventoryTable rows={data.rows} search={search} />
       ) : (
         <InventoryCards q={search.q} rows={data.rows} signedIn={signedIn} />
       )}
-      <Pagination className="mx-auto max-w-4xl">
+      <Pagination className="max-w-4xl">
         <PaginationButton
           disabled={data.page <= 1}
           onClick={() =>
@@ -245,6 +260,6 @@ function InventoryIndex() {
           Next
         </PaginationButton>
       </Pagination>
-    </div>
+    </ListingLayout>
   );
 }

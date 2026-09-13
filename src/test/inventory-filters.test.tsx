@@ -2,34 +2,47 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { InventoryFilterBar } from "#/components/inventory-filter-bar";
+import {
+  InventoryFilters,
+  InventorySearchBar,
+} from "#/components/inventory-filters";
 
 afterEach(cleanup);
 
-function renderBar(
-  overrides: Partial<Parameters<typeof InventoryFilterBar>[0]> = {}
+function renderSearch(
+  overrides: Partial<Parameters<typeof InventorySearchBar>[0]> = {}
 ) {
   return render(
-    <InventoryFilterBar
-      categories={[]}
-      onCategoriesChange={() => {}}
+    <InventorySearchBar
       onQChange={() => {}}
-      onStatusChange={() => {}}
       onViewChange={() => {}}
       q=""
-      selectedCategories={[]}
-      status={null}
       view="card"
       {...overrides}
     />
   );
 }
 
-describe("InventoryFilterBar", () => {
+function renderFilters(
+  overrides: Partial<Parameters<typeof InventoryFilters>[0]> = {}
+) {
+  return render(
+    <InventoryFilters
+      categories={[]}
+      onCategoriesChange={() => {}}
+      onStatusChange={() => {}}
+      selectedCategories={[]}
+      status={null}
+      {...overrides}
+    />
+  );
+}
+
+describe("InventorySearchBar", () => {
   it("debounces search input", async () => {
     vi.useFakeTimers();
     const onQChange = vi.fn();
-    const { getByPlaceholderText } = renderBar({ onQChange });
+    const { getByPlaceholderText } = renderSearch({ onQChange });
     fireEvent.change(getByPlaceholderText("Search inventory"), {
       target: { value: "arduino" },
     });
@@ -47,7 +60,7 @@ describe("InventoryFilterBar", () => {
     // the only one of six with no sync-back, so Back undid itself.
     vi.useFakeTimers();
     const onQChange = vi.fn();
-    const { getByPlaceholderText, rerender } = renderBar({
+    const { getByPlaceholderText, rerender } = renderSearch({
       onQChange,
       q: "old",
     });
@@ -56,21 +69,12 @@ describe("InventoryFilterBar", () => {
     });
 
     rerender(
-      <InventoryFilterBar
-        categories={[]}
-        onCategoriesChange={() => {
-          // no-op
-        }}
+      <InventorySearchBar
         onQChange={onQChange}
-        onStatusChange={() => {
-          // no-op
-        }}
         onViewChange={() => {
           // no-op
         }}
         q="fromBack"
-        selectedCategories={[]}
-        status={null}
         view="card"
       />
     );
@@ -82,12 +86,20 @@ describe("InventoryFilterBar", () => {
     vi.useRealTimers();
   });
 
-  it("renders the status dropdown and the view toggle", () => {
-    const { getByLabelText } = renderBar();
-    // Select triggers are labelled via their associated <Label htmlFor>.
-    expect(getByLabelText("Status")).toBeTruthy();
+  it("renders the view toggle beside the search", () => {
+    const { getByLabelText } = renderSearch();
+    expect(getByLabelText("Search inventory")).toBeTruthy();
     expect(getByLabelText("Card view")).toBeTruthy();
     expect(getByLabelText("Table view")).toBeTruthy();
+  });
+});
+
+describe("InventoryFilters", () => {
+  it("renders the status dropdown, labelled through its Label", () => {
+    const { getByLabelText } = renderFilters();
+    // Select triggers are labelled via their associated <Label htmlFor>,
+    // whose id comes from useId so two mounts do not collide.
+    expect(getByLabelText("Status")).toBeTruthy();
   });
 
   it("renders a checkbox per category, checked according to selection", () => {
@@ -95,7 +107,7 @@ describe("InventoryFilterBar", () => {
       { id: "11111111-1111-4111-8111-111111111111", name: "Cameras" },
       { id: "22222222-2222-4222-8222-222222222222", name: "Drills" },
     ];
-    const { getByLabelText } = renderBar({
+    const { getByLabelText } = renderFilters({
       categories,
       selectedCategories: [categories[0].id],
     });
@@ -109,7 +121,7 @@ describe("InventoryFilterBar", () => {
       { id: "22222222-2222-4222-8222-222222222222", name: "Drills" },
     ];
     const onCategoriesChange = vi.fn();
-    const { getByLabelText } = renderBar({
+    const { getByLabelText } = renderFilters({
       categories,
       onCategoriesChange,
       selectedCategories: [categories[0].id],

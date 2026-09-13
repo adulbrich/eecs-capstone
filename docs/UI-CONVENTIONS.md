@@ -241,10 +241,11 @@ short, `my/bookmarks.tsx`
 bounds only its title, `inventory/$itemId.tsx` holds a two-column detail
 layout, and `admin/analytics.tsx` holds a two-column grid of figure cards.
 `my/bookmarks.tsx` lets the table run full width below the bounded
-title, the way the admin tables do. `projects/index.tsx` used to as well; since
-#350 it passes `mx-auto max-w-4xl xl:max-w-7xl` to `ListingLayout`, so the
-table is bounded with the cards below `xl` and shares the wider grid with the
-aside from `xl`. `/admin/projects` passes no width and runs full, as before. The sign-in/sign-up/forgot/reset-password cards
+title, the way the admin tables do. `projects/index.tsx` and
+`inventory/index.tsx` used to as well; since #350 and #352 they pass
+`mx-auto max-w-4xl xl:max-w-7xl` to `ListingLayout`, so the table is bounded
+with the cards below `xl` and shares the wider grid with the aside from `xl`.
+`/admin/projects` and `/admin/inventory` pass no width and run full, as before. The sign-in/sign-up/forgot/reset-password cards
 are narrower still but live inside the separate `island-shell` container below, not
 this padding pattern.
 
@@ -672,7 +673,10 @@ this rule existed, and two had already drifted apart on details like
 ### Listing layout
 
 A page that lists and filters renders through `ListingLayout` from
-`#/components/listing-layout`, with four slots:
+`#/components/listing-layout`, with four slots. The four listings on it are
+`/projects`, `/admin/projects`, `/inventory` and `/admin/inventory`; the
+filters components are `projects-filters.tsx` and `inventory-filters.tsx`,
+with the admin forms inline in their routes.
 
 ```tsx
 <ListingLayout

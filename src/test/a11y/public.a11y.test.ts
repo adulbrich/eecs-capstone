@@ -262,6 +262,33 @@ test("@smoke inventory list", async ({ page }) => {
   await checkA11y(page);
 });
 
+test("@smoke inventory list, filters aside at xl", async ({ page }) => {
+  await page.goto("/inventory");
+  await waitForHydration(page);
+  const aside = page.getByRole("complementary", { name: "Filters" });
+  await expect(aside.getByRole("combobox", { name: "Status" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Filters" })).toBeHidden();
+  await checkA11y(page);
+});
+
+test("@smoke inventory list, filters sheet at 375px", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/inventory");
+  await waitForHydration(page);
+  await expect(
+    page.getByRole("complementary", { name: "Filters" })
+  ).toBeHidden();
+  await page.getByRole("button", { name: "Filters" }).click();
+  const sheet = page.getByRole("dialog", { name: "Filters" });
+  await expect(sheet.getByRole("combobox", { name: "Status" })).toBeVisible();
+  await expect(sheet.locator(":focus")).toHaveCount(1);
+  await expectNoHorizontalOverflow(page);
+  await checkA11y(page);
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  await expect(page.getByRole("button", { name: "Filters" })).toBeFocused();
+});
+
 test("@smoke inventory list, table mode", async ({ page }) => {
   await page.goto("/inventory?view=table");
   await expect(page.locator(".admin-table")).toBeVisible();

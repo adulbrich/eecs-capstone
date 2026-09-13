@@ -33,7 +33,7 @@ import ts from "typescript";
  *
  * A `Record` keyed by a vocabulary is deliberately **not** a copy and is not
  * examined. The label and style tables in `status-badge.tsx`,
- * `inventory-status-badge.tsx`, `inventory-filter-bar.tsx`,
+ * `inventory-status-badge.tsx`, `inventory-filters.tsx`,
  * `admin/analytics.tsx` and `my/items.tsx` all name a whole vocabulary on
  * purpose, and the type forces them to be total: adding a status fails to
  * compile there rather than silently rendering nothing. That holds only while
