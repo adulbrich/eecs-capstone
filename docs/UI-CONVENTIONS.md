@@ -162,6 +162,14 @@ Semantic aliases adapt to dark mode; raw palette classes do not.
 | `dark:bg-neutral-900` | `dark:bg-card` |
 | `dark:border-neutral-800` | `dark:border-border` |
 
+A brand-colored link on a surface that can be tinted uses `text-brand-dark`, not
+`text-brand`. Beaver Orange on white is 4.57:1, a margin of 0.07 over AA, so the
+moment a row hover, a selected state or a status background sits under it the
+link fails; `text-brand-dark` is 6.0:1 on white and about 5.6:1 on a hovered
+table row, and in dark mode it resolves to the lighter orange the buttons use.
+Table cells are the known case (#357). `text-brand` stays for text that sits on
+the page background or a plain card and never gets a tint under it.
+
 Status colors have no Tailwind alias, so reference the variable directly:
 
 ```tsx
