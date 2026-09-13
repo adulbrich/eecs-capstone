@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
  *
  * It owns three things, and the third is why this exists rather than a bare
  * debounce helper: the draft, the debounced commit, and **resyncing the draft
- * when the value changes underneath**. `inventory-filter-bar.tsx` had the first
+ * when the value changes underneath**. `inventory-filter-bar.tsx` (now `inventory-filters.tsx`) had the first
  * two and not the third, so browser Back changed the URL, the stale draft
  * survived, and 300ms later it was written straight back over the top. Owning
  * all three makes that unrepresentable at a call site.

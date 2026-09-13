@@ -90,8 +90,35 @@ test("admin analytics dashboard, one program selected", async ({ page }) => {
 });
 
 test("@smoke admin inventory list", async ({ page }) => {
+  // The two switches and the status select live in the filters aside at
+  // 1280 and in the filters sheet at 375 (#352).
   await page.goto("/admin/inventory");
+  await waitForHydration(page);
+  const aside = page.getByRole("complementary", { name: "Filters" });
+  await expect(
+    aside.getByRole("switch", { name: "Show only retired" })
+  ).toBeVisible();
+  await expect(
+    aside.getByRole("switch", { name: "Show only overdue" })
+  ).toBeVisible();
+  await expectNoHorizontalOverflow(page);
   await checkA11y(page);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/admin/inventory");
+  await waitForHydration(page);
+  await expect(aside).toBeHidden();
+  await page.getByRole("button", { name: "Filters" }).click();
+  const sheet = page.getByRole("dialog", { name: "Filters" });
+  await expect(
+    sheet.getByRole("switch", { name: "Show only retired" })
+  ).toBeVisible();
+  await expect(sheet.getByRole("combobox", { name: "Status" })).toBeVisible();
+  await expect(sheet.locator(":focus")).toHaveCount(1);
+  await expectNoHorizontalOverflow(page);
+  await checkA11y(page);
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
 });
 
 test("admin inventory table interactions", async ({ page }) => {

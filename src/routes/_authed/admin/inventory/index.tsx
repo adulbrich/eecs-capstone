@@ -4,17 +4,22 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useId } from "react";
 import { z } from "zod";
 import {
   AdminDataTable,
   defineAdminColumns,
 } from "#/components/admin-data-table";
+import {
+  CategoryCheckboxList,
+  type CategoryOption,
+} from "#/components/category-checkbox-list";
 import { CategoryChip } from "#/components/category-chip";
-import { CategoryFilterCombobox } from "#/components/category-filter-combobox";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
+import { INVENTORY_STATUS_OPTIONS } from "#/components/inventory-filters";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
+import { ListingLayout } from "#/components/listing-layout";
 import { LocalTime } from "#/components/local-time";
 import { OverdueBadge } from "#/components/overdue-badge";
 import {
@@ -113,6 +118,7 @@ export const Route = createFileRoute("/_authed/admin/inventory/")({
   component: AdminInventory,
 });
 
+type Search = z.infer<typeof searchSchema>;
 type Row = Awaited<ReturnType<typeof listAdminInventory>>["rows"][number];
 
 /**
@@ -426,6 +432,141 @@ const EXPORT_COLUMNS = defineCsvColumns<Row>()([
   { header: "Updated", key: "updatedAt", value: (row) => row.updatedAt },
 ]);
 
+/**
+ * How many narrowing controls are on: what the Filters button shows below
+ * xl, and what decides whether Clear all renders. The search is excluded,
+ * since it sits beside the button. Clear all resets exactly these fields.
+ */
+function countActiveAdminFilters(search: Search): number {
+  return [
+    search.status !== null,
+    search.categories.length > 0,
+    search.retiredOnly,
+    search.overdueOnly,
+  ].filter(Boolean).length;
+}
+
+/**
+ * The narrowing form. Its own component because ListingLayout mounts it
+ * twice (aside and sheet) and each mount needs its own `useId` set.
+ */
+function AdminInventoryFilters({
+  categories,
+}: {
+  categories: CategoryOption[];
+}) {
+  const uid = useId();
+  const navigate = useNavigate({ from: "/admin/inventory/" });
+  const search = Route.useSearch();
+  const {
+    categories: selectedCategories,
+    overdueOnly,
+    retiredOnly,
+    status,
+  } = search;
+  const active = countActiveAdminFilters(search);
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1.5">
+        <Label htmlFor={`${uid}-status`}>Status</Label>
+        {/* Disabled while retired-only is on. Retired cannot co-occur
+            with any status this offers, so leaving it live would let
+            staff set a filter that is silently ignored, or express an
+            intersection that was never going to match. */}
+        <Select
+          disabled={retiredOnly}
+          onValueChange={(v) =>
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                status: (v === "_all_" ? null : v) as ActiveStatus | null,
+              }),
+            })
+          }
+          value={status ?? "_all_"}
+        >
+          <SelectTrigger className="w-full" id={`${uid}-status`}>
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all_">All statuses</SelectItem>
+            {INVENTORY_STATUS_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <CategoryCheckboxList
+        categories={categories}
+        onChange={(next) =>
+          void navigate({
+            search: (prev) => ({ ...prev, categories: next }),
+          })
+        }
+        selected={selectedCategories}
+      />
+      <div>
+        <FilterSwitch
+          checked={retiredOnly}
+          id={`${uid}-retired-only`}
+          label="Show only retired"
+          onCheckedChange={(next) =>
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                // Clearing the status keeps the URL honest about what is
+                // actually filtering, rather than carrying a value the
+                // disabled control no longer applies.
+                // Overdue goes with it: nothing retired is reserved or
+                // checked out, so the pair can only ever match nothing.
+                overdueOnly: next ? false : prev.overdueOnly,
+                retiredOnly: next,
+                status: next ? null : prev.status,
+              }),
+            })
+          }
+        />
+        {/* Nothing retired can be overdue: a retired item is neither
+            reserved nor checked out, which is what the two deadlines
+            belong to. Leaving both on would always show an empty table. */}
+        <FilterSwitch
+          checked={overdueOnly}
+          disabled={retiredOnly}
+          id={`${uid}-overdue-only`}
+          label="Show only overdue"
+          onCheckedChange={(next) =>
+            void navigate({
+              search: (prev) => ({ ...prev, overdueOnly: next }),
+            })
+          }
+        />
+      </div>
+      {active > 0 && (
+        <Button
+          className="h-auto p-0"
+          onClick={() =>
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                categories: [],
+                overdueOnly: false,
+                retiredOnly: false,
+                status: null,
+              }),
+            })
+          }
+          type="button"
+          variant="link"
+        >
+          Clear all
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function AdminInventory() {
   const navigate = useNavigate({ from: "/admin/inventory/" });
   const { categories, rows } = Route.useLoaderData();
@@ -468,32 +609,53 @@ function AdminInventory() {
   });
 
   return (
-    <div className="px-4 py-6 md:px-8">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/admin">Admin</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Inventory</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="font-semibold text-2xl">Inventory</h1>
-        <div className="flex gap-2">
-          <Button asChild size="sm" variant="outline">
-            <Link to="/admin/inventory/requests">Request queue</Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link to="/inventory/new">+ New item</Link>
-          </Button>
-        </div>
-      </div>
-
+    <ListingLayout
+      activeFilterCount={countActiveAdminFilters(search)}
+      filters={<AdminInventoryFilters categories={categories} />}
+      search={
+        <>
+          <Label className="sr-only" htmlFor="inv-search">
+            Search
+          </Label>
+          <Input
+            className="min-w-0 flex-1 basis-64"
+            id="inv-search"
+            onChange={(e) => setQDraft(e.target.value)}
+            placeholder="Name, description, serial, label, location, or holder"
+            type="search"
+            value={qDraft}
+          />
+        </>
+      }
+      title={
+        <>
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link to="/admin">Admin</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Inventory</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <h1 className="font-semibold text-2xl">Inventory</h1>
+            <div className="flex gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link to="/admin/inventory/requests">Request queue</Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link to="/inventory/new">+ New item</Link>
+              </Button>
+            </div>
+          </div>
+        </>
+      }
+    >
       <AdminDataTable
         actions={
           <ExportCsvButton
@@ -515,105 +677,8 @@ function AdminInventory() {
         getRowId={(row) => row.id}
         noMatchMessage="No items in this view."
         {...tableProps}
-        toolbar={
-          <>
-            <div>
-              <Label htmlFor="inv-search">Search</Label>
-              <Input
-                className="mt-1 w-64"
-                id="inv-search"
-                onChange={(e) => setQDraft(e.target.value)}
-                placeholder="Name, description, serial, label, location, or holder"
-                type="search"
-                value={qDraft}
-              />
-            </div>
-            <div>
-              <Label htmlFor="inv-status">Status</Label>
-              {/* Disabled while retired-only is on. Retired cannot co-occur
-                  with any status this offers, so leaving it live would let
-                  staff set a filter that is silently ignored, or express an
-                  intersection that was never going to match. */}
-              <Select
-                disabled={retiredOnly}
-                onValueChange={(v) =>
-                  void navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      status: (v === "_all_" ? null : v) as ActiveStatus | null,
-                    }),
-                  })
-                }
-                value={status ?? "_all_"}
-              >
-                <SelectTrigger className="mt-1 w-40" id="inv-status">
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all_">All statuses</SelectItem>
-                  {ACTIVE_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s.replace(/_/g, " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <FilterSwitch
-              checked={retiredOnly}
-              id="inv-retired-only"
-              label="Show only retired"
-              onCheckedChange={(next) =>
-                void navigate({
-                  search: (prev) => ({
-                    ...prev,
-                    // Clearing the status keeps the URL honest about what is
-                    // actually filtering, rather than carrying a value the
-                    // disabled control no longer applies.
-                    // Overdue goes with it: nothing retired is reserved or
-                    // checked out, so the pair can only ever match nothing.
-                    overdueOnly: next ? false : prev.overdueOnly,
-                    retiredOnly: next,
-                    status: next ? null : prev.status,
-                  }),
-                })
-              }
-            />
-            {/* Nothing retired can be overdue: a retired item is neither
-                reserved nor checked out, which is what the two deadlines
-                belong to. Leaving both on would always show an empty table. */}
-            <FilterSwitch
-              checked={overdueOnly}
-              disabled={retiredOnly}
-              id="inv-overdue-only"
-              label="Show only overdue"
-              onCheckedChange={(next) =>
-                void navigate({
-                  search: (prev) => ({ ...prev, overdueOnly: next }),
-                })
-              }
-            />
-            <div>
-              <Label htmlFor="inv-category">
-                Categories (matches all selected)
-              </Label>
-              <div className="mt-1 w-56">
-                <CategoryFilterCombobox
-                  categories={categories}
-                  id="inv-category"
-                  onChange={(next) =>
-                    void navigate({
-                      search: (prev) => ({ ...prev, categories: next }),
-                    })
-                  }
-                  value={selectedCategories}
-                />
-              </div>
-            </div>
-          </>
-        }
       />
       <ListCount count={visible.length} />
-    </div>
+    </ListingLayout>
   );
 }
