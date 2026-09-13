@@ -1,13 +1,13 @@
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
 
-export interface FilterCategory {
+export interface CategoryOption {
   id: string;
   name: string;
 }
 
 interface Props {
-  categories: FilterCategory[];
+  categories: CategoryOption[];
   onChange: (next: string[]) => void;
   selected: string[];
 }

@@ -12,7 +12,7 @@ import {
 } from "#/components/admin-data-table";
 import {
   CategoryCheckboxList,
-  type FilterCategory,
+  type CategoryOption,
 } from "#/components/category-checkbox-list";
 import { CategoryChip } from "#/components/category-chip";
 import { ExportCsvButton } from "#/components/export-csv-button";
@@ -453,7 +453,7 @@ function countActiveAdminFilters(search: Search): number {
 function AdminInventoryFilters({
   categories,
 }: {
-  categories: FilterCategory[];
+  categories: CategoryOption[];
 }) {
   const uid = useId();
   const navigate = useNavigate({ from: "/admin/inventory/" });

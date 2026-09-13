@@ -4,7 +4,7 @@ import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import type { ViewMode } from "#/lib/view-preference";
 import {
   CategoryCheckboxList,
-  type FilterCategory,
+  type CategoryOption,
 } from "./category-checkbox-list";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -85,7 +85,7 @@ export function InventorySearchBar({
 }
 
 interface FiltersProps {
-  categories: FilterCategory[];
+  categories: CategoryOption[];
   onCategoriesChange: (next: string[]) => void;
   /** Clear all: every narrowing filter off in one navigation. */
   onClear: () => void;
