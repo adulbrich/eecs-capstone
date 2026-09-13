@@ -2,14 +2,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// The bar lists categories and programs through two server functions on
-// mount; neither matters to the recommendation gate, so both answer empty.
-vi.mock("#/server/categories", () => ({
-  listCategories: vi.fn().mockResolvedValue({ rows: [] }),
-}));
-vi.mock("#/server/programs", () => ({
-  listPrograms: vi.fn().mockResolvedValue({ rows: [] }),
-}));
 vi.mock("@tanstack/react-router", () => ({
   // `to` becomes the href so the anchor has the link role. `search` is
   // serialised by hand for the one link that carries it, so the assertion
@@ -34,24 +26,16 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
 }));
 
-import { ProjectsFilterBar } from "#/components/projects-filter-bar";
+import { RecommendationPrompt } from "#/components/projects-filters";
 
 afterEach(cleanup);
 
-function renderBar(viewer: { canRecommend: boolean; signedIn: boolean }) {
+function renderPrompt(viewer: { canRecommend: boolean; signedIn: boolean }) {
   return render(
-    <ProjectsFilterBar
-      acceptingOnly={false}
-      archivedOnly={false}
+    <RecommendationPrompt
       canRecommend={viewer.canRecommend}
-      categories={[]}
       order="relevance"
-      program={null}
-      q=""
-      seekingMentorOnly={false}
       signedIn={viewer.signedIn}
-      studentProposedOnly={false}
-      view="card"
     />
   );
 }
@@ -62,9 +46,9 @@ function renderBar(viewer: { canRecommend: boolean; signedIn: boolean }) {
  * once the select is open, which the browser suite covers; here the prompts
  * are what is pinned, since they decide where a reader is sent.
  */
-describe("ProjectsFilterBar recommendation prompt", () => {
+describe("RecommendationPrompt", () => {
   it("sends a visitor to sign in, with the listing as the return address", () => {
-    renderBar({ canRecommend: false, signedIn: false });
+    renderPrompt({ canRecommend: false, signedIn: false });
     const link = screen.getByRole("link", {
       name: "Sign in to get recommendations",
     });
@@ -75,7 +59,7 @@ describe("ProjectsFilterBar recommendation prompt", () => {
   });
 
   it("sends a member without interests to the profile", () => {
-    renderBar({ canRecommend: false, signedIn: true });
+    renderPrompt({ canRecommend: false, signedIn: true });
     expect(
       screen
         .getByRole("link", { name: "Add your interests" })
@@ -87,7 +71,7 @@ describe("ProjectsFilterBar recommendation prompt", () => {
   });
 
   it("shows no prompt to a member who already has interests", () => {
-    renderBar({ canRecommend: true, signedIn: true });
+    renderPrompt({ canRecommend: true, signedIn: true });
     expect(
       screen.queryByRole("link", { name: "Add your interests" })
     ).toBeNull();

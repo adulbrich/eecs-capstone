@@ -194,6 +194,16 @@ Write the small-screen styles first, then add `md:` (768px and up) overrides. Th
 a deliberate two-tier system, mobile and desktop, so `sm:`, `lg:`, and `xl:` overrides
 are reserved for the rare case that genuinely needs a third tier.
 
+One case does: a listing's filters. `ListingLayout` (see
+[Listing layout](#listing-layout)) puts them in a left aside from `xl` (1280px)
+and in a `Sheet` below it. The tier is `xl` and not `lg` by arithmetic, not
+taste: the card column is `max-w-4xl` (896px), the aside is 18rem (288px), the
+gap 2rem and the page padding 4rem, and 288 + 32 + 896 + 64 is 1280. At `lg`
+the cards would have to shrink to make room. The `xl:` layout classes live in
+that one component; a route passes at most its width pair through `className`
+(`mx-auto max-w-4xl xl:max-w-7xl` on `/projects`). Any other `xl:` still needs
+a reason this paragraph does not already give (#350).
+
 There is no card grid any more. The listing cards (`project-card.tsx`,
 `inventory-card.tsx`) are one component at both widths: image on top at 16:9
 below `md`, image on the left at 3:2 and `w-40` from `md` up, in a single column
@@ -230,9 +240,11 @@ above it, all bounded to the title width since a borrower's list is
 short, `my/bookmarks.tsx`
 bounds only its title, `inventory/$itemId.tsx` holds a two-column detail
 layout, and `admin/analytics.tsx` holds a two-column grid of figure cards.
-`projects/index.tsx` in
-table mode and `my/bookmarks.tsx` let the table run full width below the bounded
-title (and filter bar), the way the admin tables do. The sign-in/sign-up/forgot/reset-password cards
+`my/bookmarks.tsx` lets the table run full width below the bounded
+title, the way the admin tables do. `projects/index.tsx` used to as well; since
+#350 it passes `mx-auto max-w-4xl xl:max-w-7xl` to `ListingLayout`, so the
+table is bounded with the cards below `xl` and shares the wider grid with the
+aside from `xl`. `/admin/projects` passes no width and runs full, as before. The sign-in/sign-up/forgot/reset-password cards
 are narrower still but live inside the separate `island-shell` container below, not
 this padding pattern.
 
@@ -279,7 +291,7 @@ live count of a page's own collection does not.
 
 The mobile drawer is a shadcn `Sheet` with `side="left"`, opened by a hamburger
 `<Button variant="ghost">`. It shares the component with the line sheet under
-Admin tables below, and nothing else. It is a Radix Dialog underneath, so it is focus-trapped
+Admin tables below and the filters sheet in `ListingLayout`, and nothing else. It is a Radix Dialog underneath, so it is focus-trapped
 and escape-dismissible for free. Four rules keep it correct:
 
 - Call `setOpen(false)` in every `<Link>` click handler, so the drawer closes once
@@ -657,10 +669,51 @@ this rule existed, and two had already drifted apart on details like
 `variant="status"`: it wants the blank canvas, and paints it with the
 `bg-primary text-primary-foreground` tokens rather than a status pair.
 
+### Listing layout
+
+A page that lists and filters renders through `ListingLayout` from
+`#/components/listing-layout`, with four slots:
+
+```tsx
+<ListingLayout
+  activeFilterCount={countActiveFilters(state)}
+  className="mx-auto max-w-4xl xl:max-w-7xl"
+  filters={<ProjectsFilters {...state} />}
+  search={<ProjectsSearchBar {...top} />}
+  title={<h1 className="font-semibold text-2xl">Projects</h1>}
+>
+  {rows}
+  <Pagination>...</Pagination>
+</ListingLayout>
+```
+
+`search` holds what does not narrow the list: the search input, the sort, the
+card/table `ViewToggle`. It renders on top at every width, beside a "Filters"
+button that is gone from `xl`. `filters` holds what narrows: program, the
+switches, the category or status lists, Clear all. It renders in a sticky
+`aside` from `xl` and inside a left `Sheet` below it; pass one element and the
+layout renders it in both places, only one of which is ever displayed. Stack the
+controls (`space-y-4`) and give each `w-full`; a fixed `w-56` that fit a toolbar
+overflows an 18rem column. A `FilterSwitch` label is one line under a
+`fieldset` legend that carries the "Only show projects that are", because the
+full sentence wrapped to two lines beside its switch at that width.
+
+`activeFilterCount` is what the button shows below `xl`, so a reader knows the
+list is narrowed without opening the sheet. Count decisions, not values: a
+category set counts once however many it holds. The public route derives it
+from the same booleans as `filtered`; the admin route also counts the
+soft-deleted switch, which widens rather than narrows and so stays out of
+`filtered`.
+
+The admin route stopped passing `toolbar` to `AdminDataTable` when its filters
+moved into the aside; Columns and Export stay on the table's own row. Growing the
+table with a filters slot was the alternative and was declined, because the
+grouping mode is meant to be that component's one extension.
+
 ### Surfaces are not all cards
 
 `<Card>` is the repeated `rounded-lg border border-border bg-card` surface used
-by list items, filter bars, and admin tiles. Three other surfaces are
+by list items, the filters aside, and admin tiles. Three other surfaces are
 deliberately separate and must not be folded into it:
 
 - `panel.tsx` for the audience-gated panels, which carry their own tone variants

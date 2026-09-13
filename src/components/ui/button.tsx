@@ -22,7 +22,10 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-        link: "text-primary underline-offset-4 hover:underline",
+        // The colour the global `a` rule uses, not `text-primary`: the dark
+        // palette overrides --primary so white text passes on a filled button,
+        // which leaves it at 3.6:1 as text on the page surface.
+        link: "text-brand-dark underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import {
   closeMenu,
+  expectNoHorizontalOverflow,
   toggleColumnOn,
   waitForHydration,
   waitForSurfaceSettled,
@@ -97,6 +98,65 @@ test("@smoke projects list, paginated", async ({ page }) => {
     await expect(control).toHaveAttribute("tabindex", "-1");
   }
   await checkA11y(page);
+});
+
+test("@smoke projects list, filters aside at xl", async ({ page }) => {
+  // The suite runs at 1280, which is where the aside appears (#350): the
+  // program select and the switches are in it, and the Filters button that
+  // opens the sheet is gone.
+  await page.goto("/projects");
+  await waitForHydration(page);
+  const aside = page.getByRole("complementary", { name: "Filters" });
+  await expect(aside.getByRole("combobox", { name: "Program" })).toBeVisible();
+  await expect(
+    aside.getByRole("switch", { name: "Accepting applicants" })
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Filters" })).toBeHidden();
+  await checkA11y(page);
+});
+
+test("@smoke projects list, filters sheet at 375px", async ({ page }) => {
+  // Below xl the same form opens in a left sheet; a change made there keeps
+  // the sheet open, since it is a navigation on the same route.
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/projects");
+  await waitForHydration(page);
+  await expect(
+    page.getByRole("complementary", { name: "Filters" })
+  ).toBeHidden();
+  await page.getByRole("button", { name: "Filters" }).click();
+  const sheet = page.getByRole("dialog", { name: "Filters" });
+  const accepting = sheet.getByRole("switch", { name: "Accepting applicants" });
+  await expect(accepting).toBeVisible();
+  // Focus lands inside the sheet on open, and the page under it does not
+  // grow sideways for the overlay.
+  await expect(sheet.locator(":focus")).toHaveCount(1);
+  await expectNoHorizontalOverflow(page);
+  await checkA11y(page);
+  await accepting.click();
+  await expect(page).toHaveURL(/acceptingOnly=true/);
+  await expect(sheet).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  // Focus returns to the button, which now carries the count of what was
+  // turned on. Tab from the search reaches it with nothing in between: the
+  // recommendation prompt renders under the row, not inside it. Four
+  // stops: the sort, the two view toggle buttons, the Filters button.
+  const button = page.getByRole("button", { name: "Filters 1" });
+  await expect(button).toBeFocused();
+  await page.getByRole("searchbox", { name: "Search projects" }).focus();
+  for (let i = 0; i < 4; i += 1) {
+    await page.keyboard.press("Tab");
+  }
+  await expect(button).toBeFocused();
+  // Enter opens it from the keyboard, and Clear all (a link-variant Button,
+  // visible now that a filter is on) is what the dark scan measures.
+  await page.keyboard.press("Enter");
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Clear all" })).toBeVisible();
+  await checkA11y(page);
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
 });
 
 test("@smoke projects list, table mode", async ({ page }) => {

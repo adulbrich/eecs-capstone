@@ -170,27 +170,38 @@ test("admin inventory requests", async ({ page }) => {
 });
 
 test("@smoke admin projects list", async ({ page }) => {
-  // The four switches are one group on the toolbar (#340): at desktop they
-  // read as one line, at 375px they stack without pushing the page wider
-  // than the viewport or truncating a label.
+  // The four switches live in the filters aside at the desktop width the
+  // suite runs at (1280, which is xl) and in the filters sheet at 375px
+  // (#350). At both widths every label reads on one line and nothing pushes
+  // the page wider than the viewport.
   const switches = [
-    "Only show projects accepting applicants",
-    "Only show student-proposed projects",
-    "Only show projects seeking a mentor",
+    "Accepting applicants",
+    "Student-proposed",
+    "Seeking a mentor",
     "Show soft-deleted",
   ];
-  async function scanWithSwitches() {
-    await page.goto("/admin/projects");
-    await waitForHydration(page);
-    for (const name of switches) {
-      await expect(page.getByRole("switch", { name })).toBeVisible();
-    }
-    await expectNoHorizontalOverflow(page);
-    await checkA11y(page);
+  await page.goto("/admin/projects");
+  await waitForHydration(page);
+  const aside = page.getByRole("complementary", { name: "Filters" });
+  for (const name of switches) {
+    await expect(aside.getByRole("switch", { name })).toBeVisible();
   }
-  await scanWithSwitches();
+  await expectNoHorizontalOverflow(page);
+  await checkA11y(page);
+
   await page.setViewportSize({ width: 375, height: 812 });
-  await scanWithSwitches();
+  await page.goto("/admin/projects");
+  await waitForHydration(page);
+  await expect(aside).toBeHidden();
+  await page.getByRole("button", { name: "Filters" }).click();
+  const sheet = page.getByRole("dialog", { name: "Filters" });
+  for (const name of switches) {
+    await expect(sheet.getByRole("switch", { name })).toBeVisible();
+  }
+  await expectNoHorizontalOverflow(page);
+  await checkA11y(page);
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
 });
 
 test("admin users list", async ({ page }) => {
