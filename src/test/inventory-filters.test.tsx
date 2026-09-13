@@ -103,39 +103,6 @@ describe("InventoryFilters", () => {
     expect(getByLabelText("Status")).toBeTruthy();
   });
 
-  it("renders a checkbox per category, checked according to selection", () => {
-    const categories = [
-      { id: "11111111-1111-4111-8111-111111111111", name: "Cameras" },
-      { id: "22222222-2222-4222-8222-222222222222", name: "Drills" },
-    ];
-    const { getByLabelText } = renderFilters({
-      categories,
-      selectedCategories: [categories[0].id],
-    });
-    expect(getByLabelText("Cameras").getAttribute("aria-checked")).toBe("true");
-    expect(getByLabelText("Drills").getAttribute("aria-checked")).toBe("false");
-  });
-
-  it("toggles a category on and off via onCategoriesChange", () => {
-    const categories = [
-      { id: "11111111-1111-4111-8111-111111111111", name: "Cameras" },
-      { id: "22222222-2222-4222-8222-222222222222", name: "Drills" },
-    ];
-    const onCategoriesChange = vi.fn();
-    const { getByLabelText } = renderFilters({
-      categories,
-      onCategoriesChange,
-      selectedCategories: [categories[0].id],
-    });
-    fireEvent.click(getByLabelText("Drills"));
-    expect(onCategoriesChange).toHaveBeenCalledWith([
-      categories[0].id,
-      categories[1].id,
-    ]);
-    fireEvent.click(getByLabelText("Cameras"));
-    expect(onCategoriesChange).toHaveBeenCalledWith([]);
-  });
-
   it("offers Clear all only while something narrows, and calls onClear", () => {
     const onClear = vi.fn();
     const { queryByRole, rerender, getByRole } = renderFilters({ onClear });

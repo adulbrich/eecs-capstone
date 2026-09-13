@@ -2,8 +2,11 @@ import { useId } from "react";
 import { ACTIVE_STATUSES, type ActiveStatus } from "#/lib/inventory-visibility";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import type { ViewMode } from "#/lib/view-preference";
+import {
+  CategoryCheckboxList,
+  type FilterCategory,
+} from "./category-checkbox-list";
 import { Button } from "./ui/button";
-import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import {
@@ -17,11 +20,6 @@ import { ViewToggle } from "./view-toggle";
 
 /** The working set, or null for no filter: retired is not offered here. */
 type StatusFilter = ActiveStatus | null;
-
-export interface InventoryFilterCategory {
-  id: string;
-  name: string;
-}
 
 // A label per status, keyed by the union so a new one cannot reach the
 // dropdown unlabelled, and ordered by the vocabulary rather than by hand.
@@ -87,7 +85,7 @@ export function InventorySearchBar({
 }
 
 interface FiltersProps {
-  categories: InventoryFilterCategory[];
+  categories: FilterCategory[];
   onCategoriesChange: (next: string[]) => void;
   /** Clear all: every narrowing filter off in one navigation. */
   onClear: () => void;
@@ -115,14 +113,6 @@ export function InventoryFilters({
     status,
   });
 
-  function toggleCategory(id: string) {
-    onCategoriesChange(
-      selectedCategories.includes(id)
-        ? selectedCategories.filter((c) => c !== id)
-        : [...selectedCategories, id]
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
@@ -147,24 +137,11 @@ export function InventoryFilters({
         </Select>
       </div>
 
-      {categories.length > 0 && (
-        <fieldset>
-          <legend className="font-medium text-muted-foreground text-xs">
-            Categories (matches all selected)
-          </legend>
-          <div className="mt-1 space-y-1">
-            {categories.map((c) => (
-              <Label className="min-h-7 font-normal" key={c.id}>
-                <Checkbox
-                  checked={selectedCategories.includes(c.id)}
-                  onCheckedChange={() => toggleCategory(c.id)}
-                />
-                {c.name}
-              </Label>
-            ))}
-          </div>
-        </fieldset>
-      )}
+      <CategoryCheckboxList
+        categories={categories}
+        onChange={onCategoriesChange}
+        selected={selectedCategories}
+      />
 
       {active > 0 && (
         <Button

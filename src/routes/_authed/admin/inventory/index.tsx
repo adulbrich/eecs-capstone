@@ -10,14 +10,14 @@ import {
   AdminDataTable,
   defineAdminColumns,
 } from "#/components/admin-data-table";
+import {
+  CategoryCheckboxList,
+  type FilterCategory,
+} from "#/components/category-checkbox-list";
 import { CategoryChip } from "#/components/category-chip";
-import { CategoryFilterCombobox } from "#/components/category-filter-combobox";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
-import {
-  INVENTORY_STATUS_OPTIONS,
-  type InventoryFilterCategory,
-} from "#/components/inventory-filters";
+import { INVENTORY_STATUS_OPTIONS } from "#/components/inventory-filters";
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { ListingLayout } from "#/components/listing-layout";
 import { LocalTime } from "#/components/local-time";
@@ -453,7 +453,7 @@ function countActiveAdminFilters(search: Search): number {
 function AdminInventoryFilters({
   categories,
 }: {
-  categories: InventoryFilterCategory[];
+  categories: FilterCategory[];
 }) {
   const uid = useId();
   const navigate = useNavigate({ from: "/admin/inventory/" });
@@ -498,21 +498,15 @@ function AdminInventoryFilters({
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor={`${uid}-category`}>
-          Categories (matches all selected)
-        </Label>
-        <CategoryFilterCombobox
-          categories={categories}
-          id={`${uid}-category`}
-          onChange={(next) =>
-            void navigate({
-              search: (prev) => ({ ...prev, categories: next }),
-            })
-          }
-          value={selectedCategories}
-        />
-      </div>
+      <CategoryCheckboxList
+        categories={categories}
+        onChange={(next) =>
+          void navigate({
+            search: (prev) => ({ ...prev, categories: next }),
+          })
+        }
+        selected={selectedCategories}
+      />
       <div>
         <FilterSwitch
           checked={retiredOnly}
