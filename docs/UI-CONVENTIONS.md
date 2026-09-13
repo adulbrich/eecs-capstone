@@ -169,9 +169,9 @@ surface itself it is already 4.27:1; `text-brand-dark` is 6.0:1 on white and
 about 5.6:1 on a hovered table row, and the `link` Button variant already uses it
 in both modes. Keep the class rather than dropping it and trusting the global `a`
 rule: that rule's hover state switches back to `--brand-primary`, and a utility
-outranks it. Table cells were the first case (#357); the links still on
-`text-brand` are listed in #358. `text-brand` stays for icons and decoration,
-where no contrast ratio applies.
+outranks it. Table cells were the first case (#357) and the rest followed in
+#358, so `text-brand` on a link is a regression. It stays for icons and
+decoration, where no contrast ratio applies.
 
 Status colors have no Tailwind alias, so reference the variable directly:
 

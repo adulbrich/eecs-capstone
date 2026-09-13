@@ -188,7 +188,7 @@ export function RecommendationPrompt({
       {order === "recommended" && canRecommend && (
         <p className="mt-2 text-muted-foreground text-xs">
           Ranked by your interests.{" "}
-          <Link className="text-brand hover:underline" to="/profile">
+          <Link className="text-brand-dark hover:underline" to="/profile">
             Edit your interests
           </Link>
         </p>
@@ -202,7 +202,7 @@ export function RecommendationPrompt({
       {!(canRecommend || signedIn) && (
         <p className="mt-2 text-muted-foreground text-xs">
           <Link
-            className="text-brand hover:underline"
+            className="text-brand-dark hover:underline"
             search={{ redirect: "/projects" }}
             to="/sign-in"
           >
@@ -213,7 +213,7 @@ export function RecommendationPrompt({
       )}
       {signedIn && !canRecommend && (
         <p className="mt-2 text-muted-foreground text-xs">
-          <Link className="text-brand hover:underline" to="/profile">
+          <Link className="text-brand-dark hover:underline" to="/profile">
             Add your interests
           </Link>{" "}
           to sort projects by how well they match you.
