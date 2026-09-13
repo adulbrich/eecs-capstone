@@ -118,6 +118,7 @@ export const Route = createFileRoute("/_authed/admin/inventory/")({
   component: AdminInventory,
 });
 
+type Search = z.infer<typeof searchSchema>;
 type Row = Awaited<ReturnType<typeof listAdminInventory>>["rows"][number];
 
 /**
@@ -432,6 +433,20 @@ const EXPORT_COLUMNS = defineCsvColumns<Row>()([
 ]);
 
 /**
+ * How many narrowing controls are on: what the Filters button shows below
+ * xl, and what decides whether Clear all renders. The search is excluded,
+ * since it sits beside the button. Clear all resets exactly these fields.
+ */
+function countActiveAdminFilters(search: Search): number {
+  return [
+    search.status !== null,
+    search.categories.length > 0,
+    search.retiredOnly,
+    search.overdueOnly,
+  ].filter(Boolean).length;
+}
+
+/**
  * The narrowing form. Its own component because ListingLayout mounts it
  * twice (aside and sheet) and each mount needs its own `useId` set.
  */
@@ -442,18 +457,14 @@ function AdminInventoryFilters({
 }) {
   const uid = useId();
   const navigate = useNavigate({ from: "/admin/inventory/" });
+  const search = Route.useSearch();
   const {
     categories: selectedCategories,
     overdueOnly,
     retiredOnly,
     status,
-  } = Route.useSearch();
-  const active = [
-    status !== null,
-    selectedCategories.length > 0,
-    retiredOnly,
-    overdueOnly,
-  ].filter(Boolean).length;
+  } = search;
+  const active = countActiveAdminFilters(search);
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
@@ -580,14 +591,6 @@ function AdminInventory() {
     selectedCategories.length > 0 ||
     retiredOnly ||
     overdueOnly;
-  // What the Filters button counts below xl: every control in the aside
-  // that is on, the search excluded since it sits beside the button.
-  const activeFilterCount = [
-    status !== null,
-    selectedCategories.length > 0,
-    retiredOnly,
-    overdueOnly,
-  ].filter(Boolean).length;
   // The only filter applied here rather than in the loader. Everything below
   // reads `visible`, so the count, the table and the export agree on what the
   // switch left.
@@ -613,7 +616,7 @@ function AdminInventory() {
 
   return (
     <ListingLayout
-      activeFilterCount={activeFilterCount}
+      activeFilterCount={countActiveAdminFilters(search)}
       filters={<AdminInventoryFilters categories={categories} />}
       search={
         <>
