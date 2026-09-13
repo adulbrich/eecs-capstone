@@ -56,7 +56,8 @@ jobs:
   # The smoke suite is the browser-level guard on the handful of flows the app
   # exists for: render a public page for an anonymous visitor, sign in, propose
   # and publish a project, pick a project image without leaving the edit page,
-  # request and return an item, and stay out of pages you are not allowed into.
+  # request and return an item, narrow each listing from its filters sheet at
+  # phone width, and stay out of pages you are not allowed into.
   # That is one per `@smoke` describe in `src/test/e2e/`,
   # and the list is worth keeping in step: AGENTS.md sends a reader here to
   # decide whether a change needs the suite run locally. It runs against the
