@@ -78,6 +78,19 @@ Accounts and access:
 
 State contains generated database and auth secrets, so it must be private.
 
+`eecs-capstone-tfstate` is the one live backend, named in the `backend "s3"`
+block in [`infra/providers.tf`](./infra/providers.tf). It is not a Terraform
+resource, because a state bucket cannot appear in its own state, which is why
+`terraform destroy` leaves it behind and section 12 says to delete it by hand.
+
+An account listing used to show a second, `cs-capstone-tfstate`. That was the
+backend for the original build, before commit `4e2f342` renamed the AWS
+project prefix from `cs-capstone` to `eecs-capstone`. The prefix names every
+resource, so the rename meant a destroy and rebuild, and the destroy could not
+remove the bucket holding the state it was writing to. It was emptied and
+retired on 2026-09-14. If you see it again, the rename is being repeated and
+the new one is whichever `providers.tf` names.
+
 ```bash
 aws --profile aws-capstone1 s3api create-bucket \
   --bucket eecs-capstone-tfstate \
