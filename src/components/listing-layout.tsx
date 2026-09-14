@@ -37,7 +37,10 @@ interface Props {
    * unnamed.
    */
   filters: ReactNode;
-  /** The search input and whatever orders or displays the results. */
+  /**
+   * The search input, its `SearchHint` right after it, and whatever orders
+   * or displays the results.
+   */
   search: ReactNode;
   /**
    * The table's `AdminTableControls` (Export CSV, the Columns menu) when
@@ -84,13 +87,15 @@ export function ListingLayout({
         </aside>
         <div className="min-w-0">
           {/*
-            One row from md, wrapping below it: the search input carries
-            flex-1 and min-w-0, so from md it gives up width to keep the
-            selects, the toggle, Filters and the table controls beside it,
-            and at a phone width it fills its own row and the buttons wrap
-            under it, left-aligned, in the same order.
+            A wrapping row at every width. The `SearchHint` inside `search`
+            is a basis-full item right after the input, so at a phone width
+            the input has a line, the hint the next, and the sort, the
+            toggle, Filters and the table controls wrap under that,
+            left-aligned in DOM order; from md the hint goes last and the
+            rest share one line, which each input's basis is sized to allow
+            at 768 (see `ProjectsSearchBar`).
           */}
-          <div className="flex flex-wrap items-center gap-3 md:flex-nowrap">
+          <div className="flex flex-wrap items-center gap-3">
             {search}
             <Sheet onOpenChange={setOpen} open={open}>
               <SheetTrigger asChild>

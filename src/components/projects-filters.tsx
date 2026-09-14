@@ -3,6 +3,7 @@ import { useCallback, useId } from "react";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import type { ViewMode } from "#/lib/view-preference";
 import { FilterSwitch } from "./filter-switch";
+import { SearchHint } from "./search-hint";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
@@ -132,14 +133,6 @@ interface SearchProps {
 }
 
 /**
- * The `SearchHint` under the row is rendered by the route, like
- * `RecommendationPrompt` below and for the same reason, so the input names
- * it by a fixed id rather than a `useId` the two would have to share. A
- * literal is safe here because the bar mounts once, unlike the filters.
- */
-export const PROJECTS_SEARCH_HINT_ID = "projects-search-hint";
-
-/**
  * The top of the listing at every width: the search, the server order and
  * the card/table toggle. None of these narrows the list, which is why they
  * stay beside the Filters button rather than inside the aside.
@@ -152,19 +145,29 @@ export function ProjectsSearchBar({
 }: Omit<SearchProps, "signedIn">) {
   const { commitQuery, setOrder, setView } = useProjectsFilterNavigation();
   const [queryDraft, setQueryDraft] = useDebouncedDraft(q, commitQuery);
+  const hintId = useId();
   return (
     <>
       <Input
-        aria-describedby={PROJECTS_SEARCH_HINT_ID}
+        aria-describedby={hintId}
         aria-label="Search projects"
-        className="min-w-0 flex-1 basis-64"
+        // basis-40 where the other three inputs carry basis-64: this is the
+        // one row with a sort select, a view toggle, Filters and Columns
+        // beside the input, and at 768 in table view it is 767px of basis
+        // in a 704px row with basis-64, so Columns wrapped. At 160px the
+        // row fits with room to spare, and flex-1 grows the input back.
+        className="min-w-0 flex-1 basis-40"
         onChange={(e) => setQueryDraft(e.target.value)}
         // A name for the box, not its documentation: the row gives it about
         // 28 characters at 768 in table view, and the fields and the syntax
-        // are on the hint line under the row (#369).
+        // are on the hint line under it (#369).
         placeholder="Search projects"
         type="search"
         value={queryDraft}
+      />
+      <SearchHint
+        fields="titles, descriptions, problem statements, objectives and qualifications"
+        id={hintId}
       />
       <Select onValueChange={(v) => setOrder(v as ProjectsOrder)} value={order}>
         <SelectTrigger aria-label="Sort" className="w-44" id="filter-sort">
@@ -188,7 +191,9 @@ export function ProjectsSearchBar({
  * as the first thing in the results column, not inside `ProjectsSearchBar`:
  * the search row is a flex-wrap row that ends with ListingLayout's Filters
  * button, and a paragraph in the middle of it put the prompt's link between
- * the view toggle and that button in the tab order.
+ * the view toggle and that button in the tab order. `pl-3` for the same
+ * reason as `SearchHint`, which sits right above it: both line up with the
+ * input's text.
  */
 export function RecommendationPrompt({
   canRecommend,
@@ -198,7 +203,7 @@ export function RecommendationPrompt({
   return (
     <>
       {order === "recommended" && canRecommend && (
-        <p className="mt-2 text-muted-foreground text-xs">
+        <p className="mt-2 pl-3 text-muted-foreground text-xs">
           Ranked by your interests.{" "}
           <Link className="text-brand-dark underline" to="/profile">
             Edit your interests
@@ -212,7 +217,7 @@ export function RecommendationPrompt({
         write their interests. A member with one gets no prompt.
       */}
       {!(canRecommend || signedIn) && (
-        <p className="mt-2 text-muted-foreground text-xs">
+        <p className="mt-2 pl-3 text-muted-foreground text-xs">
           <Link
             className="text-brand-dark underline"
             search={{ redirect: "/projects" }}
@@ -224,7 +229,7 @@ export function RecommendationPrompt({
         </p>
       )}
       {signedIn && !canRecommend && (
-        <p className="mt-2 text-muted-foreground text-xs">
+        <p className="mt-2 pl-3 text-muted-foreground text-xs">
           <Link className="text-brand-dark underline" to="/profile">
             Add your interests
           </Link>{" "}

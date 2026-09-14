@@ -6,6 +6,7 @@ import {
   CategoryCheckboxList,
   type CategoryOption,
 } from "./category-checkbox-list";
+import { SearchHint } from "./search-hint";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -56,9 +57,6 @@ interface SearchProps {
   view: ViewMode;
 }
 
-/** The route renders the `SearchHint` under the row; see `projects-filters`. */
-export const INVENTORY_SEARCH_HINT_ID = "inventory-search-hint";
-
 /**
  * The top of the listing at every width: the search and the card/table
  * toggle. Neither narrows the list, which is why they stay beside the
@@ -72,10 +70,11 @@ export function InventorySearchBar({
   view,
 }: SearchProps) {
   const [localQ, setLocalQ] = useDebouncedDraft(q, onQChange);
+  const hintId = useId();
   return (
     <>
       <Input
-        aria-describedby={INVENTORY_SEARCH_HINT_ID}
+        aria-describedby={hintId}
         aria-label="Search inventory"
         className="min-w-0 flex-1 basis-64"
         onChange={(e) => setLocalQ(e.target.value)}
@@ -83,6 +82,7 @@ export function InventorySearchBar({
         type="search"
         value={localQ}
       />
+      <SearchHint fields="names and descriptions" id={hintId} />
       <ViewToggle current={view} onChange={onViewChange} />
     </>
   );

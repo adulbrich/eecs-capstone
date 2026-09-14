@@ -172,12 +172,12 @@ placeholder is a name for the box, "Search projects" or "Search inventory",
 at most about 25 characters: the search row gives `/projects` about 28 at
 768 in table view, and the two long placeholders it replaced clipped there and
 at 375 (#369). What the box searches and the syntax it takes go on a
-`SearchHint` line under the row (`#/components/search-hint`), which the input
-names through `aria-describedby`. The component carries the syntax sentence,
-because every listing search runs through `websearch_to_tsquery`; the route
-passes the fields sentence, which must be true of that page's query. The line
-is text only, so the tab order from the search to the Filters button is what
-the a11y suite asserts.
+`SearchHint` line (`#/components/search-hint`) rendered right after the input
+in the same row, which the input names through `aria-describedby`. The
+component carries the syntax sentence, because every listing search runs
+through `websearch_to_tsquery`; the caller passes the fields sentence, which
+must be true of that page's query. The line is text only, so the tab order
+from the search to the Filters button is what the a11y suite asserts.
 
 ### Why not shadcn `form`
 
@@ -762,18 +762,20 @@ with the admin forms inline in their routes.
 </ListingLayout>
 ```
 
-`search` holds what does not narrow the list: the search input, the sort, the
-card/table `ViewToggle`. The row renders on top at every width, beside a
-"Filters" button that is gone from `xl`. The `SearchHint` line and, on
-`/projects`, the recommendation prompt render from the route as the first
-children, under the row and outside it, so nothing lands between the toggle and
-the Filters button in the tab order. `tableControls` is that table's
-`AdminTableControls` (Export CSV, the Columns menu) when a table is showing, and
-nothing in card view; the layout renders it after the Filters button, at the end
-of the same row. The row is one line from
-`md`, where the search input gives up width so the buttons stay beside it, and
-wraps below `md`, where the input fills its own line and the buttons follow it
-left-aligned in the same order, which is also the tab order. `filters` holds what narrows: program, the
+`search` holds what does not narrow the list: the search input, its
+`SearchHint` right after it, the sort, the card/table `ViewToggle`. The row
+renders on top at every width, beside a "Filters" button that is gone from
+`xl`. `tableControls` is that table's `AdminTableControls` (Export CSV, the
+Columns menu) when a table is showing, and nothing in card view; the layout
+renders it after the Filters button, at the end of the same row. The row wraps
+at every width and the hint is a `basis-full` item, so below `md` the input has
+a line, the hint the next, and the buttons follow it left-aligned in DOM order,
+which is also the tab order; from `md` the hint takes `order-last` and the
+input and the buttons share one line, which each input's `basis` is sized to
+allow at 768 (`/projects` carries `basis-40` because its row is the fullest).
+On `/projects` the recommendation prompt renders from the route as the first
+child under the row, outside it, so its link does not land between the toggle
+and the Filters button in the tab order. `filters` holds what narrows: program, the
 switches, the category or status lists, Clear all. It renders in a sticky
 `aside` from `xl` and inside a left `Sheet` below it; pass one element and the
 layout renders it in both places, only one of which is ever displayed. Stack the

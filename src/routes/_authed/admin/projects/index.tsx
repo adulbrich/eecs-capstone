@@ -188,7 +188,7 @@ type Row = Awaited<ReturnType<typeof listAdminProjects>>["rows"][number];
 
 const DEFAULT_SORT: SortState = { desc: true, id: "updatedAt" };
 
-/** The hint line under the search row, named by the input; see `SearchHint`. */
+/** The hint line under the search input, which names it; see `SearchHint`. */
 const SEARCH_HINT_ID = "admin-search-hint";
 
 const COLUMNS = defineAdminColumns<Row>()([
@@ -804,6 +804,10 @@ function AdminProjects() {
             type="search"
             value={queryDraft}
           />
+          <SearchHint
+            fields="titles, descriptions, problem statements, objectives, qualifications, contacts and proposers"
+            id={SEARCH_HINT_ID}
+          />
         </>
       }
       tableControls={
@@ -854,10 +858,6 @@ function AdminProjects() {
         </>
       }
     >
-      <SearchHint
-        fields="titles, descriptions, problem statements, objectives, qualifications, contacts and proposers"
-        id={SEARCH_HINT_ID}
-      />
       <AdminDataTable
         caption="Projects"
         controls="listing"

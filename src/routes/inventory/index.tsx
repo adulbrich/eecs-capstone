@@ -10,7 +10,6 @@ import { EmptyState } from "#/components/empty-state";
 import { InventoryCard } from "#/components/inventory-card";
 import {
   countActiveInventoryFilters,
-  INVENTORY_SEARCH_HINT_ID,
   InventoryFilters,
   InventorySearchBar,
 } from "#/components/inventory-filters";
@@ -20,7 +19,6 @@ import {
   type InventoryListRow,
 } from "#/components/inventory-table-columns";
 import { ListingLayout } from "#/components/listing-layout";
-import { SearchHint } from "#/components/search-hint";
 import { Button } from "#/components/ui/button";
 import {
   Pagination,
@@ -226,10 +224,6 @@ function InventoryIndex() {
         </div>
       }
     >
-      <SearchHint
-        fields="names and descriptions"
-        id={INVENTORY_SEARCH_HINT_ID}
-      />
       {view === "table" ? (
         <AdminDataTable
           caption="Inventory"
