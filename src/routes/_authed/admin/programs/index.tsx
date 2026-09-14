@@ -89,7 +89,7 @@ const COLUMNS = defineAdminColumns<Row>()([
     cell: ({ row }) =>
       row.original.description ? (
         <div
-          className="max-w-md md:line-clamp-2 md:whitespace-normal"
+          className="md:line-clamp-2 md:min-w-xs md:max-w-md md:whitespace-normal"
           title={row.original.description}
         >
           {row.original.description}

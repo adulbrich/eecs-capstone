@@ -459,24 +459,36 @@ oddity and get lived with instead of reported, which is why this is checked at a
 From `md` up every `TableCell` is `md:whitespace-nowrap`, so a cell cannot wrap
 on its own: one 200-character title sets the width of the whole column and
 pushes every other column right. A column whose value is free text therefore
-bounds itself and clamps. The title or name cell puts `min-w-xs max-w-md` on
-its outer flex container and `min-w-0 md:line-clamp-2 md:whitespace-normal` on
-the link, with the full text in a native `title` attribute so a mouse user can
-hover for it; a description cell keeps `max-w-xs` with `line-clamp-3`. Two of
-those classes are load-bearing in ways that are easy to drop. `whitespace-normal`:
-`line-clamp` does not reset the inherited `nowrap`, and a clamp on one
-unbreakable line truncates with no ellipsis. `min-w-xs`: an auto-layout table
-that is wider than its container shrinks the column with the most slack, and a
-clamped cell with no minimum is that column, so with `max-w-md` alone the title
-column collapses to its longest word while every nowrap column keeps its full
-width. Two lines rather than one because titles here often differ only in their
-tail, and two lines match the height of the 3:2 thumbnail at `w-16`. The clamp is CSS,
-so the full value stays in the DOM for screen readers, Find-in-page and the
-CSV export. Below `md` the cell is the card header strip and wraps in full.
-The six cells that do this are the title cells of the two projects listings,
-the bookmarks table and the two inventory listings, and the programs
-description (#371). A short-capped name column (categories, users, mentors)
-has not needed it.
+bounds itself and clamps, and every class it uses for that carries the `md:`
+prefix, because below `md` the cell is the card header strip, which wraps in
+full and must stay exactly as wide as the card.
+
+The title or name cell puts `md:min-w-xs md:max-w-md` on its outer flex
+container and `min-w-0 md:line-clamp-2 md:whitespace-normal` on the link, with
+the full text in a native `title` attribute so a mouse user can hover for it.
+Two of those classes are load-bearing in ways that are easy to drop.
+`md:whitespace-normal`: `line-clamp` does not reset the inherited `nowrap`, and
+a clamp on one unbreakable line clips it with no ellipsis. `md:min-w-xs`: an
+auto-layout table that is wider than its container shrinks the column with the
+most slack, and a clamped cell with no minimum is that column, so with the
+maximum alone the title column collapses to its longest word while every
+nowrap column keeps its full width. Two lines rather than one because titles
+here often differ only in their tail, and two lines match the height of the
+3:2 thumbnail at `w-16`. The clamp is CSS, so the full value stays in the DOM
+for screen readers, Find-in-page and the CSV export.
+
+A description cell is `line-clamp-3 max-w-xs md:whitespace-normal`: narrower
+and three lines, because it is hidden by default and read on purpose rather
+than scanned, and no minimum, because it competes with nothing when shown. The
+`md:whitespace-normal` is the same fix as above; the two public description
+cells shipped without it and clipped to one line.
+
+The cells that do this: the title cells of the two projects listings, the
+bookmarks table and the two inventory listings, and the programs description,
+which follows the title recipe with no thumbnail (#371). A short-capped name
+column (categories, users, mentors) has not needed it. Classes on each cell
+rather than an `AdminColumn` option or a shared cell component: six cells, one
+pattern, and the triage on #371 chose the pattern over the abstraction.
 
 ### Grouping rows that arrived together
 

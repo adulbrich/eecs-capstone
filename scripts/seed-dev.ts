@@ -869,7 +869,7 @@ async function main() {
     {
       // A name at the 200-character cap, for the same reason as the long
       // project title above (#371).
-      name: "Benchtop Programmable DC Power Supply with Four Isolated Output Channels, USB and LAN Remote Control, Data Logging to SD Card, Overvoltage and Overcurrent Protection, and Rack Mount Kit",
+      name: "Benchtop Programmable DC Power Supply with Four Isolated Output Channels, USB and LAN Remote Control, Data Logging to SD Card, Overvoltage and Overcurrent Protection, Rack Mount Kit and Test Leads Set",
       description:
         "Four isolated channels, 0 to 30 V at 5 A each, with SCPI over USB and LAN.",
       categoryNames: ["Peripheral"],

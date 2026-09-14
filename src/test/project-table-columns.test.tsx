@@ -248,6 +248,10 @@ describe("the public project table", () => {
     expect(link.getAttribute("title")).toBe("Rover Telemetry");
     expect(link.className).toContain("md:line-clamp-2");
     expect(link.className).toContain("min-w-0");
-    expect(link.parentElement?.className).toContain("max-w-md");
+    // Both bounds carry the `md:` prefix: below `md` the cell is the card
+    // header strip, which must stay as wide as the card and no wider.
+    expect(link.parentElement?.className).toContain("md:min-w-xs");
+    expect(link.parentElement?.className).toContain("md:max-w-md");
+    expect(link.parentElement?.className).not.toMatch(/(^|\s)max-w-md/);
   });
 });

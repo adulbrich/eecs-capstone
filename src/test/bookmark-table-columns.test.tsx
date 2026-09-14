@@ -186,7 +186,9 @@ describe("the bookmarks table", () => {
     const link = screen.getByRole("link", { name: "Two" });
     expect(link.getAttribute("title")).toBe("Two");
     expect(link.className).toContain("md:line-clamp-2");
-    expect(link.parentElement?.className).toContain("max-w-md");
+    expect(link.className).toContain("min-w-0");
+    expect(link.parentElement?.className).toContain("md:min-w-xs");
+    expect(link.parentElement?.className).toContain("md:max-w-md");
   });
 
   it("marks a closed roster and an NDA, and removes through the loader", async () => {

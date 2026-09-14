@@ -137,6 +137,9 @@ describe("the public inventory table", () => {
     const cell = rowFor("Oscilloscope").getByText("Two channels, 100 MHz.");
     expect(cell.className).toContain("line-clamp-3");
     expect(cell.className).toContain("max-w-xs");
+    // Inherited `md:whitespace-nowrap` would leave one unbreakable line
+    // for the clamp, which clips it with no ellipsis.
+    expect(cell.className).toContain("md:whitespace-normal");
   });
 
   it("puts the thumbnail and the add-to-cart control in the Name cell, for an available item only", async () => {
@@ -165,7 +168,8 @@ describe("the public inventory table", () => {
     expect(link.getAttribute("title")).toBe("Oscilloscope");
     expect(link.className).toContain("md:line-clamp-2");
     expect(link.className).toContain("min-w-0");
-    expect(link.parentElement?.className).toContain("max-w-md");
+    expect(link.parentElement?.className).toContain("md:min-w-xs");
+    expect(link.parentElement?.className).toContain("md:max-w-md");
   });
 
   it("renders no control for a signed-out viewer", async () => {

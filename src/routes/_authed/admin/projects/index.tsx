@@ -195,7 +195,7 @@ const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => row.title,
     cell: ({ row }) => (
-      <div className="flex min-w-xs max-w-md items-center gap-2">
+      <div className="flex items-center gap-2 md:min-w-xs md:max-w-md">
         <ImageOrFallback
           className="aspect-[3/2] w-16 shrink-0 rounded object-cover"
           src={projectImageSrc(row.original.imageUrl)}

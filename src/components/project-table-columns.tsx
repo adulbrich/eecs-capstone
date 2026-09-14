@@ -35,7 +35,11 @@ function Prose({ text }: { text: string | null }) {
   if (!text) {
     return "-";
   }
-  return <div className="line-clamp-3 max-w-xs">{stripMarkdown(text)}</div>;
+  return (
+    <div className="line-clamp-3 max-w-xs md:whitespace-normal">
+      {stripMarkdown(text)}
+    </div>
+  );
 }
 
 /** The nullable text columns of a row: what a prose cell can be pointed at. */
@@ -79,7 +83,7 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
   {
     accessorFn: (row) => row.title,
     cell: ({ row }) => (
-      <div className="flex min-w-xs max-w-md items-center gap-2">
+      <div className="flex items-center gap-2 md:min-w-xs md:max-w-md">
         <ImageOrFallback
           className="aspect-[3/2] w-16 shrink-0 rounded object-cover"
           src={projectImageSrc(row.original.imageUrl)}

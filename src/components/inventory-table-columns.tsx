@@ -36,7 +36,7 @@ export const INVENTORY_TABLE_COLUMNS = defineAdminColumns<InventoryListRow>()([
   {
     accessorFn: (row) => row.name,
     cell: ({ row }) => (
-      <div className="flex min-w-xs max-w-md items-center gap-2">
+      <div className="flex items-center gap-2 md:min-w-xs md:max-w-md">
         <ImageOrFallback
           className="aspect-[3/2] w-16 shrink-0 rounded object-cover"
           src={getPublicUrl(row.original.imageUrl)}
@@ -94,7 +94,9 @@ export const INVENTORY_TABLE_COLUMNS = defineAdminColumns<InventoryListRow>()([
   {
     cell: ({ row }) =>
       row.original.description ? (
-        <div className="line-clamp-3 max-w-xs">{row.original.description}</div>
+        <div className="line-clamp-3 max-w-xs md:whitespace-normal">
+          {row.original.description}
+        </div>
       ) : (
         "-"
       ),
