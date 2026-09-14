@@ -456,11 +456,20 @@ aws --profile aws-capstone1 s3api put-public-access-block \
 # A SECOND inline policy, beside the Terraform-managed one named "app".
 # Putting it here rather than in `infra/iam.tf` keeps a temporary grant out of
 # the permanent role, and `delete-role-policy` below takes it back cleanly.
-# `legacy-*`, not `legacy/*`: 7a.6 uploads a second cohort under `legacy-live/`
-# and an AccessDenied there is not the missing-key case the script handles.
+# Two statements. GetObject is the obvious one; ListBucket is what makes a
+# MISSING key report itself as one. Without it S3 answers a GetObject for an
+# absent object with 403 AccessDenied rather than 404 NoSuchKey, and the
+# importer only treats NoSuchKey as "not there": `image-keys.json` is optional
+# by design, so a run without it would crash instead of importing text only.
+#
+# `legacy*` with no separator, so it spans BOTH prefixes this runbook uses:
+# `legacy/` in 7a.2 and `legacy-live/` in 7a.6. An S3 ARN wildcard is literal
+# up to the `*`, so `legacy-*` would cover the second and miss the first, and
+# an AccessDenied on the projects file is not the missing-key case the script
+# handles: it crashes the task instead.
 aws --profile aws-capstone1 iam put-role-policy \
   --role-name "$TASK_ROLE" --policy-name legacy-import \
-  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::'"$OPS_BUCKET"'/legacy-*"}]}'
+  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::'"$OPS_BUCKET"'/legacy*"},{"Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::'"$OPS_BUCKET"'"}]}'
 ```
 
 When the import is settled, take both back:
@@ -708,7 +717,18 @@ aws --profile aws-capstone1 s3 cp ./live-out/image-keys.json \
 
 Both files, not just the key map: the importer reads the projects file from
 the same prefix, and a missing one is fatal. The grant in 7a.0b already spans
-`legacy-*`, so this prefix needs no new permission.
+`legacy*`, so this prefix needs no new permission.
+
+Then run 7a.4 with both variables set, rather than composing the override by
+hand. `CLUSTER`, `TASKDEF` and `NETCFG` come from 7a.4 unchanged:
+
+```bash
+aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARGATE \
+  --task-definition "$TASKDEF" \
+  --network-configuration "$NETCFG" \
+  --overrides '{"containerOverrides":[{"name":"app","command":["node","scripts/import-legacy.mjs"],"environment":[{"name":"LEGACY_DATA_S3_URI","value":"s3://'"$OPS_BUCKET"'/legacy-live/"},{"name":"LEGACY_DATA_PROJECTS_FILE","value":"live-projects.jsonl"}]}]}' \
+  --region us-west-2
+```
 
 Images for that set need their own `legacy-images-manifest.jsonl` and their
 own `prepare`. The manifest is generated per cohort, so the archived one names

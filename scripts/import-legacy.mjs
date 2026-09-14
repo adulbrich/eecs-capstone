@@ -94,6 +94,11 @@ async function readInput(name) {
       );
       return await out.Body.transformToString();
     } catch (error) {
+      // Depends on the task role holding s3:ListBucket, which DEPLOYMENT.md
+      // 7a.0b grants alongside GetObject. Without it S3 answers a GetObject
+      // for an absent object with AccessDenied rather than NoSuchKey, and the
+      // optional key map stops being optional: the run crashes instead of
+      // importing text only.
       if (error?.name === "NoSuchKey") {
         return null;
       }

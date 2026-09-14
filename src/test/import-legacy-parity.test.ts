@@ -33,6 +33,7 @@ import { describe, expect, it } from "vitest";
 const IMAGES_SOURCE = readFileSync("scripts/import-legacy-images.ts", "utf8");
 const IMPORT_SOURCE = readFileSync("scripts/import-legacy.mjs", "utf8");
 const NAMESPACE_PATTERN = /const NAMESPACE = "([0-9a-f-]{36})";/;
+const KEY_MAP_PATTERN = /const IMAGE_KEYS_NAME = "([^"]+)";/;
 
 /**
  * Everything between `function uuidv5(...) {` and the closing brace, with
@@ -105,15 +106,18 @@ describe("the legacy import's two scripts", () => {
   });
 
   /**
-   * The name is read out of the importer and looked for in the image script,
-   * rather than both being compared to a literal here: a deliberate rename of
-   * the file is fine as long as both ends move, and drift in either direction
-   * is what fails.
+   * Compared declaration to declaration, the same way the namespace is. Not a
+   * text search for the name in the other file: both spell it in prose too,
+   * and a comment left stale behind a real rename would satisfy that.
+   *
+   * A deliberate rename is fine as long as both ends move. Drift in either
+   * direction is what fails.
    */
   it("agree on the name of the key map file", () => {
-    const name = /const IMAGE_KEYS_NAME = "([^"]+)";/.exec(IMPORT_SOURCE)?.[1];
-    expect(name).toBeDefined();
-    expect(IMAGES_SOURCE).toContain(`"${name}"`);
+    const fromImages = KEY_MAP_PATTERN.exec(IMAGES_SOURCE)?.[1];
+    const fromImport = KEY_MAP_PATTERN.exec(IMPORT_SOURCE)?.[1];
+    expect(fromImages).toBeDefined();
+    expect(fromImport).toBe(fromImages);
   });
 
   /**

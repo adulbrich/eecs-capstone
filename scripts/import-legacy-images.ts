@@ -53,6 +53,14 @@ import {
  */
 const NAMESPACE = "6f2a1c84-0d3e-4b57-9a6f-1e8c5d40b213";
 
+/**
+ * MUST match `IMAGE_KEYS_NAME` in `scripts/import-legacy.mjs`, which reads the
+ * file this writes. Named at both ends rather than spelled inline, so the
+ * parity test can compare the two declarations instead of grepping for a
+ * string that also appears in prose.
+ */
+const IMAGE_KEYS_NAME = "image-keys.json";
+
 /** RFC 4122 v5 (SHA-1, name-based). Same input always yields the same uuid. */
 function uuidv5(name: string): string {
   const ns = Buffer.from(NAMESPACE.replaceAll("-", ""), "hex");
@@ -142,13 +150,13 @@ async function prepare(srcDir: string, outDir: string) {
   }
 
   writeFileSync(
-    join(outDir, "image-keys.json"),
+    join(outDir, IMAGE_KEYS_NAME),
     `${JSON.stringify(keys, null, 2)}\n`
   );
   process.stdout.write(
     `wrote ${Object.keys(keys).length} webp files under ${outDir}\n`
   );
-  process.stdout.write(`wrote ${join(outDir, "image-keys.json")}\n`);
+  process.stdout.write(`wrote ${join(outDir, IMAGE_KEYS_NAME)}\n`);
   for (const f of failures) {
     process.stdout.write(`  skipped ${f.image_id} (${f.name}): ${f.reason}\n`);
   }
