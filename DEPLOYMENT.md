@@ -428,9 +428,47 @@ BOX="$HOME/Library/CloudStorage/Box-Box/Projects"
 ASSETS_BUCKET=$(cd infra && terraform state show aws_s3_bucket.assets \
   | awk '/^ *bucket  *=/ {gsub(/"/, "", $3); print $3}')
 : "${ASSETS_BUCKET:?terraform state show returned no bucket; run terraform init}"
-# A PRIVATE bucket, not the assets one. Create it if it does not exist; the
-# ECS task role needs s3:GetObject on "$OPS_BUCKET/legacy/*".
+# A PRIVATE bucket, not the assets one. 7a.0b creates it and grants the task
+# role; the name is yours to pick, it is not a Terraform resource.
 OPS_BUCKET=eecs-capstone-ops
+# `infra/iam.tf` names it "${var.project}-ecs-task". Read from state for the
+# same reason as the bucket above.
+# The four-space anchor matters: the role's inline_policy block carries a
+# `name` too, and a looser pattern returns both on two lines.
+TASK_ROLE=$(cd infra && terraform state show aws_iam_role.task \
+  | awk '/^    name  *=/ {gsub(/"/, "", $3); print $3}')
+: "${TASK_ROLE:?terraform state show returned no role; run terraform init}"
+```
+
+### 7a.0b Create the private bucket and grant the task role
+
+Once, before the first import. The ops bucket is deliberately not a Terraform
+resource: it holds one cohort of student PII for the length of one import and
+is meant to be deleted, which is the opposite of what Terraform state is for.
+Skip the first two commands if the bucket already exists.
+
+```bash
+aws --profile aws-capstone1 s3 mb "s3://$OPS_BUCKET" --region us-west-2
+aws --profile aws-capstone1 s3api put-public-access-block \
+  --bucket "$OPS_BUCKET" --public-access-block-configuration \
+  'BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true'
+
+# A SECOND inline policy, beside the Terraform-managed one named "app".
+# Putting it here rather than in `infra/iam.tf` keeps a temporary grant out of
+# the permanent role, and `delete-role-policy` below takes it back cleanly.
+# `legacy-*`, not `legacy/*`: 7a.6 uploads a second cohort under `legacy-live/`
+# and an AccessDenied there is not the missing-key case the script handles.
+aws --profile aws-capstone1 iam put-role-policy \
+  --role-name "$TASK_ROLE" --policy-name legacy-import \
+  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::'"$OPS_BUCKET"'/legacy-*"}]}'
+```
+
+When the import is settled, take both back:
+
+```bash
+aws --profile aws-capstone1 iam delete-role-policy \
+  --role-name "$TASK_ROLE" --policy-name legacy-import
+aws --profile aws-capstone1 s3 rb "s3://$OPS_BUCKET" --force
 ```
 
 ### 7a.1 Prepare the data on a workstation
@@ -478,8 +516,8 @@ aws --profile aws-capstone1 s3 cp ./legacy-out/image-keys.json \
   "s3://$OPS_BUCKET/legacy/" --region us-west-2
 ```
 
-`$OPS_BUCKET` must block public access and the ECS task role needs
-`s3:GetObject` on `arn:aws:s3:::$OPS_BUCKET/legacy/*`.
+7a.0b is what makes those two commands work: it blocks public access on
+`$OPS_BUCKET` and grants the task role `s3:GetObject` on it.
 
 **Keep both objects until you are sure you will not re-run or undo.** The
 importer reads the projects file before it does anything, `--undo` included,
@@ -669,10 +707,8 @@ aws --profile aws-capstone1 s3 cp ./live-out/image-keys.json \
 ```
 
 Both files, not just the key map: the importer reads the projects file from
-the same prefix, and a missing one is fatal. Widen the task role's
-`s3:GetObject` grant to `$OPS_BUCKET/legacy-*` before the run, because the
-grant in 7a.0 covers `legacy/*` only and an AccessDenied here is not the
-missing-key case the script handles.
+the same prefix, and a missing one is fatal. The grant in 7a.0b already spans
+`legacy-*`, so this prefix needs no new permission.
 
 Images for that set need their own `legacy-images-manifest.jsonl` and their
 own `prepare`. The manifest is generated per cohort, so the archived one names

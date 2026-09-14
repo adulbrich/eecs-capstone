@@ -17,8 +17,10 @@
  * `scripts/import-legacy-images.ts` is the other half, and the split is by
  * responsibility rather than by runtime: it converts the images on a
  * workstation, reusing the app's own `processImage` and `projectImageKeys`,
- * and writes the `image-keys.json` this reads. Nothing is duplicated between
- * them but `NAMESPACE`, which `src/test/import-legacy-parity.test.ts` pins.
+ * and writes the `image-keys.json` this reads. Three things are duplicated
+ * between them and cannot be imported across the boundary: `NAMESPACE`, the
+ * `uuidv5` body, and that filename. `src/test/import-legacy-parity.test.ts`
+ * pins all three.
  *
  * Image bytes are NOT handled here. They go to the bucket with `aws s3 sync`
  * from a workstation (see `import-legacy-images.ts` and the runbook in

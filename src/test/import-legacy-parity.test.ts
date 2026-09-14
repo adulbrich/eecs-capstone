@@ -105,6 +105,18 @@ describe("the legacy import's two scripts", () => {
   });
 
   /**
+   * The name is read out of the importer and looked for in the image script,
+   * rather than both being compared to a literal here: a deliberate rename of
+   * the file is fine as long as both ends move, and drift in either direction
+   * is what fails.
+   */
+  it("agree on the name of the key map file", () => {
+    const name = /const IMAGE_KEYS_NAME = "([^"]+)";/.exec(IMPORT_SOURCE)?.[1];
+    expect(name).toBeDefined();
+    expect(IMAGES_SOURCE).toContain(`"${name}"`);
+  });
+
+  /**
    * A regression pin, independent of both sources: it recomputes the id here
    * and compares to the value an imported database already holds. It does NOT
    * execute either script, so it is the assertions above that tie it to what
