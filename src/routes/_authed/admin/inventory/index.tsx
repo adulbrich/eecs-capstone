@@ -8,6 +8,7 @@ import { useCallback, useId } from "react";
 import { z } from "zod";
 import {
   AdminDataTable,
+  AdminTableControls,
   defineAdminColumns,
 } from "#/components/admin-data-table";
 import {
@@ -600,7 +601,7 @@ function AdminInventory() {
   );
   const [qDraft, setQDraft] = useDebouncedDraft(q, commitQuery);
 
-  const { orderRows, tableProps } = useAdminTable({
+  const { controlsProps, orderRows, tableProps } = useAdminTable({
     columns: COLUMNS,
     defaultSort: DEFAULT_SORT,
     navigate,
@@ -626,6 +627,26 @@ function AdminInventory() {
             value={qDraft}
           />
         </>
+      }
+      tableControls={
+        <AdminTableControls
+          actions={
+            <ExportCsvButton
+              filename="inventory"
+              load={() =>
+                Promise.resolve(
+                  toCsv(
+                    EXPORT_COLUMNS,
+                    orderRows(visible, (row) => row.id)
+                  )
+                )
+              }
+            />
+          }
+          filtered={filtered}
+          rowCount={visible.length}
+          {...controlsProps}
+        />
       }
       title={
         <>
@@ -657,20 +678,8 @@ function AdminInventory() {
       }
     >
       <AdminDataTable
-        actions={
-          <ExportCsvButton
-            filename="inventory"
-            load={() =>
-              Promise.resolve(
-                toCsv(
-                  EXPORT_COLUMNS,
-                  orderRows(visible, (row) => row.id)
-                )
-              )
-            }
-          />
-        }
         caption="Inventory items"
+        controls="listing"
         data={visible}
         emptyMessage="No items yet."
         filtered={filtered}

@@ -39,6 +39,15 @@ interface Props {
   filters: ReactNode;
   /** The search input and whatever orders or displays the results. */
   search: ReactNode;
+  /**
+   * The table's `AdminTableControls` (Export CSV, the Columns menu) when
+   * the listing is showing a table, and nothing in card view. Rendered at
+   * the end of the search row, after the Filters button, so the table
+   * starts one row higher than it would with the controls on a row of
+   * their own (#366, #367) and the tab order reads search, Filters, then
+   * the controls that act on the table.
+   */
+  tableControls?: ReactNode;
   /** The heading row: h1, breadcrumb, page-scoped buttons. */
   title: ReactNode;
 }
@@ -59,6 +68,7 @@ export function ListingLayout({
   className,
   filters,
   search,
+  tableControls,
   title,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -73,7 +83,14 @@ export function ListingLayout({
           <Card className="bg-transparent p-4">{filters}</Card>
         </aside>
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
+          {/*
+            One row from md, wrapping below it: the search input carries
+            flex-1 and min-w-0, so from md it gives up width to keep the
+            selects, the toggle, Filters and the table controls beside it,
+            and at a phone width it fills its own row and the buttons wrap
+            under it, left-aligned, in the same order.
+          */}
+          <div className="flex flex-wrap items-center gap-3 md:flex-nowrap">
             {search}
             <Sheet onOpenChange={setOpen} open={open}>
               <SheetTrigger asChild>
@@ -97,6 +114,7 @@ export function ListingLayout({
                 <div className="px-4 pb-4">{filters}</div>
               </SheetContent>
             </Sheet>
+            {tableControls}
           </div>
           {children}
         </div>

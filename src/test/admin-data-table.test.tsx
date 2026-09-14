@@ -12,8 +12,10 @@ import {
   type AdminColumn,
   AdminDataTable,
   type AdminDataTableProps,
+  AdminTableControls,
 } from "#/components/admin-data-table";
 import { orderBySortedIds, toCsv } from "#/lib/csv";
+import { readStoredHidden, writeStoredHidden } from "#/lib/table-state";
 
 // Radix's dropdown menu (Popper/floating-ui) relies on a few DOM APIs jsdom
 // omits. Same stub set as proposer-picker.test.tsx.
@@ -640,6 +642,93 @@ describe("the Columns menu", () => {
       />
     );
     expect(screen.queryByRole("button", { name: "Columns" })).toBeNull();
+  });
+});
+
+describe("controls: listing", () => {
+  it("draws no row of its own, so the route can put the controls beside the search", () => {
+    // The listing pages render AdminTableControls in ListingLayout's search
+    // row (#366, #367); a second Columns menu here would be the row the
+    // issues exist to remove.
+    renderTable({
+      actions: <button type="button">Export CSV</button>,
+      controls: "listing",
+      toolbar: <p>Filters go here</p>,
+    });
+    expect(screen.getByRole("table")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Columns" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Export CSV" })).toBeNull();
+    expect(screen.queryByText("Filters go here")).toBeNull();
+  });
+});
+
+describe("AdminTableControls", () => {
+  function renderControls(
+    overrides: Partial<Parameters<typeof AdminTableControls<Row>>[0]> = {}
+  ) {
+    const onHiddenChange = vi.fn();
+    render(
+      <AdminTableControls
+        columns={COLUMNS}
+        hidden={["location"]}
+        onHiddenChange={onHiddenChange}
+        rowCount={DATA.length}
+        storageKey="test"
+        {...overrides}
+      />
+    );
+    return { onHiddenChange };
+  }
+
+  it("renders the actions before the Columns menu, in that order", () => {
+    renderControls({ actions: <button type="button">Export CSV</button> });
+    const buttons = screen.getAllByRole("button").map((b) => b.textContent);
+    expect(buttons).toEqual(["Export CSV", "Columns"]);
+  });
+
+  it("renders nothing for an unfiltered listing with no rows", () => {
+    // The same #260 gate as the table's own row: the two are one predicate.
+    renderControls({
+      actions: <button type="button">Export CSV</button>,
+      rowCount: 0,
+    });
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("keeps the controls for a filtered listing with no rows", () => {
+    renderControls({ filtered: true, rowCount: 0 });
+    expect(screen.getByRole("button", { name: "Columns" })).not.toBeNull();
+  });
+
+  it("shows a column by writing the next hidden set to the URL and to storage", () => {
+    // Location is hidden by default, so showing it is a real preference:
+    // the URL gets an explicit empty set and storage records it.
+    const { onHiddenChange } = renderControls();
+    openColumnsMenu();
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Location" }));
+    expect(onHiddenChange).toHaveBeenCalledWith("");
+    expect(readStoredHidden("test")).toEqual([]);
+  });
+
+  it("clears storage when a toggle lands back on the page default", () => {
+    // Hiding Location again is the default set: the param goes, and so does
+    // the stored preference, or the seed effect would write it straight
+    // back (the resetColumns lesson in table-state.test.ts).
+    writeStoredHidden("test", []);
+    const { onHiddenChange } = renderControls({ hidden: [] });
+    openColumnsMenu();
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Location" }));
+    expect(onHiddenChange).toHaveBeenCalledWith(undefined);
+    expect(readStoredHidden("test")).toBeNull();
+  });
+
+  it("resets by clearing storage and dropping the param", () => {
+    writeStoredHidden("test", []);
+    const { onHiddenChange } = renderControls({ hidden: [] });
+    openColumnsMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Reset columns" }));
+    expect(onHiddenChange).toHaveBeenCalledWith(undefined);
+    expect(readStoredHidden("test")).toBeNull();
   });
 });
 

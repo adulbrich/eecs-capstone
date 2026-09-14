@@ -9,6 +9,7 @@ import { useCallback, useId } from "react";
 import { z } from "zod";
 import {
   AdminDataTable,
+  AdminTableControls,
   defineAdminColumns,
 } from "#/components/admin-data-table";
 import { ExportCsvButton } from "#/components/export-csv-button";
@@ -771,7 +772,7 @@ function AdminProjects() {
   );
   const [queryDraft, setQueryDraft] = useDebouncedDraft(q, commitQuery);
 
-  const { orderRows, tableProps } = useAdminTable({
+  const { controlsProps, orderRows, tableProps } = useAdminTable({
     columns: COLUMNS,
     defaultSort: DEFAULT_SORT,
     navigate,
@@ -800,6 +801,35 @@ function AdminProjects() {
           />
         </>
       }
+      tableControls={
+        <AdminTableControls
+          actions={
+            <ExportCsvButton
+              filename="projects"
+              load={async () => {
+                // The same resolved filter the loader sent, so the file
+                // can never disagree with the table about which rows
+                // match.
+                const { rows: exportRows } = await exportAdminProjects({
+                  data: resolved,
+                });
+                // The export's rows are a wider projection of the same
+                // records the table lists under the same filters, keyed
+                // by the same id, so ordering by the table's sorted id
+                // sequence still applies even though this array did not
+                // come from `rows`.
+                return toCsv(
+                  EXPORT_COLUMNS,
+                  orderRows(exportRows, (row) => row.id)
+                );
+              }}
+            />
+          }
+          filtered={filtered}
+          rowCount={rows.length}
+          {...controlsProps}
+        />
+      }
       title={
         <>
           <Breadcrumb>
@@ -820,28 +850,8 @@ function AdminProjects() {
       }
     >
       <AdminDataTable
-        actions={
-          <ExportCsvButton
-            filename="projects"
-            load={async () => {
-              // The same resolved filter the loader sent, so the file can
-              // never disagree with the table about which rows match.
-              const { rows: exportRows } = await exportAdminProjects({
-                data: resolved,
-              });
-              // The export's rows are a wider projection of the same
-              // records the table lists under the same filters, keyed by
-              // the same id, so ordering by the table's sorted id sequence
-              // still applies even though this array did not come from
-              // `rows`.
-              return toCsv(
-                EXPORT_COLUMNS,
-                orderRows(exportRows, (row) => row.id)
-              );
-            }}
-          />
-        }
         caption="Projects"
+        controls="listing"
         data={rows}
         emptyMessage="No projects yet."
         filtered={filtered}

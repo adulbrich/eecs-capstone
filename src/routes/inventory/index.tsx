@@ -1,7 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { z } from "zod";
-import { AdminDataTable } from "#/components/admin-data-table";
+import {
+  AdminDataTable,
+  AdminTableControls,
+} from "#/components/admin-data-table";
 import { BorrowListButton } from "#/components/borrow-list-button";
 import { EmptyState } from "#/components/empty-state";
 import { InventoryCard } from "#/components/inventory-card";
@@ -50,8 +53,6 @@ const searchSchema = z.object({
   sort: z.string().optional(),
 });
 
-type Search = z.infer<typeof searchSchema>;
-
 export const Route = createFileRoute("/inventory/")({
   validateSearch: searchSchema,
   // Only the filter fields: the view mode, the column sort and the column
@@ -79,41 +80,6 @@ export const Route = createFileRoute("/inventory/")({
   },
   component: InventoryIndex,
 });
-
-/**
- * Table mode. Its own component so `useAdminTable`, and the column seed
- * effect it runs, only exist while the table is on screen. Sorting is local
- * to the page, as on `/projects`.
- */
-function InventoryTable({
-  rows,
-  search,
-}: {
-  rows: InventoryListRow[];
-  search: Search;
-}) {
-  const navigate = useNavigate({ from: "/inventory/" });
-  const { tableProps } = useAdminTable({
-    columns: INVENTORY_TABLE_COLUMNS,
-    defaultSort: INVENTORY_TABLE_DEFAULT_SORT,
-    navigate,
-    search,
-    storageKey: "public-inventory",
-  });
-  const filtered =
-    search.q !== "" || search.status !== null || search.categories.length > 0;
-  return (
-    <AdminDataTable
-      caption="Inventory"
-      data={rows}
-      emptyMessage="No items yet."
-      filtered={filtered}
-      getRowId={(row) => row.id}
-      noMatchMessage="No items match."
-      {...tableProps}
-    />
-  );
-}
 
 function InventoryCards({
   q,
@@ -181,6 +147,19 @@ function InventoryIndex() {
   );
   const signedIn = useSignedIn();
   const data = Route.useLoaderData();
+  // In the route, for the same reason as on /projects: the Columns menu is
+  // in the search row, and `seedColumns` holds the column seed for table
+  // view. Sorting is local to the page, as there.
+  const { controlsProps, tableProps } = useAdminTable({
+    columns: INVENTORY_TABLE_COLUMNS,
+    defaultSort: INVENTORY_TABLE_DEFAULT_SORT,
+    navigate,
+    search,
+    seedColumns: view === "table",
+    storageKey: "public-inventory",
+  });
+  const filtered =
+    search.q !== "" || search.status !== null || search.categories.length > 0;
 
   const totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
   return (
@@ -218,6 +197,15 @@ function InventoryIndex() {
           view={view}
         />
       }
+      tableControls={
+        view === "table" ? (
+          <AdminTableControls
+            filtered={filtered}
+            rowCount={data.rows.length}
+            {...controlsProps}
+          />
+        ) : undefined
+      }
       title={
         /* flex-wrap and ml-auto, as on /projects: at a phone width the two
            buttons drop under the heading, right-aligned, rather than
@@ -237,7 +225,16 @@ function InventoryIndex() {
       }
     >
       {view === "table" ? (
-        <InventoryTable rows={data.rows} search={search} />
+        <AdminDataTable
+          caption="Inventory"
+          controls="listing"
+          data={data.rows}
+          emptyMessage="No items yet."
+          filtered={filtered}
+          getRowId={(row) => row.id}
+          noMatchMessage="No items match."
+          {...tableProps}
+        />
       ) : (
         <InventoryCards q={search.q} rows={data.rows} signedIn={signedIn} />
       )}

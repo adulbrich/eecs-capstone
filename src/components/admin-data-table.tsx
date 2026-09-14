@@ -273,11 +273,21 @@ export interface AdminDataTableProps<T extends RowData> {
    * Controls rendered in the right-hand group, before the Columns menu.
    * A slot rather than an `onExport` callback: the export needs per-route
    * column definitions and filter state, and threading those through here
-   * would make the table know about exports.
+   * would make the table know about exports. Read only under `controls:
+   * "inline"`; a listing passes its actions to `AdminTableControls` instead.
    */
   actions?: ReactNode;
   caption: string;
   columns: AdminColumn<T>[];
+  /**
+   * Where Export CSV and the Columns menu render. `inline`, the default, is
+   * the row this component draws above the table: `toolbar` on the left,
+   * `actions` and the menu on the right. `listing` draws no row at all: the
+   * route renders `AdminTableControls` itself, in `ListingLayout`'s search
+   * row beside the search input, so the table starts one row higher
+   * (#366, #367). `actions` and `toolbar` are not read under `listing`.
+   */
+  controls?: "inline" | "listing";
   data: T[];
   defaultSort: SortState;
   /**
@@ -339,7 +349,172 @@ export interface AdminDataTableProps<T extends RowData> {
   serverSorted?: boolean;
   sort: SortState;
   storageKey: string;
+  /** The left-hand group of the inline row: search, selects, switches. */
   toolbar?: ReactNode;
+}
+
+/**
+ * Whether a listing has a table to show, which is also whether it has
+ * controls to show: a filtered result keeps its table even with no rows in
+ * it, because the headers and the controls are what the reader is searching
+ * over, while an unfiltered empty result has nothing to show and shows the
+ * empty message alone. The controls go with the table because they act on
+ * it: a Columns menu over an empty listing would toggle headers that are not
+ * on the page, and an export would write a file of nothing (#260). One
+ * predicate for both, here, so the table and a listing's separately placed
+ * `AdminTableControls` cannot drift apart.
+ */
+export function showsTable(rowCount: number, filtered: boolean): boolean {
+  return rowCount > 0 || filtered;
+}
+
+/**
+ * Applies a new hidden set: to storage, so the next param-less visit seeds
+ * it, and to the URL through `onHiddenChange`, which is what the table
+ * actually renders from. A set that lands back on the page default clears
+ * storage rather than writing the literal default into it: writing it would
+ * leave a "preference" on record, and `useSeedColumnsFromStorage` would
+ * write it straight back into the URL the next time `cols` is undefined,
+ * undoing the clean URL `serializeHidden` just produced.
+ */
+function commitHidden(
+  nextHidden: readonly string[],
+  defaultHidden: readonly string[],
+  storageKey: string,
+  onHiddenChange: (cols: string | undefined) => void
+): void {
+  const serialized = serializeHidden(nextHidden, defaultHidden);
+  if (serialized === undefined) {
+    clearStoredHidden(storageKey);
+  } else {
+    writeStoredHidden(storageKey, nextHidden);
+  }
+  onHiddenChange(serialized);
+}
+
+export interface AdminTableControlsProps<T extends RowData> {
+  /** See `AdminDataTableProps.actions`. Rendered before the Columns menu. */
+  actions?: ReactNode;
+  columns: AdminColumn<T>[];
+  /** See `AdminDataTableProps.filtered`. */
+  filtered?: boolean;
+  hidden: readonly string[];
+  onHiddenChange: (cols: string | undefined) => void;
+  /** How many rows the table has, for the `showsTable` gate. */
+  rowCount: number;
+  storageKey: string;
+}
+
+/**
+ * Export CSV and the Columns menu: the controls that act on a table rather
+ * than narrow it. `AdminDataTable` renders this on its own row under
+ * `controls: "inline"`; a listing renders it in `ListingLayout`'s search row
+ * under `controls: "listing"`, spreading `controlsProps` from
+ * `useAdminTable` so the two agree on the column list and the storage key.
+ *
+ * Built from the column list and the hidden set rather than from the table
+ * instance, which is what lets it render above the table in a different
+ * subtree: which columns can hide, which are hidden and which the page hides
+ * by default are all in the props, and toggling one writes the next set
+ * through the same `commitHidden` path the table's own state came from.
+ *
+ * Renders nothing when `showsTable` is false, and no menu when no column
+ * can be hidden: a table whose columns are all `enableHiding: false` (the
+ * bookmarks shortlist) would otherwise offer an empty picker, a control that
+ * exists to be ignored.
+ */
+export function AdminTableControls<T extends RowData>({
+  actions,
+  columns,
+  filtered = false,
+  hidden,
+  onHiddenChange,
+  rowCount,
+  storageKey,
+}: AdminTableControlsProps<T>) {
+  const hideable = useMemo(
+    () => columns.filter((column) => column.enableHiding !== false),
+    [columns]
+  );
+  const defaultHidden = useMemo(
+    () =>
+      columns
+        .filter((column) => column.defaultHidden)
+        .map((column) => column.id),
+    [columns]
+  );
+  if (!showsTable(rowCount, filtered)) {
+    return null;
+  }
+  const toggle = (id: string, visible: boolean) => {
+    const nextHidden = visible
+      ? hidden.filter((hiddenId) => hiddenId !== id)
+      : [...hidden, id];
+    commitHidden(nextHidden, defaultHidden, storageKey, onHiddenChange);
+  };
+  const reset = () => {
+    // Clear the stored preference rather than writing the default set into
+    // it. "Reset" means "I no longer have a preference," not "my preference
+    // happens to equal the default."
+    clearStoredHidden(storageKey);
+    onHiddenChange(undefined);
+  };
+  return (
+    <>
+      {actions}
+      {hideable.length > 0 && (
+        /*
+          modal={false}: Radix's default modal DropdownMenu hides the rest
+          of the page from assistive tech via `aria-hidden` (not `inert`)
+          while it's open: @radix-ui/react-menu calls `hideOthers` from the
+          `aria-hidden` package directly rather than its `inert`-aware
+          `suppressOthers`. That leaves every focusable element outside the
+          menu (nav links, the search box, sort buttons) inside an
+          aria-hidden subtree, which axe correctly flags as
+          aria-hidden-focus. This menu is a lightweight column toggle, not
+          a workflow that needs a hard focus trap, so opting out of modal
+          behavior is the right fix here rather than living with the
+          violation or fighting Radix's internals.
+        */
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            {/*
+              Default size, not sm: this button sits on the same row as
+              the page's search input and filter selects, which are all
+              h-9. An h-8 button beside them reads as misaligned rather
+              than compact.
+            */}
+            <Button type="button" variant="outline">
+              <Columns3 aria-hidden className="size-4" />
+              Columns
+            </Button>
+          </DropdownMenuTrigger>
+          {/*
+            tabIndex 0, not Radix's -1: a menu with enough columns to
+            scroll (the public projects table has fifteen) fails axe's
+            scrollable-region-focusable otherwise. See docs/QUIRKS.md,
+            "A Columns menu that scrolls must be focusable itself".
+          */}
+          <DropdownMenuContent align="end" tabIndex={0}>
+            <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {hideable.map((column) => (
+              <DropdownMenuCheckboxItem
+                checked={!hidden.includes(column.id)}
+                key={column.id}
+                onCheckedChange={(value) => toggle(column.id, value)}
+                onSelect={(event) => event.preventDefault()}
+              >
+                {column.header}
+              </DropdownMenuCheckboxItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={reset}>Reset columns</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </>
+  );
 }
 
 /**
@@ -397,6 +572,7 @@ export function AdminDataTable<T extends RowData>({
   actions,
   caption,
   columns,
+  controls = "inline",
   data,
   defaultSort,
   emptyMessage,
@@ -455,14 +631,6 @@ export function AdminDataTable<T extends RowData>({
     highlighted.current?.scrollIntoView({ block: "center" });
   }, []);
 
-  const defaultHidden = useMemo(
-    () =>
-      columns
-        .filter((column) => column.defaultHidden)
-        .map((column) => column.id),
-    [columns]
-  );
-
   // TanStack auto-detects `alphanumeric` sorting for columns whose sample
   // values look numeric-ish; default every column without its own
   // `sortFn` to the locale-aware comparator above instead.
@@ -490,25 +658,9 @@ export function AdminDataTable<T extends RowData>({
     features,
     getRowId,
     manualSorting: serverSorted ?? false,
-    onColumnVisibilityChange: (updater) => {
-      const next =
-        typeof updater === "function" ? updater(columnVisibility) : updater;
-      const nextHidden = Object.entries(next)
-        .filter(([, visible]) => !visible)
-        .map(([id]) => id);
-      const serialized = serializeHidden(nextHidden, defaultHidden);
-      // A toggle that lands back on the page default hits the same trap as
-      // an explicit reset: writing the literal default set into storage
-      // would leave a "preference" on record, and the seed effect would
-      // write it straight back into the URL the next time cols is
-      // undefined, undoing the clean URL serializeHidden just produced.
-      if (serialized === undefined) {
-        clearStoredHidden(storageKey);
-      } else {
-        writeStoredHidden(storageKey, nextHidden);
-      }
-      onHiddenChange(serialized);
-    },
+    // No onColumnVisibilityChange: visibility is controlled from `hidden`,
+    // and the only control that changes it is `AdminTableControls`, which
+    // writes through `commitHidden` rather than through the table.
     onSortingChange: (updater) => {
       const next = typeof updater === "function" ? updater(sorting) : updater;
       const first: ColumnSort = next[0] ?? {
@@ -533,15 +685,7 @@ export function AdminDataTable<T extends RowData>({
   // rows that TanStack has already sorted is cheap.
   const groups = group && grouped ? groupRows(rows, group.key) : [];
   const visibleColumnCount = table.getVisibleLeafColumns().length;
-  const hideable = table.getAllLeafColumns().filter((c) => c.getCanHide());
-  // A filtered result keeps its table even with no rows in it: the headers
-  // and the controls are what the reader is searching over. An unfiltered
-  // one has nothing to show and shows the message alone. The right-hand
-  // controls (the caller's `actions`, Export CSV on the admin routes, and the
-  // Columns menu) act on the table, so they go when it does: a picker there
-  // would toggle headers that are not on the page, and an export would write
-  // a file of nothing (#260). One flag for both so they cannot drift apart.
-  const showTable = rows.length > 0 || filtered;
+  const showTable = showsTable(rows.length, filtered);
 
   // Reports the table's own sorted row order to the caller. Skipped when
   // serverSorted: the rows there are not locally reordered at all (see
@@ -566,17 +710,6 @@ export function AdminDataTable<T extends RowData>({
   // paginated or not, so a reader hears one number (#209).
   const sortedLabel = labels.get(sort.id) ?? sort.id;
   const orderText = `Sorted by ${sortedLabel}, ${sort.desc ? "descending" : "ascending"}`;
-
-  const resetColumns = () => {
-    // Clear the stored preference rather than writing the default set into
-    // it. "Reset" means "I no longer have a preference," not "my preference
-    // happens to equal the default." Writing the latter would leave a
-    // preference on record, and useSeedColumnsFromStorage would dutifully
-    // seed it straight back into the URL the next time cols is undefined,
-    // undoing the clean URL that onHiddenChange(undefined) just produced.
-    clearStoredHidden(storageKey);
-    onHiddenChange(undefined);
-  };
 
   const renderRow = (row: Row<AdminTableFeatures, T>) => {
     const isHighlighted = !!highlightedRowId && row.id === highlightedRowId;
@@ -611,74 +744,24 @@ export function AdminDataTable<T extends RowData>({
 
   return (
     <div className="mt-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-wrap items-end gap-3">{toolbar}</div>
-        {showTable && (
-          <div className="flex items-end gap-3">
-            {actions}
-            {/*
-            modal={false}: Radix's default modal DropdownMenu hides the rest
-            of the page from assistive tech via `aria-hidden` (not `inert`)
-            while it's open: @radix-ui/react-menu calls `hideOthers` from the
-            `aria-hidden` package directly rather than its `inert`-aware
-            `suppressOthers`. That leaves every focusable element outside the
-            menu (nav links, the search box, sort buttons) inside an
-            aria-hidden subtree, which axe correctly flags as
-            aria-hidden-focus. This menu is a lightweight column toggle, not
-            a workflow that needs a hard focus trap, so opting out of modal
-            behavior is the right fix here rather than living with the
-            violation or fighting Radix's internals.
-          */}
-            {/*
-            No menu when nothing can be hidden: a table whose columns are all
-            `enableHiding: false` (the bookmarks shortlist) would otherwise
-            offer an empty picker, a control that exists to be ignored.
-          */}
-            {hideable.length > 0 && (
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  {/*
-                Default size, not sm: this button sits on the same row as
-                the page's search input and filter selects, which are all
-                h-9. An h-8 button beside them reads as misaligned rather
-                than compact.
-              */}
-                  <Button type="button" variant="outline">
-                    <Columns3 aria-hidden className="size-4" />
-                    Columns
-                  </Button>
-                </DropdownMenuTrigger>
-                {/*
-              tabIndex 0, not Radix's -1: a menu with enough columns to
-              scroll (the public projects table has fifteen) fails axe's
-              scrollable-region-focusable otherwise. See docs/QUIRKS.md,
-              "A Columns menu that scrolls must be focusable itself".
-            */}
-                <DropdownMenuContent align="end" tabIndex={0}>
-                  <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {hideable.map((column) => (
-                    <DropdownMenuCheckboxItem
-                      checked={column.getIsVisible()}
-                      key={column.id}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(value)
-                      }
-                      onSelect={(event) => event.preventDefault()}
-                    >
-                      {labels.get(column.id) ?? column.id}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={resetColumns}>
-                    Reset columns
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-        )}
-      </div>
+      {controls === "inline" && (
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-wrap items-end gap-3">{toolbar}</div>
+          {showTable && (
+            <div className="flex items-end gap-3">
+              <AdminTableControls
+                actions={actions}
+                columns={columns}
+                filtered={filtered}
+                hidden={hidden}
+                onHiddenChange={onHiddenChange}
+                rowCount={rows.length}
+                storageKey={storageKey}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       <p aria-live="polite" className="sr-only">
         {orderText}
