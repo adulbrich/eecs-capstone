@@ -240,10 +240,6 @@ async function ensureCategory(c: Cat) {
 }
 
 const PROJECT_CATEGORIES: ProjectCat[] = [
-  // Sponsorship model.
-  { name: "Industry Sponsored", type: "project_type" },
-  { name: "Faculty Sponsored", type: "project_type" },
-  { name: "Student Led", type: "project_type" },
   // Field.
   { name: "Web Development", type: "field" },
   { name: "Robotics", type: "field" },
@@ -380,7 +376,6 @@ async function main() {
       status: "published",
       publishedAt: daysAgo(40),
       categories: [
-        "Industry Sponsored",
         "Robotics",
         "Python",
         "C++ / Embedded",
@@ -412,7 +407,6 @@ async function main() {
       status: "published",
       publishedAt: daysAgo(38),
       categories: [
-        "Industry Sponsored",
         "Web Development",
         "React",
         "AWS Cloud",
@@ -445,7 +439,6 @@ async function main() {
       status: "published",
       publishedAt: daysAgo(35),
       categories: [
-        "Faculty Sponsored",
         "Data Science",
         "Python",
         "Machine Learning",
@@ -476,7 +469,7 @@ async function main() {
       programId: p461.id,
       status: "approved",
       publishedAt: null,
-      categories: ["Faculty Sponsored", "AR / VR", "Unity / VR"],
+      categories: ["AR / VR", "Unity / VR"],
     },
     {
       title: "Campus Sustainability Tracker",
@@ -503,7 +496,7 @@ async function main() {
       programId: p461.id,
       status: "submitted",
       publishedAt: null,
-      categories: ["Student Led", "Web Development", "React", "Mobile", "React Native"],
+      categories: ["Web Development", "React", "Mobile", "React Native"],
     },
     {
       title: "Edge AI Inference on Single-Board Computers",
@@ -531,7 +524,6 @@ async function main() {
       status: "published",
       publishedAt: daysAgo(20),
       categories: [
-        "Industry Sponsored",
         "IoT / Embedded",
         "Machine Learning",
         "Python",
@@ -563,7 +555,7 @@ async function main() {
       programId: p461.id,
       status: "published",
       publishedAt: daysAgo(12),
-      categories: ["Faculty Sponsored", "Web Development", "React"],
+      categories: ["Web Development", "React"],
     },
     {
       title: "Open-Source Drone Telemetry Platform",
@@ -590,7 +582,7 @@ async function main() {
       programId: p461.id,
       status: "draft",
       publishedAt: null,
-      categories: ["Student Led", "Robotics", "Python", "IoT / Embedded"],
+      categories: ["Robotics", "Python", "IoT / Embedded"],
     },
   ];
 

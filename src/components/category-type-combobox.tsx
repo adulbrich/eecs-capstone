@@ -16,7 +16,20 @@ import {
 } from "#/components/ui/popover";
 import { cn } from "#/lib/utils.ts";
 
+/**
+ * What the two project-category fields mean, under their labels in the New
+ * category dialog and on the edit route. The examples live here rather than
+ * in a placeholder because a placeholder is not documentation
+ * (docs/UI-CONVENTIONS.md), and one string per field keeps the dialog and
+ * the edit route saying the same thing (#374).
+ */
+export const CATEGORY_FIELD_DESCRIPTION = {
+  name: "The category itself, such as React under Technology or Robotics under Field.",
+  type: "The group this category is filed under in the picker, such as Technology, Field or Industry.",
+} as const;
+
 interface Props {
+  describedBy?: string;
   id?: string;
   onChange: (type: string) => void;
   types: string[];
@@ -25,10 +38,20 @@ interface Props {
 
 /**
  * Creatable combobox for category types. Types are derived from existing
- * categories, so the control lets admins pick an existing type or type a
+ * categories, so the control lets staff pick an existing type or type a
  * brand-new one (preserving the old <datalist> behavior with shadcn styling).
+ *
+ * The Create row sits below the existing types, not above: a reader who has
+ * typed a prefix sees the matches first, so a typo does not mint a new type
+ * before the intended one scrolls into view (#374).
  */
-export function CategoryTypeCombobox({ value, onChange, types, id }: Props) {
+export function CategoryTypeCombobox({
+  describedBy,
+  value,
+  onChange,
+  types,
+  id,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -47,6 +70,7 @@ export function CategoryTypeCombobox({ value, onChange, types, id }: Props) {
     <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger asChild>
         <Button
+          aria-describedby={describedBy}
           aria-expanded={open}
           className="w-full justify-between font-normal"
           id={id}
@@ -64,21 +88,15 @@ export function CategoryTypeCombobox({ value, onChange, types, id }: Props) {
         <Command>
           <CommandInput
             onValueChange={setQuery}
-            placeholder="Search or add a type..."
+            placeholder="Search or add a type"
             value={query}
           />
           <CommandList>
-            <CommandEmpty>No types yet. Type to create one.</CommandEmpty>
-            {showCreate && (
-              <CommandGroup>
-                <CommandItem
-                  onSelect={() => select(trimmed)}
-                  value={`create-${trimmed}`}
-                >
-                  Create "{trimmed}"
-                </CommandItem>
-              </CommandGroup>
-            )}
+            {/*
+              Reachable only with no types and nothing typed: the Create row
+              matches whatever is typed, so it, not this, answers a query.
+            */}
+            <CommandEmpty>No types yet. Type one to create it.</CommandEmpty>
             <CommandGroup>
               {types.map((t) => (
                 <CommandItem key={t} onSelect={() => select(t)} value={t}>
@@ -89,6 +107,16 @@ export function CategoryTypeCombobox({ value, onChange, types, id }: Props) {
                 </CommandItem>
               ))}
             </CommandGroup>
+            {showCreate && (
+              <CommandGroup>
+                <CommandItem
+                  onSelect={() => select(trimmed)}
+                  value={`create-${trimmed}`}
+                >
+                  Create type "{trimmed}"
+                </CommandItem>
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>

@@ -107,9 +107,9 @@ export const categories = pgTable(
      */
     domain: categoryDomainEnum("domain").notNull(),
     /**
-     * The facet within the project domain: project_type, technology, industry,
-     * field, or anything staff create. Null for inventory categories, which are
-     * flat.
+     * The facet within the project domain: technology, industry, field, or
+     * anything staff create. Null for inventory categories, which are flat.
+     * Never a fact that is a column on `projects` (ADR-0021).
      */
     type: text("type"),
     createdAt: timestamp("created_at", { withTimezone: true })

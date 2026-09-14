@@ -12,7 +12,10 @@ import {
   AdminDataTable,
   defineAdminColumns,
 } from "#/components/admin-data-table";
-import { CategoryTypeCombobox } from "#/components/category-type-combobox";
+import {
+  CATEGORY_FIELD_DESCRIPTION,
+  CategoryTypeCombobox,
+} from "#/components/category-type-combobox";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { LocalTime } from "#/components/local-time";
 import {
@@ -266,24 +269,27 @@ function CategoriesAdmin() {
               </DialogTitle>
               <DialogDescription>
                 {tab === "project"
-                  ? "Add a category and assign it a type. Pick an existing type or create a new one."
+                  ? "Pick the type first, then name the category."
                   : "Add a category for inventory items."}
               </DialogDescription>
             </DialogHeader>
             <form className="flex flex-col gap-4" onSubmit={onCreate}>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="cat-name">Name</Label>
-                <Input
-                  id="cat-name"
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  value={name}
-                />
-              </div>
+              {/*
+                Type above Name on the project tab: the type is the group and
+                the name is the category, and a first-time reader who meets
+                Name first files the group under the category (#374).
+              */}
               {tab === "project" && (
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="cat-type">Type</Label>
+                  <p
+                    className="text-muted-foreground text-xs"
+                    id="cat-type-description"
+                  >
+                    {CATEGORY_FIELD_DESCRIPTION.type}
+                  </p>
                   <CategoryTypeCombobox
+                    describedBy="cat-type-description"
                     id="cat-type"
                     onChange={setType}
                     types={types}
@@ -291,6 +297,26 @@ function CategoriesAdmin() {
                   />
                 </div>
               )}
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="cat-name">Name</Label>
+                {tab === "project" && (
+                  <p
+                    className="text-muted-foreground text-xs"
+                    id="cat-name-description"
+                  >
+                    {CATEGORY_FIELD_DESCRIPTION.name}
+                  </p>
+                )}
+                <Input
+                  aria-describedby={
+                    tab === "project" ? "cat-name-description" : undefined
+                  }
+                  id="cat-name"
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  value={name}
+                />
+              </div>
               {error && <p className="text-destructive text-sm">{error}</p>}
               <DialogFooter>
                 <Button
