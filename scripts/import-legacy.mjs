@@ -11,7 +11,8 @@
  * port exists because the `.ts` one cannot run in production: the runtime
  * image installs with `--omit=dev` so there is no `tsx`, and it ships
  * `.output` without `src/`, so nothing under `#/lib` or `../src/db` resolves.
- * Only `pg` is used here, the same dependency `migrate.mjs` relies on.
+ * Only `pg` and `@aws-sdk/client-s3` are used, both production dependencies
+ * the server already ships, the way `migrate.mjs` relies on `pg` alone.
  *
  * Images are NOT handled here. Their bytes go straight to the bucket with
  * `aws s3 sync` from a workstation (see `--prepare-images` in the `.ts`
@@ -210,6 +211,17 @@ function buildNotes(row) {
   return parts.join("\n\n");
 }
 
+/**
+ * `projects.proposer_email` is stored trimmed and lowercase (ADR-0015, and
+ * docs/QUIRKS.md "Addresses are lowercase in the four columns we write").
+ * This importer writes the column directly rather than through a server
+ * function, so like the two direct writers QUIRKS already names, it folds by
+ * hand. `export.sql` applies LOWER() too; this also trims.
+ */
+function proposerEmailOf(row) {
+  return row.proposer_email.trim().toLowerCase();
+}
+
 function contactNameOf(row) {
   const name = [row.proposer_first, row.proposer_last]
     .filter(Boolean)
@@ -228,7 +240,7 @@ function contactNameOf(row) {
  * drifted and the row it just made is a duplicate, which is why each decision
  * is printed.
  */
-async function resolvePrograms(client) {
+async function resolvePrograms(client, createMissingPrograms) {
   const byCourse = new Map();
   for (const [course, spec] of Object.entries(PROGRAMS)) {
     const found = await client.query(
@@ -247,14 +259,22 @@ async function resolvePrograms(client) {
       console.log(`  matched ${spec.courseId} "${found.rows[0].course_name}"`);
       continue;
     }
+    // Absent is an error by default. In production all four exist, so a miss
+    // means an id drifted, and inserting would attach projects to a brand new
+    // program that merely looks right. Creating is opt-in for a fresh local
+    // database, where nothing is there to match.
+    if (!createMissingPrograms) {
+      throw new Error(
+        `No program with course_id "${spec.courseId}" (for legacy course "${course}"). ` +
+          "Create it first, or pass --create-missing-programs on an empty database."
+      );
+    }
     const created = await client.query(
       "INSERT INTO programs (course_id, course_name, term_count) VALUES ($1, $2, $3) RETURNING id",
       [spec.courseId, spec.courseName, spec.termCount]
     );
     byCourse.set(course, created.rows[0].id);
-    console.log(
-      `  CREATED ${spec.courseId} "${spec.courseName}" (absent, check this is not a duplicate)`
-    );
+    console.log(`  CREATED ${spec.courseId} "${spec.courseName}"`);
   }
   return byCourse;
 }
@@ -287,7 +307,7 @@ function assertEveryCourseIsMapped(rows) {
  * Unlike the local run, this one will match: production has real accounts.
  */
 async function resolveProposers(client, rows) {
-  const emails = [...new Set(rows.map((r) => r.proposer_email))];
+  const emails = [...new Set(rows.map(proposerEmailOf))];
   const found = await client.query(
     'SELECT id, email FROM "user" WHERE lower(email) = ANY($1)',
     [emails]
@@ -331,7 +351,11 @@ ON CONFLICT (id) DO UPDATE SET
   archived_at = excluded.archived_at,
   created_at = excluded.created_at,
   updated_at = excluded.updated_at,
-  image_url = excluded.image_url
+  -- COALESCE, not a plain overwrite: the image-keys file is optional, so a
+  -- re-run without it binds null here and would otherwise wipe image_url on
+  -- all 547 rows while the objects stayed in the bucket. A row keeps the image
+  -- it has unless this run actually carries a key for it.
+  image_url = COALESCE(excluded.image_url, projects.image_url)
 `;
 
 async function main() {
@@ -341,6 +365,7 @@ async function main() {
   }
   const undo = process.argv.includes("--undo");
   const skipExisting = process.argv.includes("--skip-existing");
+  const createMissingPrograms = process.argv.includes("--create-missing-programs");
   const rows = await readRows();
   const ids = rows.map((r) => uuidv5(r.legacy_id));
 
@@ -392,10 +417,10 @@ async function main() {
     // that landed are indistinguishable from a complete run without counting.
     await client.query("BEGIN");
     assertEveryCourseIsMapped(rows);
-    const programIds = await resolvePrograms(client);
+    const programIds = await resolvePrograms(client, createMissingPrograms);
     const proposerIds = await resolveProposers(client, rows);
     console.log(
-      `  ${proposerIds.size} of ${new Set(rows.map((r) => r.proposer_email)).size} proposer emails match an existing account`
+      `  ${proposerIds.size} of ${new Set(rows.map(proposerEmailOf)).size} proposer emails match an existing account`
     );
 
     // A re-run REPLACES every column on a row that already exists, including
@@ -443,8 +468,8 @@ async function main() {
         true,
         row.teams_supported,
         buildNotes(row),
-        proposerIds.get(row.proposer_email) ?? null,
-        row.proposer_email,
+        proposerIds.get(proposerEmailOf(row)) ?? null,
+        proposerEmailOf(row),
         row.program_course
           ? (programIds.get(row.program_course) ?? null)
           : null,

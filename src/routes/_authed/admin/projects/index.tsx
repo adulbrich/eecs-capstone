@@ -767,8 +767,9 @@ function DatelessNotice({
         {count === 1
           ? `1 project in this view has no ${label} date and is not shown.`
           : `${count} projects in this view have no ${label} date and are not shown.`}{" "}
-        Projects imported from the legacy portal often have none, because its
-        event log only goes back to August 2022.
+        A project has no {label} date if it never reached that point, or if it
+        was imported from the legacy portal, whose event log only goes back to
+        August 2022.
       </p>
       <Button
         className="mt-2 h-auto p-0"

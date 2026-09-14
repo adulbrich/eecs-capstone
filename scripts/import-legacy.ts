@@ -166,6 +166,18 @@ function buildNotes(row: LegacyRow): string {
   return parts.join("\n\n");
 }
 
+/**
+ * `projects.proposer_email` is stored trimmed and lowercase (ADR-0015, and
+ * docs/QUIRKS.md "Addresses are lowercase in the four columns we write").
+ * This importer writes the column directly rather than through
+ * `createProjectAs`, so like the two direct writers QUIRKS already names, it
+ * folds by hand. `export.sql` applies `LOWER()` too; this is the belt to that
+ * brace, and it is the half that also trims.
+ */
+function proposerEmailOf(row: LegacyRow): string {
+  return row.proposer_email.trim().toLowerCase();
+}
+
 function contactNameOf(row: LegacyRow): string | null {
   const name = [row.proposer_first, row.proposer_last]
     .filter(Boolean)
@@ -248,7 +260,7 @@ function assertEveryCourseIsMapped(rows: LegacyRow[]) {
  * addresses into the auth table years before their owners sign in.
  */
 async function resolveProposers(rows: LegacyRow[]) {
-  const emails = [...new Set(rows.map((r) => r.proposer_email))];
+  const emails = [...new Set(rows.map(proposerEmailOf))];
   const found = await db
     .select({ id: user.id, email: user.email })
     .from(user)
@@ -282,8 +294,9 @@ type ImageRow = { legacy_id: string; image_id: string; name: string };
  * instead of being baked into a container image or streamed through a
  * one-off task. It also sidesteps having to trust Sharp on arm64 Fargate.
  *
- * The small `image-keys.json` rides in the image for `import-legacy.mjs` to
- * apply against the database.
+ * `import-legacy.mjs` reads the small `image-keys.json` this step emits from
+ * a private S3 prefix at runtime and applies it to the database. It is never
+ * committed or baked into an image.
  */
 async function prepareImages(dir: string, outDir: string) {
   const rows = readManifest(dir);
@@ -452,7 +465,7 @@ async function main() {
   const programIds = await resolvePrograms();
   const proposerIds = await resolveProposers(rows);
   process.stdout.write(
-    `  ${proposerIds.size} of ${new Set(rows.map((r) => r.proposer_email)).size} proposer emails match an existing account\n`
+    `  ${proposerIds.size} of ${new Set(rows.map(proposerEmailOf)).size} proposer emails match an existing account\n`
   );
 
   const values = rows.map((row) => ({
@@ -499,8 +512,8 @@ async function main() {
     acceptingApplicants: true,
     teamsSupported: row.teams_supported,
     notes: buildNotes(row),
-    proposerId: proposerIds.get(row.proposer_email) ?? null,
-    proposerEmail: row.proposer_email,
+    proposerId: proposerIds.get(proposerEmailOf(row)) ?? null,
+    proposerEmail: proposerEmailOf(row),
     programId: row.program_course
       ? (programIds.get(row.program_course) ?? null)
       : null,

@@ -188,11 +188,6 @@ function buildAdminProjectListConditions(data: AdminProjectsFilter): SQL[] {
 }
 
 /**
- * Test seam. Integration tests call this directly with a viewer instead of
- * going through the request session, matching the `*As(viewer, ...)`
- * convention used by the mutation helpers.
- */
-/**
  * How many rows the date range is hiding because they have no date at all,
  * rather than because they fall outside it.
  *
@@ -219,6 +214,11 @@ async function countDatelessInScope(
   return row?.count ?? 0;
 }
 
+/**
+ * Test seam. Integration tests call this directly with a viewer instead of
+ * going through the request session, matching the `*As(viewer, ...)`
+ * convention used by the mutation helpers.
+ */
 export async function listAdminProjectsAs(
   viewer: Viewer,
   data: AdminProjectsFilter

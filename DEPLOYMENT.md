@@ -553,6 +553,15 @@ counts both groups before it writes:
   12 new, 547 already imported (will be overwritten)
 ```
 
+Two columns are exempt from that replacement. `image_url` is written with
+`COALESCE(excluded.image_url, projects.image_url)`, so a re-run without
+`image-keys.json` keeps the images a row already has rather than nulling them
+while the objects sit in the bucket. Programs are never created by default: a
+missing `course_id` is an error, because in production all four exist and a
+miss means an identifier drifted, where inserting would attach projects to a
+brand new program that merely looks right. `--create-missing-programs` opts in,
+for a fresh local database with nothing to match.
+
 Pass `--skip-existing` to add only the rows that are not there yet and leave
 the rest untouched:
 
@@ -566,6 +575,20 @@ second image upload overwrites the same object rather than orphaning it. Note
 that a re-run also re-links proposers, so someone whose account was deleted
 since (which nulls `proposer_id`) gets linked again if a matching account
 exists.
+
+`--undo` hard-deletes the rows rather than soft-deleting them, which is right
+for backing out an import nobody has used yet and wrong once anyone has. It
+refuses when a row has bids or assignments, and it leaves the image objects in
+the bucket: they are keyed off the legacy ids, so a later re-import picks them
+back up, and clearing them is `aws s3 rm` on the keys in `image-keys.json`.
+
+Three things this import deliberately leaves out, none of which a re-run
+changes: `project_status_history` rows (ADR-0004 gives that table one writer,
+and the legacy log is day-granularity text that cannot reconstruct it),
+keywords and categories (683 distinct values, 1001 of 1111 unapproved in the
+source, which needs curation rather than a mapping), and the `studentProposed`
+flag (four candidates are identifiable only from prose in the legacy comments,
+so they want a staff eye rather than a hardcoded id list).
 
 **To import the projects that are still live in the old portal**, drop the
 `cp_archived = 1` condition from `export.sql` and write the result to a
