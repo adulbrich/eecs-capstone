@@ -7,17 +7,23 @@
  *   node scripts/import-legacy.mjs --undo          # delete exactly the imported rows
  *   node scripts/import-legacy.mjs --skip-existing # add only rows not already imported
  *
- * A port of `import-legacy.ts` rather than a second implementation, and the
- * port exists because the `.ts` one cannot run in production: the runtime
- * image installs with `--omit=dev` so there is no `tsx`, and it ships
- * `.output` without `src/`, so nothing under `#/lib` or `../src/db` resolves.
- * Only `pg` and `@aws-sdk/client-s3` are used, both production dependencies
- * the server already ships, the way `migrate.mjs` relies on `pg` alone.
+ * The only thing that writes the imported rows to the database, and plain
+ * `.mjs` so it runs from the production image: that installs with
+ * `--omit=dev`, so there is no `tsx`, and it ships `.output` without `src/`,
+ * so nothing under `#/lib` or `../src/db` resolves. Only `pg` and
+ * `@aws-sdk/client-s3` are used, both production dependencies the server
+ * already ships, the way `migrate.mjs` relies on `pg` alone.
  *
- * Images are NOT handled here. Their bytes go straight to the bucket with
- * `aws s3 sync` from a workstation (see `--prepare-images` in the `.ts`
- * script and the runbook in DEPLOYMENT.md); this reads the small
- * `image-keys.json` that step emits and sets `image_url` from it.
+ * `scripts/import-legacy-images.ts` is the other half, and the split is by
+ * responsibility rather than by runtime: it converts the images on a
+ * workstation, reusing the app's own `processImage` and `projectImageKeys`,
+ * and writes the `image-keys.json` this reads. Nothing is duplicated between
+ * them but `NAMESPACE`, which `src/test/import-legacy-parity.test.ts` pins.
+ *
+ * Image bytes are NOT handled here. They go to the bucket with `aws s3 sync`
+ * from a workstation (see `import-legacy-images.ts` and the runbook in
+ * DEPLOYMENT.md); this reads the small `image-keys.json` that step emits and
+ * sets `image_url` from it.
  *
  * Inputs: `archived-projects-clean.jsonl` and, optionally, `image-keys.json`.
  *
@@ -36,7 +42,7 @@ import { existsSync, readFileSync } from "node:fs";
 import pg from "pg";
 
 /**
- * MUST match `NAMESPACE` in `scripts/import-legacy.ts` exactly. Every row's
+ * MUST match `NAMESPACE` in `scripts/import-legacy-images.ts` exactly. Every row's
  * primary key is derived from it, so a different value here re-keys all 547
  * rows and orphans everything a previous run wrote, including the image
  * objects already in the bucket.

@@ -411,8 +411,8 @@ It lives in Box and reaches production through a private S3 prefix.
 The whole thing is idempotent: every project's primary key is a UUIDv5 derived
 from its legacy `cp_id`, so a second run refreshes the same rows and `--undo`
 deletes exactly them. The `NAMESPACE` constant is shared by
-`scripts/import-legacy.ts` and `scripts/import-legacy.mjs` and **must never
-change**: a different value re-keys all 547 rows and orphans every image
+`scripts/import-legacy-images.ts` and `scripts/import-legacy.mjs` and **must
+never change**: a different value re-keys all 547 rows and orphans every image
 object already in the bucket.
 
 ### 7a.1 Prepare the data on a workstation
@@ -421,8 +421,8 @@ From the repo, with the Box folder holding `archived-projects-clean.jsonl`,
 `legacy-images/` and `legacy-images-manifest.jsonl`:
 
 ```bash
-npx tsx --env-file=.env.local scripts/import-legacy.ts \
-  --prepare-images "$BOX/Capstone Portal Migration" ./legacy-out
+npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
+  prepare "$BOX/Capstone Portal Migration" ./legacy-out
 ```
 
 That writes `./legacy-out/projects/<uuid>/<uuid>.webp` (paths that *are* the
@@ -553,14 +553,14 @@ counts both groups before it writes:
   12 new, 547 already imported (will be overwritten)
 ```
 
-Two columns are exempt from that replacement. `image_url` is written with
+Two things are exempt from that replacement. `image_url` is written with
 `COALESCE(excluded.image_url, projects.image_url)`, so a re-run without
 `image-keys.json` keeps the images a row already has rather than nulling them
-while the objects sit in the bucket. Programs are never created by default: a
-missing `course_id` is an error, because in production all four exist and a
-miss means an identifier drifted, where inserting would attach projects to a
-brand new program that merely looks right. `--create-missing-programs` opts in,
-for a fresh local database with nothing to match.
+while the objects sit in the bucket. And a program is never created: a missing
+`course_id` is an error, because in production all four exist and a miss means
+an identifier drifted, where inserting would attach projects to a brand new
+program that merely looks right. `--create-missing-programs` opts in, for a
+fresh local database with nothing to match.
 
 Pass `--skip-existing` to add only the rows that are not there yet and leave
 the rest untouched:

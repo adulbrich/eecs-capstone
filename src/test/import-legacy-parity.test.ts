@@ -3,91 +3,72 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 /**
- * `scripts/import-legacy.ts` and `scripts/import-legacy.mjs` are deliberate
- * near-duplicates: the `.mjs` exists because the production image installs
- * with `--omit=dev` (no `tsx`) and ships `.output` without `src/`, so the
- * TypeScript one cannot run there.
+ * The legacy import is two scripts, split by responsibility rather than by
+ * runtime:
  *
- * Duplication is the accepted cost; silent divergence is not. Several blocks
- * MUST agree, and nothing else would catch them drifting: the two files are
- * run months apart, against different databases, by different people.
+ * - `scripts/import-legacy-images.ts` converts the images. Workstation only,
+ *   because it reuses the app's `processImage` and `projectImageKeys`, which
+ *   the production container does not ship (`npm ci --omit=dev` leaves no
+ *   `tsx`, and the image carries `.output` without `src/`).
+ * - `scripts/import-legacy.mjs` is the only thing that writes to the
+ *   database, and runs anywhere.
  *
- * `NAMESPACE` is the worst case. Every imported row's primary key and every
- * image storage key derives from it, so a change in one file re-keys all 547
- * rows and orphans every object already in the bucket.
+ * They share exactly one thing, and it is load-bearing: `NAMESPACE`. A
+ * project's row id and the prefix of its image key both derive from it, so a
+ * value that differed between the two would write every object under a key no
+ * imported row points at, with no error anywhere. Nothing else would catch it:
+ * the two run months apart, by different people.
  *
- * `PROGRAMS` is the subtlest. A `courseId` edited in one file and not the
- * other attaches 181 projects to the wrong campus, with no error anywhere.
- *
- * This follows `env-contract.test.ts`: read the sources as text and assert
- * the literals match, rather than importing modules that expect a database.
+ * Read as text rather than imported, following `env-contract.test.ts`, since
+ * importing either module expects a database or object storage.
  */
-const TS_SOURCE = readFileSync("scripts/import-legacy.ts", "utf8");
-const MJS_SOURCE = readFileSync("scripts/import-legacy.mjs", "utf8");
+const IMAGES_SOURCE = readFileSync("scripts/import-legacy-images.ts", "utf8");
+const IMPORT_SOURCE = readFileSync("scripts/import-legacy.mjs", "utf8");
+const NAMESPACE_PATTERN = /const NAMESPACE = "([0-9a-f-]{36})";/;
 
-/** The body of a top-level `const <name> = { ... };`, whitespace collapsed. */
-function objectLiteral(source: string, name: string): string {
-  const start = source.indexOf(`const ${name} = {`);
-  if (start === -1) {
-    throw new Error(`No object literal named ${name}`);
-  }
-  const open = source.indexOf("{", start);
-  let depth = 0;
-  for (let i = open; i < source.length; i++) {
-    if (source[i] === "{") {
-      depth++;
-    } else if (source[i] === "}") {
-      depth--;
-      if (depth === 0) {
-        return source.slice(open, i + 1).replace(/\s+/g, " ");
-      }
-    }
-  }
-  throw new Error(`Unbalanced braces in ${name}`);
-}
-
-describe("import-legacy.ts and import-legacy.mjs agree", () => {
-  it("derives row ids from the same UUIDv5 namespace", () => {
-    const pattern = /const NAMESPACE = "([0-9a-f-]{36})";/;
-    const fromTs = pattern.exec(TS_SOURCE)?.[1];
-    const fromMjs = pattern.exec(MJS_SOURCE)?.[1];
-    expect(fromTs).toBeDefined();
-    expect(fromMjs).toBe(fromTs);
-  });
-
-  it("maps every legacy course onto the same program", () => {
-    expect(objectLiteral(MJS_SOURCE, "PROGRAMS")).toBe(
-      objectLiteral(TS_SOURCE, "PROGRAMS")
-    );
-  });
-
-  it("accepts the same target statuses", () => {
-    const pattern = /const IMPORTABLE_STATUSES = (\[[^\]]*\])/;
-    const fromTs = pattern.exec(TS_SOURCE)?.[1].replace(/\s+/g, " ");
-    const fromMjs = pattern.exec(MJS_SOURCE)?.[1].replace(/\s+/g, " ");
-    expect(fromTs).toBeDefined();
-    expect(fromMjs).toBe(fromTs);
+describe("the legacy import's two scripts", () => {
+  it("derive ids from the same UUIDv5 namespace", () => {
+    const fromImages = NAMESPACE_PATTERN.exec(IMAGES_SOURCE)?.[1];
+    const fromImport = NAMESPACE_PATTERN.exec(IMPORT_SOURCE)?.[1];
+    expect(fromImages).toBeDefined();
+    expect(fromImport).toBe(fromImages);
   });
 
   /**
-   * A fixed vector, so a change to either `uuidv5` body is caught even though
-   * the two implementations are written in different dialects and cannot be
-   * compared as text. Computed the same way both files do it: the namespace
-   * bytes, then the name, SHA-1, with the version and variant bits forced.
+   * The two `uuidv5` bodies differ only in a type annotation, so the lines
+   * that matter compare directly as text. Named individually rather than
+   * diffed whole: these four are the ones whose divergence is silent, where a
+   * changed hash input or a wrong version nibble yields a valid-looking uuid
+   * that simply addresses nothing.
    */
-  it("turns a known cp_id into a known project id", () => {
-    const namespace = /const NAMESPACE = "([0-9a-f-]{36})";/.exec(
-      TS_SOURCE
-    )?.[1] as string;
+  it("derive ids by the same construction", () => {
+    for (const line of [
+      "const ns = Buffer.from(NAMESPACE.replace",
+      '.update(Buffer.concat([ns, Buffer.from(name, "utf8")]))',
+      "hash[6] = (hash[6] & 0x0f) | 0x50;",
+      "hash[8] = (hash[8] & 0x3f) | 0x80;",
+    ]) {
+      expect(IMAGES_SOURCE, `import-legacy-images.ts: ${line}`).toContain(line);
+      expect(IMPORT_SOURCE, `import-legacy.mjs: ${line}`).toContain(line);
+    }
+  });
+
+  /**
+   * A regression pin on the whole construction, independent of both sources:
+   * it recomputes the id here and compares to the value an imported database
+   * already holds. It does NOT execute either script, so it catches a changed
+   * algorithm only together with the text assertions above.
+   */
+  it("turn a known cp_id into a known project id", () => {
+    const namespace = NAMESPACE_PATTERN.exec(IMPORT_SOURCE)?.[1] as string;
     const ns = Buffer.from(namespace.replaceAll("-", ""), "hex");
     const hash = createHash("sha1")
       .update(Buffer.concat([ns, Buffer.from("Qlp7QCpPLveoERMn", "utf8")]))
       .digest();
     // The scripts write these as `(h & 0x0f) | 0x50` and `(h & 0x3f) | 0x80`.
-    // Spelled with arithmetic here because Biome forbids bitwise operators in
-    // `src/`, and the two forms are exactly equal: the mask is a modulo, and
-    // the set bits of 0x50 and 0x80 lie above the masked range, so the OR is
-    // an addition.
+    // Spelled with arithmetic because Biome forbids bitwise operators in
+    // `src/`, and the forms are exactly equal: the mask is a modulo, and the
+    // set bits of 0x50 and 0x80 lie above the masked range, so the OR adds.
     hash[6] = (hash[6] % 0x10) + 0x50;
     hash[8] = (hash[8] % 0x40) + 0x80;
     const hex = hash.subarray(0, 16).toString("hex");
@@ -98,9 +79,9 @@ describe("import-legacy.ts and import-legacy.mjs agree", () => {
       hex.slice(16, 20),
       hex.slice(20, 32),
     ].join("-");
-    // The id legacy cp_id "Qlp7QCpPLveoERMn" ("Know It's Off") already
-    // carries in an imported database. If this changes, every imported row is
-    // re-keyed and every image object in the bucket is orphaned.
+    // The id legacy cp_id "Qlp7QCpPLveoERMn" ("Know It's Off") already carries
+    // in an imported database. If this changes, every imported row is re-keyed
+    // and every image object in the bucket is orphaned.
     expect(id).toBe("40eb1fdf-97d2-5b09-92d6-e61e96059deb");
   });
 });
