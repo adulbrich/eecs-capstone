@@ -227,6 +227,20 @@ test("@smoke admin projects list", async ({ page }) => {
   }
   await expectNoHorizontalOverflow(page);
   await checkA11y(page);
+  // Clear all (a link-variant Button, #355) renders only while a filter is
+  // on, so it is absent now and present after one switch, and the second
+  // scan is what measures it. Turning the switch on keeps the sheet open,
+  // since it is a navigation on the same route; one click on the button
+  // returns the URL to the route's defaults and the button goes with it.
+  const clearAll = sheet.getByRole("button", { name: "Clear all" });
+  await expect(clearAll).toBeHidden();
+  await sheet.getByRole("switch", { name: "Accepting applicants" }).click();
+  await expect(page).toHaveURL(/acceptingOnly=true/);
+  await expect(clearAll).toBeVisible();
+  await checkA11y(page);
+  await clearAll.click();
+  await expect(page).not.toHaveURL(/acceptingOnly/);
+  await expect(clearAll).toBeHidden();
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
 });

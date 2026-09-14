@@ -88,7 +88,7 @@ test.describe("@smoke listing filters sheet", () => {
     }
   });
 
-  test("admin projects: unchecking a status narrows the table, rechecking it restores the table", async ({
+  test("admin projects: unchecking a status narrows the table, Clear all restores it", async ({
     browser,
   }) => {
     const context = await browser.newContext({ storageState: ADMIN_AUTH });
@@ -107,12 +107,11 @@ test.describe("@smoke listing filters sheet", () => {
       await expect(staff).toHaveURL(/[?&]status=/);
       await expectNarrowed(staff, sheet, before);
 
-      // Rechecked rather than cleared: this listing has no Clear all (#355),
-      // so the inverse click is what restores the default set, and the URL
-      // dropping the key is what proves the set is the default again.
-      await reopenSheet(staff, sheet);
-      await published.click();
+      await clearAll(staff, sheet);
+      // The key gone from the URL is what proves the set is the default
+      // again, and the box is checked once more in the same navigation.
       await expect(staff).not.toHaveURL(/[?&]status=/);
+      await expect(published).toBeChecked();
       await expectRestored(staff, sheet, before);
     } finally {
       await context.close();
@@ -176,15 +175,14 @@ async function expectNarrowed(
   ).toBeVisible();
 }
 
-/** Reopens the sheet by its counted name, while it counts one filter. */
-async function reopenSheet(page: Page, sheet: Locator): Promise<void> {
+/**
+ * Reopens the sheet by its counted name and clicks Clear all inside it. The
+ * button exists only while a filter is on, which the count in the name has
+ * just established.
+ */
+async function clearAll(page: Page, sheet: Locator): Promise<void> {
   await page.getByRole("button", { name: "Filters 1", exact: true }).click();
   await expect(sheet).toBeVisible();
-}
-
-/** Reopens the sheet and clicks Clear all inside it. */
-async function clearAll(page: Page, sheet: Locator): Promise<void> {
-  await reopenSheet(page, sheet);
   await sheet.getByRole("button", { name: "Clear all" }).click();
 }
 
