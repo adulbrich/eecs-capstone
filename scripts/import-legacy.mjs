@@ -34,7 +34,9 @@
  * the task role. They are deliberately NOT committed and NOT baked into the
  * image: the JSONL names 299 real proposers and their email addresses, and
  * this repo is public and mirrors to GitLab. The prefix must not be the
- * app's asset bucket either, whose policy grants `s3:GetObject` to `*`.
+ * app's asset bucket either: its policy grants GetObject to the CloudFront
+ * service principal for every key, so anything put there is world readable
+ * through the distribution.
  *
  * `LEGACY_DATA_DIR` reads the same two files from a local directory instead,
  * which is what a local dry run against a tunnelled database uses.

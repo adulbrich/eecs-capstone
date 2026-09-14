@@ -405,7 +405,8 @@ importer links a project to an account only where one already exists.
 
 **The source data never enters this repo or a container image.** The JSONL
 names 299 real proposers and their email addresses, this repo is public and
-mirrors to GitLab, and the app's asset bucket grants `s3:GetObject` to `*`.
+mirrors to GitLab, and everything in the app's asset bucket is served to
+the world through its CloudFront distribution.
 It lives in Box and reaches production through a private S3 prefix.
 
 The whole thing is idempotent: every project's primary key is a UUIDv5 derived
