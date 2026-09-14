@@ -480,8 +480,9 @@ for screen readers, Find-in-page and the CSV export.
 A description cell is `line-clamp-3 max-w-xs md:whitespace-normal`: narrower
 and three lines, because it is hidden by default and read on purpose rather
 than scanned, and no minimum, because it competes with nothing when shown. The
-`md:whitespace-normal` is the same fix as above; the two public description
-cells shipped without it and clipped to one line.
+`md:whitespace-normal` is the same fix as above; the `Prose` cell behind the
+six hidden prose columns of `/projects` and the inventory description cell
+shipped without it and clipped to one line.
 
 The cells that do this: the title cells of the two projects listings, the
 bookmarks table and the two inventory listings, and the programs description,

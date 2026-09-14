@@ -193,6 +193,7 @@ describe("the public project table", () => {
     );
     expect(cell.className).toContain("line-clamp-3");
     expect(cell.className).toContain("max-w-xs");
+    expect(cell.className).toContain("md:whitespace-normal");
   });
 
   it("renders the NDA flag as a badge and its absence as a dash", () => {
@@ -247,6 +248,7 @@ describe("the public project table", () => {
     expect(link.textContent).toBe("Rover Telemetry");
     expect(link.getAttribute("title")).toBe("Rover Telemetry");
     expect(link.className).toContain("md:line-clamp-2");
+    expect(link.className).toContain("md:whitespace-normal");
     expect(link.className).toContain("min-w-0");
     // Both bounds carry the `md:` prefix: below `md` the cell is the card
     // header strip, which must stay as wide as the card and no wider.

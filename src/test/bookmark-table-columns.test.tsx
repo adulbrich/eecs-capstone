@@ -186,6 +186,7 @@ describe("the bookmarks table", () => {
     const link = screen.getByRole("link", { name: "Two" });
     expect(link.getAttribute("title")).toBe("Two");
     expect(link.className).toContain("md:line-clamp-2");
+    expect(link.className).toContain("md:whitespace-normal");
     expect(link.className).toContain("min-w-0");
     expect(link.parentElement?.className).toContain("md:min-w-xs");
     expect(link.parentElement?.className).toContain("md:max-w-md");
