@@ -100,8 +100,9 @@ the cue (#361 lists what the pass found; the sign-in, sign-up and profile pages
 had the underline before it). A shared component that lands in colored prose
 anywhere carries the underline everywhere, as `SupportEmailLink` does in the
 privacy policy: one look per component, no prop to get wrong. Breadcrumbs are
-a navigation landmark rather than prose, so their links keep the hover cue.
-Color against the background is the separate rule under "Color tokens".
+a navigation landmark rather than prose; `BreadcrumbLink` underlines in no
+state and changes color on hover instead, and stays that way. Color against
+the background is the separate rule under "Color tokens".
 
 ### Plain navigation links use `.nav-link`
 
