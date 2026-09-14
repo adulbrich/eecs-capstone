@@ -86,7 +86,17 @@ const COLUMNS = defineAdminColumns<Row>()([
   },
   {
     accessorFn: (row) => row.description ?? undefined,
-    cell: ({ row }) => row.original.description ?? "-",
+    cell: ({ row }) =>
+      row.original.description ? (
+        <div
+          className="max-w-md md:line-clamp-2 md:whitespace-normal"
+          title={row.original.description}
+        >
+          {row.original.description}
+        </div>
+      ) : (
+        "-"
+      ),
     defaultHidden: true,
     header: "Description",
     id: "description",

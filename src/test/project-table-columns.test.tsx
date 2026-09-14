@@ -237,4 +237,17 @@ describe("the public project table", () => {
       screen.getAllByRole("columnheader").map((h) => h.textContent?.trim())
     ).not.toContain("Bookmark");
   });
+
+  it("bounds the Title cell and clamps the title, keeping the full text in the DOM and on the link", () => {
+    renderTable(DEFAULT_HIDDEN);
+    const link = screen.getByRole("link", { name: "Rover Telemetry" });
+    // The clamp is CSS from `md` up, so the text itself is whole: screen
+    // readers, Find-in-page and the CSV export all still see it, and the
+    // native title is what a mouse user hovers for (#371).
+    expect(link.textContent).toBe("Rover Telemetry");
+    expect(link.getAttribute("title")).toBe("Rover Telemetry");
+    expect(link.className).toContain("md:line-clamp-2");
+    expect(link.className).toContain("min-w-0");
+    expect(link.parentElement?.className).toContain("max-w-md");
+  });
 });

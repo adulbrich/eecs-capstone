@@ -36,14 +36,15 @@ export const INVENTORY_TABLE_COLUMNS = defineAdminColumns<InventoryListRow>()([
   {
     accessorFn: (row) => row.name,
     cell: ({ row }) => (
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-xs max-w-md items-center gap-2">
         <ImageOrFallback
           className="aspect-[3/2] w-16 shrink-0 rounded object-cover"
           src={getPublicUrl(row.original.imageUrl)}
         />
         <Link
-          className="hover:underline"
+          className="min-w-0 hover:underline md:line-clamp-2 md:whitespace-normal"
           params={{ itemId: row.original.id }}
+          title={row.original.name}
           to="/inventory/$itemId"
         >
           {row.original.name}

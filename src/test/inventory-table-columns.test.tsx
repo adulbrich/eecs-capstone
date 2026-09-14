@@ -158,6 +158,16 @@ describe("the public inventory table", () => {
     expect(rowFor("Drill").queryByRole("button")).toBeNull();
   });
 
+  it("bounds the Name cell and clamps the name, keeping the full text in the DOM and on the link", () => {
+    renderTable(DEFAULT_HIDDEN);
+    const link = screen.getByRole("link", { name: "Oscilloscope" });
+    expect(link.textContent).toBe("Oscilloscope");
+    expect(link.getAttribute("title")).toBe("Oscilloscope");
+    expect(link.className).toContain("md:line-clamp-2");
+    expect(link.className).toContain("min-w-0");
+    expect(link.parentElement?.className).toContain("max-w-md");
+  });
+
   it("renders no control for a signed-out viewer", async () => {
     session.data = null;
     renderTable(DEFAULT_HIDDEN);

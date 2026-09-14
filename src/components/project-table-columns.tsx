@@ -79,14 +79,15 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
   {
     accessorFn: (row) => row.title,
     cell: ({ row }) => (
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-xs max-w-md items-center gap-2">
         <ImageOrFallback
           className="aspect-[3/2] w-16 shrink-0 rounded object-cover"
           src={projectImageSrc(row.original.imageUrl)}
         />
         <Link
-          className="hover:underline"
+          className="min-w-0 hover:underline md:line-clamp-2 md:whitespace-normal"
           params={{ projectId: row.original.id }}
+          title={row.original.title}
           to="/projects/$projectId"
         >
           {row.original.title}
