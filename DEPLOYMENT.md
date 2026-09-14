@@ -423,9 +423,11 @@ and an unset bucket name hands `aws` an empty string rather than failing:
 ```bash
 BOX="$HOME/Library/CloudStorage/Box-Box/Projects"
 # `infra/s3.tf` names it "${var.project}-assets-<account id>"; there is no
-# terraform output for it, so read it from the state or the console.
+# terraform output for it, so read it from the state. The backend is remote,
+# so `terraform init` has to have run in this checkout first.
 ASSETS_BUCKET=$(cd infra && terraform state show aws_s3_bucket.assets \
   | awk '/^ *bucket  *=/ {gsub(/"/, "", $3); print $3}')
+: "${ASSETS_BUCKET:?terraform state show returned no bucket; run terraform init}"
 # A PRIVATE bucket, not the assets one. Create it if it does not exist; the
 # ECS task role needs s3:GetObject on "$OPS_BUCKET/legacy/*".
 OPS_BUCKET=eecs-capstone-ops
@@ -660,11 +662,25 @@ wrong image map. `LEGACY_DATA_S3_URI` is per invocation, so a second prefix
 costs nothing:
 
 ```bash
+aws --profile aws-capstone1 s3 cp ./live-out/live-projects.jsonl \
+  "s3://$OPS_BUCKET/legacy-live/" --region us-west-2
 aws --profile aws-capstone1 s3 cp ./live-out/image-keys.json \
   "s3://$OPS_BUCKET/legacy-live/" --region us-west-2
-``` `clean-export.py` still routes hidden rows to their
-own file, which matters more here: a hidden live project has never been
-public, and importing it as `published` would list it immediately.
+```
+
+Both files, not just the key map: the importer reads the projects file from
+the same prefix, and a missing one is fatal. Widen the task role's
+`s3:GetObject` grant to `$OPS_BUCKET/legacy-*` before the run, because the
+grant in 7a.0 covers `legacy/*` only and an AccessDenied here is not the
+missing-key case the script handles.
+
+Images for that set need their own `legacy-images-manifest.jsonl` and their
+own `prepare`. The manifest is generated per cohort, so the archived one names
+only archived projects.
+
+`clean-export.py` still routes hidden rows to their own file, which matters
+more here: a hidden live project has never been public, and importing it as
+`published` would list it immediately.
 
 Three things to decide before doing that, none of which this import settles:
 

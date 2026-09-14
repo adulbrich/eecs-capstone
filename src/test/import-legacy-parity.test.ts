@@ -83,25 +83,25 @@ describe("the legacy import's two scripts", () => {
   });
 
   /**
-   * Comparing the two to each other says they agree, not that they are right:
-   * an edit applied to both passes. These pin the construction itself, so the
-   * known-answer test below stays anchored to something the sources actually
-   * contain rather than to a constant this file alone repeats.
+   * Pinned against a literal, not only against each other. Comparing the two
+   * says they agree, which an edit applied to both satisfies: changing
+   * `createHash("sha1")` to `"sha256"` in both files re-keys all 547 rows and
+   * orphans every image object, and a same-to-same comparison passes it.
+   *
+   * Updating this string is the point. It is a deliberate step that says the
+   * ids are changing, which is a migration, not an edit.
    */
-  it("derive ids by the construction the fixed vector assumes", () => {
-    for (const source of [IMAGES_SOURCE, IMPORT_SOURCE]) {
-      expect(source).toContain('NAMESPACE.replaceAll("-", "")');
-      expect(source).toContain(
-        '.update(Buffer.concat([ns, Buffer.from(name, "utf8")]))'
-      );
-      expect(source).toContain("hash[6] = (hash[6] & 0x0f) | 0x50;");
-      expect(source).toContain("hash[8] = (hash[8] & 0x3f) | 0x80;");
-    }
-  });
-
-  it("agree on the name of the key map file", () => {
-    expect(IMAGES_SOURCE).toContain('"image-keys.json"');
-    expect(IMPORT_SOURCE).toContain('"image-keys.json"');
+  it("derive ids by exactly the pinned construction", () => {
+    const expected =
+      'const ns = Buffer.from(NAMESPACE.replaceAll("-", ""), "hex"); ' +
+      'const hash = createHash("sha1") ' +
+      '.update(Buffer.concat([ns, Buffer.from(name, "utf8")])) ' +
+      ".digest(); hash[6] = (hash[6] & 0x0f) | 0x50; " +
+      "hash[8] = (hash[8] & 0x3f) | 0x80; " +
+      'const hex = hash.subarray(0, 16).toString("hex"); ' +
+      "return [ hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), " +
+      'hex.slice(16, 20), hex.slice(20, 32), ].join("-");';
+    expect(uuidv5Body(IMPORT_SOURCE, "import-legacy.mjs")).toBe(expected);
   });
 
   /**

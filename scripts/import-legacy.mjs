@@ -57,8 +57,8 @@ const NAMESPACE = "6f2a1c84-0d3e-4b57-9a6f-1e8c5d40b213";
  * "write the result to a different filename" step has no way to be read.
  */
 // `||` rather than `??`: `.env.example` ships this key blank, and a blank
-// value is "unset" here, not "read a file with no name". Every other
-// LEGACY_DATA_* in this file treats blank as unset the same way.
+// value is "unset" here, not "read a file with no name". Every LEGACY_DATA_*
+// read in this file uses `||` or a truthiness check for that reason.
 const PROJECTS_NAME =
   process.env.LEGACY_DATA_PROJECTS_FILE || "archived-projects-clean.jsonl";
 const IMAGE_KEYS_NAME = "image-keys.json";
@@ -81,8 +81,10 @@ async function readInput(name) {
     // Its own region var: the private ops bucket holding this data need not
     // sit in the same region as the app's asset bucket, and GetObject against
     // the wrong region fails with a redirect, not the NoSuchKey handled below.
+    // `||` throughout, for the same reason as PROJECTS_NAME: `.env.example`
+    // ships both keys blank, and a blank value means unset.
     const region =
-      process.env.LEGACY_DATA_S3_REGION ?? process.env.S3_REGION ?? "us-west-2";
+      process.env.LEGACY_DATA_S3_REGION || process.env.S3_REGION || "us-west-2";
     const client = new S3Client({ region });
     try {
       const out = await client.send(
