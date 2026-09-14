@@ -54,13 +54,18 @@ function MyBookmarks() {
               // would contradict the count and read as lost bookmarks.
               <>
                 {unavailableLine(unavailableCount)} Save another from the{" "}
-                <Link to="/projects">projects list</Link> or a project's page.
+                <Link className="text-brand-dark underline" to="/projects">
+                  projects list
+                </Link>{" "}
+                or a project's page.
               </>
             ) : (
               <>
                 No bookmarks yet. Save a project from the{" "}
-                <Link to="/projects">projects list</Link> or its page and it
-                shows up here.
+                <Link className="text-brand-dark underline" to="/projects">
+                  projects list
+                </Link>{" "}
+                or its page and it shows up here.
               </>
             )}
           </EmptyState>
