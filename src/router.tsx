@@ -13,7 +13,10 @@ function NotFound() {
       <p className="mt-3 text-muted-foreground text-sm">
         We could not find the page you were looking for.
       </p>
-      <Link className="mt-4 inline-block text-sm hover:underline" to="/">
+      <Link
+        className="mt-4 inline-block text-brand-dark text-sm underline"
+        to="/"
+      >
         Go home
       </Link>
     </div>

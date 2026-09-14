@@ -7,11 +7,10 @@ import { brand } from "#/lib/brand";
  * "who shows the support address" is a grep for this name rather than a
  * sentence in QUIRKS to keep true.
  *
- * Underlined at rest everywhere it renders, because one of its homes is the
+ * Underlined at rest, because both of its homes are running text: the
  * destructive prose of the OAuth error banner, where the brand color is about
- * 1.07:1 against the words around it (UI-CONVENTIONS, "A link inside colored
- * prose"). The privacy policy's copy is uncolored and would do with the hover
- * cue, but one component with one look beats a prop for that.
+ * 1.07:1 against the words around it, and a privacy policy paragraph
+ * (UI-CONVENTIONS, "A link inside running text").
  */
 export function SupportEmailLink() {
   return (
