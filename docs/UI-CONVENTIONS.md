@@ -86,6 +86,24 @@ activation.
 </Button>
 ```
 
+### A link inside colored prose is underlined at rest
+
+A link whose surrounding words are `text-muted-foreground`, `text-destructive`
+or a status color carries `underline`, not `hover:underline`. Color alone does
+not tell it apart there: `text-brand-dark` is about 1.05:1 against the muted
+text and 1.07:1 against the destructive text in light mode, and no better in
+dark, where WCAG 1.4.1 asks for 3:1 or a cue that is not color. The global `a`
+rule in `styles.css` already sets the underline's color, thickness and offset,
+so the class only turns the line on. `hover:underline` stays right for a link
+in default-colored prose, a table cell or a card, where the color itself is
+the cue (#361 lists what the pass found; the sign-in, sign-up and profile pages
+had the underline before it). A shared component that lands in colored prose
+anywhere carries the underline everywhere, as `SupportEmailLink` does in the
+privacy policy: one look per component, no prop to get wrong. Breadcrumbs are
+a navigation landmark rather than prose; `BreadcrumbLink` underlines in no
+state and changes color on hover instead, and stays that way. Color against
+the background is the separate rule under "Color tokens".
+
 ### Plain navigation links use `.nav-link`
 
 Header nav items (Projects, My projects, Admin) use the `.nav-link` class from

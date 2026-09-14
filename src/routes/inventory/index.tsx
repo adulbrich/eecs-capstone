@@ -135,7 +135,7 @@ function InventoryCards({
           <>
             {" "}
             <Link
-              className="text-brand-dark hover:underline"
+              className="text-brand-dark underline"
               search={{ q: q || undefined }}
               to="/inventory/request"
             >
