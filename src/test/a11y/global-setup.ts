@@ -176,6 +176,13 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
     .onConflictDoNothing();
 
   // Project (no unique constraint on title, hence the select-first pattern)
+  // The detail scan asserts the contact address and the URL as links in
+  // body copy, so the fixture carries both; `public.a11y.test.ts` names them.
+  const A11Y_PROJECT_CONTACT = {
+    contactEmail: "a11y-contact@example.com",
+    contactName: "A11y Contact",
+    url: "https://example.com/a11y-project",
+  };
   let [project] = await db
     .select()
     .from(schema.projects)
@@ -223,7 +230,17 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
           "2. Set up the local dev environment\n\n```sh\nnpm install\n```",
         status: "published",
         proposerId: owner.id,
+        ...A11Y_PROJECT_CONTACT,
       })
+      .returning();
+  } else if (!project.contactEmail) {
+    // A row from before the contact fields existed: the detail scan reads
+    // the address and the URL, so fill them in rather than fail on a stale
+    // local fixture.
+    [project] = await db
+      .update(schema.projects)
+      .set(A11Y_PROJECT_CONTACT)
+      .where(eq(schema.projects.id, project.id))
       .returning();
   }
 
