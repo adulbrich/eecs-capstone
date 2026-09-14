@@ -15,8 +15,9 @@ export type ImprovableField = (typeof IMPROVABLE_FIELDS)[number];
 
 /**
  * The form labels, Title Case as docs/UI-CONVENTIONS.md "Form inputs" has it
- * for every field label. One source for the form and for the field tags the
- * review prompt hands the model, so the two cannot drift (#375).
+ * for the project and inventory forms. One source for the form and for the
+ * field tags the review prompt hands the model, so the two cannot drift
+ * (#375).
  */
 export const FIELD_LABELS: Record<ImprovableField, string> = {
   title: "Title",
