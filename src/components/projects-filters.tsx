@@ -145,6 +145,10 @@ export function ProjectsSearchBar({
 }: Omit<SearchProps, "signedIn">) {
   const { commitQuery, setOrder, setView } = useProjectsFilterNavigation();
   const [queryDraft, setQueryDraft] = useDebouncedDraft(q, commitQuery);
+  // `useId` rather than a literal: the bar mounts once, so a literal would
+  // work, but the hint is this component's own and nothing outside needs
+  // the id. The admin routes render input and hint inline and keep a
+  // literal beside the literal `id` their sr-only Label already points at.
   const hintId = useId();
   return (
     <>
@@ -192,8 +196,8 @@ export function ProjectsSearchBar({
  * the search row is a flex-wrap row that ends with ListingLayout's Filters
  * button, and a paragraph in the middle of it put the prompt's link between
  * the view toggle and that button in the tab order. `pl-3` for the same
- * reason as `SearchHint`, which sits right above it: both line up with the
- * input's text.
+ * reason as `SearchHint`: both line up with the input's text, and from `md`
+ * they are adjacent lines under the row.
  */
 export function RecommendationPrompt({
   canRecommend,

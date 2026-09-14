@@ -70,6 +70,7 @@ export function InventorySearchBar({
   view,
 }: SearchProps) {
   const [localQ, setLocalQ] = useDebouncedDraft(q, onQChange);
+  // `useId` for the reason `ProjectsSearchBar` gives.
   const hintId = useId();
   return (
     <>
