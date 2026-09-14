@@ -19,6 +19,7 @@ import { Button } from "#/components/ui/button";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
 import { projectImageSrc } from "#/lib/project-image";
+import { FIELD_HEADINGS } from "#/lib/project-review-fields";
 import { listProjectCategories } from "#/server/categories";
 import { getProject, listProjectComments } from "#/server/projects-queries";
 
@@ -180,16 +181,19 @@ function ProjectDetail() {
         />
       </div>
 
-      <Section body={project.description} label="Description" />
-      <Section body={project.problemStatement} label="Problem statement" />
-      <Section body={project.objectives} label="Objectives" />
+      <Section body={project.description} label={FIELD_HEADINGS.description} />
+      <Section
+        body={project.problemStatement}
+        label={FIELD_HEADINGS.problemStatement}
+      />
+      <Section body={project.objectives} label={FIELD_HEADINGS.objectives} />
       <Section
         body={project.minQualifications}
-        label="Minimum qualifications"
+        label={FIELD_HEADINGS.minQualifications}
       />
       <Section
         body={project.prefQualifications}
-        label="Preferred qualifications"
+        label={FIELD_HEADINGS.prefQualifications}
       />
       <ContactSection email={project.contactEmail} name={project.contactName} />
       <AgreementSection
@@ -268,7 +272,7 @@ function AgreementSection({
   }
   return (
     <section className="mt-8">
-      <SectionHeading>Licensing / IP / NDA</SectionHeading>
+      <SectionHeading>{FIELD_HEADINGS.licenseRestrictions}</SectionHeading>
       <p className="mt-2">This project requires an NDA or IP agreement.</p>
       {body && (
         <div className="mt-2">

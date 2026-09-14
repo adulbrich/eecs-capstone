@@ -26,7 +26,7 @@ vi.mock("#/server/uploads", () => ({
 }));
 
 import { ProjectForm } from "#/components/project-form";
-import { PRIVATE_NOTES_LABEL } from "#/lib/private-notes";
+import { PRIVATE_NOTES_FIELD_LABEL } from "#/lib/private-notes";
 import { FIELD_MAX_LENGTHS } from "#/lib/project-review-fields";
 import { createProject } from "#/server/projects";
 import { installResizeObserver } from "./radix-jsdom";
@@ -101,12 +101,12 @@ describe("ProjectForm configuration props", () => {
 
   it("draws no private notes field without showNotes", () => {
     renderForm();
-    expect(screen.queryByLabelText(PRIVATE_NOTES_LABEL)).toBeNull();
+    expect(screen.queryByLabelText(PRIVATE_NOTES_FIELD_LABEL)).toBeNull();
   });
 
   it("draws the private notes field with showNotes", () => {
     renderForm({ showNotes: true });
-    expect(screen.getByLabelText(PRIVATE_NOTES_LABEL)).toBeTruthy();
+    expect(screen.getByLabelText(PRIVATE_NOTES_FIELD_LABEL)).toBeTruthy();
   });
 
   it("draws no staff panel: the proposer and the categories live on the project page", () => {

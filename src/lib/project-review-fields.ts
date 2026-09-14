@@ -13,14 +13,37 @@ export const IMPROVABLE_FIELDS = [
 
 export type ImprovableField = (typeof IMPROVABLE_FIELDS)[number];
 
+/**
+ * The form labels, Title Case as docs/UI-CONVENTIONS.md "Form inputs" has it
+ * for every field label. One source for the form and for the field tags the
+ * review prompt hands the model, so the two cannot drift (#375).
+ */
 export const FIELD_LABELS: Record<ImprovableField, string> = {
   title: "Title",
   description: "Description",
+  problemStatement: "Problem Statement",
+  objectives: "Objectives",
+  minQualifications: "Minimum Qualifications",
+  prefQualifications: "Preferred Qualifications",
+  licenseRestrictions: "Licensing / IP / NDA Notes",
+};
+
+/**
+ * The same fields as the project page names them: sentence case, because a
+ * page heading is not a form label, and without "Notes" on the agreement
+ * section, whose heading covers the flag as well as the prose. A sibling
+ * constant rather than a case transform, since "IP" and "NDA" would not
+ * survive one; `project-review-fields.test.ts` pins each heading to its
+ * label so they stay the same words.
+ */
+export const FIELD_HEADINGS: Record<ImprovableField, string> = {
+  title: "Title",
+  description: "Description",
   problemStatement: "Problem statement",
-  objectives: "Objectives / deliverables",
+  objectives: "Objectives",
   minQualifications: "Minimum qualifications",
   prefQualifications: "Preferred qualifications",
-  licenseRestrictions: "Licensing / IP / NDA notes",
+  licenseRestrictions: "Licensing / IP / NDA",
 };
 
 /**

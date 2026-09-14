@@ -11,6 +11,12 @@
  */
 export const PRIVATE_NOTES_LABEL = "Private notes";
 
+/**
+ * The same words as a form field label, which docs/UI-CONVENTIONS.md puts in
+ * Title Case; the panel heading above keeps sentence case (#375).
+ */
+export const PRIVATE_NOTES_FIELD_LABEL = "Private Notes";
+
 export const PRIVATE_NOTES_PROJECT_HINT =
   "Only visible to staff and the proposer. Never shown publicly.";
 

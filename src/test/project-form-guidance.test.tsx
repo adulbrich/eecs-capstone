@@ -75,10 +75,10 @@ describe("ProjectForm field guidance", () => {
     expect(
       screen.queryByText(/Contact details below are shown publicly/)
     ).toBeNull();
-    expect(describedText("Contact name")).toBe(
+    expect(describedText("Contact Name")).toBe(
       "Optional. Leave blank to keep private."
     );
-    expect(describedText("Contact email")).toBe(
+    expect(describedText("Contact Email")).toBe(
       "Optional. Leave blank to keep private."
     );
   });
@@ -98,10 +98,10 @@ describe("ProjectForm field guidance", () => {
     for (const label of [
       "Title",
       "Description",
-      "Problem statement",
-      "Objectives / deliverables",
-      "Minimum qualifications",
-      "Preferred qualifications",
+      "Problem Statement",
+      "Objectives",
+      "Minimum Qualifications",
+      "Preferred Qualifications",
       "URL",
     ]) {
       // Non-empty rather than exact: the markdown fields concatenate their

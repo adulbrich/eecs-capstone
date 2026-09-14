@@ -6,8 +6,8 @@ import { applyServerErrors } from "#/lib/apply-server-errors";
 import { errorMessage } from "#/lib/error-message";
 import { imageUrlToSave } from "#/lib/image-save";
 import {
+  PRIVATE_NOTES_FIELD_LABEL,
   PRIVATE_NOTES_INVENTORY_HINT,
-  PRIVATE_NOTES_LABEL,
   STAFF_ONLY_FIELD_HINT,
 } from "#/lib/private-notes";
 import {
@@ -147,7 +147,7 @@ export function InventoryForm({
 
   return (
     <form
-      className="space-y-4"
+      className="space-y-6"
       onSubmit={(e) => {
         e.preventDefault();
         setFormError(null);
@@ -165,7 +165,7 @@ export function InventoryForm({
       <form.Field name="categoryIds">
         {(field: AnyForm) => (
           <div className="flex flex-col gap-2">
-            <Label>Categories</Label>
+            <Label className="text-base">Categories</Label>
             <CategoryMultiSelect
               domain="inventory"
               onChange={(ids) => field.handleChange(ids)}
@@ -178,7 +178,7 @@ export function InventoryForm({
       <form.Field name="imageUrl">
         {(field: AnyForm) => (
           <div>
-            <Label>Image</Label>
+            <Label className="text-base">Image</Label>
             <div className="mt-1">
               <InventoryImageUploader
                 currentKey={(field.state.value as string) || null}
@@ -227,7 +227,7 @@ export function InventoryForm({
       <Field
         description={PRIVATE_NOTES_INVENTORY_HINT}
         form={form}
-        label={PRIVATE_NOTES_LABEL}
+        label={PRIVATE_NOTES_FIELD_LABEL}
         name="notes"
         rows={3}
         textarea
@@ -278,7 +278,9 @@ function Field({
     <form.Field name={name as never}>
       {(field: AnyForm) => (
         <div>
-          <Label htmlFor={field.name}>{label}</Label>
+          <Label className="text-base" htmlFor={field.name}>
+            {label}
+          </Label>
           {description && (
             <p
               className="mt-0.5 text-muted-foreground text-xs"

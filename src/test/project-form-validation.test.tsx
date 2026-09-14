@@ -65,7 +65,7 @@ describe("ProjectForm validation", () => {
     fireEvent.change(screen.getByLabelText("Title"), {
       target: { value: "A project" },
     });
-    fireEvent.change(screen.getByLabelText("Contact email"), {
+    fireEvent.change(screen.getByLabelText("Contact Email"), {
       target: { value: "notanemail" },
     });
     fireEvent.submit(form);
