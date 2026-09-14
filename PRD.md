@@ -23,10 +23,9 @@ For developer setup, architecture notes, and the active roadmap, see
   - `user`: default role on sign-up. Browses and bookmarks projects, submits
     proposals, browses and requests inventory.
   - `instructor`: staff privileges over the project and inventory domains
-    (review projects, manage programs, manage inventory) but not user or
-    category administration that is reserved for admins.
-  - `admin`: full access, including user administration and category
-    management.
+    (review projects, manage programs, manage categories, manage inventory)
+    but not the user administration that is reserved for admins.
+  - `admin`: full access, including user administration.
 - [x] "Staff" is the union of `instructor` and `admin`; staff-only UI and data
   (internal comments, edit logs, transition actions, proposer email, inventory
   private notes) are gated on it. Project private notes are the one shared
@@ -230,7 +229,7 @@ Each project carries:
   type, technology, industry, field) that groups them in the pickers; the
   admin form autocompletes existing types. Inventory categories are flat and
   carry no type.
-- [x] Categories created/edited/deleted by admins (`/admin/categories`).
+- [x] Categories created/edited/deleted by staff (`/admin/categories`).
 - [x] Categories assigned by staff only, many per record, through a
   multi-select in the project page's staff panel (#322) and on the item form.
 - [ ] Partial: Multiple category types exist and can be filtered, but per-type faceted

@@ -5,7 +5,10 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { useState } from "react";
-import { CategoryTypeCombobox } from "#/components/category-type-combobox";
+import {
+  CATEGORY_FIELD_DESCRIPTION,
+  CategoryTypeCombobox,
+} from "#/components/category-type-combobox";
 import { ConfirmDialog } from "#/components/confirm-dialog";
 import {
   Breadcrumb,
@@ -109,19 +112,18 @@ function CategoryEdit() {
       </Breadcrumb>
       <h1 className="mt-2 font-semibold text-2xl">Edit category</h1>
       <form className="mt-6 space-y-3" onSubmit={onSave}>
-        <div className="space-y-1.5">
-          <Label htmlFor="cat-name">Name</Label>
-          <Input
-            id="cat-name"
-            onChange={(e) => setName(e.target.value)}
-            required
-            value={name}
-          />
-        </div>
+        {/* Same order and descriptions as the New category dialog (#374). */}
         {isProject && (
           <div className="space-y-1.5">
             <Label htmlFor="cat-type">Type</Label>
+            <p
+              className="text-muted-foreground text-xs"
+              id="cat-type-description"
+            >
+              {CATEGORY_FIELD_DESCRIPTION.type}
+            </p>
             <CategoryTypeCombobox
+              describedBy="cat-type-description"
               id="cat-type"
               onChange={setType}
               types={types}
@@ -129,6 +131,24 @@ function CategoryEdit() {
             />
           </div>
         )}
+        <div className="space-y-1.5">
+          <Label htmlFor="cat-name">Name</Label>
+          {isProject && (
+            <p
+              className="text-muted-foreground text-xs"
+              id="cat-name-description"
+            >
+              {CATEGORY_FIELD_DESCRIPTION.name}
+            </p>
+          )}
+          <Input
+            aria-describedby={isProject ? "cat-name-description" : undefined}
+            id="cat-name"
+            onChange={(e) => setName(e.target.value)}
+            required
+            value={name}
+          />
+        </div>
         <div className="flex gap-2">
           <Button size="sm" type="submit">
             Save

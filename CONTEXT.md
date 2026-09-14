@@ -19,12 +19,12 @@ changes it; a user browses, bookmarks and proposes projects and borrows items.
 _Avoid_: member, student (as a role: there is no student role)
 
 **Instructor**:
-The role with staff powers over projects and inventory, but not over accounts or
-categories.
+The role with staff powers over projects, categories and inventory, but not over
+accounts.
 _Avoid_: teacher, faculty (as a role)
 
 **Admin**:
-The role with every power, including user administration and category management.
+The role with every power, including user administration.
 _Avoid_: administrator, superuser
 
 **Staff**:
@@ -219,8 +219,8 @@ an endpoint requires), privacy
 A tag from a fixed list that classifies a project or an item. Every category belongs
 to one domain, project or inventory, for life. Project categories also carry a type,
 a free-text facet such as technology or industry that groups them in the picker;
-inventory categories are flat. Filtering by several categories means all of them,
-not any.
+inventory categories are flat. Staff manage categories. Filtering by several
+categories means all of them, not any.
 _Avoid_: tag, label (that is an inventory field), topic, keyword, facet (that is
 the type, not the category)
 
