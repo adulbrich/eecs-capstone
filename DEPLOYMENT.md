@@ -472,7 +472,11 @@ aws --profile aws-capstone1 iam put-role-policy \
   --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::'"$OPS_BUCKET"'/legacy*"},{"Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::'"$OPS_BUCKET"'"}]}'
 ```
 
-When the import is settled, take both back:
+When the import is settled, take both back. Settled means you will not
+re-run, `--undo`, or import the live cohort: every one of those reads the same
+ops prefix under the same grant, so after the takedown each needs 7a.0b run
+again first. Re-running it is cheap and its first two commands are skippable
+if the bucket survived.
 
 ```bash
 aws --profile aws-capstone1 iam delete-role-policy \
@@ -738,10 +742,9 @@ aws --profile aws-capstone1 s3 cp ./live-out/image-keys.json \
 
 Both data files, not just the key map: the importer reads the projects file
 from the same prefix, and a missing one is fatal. The grant in 7a.0b already
-spans `legacy*`, so this prefix needs no new permission, PROVIDED the bucket
-and that policy still exist. If the archived import is settled and you ran the
-7a.0b takedown, run 7a.0b again before this: `s3 cp` to a deleted bucket fails
-with NoSuchBucket, and a missing policy fails later, inside the task.
+spans `legacy*`, so this prefix needs no new permission of its own. It does
+need the 7a.0b grant to still exist, which it does not if you ran the takedown
+after the archived import.
 
 Then run 7a.4 with both variables set, rather than composing the override by
 hand. `CLUSTER`, `TASKDEF` and `NETCFG` come from 7a.4 unchanged:
