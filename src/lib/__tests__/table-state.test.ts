@@ -172,6 +172,22 @@ describe("useSeedColumnsFromStorage", () => {
     renderHook(() => useSeedColumnsFromStorage("inventory", undefined, seed));
     expect(seed).not.toHaveBeenCalled();
   });
+
+  it("waits while disabled and seeds once enabled", () => {
+    // A public listing in card view: the hook lives in the route at every
+    // view, and a stored layout must not reach the URL until the table it
+    // belongs to is on screen.
+    writeStoredHidden("inventory", ["serial"]);
+    const seed = vi.fn();
+    const { rerender } = renderHook(
+      ({ enabled }) =>
+        useSeedColumnsFromStorage("inventory", undefined, seed, enabled),
+      { initialProps: { enabled: false } }
+    );
+    expect(seed).not.toHaveBeenCalled();
+    rerender({ enabled: true });
+    expect(seed).toHaveBeenCalledWith("serial");
+  });
 });
 
 describe("useAdminTableState", () => {

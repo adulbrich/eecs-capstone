@@ -140,10 +140,10 @@ export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
 }
 
 /**
- * Toggles a column's checkbox in an `AdminDataTable` Columns menu and waits
- * for its columnheader to actually appear before moving on.
- * `onColumnVisibilityChange` derives its next state from the current
- * `hidden` prop, which only updates after the URL round-trip commits, so
+ * Toggles a column's checkbox in an `AdminTableControls` Columns menu and
+ * waits for its columnheader to actually appear before moving on. A toggle
+ * derives its next hidden set from the current `hidden` prop, which only
+ * updates after the URL round-trip commits, so
  * firing the clicks back-to-back with nothing awaited between them drops all
  * but the last one. Confirming each toggle lands is what a real user waiting
  * to see the column would also, incidentally, do.

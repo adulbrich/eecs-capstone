@@ -170,14 +170,20 @@ export function clearStoredHidden(storageKey: string): void {
  *
  * `seed` must be referentially stable (wrap it in `useCallback`) or the
  * effect re-runs on every render.
+ *
+ * `enabled` is false while the table this layout belongs to is off screen,
+ * as on a public listing in card view: a stored layout has nothing to seed
+ * into there, and the URL stays free of a `cols` nobody is looking at. The
+ * seed runs once the flag turns true.
  */
 export function useSeedColumnsFromStorage(
   storageKey: string,
   current: string | undefined,
-  seed: (cols: string) => void
+  seed: (cols: string) => void,
+  enabled = true
 ) {
   useEffect(() => {
-    if (current !== undefined) {
+    if (!enabled || current !== undefined) {
       return;
     }
     const stored = readStoredHidden(storageKey);
@@ -185,7 +191,7 @@ export function useSeedColumnsFromStorage(
       return;
     }
     seed(stored.join(","));
-  }, [storageKey, current, seed]);
+  }, [storageKey, current, seed, enabled]);
 }
 
 /** The three URL params this hook owns. Routes carry others alongside them. */
@@ -213,6 +219,13 @@ interface UseAdminTableStateOptions {
   /** Applies a param patch with history replacement, for the storage seed. */
   replaceSearch: (patch: AdminTableSearch) => void;
   search: AdminTableSearch;
+  /**
+   * Whether to seed `?cols=` from storage. Default true; a listing that can
+   * hide its table (card view) passes false while it does, so the hook can
+   * live in the route at every view without the seed running against a
+   * table that is not on the page.
+   */
+  seedColumns?: boolean;
   /** Applies a param patch as a normal navigation. */
   setSearch: (patch: AdminTableSearch) => void;
   storageKey: string;
@@ -235,6 +248,7 @@ export function useAdminTableState({
   defaultSort,
   replaceSearch,
   search,
+  seedColumns = true,
   setSearch,
   storageKey,
 }: UseAdminTableStateOptions) {
@@ -255,7 +269,7 @@ export function useAdminTableState({
     (cols: string) => replaceSearch({ cols }),
     [replaceSearch]
   );
-  useSeedColumnsFromStorage(storageKey, search.cols, seed);
+  useSeedColumnsFromStorage(storageKey, search.cols, seed, seedColumns);
 
   const onSortChange = useCallback(
     (next: SortState) => setSearch(serializeSort(next, defaultSort)),

@@ -59,6 +59,13 @@ interface UseAdminTableOptions<
     ? boolean
     : "resetPageOnSort needs a `page` in this route's search schema";
   search: TSearch;
+  /**
+   * False while the table is off screen. A public listing calls this hook
+   * at every view, so its `AdminTableControls` can sit in the search row,
+   * and passes `view === "table"` here so the column seed effect waits for
+   * the table it seeds. See `useAdminTableState`.
+   */
+  seedColumns?: boolean;
   /** Passed straight through to the table. See its prop docs. */
   serverSorted?: boolean;
   storageKey: string;
@@ -87,6 +94,13 @@ interface UseAdminTableOptions<
  * same prop bag as everything else the table needs, not because anything here
  * would break without it. Contrast `resetPageOnSort`, which this hook reads and
  * never forwards: the table has no such prop.
+ *
+ * `controlsProps` is the second bag, for `AdminTableControls` when a listing
+ * renders Export CSV and the Columns menu in its search row rather than on
+ * the table's own row. Its four members are all in `tableProps` too, and
+ * they come from one place for the same reason the first bag exists: named
+ * once here, the menu and the table cannot disagree about which columns can
+ * hide, which are hidden, or which key the layout is stored under.
  */
 export function useAdminTable<
   TSearch extends AdminTableSearch,
@@ -97,6 +111,7 @@ export function useAdminTable<
   navigate,
   resetPageOnSort,
   search,
+  seedColumns,
   serverSorted,
   storageKey,
 }: UseAdminTableOptions<TSearch, TColumn>) {
@@ -134,6 +149,7 @@ export function useAdminTable<
     defaultSort,
     replaceSearch,
     search,
+    seedColumns,
     setSearch,
     storageKey,
   });
@@ -163,6 +179,7 @@ export function useAdminTable<
   );
 
   return {
+    controlsProps: { columns, hidden, onHiddenChange, storageKey },
     orderRows,
     tableProps: {
       columns,

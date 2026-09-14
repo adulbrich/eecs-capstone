@@ -2,7 +2,10 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { FilePlus } from "lucide-react";
 import { useCallback } from "react";
 import { z } from "zod";
-import { AdminDataTable } from "#/components/admin-data-table";
+import {
+  AdminDataTable,
+  AdminTableControls,
+} from "#/components/admin-data-table";
 import { BookmarkSetProvider } from "#/components/bookmark-set";
 import { BookmarksButton } from "#/components/bookmarks-button";
 import { EmptyState } from "#/components/empty-state";
@@ -111,47 +114,19 @@ export const Route = createFileRoute("/projects/")({
 type Search = z.infer<typeof searchSchema>;
 
 /**
- * Table mode. Its own component so `useAdminTable`, and the column seed
- * effect it runs, only exist while the table is on screen: in card mode a
- * stored column layout has nothing to seed into.
- *
- * Sorting is local to the page. The server's `order` decides which rows are
- * here; the column sort decides their order on it, and clicking a header does
- * not send the reader back to page one because the page's rows do not change.
+ * The table's narrowing state, for `filtered` on the table and its controls:
+ * with it, an empty result keeps the headers and the Columns menu and says
+ * no project matched; without it, an empty listing says so alone.
  */
-function ProjectTable({
-  rows,
-  search,
-}: {
-  rows: ProjectListRow[];
-  search: Search;
-}) {
-  const navigate = useNavigate({ from: "/projects/" });
-  const { tableProps } = useAdminTable({
-    columns: PROJECT_TABLE_COLUMNS,
-    defaultSort: PROJECT_TABLE_DEFAULT_SORT,
-    navigate,
-    search,
-    storageKey: "public-projects",
-  });
-  const filtered =
+function isFiltered(search: Search): boolean {
+  return (
     search.q !== "" ||
     search.categories.length > 0 ||
     search.program !== null ||
     search.archivedOnly ||
     search.acceptingOnly ||
     search.studentProposedOnly ||
-    search.seekingMentorOnly;
-  return (
-    <AdminDataTable
-      caption="Projects"
-      data={rows}
-      emptyMessage="No projects yet."
-      filtered={filtered}
-      getRowId={(row) => row.id}
-      noMatchMessage="No projects matched your search."
-      {...tableProps}
-    />
+    search.seekingMentorOnly
   );
 }
 
@@ -180,6 +155,23 @@ function ProjectsList() {
     [navigate]
   );
   useSeedViewFromStorage(search.view, seedView);
+  // In the route rather than in a table-only component, because the
+  // Columns menu sits in the search row above the table (#367) and needs
+  // the same `controlsProps` the table gets. `seedColumns` keeps the column
+  // seed effect waiting for table view, so card view's URL stays free of a
+  // stored layout it has nothing to show. Sorting is local to the page: the
+  // server's `order` decides which rows are here, the column sort decides
+  // their order on it, and clicking a header does not send the reader back
+  // to page one because the page's rows do not change.
+  const { controlsProps, tableProps } = useAdminTable({
+    columns: PROJECT_TABLE_COLUMNS,
+    defaultSort: PROJECT_TABLE_DEFAULT_SORT,
+    navigate,
+    search,
+    seedColumns: view === "table",
+    storageKey: "public-projects",
+  });
+  const filtered = isFiltered(search);
   const signedIn = useSignedIn();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const filterState = {
@@ -208,6 +200,15 @@ function ProjectsList() {
           q={search.q}
           view={view}
         />
+      }
+      tableControls={
+        view === "table" ? (
+          <AdminTableControls
+            filtered={filtered}
+            rowCount={rows.length}
+            {...controlsProps}
+          />
+        ) : undefined
       }
       title={
         /* flex-wrap and ml-auto: at a phone width the two buttons drop
@@ -239,7 +240,16 @@ function ProjectsList() {
       />
       <BookmarkSetProvider>
         {view === "table" ? (
-          <ProjectTable rows={rows} search={search} />
+          <AdminDataTable
+            caption="Projects"
+            controls="listing"
+            data={rows}
+            emptyMessage="No projects yet."
+            filtered={filtered}
+            getRowId={(row) => row.id}
+            noMatchMessage="No projects matched your search."
+            {...tableProps}
+          />
         ) : (
           <ProjectCards rows={rows} />
         )}

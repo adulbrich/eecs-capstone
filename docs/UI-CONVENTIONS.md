@@ -407,6 +407,18 @@ which turns off local reordering. They are separate because server-ordered does 
 imply paginated. `orderRows(rows, getId)` puts exported rows in the order the table is
 rendering, so a CSV matches the screen; it is a no-op under `serverSorted`.
 
+The hook hands back a second bag, `controlsProps`, for the listings whose Export CSV
+and Columns menu sit in the search row rather than on the table's own row. Pass
+`controls="listing"` to the table, which then draws no row above itself, and render
+`<AdminTableControls actions={<ExportCsvButton />} filtered={filtered} rowCount={rows.length} {...controlsProps} />`
+where the controls should go. The component is built from the column list and the hidden
+set rather than from the table instance, which is what lets it render in another subtree;
+it hides itself under the same rule as the table (no rows and no filter, #260), and
+the `rowCount` and `filtered` it takes are the table's own. Every other table leaves
+`controls` at its default and gets the table's own row: whatever it passes as `toolbar`
+on the left, its `actions` and the Columns menu on the right, and nothing visible when
+it passes neither and no column can hide (the bookmarks shortlist).
+
 `resetPageOnSort` is unsatisfiable unless the route's own search type declares a `page`,
 so setting it on a route that paginates nothing is a compile error rather than a stray
 `page: 1` pushed into a schema with no `page` in it. The compiler prints the reason,
@@ -714,7 +726,7 @@ this rule existed, and two had already drifted apart on details like
 ### Listing layout
 
 A page that lists and filters renders through `ListingLayout` from
-`#/components/listing-layout`, with four slots. The four listings on it are
+`#/components/listing-layout`, with four slots and an optional fifth. The four listings on it are
 `/projects`, `/admin/projects`, `/inventory` and `/admin/inventory`; the
 filters components are `projects-filters.tsx` and `inventory-filters.tsx`,
 with the admin forms inline in their routes.
@@ -725,6 +737,11 @@ with the admin forms inline in their routes.
   className="mx-auto max-w-4xl xl:max-w-7xl"
   filters={<ProjectsFilters {...state} />}
   search={<ProjectsSearchBar {...top} />}
+  tableControls={
+    view === "table" ? (
+      <AdminTableControls filtered={filtered} rowCount={rows.length} {...controlsProps} />
+    ) : undefined
+  }
   title={<h1 className="font-semibold text-2xl">Projects</h1>}
 >
   {rows}
@@ -734,7 +751,13 @@ with the admin forms inline in their routes.
 
 `search` holds what does not narrow the list: the search input, the sort, the
 card/table `ViewToggle`. It renders on top at every width, beside a "Filters"
-button that is gone from `xl`. `filters` holds what narrows: program, the
+button that is gone from `xl`. `tableControls` is that table's
+`AdminTableControls` (Export CSV, the Columns menu) when a table is showing, and
+nothing in card view; the layout renders it after the Filters button, at the end
+of the same row. The row is one line from
+`md`, where the search input gives up width so the buttons stay beside it, and
+wraps below `md`, where the input fills its own line and the buttons follow it
+left-aligned in the same order, which is also the tab order. `filters` holds what narrows: program, the
 switches, the category or status lists, Clear all. It renders in a sticky
 `aside` from `xl` and inside a left `Sheet` below it; pass one element and the
 layout renders it in both places, only one of which is ever displayed. Stack the
@@ -751,9 +774,14 @@ soft-deleted switch, which widens rather than narrows and so stays out of
 `filtered`.
 
 The admin route stopped passing `toolbar` to `AdminDataTable` when its filters
-moved into the aside; Columns and Export stay on the table's own row. Growing the
-table with a filters slot was the alternative and was declined, because the
-grouping mode is meant to be that component's one extension.
+moved into the aside, which left Export and Columns alone on a row of their own
+under the search; #366 and #367 moved them into the search row through
+`controls="listing"` and `AdminTableControls` ("Admin tables" above). The public
+listings render the controls only in table view, from a `useAdminTable` call that
+lives in the route at every view with `seedColumns: view === "table"`, so card
+view's URL never picks up a stored column layout. Growing the table with a filters
+slot was the alternative and was declined, because the grouping mode is meant to
+be that component's one extension.
 
 ### Surfaces are not all cards
 

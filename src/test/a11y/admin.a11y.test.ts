@@ -413,15 +413,14 @@ test("toggling a column writes cols into the URL, absent by default", async ({
 
   // Toggling it back on returns the visible set to the page default: the
   // param must disappear again, not be written back with the literal default
-  // list. This used to fail: resetColumns's sibling code path,
-  // onColumnVisibilityChange, wrote the literal default set into storage
-  // whenever a toggle happened to land back on the default, and
+  // list. This used to fail: the toggle path wrote the literal default set
+  // into storage whenever a toggle happened to land back on the default, and
   // useSeedColumnsFromStorage would re-seed `cols` from that stored value on
   // the very next render, undoing the clean URL serializeHidden had just
   // produced. Fixed by clearing the stored preference instead of writing the
-  // default into it (src/components/admin-data-table.tsx,
-  // onColumnVisibilityChange and resetColumns both route through
-  // clearStoredHidden now).
+  // default into it (src/components/admin-data-table.tsx, `commitHidden`
+  // for a toggle and the reset item both route through clearStoredHidden
+  // now).
   await page.getByRole("button", { name: "Columns" }).click();
   await page.getByRole("menuitemcheckbox", { name: "Location" }).click();
   await closeMenu(page);
