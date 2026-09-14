@@ -92,9 +92,11 @@ export function CategoryTypeCombobox({
             value={query}
           />
           <CommandList>
-            <CommandEmpty>
-              No matching type. Press Enter to create one.
-            </CommandEmpty>
+            {/*
+              Reachable only with no types and nothing typed: the Create row
+              matches whatever is typed, so it, not this, answers a query.
+            */}
+            <CommandEmpty>No types yet. Type one to create it.</CommandEmpty>
             <CommandGroup>
               {types.map((t) => (
                 <CommandItem key={t} onSelect={() => select(t)} value={t}>

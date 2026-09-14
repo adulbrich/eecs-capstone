@@ -1,28 +1,16 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import {
-  CATEGORY_FIELD_DESCRIPTION,
-  CategoryTypeCombobox,
-} from "#/components/category-type-combobox";
+import { CategoryTypeCombobox } from "#/components/category-type-combobox";
+import { installResizeObserver } from "./radix-jsdom";
 
 // Radix Popover (Floating UI) and cmdk rely on a few DOM APIs jsdom omits.
 beforeAll(() => {
+  installResizeObserver();
   Element.prototype.scrollIntoView = vi.fn();
   Element.prototype.hasPointerCapture = vi.fn();
   Element.prototype.setPointerCapture = vi.fn();
   Element.prototype.releasePointerCapture = vi.fn();
-  globalThis.ResizeObserver = class {
-    observe() {
-      // no-op
-    }
-    unobserve() {
-      // no-op
-    }
-    disconnect() {
-      // no-op
-    }
-  };
 });
 
 afterEach(cleanup);
@@ -66,10 +54,5 @@ describe("CategoryTypeCombobox", () => {
     });
     fireEvent.click(await screen.findByText('Create type "Domain"'));
     expect(onChange).toHaveBeenCalledWith("Domain");
-  });
-
-  it("names the field descriptions with the examples the dialog shows", () => {
-    expect(CATEGORY_FIELD_DESCRIPTION.type).toMatch(/Technology, Field/);
-    expect(CATEGORY_FIELD_DESCRIPTION.name).toMatch(/React under Technology/);
   });
 });

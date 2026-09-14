@@ -825,7 +825,7 @@ The decisions: `transitionItem` is the only writer ([ADR-0004](./adr/0004-one-wr
 
 Inventory full-text search no longer matches category names: `search_vector` is a generated column, which can only read columns on its own row, and the category text column it used to weight is gone. Accepted gap, since the all-match filter covers that case directly.
 
-A fact that is a column on `projects` never also becomes a category. The dev seed carried `project_type` categories "Industry Sponsored", "Faculty Sponsored" and "Student Led" until #374, each duplicating `isSponsored` or `studentProposed` and none of them able to disagree with the column it copied; a listing filter on the column is the one that cannot lie.
+A fact that is a column on `projects` never also becomes a category ([ADR-0021](./adr/0021-a-column-on-projects-never-becomes-a-category.md)); the seed's `project_type` rows went in #374.
 
 ### Two role predicates, in `src/lib/viewer.ts`
 
