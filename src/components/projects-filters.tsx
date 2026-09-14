@@ -3,6 +3,7 @@ import { useCallback, useId } from "react";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import type { ViewMode } from "#/lib/view-preference";
 import { FilterSwitch } from "./filter-switch";
+import { SearchHint } from "./search-hint";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
@@ -144,15 +145,33 @@ export function ProjectsSearchBar({
 }: Omit<SearchProps, "signedIn">) {
   const { commitQuery, setOrder, setView } = useProjectsFilterNavigation();
   const [queryDraft, setQueryDraft] = useDebouncedDraft(q, commitQuery);
+  // `useId` rather than a literal: the bar mounts once, so a literal would
+  // work, but the hint is this component's own and nothing outside needs
+  // the id. The admin routes render input and hint inline and keep a
+  // literal beside the literal `id` their sr-only Label already points at.
+  const hintId = useId();
   return (
     <>
       <Input
+        aria-describedby={hintId}
         aria-label="Search projects"
-        className="min-w-0 flex-1 basis-64"
+        // basis-40 where the other three inputs carry basis-64: this is the
+        // one row with a sort select, a view toggle, Filters and Columns
+        // beside the input, and at 768 in table view it is 767px of basis
+        // in a 704px row with basis-64, so Columns wrapped. At 160px the
+        // row fits with room to spare, and flex-1 grows the input back.
+        className="min-w-0 flex-1 basis-40"
         onChange={(e) => setQueryDraft(e.target.value)}
-        placeholder='Search projects (try "phrase" or -word to exclude)'
+        // A name for the box, not its documentation: the row gives it about
+        // 28 characters at 768 in table view, and the fields and the syntax
+        // are on the hint line under it (#369).
+        placeholder="Search projects"
         type="search"
         value={queryDraft}
+      />
+      <SearchHint
+        fields="titles, descriptions, problem statements, objectives and qualifications"
+        id={hintId}
       />
       <Select onValueChange={(v) => setOrder(v as ProjectsOrder)} value={order}>
         <SelectTrigger aria-label="Sort" className="w-44" id="filter-sort">
@@ -176,7 +195,9 @@ export function ProjectsSearchBar({
  * as the first thing in the results column, not inside `ProjectsSearchBar`:
  * the search row is a flex-wrap row that ends with ListingLayout's Filters
  * button, and a paragraph in the middle of it put the prompt's link between
- * the view toggle and that button in the tab order.
+ * the view toggle and that button in the tab order. `pl-3` for the same
+ * reason as `SearchHint`: both line up with the input's text, and from `md`
+ * they are adjacent lines under the row.
  */
 export function RecommendationPrompt({
   canRecommend,
@@ -186,7 +207,7 @@ export function RecommendationPrompt({
   return (
     <>
       {order === "recommended" && canRecommend && (
-        <p className="mt-2 text-muted-foreground text-xs">
+        <p className="mt-2 pl-3 text-muted-foreground text-xs">
           Ranked by your interests.{" "}
           <Link className="text-brand-dark underline" to="/profile">
             Edit your interests
@@ -200,7 +221,7 @@ export function RecommendationPrompt({
         write their interests. A member with one gets no prompt.
       */}
       {!(canRecommend || signedIn) && (
-        <p className="mt-2 text-muted-foreground text-xs">
+        <p className="mt-2 pl-3 text-muted-foreground text-xs">
           <Link
             className="text-brand-dark underline"
             search={{ redirect: "/projects" }}
@@ -212,7 +233,7 @@ export function RecommendationPrompt({
         </p>
       )}
       {signedIn && !canRecommend && (
-        <p className="mt-2 text-muted-foreground text-xs">
+        <p className="mt-2 pl-3 text-muted-foreground text-xs">
           <Link className="text-brand-dark underline" to="/profile">
             Add your interests
           </Link>{" "}

@@ -94,6 +94,10 @@ test("@smoke admin inventory list", async ({ page }) => {
   // 1280 and in the filters sheet at 375 (#352).
   await page.goto("/admin/inventory");
   await waitForHydration(page);
+  // The searchbox is described by the hint line under the row (#369).
+  await expect(
+    page.getByRole("searchbox", { name: "Search" })
+  ).toHaveAccessibleDescription(/Quote a "phrase"/);
   const aside = page.getByRole("complementary", { name: "Filters" });
   await expect(
     aside.getByRole("switch", { name: "Show only retired" })
@@ -209,6 +213,10 @@ test("@smoke admin projects list", async ({ page }) => {
   ];
   await page.goto("/admin/projects");
   await waitForHydration(page);
+  // The searchbox is described by the hint line under the row (#369).
+  await expect(
+    page.getByRole("searchbox", { name: "Search" })
+  ).toHaveAccessibleDescription(/Quote a "phrase"/);
   const aside = page.getByRole("complementary", { name: "Filters" });
   for (const name of switches) {
     await expect(aside.getByRole("switch", { name })).toBeVisible();

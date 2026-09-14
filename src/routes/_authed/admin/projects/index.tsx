@@ -22,6 +22,7 @@ import {
   type FilterProgram,
   PROJECT_SWITCH_LABEL,
 } from "#/components/projects-filters";
+import { SearchHint } from "#/components/search-hint";
 import { StatusBadge } from "#/components/status-badge";
 import {
   Breadcrumb,
@@ -186,6 +187,9 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
 type Row = Awaited<ReturnType<typeof listAdminProjects>>["rows"][number];
 
 const DEFAULT_SORT: SortState = { desc: true, id: "updatedAt" };
+
+/** The hint line under the search input, which names it; see `SearchHint`. */
+const SEARCH_HINT_ID = "admin-search-hint";
 
 const COLUMNS = defineAdminColumns<Row>()([
   {
@@ -792,12 +796,17 @@ function AdminProjects() {
             Search
           </Label>
           <Input
+            aria-describedby={SEARCH_HINT_ID}
             className="min-w-0 flex-1 basis-64"
             id="admin-search"
             onChange={(e) => setQueryDraft(e.target.value)}
-            placeholder="Title, description, contact, or proposer"
+            placeholder="Search projects"
             type="search"
             value={queryDraft}
+          />
+          <SearchHint
+            fields="titles, descriptions, problem statements, objectives, qualifications, contacts and proposers"
+            id={SEARCH_HINT_ID}
           />
         </>
       }

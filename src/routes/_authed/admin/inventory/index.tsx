@@ -23,6 +23,7 @@ import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { ListingLayout } from "#/components/listing-layout";
 import { LocalTime } from "#/components/local-time";
 import { OverdueBadge } from "#/components/overdue-badge";
+import { SearchHint } from "#/components/search-hint";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -378,6 +379,9 @@ export const COLUMNS = defineAdminColumns<Row>()([
 // fullForStaff's projection cannot silently miss the file. InventoryItemStaff
 // is a hand-picked field list, not the bare table row, so searchVector was
 // never a member of Row to begin with.
+/** The hint line under the search input, which names it; see `SearchHint`. */
+const SEARCH_HINT_ID = "inv-search-hint";
+
 const EXPORT_COLUMNS = defineCsvColumns<Row>()([
   { header: "ID", key: "id", value: (row) => row.id },
   { header: "Name", key: "name", value: (row) => row.name },
@@ -619,12 +623,17 @@ function AdminInventory() {
             Search
           </Label>
           <Input
+            aria-describedby={SEARCH_HINT_ID}
             className="min-w-0 flex-1 basis-64"
             id="inv-search"
             onChange={(e) => setQDraft(e.target.value)}
-            placeholder="Name, description, serial, label, location, or holder"
+            placeholder="Search inventory"
             type="search"
             value={qDraft}
+          />
+          <SearchHint
+            fields="names, descriptions, serials, labels, locations, holders and programs"
+            id={SEARCH_HINT_ID}
           />
         </>
       }

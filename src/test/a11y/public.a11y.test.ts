@@ -83,6 +83,11 @@ test("@smoke projects list", async ({ page }) => {
   await expectUnderlinedAtRest(
     page.getByRole("link", { name: "Sign in to get recommendations" })
   );
+  // The fields and the syntax are on the hint line under the row, and the
+  // searchbox is described by it; the placeholder is only a name (#369).
+  await expect(
+    page.getByRole("searchbox", { name: "Search projects" })
+  ).toHaveAccessibleDescription(/Quote a "phrase"/);
   await checkA11y(page);
 });
 
@@ -273,6 +278,9 @@ test("@smoke project detail", async ({ page }) => {
 test("@smoke inventory list", async ({ page }) => {
   await page.goto("/inventory");
   await checkA11y(page);
+  await expect(
+    page.getByRole("searchbox", { name: "Search inventory" })
+  ).toHaveAccessibleDescription(/Quote a "phrase"/);
 });
 
 test("@smoke inventory list, filters aside at xl", async ({ page }) => {
