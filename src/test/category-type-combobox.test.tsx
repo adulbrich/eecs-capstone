@@ -47,6 +47,13 @@ describe("CategoryTypeCombobox", () => {
     expect(screen.queryByText(/^Create type/)).toBeNull();
   });
 
+  it("explains the empty list when there are no types yet", async () => {
+    open([]);
+    expect(
+      await screen.findByText("No types yet. Type one to create it.")
+    ).toBeTruthy();
+  });
+
   it("selects the typed value from the Create row", async () => {
     const onChange = open();
     fireEvent.change(screen.getByPlaceholderText("Search or add a type"), {
