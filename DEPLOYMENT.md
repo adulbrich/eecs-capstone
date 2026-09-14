@@ -85,8 +85,10 @@ resource, because a state bucket cannot appear in its own state, which is why
 
 An account listing used to show a second, `cs-capstone-tfstate`. That was the
 backend for the original build, before commit `4e2f342` renamed the AWS
-project prefix from `cs-capstone` to `eecs-capstone`. The prefix names every
-resource, so the rename meant a destroy and rebuild, and the destroy could not
+project prefix from `cs-capstone` to `eecs-capstone`. Most resources rename in
+place, but a few (the RDS subnet group, and security groups holding RDS ENIs)
+hit ordering problems, so that commit chose a full destroy and apply instead,
+which was cheap because no production data existed yet. The destroy could not
 remove the bucket holding the state it was writing to. It was emptied and
 retired on 2026-09-14. If you see it again, the rename is being repeated and
 the new one is whichever `providers.tf` names.
