@@ -711,7 +711,11 @@ overwrite the archived cohort's manifest in Box and its key map in
 `./legacy-out`, and those are the record of what the first import did:
 
 ```bash
-LIVE="$BOX/Capstone Portal Migration/live"   # its own manifest, images and jsonl
+# Must hold `legacy-images-manifest.jsonl`, a `legacy-images/` directory of
+# the image files, and `live-projects.jsonl`. `prepare` hardcodes the first
+# two names, so a differently named directory reports every row as
+# "file missing" rather than failing outright.
+LIVE="$BOX/Capstone Portal Migration/live"
 npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
   prepare "$LIVE" ./live-out
 cp "$LIVE/live-projects.jsonl" ./live-out/
@@ -734,7 +738,10 @@ aws --profile aws-capstone1 s3 cp ./live-out/image-keys.json \
 
 Both data files, not just the key map: the importer reads the projects file
 from the same prefix, and a missing one is fatal. The grant in 7a.0b already
-spans `legacy*`, so this prefix needs no new permission.
+spans `legacy*`, so this prefix needs no new permission, PROVIDED the bucket
+and that policy still exist. If the archived import is settled and you ran the
+7a.0b takedown, run 7a.0b again before this: `s3 cp` to a deleted bucket fails
+with NoSuchBucket, and a missing policy fails later, inside the task.
 
 Then run 7a.4 with both variables set, rather than composing the override by
 hand. `CLUSTER`, `TASKDEF` and `NETCFG` come from 7a.4 unchanged:
