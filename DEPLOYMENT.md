@@ -702,22 +702,39 @@ row carries `target_status`, computed as `archived` or `published` from
 `export.sql` and `clean-export.py` live beside the data in Box, not in this
 repo.
 
-Give that set its own S3 prefix as well as its own filename. Its
-`image-keys.json` is named the same as the archived set's, so uploading both
-under `legacy/` overwrites the first and the second import lands with the
-wrong image map. `LEGACY_DATA_S3_URI` is per invocation, so a second prefix
-costs nothing:
+That cohort needs its own images too, and `prepare` reads a fixed filename at
+each end: `legacy-images-manifest.jsonl` in the source directory, and it
+writes `image-keys.json` into the output one. The manifest is generated per
+cohort, so the archived one names only archived projects. Give the live set
+its own directory at BOTH ends rather than regenerating in place, which would
+overwrite the archived cohort's manifest in Box and its key map in
+`./legacy-out`, and those are the record of what the first import did:
 
 ```bash
+LIVE="$BOX/Capstone Portal Migration/live"   # its own manifest, images and jsonl
+npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
+  prepare "$LIVE" ./live-out
+cp "$LIVE/live-projects.jsonl" ./live-out/
+```
+
+That leaves `./live-out` holding both files the import needs. Give the set its
+own S3 prefix as well as its own filename, for the same reason `prepare` got
+its own directory: `LEGACY_DATA_S3_URI` is per invocation, so a second prefix
+costs nothing.
+
+```bash
+aws --profile aws-capstone1 s3 sync ./live-out/projects \
+  "s3://$ASSETS_BUCKET/projects/" --region us-west-2 \
+  --exclude "*" --include "*.webp"
 aws --profile aws-capstone1 s3 cp ./live-out/live-projects.jsonl \
   "s3://$OPS_BUCKET/legacy-live/" --region us-west-2
 aws --profile aws-capstone1 s3 cp ./live-out/image-keys.json \
   "s3://$OPS_BUCKET/legacy-live/" --region us-west-2
 ```
 
-Both files, not just the key map: the importer reads the projects file from
-the same prefix, and a missing one is fatal. The grant in 7a.0b already spans
-`legacy*`, so this prefix needs no new permission.
+Both data files, not just the key map: the importer reads the projects file
+from the same prefix, and a missing one is fatal. The grant in 7a.0b already
+spans `legacy*`, so this prefix needs no new permission.
 
 Then run 7a.4 with both variables set, rather than composing the override by
 hand. `CLUSTER`, `TASKDEF` and `NETCFG` come from 7a.4 unchanged:
@@ -729,10 +746,6 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
   --overrides '{"containerOverrides":[{"name":"app","command":["node","scripts/import-legacy.mjs"],"environment":[{"name":"LEGACY_DATA_S3_URI","value":"s3://'"$OPS_BUCKET"'/legacy-live/"},{"name":"LEGACY_DATA_PROJECTS_FILE","value":"live-projects.jsonl"}]}]}' \
   --region us-west-2
 ```
-
-Images for that set need their own `legacy-images-manifest.jsonl` and their
-own `prepare`. The manifest is generated per cohort, so the archived one names
-only archived projects.
 
 `clean-export.py` still routes hidden rows to their own file, which matters
 more here: a hidden live project has never been public, and importing it as
