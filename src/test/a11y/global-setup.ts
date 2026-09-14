@@ -94,10 +94,16 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   }
 
   // Opt the owner user into mentoring so /admin/mentors renders a populated
-  // row (Input + Save/Remove buttons) for axe to scan, not just the empty state.
+  // row (Input + Save/Remove buttons) for axe to scan, not just the empty
+  // state, and give them a LinkedIn address so the admin user detail renders
+  // that link in body copy for the underline assertion.
   await db
     .update(schema.user)
-    .set({ wantsToMentor: true, mentorTeamCount: 2 })
+    .set({
+      linkedin: "https://www.linkedin.com/in/a11y-owner",
+      mentorTeamCount: 2,
+      wantsToMentor: true,
+    })
     .where(eq(schema.user.id, owner.id));
 
   // Self-heal any row left behind by a create-dialog test that failed after

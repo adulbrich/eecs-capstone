@@ -15,7 +15,7 @@ import {
   waitForHydration,
   waitForSurfaceSettled,
 } from "../shared/playwright";
-import { checkA11y } from "./helpers";
+import { checkA11y, expectUnderlinedAtRest } from "./helpers";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -252,6 +252,11 @@ test("admin users list", async ({ page }) => {
 
 test("admin user detail", async ({ page }) => {
   await page.goto(`/admin/users/${userId}`);
+  // The LinkedIn address sits beside its label in one paragraph (#364);
+  // global-setup gives this user one.
+  await expectUnderlinedAtRest(
+    page.getByRole("link", { name: /linkedin\.com\/in\/a11y-owner/ })
+  );
   await checkA11y(page);
 });
 
