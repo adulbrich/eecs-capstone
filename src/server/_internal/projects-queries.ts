@@ -23,6 +23,7 @@ import {
   user,
 } from "#/db/schema";
 import { readSession } from "#/lib/_internal/auth-guards";
+import { dateFieldIsNullable } from "#/lib/admin-project-filters";
 import { dayRange } from "#/lib/day-range";
 import {
   canEditProject,
@@ -100,6 +101,7 @@ export async function listMyProjectsImpl(data: { status: StatusFilter }) {
 
 /** The column each From and To pair narrows on. */
 const ADMIN_DATE_COLUMN = {
+  archived: projects.archivedAt,
   created: projects.createdAt,
   published: projects.publishedAt,
   updated: projects.updatedAt,
@@ -116,7 +118,11 @@ const ADMIN_DATE_COLUMN = {
  * `publishedAt` excludes rows that were never published; the field selector
  * on the page is where that shows (#335).
  */
-function buildAdminProjectScope(data: AdminProjectsFilter): SQL[] {
+function buildAdminProjectScope(
+  data: AdminProjectsFilter,
+  opts: { withDateRange?: boolean } = {}
+): SQL[] {
+  const { withDateRange = true } = opts;
   const scope: SQL[] = [inArray(projects.status, data.statuses)];
   if (!data.includeSoftDeleted) {
     scope.push(isNull(projects.deletedAt));
@@ -126,10 +132,10 @@ function buildAdminProjectScope(data: AdminProjectsFilter): SQL[] {
   }
   const column = ADMIN_DATE_COLUMN[data.dateField];
   const { start, end } = dayRange(data.from, data.to);
-  if (start) {
+  if (withDateRange && start) {
     scope.push(gte(column, start));
   }
-  if (end) {
+  if (withDateRange && end) {
     scope.push(lt(column, end));
   }
   // The same three conditions the public listing applies under the same
@@ -186,6 +192,33 @@ function buildAdminProjectListConditions(data: AdminProjectsFilter): SQL[] {
  * going through the request session, matching the `*As(viewer, ...)`
  * convention used by the mutation helpers.
  */
+/**
+ * How many rows the date range is hiding because they have no date at all,
+ * rather than because they fall outside it.
+ *
+ * Counted against the scope with the range removed, so it answers "invisible
+ * no matter which range you pick" rather than "outside this one". Zero unless
+ * a range is actually set and the chosen column is nullable, so the listing
+ * pays for one extra count only when the notice could say something.
+ */
+async function countDatelessInScope(
+  data: AdminProjectsFilter
+): Promise<number> {
+  const { start, end } = dayRange(data.from, data.to);
+  if (!((start || end) && dateFieldIsNullable(data.dateField))) {
+    return 0;
+  }
+  const conditions = [
+    ...buildAdminProjectScope(data, { withDateRange: false }),
+    isNull(ADMIN_DATE_COLUMN[data.dateField]),
+  ];
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(projects)
+    .where(and(...conditions));
+  return row?.count ?? 0;
+}
+
 export async function listAdminProjectsAs(
   viewer: Viewer,
   data: AdminProjectsFilter
@@ -194,7 +227,7 @@ export async function listAdminProjectsAs(
   const scope = buildAdminProjectScope(data);
   const listConditions = buildAdminProjectListConditions(data);
 
-  const [rows, proposers] = await Promise.all([
+  const [rows, proposers, datelessInScope] = await Promise.all([
     db
       .select(adminProjectSummarySelect)
       .from(projects)
@@ -214,8 +247,9 @@ export async function listAdminProjectsAs(
       .innerJoin(user, eq(projects.proposerId, user.id))
       .where(scope.length ? and(...scope) : undefined)
       .orderBy(asc(user.name)),
+    countDatelessInScope(data),
   ]);
-  return { proposers, rows };
+  return { datelessInScope, proposers, rows };
 }
 
 export async function listAdminProjectsImpl(data: AdminProjectsFilter) {

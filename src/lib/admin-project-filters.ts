@@ -13,14 +13,44 @@ import { PROJECT_STATUSES, type ProjectStatus } from "./vocabularies";
 export const DEFAULT_ADMIN_STATUSES: readonly ProjectStatus[] =
   PROJECT_STATUSES.filter((s) => s !== "archived");
 
-/** The timestamp a From and To pair narrows on. */
-export const ADMIN_DATE_FIELDS = ["created", "published", "updated"] as const;
+/**
+ * The timestamp a From and To pair narrows on.
+ *
+ * `archived` is here because "what did we retire last summer" is a question
+ * staff ask about the archive, and without it the only way to ask was a range
+ * on `updated`, which answers something else.
+ */
+export const ADMIN_DATE_FIELDS = [
+  "created",
+  "published",
+  "updated",
+  "archived",
+] as const;
 export type AdminDateField = (typeof ADMIN_DATE_FIELDS)[number];
 export const ADMIN_DATE_FIELD_LABEL: Record<AdminDateField, string> = {
   created: "Created",
   published: "Published",
   updated: "Updated",
+  archived: "Archived",
 };
+
+/**
+ * `created` and `updated` are `notNull` on `projects`; `published` and
+ * `archived` are not, so a range on either silently drops every row with no
+ * value. That was a rare edge case when a null meant "a draft, never
+ * published". The legacy import makes it the common case: 302 of the 547
+ * imported rows have no publish date and 264 have no archive date, because
+ * the old portal's event log only starts 2022-08-03. The listing counts those
+ * rows and says so rather than returning a quietly incomplete answer.
+ */
+export const ADMIN_DATE_FIELDS_NULLABLE: readonly AdminDateField[] = [
+  "published",
+  "archived",
+];
+
+export function dateFieldIsNullable(field: AdminDateField): boolean {
+  return ADMIN_DATE_FIELDS_NULLABLE.includes(field);
+}
 
 /** Set equality on statuses, order and repeats ignored. */
 export function sameStatusSet(

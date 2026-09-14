@@ -424,7 +424,12 @@ async function publish(admin: { id: string; role: string }, id: string) {
 /** Writes the three timestamps the range can narrow on, past the writers. */
 async function stamp(
   id: string,
-  at: { createdAt?: Date; publishedAt?: Date | null; updatedAt?: Date }
+  at: {
+    archivedAt?: Date | null;
+    createdAt?: Date;
+    publishedAt?: Date | null;
+    updatedAt?: Date;
+  }
 ) {
   await db.update(projects).set(at).where(eq(projects.id, id));
 }
@@ -575,6 +580,66 @@ describe("admin projects date range", () => {
       filter({ ...july, dateField: "created" })
     );
     expect(onCreated.rows.map((r) => r.title)).toEqual(["Draft"]);
+  });
+
+  it("counts the rows a nullable date range hides, so an empty result is explained", async () => {
+    const admin = await makeAdmin(`d4b-${Date.now()}@x.com`);
+    const dateless = await createProjectAs(
+      admin,
+      baseProject("Dateless", null)
+    );
+    await stamp(dateless.id, { createdAt: midJuly, publishedAt: null });
+    const july = { from: "2026-07-01", to: "2026-07-31" };
+
+    // The case the legacy import makes common: a range on Published returns
+    // nothing, and without this count nothing on the page says why.
+    const onPublished = await listAdminProjectsAs(
+      admin,
+      filter({ ...july, dateField: "published" })
+    );
+    expect(onPublished.rows).toEqual([]);
+    expect(onPublished.datelessInScope).toBe(1);
+
+    // Zero on a notNull column, so the notice never fires where it would be
+    // meaningless.
+    const onCreated = await listAdminProjectsAs(
+      admin,
+      filter({ ...july, dateField: "created" })
+    );
+    expect(onCreated.datelessInScope).toBe(0);
+
+    // Zero with no range set: nothing is hidden, so there is nothing to say.
+    const unbounded = await listAdminProjectsAs(
+      admin,
+      filter({ dateField: "published" })
+    );
+    expect(unbounded.datelessInScope).toBe(0);
+  });
+
+  it("narrows on Archived, which is its own field and not Updated", async () => {
+    const admin = await makeAdmin(`d4c-${Date.now()}@x.com`);
+    const retired = await createProjectAs(admin, baseProject("Retired", null));
+    await stamp(retired.id, {
+      archivedAt: lateJune,
+      createdAt: midJuly,
+      publishedAt: null,
+      updatedAt: midJuly,
+    });
+    const neverArchived = await createProjectAs(
+      admin,
+      baseProject("Still here", null)
+    );
+    await stamp(neverArchived.id, { archivedAt: null, updatedAt: lateJune });
+    const june = { from: "2026-06-01", to: "2026-06-30" };
+
+    const onArchived = await listAdminProjectsAs(
+      admin,
+      filter({ ...june, dateField: "archived" })
+    );
+    expect(onArchived.rows.map((r) => r.title)).toEqual(["Retired"]);
+    // Archived is nullable too, so the row with no archive date is counted
+    // rather than silently dropped.
+    expect(onArchived.datelessInScope).toBe(1);
   });
 
   it("composes with the status set and the program, for the rows and the proposer dropdown", async () => {

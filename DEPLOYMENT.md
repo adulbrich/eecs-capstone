@@ -397,6 +397,198 @@ Repeat with the second admin's email. Check the task's CloudWatch log for
 
 ---
 
+## 7a. Importing the legacy portal archive
+
+A one-time job: 547 archived projects and 330 images from the old PHP capstone
+portal. Run it after the first deploy and after the admins exist, since the
+importer links a project to an account only where one already exists.
+
+**The source data never enters this repo or a container image.** The JSONL
+names 299 real proposers and their email addresses, this repo is public and
+mirrors to GitLab, and the app's asset bucket grants `s3:GetObject` to `*`.
+It lives in Box and reaches production through a private S3 prefix.
+
+The whole thing is idempotent: every project's primary key is a UUIDv5 derived
+from its legacy `cp_id`, so a second run refreshes the same rows and `--undo`
+deletes exactly them. The `NAMESPACE` constant is shared by
+`scripts/import-legacy.ts` and `scripts/import-legacy.mjs` and **must never
+change**: a different value re-keys all 547 rows and orphans every image
+object already in the bucket.
+
+### 7a.1 Prepare the data on a workstation
+
+From the repo, with the Box folder holding `archived-projects-clean.jsonl`,
+`legacy-images/` and `legacy-images-manifest.jsonl`:
+
+```bash
+npx tsx --env-file=.env.local scripts/import-legacy.ts \
+  --prepare-images "$BOX/Capstone Portal Migration" ./legacy-out
+```
+
+That writes `./legacy-out/projects/<uuid>/<uuid>.webp` (paths that *are* the
+object-storage keys), plus `image-keys.json`. Expect `wrote 330 webp files`
+and one skip: `41z9KqPQXXbHwZtb` is a PDF somebody uploaded as a project
+image.
+
+Converting here rather than in the cluster is deliberate. The keys are fully
+derived from the manifest, so a workstation run produces exactly what an
+in-cluster run would; it keeps 100 MB out of the container image; and it does
+not depend on Sharp working under arm64 Fargate.
+
+### 7a.2 Upload
+
+Images go to the app's asset bucket (they are public by design, the same as
+any uploaded project image):
+
+```bash
+aws --profile aws-capstone1 s3 sync ./legacy-out/projects \
+  "s3://$ASSETS_BUCKET/projects/" --region us-west-2
+```
+
+The two data files go to a **private** bucket or prefix, never the asset
+bucket:
+
+```bash
+aws --profile aws-capstone1 s3 cp \
+  "$BOX/Capstone Portal Migration/archived-projects-clean.jsonl" \
+  "s3://$OPS_BUCKET/legacy/" --region us-west-2
+aws --profile aws-capstone1 s3 cp ./legacy-out/image-keys.json \
+  "s3://$OPS_BUCKET/legacy/" --region us-west-2
+```
+
+`$OPS_BUCKET` must block public access and the ECS task role needs
+`s3:GetObject` on `arn:aws:s3:::$OPS_BUCKET/legacy/*`. Delete both objects
+once the import is verified; nothing reads them afterwards.
+
+### 7a.3 Check `programs` first
+
+The importer resolves four programs by `course_id` and attaches projects to
+them:
+
+| `course_id` | legacy course it receives | projects |
+| --- | --- | ---: |
+| `CS46X-CORVALLIS` | CS46X On Campus (9 Month) | 181 |
+| `ECE44X-CORVALLIS` | ECE44X (9 Month) | 81 |
+| `CS467` | CS467 (3 Month) | 11 |
+| `CS46X-ECAMPUS` | CS46X Online (9-month) | 0 |
+
+All four already exist in production, so a correct run prints four `matched`
+lines and creates nothing. A `CREATED` line means an id has drifted and the
+row it just made is a duplicate: stop, fix the id, and re-run.
+
+`CS46X-ECAMPUS` receives nothing. No legacy project ever used the online
+section, across all 1111 of them, so the distinction cannot be recovered from
+the data; it is resolved anyway so the choice exists for new proposals.
+
+Matching is on `course_id` alone, not on the name, because all three 3-term
+rows share the display name "Capstone (3-term)" and a rename in the UI would
+otherwise turn a match into a duplicate. `course_id` has no unique constraint,
+so the importer refuses an ambiguous match rather than guessing:
+
+```
+Error: 2 programs share course_id "CS467". Refusing to guess which one these
+projects belong to; give them distinct course ids first.
+```
+
+The whole import is one transaction, so that failure leaves nothing behind.
+
+### 7a.4 Run the import
+
+The database is private, so this half runs inside the VPC, the same one-off
+task shape as bootstrapping an admin:
+
+```bash
+CLUSTER=eecs-capstone
+SERVICE=eecs-capstone
+TASKDEF=$(aws --profile aws-capstone1 ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
+  --query 'services[0].taskDefinition' --output text --region us-west-2)
+NETCFG=$(aws --profile aws-capstone1 ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
+  --query 'services[0].networkConfiguration' --output json --region us-west-2)
+
+aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARGATE \
+  --task-definition "$TASKDEF" \
+  --network-configuration "$NETCFG" \
+  --overrides '{"containerOverrides":[{"name":"app","command":["node","scripts/import-legacy.mjs"],"environment":[{"name":"LEGACY_DATA_S3_URI","value":"s3://'"$OPS_BUCKET"'/legacy/"}]}]}' \
+  --region us-west-2
+```
+
+The CloudWatch log should end with:
+
+```
+Imported 547 projects (302 with no publish date, 330 with an image)
+```
+
+Everything runs in one transaction, so a failure leaves nothing behind. To
+undo, add `"--undo"` after `"scripts/import-legacy.mjs"` in the command array.
+
+### 7a.5 What to expect afterwards
+
+- **302 projects have no `published_at` and 264 no `archived_at`.** The legacy
+  event log only starts 2022-08-03, so those dates do not exist to import.
+  They are left null rather than backfilled. `searchProjects` orders on
+  `coalesce(published_at, created_at)` so the nulls still sort by age, and
+  `/admin/projects` says how many rows a date range is hiding.
+- **The archive is public.** `searchProjects` has no auth guard and
+  `archivedOnly` resolves to `status = 'archived'`, so a signed-out visitor
+  can browse all 547. That is the intent; it is also why the 141 projects the
+  old portal kept hidden are held back in `archived-hidden-projects.jsonl` and
+  are not part of this import.
+- **No `contact_email` is set.** The old portal published proposer names and
+  never published an address. The addresses live in `proposer_email`, which is
+  staff-only on both read paths.
+- **Unlinked proposers are normal.** A project links to an account only where
+  one exists for that address; the rest carry `proposer_email` alone and link
+  themselves the first time that person signs in.
+
+### 7a.6 Re-running, and importing the projects still live in the old portal
+
+Both are supported, with one thing to know about each.
+
+**A re-run replaces every column on a row it already imported**, including
+anything staff edited in this app since. That is what you want when correcting
+a bad mapping and not what you want for a routine top-up, so the importer
+counts both groups before it writes:
+
+```
+  12 new, 547 already imported (will be overwritten)
+```
+
+Pass `--skip-existing` to add only the rows that are not there yet and leave
+the rest untouched:
+
+```bash
+node scripts/import-legacy.mjs --skip-existing
+```
+
+Re-running is otherwise safe: the primary key is derived from the legacy
+`cp_id`, so no run can duplicate a row, and the derived image keys mean a
+second image upload overwrites the same object rather than orphaning it. Note
+that a re-run also re-links proposers, so someone whose account was deleted
+since (which nulls `proposer_id`) gets linked again if a matching account
+exists.
+
+**To import the projects that are still live in the old portal**, drop the
+`cp_archived = 1` condition from `export.sql` and write the result to a
+different filename. Each row carries `target_status`, computed as `archived`
+or `published` from `cp_archived`, and the importer reads it; nothing is
+hardcoded to `archived`. `clean-export.py` still routes hidden rows to their
+own file, which matters more here: a hidden live project has never been
+public, and importing it as `published` would list it immediately.
+
+Three things to decide before doing that, none of which this import settles:
+
+- Those projects are still being edited in the old portal, so the two systems
+  diverge from the moment you copy. Either the old portal becomes read-only or
+  you accept a cutover date and re-run.
+- `published` rows appear in the default catalog, not behind the archived
+  filter, so they are visible to every visitor immediately rather than as
+  history.
+- `accepting_applicants` is imported as `true` for the same reason as the
+  archived set (the legacy schema has no closed flag), and for a live project
+  that claim is load-bearing rather than inert.
+
+---
+
 ## 8. Routine operations
 
 ### Deploy a change

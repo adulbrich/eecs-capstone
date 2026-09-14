@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
-import { user } from "#/db/schema";
+import { projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import {
   createProjectAs,
@@ -241,5 +241,55 @@ describe("the two mark filters", () => {
       studentProposedOnly: true,
     });
     expect(both.rows).toEqual([]);
+  });
+
+  it("sorts an archived project with no publish date by its creation date, not above everything", async () => {
+    const admin = await makeAdmin(`arch-${Date.now()}@x.com`);
+    // Two archived projects. The older one has no publishedAt, which is the
+    // shape 302 of the 547 rows imported from the legacy portal carry: its
+    // event log only starts 2022-08-03, so there is no publish date to
+    // import and the column is left null rather than backfilled.
+    const dateless = await publish(admin, "Older, no publish date");
+    const dated = await publish(admin, "Newer, published");
+    await performTransitionAs(admin, dateless, "archived");
+    await performTransitionAs(admin, dated, "archived");
+    await db
+      .update(projects)
+      .set({
+        createdAt: new Date("2019-05-01T12:00:00.000Z"),
+        publishedAt: null,
+      })
+      .where(eq(projects.id, dateless));
+    await db
+      .update(projects)
+      .set({
+        createdAt: new Date("2025-09-01T12:00:00.000Z"),
+        publishedAt: new Date("2025-09-02T12:00:00.000Z"),
+      })
+      .where(eq(projects.id, dated));
+
+    // Ordering on the bare column would put `dateless` first: Postgres `DESC`
+    // is NULLS FIRST, so every dateless row floats above every dated one.
+    // Ordering on coalesce(published_at, created_at) puts the 2025 project
+    // first, which is what "newest" means to a reader.
+    const newest = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      archivedOnly: true,
+      pageSize: 50,
+      sort: "newest",
+    });
+    expect(newest.rows.map((r) => r.id)).toEqual([dated, dateless]);
+
+    // Same for the default relevance sort with no query text, which falls
+    // through to the same date ordering.
+    const relevance = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      archivedOnly: true,
+      pageSize: 50,
+    });
+    expect(relevance.rows.map((r) => r.id)).toEqual([dated, dateless]);
+
+    // And the dateless row is still reachable, not filtered out.
+    expect(newest.total).toBe(2);
   });
 });

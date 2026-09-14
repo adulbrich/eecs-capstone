@@ -735,8 +735,60 @@ function AdminProjectsFilters({
   );
 }
 
+/**
+ * Says how many rows the date range is hiding because they have no date at
+ * all, rather than because they fall outside it.
+ *
+ * `published` and `archived` are nullable, so a range on either drops those
+ * rows with nothing in the result to say so. Before the legacy import a null
+ * meant "a draft, never published" and was rare enough to live as a note in
+ * the query (#335); 302 of the 547 imported projects have no publish date and
+ * 264 have no archive date, so the quiet answer is now the wrong one often
+ * enough to show.
+ */
+function DatelessNotice({
+  count,
+  dateField,
+}: {
+  count: number;
+  dateField: AdminDateField;
+}) {
+  const navigate = useNavigate({ from: "/admin/projects/" });
+  if (count === 0) {
+    return null;
+  }
+  const label = ADMIN_DATE_FIELD_LABEL[dateField].toLowerCase();
+  return (
+    // `mt-4` to match `AdminDataTable`'s own top margin: `ListingLayout`
+    // renders its children straight after the controls row with no spacing of
+    // its own, so each block brings its own.
+    <div className="mt-4 rounded-md border border-border bg-muted/40 px-4 py-3 text-sm">
+      <p className="text-muted-foreground">
+        {count === 1
+          ? `1 project in this view has no ${label} date and is not shown.`
+          : `${count} projects in this view have no ${label} date and are not shown.`}{" "}
+        Projects imported from the legacy portal often have none, because its
+        event log only goes back to August 2022.
+      </p>
+      <Button
+        className="mt-2 h-auto p-0"
+        onClick={() =>
+          void navigate({
+            search: (prev) => ({ ...prev, from: undefined, to: undefined }),
+          })
+        }
+        size="sm"
+        type="button"
+        variant="link"
+      >
+        Clear the date range
+      </Button>
+    </div>
+  );
+}
+
 function AdminProjects() {
-  const { rows, proposers, programs } = Route.useLoaderData();
+  const { datelessInScope, rows, proposers, programs } = Route.useLoaderData();
   // The whole search object goes to the hook, which reads cols/dir/sort.
   const search = Route.useSearch();
   const {
@@ -858,6 +910,7 @@ function AdminProjects() {
         </>
       }
     >
+      <DatelessNotice count={datelessInScope} dateField={resolved.dateField} />
       <AdminDataTable
         caption="Projects"
         controls="listing"
