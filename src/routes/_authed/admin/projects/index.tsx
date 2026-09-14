@@ -132,6 +132,28 @@ export function resolveAdminFilter(search: Search) {
   };
 }
 
+/**
+ * How many controls are on: what the Filters button shows below xl, and
+ * what decides whether Clear all renders. The search is excluded, since it
+ * sits beside the button. The soft-deleted switch is in: it is a control
+ * the reader turned on, whether or not it narrows. The default status set
+ * is the listing, not a filter (#335), and the date field alone counts for
+ * nothing until a bound is set. Clear all resets exactly these fields.
+ */
+function countActiveAdminFilters(search: Search): number {
+  const resolved = resolveAdminFilter(search);
+  return [
+    !isDefaultStatusSelection(resolved.statuses),
+    resolved.from !== null || resolved.to !== null,
+    search.program !== null,
+    search.proposer !== null,
+    search.acceptingOnly,
+    search.studentProposedOnly,
+    search.seekingMentorOnly,
+    search.includeSoftDeleted,
+  ].filter(Boolean).length;
+}
+
 export const Route = createFileRoute("/_authed/admin/projects/")({
   validateSearch: searchSchema,
   search: { middlewares: [stripSearchParams(SWITCH_DEFAULTS)] },
@@ -675,6 +697,35 @@ function AdminProjectsFilters({
           })
         }
       />
+      {countActiveAdminFilters(search) > 0 && (
+        <Button
+          className="h-auto p-0"
+          onClick={() =>
+            void navigate({
+              // Every field the count reads, to its default; the search,
+              // sort and column state ride along in `prev`. The soft-deleted
+              // switch goes too, since the button counts it (#355).
+              search: (prev) => ({
+                ...prev,
+                acceptingOnly: false,
+                dateField: "published",
+                from: undefined,
+                includeSoftDeleted: false,
+                program: null,
+                proposer: null,
+                seekingMentorOnly: false,
+                status: undefined,
+                studentProposedOnly: false,
+                to: undefined,
+              }),
+            })
+          }
+          type="button"
+          variant="link"
+        >
+          Clear all
+        </Button>
+      )}
     </div>
   );
 }
@@ -685,7 +736,6 @@ function AdminProjects() {
   const search = Route.useSearch();
   const {
     acceptingOnly,
-    includeSoftDeleted,
     program,
     proposer,
     q,
@@ -707,18 +757,7 @@ function AdminProjects() {
     acceptingOnly ||
     studentProposedOnly ||
     seekingMentorOnly;
-  // What the Filters button counts below xl. The soft-deleted switch is in:
-  // it is a control the reader turned on, whether or not it narrows.
-  const activeFilterCount = [
-    !isDefaultStatusSelection(resolved.statuses),
-    resolved.from !== null || resolved.to !== null,
-    program !== null,
-    proposer !== null,
-    acceptingOnly,
-    studentProposedOnly,
-    seekingMentorOnly,
-    includeSoftDeleted,
-  ].filter(Boolean).length;
+  const activeFilterCount = countActiveAdminFilters(search);
   const navigate = useNavigate({ from: "/admin/projects/" });
 
   // Debounced URL sync, matching the public listing's filter bar: the input is
