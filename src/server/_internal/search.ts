@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
   programs,
@@ -72,12 +72,33 @@ export async function searchProjectsImpl(
     conditions.push(inArray(projects.id, matchingProjectIds));
   }
 
+  /**
+   * The date the listing sorts on. `publishedAt` alone is wrong for the
+   * archive: `archivedOnly` above resolves to `status = 'archived'` for a null
+   * viewer, so the archive is public, and the 302 projects imported from the
+   * legacy portal with no publish date (its event log only starts 2022-08-03)
+   * carry a null there. Postgres `DESC` is NULLS FIRST, so ordering on the
+   * bare column floats every dateless row above everything with a real date.
+   *
+   * `createdAt` rather than `updatedAt` as the fallback, for two reasons.
+   * `updatedAt` moves on every edit, so one staff typo fix would jump a 2019
+   * project to the top of "newest"; and measured against the 245 imported
+   * rows that do have a publish date, `createdAt` is the closer estimate
+   * (mean error 15.8 days against 37.0).
+   *
+   * A no-op for anything proposed in this app, where `publishedAt` is set on
+   * every publish. `projects_published_at_idx` does not serve this ordering;
+   * at the row counts here that costs nothing, and an expression index is the
+   * fix if it ever does.
+   */
+  const listingDate = sql`coalesce(${projects.publishedAt}, ${projects.createdAt})`;
+
   // "relevance" is the default because ordering used to be implicit: a query
   // ranked by ts_rank, everything else by date. Defaulting to "newest" would
   // silently reorder every existing keyword search.
   const relevanceOrder = trimmed
-    ? sql`ts_rank(${projects.searchVector}, websearch_to_tsquery('english', ${trimmed})) DESC, ${projects.publishedAt} DESC`
-    : desc(projects.publishedAt);
+    ? sql`ts_rank(${projects.searchVector}, websearch_to_tsquery('english', ${trimmed})) DESC, ${listingDate} DESC`
+    : sql`${listingDate} DESC`;
 
   // Read for every signed-in viewer, not only under `recommended`: the
   // listing tells the reader whether the recommended sort is open to them,
@@ -87,7 +108,7 @@ export async function searchProjectsImpl(
 
   let orderBy = relevanceOrder;
   if (data.sort === "newest") {
-    orderBy = desc(projects.publishedAt);
+    orderBy = sql`${listingDate} DESC`;
   } else if (data.sort === "recommended" && interestsVector) {
     const probe = toSqlVector(interestsVector);
     // Null embeddings sort last rather than being filtered out: a project

@@ -27,3 +27,10 @@ test-results/
 # Personal Claude Code overrides. `.claude/settings.json` is tracked and shared;
 # this one is not, and the directory being tracked makes it committable by accident.
 .claude/settings.local.json
+
+# Legacy import working directories (DEPLOYMENT.md section 7a). They hold the
+# exported JSONL, which names 299 real proposers and their email addresses,
+# and the converted images. This repo is public and mirrors to GitLab, so a
+# stray `git add` here would publish student and sponsor PII.
+legacy-out/
+live-out/
