@@ -157,7 +157,7 @@ Semantic aliases adapt to dark mode; raw palette classes do not.
 | `bg-neutral-50`, `bg-neutral-100` | `bg-secondary` |
 | `bg-white` | `bg-card` |
 | `text-red-600`, `text-red-700` | `text-destructive` |
-| `text-blue-700` on links | Drop it; the global `a` style handles link color |
+| `text-blue-700` on links | `text-brand-dark`; see the brand link rule below |
 | `bg-blue-50` for highlights | `bg-[var(--brand-primary-tint)]` |
 | `dark:bg-neutral-900` | `dark:bg-card` |
 | `dark:border-neutral-800` | `dark:border-border` |
@@ -169,9 +169,10 @@ surface itself it is already 4.27:1; `text-brand-dark` is 6.0:1 on white and
 about 5.6:1 on a hovered table row, and the `link` Button variant already uses it
 in both modes. Keep the class rather than dropping it and trusting the global `a`
 rule: that rule's hover state switches back to `--brand-primary`, and a utility
-outranks it. Table cells were the first case (#357); the links still on
-`text-brand` are listed in #358. `text-brand` stays for icons and decoration,
-where no contrast ratio applies.
+outranks it. Table cells were the first case (#357) and the rest followed in
+#358, so `text-brand` on a link is a regression. `text-brand` stays for icons
+and decoration, where no contrast ratio applies; each such file is named in
+`src/test/brand-link-scan.test.ts`, which fails on any other.
 
 Status colors have no Tailwind alias, so reference the variable directly:
 

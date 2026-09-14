@@ -10,7 +10,7 @@ import { brand } from "#/lib/brand";
 export function SupportEmailLink() {
   return (
     <a
-      className="text-brand hover:underline"
+      className="text-brand-dark hover:underline"
       href={`mailto:${brand.supportEmail}`}
     >
       {brand.supportEmail}

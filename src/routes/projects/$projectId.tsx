@@ -296,7 +296,10 @@ function ContactSection({
         {name && <span>{name}</span>}
         {name && email && <span>: </span>}
         {email && (
-          <a className="text-brand hover:underline" href={`mailto:${email}`}>
+          <a
+            className="text-brand-dark hover:underline"
+            href={`mailto:${email}`}
+          >
             {email}
           </a>
         )}
@@ -315,7 +318,7 @@ function UrlSection({ url }: { url: string | null }) {
       <SectionHeading>URL</SectionHeading>
       <p className="mt-2">
         <a
-          className="break-all text-brand hover:underline"
+          className="break-all text-brand-dark hover:underline"
           href={href}
           rel="noopener noreferrer"
           target="_blank"
