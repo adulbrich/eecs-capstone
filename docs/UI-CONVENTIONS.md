@@ -140,14 +140,18 @@ every input an `id` that the `Label`'s `htmlFor` matches, and render errors with
 </div>
 ```
 
-**Form field labels are Title Case; nothing else is.** "Problem Statement",
-"Contact Email", "Private Notes". A checkbox label is a sentence and stays one.
-Page headings, section headings, table headers, legends, badges and buttons
-stay sentence case, so a label reads as the name of a box and a heading as a
-line of prose. Where a form label and a page heading name the same field, the
-two are sibling constants, `FIELD_LABELS` and `FIELD_HEADINGS` in
-`src/lib/project-review-fields.ts`, pinned to the same words by a unit test;
-a case transform would lowercase "IP" and "NDA".
+**On the project and inventory forms, field labels are Title Case; nothing
+else is.** "Problem Statement", "Contact Email", "Private Notes". A checkbox
+label is a sentence and stays one. Page headings, section headings, table
+headers, legends, badges and buttons stay sentence case, so a label reads as
+the name of a box and a heading as a line of prose. The rule is scoped to the
+two long forms on purpose (#375): the labels in dialogs, panels and the
+profile page are still sentence case, and moving them is a separate change.
+Where a form label and a page heading name the same field, the two are
+sibling constants pinned to the same words by a unit test, since a case
+transform would lowercase "IP" and "NDA": `FIELD_LABELS` and `FIELD_HEADINGS`
+in `src/lib/project-review-fields.ts`, and `PRIVATE_NOTES_FIELD_LABEL` beside
+`PRIVATE_NOTES_LABEL` in `src/lib/private-notes.ts`.
 
 **The project and inventory forms set their labels at `text-base`** through
 their local `Field` helpers and the raw `Label` uses beside them, and space

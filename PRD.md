@@ -83,7 +83,7 @@ For developer setup, architecture notes, and the active roadmap, see
 Each project carries:
 
 - [x] Random UUID, title, description, problem statement,
-  objectives/deliverables, minimum qualifications, preferred qualifications,
+  objectives, minimum qualifications, preferred qualifications,
   URL, contact name, contact email, image, license/IP restrictions.
 - [x] The long text fields (description, problem statement, objectives, both
   qualification fields, license/IP restrictions) accept Markdown, authored with

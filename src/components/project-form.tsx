@@ -652,7 +652,7 @@ export function ProjectForm({
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Form generics are unstable; field name comes from schema
 type AnyForm = any;
 
-/** A hairline between the form's three groups; decorative, so no role. */
+/** A hairline between the form's three groups (#375). */
 function Divider() {
   return <hr className="border-border border-t" />;
 }
