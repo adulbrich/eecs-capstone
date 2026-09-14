@@ -415,6 +415,22 @@ deletes exactly them. The `NAMESPACE` constant is shared by
 never change**: a different value re-keys all 547 rows and orphans every image
 object already in the bucket.
 
+### 7a.0 The values the rest of this section uses
+
+Set these once, in the shell you will run 7a from. Nothing below assigns them,
+and an unset bucket name hands `aws` an empty string rather than failing:
+
+```bash
+BOX="$HOME/Library/CloudStorage/Box-Box/Projects"
+# `infra/s3.tf` names it "${var.project}-assets-<account id>"; there is no
+# terraform output for it, so read it from the state or the console.
+ASSETS_BUCKET=$(cd infra && terraform state show aws_s3_bucket.assets \
+  | awk '/^ *bucket  *=/ {gsub(/"/, "", $3); print $3}')
+# A PRIVATE bucket, not the assets one. Create it if it does not exist; the
+# ECS task role needs s3:GetObject on "$OPS_BUCKET/legacy/*".
+OPS_BUCKET=eecs-capstone-ops
+```
+
 ### 7a.1 Prepare the data on a workstation
 
 From the repo, with the Box folder holding `archived-projects-clean.jsonl`,
@@ -441,8 +457,12 @@ Images go to the app's asset bucket (they are public by design, the same as
 any uploaded project image):
 
 ```bash
+# --exclude, because this path does not go through the scripts' key-space
+# guard: a .DS_Store Finder leaves in the tree would upload as an object no
+# row points at. The `upload` mode in 7a.2b refuses those itself.
 aws --profile aws-capstone1 s3 sync ./legacy-out/projects \
-  "s3://$ASSETS_BUCKET/projects/" --region us-west-2
+  "s3://$ASSETS_BUCKET/projects/" --region us-west-2 \
+  --exclude "*" --include "*.webp"
 ```
 
 The two data files go to a **private** bucket or prefix, never the asset
@@ -471,6 +491,25 @@ the image script's own `upload` mode rather than `aws s3 sync`:
 ```bash
 npx tsx --env-file=.env.local scripts/import-legacy-images.ts upload ./legacy-out
 ```
+
+### 7a.2b Running it against a local database
+
+The production steps above are for the deployed stack. The same two scripts
+cover a local one end to end, which is also how to rehearse the import:
+
+```bash
+npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
+  prepare "$BOX/Capstone Portal Migration" ./legacy-out
+npx tsx --env-file=.env.local scripts/import-legacy-images.ts upload ./legacy-out
+cp "$BOX/Capstone Portal Migration/archived-projects-clean.jsonl" ./legacy-out/
+LEGACY_DATA_DIR=./legacy-out node --env-file=.env.local \
+  scripts/import-legacy.mjs --create-missing-programs
+```
+
+`--create-missing-programs` because a fresh local database has no programs to
+match. Leave it off against production, where all four exist and a miss means
+an identifier drifted. The projects file has to sit beside `image-keys.json`
+in `LEGACY_DATA_DIR`: both are read from the same place.
 
 ### 7a.3 Check `programs` first
 
@@ -612,7 +651,18 @@ different filename, then name that file with `LEGACY_DATA_PROJECTS_FILE`. Each
 row carries `target_status`, computed as `archived` or `published` from
 `cp_archived`, and the importer reads it; nothing is hardcoded to `archived`.
 `export.sql` and `clean-export.py` live beside the data in Box, not in this
-repo. `clean-export.py` still routes hidden rows to their
+repo.
+
+Give that set its own S3 prefix as well as its own filename. Its
+`image-keys.json` is named the same as the archived set's, so uploading both
+under `legacy/` overwrites the first and the second import lands with the
+wrong image map. `LEGACY_DATA_S3_URI` is per invocation, so a second prefix
+costs nothing:
+
+```bash
+aws --profile aws-capstone1 s3 cp ./live-out/image-keys.json \
+  "s3://$OPS_BUCKET/legacy-live/" --region us-west-2
+``` `clean-export.py` still routes hidden rows to their
 own file, which matters more here: a hidden live project has never been
 public, and importing it as `published` would list it immediately.
 

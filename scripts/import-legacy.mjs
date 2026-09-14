@@ -56,8 +56,11 @@ const NAMESPACE = "6f2a1c84-0d3e-4b57-9a6f-1e8c5d40b213";
  * `target_status` already says where it lands. Without this the runbook's own
  * "write the result to a different filename" step has no way to be read.
  */
+// `||` rather than `??`: `.env.example` ships this key blank, and a blank
+// value is "unset" here, not "read a file with no name". Every other
+// LEGACY_DATA_* in this file treats blank as unset the same way.
 const PROJECTS_NAME =
-  process.env.LEGACY_DATA_PROJECTS_FILE ?? "archived-projects-clean.jsonl";
+  process.env.LEGACY_DATA_PROJECTS_FILE || "archived-projects-clean.jsonl";
 const IMAGE_KEYS_NAME = "image-keys.json";
 
 /**
@@ -516,8 +519,9 @@ async function main() {
     // An image key naming a cp_id this run did not import would otherwise be
     // invisible: the object is in the bucket and no row points at it. Says so
     // rather than leaving it to a count comparison by eye.
+    const imported = new Set(rows.map((r) => r.legacy_id));
     const orphanKeys = Object.keys(imageKeys).filter(
-      (legacyId) => !rows.some((r) => r.legacy_id === legacyId)
+      (legacyId) => !imported.has(legacyId)
     );
     if (orphanKeys.length > 0) {
       console.log(

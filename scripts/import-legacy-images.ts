@@ -182,6 +182,9 @@ async function upload(outDir: string) {
     // predicate the delete path and the write guard also read. Anything the
     // filesystem contributed on its own, a .DS_Store above all, fails it and
     // is named rather than uploaded as an image nothing points at.
+    //
+    // The production route is `aws s3 sync` and does not pass through here,
+    // so the runbook pairs it with `--include "*.webp"` to the same end.
     const projectId = rel.split("/")[1] ?? "";
     if (!projectImageKeys(projectId).owns(rel)) {
       skipped.push(rel);

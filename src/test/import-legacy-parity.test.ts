@@ -39,8 +39,12 @@ const NAMESPACE_PATTERN = /const NAMESPACE = "([0-9a-f-]{36})";/;
  * whitespace collapsed. The signatures differ by a type annotation, so the
  * body is what compares.
  */
-function uuidv5Body(source: string): string {
-  const open = source.indexOf("{", source.indexOf("function uuidv5"));
+function uuidv5Body(source: string, label: string): string {
+  const declaration = source.indexOf("function uuidv5");
+  if (declaration === -1) {
+    throw new Error(`No function named uuidv5 in ${label}`);
+  }
+  const open = source.indexOf("{", declaration);
   let depth = 0;
   for (let i = open; i < source.length; i++) {
     if (source[i] === "{") {
@@ -55,7 +59,7 @@ function uuidv5Body(source: string): string {
       }
     }
   }
-  throw new Error("Unbalanced braces in uuidv5");
+  throw new Error(`Unbalanced braces in uuidv5 in ${label}`);
 }
 
 describe("the legacy import's two scripts", () => {
@@ -73,7 +77,26 @@ describe("the legacy import's two scripts", () => {
    * the shorter string is a prefix of the longer.
    */
   it("derive ids by the same construction", () => {
-    expect(uuidv5Body(IMAGES_SOURCE)).toBe(uuidv5Body(IMPORT_SOURCE));
+    expect(uuidv5Body(IMAGES_SOURCE, "import-legacy-images.ts")).toBe(
+      uuidv5Body(IMPORT_SOURCE, "import-legacy.mjs")
+    );
+  });
+
+  /**
+   * Comparing the two to each other says they agree, not that they are right:
+   * an edit applied to both passes. These pin the construction itself, so the
+   * known-answer test below stays anchored to something the sources actually
+   * contain rather than to a constant this file alone repeats.
+   */
+  it("derive ids by the construction the fixed vector assumes", () => {
+    for (const source of [IMAGES_SOURCE, IMPORT_SOURCE]) {
+      expect(source).toContain('NAMESPACE.replaceAll("-", "")');
+      expect(source).toContain(
+        '.update(Buffer.concat([ns, Buffer.from(name, "utf8")]))'
+      );
+      expect(source).toContain("hash[6] = (hash[6] & 0x0f) | 0x50;");
+      expect(source).toContain("hash[8] = (hash[8] & 0x3f) | 0x80;");
+    }
   });
 
   it("agree on the name of the key map file", () => {
@@ -82,10 +105,10 @@ describe("the legacy import's two scripts", () => {
   });
 
   /**
-   * A regression pin on the whole construction, independent of both sources:
-   * it recomputes the id here and compares to the value an imported database
-   * already holds. It does NOT execute either script, so it catches a changed
-   * algorithm only together with the text assertions above.
+   * A regression pin, independent of both sources: it recomputes the id here
+   * and compares to the value an imported database already holds. It does NOT
+   * execute either script, so it is the assertions above that tie it to what
+   * the scripts really do.
    */
   it("turn a known cp_id into a known project id", () => {
     const namespace = NAMESPACE_PATTERN.exec(IMPORT_SOURCE)?.[1] as string;
