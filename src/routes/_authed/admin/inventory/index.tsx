@@ -23,6 +23,7 @@ import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { ListingLayout } from "#/components/listing-layout";
 import { LocalTime } from "#/components/local-time";
 import { OverdueBadge } from "#/components/overdue-badge";
+import { SearchHint } from "#/components/search-hint";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -619,10 +620,11 @@ function AdminInventory() {
             Search
           </Label>
           <Input
+            aria-describedby="inv-search-hint"
             className="min-w-0 flex-1 basis-64"
             id="inv-search"
             onChange={(e) => setQDraft(e.target.value)}
-            placeholder="Name, description, serial, label, location, or holder"
+            placeholder="Search inventory"
             type="search"
             value={qDraft}
           />
@@ -677,6 +679,10 @@ function AdminInventory() {
         </>
       }
     >
+      <SearchHint
+        fields="names, descriptions, serials, labels, locations, holders and programs"
+        id="inv-search-hint"
+      />
       <AdminDataTable
         caption="Inventory items"
         controls="listing"

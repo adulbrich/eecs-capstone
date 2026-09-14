@@ -166,6 +166,19 @@ report its absence, because `placeholder` is a fallback in the accessible-name
 computation, so the name reads as non-empty. Six controls shipped this way.
 `src/test/field.test.tsx` enforces it.
 
+**A placeholder is not documentation either.** It has no tooltip, it clips
+without saying so, and it is gone once the reader types. A listing search
+placeholder is a name for the box, "Search projects" or "Search inventory",
+at most about 25 characters: the search row gives `/projects` about 28 at
+768 in table view, and the two long placeholders it replaced clipped there and
+at 375 (#369). What the box searches and the syntax it takes go on a
+`SearchHint` line under the row (`#/components/search-hint`), which the input
+names through `aria-describedby`. The component carries the syntax sentence,
+because every listing search runs through `websearch_to_tsquery`; the route
+passes the fields sentence, which must be true of that page's query. The line
+is text only, so the tab order from the search to the Filters button is what
+the a11y suite asserts.
+
 ### Why not shadcn `form`
 
 The upstream `form` component declares `react-hook-form` and `@hookform/resolvers`
@@ -750,7 +763,10 @@ with the admin forms inline in their routes.
 ```
 
 `search` holds what does not narrow the list: the search input, the sort, the
-card/table `ViewToggle`. It renders on top at every width, beside a "Filters"
+card/table `ViewToggle`. The `SearchHint` line and, on `/projects`, the
+recommendation prompt render from the route as the first children, under the
+row and outside it, so nothing lands between the toggle and the Filters button
+in the tab order. It renders on top at every width, beside a "Filters"
 button that is gone from `xl`. `tableControls` is that table's
 `AdminTableControls` (Export CSV, the Columns menu) when a table is showing, and
 nothing in card view; the layout renders it after the Filters button, at the end

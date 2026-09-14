@@ -20,10 +20,12 @@ import {
   countActiveFilters,
   type FilterCategory,
   type FilterProgram,
+  PROJECTS_SEARCH_HINT_ID,
   ProjectsFilters,
   ProjectsSearchBar,
   RecommendationPrompt,
 } from "#/components/projects-filters";
+import { SearchHint } from "#/components/search-hint";
 import { Button } from "#/components/ui/button";
 import {
   Pagination,
@@ -233,6 +235,10 @@ function ProjectsList() {
         </div>
       }
     >
+      <SearchHint
+        fields="titles, descriptions, objectives and qualifications"
+        id={PROJECTS_SEARCH_HINT_ID}
+      />
       <RecommendationPrompt
         canRecommend={viewer.canRecommend}
         order={search.order}

@@ -56,6 +56,9 @@ interface SearchProps {
   view: ViewMode;
 }
 
+/** The route renders the `SearchHint` under the row; see `projects-filters`. */
+export const INVENTORY_SEARCH_HINT_ID = "inventory-search-hint";
+
 /**
  * The top of the listing at every width: the search and the card/table
  * toggle. Neither narrows the list, which is why they stay beside the
@@ -72,6 +75,7 @@ export function InventorySearchBar({
   return (
     <>
       <Input
+        aria-describedby={INVENTORY_SEARCH_HINT_ID}
         aria-label="Search inventory"
         className="min-w-0 flex-1 basis-64"
         onChange={(e) => setLocalQ(e.target.value)}

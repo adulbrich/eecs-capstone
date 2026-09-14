@@ -22,6 +22,7 @@ import {
   type FilterProgram,
   PROJECT_SWITCH_LABEL,
 } from "#/components/projects-filters";
+import { SearchHint } from "#/components/search-hint";
 import { StatusBadge } from "#/components/status-badge";
 import {
   Breadcrumb,
@@ -792,10 +793,11 @@ function AdminProjects() {
             Search
           </Label>
           <Input
+            aria-describedby="admin-search-hint"
             className="min-w-0 flex-1 basis-64"
             id="admin-search"
             onChange={(e) => setQueryDraft(e.target.value)}
-            placeholder="Title, description, contact, or proposer"
+            placeholder="Search projects"
             type="search"
             value={queryDraft}
           />
@@ -849,6 +851,10 @@ function AdminProjects() {
         </>
       }
     >
+      <SearchHint
+        fields="titles, descriptions, objectives, qualifications, contacts and proposers"
+        id="admin-search-hint"
+      />
       <AdminDataTable
         caption="Projects"
         controls="listing"

@@ -132,6 +132,14 @@ interface SearchProps {
 }
 
 /**
+ * The `SearchHint` under the row is rendered by the route, like
+ * `RecommendationPrompt` below and for the same reason, so the input names
+ * it by a fixed id rather than a `useId` the two would have to share. A
+ * literal is safe here because the bar mounts once, unlike the filters.
+ */
+export const PROJECTS_SEARCH_HINT_ID = "projects-search-hint";
+
+/**
  * The top of the listing at every width: the search, the server order and
  * the card/table toggle. None of these narrows the list, which is why they
  * stay beside the Filters button rather than inside the aside.
@@ -147,10 +155,14 @@ export function ProjectsSearchBar({
   return (
     <>
       <Input
+        aria-describedby={PROJECTS_SEARCH_HINT_ID}
         aria-label="Search projects"
         className="min-w-0 flex-1 basis-64"
         onChange={(e) => setQueryDraft(e.target.value)}
-        placeholder='Search projects (try "phrase" or -word to exclude)'
+        // A name for the box, not its documentation: the row gives it about
+        // 28 characters at 768 in table view, and the fields and the syntax
+        // are on the hint line under the row (#369).
+        placeholder="Search projects"
         type="search"
         value={queryDraft}
       />
