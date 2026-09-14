@@ -43,18 +43,24 @@ import {
  * MUST match `NAMESPACE` in `scripts/import-legacy.mjs`. A project's row id
  * and its image key prefix both derive from it, so a different value here
  * writes objects under keys no imported row points at.
- * `src/test/import-legacy-parity.test.ts` asserts the two agree.
+ *
+ * Three things are shared with that file and cannot be imported across the
+ * runtime boundary: this constant, the `uuidv5` body below, and the
+ * `image-keys.json` filename. `src/test/import-legacy-parity.test.ts` pins
+ * all three, because each fails silently: a drifted filename makes the
+ * importer read nothing, which it is allowed to do, and land every row with
+ * no image and no error.
  */
 const NAMESPACE = "6f2a1c84-0d3e-4b57-9a6f-1e8c5d40b213";
 
 /** RFC 4122 v5 (SHA-1, name-based). Same input always yields the same uuid. */
 function uuidv5(name: string): string {
-  const ns = Buffer.from(NAMESPACE.replace(/-/g, ""), "hex");
+  const ns = Buffer.from(NAMESPACE.replaceAll("-", ""), "hex");
   const hash = createHash("sha1")
     .update(Buffer.concat([ns, Buffer.from(name, "utf8")]))
     .digest();
-  hash[6] = (hash[6] & 0x0f) | 0x50; // version 5
-  hash[8] = (hash[8] & 0x3f) | 0x80; // RFC 4122 variant
+  hash[6] = (hash[6] & 0x0f) | 0x50;
+  hash[8] = (hash[8] & 0x3f) | 0x80;
   const hex = hash.subarray(0, 16).toString("hex");
   return [
     hex.slice(0, 8),
@@ -104,6 +110,10 @@ function imageKeyFor(legacyId: string, imageId: string): string {
  */
 async function prepare(srcDir: string, outDir: string) {
   const rows = readManifest(srcDir);
+  // Before the loop, so a run where every row fails still writes an empty
+  // key map and prints the failures rather than throwing ENOENT on the last
+  // line.
+  mkdirSync(outDir, { recursive: true });
   const keys: Record<string, string> = {};
   const failures: { image_id: string; name: string; reason: string }[] = [];
 
@@ -166,11 +176,24 @@ async function upload(outDir: string) {
     throw new Error(`No projects/ directory in ${outDir}; run prepare first`);
   }
   let count = 0;
+  const skipped: string[] = [];
   for (const rel of walk(projectsDir, outDir)) {
+    // `owns` rather than a bare extension check, because it is the one
+    // predicate the delete path and the write guard also read. Anything the
+    // filesystem contributed on its own, a .DS_Store above all, fails it and
+    // is named rather than uploaded as an image nothing points at.
+    const projectId = rel.split("/")[1] ?? "";
+    if (!projectImageKeys(projectId).owns(rel)) {
+      skipped.push(rel);
+      continue;
+    }
     await storage.put(rel, readFileSync(join(outDir, rel)), "image/webp");
     count++;
   }
   process.stdout.write(`uploaded ${count} objects\n`);
+  for (const rel of skipped) {
+    process.stdout.write(`  skipped ${rel}: outside the project key space\n`);
+  }
 }
 
 async function main() {

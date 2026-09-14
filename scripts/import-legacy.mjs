@@ -49,7 +49,15 @@ import pg from "pg";
  */
 const NAMESPACE = "6f2a1c84-0d3e-4b57-9a6f-1e8c5d40b213";
 
-const PROJECTS_NAME = "archived-projects-clean.jsonl";
+/**
+ * The archived set by default. Overridable because the same pipeline brings
+ * across the projects still live in the old portal: that export goes to a
+ * different filename so the two sets stay separable, and each row's
+ * `target_status` already says where it lands. Without this the runbook's own
+ * "write the result to a different filename" step has no way to be read.
+ */
+const PROJECTS_NAME =
+  process.env.LEGACY_DATA_PROJECTS_FILE ?? "archived-projects-clean.jsonl";
 const IMAGE_KEYS_NAME = "image-keys.json";
 
 /**
@@ -505,6 +513,17 @@ async function main() {
     console.log(
       `Imported ${total} projects (${no_publish} with no publish date, ${with_image} with an image)`
     );
+    // An image key naming a cp_id this run did not import would otherwise be
+    // invisible: the object is in the bucket and no row points at it. Says so
+    // rather than leaving it to a count comparison by eye.
+    const orphanKeys = Object.keys(imageKeys).filter(
+      (legacyId) => !rows.some((r) => r.legacy_id === legacyId)
+    );
+    if (orphanKeys.length > 0) {
+      console.log(
+        `  ${orphanKeys.length} image key(s) name a project not in this import: ${orphanKeys.slice(0, 5).join(", ")}${orphanKeys.length > 5 ? ", ..." : ""}`
+      );
+    }
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {
       // The connection may already be gone; the original error is what matters.

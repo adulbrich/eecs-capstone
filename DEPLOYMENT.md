@@ -457,8 +457,20 @@ aws --profile aws-capstone1 s3 cp ./legacy-out/image-keys.json \
 ```
 
 `$OPS_BUCKET` must block public access and the ECS task role needs
-`s3:GetObject` on `arn:aws:s3:::$OPS_BUCKET/legacy/*`. Delete both objects
-once the import is verified; nothing reads them afterwards.
+`s3:GetObject` on `arn:aws:s3:::$OPS_BUCKET/legacy/*`.
+
+**Keep both objects until you are sure you will not re-run or undo.** The
+importer reads the projects file before it does anything, `--undo` included,
+because the rows are what the imported ids derive from. Delete them when the
+import is settled, and re-upload if you need either again.
+
+For a local run against the dev database, point `LEGACY_DATA_DIR` at a folder
+holding those same two files, and upload the images to the local stack with
+the image script's own `upload` mode rather than `aws s3 sync`:
+
+```bash
+npx tsx --env-file=.env.local scripts/import-legacy-images.ts upload ./legacy-out
+```
 
 ### 7a.3 Check `programs` first
 
@@ -566,8 +578,12 @@ Pass `--skip-existing` to add only the rows that are not there yet and leave
 the rest untouched:
 
 ```bash
-node scripts/import-legacy.mjs --skip-existing
+LEGACY_DATA_S3_URI="s3://$OPS_BUCKET/legacy/" \
+  node scripts/import-legacy.mjs --skip-existing
 ```
+
+(as an ECS container override, the same shape as 7a.4; the flag alone in a
+shell has neither `DATABASE_URL` nor a data location and exits immediately)
 
 Re-running is otherwise safe: the primary key is derived from the legacy
 `cp_id`, so no run can duplicate a row, and the derived image keys mean a
@@ -592,9 +608,11 @@ so they want a staff eye rather than a hardcoded id list).
 
 **To import the projects that are still live in the old portal**, drop the
 `cp_archived = 1` condition from `export.sql` and write the result to a
-different filename. Each row carries `target_status`, computed as `archived`
-or `published` from `cp_archived`, and the importer reads it; nothing is
-hardcoded to `archived`. `clean-export.py` still routes hidden rows to their
+different filename, then name that file with `LEGACY_DATA_PROJECTS_FILE`. Each
+row carries `target_status`, computed as `archived` or `published` from
+`cp_archived`, and the importer reads it; nothing is hardcoded to `archived`.
+`export.sql` and `clean-export.py` live beside the data in Box, not in this
+repo. `clean-export.py` still routes hidden rows to their
 own file, which matters more here: a hidden live project has never been
 public, and importing it as `published` would list it immediately.
 

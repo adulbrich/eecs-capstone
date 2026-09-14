@@ -13,11 +13,19 @@ import { describe, expect, it } from "vitest";
  * - `scripts/import-legacy.mjs` is the only thing that writes to the
  *   database, and runs anywhere.
  *
- * They share exactly one thing, and it is load-bearing: `NAMESPACE`. A
- * project's row id and the prefix of its image key both derive from it, so a
- * value that differed between the two would write every object under a key no
- * imported row points at, with no error anywhere. Nothing else would catch it:
- * the two run months apart, by different people.
+ * Three things cross that boundary and cannot be imported across it, so each
+ * is written out twice and each fails silently if the copies drift:
+ *
+ * - `NAMESPACE`. A project's row id and the prefix of its image key both
+ *   derive from it, so a differing value writes every object under a key no
+ *   imported row points at.
+ * - The `uuidv5` body. Same consequence, reached a different way.
+ * - The `image-keys.json` filename. The importer treats an unreadable key map
+ *   as "the image step has not run yet", which is legal, so a drifted name
+ *   lands all 547 rows with no image and no error.
+ *
+ * Nothing else would catch any of them: the two run months apart, by
+ * different people.
  *
  * Read as text rather than imported, following `env-contract.test.ts`, since
  * importing either module expects a database or object storage.
@@ -25,6 +33,30 @@ import { describe, expect, it } from "vitest";
 const IMAGES_SOURCE = readFileSync("scripts/import-legacy-images.ts", "utf8");
 const IMPORT_SOURCE = readFileSync("scripts/import-legacy.mjs", "utf8");
 const NAMESPACE_PATTERN = /const NAMESPACE = "([0-9a-f-]{36})";/;
+
+/**
+ * Everything between `function uuidv5(...) {` and the closing brace, with
+ * whitespace collapsed. The signatures differ by a type annotation, so the
+ * body is what compares.
+ */
+function uuidv5Body(source: string): string {
+  const open = source.indexOf("{", source.indexOf("function uuidv5"));
+  let depth = 0;
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === "{") {
+      depth++;
+    } else if (source[i] === "}") {
+      depth--;
+      if (depth === 0) {
+        return source
+          .slice(open + 1, i)
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+    }
+  }
+  throw new Error("Unbalanced braces in uuidv5");
+}
 
 describe("the legacy import's two scripts", () => {
   it("derive ids from the same UUIDv5 namespace", () => {
@@ -35,22 +67,18 @@ describe("the legacy import's two scripts", () => {
   });
 
   /**
-   * The two `uuidv5` bodies differ only in a type annotation, so the lines
-   * that matter compare directly as text. Named individually rather than
-   * diffed whole: these four are the ones whose divergence is silent, where a
-   * changed hash input or a wrong version nibble yields a valid-looking uuid
-   * that simply addresses nothing.
+   * The whole body, not a sample of lines. An earlier version of this test
+   * asserted four lines and passed while the two spelled the first one
+   * differently (`replace(/-/g, "")` against `replaceAll("-", "")`), because
+   * the shorter string is a prefix of the longer.
    */
   it("derive ids by the same construction", () => {
-    for (const line of [
-      "const ns = Buffer.from(NAMESPACE.replace",
-      '.update(Buffer.concat([ns, Buffer.from(name, "utf8")]))',
-      "hash[6] = (hash[6] & 0x0f) | 0x50;",
-      "hash[8] = (hash[8] & 0x3f) | 0x80;",
-    ]) {
-      expect(IMAGES_SOURCE, `import-legacy-images.ts: ${line}`).toContain(line);
-      expect(IMPORT_SOURCE, `import-legacy.mjs: ${line}`).toContain(line);
-    }
+    expect(uuidv5Body(IMAGES_SOURCE)).toBe(uuidv5Body(IMPORT_SOURCE));
+  });
+
+  it("agree on the name of the key map file", () => {
+    expect(IMAGES_SOURCE).toContain('"image-keys.json"');
+    expect(IMPORT_SOURCE).toContain('"image-keys.json"');
   });
 
   /**
