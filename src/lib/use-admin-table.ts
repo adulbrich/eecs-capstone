@@ -97,10 +97,10 @@ interface UseAdminTableOptions<
  *
  * `controlsProps` is the second bag, for `AdminTableControls` when a listing
  * renders Export CSV and the Columns menu in its search row rather than on
- * the table's own row. It repeats `columns` and `storageKey` from
- * `tableProps` for the same reason the first bag exists: named once here,
- * the menu and the table cannot disagree about which key the layout is
- * stored under.
+ * the table's own row. Its four members are all in `tableProps` too, and
+ * they come from one place for the same reason the first bag exists: named
+ * once here, the menu and the table cannot disagree about which columns can
+ * hide, which are hidden, or which key the layout is stored under.
  */
 export function useAdminTable<
   TSearch extends AdminTableSearch,

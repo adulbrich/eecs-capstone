@@ -737,7 +737,11 @@ with the admin forms inline in their routes.
   className="mx-auto max-w-4xl xl:max-w-7xl"
   filters={<ProjectsFilters {...state} />}
   search={<ProjectsSearchBar {...top} />}
-  tableControls={view === "table" ? <AdminTableControls {...controls} /> : undefined}
+  tableControls={
+    view === "table" ? (
+      <AdminTableControls filtered={filtered} rowCount={rows.length} {...controlsProps} />
+    ) : undefined
+  }
   title={<h1 className="font-semibold text-2xl">Projects</h1>}
 >
   {rows}
