@@ -97,8 +97,11 @@ rule in `styles.css` already sets the underline's color, thickness and offset,
 so the class only turns the line on. `hover:underline` stays right for a link
 in default-colored prose, a table cell or a card, where the color itself is
 the cue (#361 lists what the pass found; the sign-in, sign-up and profile pages
-had the underline before it). Color against the background is the separate
-rule under "Color tokens".
+had the underline before it). A shared component that lands in colored prose
+anywhere carries the underline everywhere, as `SupportEmailLink` does in the
+privacy policy: one look per component, no prop to get wrong. Breadcrumbs are
+a navigation landmark rather than prose, so their links keep the hover cue.
+Color against the background is the separate rule under "Color tokens".
 
 ### Plain navigation links use `.nav-link`
 
