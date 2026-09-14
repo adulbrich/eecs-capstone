@@ -94,10 +94,16 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
   }
 
   // Opt the owner user into mentoring so /admin/mentors renders a populated
-  // row (Input + Save/Remove buttons) for axe to scan, not just the empty state.
+  // row (Input + Save/Remove buttons) for axe to scan, not just the empty
+  // state, and give them a LinkedIn address so the admin user detail renders
+  // that link in body copy for the underline assertion.
   await db
     .update(schema.user)
-    .set({ wantsToMentor: true, mentorTeamCount: 2 })
+    .set({
+      linkedin: "https://www.linkedin.com/in/a11y-owner",
+      mentorTeamCount: 2,
+      wantsToMentor: true,
+    })
     .where(eq(schema.user.id, owner.id));
 
   // Self-heal any row left behind by a create-dialog test that failed after
@@ -176,6 +182,13 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
     .onConflictDoNothing();
 
   // Project (no unique constraint on title, hence the select-first pattern)
+  // The detail scan asserts the contact address and the URL as links in
+  // body copy, so the fixture carries both; `public.a11y.test.ts` names them.
+  const A11Y_PROJECT_CONTACT = {
+    contactEmail: "a11y-contact@example.com",
+    contactName: "A11y Contact",
+    url: "https://example.com/a11y-project",
+  };
   let [project] = await db
     .select()
     .from(schema.projects)
@@ -223,7 +236,17 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
           "2. Set up the local dev environment\n\n```sh\nnpm install\n```",
         status: "published",
         proposerId: owner.id,
+        ...A11Y_PROJECT_CONTACT,
       })
+      .returning();
+  } else if (!project.contactEmail) {
+    // A row from before the contact fields existed: the detail scan reads
+    // the address and the URL, so fill them in rather than fail on a stale
+    // local fixture.
+    [project] = await db
+      .update(schema.projects)
+      .set(A11Y_PROJECT_CONTACT)
+      .where(eq(schema.projects.id, project.id))
       .returning();
   }
 

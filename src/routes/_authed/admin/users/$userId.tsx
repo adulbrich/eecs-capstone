@@ -111,7 +111,12 @@ function UserDetail() {
       {user.linkedin && (
         <p className="text-sm">
           <span className="text-muted-foreground">LinkedIn: </span>
-          <a href={user.linkedin}>{user.linkedin}</a>
+          <a
+            className="break-all text-brand-dark underline"
+            href={user.linkedin}
+          >
+            {user.linkedin}
+          </a>
         </p>
       )}
       {user.wantsToMentor && (

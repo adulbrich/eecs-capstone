@@ -74,7 +74,7 @@ export function NeedsAttention({
       </ul>
       <p className="mt-2 text-sm">
         <Link
-          className="text-brand-dark hover:underline"
+          className="text-brand-dark underline"
           search={{ filter: "open" }}
           to="/my/items"
         >

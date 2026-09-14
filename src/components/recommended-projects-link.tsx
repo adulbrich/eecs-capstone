@@ -6,7 +6,7 @@ import { Link } from "@tanstack/react-router";
  * unit test can pin the target without rendering the profile route.
  *
  * Underlined at rest: its one home is the muted "Saved." line under the
- * interests form (UI-CONVENTIONS, "A link inside colored prose").
+ * interests form (UI-CONVENTIONS, "A link inside running text").
  */
 export function RecommendedProjectsLink() {
   return (

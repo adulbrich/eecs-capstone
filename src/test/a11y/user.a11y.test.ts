@@ -7,7 +7,7 @@ import {
   waitForHydration,
   waitForSurfaceSettled,
 } from "../shared/playwright";
-import { checkA11y } from "./helpers";
+import { checkA11y, expectUnderlinedAtRest } from "./helpers";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -171,7 +171,10 @@ test("my items opens by saying what needs attention", async ({ page }) => {
   // Borrow list tab shows the assembled request rather than the empty state.
   const region = page.getByRole("region", { name: "Needs your attention" });
   await expect(region).toBeVisible();
-  await expect(region.getByRole("link", { name: /below/ })).toBeVisible();
+  const below = region.getByRole("link", { name: /below/ });
+  await expect(below).toBeVisible();
+  // The one link in the callout is body copy under a list (#364).
+  await expectUnderlinedAtRest(below);
   // The borrow list is the first group, with Submit on its header and the
   // dialog that carries the note behind it.
   await expect(page.getByText("Not submitted yet")).toBeVisible();
