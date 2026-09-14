@@ -763,11 +763,11 @@ with the admin forms inline in their routes.
 ```
 
 `search` holds what does not narrow the list: the search input, the sort, the
-card/table `ViewToggle`. The `SearchHint` line and, on `/projects`, the
-recommendation prompt render from the route as the first children, under the
-row and outside it, so nothing lands between the toggle and the Filters button
-in the tab order. It renders on top at every width, beside a "Filters"
-button that is gone from `xl`. `tableControls` is that table's
+card/table `ViewToggle`. The row renders on top at every width, beside a
+"Filters" button that is gone from `xl`. The `SearchHint` line and, on
+`/projects`, the recommendation prompt render from the route as the first
+children, under the row and outside it, so nothing lands between the toggle and
+the Filters button in the tab order. `tableControls` is that table's
 `AdminTableControls` (Export CSV, the Columns menu) when a table is showing, and
 nothing in card view; the layout renders it after the Filters button, at the end
 of the same row. The row is one line from

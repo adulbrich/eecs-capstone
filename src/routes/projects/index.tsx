@@ -236,7 +236,7 @@ function ProjectsList() {
       }
     >
       <SearchHint
-        fields="titles, descriptions, objectives and qualifications"
+        fields="titles, descriptions, problem statements, objectives and qualifications"
         id={PROJECTS_SEARCH_HINT_ID}
       />
       <RecommendationPrompt

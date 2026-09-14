@@ -379,6 +379,9 @@ export const COLUMNS = defineAdminColumns<Row>()([
 // fullForStaff's projection cannot silently miss the file. InventoryItemStaff
 // is a hand-picked field list, not the bare table row, so searchVector was
 // never a member of Row to begin with.
+/** The hint line under the search row, named by the input; see `SearchHint`. */
+const SEARCH_HINT_ID = "inv-search-hint";
+
 const EXPORT_COLUMNS = defineCsvColumns<Row>()([
   { header: "ID", key: "id", value: (row) => row.id },
   { header: "Name", key: "name", value: (row) => row.name },
@@ -620,7 +623,7 @@ function AdminInventory() {
             Search
           </Label>
           <Input
-            aria-describedby="inv-search-hint"
+            aria-describedby={SEARCH_HINT_ID}
             className="min-w-0 flex-1 basis-64"
             id="inv-search"
             onChange={(e) => setQDraft(e.target.value)}
@@ -681,7 +684,7 @@ function AdminInventory() {
     >
       <SearchHint
         fields="names, descriptions, serials, labels, locations, holders and programs"
-        id="inv-search-hint"
+        id={SEARCH_HINT_ID}
       />
       <AdminDataTable
         caption="Inventory items"

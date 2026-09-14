@@ -188,6 +188,9 @@ type Row = Awaited<ReturnType<typeof listAdminProjects>>["rows"][number];
 
 const DEFAULT_SORT: SortState = { desc: true, id: "updatedAt" };
 
+/** The hint line under the search row, named by the input; see `SearchHint`. */
+const SEARCH_HINT_ID = "admin-search-hint";
+
 const COLUMNS = defineAdminColumns<Row>()([
   {
     accessorFn: (row) => row.title,
@@ -793,7 +796,7 @@ function AdminProjects() {
             Search
           </Label>
           <Input
-            aria-describedby="admin-search-hint"
+            aria-describedby={SEARCH_HINT_ID}
             className="min-w-0 flex-1 basis-64"
             id="admin-search"
             onChange={(e) => setQueryDraft(e.target.value)}
@@ -852,8 +855,8 @@ function AdminProjects() {
       }
     >
       <SearchHint
-        fields="titles, descriptions, objectives, qualifications, contacts and proposers"
-        id="admin-search-hint"
+        fields="titles, descriptions, problem statements, objectives, qualifications, contacts and proposers"
+        id={SEARCH_HINT_ID}
       />
       <AdminDataTable
         caption="Projects"
