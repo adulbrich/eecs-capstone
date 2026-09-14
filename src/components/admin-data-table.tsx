@@ -452,13 +452,12 @@ export function AdminTableControls<T extends RowData>({
       : [...hidden, id];
     commitHidden(nextHidden, defaultHidden, storageKey, onHiddenChange);
   };
-  const reset = () => {
-    // Clear the stored preference rather than writing the default set into
-    // it. "Reset" means "I no longer have a preference," not "my preference
-    // happens to equal the default."
-    clearStoredHidden(storageKey);
-    onHiddenChange(undefined);
-  };
+  // A reset is a commit of the page default, and `commitHidden` clears the
+  // stored preference for that set rather than recording it: "Reset" means
+  // "I no longer have a preference," not "my preference happens to equal
+  // the default."
+  const reset = () =>
+    commitHidden(defaultHidden, defaultHidden, storageKey, onHiddenChange);
   return (
     <>
       {actions}

@@ -414,9 +414,10 @@ and Columns menu sit in the search row rather than on the table's own row. Pass
 where the controls should go. The component is built from the column list and the hidden
 set rather than from the table instance, which is what lets it render in another subtree;
 it hides itself under the same rule as the table (no rows and no filter, #260), and
-the `rowCount` and `filtered` it takes are the table's own. Every other admin table
-leaves `controls` at its default and keeps its `toolbar` on the left of the table's row
-with Export and Columns on the right.
+the `rowCount` and `filtered` it takes are the table's own. Every other table leaves
+`controls` at its default and gets the table's own row: whatever it passes as `toolbar`
+on the left, its `actions` and the Columns menu on the right, and nothing visible when
+it passes neither and no column can hide (the bookmarks shortlist).
 
 `resetPageOnSort` is unsatisfiable unless the route's own search type declares a `page`,
 so setting it on a route that paginates nothing is a compile error rather than a stray
