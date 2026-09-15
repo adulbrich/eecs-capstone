@@ -15,6 +15,7 @@ import {
 } from "#/lib/_internal/bedrock-embed";
 import {
   buildInterestsEmbeddingSource,
+  buildProgramLabel,
   buildProjectEmbeddingSource,
   embeddingHash,
 } from "#/lib/embedding-source";
@@ -28,9 +29,9 @@ export type RefreshOutcome =
   | "failed";
 
 /**
- * The statuses that carry an embedding, and the single spelling of that rule:
- * `refreshProjectEmbedding` gates on it, and both callers in `projects.ts` ask
- * it rather than repeating the comparison.
+ * The statuses that carry an embedding. `refreshProjectEmbedding` gates on it,
+ * both callers in `projects.ts` ask it rather than repeating the comparison,
+ * and `scripts/backfill-embeddings.ts` selects on it.
  *
  * `archived` is in because the 547 projects imported from the legacy portal
  * land there directly and would otherwise never get a vector (#427). An
@@ -38,11 +39,23 @@ export type RefreshOutcome =
  * (`src/lib/project-workflow.ts`), so archiving keeps the vector it had; this
  * is what lets an archived project be re-embedded when someone edits it.
  *
- * Adding a status here does not backfill the rows already in it. Run
- * `scripts/backfill-embeddings.mjs` for that.
+ * `canSeeProject` in `src/lib/project-visibility.ts` names the same two
+ * statuses today and is a different rule (who may read a project, not what
+ * carries a vector). They are free to diverge; do not merge them.
+ *
+ * Two things this does not reach. `scripts/backfill-embeddings.mjs` spells the
+ * set again in SQL, because the production image ships no `src/`, and
+ * `src/test/backfill-embeddings-parity.test.ts` pins that copy against this
+ * one. And adding a status here embeds nothing that is already in it: run
+ * either sweeper for that.
  */
+export const EMBEDDABLE_STATUSES: readonly ProjectStatus[] = [
+  "published",
+  "archived",
+];
+
 export function isEmbeddableStatus(status: ProjectStatus): boolean {
-  return status === "published" || status === "archived";
+  return EMBEDDABLE_STATUSES.includes(status);
 }
 
 /** pgvector's text input format, e.g. `[0.1,0.2]`. */
@@ -90,7 +103,7 @@ export async function refreshProjectEmbedding(
         .from(programs)
         .where(eq(programs.id, project.programId));
       programLabel = program
-        ? `${program.courseId} ${program.courseName}`
+        ? buildProgramLabel(program.courseId, program.courseName)
         : null;
     }
 

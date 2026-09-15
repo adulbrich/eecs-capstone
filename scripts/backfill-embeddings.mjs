@@ -19,17 +19,21 @@
  *
  * ## The duplication, and what it costs
  *
- * Five things below are copied from `src/` and cannot be imported across the
- * image boundary. This is the accepted cost of shipping an `.mjs` rather than
- * compiling the TypeScript sweeper into the image, taken because this is
- * expected to run a couple of times, not continuously (#427).
+ * Everything below marked `MUST match` is copied from `src/` and cannot be
+ * imported across the image boundary. This is the accepted cost of shipping an
+ * `.mjs` rather than compiling the TypeScript sweeper into the image, taken
+ * because this is expected to run a couple of times, not continuously. See
+ * `docs/adr/0024-ops-scripts-are-plain-mjs.md`.
  *
- * - `EMBEDDING_SOURCE_LIMIT`, `section` and `buildProjectEmbeddingSource` from
- *   `src/lib/embedding-source.ts`. If these drift, the script stores vectors
- *   computed from different text than the app would use for the same project.
- *   Nothing errors, recommendations quietly get worse, and the stored hash
- *   still looks valid to the app, so nothing ever recomputes them. This is the
- *   worst of the three failures and the only silent one.
+ * Eight of them are pinned by `src/test/backfill-embeddings-parity.test.ts`,
+ * because their drift is silent or expensive:
+ *
+ * - `EMBEDDING_SOURCE_LIMIT`, `section`, `buildProgramLabel` and
+ *   `buildProjectEmbeddingSource` from `src/lib/embedding-source.ts`. If these
+ *   drift, the script stores vectors computed from different text than the app
+ *   would use for the same project. Nothing errors, recommendations quietly
+ *   get worse, and the stored hash still looks valid to the app, so nothing
+ *   ever recomputes them. This is the worst failure and the only silent one.
  * - `embeddingHash` from the same file. If its inputs drift, every row looks
  *   stale to whichever side did not change, so runs re-embed rows that were
  *   already correct at one paid Bedrock call each, and the two sides can
@@ -38,12 +42,20 @@
  *   `src/lib/_internal/bedrock-embed.ts`. If the dimension default drifts,
  *   pgvector rejects the insert because the column is fixed at 1024. Loud, and
  *   therefore the least dangerous.
+ * - The status set in `SELECT_SQL`, against `EMBEDDABLE_STATUSES`, and the
+ *   alias list in the same query against `EmbeddableProject`. A status added
+ *   to the app alone is rows this never sweeps; a field added to the app alone
+ *   is a section missing from every string this embeds, with no error, because
+ *   `section` reads an absent key as an empty one.
  *
- * `src/test/backfill-embeddings-parity.test.ts` compares all five bodies as
- * text and pins the hash and config constructions against literals, so a
- * change to one side without the other fails the unit suite. Keep the copied
- * bodies free of comments and of TypeScript annotations: the comparison
- * collapses whitespace but cannot strip either. Explain above the function.
+ * Four more are copied and deliberately not pinned, because drift in each is
+ * loud rather than silent: `parseEmbedResponse` and `buildBedrockConfig`,
+ * whose TypeScript bodies carry annotations an `.mjs` cannot hold, plus
+ * `toSqlVector` and `DEFAULT_REGION`.
+ *
+ * Keep every pinned body free of comments and of TypeScript annotations: the
+ * comparison collapses whitespace but cannot strip either. Explain above the
+ * function.
  */
 import { createHash } from "node:crypto";
 import {
@@ -60,6 +72,11 @@ const EMBEDDING_SOURCE_LIMIT = 45_000;
 
 /** MUST match `DEFAULT_REGION` in `src/lib/_internal/bedrock.ts`. */
 const DEFAULT_REGION = "us-east-1";
+
+/** MUST match `buildProgramLabel` in `src/lib/embedding-source.ts`. */
+function buildProgramLabel(courseId, courseName) {
+  return `${courseId} ${courseName}`;
+}
 
 /** MUST match `section` in `src/lib/embedding-source.ts`. */
 function section(label, value) {
@@ -254,7 +271,7 @@ async function main() {
           const programs = await db.query(PROGRAM_SQL, [project.programId]);
           const program = programs.rows[0];
           programLabel = program
-            ? `${program.courseId} ${program.courseName}`
+            ? buildProgramLabel(program.courseId, program.courseName)
             : null;
         }
 

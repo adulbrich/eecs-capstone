@@ -12,14 +12,15 @@ import { describe, expect, it } from "vitest";
  *   `src/`. Nothing under `#/lib` resolves there, so it carries its own copy
  *   of what it needs.
  *
- * Five declarations cross that boundary, and each fails silently or expensively
- * if the copies drift (#427):
+ * Eight declarations cross that boundary, and each fails silently or
+ * expensively if the copies drift (#427):
  *
- * - `EMBEDDING_SOURCE_LIMIT`, `section` and `buildProjectEmbeddingSource`
- *   assemble the exact text that gets embedded. Drift stores vectors computed
- *   from text the app would never produce for that project. Nothing errors, the
- *   stored hash still looks valid to the app, so nothing recomputes them, and
- *   recommendations quietly get worse. The only silent failure of the three.
+ * - `EMBEDDING_SOURCE_LIMIT`, `section`, `buildProgramLabel` and
+ *   `buildProjectEmbeddingSource` assemble the exact text that gets embedded.
+ *   Drift stores vectors computed from text the app would never produce for
+ *   that project. Nothing errors, the stored hash still looks valid to the app,
+ *   so nothing recomputes them, and recommendations quietly get worse. The only
+ *   silent failure of the set.
  * - `embeddingHash` decides whether a project needs re-embedding. Drift in its
  *   inputs makes every row look stale to whichever side did not change, so both
  *   sides re-embed rows that were already correct at one paid Bedrock call
@@ -27,6 +28,13 @@ import { describe, expect, it } from "vitest";
  * - `buildEmbedConfig` carries the model id and dimension defaults, which are
  *   themselves hash inputs. A dimension change is loud, since pgvector rejects
  *   a vector that is not 1024 wide, but a model id change is not.
+ * - The script's `SELECT_SQL` spells the embeddable status set again in SQL,
+ *   and names every field `buildProjectEmbeddingSource` reads. A status added
+ *   to `EMBEDDABLE_STATUSES` alone leaves rows the script never sweeps; a field
+ *   added to `EmbeddableProject` alone is worse, because the parity comparison
+ *   below then forces the script's builder body to read a key the query never
+ *   selected, and `section` treats an absent key as an empty one. The section
+ *   silently vanishes from every string the script embeds.
  *
  * Nothing else would catch any of them: the two run months apart, by different
  * people, and the `.mjs` runs where no test does.
@@ -43,6 +51,24 @@ const SOURCE_FILE = readFileSync("src/lib/embedding-source.ts", "utf8");
 const BEDROCK_FILE = readFileSync("src/lib/_internal/bedrock-embed.ts", "utf8");
 const SCRIPT_FILE = readFileSync("scripts/backfill-embeddings.mjs", "utf8");
 const LIMIT_PATTERN = /const EMBEDDING_SOURCE_LIMIT = ([0-9_]+);/;
+const EMBEDDINGS_FILE = readFileSync(
+  "src/server/_internal/project-embeddings.ts",
+  "utf8"
+);
+
+const STATUS_SET_PATTERN =
+  /const EMBEDDABLE_STATUSES: readonly ProjectStatus\[\] = \[([^\]]*)\]/;
+const SQL_STATUS_PATTERN = /WHERE status IN \(([^)]*)\)/;
+const INTERFACE_PATTERN = /export interface EmbeddableProject \{([^}]*)\}/;
+const SELECT_SQL_PATTERN = /const SELECT_SQL = `([^`]*)`/;
+
+/** The quoted words inside a captured `[...]` or `(...)`, in source order. */
+function quotedWords(inner: string | undefined, label: string): string[] {
+  if (inner === undefined) {
+    throw new Error(`Nothing to read in ${label}`);
+  }
+  return [...inner.matchAll(/["']([a-z_]+)["']/g)].map((match) => match[1]);
+}
 
 /**
  * Everything between `function <name>(...) {` and the closing brace, with
@@ -51,7 +77,15 @@ const LIMIT_PATTERN = /const EMBEDDING_SOURCE_LIMIT = ([0-9_]+);/;
  * annotations and of comments: this collapses whitespace and strips neither.
  */
 function functionBody(source: string, name: string, label: string): string {
-  const declaration = source.indexOf(`function ${name}`);
+  // Anchored rather than `indexOf("function " + name)`, which matches a longer
+  // name starting with this one and matches the words inside a comment, either
+  // of which silently compares the wrong body in the one test whose job is
+  // catching silent drift. Every function it compares sits at column zero, so
+  // the newline is what keeps it out of the JSDoc above it, and the `(` is
+  // what stops `section` matching a later `sectionHeader`.
+  const declaration = source.search(
+    new RegExp(`\\n(?:export )?function ${name}\\s*\\(`)
+  );
   if (declaration === -1) {
     throw new Error(`No function named ${name} in ${label}`);
   }
@@ -84,6 +118,15 @@ describe("the production backfill's copies of the embedding helpers", () => {
   it("assemble a section the same way", () => {
     const [fromSrc, fromScript] = bothBodies(
       "section",
+      SOURCE_FILE,
+      "embedding-source.ts"
+    );
+    expect(fromScript).toBe(fromSrc);
+  });
+
+  it("label a program the same way", () => {
+    const [fromSrc, fromScript] = bothBodies(
+      "buildProgramLabel",
       SOURCE_FILE,
       "embedding-source.ts"
     );
@@ -176,6 +219,55 @@ describe("the production backfill's copies of the embedding helpers", () => {
       "bedrock-embed.ts"
     );
     expect(fromScript).toBe(fromSrc);
+  });
+
+  /**
+   * The script cannot import `EMBEDDABLE_STATUSES`, so it spells the set again
+   * in SQL. Widening one side alone is silent: the app starts writing vectors
+   * for a status the sweeper never selects, so every row already in that status
+   * stays null forever and nothing says so.
+   */
+  it("sweep exactly the statuses the app embeds", () => {
+    const fromSrc = quotedWords(
+      STATUS_SET_PATTERN.exec(EMBEDDINGS_FILE)?.[1],
+      "EMBEDDABLE_STATUSES in project-embeddings.ts"
+    );
+    const fromScript = quotedWords(
+      SQL_STATUS_PATTERN.exec(SCRIPT_FILE)?.[1],
+      "SELECT_SQL in backfill-embeddings.mjs"
+    );
+    expect(fromSrc).toEqual(["published", "archived"]);
+    expect(fromScript).toEqual(fromSrc);
+  });
+
+  /**
+   * The nastiest of the pins, because the body comparison above actively hides
+   * this one. Add a field to `EmbeddableProject` and to the builder, and the
+   * script's copied body has to read `project.newField` to stay byte-identical,
+   * while nothing makes `SELECT_SQL` fetch that column. `section` reads the
+   * absent key as an empty value and returns null, so the whole section drops
+   * out of every string the script embeds, with no error and a hash the app
+   * accepts as current.
+   */
+  it("select every field the embedded text is built from", () => {
+    const interfaceBody = INTERFACE_PATTERN.exec(SOURCE_FILE)?.[1];
+    expect(interfaceBody).toBeDefined();
+    const keys = [
+      ...(interfaceBody as string).matchAll(/^\s*(\w+)\s*[?:]/gm),
+    ].map((match) => match[1]);
+    // Guards the regex itself: an interface that stopped matching would
+    // otherwise pass this test with nothing to check.
+    expect(keys).toContain("title");
+    expect(keys.length).toBeGreaterThan(5);
+
+    const selectSql = SELECT_SQL_PATTERN.exec(SCRIPT_FILE)?.[1];
+    expect(selectSql).toBeDefined();
+    for (const key of keys) {
+      // Either the column is already camelCase (`title`) or the query aliases
+      // it to camelCase (`problem_statement AS "problemStatement"`), so the key
+      // itself is what appears either way.
+      expect(selectSql).toContain(key);
+    }
   });
 
   /**

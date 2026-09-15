@@ -22,6 +22,19 @@ function section(label: string, value: string | null): string | null {
 }
 
 /**
+ * The "Program" section's text. Here rather than inline at the two call sites
+ * because it is part of the embedded source, so it has to be pinned like the
+ * rest of it: change the space to a colon in the app alone and every hash the
+ * script wrote silently stops matching, with nothing to say so.
+ */
+export function buildProgramLabel(
+  courseId: string,
+  courseName: string
+): string {
+  return `${courseId} ${courseName}`;
+}
+
+/**
  * Assembles the exact string that gets embedded.
  *
  * `scripts/backfill-embeddings.mjs` carries a byte-identical copy of this

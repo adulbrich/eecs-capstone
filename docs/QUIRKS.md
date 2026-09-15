@@ -987,11 +987,13 @@ grep -rn 'insert(projectStatusHistory)' src --include='*.ts' | grep -v __tests__
 
 `update(projects)` has five legitimate non-status writers, so a grep on that proves nothing.
 
-### There are two embedding backfills, and only one of them runs in production
+### A declaration a parity test compares carries no comment and no type annotation
 
-`scripts/backfill-embeddings.ts` calls `refreshProjectEmbedding`, so it has nothing to keep in sync, and it cannot run in production: it imports from `src/`, and the runtime image installs with `npm ci --omit=dev` (no `tsx`) and ships `.output` without `src/`. `scripts/backfill-embeddings.mjs` is the one that runs as an ECS task, and it pays for that by carrying its own copy of `EMBEDDING_SOURCE_LIMIT`, `section`, `buildProjectEmbeddingSource`, `embeddingHash`, `buildEmbedConfig` and `buildEmbedRequestBody`. `src/test/backfill-embeddings-parity.test.ts` compares those bodies as text with whitespace collapsed, so **keep them free of comments and of TypeScript annotations**: a comment inside one of them, or a type predicate on the `filter` in `buildProjectEmbeddingSource`, fails a comparison an `.mjs` can never match. Explain above the function instead. The worst drift is silent: a source builder that differs stores vectors computed from text the app would never produce, and the stored hash still looks valid, so nothing recomputes them.
+`src/test/backfill-embeddings-parity.test.ts` and `src/test/import-legacy-parity.test.ts` compare whole function bodies as text with whitespace collapsed ([ADR-0024](./adr/0024-ops-scripts-are-plain-mjs.md)), and that comparison strips neither. So a comment inside `buildProjectEmbeddingSource`, or the `(part): part is string` predicate its `filter` used to carry, fails against an `.mjs` copy that can hold neither. Put the explanation in the JSDoc above the function.
 
-Neither sweeper refreshes a stale vector. `.mjs` selects `embedding IS NULL` only, which is what makes a second run free, and `.ts` leans on the hash check inside `refreshProjectEmbedding`. Re-embedding a project whose text changed is `refreshProjectEmbedding`'s job on edit.
+### There are two embedding backfills, and only the `.mjs` runs in production
+
+`scripts/backfill-embeddings.ts` calls `refreshProjectEmbedding` and needs `tsx` and `src/`, so it is workstation only; `scripts/backfill-embeddings.mjs` is the ECS task, and pays for that with the copies ADR-0024 describes. Neither refreshes a stale vector: the `.mjs` selects `embedding IS NULL` only, which is what makes a second run free, and the `.ts` leans on the hash check inside `refreshProjectEmbedding`. Re-embedding a project whose text changed is `refreshProjectEmbedding`'s job on edit.
 
 ### `sendEmail` is decided by role in `performTransitionAs`, not by the schema
 

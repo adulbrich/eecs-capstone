@@ -10,7 +10,10 @@
 import { and, inArray, isNull } from "drizzle-orm";
 import { db } from "../src/db";
 import { projects } from "../src/db/schema";
-import { refreshProjectEmbedding } from "../src/server/_internal/project-embeddings";
+import {
+  EMBEDDABLE_STATUSES,
+  refreshProjectEmbedding,
+} from "../src/server/_internal/project-embeddings";
 
 const DELAY_MS = 200;
 
@@ -24,7 +27,7 @@ async function main() {
     .from(projects)
     .where(
       and(
-        inArray(projects.status, ["published", "archived"]),
+        inArray(projects.status, [...EMBEDDABLE_STATUSES]),
         isNull(projects.deletedAt)
       )
     );
@@ -47,7 +50,7 @@ async function main() {
   }
 
   process.stdout.write(
-    `\n${rows.length} published or archived projects: ${tally.updated} updated, ` +
+    `\n${rows.length} embeddable projects: ${tally.updated} updated, ` +
       `${tally.unchanged} already current, ${tally.failed} failed, ` +
       `${tally.skipped} skipped.\n`
   );
