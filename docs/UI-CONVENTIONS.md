@@ -705,10 +705,12 @@ and can be told not to send (#379, ADR-0019). Render `SendEmailCheckbox` from
 already has: "Email <address>", checked by default, over a line saying what
 unchecking leaves in place. Pick the line from `EMAIL_SKIP_HINT`: `withBell`
 when the action also writes an in-app notification, `emailOnly` when email is
-the only channel (a mentor named, a hard delete, a role change, a ban). With
-`address={null}` the box is disabled and reads "No address on file, no email
-will be sent"; keep sending `true` in that state and let the server decide
-who is reachable.
+the only channel (a mentor named, a hard delete, a role change, a ban), and
+`holder` for a hold, where an account holder gets the row and a walk-in does
+not. With `address={null}` the box is disabled and reads "No address on file,
+no email will be sent"; keep sending `true` in that state and let the server
+decide who is reachable. A popover carries it the same way a dialog does: the
+inventory queue's approve and reject popovers do.
 
 A Save that had no dialog opens `SendEmailDialog` from
 `#/components/send-email-dialog`, and only when the pending change would
