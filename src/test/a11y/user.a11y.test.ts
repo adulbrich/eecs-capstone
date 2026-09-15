@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Locator } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import {
   expectNoHorizontalOverflow,
@@ -48,6 +49,49 @@ test("projects list, signed in, with bookmark controls", async ({ page }) => {
   await expect(page.locator(".admin-table")).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await checkA11y(page);
+});
+
+/**
+ * A rendered `<button>` and an `asChild` `<Link>` of the same variant read the
+ * same (UI-CONVENTIONS, "A variant owns its text colour at rest" and "A button
+ * shows the hand cursor").
+ *
+ * Before #392 the anchor inherited the global `a` rule, brand orange, and the
+ * browser's hand cursor, while the button inherited the body colour and the
+ * arrow, so the cursor told the reader which element the code had chosen. Both
+ * are `outline`; the sizes differ, which is why only colour and cursor are
+ * compared. jsdom computes neither, so this is the suite that can see it.
+ */
+test("an outline Button and an outline asChild Link read the same", async ({
+  page,
+}) => {
+  await page.goto("/projects");
+  await waitForHydration(page);
+  const link = page.getByRole("link", { name: "Propose project" });
+  // The unpressed half of the view toggle: the pressed one takes the
+  // aria-pressed fill, which is a background rather than a colour.
+  const button = page.getByRole("button", { name: "Table view" });
+  await expect(link).toBeVisible();
+  await expect(button).toBeVisible();
+
+  const read = (locator: Locator) =>
+    locator.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return { color: style.color, cursor: style.cursor };
+    });
+
+  expect(await read(link)).toEqual(await read(button));
+  expect((await read(link)).cursor).toBe("pointer");
+
+  await link.hover();
+  const hovered = await read(link);
+  await button.hover();
+  expect(await read(button)).toEqual(hovered);
+
+  await link.focus();
+  const focused = await read(link);
+  await button.focus();
+  expect(await read(button)).toEqual(focused);
 });
 
 test("projects table, signed in, with bookmark controls", async ({ page }) => {
