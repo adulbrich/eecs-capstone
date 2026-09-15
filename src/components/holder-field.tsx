@@ -207,6 +207,9 @@ export function HolderField({
             Matches account: {account.name ?? account.email}
           </p>
         )}
+        <p className="mt-1 text-muted-foreground text-xs">
+          A holder with an address receives pickup and due emails there.
+        </p>
       </div>
 
       {/* Gated on the resolved answer, not on the absence of one. While the

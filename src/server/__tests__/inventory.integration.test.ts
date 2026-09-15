@@ -3831,6 +3831,123 @@ describe("inventory emails", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it("honors the staff skip on every decision, for the email alone (#387)", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser(`a-skip-${Date.now()}@x.com`, "admin");
+    const student = await makeUser(`s-skip-${Date.now()}@x.com`, "user");
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    // Approve one line: the bell row is written, the email is not.
+    const approvedItem = await makeItem();
+    const { line: approvedLine } = await makeRequestLine(
+      student.id,
+      approvedItem.id
+    );
+    await approveRequestItemAs(
+      admin,
+      { requestItemId: approvedLine.id, pickupBy: null },
+      { send, sendEmail: false }
+    );
+    expect(send).not.toHaveBeenCalled();
+    const bell = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, student.id));
+    expect(bell.some((r) => r.type === "inventory_request_approved")).toBe(
+      true
+    );
+
+    // A batch, then a denial, then a staff checkout and a walk-in hold.
+    const first = await makeItem();
+    const second = await makeItem();
+    const { line: firstLine } = await makeRequestLine(student.id, first.id);
+    const { line: secondLine } = await makeRequestLine(student.id, second.id);
+    await approveRequestLinesAs(
+      admin,
+      { requestItemIds: [firstLine.id, secondLine.id], pickupBy: null },
+      { send, sendEmail: false }
+    );
+    expect(send).not.toHaveBeenCalled();
+    const rowsOfType = async (type: string) =>
+      (
+        await db
+          .select()
+          .from(notifications)
+          .where(eq(notifications.userId, student.id))
+      ).filter((r) => r.type === type).length;
+    expect(await rowsOfType("inventory_request_approved")).toBe(3);
+
+    const deniedItem = await makeItem();
+    const { line: deniedLine } = await makeRequestLine(
+      student.id,
+      deniedItem.id
+    );
+    await transitionItem(student, {
+      itemId: deniedItem.id,
+      nextStatus: "requested",
+      requestItemId: deniedLine.id,
+      holderId: student.id,
+      authority: "self_request",
+    });
+    await rejectRequestItemAs(
+      admin,
+      { requestItemId: deniedLine.id, reviewComment: "Out of scope" },
+      { send, sendEmail: false }
+    );
+    expect(send).not.toHaveBeenCalled();
+    expect(await rowsOfType("inventory_request_rejected")).toBe(1);
+
+    await transitionItem(
+      admin,
+      {
+        itemId: approvedItem.id,
+        nextStatus: "checked_out",
+        holderId: student.id,
+        dueAt: new Date(Date.now() + 14 * 86_400_000),
+      },
+      undefined,
+      { send, sendEmail: false }
+    );
+    expect(send).not.toHaveBeenCalled();
+    expect(await rowsOfType("inventory_item_checked_out")).toBe(1);
+
+    const walkIn = await makeItem();
+    await transitionItem(
+      admin,
+      {
+        itemId: walkIn.id,
+        nextStatus: "reserved",
+        holderEmail: "walkin-skip@example.com",
+        holderName: "Walk In",
+        pickupBy: new Date(Date.now() + 7 * 86_400_000),
+      },
+      undefined,
+      { send, sendEmail: false }
+    );
+    expect(send).not.toHaveBeenCalled();
+
+    // Sent when the skip is absent, so the seam above was doing the work.
+    await transitionItem(
+      admin,
+      { itemId: walkIn.id, nextStatus: "available" },
+      undefined,
+      { send }
+    );
+    await transitionItem(
+      admin,
+      {
+        itemId: walkIn.id,
+        nextStatus: "reserved",
+        holderEmail: "walkin-skip@example.com",
+        holderName: "Walk In",
+        pickupBy: new Date(Date.now() + 7 * 86_400_000),
+      },
+      undefined,
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+  });
+
   it("emails once per line when a batch is approved", async () => {
     process.env.BETTER_AUTH_URL = "https://app";
     const admin = await makeUser(`a-batch-mail-${Date.now()}@x.com`, "admin");

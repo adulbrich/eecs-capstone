@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { errorMessage } from "#/lib/error-message";
 import { approveRequestLines } from "#/server/inventory";
+import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -33,12 +34,16 @@ export interface ApproveAllLine {
 export function ApproveAllDialog({
   lines,
   onDone,
+  requesterEmail,
 }: {
   lines: ApproveAllLine[];
   onDone: () => void;
+  /** One requester per request, so one address for the whole batch (#387). */
+  requesterEmail: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [pickupBy, setPickupBy] = useState("");
+  const [sendEmail, setSendEmail] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pending = lines.filter((line) => line.status === "pending");
@@ -55,6 +60,7 @@ export function ApproveAllDialog({
         data: {
           requestItemIds: pending.map((line) => line.id),
           pickupBy: pickupBy ? new Date(pickupBy) : null,
+          sendEmail,
         },
       });
       setPickupBy("");
@@ -74,6 +80,7 @@ export function ApproveAllDialog({
     setOpen(next);
     if (!next) {
       setError(null);
+      setSendEmail(true);
     }
   }
 
@@ -108,6 +115,13 @@ export function ApproveAllDialog({
             value={pickupBy}
           />
         </div>
+        <SendEmailCheckbox
+          address={requesterEmail}
+          checked={sendEmail}
+          disabled={busy}
+          hint={EMAIL_SKIP_HINT.withBell}
+          onCheckedChange={setSendEmail}
+        />
         {error && <p className="text-destructive text-sm">{error}</p>}
         <DialogFooter>
           <Button

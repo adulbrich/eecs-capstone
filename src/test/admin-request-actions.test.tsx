@@ -29,6 +29,7 @@ function renderPending() {
     <AdminRequestActions
       lineId="line-1"
       onDone={() => undefined}
+      requesterEmail="student@x.edu"
       status="pending"
     />
   );
@@ -49,6 +50,7 @@ describe("AdminRequestActions", () => {
       <AdminRequestActions
         lineId="line-1"
         onDone={() => undefined}
+        requesterEmail="student@x.edu"
         status="approved"
       />
     );
@@ -81,5 +83,52 @@ describe("AdminRequestActions", () => {
       expect(screen.queryByLabelText("Reason (sent to requester)")).toBeNull()
     );
     expect(rejectRequestItem).not.toHaveBeenCalled();
+  });
+
+  it("names the requester on both popovers and sends the skip with the decision (#387)", async () => {
+    vi.mocked(approveRequestItem).mockResolvedValue({ ok: true });
+    vi.mocked(rejectRequestItem).mockResolvedValue({ ok: true });
+    renderPending();
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    const approveBox = await screen.findByRole("checkbox", {
+      name: "Email student@x.edu",
+    });
+    expect(approveBox.getAttribute("aria-checked")).toBe("true");
+    expect(
+      screen.getByText(
+        "Uncheck to skip the email; the in-app notification is still sent."
+      )
+    ).toBeTruthy();
+    fireEvent.click(approveBox);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm approve" }));
+    await waitFor(() =>
+      expect(approveRequestItem).toHaveBeenCalledWith({
+        data: { requestItemId: "line-1", pickupBy: null, sendEmail: false },
+      })
+    );
+    // The popover closes once the decision lands; opening the next one
+    // before that would race its close.
+    await waitFor(() => expect(screen.queryByRole("checkbox")).toBeNull());
+
+    // Checked again for the next decision: the skip was about that one.
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    const rejectBox = await screen.findByRole("checkbox", {
+      name: "Email student@x.edu",
+    });
+    expect(rejectBox.getAttribute("aria-checked")).toBe("true");
+    fireEvent.change(screen.getByLabelText("Reason (sent to requester)"), {
+      target: { value: "Out of scope" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm reject" }));
+    await waitFor(() =>
+      expect(rejectRequestItem).toHaveBeenCalledWith({
+        data: {
+          requestItemId: "line-1",
+          reviewComment: "Out of scope",
+          sendEmail: true,
+        },
+      })
+    );
   });
 });

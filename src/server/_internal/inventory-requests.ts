@@ -100,7 +100,7 @@ export async function approveRequestItemAs(
   );
   // After the commit, never inside it: a failed email must not undo an
   // approval, and a slow one must not hold the item's lock.
-  await notifyInventoryByEmail(notice, opts?.send);
+  await notifyInventoryByEmail(notice, opts);
   return { ok: true as const };
 }
 
@@ -139,7 +139,7 @@ export async function approveRequestLinesAs(
   // One email per line, matching the one bell row per line. A cart of six
   // items is six emails; coalescing them is a later change if it grates.
   for (const notice of notices) {
-    await notifyInventoryByEmail(notice, opts?.send);
+    await notifyInventoryByEmail(notice, opts);
   }
   return { approved: ids };
 }
@@ -188,7 +188,7 @@ export async function rejectRequestItemAs(
       tx
     );
   });
-  await notifyInventoryByEmail(notice, opts?.send);
+  await notifyInventoryByEmail(notice, opts);
   return { ok: true as const };
 }
 
@@ -250,28 +250,36 @@ export async function cancelRequestItemAs(
   });
 }
 
+// The skip rides in `EmailOptions`, beside the test seam, so the `*As`
+// inputs stay the row fields (#387).
 export async function approveRequestItemForCurrentUser(data: {
   requestItemId: string;
   pickupBy: Date | null;
+  sendEmail: boolean;
 }) {
   const viewer = await requireUser();
-  return approveRequestItemAs(viewer, data);
+  const { sendEmail, ...fields } = data;
+  return approveRequestItemAs(viewer, fields, { sendEmail });
 }
 
 export async function approveRequestLinesForCurrentUser(data: {
   requestItemIds: string[];
   pickupBy: Date | null;
+  sendEmail: boolean;
 }) {
   const viewer = await requireUser();
-  return approveRequestLinesAs(viewer, data);
+  const { sendEmail, ...fields } = data;
+  return approveRequestLinesAs(viewer, fields, { sendEmail });
 }
 
 export async function rejectRequestItemForCurrentUser(data: {
   requestItemId: string;
   reviewComment: string;
+  sendEmail: boolean;
 }) {
   const viewer = await requireUser();
-  return rejectRequestItemAs(viewer, data);
+  const { sendEmail, ...fields } = data;
+  return rejectRequestItemAs(viewer, fields, { sendEmail });
 }
 
 export async function cancelRequestItemForCurrentUser(data: {

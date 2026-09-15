@@ -8,6 +8,9 @@ import { Label } from "./ui/label";
  */
 export const EMAIL_SKIP_HINT = {
   emailOnly: "Uncheck and they will not be told.",
+  // A hold: the row is written for an account, and a walk-in has none.
+  holder:
+    "Uncheck to skip the email; a holder with an account still gets the in-app notification.",
   withBell: "Uncheck to skip the email; the in-app notification is still sent.",
 } as const;
 

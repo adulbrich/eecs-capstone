@@ -51,7 +51,13 @@ function openDialog() {
 
 describe("ApproveAllDialog", () => {
   it("lists only the pending lines it is about to approve", () => {
-    render(<ApproveAllDialog lines={lines} onDone={vi.fn()} />);
+    render(
+      <ApproveAllDialog
+        lines={lines}
+        onDone={vi.fn()}
+        requesterEmail="student@x.edu"
+      />
+    );
     openDialog();
     const dialog = screen.getByRole("dialog", { name: "Approve 2 lines" });
     expect(dialog.textContent).toContain("Oscilloscope");
@@ -62,7 +68,13 @@ describe("ApproveAllDialog", () => {
   it("sends exactly the pending ids and the one date, then reports done", async () => {
     vi.mocked(approveRequestLines).mockResolvedValue({ approved: ["a", "b"] });
     const onDone = vi.fn();
-    render(<ApproveAllDialog lines={lines} onDone={onDone} />);
+    render(
+      <ApproveAllDialog
+        lines={lines}
+        onDone={onDone}
+        requesterEmail="student@x.edu"
+      />
+    );
     openDialog();
     fireEvent.change(screen.getByLabelText("Pickup by (optional)"), {
       target: { value: "2026-10-01" },
@@ -76,6 +88,7 @@ describe("ApproveAllDialog", () => {
       data: {
         requestItemIds: ["b", "a"],
         pickupBy: new Date("2026-10-01"),
+        sendEmail: true,
       },
     });
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -86,7 +99,13 @@ describe("ApproveAllDialog", () => {
       new Error("Oscilloscope is no longer pending")
     );
     const onDone = vi.fn();
-    render(<ApproveAllDialog lines={lines} onDone={onDone} />);
+    render(
+      <ApproveAllDialog
+        lines={lines}
+        onDone={onDone}
+        requesterEmail="student@x.edu"
+      />
+    );
     openDialog();
     fireEvent.click(
       screen.getByRole("button", { name: "Confirm approve all" })
@@ -102,7 +121,13 @@ describe("ApproveAllDialog", () => {
   });
 
   it("closes on Cancel without approving anything", async () => {
-    render(<ApproveAllDialog lines={lines} onDone={vi.fn()} />);
+    render(
+      <ApproveAllDialog
+        lines={lines}
+        onDone={vi.fn()}
+        requesterEmail="student@x.edu"
+      />
+    );
     openDialog();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -113,7 +138,13 @@ describe("ApproveAllDialog", () => {
     vi.mocked(approveRequestLines).mockRejectedValue(
       new Error("Oscilloscope is no longer pending")
     );
-    render(<ApproveAllDialog lines={lines} onDone={vi.fn()} />);
+    render(
+      <ApproveAllDialog
+        lines={lines}
+        onDone={vi.fn()}
+        requesterEmail="student@x.edu"
+      />
+    );
     openDialog();
     fireEvent.click(
       screen.getByRole("button", { name: "Confirm approve all" })
@@ -137,8 +168,39 @@ describe("ApproveAllDialog", () => {
       <ApproveAllDialog
         lines={[{ id: "c", itemName: "Multimeter", status: "approved" }]}
         onDone={vi.fn()}
+        requesterEmail="student@x.edu"
       />
     );
     expect(screen.queryByRole("button", { name: "Approve all" })).toBeNull();
+  });
+
+  it("carries the skip for the whole batch, and checks the box again after a Cancel (#387)", async () => {
+    vi.mocked(approveRequestLines).mockResolvedValue({ approved: ["a", "b"] });
+    const onDone = vi.fn();
+    render(
+      <ApproveAllDialog
+        lines={lines}
+        onDone={onDone}
+        requesterEmail="student@x.edu"
+      />
+    );
+    openDialog();
+    const box = screen.getByRole("checkbox", { name: "Email student@x.edu" });
+    expect(box.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(box);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    openDialog();
+    const again = screen.getByRole("checkbox", { name: "Email student@x.edu" });
+    expect(again.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(again);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm approve all" })
+    );
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+    expect(approveRequestLines).toHaveBeenCalledWith({
+      data: { requestItemIds: ["b", "a"], pickupBy: null, sendEmail: false },
+    });
   });
 });

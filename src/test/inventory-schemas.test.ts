@@ -57,7 +57,18 @@ describe("transitionSchema is the staff gate", () => {
       "nextStatus",
       "pickupBy",
       "requestItemId",
+      // The email-only skip (#387); `silent` is still not on the wire.
+      "sendEmail",
     ]);
+  });
+
+  it("defaults the email skip to sending and still strips silent", () => {
+    const parsed = transitionSchema.parse({ ...valid, silent: true });
+    expect(parsed.sendEmail).toBe(true);
+    expect("silent" in parsed).toBe(false);
+    expect(
+      transitionSchema.parse({ ...valid, sendEmail: false }).sendEmail
+    ).toBe(false);
   });
 });
 

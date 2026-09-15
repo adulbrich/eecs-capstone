@@ -22,6 +22,7 @@ import { HolderField } from "./holder-field";
 import { InventoryStatusBadge } from "./inventory-status-badge";
 import { LocalTime } from "./local-time";
 import { PanelSection } from "./panel";
+import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -358,6 +359,7 @@ export function InventoryLifecyclePanel({
   const [dueDate, setDueDate] = useState("");
   const [pickupDate, setPickupDate] = useState("");
   const [dlgComment, setDlgComment] = useState("");
+  const [dlgSendEmail, setDlgSendEmail] = useState(true);
 
   // Delete dialog state
   const [delOpen, setDelOpen] = useState(false);
@@ -371,6 +373,7 @@ export function InventoryLifecyclePanel({
     nextStatus: ItemStatus;
     requestItemId?: string | null;
     holderEmail?: string | null;
+    sendEmail?: boolean;
     holderLabel?: string | null;
     holderName?: string | null;
     holderProgram?: string | null;
@@ -385,6 +388,7 @@ export function InventoryLifecyclePanel({
         data: {
           itemId: item.id,
           nextStatus: input.nextStatus,
+          sendEmail: input.sendEmail ?? true,
           requestItemId: input.requestItemId ?? null,
           holderEmail: input.holderEmail ?? null,
           holderLabel: input.holderLabel ?? null,
@@ -421,6 +425,8 @@ export function InventoryLifecyclePanel({
     setDueDate(toDateInput(item.dueAt));
     setPickupDate(toDateInput(item.pickupBy));
     setDlgComment("");
+    // The skip is a decision about one hold; checked again on every open.
+    setDlgSendEmail(true);
     setError(null);
     setDlgOpen(true);
   }
@@ -474,6 +480,7 @@ export function InventoryLifecyclePanel({
       dueAt:
         dlgTargetStatus === "checked_out" && dueDate ? new Date(dueDate) : null,
       comment: dlgComment || null,
+      sendEmail: dlgSendEmail,
     });
     setDlgOpen(false);
   }
@@ -677,6 +684,17 @@ export function InventoryLifecyclePanel({
                 value={dlgComment}
               />
             </div>
+            {/*
+              The address typed above, or none for a label hold, which emails
+              nobody; the server still decides who is reachable (#387).
+            */}
+            <SendEmailCheckbox
+              address={assignEmail.trim() || null}
+              checked={dlgSendEmail}
+              disabled={busy}
+              hint={EMAIL_SKIP_HINT.holder}
+              onCheckedChange={setDlgSendEmail}
+            />
             {error && <p className="text-destructive text-sm">{error}</p>}
           </div>
           <DialogFooter>

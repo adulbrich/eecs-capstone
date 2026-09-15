@@ -7,6 +7,7 @@ import {
   updateSourcingNote,
 } from "#/server/inventory-custom";
 import { FulfillCustomLineDialog } from "./fulfill-custom-line-dialog";
+import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -29,13 +30,17 @@ export interface CustomLineForActions {
 export function CustomLineActions({
   line,
   onDone,
+  requesterEmail,
 }: {
   line: CustomLineForActions;
   onDone: () => void;
+  /** Emailed by Fulfil and Reject; named on the skip (#387). */
+  requesterEmail: string;
 }) {
   const [open, setOpen] = useState<null | "note" | "reject">(null);
   const [note, setNote] = useState(line.sourcingNote ?? "");
   const [reason, setReason] = useState("");
+  const [sendEmail, setSendEmail] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -130,10 +135,20 @@ export function CustomLineActions({
         </PopoverContent>
       </Popover>
 
-      <FulfillCustomLineDialog line={line} onDone={onDone} />
+      <FulfillCustomLineDialog
+        line={line}
+        onDone={onDone}
+        requesterEmail={requesterEmail}
+      />
 
       <Popover
-        onOpenChange={(next) => setOpen(next ? "reject" : null)}
+        onOpenChange={(next) => {
+          setOpen(next ? "reject" : null);
+          if (!next) {
+            // The skip is a decision about one click.
+            setSendEmail(true);
+          }
+        }}
         open={open === "reject"}
       >
         <PopoverTrigger asChild>
@@ -151,6 +166,13 @@ export function CustomLineActions({
             rows={3}
             value={reason}
           />
+          <SendEmailCheckbox
+            address={requesterEmail}
+            checked={sendEmail}
+            disabled={busy}
+            hint={EMAIL_SKIP_HINT.withBell}
+            onCheckedChange={setSendEmail}
+          />
           {error && <p className="text-destructive text-sm">{error}</p>}
           <div className="flex gap-2">
             <Button
@@ -163,7 +185,11 @@ export function CustomLineActions({
                 void run(
                   () =>
                     rejectCustomLine({
-                      data: { customLineId: line.id, outcomeNote: reason },
+                      data: {
+                        customLineId: line.id,
+                        outcomeNote: reason,
+                        sendEmail,
+                      },
                     }),
                   "Reject failed"
                 );

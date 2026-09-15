@@ -94,7 +94,7 @@ test.describe("inventory walk-in checkout", () => {
 
       // Nothing is prefilled, unlike the request-backed checkout in the smoke
       // suite: this item was never requested, so there is no holder to inherit.
-      await expect(dialog.getByLabel("Email")).toHaveValue("");
+      await expect(dialog.getByLabel("Email", { exact: true })).toHaveValue("");
 
       // Leaving Email empty is what makes this a walk-in. HolderField shows the
       // Label input only while the address is blank, so filling one closes the

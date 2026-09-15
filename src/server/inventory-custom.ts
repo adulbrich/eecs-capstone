@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { SEND_EMAIL_FIELD } from "./send-email-field";
 
 /**
  * Custom requests: asks for equipment the inventory does not hold. Its own
@@ -76,6 +77,7 @@ export const rejectCustomLine = createServerFn({ method: "POST" })
       .object({
         customLineId: lineId,
         outcomeNote: z.string().min(1).max(2000),
+        ...SEND_EMAIL_FIELD,
       })
       .parse(d)
   )
@@ -97,6 +99,7 @@ export const fulfillCustomLine = createServerFn({ method: "POST" })
         // Ticked by default: the thing arrived for someone, and that someone
         // is on the line.
         reserve: z.boolean().default(true),
+        ...SEND_EMAIL_FIELD,
       })
       .parse(d)
   )

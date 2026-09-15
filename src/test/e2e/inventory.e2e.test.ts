@@ -76,7 +76,10 @@ test.describe("@smoke inventory lifecycle", () => {
       // test proves the hold carried across the two roles, and it is also why
       // there is no Label field to fill: HolderField hides it whenever an
       // email is present.
-      await expect(dialog.getByLabel("Email")).toHaveValue("user@example.com");
+      // Exact, since #387 put an "Email <address>" box in the same dialog.
+      await expect(dialog.getByLabel("Email", { exact: true })).toHaveValue(
+        "user@example.com"
+      );
       await dialog.getByLabel("Due date").fill(dueDateInput());
       await dialog.getByRole("button", { name: "Confirm" }).click();
       await expect(dialog).toBeHidden();
