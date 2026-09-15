@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2 } from "lucide-react";
+import { ClipboardCheck, ClipboardPlus, Loader2 } from "lucide-react";
 import { authClient } from "#/lib/auth-client";
 import { useHasMounted } from "#/lib/use-has-mounted";
 import { addToCart, getCart } from "#/server/inventory";
@@ -7,6 +7,13 @@ import { Button } from "./ui/button";
 
 interface Props {
   className?: string;
+  /**
+   * Hide the resting and in-list labels below `md`, leaving the icon. For a
+   * row action in a mobile card header, where the text took half the row
+   * from the name (#401). The pending and error labels stay at every width:
+   * an icon alone says too little about a failure.
+   */
+  compact?: boolean;
   itemId: string;
   size?: "sm" | "default";
   variant?: "default" | "outline";
@@ -31,6 +38,7 @@ interface Props {
  */
 export function AddToCartButton({
   className,
+  compact = false,
   itemId,
   size = "sm",
   variant = "outline",
@@ -51,44 +59,58 @@ export function AddToCartButton({
 
   // isSuccess as well as the cart, so the label flips the moment the write
   // lands rather than waiting for the refetch that follows it. Without it the
-  // button reads "Add to borrow list" again for as long as the invalidation takes,
-  // which is exactly the moment the user is looking for confirmation.
+  // button reads "Borrow" again for as long as the invalidation takes, which
+  // is exactly the moment the user is looking for confirmation.
   const inCart = isSuccess || (cart ?? []).some((row) => row.itemId === itemId);
+
+  // The clipboard icons rhyme with the `ClipboardList` on the "Borrow list"
+  // control, so the two read as one thing. The label is the accessible name
+  // at every width; `compact` only hides its text below `md`.
+  const labelClass = compact ? "hidden md:inline" : undefined;
 
   if (inCart) {
     return (
       <Button
+        aria-label="In borrow list"
         className={className}
         disabled
         size={size}
+        title="In borrow list"
         type="button"
         // aria-disabled would keep it focusable, but there is nothing left to
         // do here and the borrow list count on the page is the next step.
         variant={variant}
       >
-        <Check aria-hidden="true" className="h-4 w-4" />
-        In borrow list
+        <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
+        <span className={labelClass}>In borrow list</span>
       </Button>
     );
   }
 
+  const label = addToCartLabel(isPending, isError);
+  const resting = !(isPending || isError);
   return (
     <Button
+      aria-label={label}
       className={className}
       disabled={isPending}
       onClick={() => mutate()}
       size={size}
+      title={label}
       type="button"
       variant={variant}
     >
-      {isPending && (
+      {isPending ? (
         <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+      ) : (
+        <ClipboardPlus aria-hidden="true" className="h-4 w-4" />
       )}
-      {addToCartLabel(isPending, isError)}
+      <span className={resting ? labelClass : undefined}>{label}</span>
     </Button>
   );
 }
 
+/** The accessible name of the button, whatever `compact` hides. */
 function addToCartLabel(isPending: boolean, isError: boolean): string {
   if (isPending) {
     return "Adding...";
@@ -96,7 +118,7 @@ function addToCartLabel(isPending: boolean, isError: boolean): string {
   if (isError) {
     return "Could not add, try again";
   }
-  return "Add to borrow list";
+  return "Borrow";
 }
 
 /**
@@ -121,5 +143,5 @@ export function ListingAddToCart({
   if (!(hasMounted && session?.user && status === "available")) {
     return null;
   }
-  return <AddToCartButton className={className} itemId={itemId} />;
+  return <AddToCartButton className={className} compact itemId={itemId} />;
 }

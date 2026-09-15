@@ -304,7 +304,7 @@ Each project carries:
   request queue. This mirrors how projects are laid out.
 - [x] One item detail page for everyone: every viewer sees image, name,
   status, category, and description; signed-in users additionally see
-  Add to borrow list when the item is available; staff additionally render two
+  a Borrow button when the item is available; staff additionally render two
   panels, splitting what the item is from what is happening to it. A
   "Private" panel holds its serial, label, location and private notes with
   the Edit link beside them, mirroring the project page's private panel; a
