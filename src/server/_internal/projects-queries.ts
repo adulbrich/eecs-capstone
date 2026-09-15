@@ -110,7 +110,7 @@ const ADMIN_DATE_COLUMN = {
 
 /**
  * The scope the proposer dropdown is built from: the status set, the date
- * range, program, the soft-delete switch and the three flag switches, but NOT
+ * range, program, the soft-delete switch and the five flag switches, but NOT
  * the search text or the proposer choice itself. Excluding the proposer keeps
  * the option you picked from being the only one left; excluding `q` keeps
  * typing in the search box from emptying the dropdown underneath you.
@@ -139,7 +139,7 @@ function buildAdminProjectScope(
   if (withDateRange && end) {
     scope.push(lt(column, end));
   }
-  // The same three conditions the public listing applies under the same
+  // The same five conditions the public listing applies under the same
   // param names (#340), so a link moved between the two pages narrows the
   // same way.
   if (data.acceptingOnly) {
