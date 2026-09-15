@@ -373,16 +373,14 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
           id: projectStatusHistory.id,
           oldStatus: projectStatusHistory.oldStatus,
           newStatus: projectStatusHistory.newStatus,
-          // The name, not the id: nothing renders a raw actor id, and a
-          // proposer reading "changes requested" needs to know which staff
-          // member to answer. Same projection the inventory item history
-          // returns, so the two timelines say "by <name>" from the same shape.
-          // An inner join, and total: `changed_by` is `notNull` with
-          // `onDelete: "restrict"`, so the account behind a history row cannot
-          // leave while the row exists. ADR 0008 scrubs it to "Deleted user"
-          // instead, which is what a deleted actor reads as.
+          // The name, not the id, and not the address beside it. The join is
+          // total, so the name is always a string: `changed_by` is `notNull`
+          // with `onDelete: "restrict"`, and ADR 0008 scrubs a deleted
+          // account's name to "Deleted user" rather than removing the row the
+          // audit trail is anchored to. An address with no reader is the case
+          // `projectDetailView` leaves out rather than nulls, so this leaves
+          // it out too; an inner join is what makes that safe.
           changedByName: user.name,
-          changedByEmail: user.email,
           comment: projectStatusHistory.comment,
           createdAt: projectStatusHistory.createdAt,
         })

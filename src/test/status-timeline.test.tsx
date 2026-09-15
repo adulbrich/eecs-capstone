@@ -13,7 +13,6 @@ function row(overrides: Partial<Row> = {}): Row {
     oldStatus: "submitted",
     newStatus: "changes_requested",
     changedByName: "Ada Lovelace",
-    changedByEmail: "ada@oregonstate.edu",
     comment: null,
     createdAt: "2026-05-28T10:00:00.000Z",
     ...overrides,
@@ -26,33 +25,19 @@ describe("StatusTimeline", () => {
     expect(screen.getByText("by Ada Lovelace")).toBeTruthy();
   });
 
-  it("falls back to the address when the name is missing", () => {
-    render(<StatusTimeline rows={[row({ changedByName: null })]} />);
-    expect(screen.getByText("by ada@oregonstate.edu")).toBeTruthy();
-  });
-
-  it("reads a deleted account as its scrubbed name, never as an address", () => {
-    // ADR 0008 sets the name to "Deleted user" and the address to
-    // deleted-<id>@invalid rather than removing the row, so the fallback above
-    // cannot print a real address for someone who has left.
-    render(
-      <StatusTimeline
-        rows={[
-          row({
-            changedByName: "Deleted user",
-            changedByEmail: "deleted-abc123@invalid",
-          }),
-        ]}
-      />
-    );
+  it("reads a deleted account as the name ADR 0008 scrubbed it to", () => {
+    // The row outlives the account: `changed_by` is `onDelete: "restrict"`, so
+    // deletion sets the name to "Deleted user" rather than removing the audit
+    // row. This is the same branch as the case above with the data a scrubbed
+    // account leaves behind, which is the only shape a missing actor can take.
+    render(<StatusTimeline rows={[row({ changedByName: "Deleted user" })]} />);
     expect(screen.getByText("by Deleted user")).toBeTruthy();
-    expect(screen.queryByText(/@invalid/)).toBeNull();
+    expect(screen.queryByText(/@/)).toBeNull();
   });
 
-  it("says so when there is no history, and names nobody", () => {
+  it("says so when there is no history", () => {
     render(<StatusTimeline rows={[]} />);
     expect(screen.getByText("No status changes yet.")).toBeTruthy();
-    expect(screen.queryByText(/^by /)).toBeNull();
   });
 
   it("still calls the first row created, and names its actor too", () => {

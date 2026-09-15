@@ -508,12 +508,15 @@ describe("status timeline visibility and changes-requested feedback", () => {
       (h) => h.newStatus === "changes_requested"
     );
     expect(decision?.changedByName).toBe("Grace Hopper");
-    expect(decision?.changedByEmail).toBe(admin.email);
+    // The address never leaves the server: the proposer is not staff, and the
+    // name is what the timeline renders.
+    expect(decision).not.toHaveProperty("changedByEmail");
+    expect(decision).not.toHaveProperty("changedBy");
     // The proposer's own submission is named too, so the timeline has no
     // anonymous rows in it.
-    expect(
-      ownerView.history.every((h) => (h.changedByName ?? "").length > 0)
-    ).toBe(true);
+    expect(ownerView.history.every((h) => h.changedByName.length > 0)).toBe(
+      true
+    );
   });
 
   it("requires a comment when requesting changes", async () => {
