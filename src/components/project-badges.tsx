@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { cn } from "#/lib/utils.ts";
 import { Badge } from "./ui/badge";
 
@@ -8,24 +9,31 @@ import { Badge } from "./ui/badge";
  * that a badge could show.
  *
  * Rendered by the card and the detail page, so no surface computes the
- * badges its own way. The agreement flag is also a badge column in the
- * public and bookmark tables and a CSV field on the staff route. Both
- * listings filter on the same facts (#336, #372).
+ * badges its own way. The detail page passes its status and applicants
+ * badges as `children`, rendered before the marks, so the page has one
+ * badge row under the title rather than two rows with two gaps (#400); the
+ * card passes nothing and still renders nothing when no mark is set. The
+ * agreement flag is also a badge column in the public and bookmark tables
+ * and a CSV field on the staff route. Both listings filter on the same
+ * facts (#336, #372).
  */
 export function ProjectBadges({
+  children,
   className,
   requiresNdaIp,
   studentProposed,
 }: {
+  children?: React.ReactNode;
   className?: string;
   requiresNdaIp: boolean;
   studentProposed: boolean;
 }) {
-  if (!(studentProposed || requiresNdaIp)) {
+  if (!(children || studentProposed || requiresNdaIp)) {
     return null;
   }
   return (
-    <div className={cn("flex flex-wrap gap-1.5", className)}>
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+      {children}
       {studentProposed && <Badge variant="outline">Student proposed</Badge>}
       {requiresNdaIp && <Badge variant="outline">NDA/IP required</Badge>}
     </div>
