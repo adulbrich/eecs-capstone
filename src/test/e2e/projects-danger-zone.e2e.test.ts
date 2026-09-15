@@ -55,9 +55,17 @@ test.describe("project danger zone", () => {
       await visitor.goto(`/projects?q=${encodeURIComponent(title)}`);
       await expect(listed).toHaveCount(0);
 
+      // Restore confirms too (#422), so the write goes out from the dialog's
+      // own button, the same as the soft delete above.
+      await staff.getByRole("button", { name: "Restore" }).click();
+      const restoreDialog = staff.getByRole("alertdialog", {
+        name: "Restore this project?",
+      });
+      await expect(restoreDialog).toBeVisible();
       await confirmed(staff, () =>
-        staff.getByRole("button", { name: "Restore" }).click()
+        restoreDialog.getByRole("button", { name: "Restore" }).click()
       );
+      await expect(restoreDialog).toBeHidden();
       await expect(
         staff.getByRole("button", { name: "Soft delete" })
       ).toBeVisible();
