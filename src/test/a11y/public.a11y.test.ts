@@ -44,6 +44,9 @@ test("@smoke home page", async ({ page }) => {
 
   await page.setViewportSize({ width: 375, height: 812 });
   await expect(
+    page.getByRole("link", { name: "Propose a project" })
+  ).toBeVisible();
+  await expect(
     page.getByRole("link", { name: "See what you can borrow" })
   ).toBeVisible();
   await expectNoHorizontalOverflow(page);

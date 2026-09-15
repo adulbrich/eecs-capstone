@@ -3,6 +3,11 @@ import { BookOpen, Package } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "#/components/ui/button";
 import { brand } from "#/lib/brand";
+import {
+  PROJECT_STATUS_DESCRIPTION,
+  PROJECT_STATUS_LABEL,
+  PROJECT_STATUSES_IN_DISPLAY_ORDER,
+} from "#/lib/project-workflow";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -11,29 +16,17 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-// The status names and their one-line meanings come from CONTEXT.md, Status.
-const PROPOSAL_PATH = [
-  {
-    status: "Draft",
-    note: "Written, not yet handed to staff. Only you and staff can see it.",
-  },
-  {
-    status: "Submitted",
-    note: "Handed to staff for review. This is what lands in the staff inbox.",
-  },
-  {
-    status: "Changes requested",
-    note: "Staff sent it back with a note in the comment thread. Edit and resubmit.",
-  },
-  {
-    status: "Approved",
-    note: "Accepted by staff, waiting to be published.",
-  },
-  {
-    status: "Published",
-    note: "In the public catalog for students to find.",
-  },
-];
+// The proposal's path, in display order, minus the archive: a landing page
+// says where a proposal goes, not where it ends up years later. Label and
+// meaning are the shared records, so the strip cannot drift from the badge
+// and the stepper.
+const PROPOSAL_PATH = PROJECT_STATUSES_IN_DISPLAY_ORDER.filter(
+  (status) => status !== "archived"
+).map((status) => ({
+  status,
+  label: PROJECT_STATUS_LABEL[status],
+  note: PROJECT_STATUS_DESCRIPTION[status],
+}));
 
 function Home() {
   return (
@@ -100,7 +93,7 @@ function Home() {
               </div>
               <div className="pt-0.5 md:pt-0">
                 <h3 className="font-semibold text-[15px] leading-[22px]">
-                  {step.status}
+                  {step.label}
                 </h3>
                 <p className="mt-1 text-muted-foreground text-sm md:pr-6">
                   {step.note}
