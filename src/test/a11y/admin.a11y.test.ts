@@ -791,7 +791,7 @@ test("admin programs: create dialog and Columns dropdown coexist", async ({
   const courseName = `A11y Dialog Program ${unique}`;
 
   try {
-    await page.getByRole("button", { name: "+ New program" }).click();
+    await page.getByRole("button", { name: "New program" }).click();
     const dialog = page.getByRole("dialog", { name: "New program" });
     await dialog.getByLabel("Course ID").fill(courseId);
     await dialog.getByLabel("Course name").fill(courseName);
@@ -834,7 +834,7 @@ test("admin categories: create dialog and Columns dropdown coexist", async ({
   const uniqueName = `A11y Dialog Category ${Date.now()}`;
 
   try {
-    await page.getByRole("button", { name: "+ New category" }).click();
+    await page.getByRole("button", { name: "New category" }).click();
     const dialog = page.getByRole("dialog", { name: "New project category" });
     await dialog.getByLabel("Name").fill(uniqueName);
     // The Type field's accessible name is ambiguous between its <label> text

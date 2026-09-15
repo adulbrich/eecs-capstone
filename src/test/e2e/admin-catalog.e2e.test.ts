@@ -53,7 +53,7 @@ test.describe("admin catalog creates and saves", () => {
       await staff.goto("/admin/categories?tab=inventory");
       await waitForHydration(staff);
 
-      await staff.getByRole("button", { name: "+ New category" }).click();
+      await staff.getByRole("button", { name: "New category" }).click();
       const dialog = staff.getByRole("dialog", {
         name: "New inventory category",
       });
@@ -122,7 +122,7 @@ test.describe("admin catalog creates and saves", () => {
       await staff.goto("/admin/programs");
       await waitForHydration(staff);
 
-      await staff.getByRole("button", { name: "+ New program" }).click();
+      await staff.getByRole("button", { name: "New program" }).click();
       const dialog = staff.getByRole("dialog", { name: "New program" });
       await expect(dialog).toBeVisible();
       await dialog.getByLabel("Course ID").fill(courseId);

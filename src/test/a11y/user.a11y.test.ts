@@ -62,7 +62,7 @@ test("projects list, signed in, with bookmark controls", async ({ page }) => {
  * are `outline`; the sizes differ, which is why only colour and cursor are
  * compared. jsdom computes neither, so this is the suite that can see it.
  */
-test("an outline Button and an outline asChild Link read the same", async ({
+test("@smoke an outline Button and an outline asChild Link read the same", async ({
   page,
 }) => {
   await page.goto("/projects");
@@ -92,6 +92,30 @@ test("an outline Button and an outline asChild Link read the same", async ({
   const focused = await read(link);
   await button.focus();
   expect(await read(button)).toEqual(focused);
+});
+
+/**
+ * The pressed half of a toggle is filled, and the fill comes from
+ * `aria-pressed` in the Button base class rather than a conditional class at
+ * the call site (UI-CONVENTIONS, "`className` on a Button never restyles it").
+ *
+ * The unit test asserts the attribute, which is what a screen reader reads;
+ * this asserts the attribute is also what paints, so the two cannot drift.
+ * jsdom resolves no Tailwind, so it cannot see this.
+ */
+test("@smoke the view toggle's pressed half is filled, from aria-pressed", async ({
+  page,
+}) => {
+  await page.goto("/projects");
+  await waitForHydration(page);
+  const pressed = page.getByRole("button", { name: "Card view" });
+  const unpressed = page.getByRole("button", { name: "Table view" });
+  await expect(pressed).toHaveAttribute("aria-pressed", "true");
+  await expect(unpressed).toHaveAttribute("aria-pressed", "false");
+
+  const background = (locator: Locator) =>
+    locator.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await background(pressed)).not.toBe(await background(unpressed));
 });
 
 test("projects table, signed in, with bookmark controls", async ({ page }) => {
