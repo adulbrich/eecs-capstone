@@ -24,7 +24,7 @@ interface Props {
    * the block can say what to change beside the button that resubmits.
    */
   changeRequest: string | null;
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
   project: Project;
 }
 
@@ -42,7 +42,7 @@ export function OwnerProjectActions({
       } else {
         await returnToDraft({ data: { id: project.id } });
       }
-      onChanged();
+      await onChanged();
     });
   }
 

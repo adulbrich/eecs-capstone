@@ -35,7 +35,7 @@ export function CustomLineActions({
   requesterEmail,
 }: {
   line: CustomLineForActions;
-  onDone: () => void;
+  onDone: () => Promise<void>;
   /** Emailed by Fulfil and Reject; named on the skip (#387). */
   requesterEmail: string;
 }) {
@@ -61,8 +61,8 @@ export function CustomLineActions({
   function runLineAction(action: () => Promise<unknown>, failure: string) {
     return run(async () => {
       await action();
+      await onDone();
       close();
-      onDone();
     }, failure);
   }
 
@@ -224,7 +224,7 @@ export function StartSourcingAllButton({
   onDone,
 }: {
   lines: { id: string; status: string }[];
-  onDone: () => void;
+  onDone: () => Promise<void>;
 }) {
   const { busy, error, run } = useAction({ fallback: "Sourcing failed" });
   const pending = lines.filter((line) => line.status === "pending");
@@ -261,7 +261,7 @@ export function StartSourcingAllButton({
             } finally {
               // Whatever went through is on the server, so the table has to
               // be refreshed even when the rest did not.
-              onDone();
+              await onDone();
             }
           })
         }

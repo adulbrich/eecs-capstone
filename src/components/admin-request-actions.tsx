@@ -16,7 +16,7 @@ interface Props {
    * deliberately not reached for in here: a cell that needs router context
    * cannot be rendered in a test.
    */
-  onDone: () => void;
+  onDone: () => Promise<void>;
   /** Who is emailed by either decision; named on the skip (#387). */
   requesterEmail: string;
   status: string;
@@ -67,8 +67,8 @@ export function AdminRequestActions({
         },
       });
       setPickupBy("");
+      await onDone();
       close();
-      onDone();
     } catch (e) {
       setError(errorMessage(e, "Approve failed"));
     } finally {
@@ -88,8 +88,8 @@ export function AdminRequestActions({
         data: { requestItemId: lineId, reviewComment: reason, sendEmail },
       });
       setReason("");
+      await onDone();
       close();
-      onDone();
     } catch (e) {
       setError(errorMessage(e, "Reject failed"));
     } finally {

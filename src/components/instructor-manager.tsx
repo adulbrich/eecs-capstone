@@ -31,7 +31,7 @@ interface Eligible {
 
 interface Props {
   initial: Instructor[];
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
   programId: string;
 }
 
@@ -63,14 +63,14 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
     void run(async () => {
       await addProgramInstructor({ data: { programId, userId: picked } });
       setPicked("");
-      onChanged();
+      await onChanged();
     }, "Could not add the instructor");
   }
 
   function remove(userId: string) {
     void run(async () => {
       await removeProgramInstructor({ data: { programId, userId } });
-      onChanged();
+      await onChanged();
     }, "Could not remove the instructor");
   }
 

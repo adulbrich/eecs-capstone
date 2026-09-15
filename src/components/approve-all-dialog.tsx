@@ -38,7 +38,7 @@ export function ApproveAllDialog({
   requesterEmail,
 }: {
   lines: ApproveAllLine[];
-  onDone: () => void;
+  onDone: () => Promise<void>;
   /** One requester per request, so one address for the whole batch (#387). */
   requesterEmail: string | null;
 }) {
@@ -65,8 +65,8 @@ export function ApproveAllDialog({
         },
       });
       setPickupBy("");
+      await onDone();
       setOpen(false);
-      onDone();
     } catch (e) {
       setError(errorMessage(e, "Approve failed"));
     } finally {

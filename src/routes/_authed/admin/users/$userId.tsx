@@ -54,8 +54,8 @@ function UserDetail() {
   const { actorId } = Route.useRouteContext();
   const isSelf = actorId === user.id;
 
-  function onChanged() {
-    void router.invalidate();
+  async function onChanged() {
+    await router.invalidate();
   }
 
   return (

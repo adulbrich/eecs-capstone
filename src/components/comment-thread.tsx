@@ -21,7 +21,7 @@ interface Comment {
 
 interface Props {
   comments: Comment[];
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
   projectId: string;
   /**
    * Staff commenting on their own project are emailed nothing, since nobody
@@ -119,7 +119,7 @@ function CommentNode({
   projectId: string;
   offersSkip: boolean;
   viewerIsStaff: boolean;
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
 }) {
   const isInternal = comment.isInternal ?? false;
   return (
@@ -176,7 +176,7 @@ function NewCommentForm({
   projectId: string;
   offersSkip: boolean;
   viewerIsStaff: boolean;
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
 }) {
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
@@ -208,7 +208,7 @@ function NewCommentForm({
       setContent("");
       setIsInternal(false);
       setSendEmail(true);
-      onChanged();
+      await onChanged();
     } catch (err) {
       setError(errorMessage(err, "Comment failed"));
     } finally {
@@ -283,7 +283,7 @@ function ReplyForm({
   parentIsInternal: boolean;
   offersSkip: boolean;
   viewerIsStaff: boolean;
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
@@ -353,15 +353,23 @@ function ReplyForm({
           sendEmail: sendEmail && !isInternal,
         },
       });
+      // The clear happens on the write, not after the refetch below. Cancel
+      // stays live in flight and bumps the attempt number, so a clear deferred
+      // past the refetch is skipped, and the posted text comes back as the next
+      // draft for the reader to post twice (#247 guards the flag, not this).
       if (isCurrent()) {
         setContent("");
         setIsInternalChoice(false);
         setSendEmail(true);
+      }
+      // Outside the guard: the reply landed whichever attempt posted it, so the
+      // thread has to refetch even when this one was cancelled. The form closes
+      // after, so it does not become a live Reply button over a thread that
+      // does not carry the reply yet.
+      await onChanged();
+      if (isCurrent()) {
         setOpen(false);
       }
-      // Outside the guard: the reply landed whichever attempt posted it, so
-      // the thread has to refetch even when this one was cancelled.
-      onChanged();
     } catch (err) {
       if (isCurrent()) {
         setError(errorMessage(err, "Reply failed"));

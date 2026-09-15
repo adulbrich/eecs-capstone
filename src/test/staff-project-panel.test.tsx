@@ -158,9 +158,7 @@ function panel(status: string, id = PROJECT_ID, viewerIsOwner = false) {
   return (
     <StaffProjectPanel
       key={id}
-      onChanged={() => {
-        // no-op
-      }}
+      onChanged={() => Promise.resolve()}
       project={project(status, id)}
       viewerIsOwner={viewerIsOwner}
     />

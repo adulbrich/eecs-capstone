@@ -23,7 +23,7 @@ export function StaffCategoriesSection({
   onChanged,
   projectId,
 }: {
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
   projectId: string;
 }) {
   const [saved, setSaved] = useState<string[] | null>(null);
@@ -54,7 +54,7 @@ export function StaffCategoriesSection({
         data: { projectId, categoryIds: draft },
       });
       await load();
-      onChanged();
+      await onChanged();
     } catch (e) {
       setError(errorMessage(e, "Save failed"));
     } finally {

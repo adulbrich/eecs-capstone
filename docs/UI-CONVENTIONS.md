@@ -1334,6 +1334,29 @@ forgotten. Loader data is what the control is about to be re-enabled over; a
 fire-and-forget invalidate re-enables it over the stale copy, and the reader
 sees the old value with a live button beside it.
 
+**A refresh a component takes as a prop returns a promise, and the child
+awaits it.** `onChanged`, `onDone` and their kin are typed `() => Promise<void>`,
+never `() => void`: a `void` return type discards the parent's
+`router.invalidate()` at the prop boundary, which is the same stale-data bug one
+hop further out and harder to see (#421). The parent returns the promise
+(`onChanged={() => router.invalidate()}`) rather than voiding it.
+
+**A handler that closes a surface awaits the refresh first, then closes**, where
+the control behind that surface is not itself disabled while the handler runs.
+`close(); await onDone();` hands the reader back a live popover trigger, status
+pill or table-row action over the row the refetch has not reached yet, which is
+the stale-data bug again with the busy window pointing at a surface that is no
+longer on screen. Awaiting first keeps the window over something the reader can
+see. Where the trigger does carry `disabled={busy}` (`role-select.tsx`,
+`staff-mentorship-section.tsx`) the order does not matter and closing first is
+the kinder one, because a modal whose buttons are all disabled has no visible
+way out.
+
+Note what this is not about: `router.invalidate()` does not reject. A loader that
+throws becomes the match's error state and renders through `errorComponent`,
+which is why `invalidate()` is what that component calls to retry. Ordering here
+buys a correct busy window, not a place for a refusal to land.
+
 Go through the hook that owns a key rather than calling the server function
 underneath it: `useWriteBookmark` exists so that a bookmark write invalidates
 `["bookmarks"]` wherever it happens.

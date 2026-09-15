@@ -6,7 +6,7 @@ import { FieldError } from "./ui/field";
 
 interface Props {
   currentKey: string | null;
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
 }
 
 export function AvatarUploader({ currentKey, onChanged }: Props) {
@@ -24,7 +24,7 @@ export function AvatarUploader({ currentKey, onChanged }: Props) {
       } else {
         await clearAvatar();
       }
-      onChanged();
+      await onChanged();
     } catch (err) {
       setError(errorMessage(err, "Save failed. Please try again."));
     } finally {

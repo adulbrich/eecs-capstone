@@ -140,8 +140,8 @@ function subjectOf(row: Row): string {
 interface KindConfig {
   /** On the group header, beside the requester. */
   badge: ReactNode;
-  groupAction: (rows: Row[], onDone: () => void) => ReactNode;
-  rowActions: (row: Row, onDone: () => void) => ReactNode;
+  groupAction: (rows: Row[], onDone: () => Promise<void>) => ReactNode;
+  rowActions: (row: Row, onDone: () => Promise<void>) => ReactNode;
   statuses: readonly string[];
 }
 
@@ -246,7 +246,10 @@ function RequestGroupHeader({
   );
 }
 
-function buildColumns(onDone: () => void, onOpen: (lineId: string) => void) {
+function buildColumns(
+  onDone: () => Promise<void>,
+  onOpen: (lineId: string) => void
+) {
   return defineAdminColumns<Row>()([
     {
       accessorFn: (row) => subjectOf(row),
@@ -369,8 +372,8 @@ function AdminRequestQueue() {
   const filtered = q !== "" || status !== "all";
   const navigate = useNavigate({ from: "/admin/inventory/requests" });
 
-  const onDone = useCallback(() => {
-    void router.invalidate();
+  const onDone = useCallback(async () => {
+    await router.invalidate();
   }, [router]);
   // The sheet is a sibling of the table, keyed by the open line's id rather
   // than holding a row, so a refetch after a decision shows the fresh row.
@@ -533,12 +536,16 @@ function timelineOf(row: Row) {
 
 function sheetActions(
   row: Row,
-  onDone: () => void,
+  onDone: () => Promise<void>,
   setOpenLineId: (id: string | null) => void
 ): ReactNode {
-  const done = () => {
+  // The refresh first, then the close. The sheet holds its own
+  // `AdminRequestActions`, so closing first hands the reader the one in the
+  // table row instead, with a busy flag of its own that is false, over a row
+  // the refetch has not reached.
+  const done = async () => {
+    await onDone();
     setOpenLineId(null);
-    onDone();
   };
   if (row.kind === "item") {
     return row.line.status === "pending" ? (
