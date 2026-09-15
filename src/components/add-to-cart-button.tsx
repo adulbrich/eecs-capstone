@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClipboardCheck, ClipboardPlus } from "lucide-react";
+import { toast } from "sonner";
 import { authClient } from "#/lib/auth-client";
+import { errorMessage } from "#/lib/error-message";
 import { useHasMounted } from "#/lib/use-has-mounted";
 import { addToCart, getCart } from "#/server/inventory";
 import { Button } from "./ui/button";
@@ -55,6 +57,14 @@ export function AddToCartButton({
     // React Query consumer that cares. The title-row count on /inventory
     // shares this key, so it updates from the same refetch.
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cart"] }),
+    // The label alone was the whole report before this, and a label says why
+    // nothing: "Could not add, try again" is the same text whether the item
+    // just went out on loan or the session expired (#410). The label stays,
+    // because it persists where a toast does not; the toast carries the
+    // reason. A row control has no panel to write a paragraph into
+    // (UI-CONVENTIONS, "Mutations and feedback").
+    onError: (err) =>
+      toast.error(errorMessage(err, "Could not add to the borrow list")),
   });
 
   // isSuccess as well as the cart, so the label flips the moment the write

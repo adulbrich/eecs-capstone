@@ -21,6 +21,12 @@ import { errorMessage } from "./error-message";
  *
  * `run` answers whether the action succeeded, so a caller can navigate or
  * close a dialog on the true branch without a second try/catch of its own.
+ * It takes a fallback of its own for a panel whose several actions fail
+ * differently ("Update failed", "Reject failed") but share one error slot.
+ *
+ * `setError` comes back out for the client-side refusals that never reach a
+ * server: `custom-line-actions.tsx` writes "Reason required" into the same
+ * paragraph a server rejection would land in.
  */
 export function useAction(options?: {
   /** Shown when the rejection carries no message of its own. */
@@ -38,7 +44,11 @@ export function useAction(options?: {
   const inFlight = useRef<boolean>(false);
 
   const run = useCallback(
-    async (action: () => void | Promise<void>): Promise<boolean> => {
+    async (
+      action: () => void | Promise<void>,
+      /** Overrides the hook's fallback for this one action. */
+      actionFallback?: string
+    ): Promise<boolean> => {
       if (inFlight.current) {
         return false;
       }
@@ -49,7 +59,7 @@ export function useAction(options?: {
         await action();
         return true;
       } catch (err) {
-        const message = errorMessage(err, fallback);
+        const message = errorMessage(err, actionFallback ?? fallback);
         if (onError) {
           onError(message);
         } else {
