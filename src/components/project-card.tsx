@@ -91,9 +91,14 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
             requiresNdaIp={project.requiresNdaIp}
             studentProposed={project.studentProposed}
           />
+          {/* `self-start` because this column stretches its items: the badge
+              is `inline-flex`, but as a flex item in a `flex-col` it is
+              blockified and fills the card. The project page renders the same
+              component inside a wrapping row, where the cross axis is vertical
+              and it sizes to its text without help. */}
           <TeamFullBadge
             acceptingApplicants={project.acceptingApplicants}
-            className="mt-2"
+            className="mt-2 self-start"
           />
           {project.description && (
             <p className="mt-2 line-clamp-3 text-muted-foreground text-sm md:mt-1">
