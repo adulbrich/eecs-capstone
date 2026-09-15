@@ -36,7 +36,7 @@ export function StaffMentorshipSection({
   onChanged,
   projectId,
 }: {
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
   projectId: string;
 }) {
   const [record, setRecord] = useState<ProjectMentorship | null>(null);
@@ -78,7 +78,7 @@ export function StaffMentorshipSection({
       });
       setConfirmOpen(false);
       await load();
-      onChanged();
+      await onChanged();
     } catch (e) {
       setError(errorMessage(e, "Save failed"));
     } finally {

@@ -19,7 +19,7 @@ interface Props {
   /** Where the role email goes; named in the confirm so the admin can skip it (#386). */
   email: string;
   initialRole: UserRole;
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
   userId: string;
 }
 
@@ -37,7 +37,7 @@ export function RoleSelect({ email, userId, initialRole, onChanged }: Props) {
     void run(async () => {
       await setUserRole({ data: { userId, role, sendEmail } });
       setConfirmOpen(false);
-      onChanged();
+      await onChanged();
     });
   }
 

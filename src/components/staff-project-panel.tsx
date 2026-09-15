@@ -100,7 +100,7 @@ export function StaffProjectPanel({
   viewerIsOwner,
 }: {
   project: Project;
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
   /** Staff deleting their own draft: no email goes out, so no skip is offered. */
   viewerIsOwner: boolean;
 }) {
@@ -156,13 +156,13 @@ export function StaffProjectPanel({
   // save back here rather than reloading a copy of its own.
   async function onProposerSaved() {
     await Promise.all([loadProposer(), loadEditLog()]);
-    onChanged();
+    await onChanged();
   }
 
   // Same for the other writers in this panel: a save shows up in the log.
-  function onSectionChanged() {
-    void loadEditLog();
-    onChanged();
+  async function onSectionChanged() {
+    await loadEditLog();
+    await onChanged();
   }
 
   const currentStatus = project.status as ProjectStatus;
@@ -204,7 +204,7 @@ export function StaffProjectPanel({
         await performTransition({ data });
       }
       closeModal();
-      onChanged();
+      await onChanged();
     } catch (err) {
       setError(errorMessage(err, "Transition failed"));
     } finally {
@@ -221,7 +221,7 @@ export function StaffProjectPanel({
     } else {
       await restoreProject({ data: { id: project.id } });
     }
-    onChanged();
+    await onChanged();
   }
 
   async function runHardDelete() {

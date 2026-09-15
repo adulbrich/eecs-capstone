@@ -1334,6 +1334,13 @@ forgotten. Loader data is what the control is about to be re-enabled over; a
 fire-and-forget invalidate re-enables it over the stale copy, and the reader
 sees the old value with a live button beside it.
 
+**A refresh a component takes as a prop returns a promise, and the child
+awaits it.** `onChanged`, `onDone` and their kin are typed `() => Promise<void>`,
+never `() => void`: a `void` return type discards the parent's
+`router.invalidate()` at the prop boundary, which is the same stale-data bug one
+hop further out and harder to see (#421). The parent returns the promise
+(`onChanged={() => router.invalidate()}`) rather than voiding it.
+
 Go through the hook that owns a key rather than calling the server function
 underneath it: `useWriteBookmark` exists so that a bookmark write invalidates
 `["bookmarks"]` wherever it happens.

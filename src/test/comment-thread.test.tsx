@@ -62,9 +62,7 @@ function renderThread(
   return render(
     <CommentThread
       comments={comments}
-      onChanged={() => {
-        // no-op
-      }}
+      onChanged={() => Promise.resolve()}
       projectId={PROJECT_ID}
       viewerIsOwner={viewerIsOwner}
       viewerIsStaff={viewerIsStaff}
@@ -392,9 +390,7 @@ describe("CommentThread forms while a post is in flight", () => {
     view.rerender(
       <CommentThread
         comments={[first, comment({ id: "c2", content: "unrelated post" })]}
-        onChanged={() => {
-          // no-op
-        }}
+        onChanged={() => Promise.resolve()}
         projectId={PROJECT_ID}
         viewerIsOwner={false}
         viewerIsStaff={true}

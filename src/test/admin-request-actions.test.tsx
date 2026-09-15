@@ -28,7 +28,7 @@ function renderPending() {
   render(
     <AdminRequestActions
       lineId="line-1"
-      onDone={() => undefined}
+      onDone={() => Promise.resolve()}
       requesterEmail="student@x.edu"
       status="pending"
     />
@@ -49,7 +49,7 @@ describe("AdminRequestActions", () => {
     render(
       <AdminRequestActions
         lineId="line-1"
-        onDone={() => undefined}
+        onDone={() => Promise.resolve()}
         requesterEmail="student@x.edu"
         status="approved"
       />

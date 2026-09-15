@@ -35,7 +35,7 @@ export function ProjectPrivatePanel({
   comments: Comment[];
   history: HistoryRow[];
   notes: string | null;
-  onCommentsChanged: () => void;
+  onCommentsChanged: () => Promise<void>;
   projectId: string;
   teamsSupported: number;
   viewerIsOwner: boolean;

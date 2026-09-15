@@ -166,9 +166,7 @@ function ProjectDetail() {
                   ?.comment ?? null)
               : null
           }
-          onChanged={() => {
-            void router.invalidate();
-          }}
+          onChanged={() => router.invalidate()}
           project={{
             id: project.id,
             status: project.status,
@@ -217,9 +215,7 @@ function ProjectDetail() {
           notes={project.notes}
           // Only the comment list refetches. The loader carries no comments,
           // so invalidating the route after a post re-ran it for nothing.
-          onCommentsChanged={() => {
-            void refreshComments();
-          }}
+          onCommentsChanged={() => refreshComments()}
           projectId={project.id}
           teamsSupported={project.teamsSupported}
           viewerIsOwner={viewerIsOwner}
@@ -234,9 +230,7 @@ function ProjectDetail() {
         // would otherwise be posted onto the next project.
         <StaffProjectPanel
           key={project.id}
-          onChanged={() => {
-            void router.invalidate();
-          }}
+          onChanged={() => router.invalidate()}
           project={{
             id: project.id,
             status: project.status,

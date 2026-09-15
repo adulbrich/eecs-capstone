@@ -40,7 +40,7 @@ export function FulfillCustomLineDialog({
   requesterEmail,
 }: {
   line: { id: string; name: string; quantity: number };
-  onDone: () => void;
+  onDone: () => Promise<void>;
   /** Emailed once for the whole fulfilment; named on the skip (#387). */
   requesterEmail: string;
 }) {
@@ -135,7 +135,7 @@ export function FulfillCustomLineDialog({
       });
       reset();
       setOpen(false);
-      onDone();
+      await onDone();
     } catch (e) {
       setError(errorMessage(e, "Fulfil failed"));
     } finally {

@@ -69,9 +69,7 @@ describe("RoleSelect email skip (#386)", () => {
       <RoleSelect
         email={EMAIL}
         initialRole="user"
-        onChanged={() => {
-          // no-op
-        }}
+        onChanged={() => Promise.resolve()}
         userId="u1"
       />
     );
@@ -107,9 +105,7 @@ describe("BanForm email skip (#386)", () => {
         banned={false}
         banReason={null}
         email={EMAIL}
-        onChanged={() => {
-          // no-op
-        }}
+        onChanged={() => Promise.resolve()}
         userId="u1"
       />
     );

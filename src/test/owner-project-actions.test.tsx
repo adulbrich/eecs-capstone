@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("#/server/projects", () => ({
@@ -25,14 +31,19 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 import { OwnerProjectActions } from "#/components/owner-project-actions";
+import { submitProject } from "#/server/projects";
 
 afterEach(cleanup);
 
-function renderBlock(status: string, changeRequest: string | null = null) {
+function renderBlock(
+  status: string,
+  changeRequest: string | null = null,
+  onChanged: () => Promise<void> = () => Promise.resolve()
+) {
   return render(
     <OwnerProjectActions
       changeRequest={changeRequest}
-      onChanged={vi.fn()}
+      onChanged={onChanged}
       project={{ id: "00000000-0000-0000-0000-000000000001", status }}
     />
   );
@@ -67,5 +78,32 @@ describe("OwnerProjectActions", () => {
   it("renders nothing for a status with no owner action", () => {
     const { container } = renderBlock("approved");
     expect(container.firstChild).toBeNull();
+  });
+
+  // The refresh is what the button is about to be re-enabled over, so the
+  // busy window has to cover it and not just the write (#421). A prop typed
+  // `() => void` is what used to make this untestable: the promise was
+  // discarded at the boundary, so there was nothing to hold the window open.
+  it("keeps the button disabled until the refresh resolves", async () => {
+    let releaseRefresh = () => {
+      // replaced below, before anything awaits the promise
+    };
+    const refreshed = new Promise<void>((resolve) => {
+      releaseRefresh = resolve;
+    });
+    renderBlock("draft", null, () => refreshed);
+
+    const button = screen.getByRole("button", {
+      name: "Submit for review",
+    }) as HTMLButtonElement;
+    fireEvent.click(button);
+
+    // The write has landed and the refresh has not, which is exactly the
+    // moment the reader could have clicked a live control over a stale row.
+    await waitFor(() => expect(submitProject).toHaveBeenCalled());
+    expect(button.disabled).toBe(true);
+
+    releaseRefresh();
+    await waitFor(() => expect(button.disabled).toBe(false));
   });
 });

@@ -16,7 +16,7 @@ interface Props {
   banReason: string | null;
   /** Where the ban email goes; named in the confirm so the admin can skip it (#386). */
   email: string;
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
   userId: string;
 }
 
@@ -51,13 +51,13 @@ export function BanForm({
     });
     setReason("");
     setExpiresAt("");
-    onChanged();
+    await onChanged();
   }
 
   function onUnban() {
     void run(async () => {
       await unbanUser({ data: { userId } });
-      onChanged();
+      await onChanged();
     });
   }
 
