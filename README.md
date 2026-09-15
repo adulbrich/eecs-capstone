@@ -229,8 +229,9 @@ blocks all public access and grants `s3:GetObject` to the assets CloudFront
 distribution alone, through Origin Access Control; Terraform provisions both
 (`infra/s3.tf`, `infra/cloudfront.tf`), so there is no bucket policy to apply by
 hand and no Block Public Access setting to turn off. Set
-`VITE_STORAGE_PUBLIC_BASE` to the customer-facing URL prefix, which in
-production is the assets distribution's domain (`terraform output assets_url`).
+`VITE_STORAGE_PUBLIC_BASE` to the customer-facing URL prefix; in production the
+deploy workflow reads the assets distribution's domain from SSM and bakes it in
+as a build arg, so that one is nobody's to set by hand either.
 
 ## AI-assisted proposal review
 

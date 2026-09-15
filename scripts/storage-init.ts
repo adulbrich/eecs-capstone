@@ -1,9 +1,8 @@
 // Local development only. Run via `npm run storage:init` (uses
 // tsx --env-file=.env.local), which points at the RustFS container in
 // docker-compose. Idempotent: creates the bucket and applies a public-read
-// policy to it. Nothing in the deployed path calls this script; production
-// provisions its bucket in Terraform (`infra/s3.tf`), where public access is
-// blocked and reads go through CloudFront.
+// policy to it. Nothing in the deployed path calls this script: production
+// provisions its bucket in Terraform, as the comment on that policy says.
 import {
   CreateBucketCommand,
   PutBucketPolicyCommand,
