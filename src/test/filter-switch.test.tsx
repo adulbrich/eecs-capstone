@@ -70,6 +70,32 @@ describe("FilterSwitch", () => {
     expect(onCheckedChange).not.toHaveBeenCalled();
   });
 
+  it("describes the switch by its hint, and only then grows past the control row", () => {
+    // The hint is the switch's accessible description (#383), the way the
+    // search hint is the input's.
+    render(
+      <FilterSwitch
+        checked={false}
+        hint="Hides projects whose team is already full."
+        id="accepting-only"
+        label="are accepting applicants"
+        onCheckedChange={() => {
+          // no-op
+        }}
+      />
+    );
+    const control = screen.getByRole("switch", {
+      name: "are accepting applicants",
+    });
+    expect(control.getAttribute("aria-describedby")).toBe(
+      "accepting-only-hint"
+    );
+    expect(document.getElementById("accepting-only-hint")?.textContent).toBe(
+      "Hides projects whose team is already full."
+    );
+    expect(control.parentElement?.className).toContain("min-h-9");
+  });
+
   it("aligns to the control row height, not the label row", () => {
     const { container } = render(
       <FilterSwitch

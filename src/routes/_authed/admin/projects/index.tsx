@@ -20,7 +20,9 @@ import { LocalTime } from "#/components/local-time";
 import { programLabel } from "#/components/project-card";
 import {
   type FilterProgram,
+  PROJECT_SWITCH_HINT,
   PROJECT_SWITCH_LABEL,
+  PROJECT_SWITCH_LEGEND,
 } from "#/components/projects-filters";
 import { SearchHint } from "#/components/search-hint";
 import { StatusBadge } from "#/components/status-badge";
@@ -94,7 +96,7 @@ const SWITCH_DEFAULTS = {
  * (#402). With "Student proposed" it is the staff to-do that `/admin/mentors`
  * is matched against.
  */
-const WITHOUT_MENTOR_LABEL = "Without a mentor";
+const WITHOUT_MENTOR_LABEL = "have no mentor recorded";
 
 export const searchSchema = z.object({
   cols: z.string().optional(),
@@ -668,11 +670,12 @@ function AdminProjectsFilters({
           beside its switch. An off switch leaves the URL: see SWITCH_DEFAULTS.
         */}
         <legend className="font-medium text-muted-foreground text-xs">
-          Only show projects that are
+          {PROJECT_SWITCH_LEGEND}
         </legend>
         <div className="mt-1">
           <FilterSwitch
             checked={acceptingOnly}
+            hint={PROJECT_SWITCH_HINT.acceptingOnly}
             id={`${uid}-accepting-only`}
             label={PROJECT_SWITCH_LABEL.acceptingOnly}
             onCheckedChange={(checked) =>

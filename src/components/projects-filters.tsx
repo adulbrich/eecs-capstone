@@ -8,6 +8,7 @@ import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -31,20 +32,54 @@ export interface FilterProgram {
 export type ProjectsOrder = "relevance" | "newest" | "recommended";
 
 /**
- * The switch labels, one line each under the legend "Only show projects that
- * are". Shared with `/admin/projects`, which carries three of the four under
- * the same params (#340), so the two listings cannot drift apart and the
- * accessibility tests name one string. The two mentor switches left with
- * the mentor state (#402).
+ * The legend over the narrowing switches. Each label below completes it as
+ * one sentence, lowercase, so a reader hears "Only show projects that are
+ * accepting applicants" (#383). Shared with `/admin/projects`, which renders
+ * the same three switches under the same params (#340) plus one of its own,
+ * so the two listings cannot drift apart and the accessibility tests name
+ * one string.
+ */
+export const PROJECT_SWITCH_LEGEND = "Only show projects that";
+
+/**
+ * The switch labels, one line each under the legend. Archive is not here:
+ * it swaps the set rather than narrowing it, so it is the "Show" radio
+ * above the switches (#383). The two mentor switches left with the mentor
+ * state (#402).
  */
 export const PROJECT_SWITCH_LABEL = {
-  acceptingOnly: "Accepting applicants",
-  archivedOnly: "Archived",
-  requiresNdaOnly: "Requiring an NDA or IP agreement",
-  // The same string as the badge, so the filter and the mark read as one
-  // fact (#372).
-  studentProposedOnly: "Student proposed",
+  acceptingOnly: "are accepting applicants",
+  requiresNdaOnly: "require an NDA or IP agreement",
+  studentProposedOnly: "were proposed by a student",
 } as const;
+
+/**
+ * The line under a switch whose label alone does not say what it hides.
+ * Only accepting applicants has one: "off" on that flag means the team is
+ * full (CONTEXT.md, "Closed to applicants"), which nothing on the listing
+ * said before (#383). Keyed like the labels so the admin page shows it too.
+ */
+export const PROJECT_SWITCH_HINT: Partial<
+  Record<keyof typeof PROJECT_SWITCH_LABEL, string>
+> = {
+  acceptingOnly: "Hides projects whose team is already full.",
+};
+
+/**
+ * The archive mode (#383): "Current projects" or "Archived projects", over
+ * the existing `archivedOnly` param so pasted links keep working. A radio
+ * rather than a switch because it swaps the set (`status = archived` in
+ * place of `published`) while every switch ANDs a condition onto it, and a
+ * switch under "Only show" read as if archived projects were in the default
+ * set.
+ */
+export const ARCHIVE_MODE_LABEL = {
+  current: "Current projects",
+  archived: "Archived projects",
+} as const;
+
+export const ARCHIVE_MODE_HINT =
+  "Archived projects ran in a past term and no longer take teams.";
 
 /** The narrowing params of `/projects`, as the route's search carries them. */
 export interface ProjectsFilterState {
@@ -254,9 +289,11 @@ interface FiltersProps extends ProjectsFilterState {
 
 /**
  * The narrowing controls, stacked for a column: `ListingLayout` puts them in
- * the aside from `xl` and in the sheet below it. The switch labels are one
- * line each under a legend that carries the "only show" so that each fits
- * an 18rem column beside its switch; the full sentence wrapped to two lines.
+ * the aside from `xl` and in the sheet below it. The archive radio comes
+ * first, outside the "Only show" fieldset, since it picks the set the
+ * switches then narrow. The switch labels are one line each under a legend
+ * that carries the "only show" so that each fits an 18rem column beside its
+ * switch; the full sentence wrapped to two lines.
  */
 export function ProjectsFilters({
   acceptingOnly,
@@ -323,20 +360,40 @@ export function ProjectsFilters({
 
       <fieldset>
         <legend className="font-medium text-muted-foreground text-xs">
-          Only show projects that are
+          Show
+        </legend>
+        <RadioGroup
+          aria-describedby={`${uid}-archive-hint`}
+          className="mt-1 gap-1"
+          onValueChange={(v) => setFilter("archivedOnly", v === "archived")}
+          value={archivedOnly ? "archived" : "current"}
+        >
+          {(["current", "archived"] as const).map((mode) => (
+            <Label className="min-h-7 font-normal" key={mode}>
+              <RadioGroupItem value={mode} />
+              {ARCHIVE_MODE_LABEL[mode]}
+            </Label>
+          ))}
+        </RadioGroup>
+        <p
+          className="mt-1 text-muted-foreground text-xs"
+          id={`${uid}-archive-hint`}
+        >
+          {ARCHIVE_MODE_HINT}
+        </p>
+      </fieldset>
+
+      <fieldset>
+        <legend className="font-medium text-muted-foreground text-xs">
+          {PROJECT_SWITCH_LEGEND}
         </legend>
         <div className="mt-1">
           <FilterSwitch
             checked={acceptingOnly}
+            hint={PROJECT_SWITCH_HINT.acceptingOnly}
             id={`${uid}-accepting-only`}
             label={PROJECT_SWITCH_LABEL.acceptingOnly}
             onCheckedChange={(v) => setFilter("acceptingOnly", v)}
-          />
-          <FilterSwitch
-            checked={archivedOnly}
-            id={`${uid}-archived-only`}
-            label={PROJECT_SWITCH_LABEL.archivedOnly}
-            onCheckedChange={(v) => setFilter("archivedOnly", v)}
           />
           <FilterSwitch
             checked={studentProposedOnly}

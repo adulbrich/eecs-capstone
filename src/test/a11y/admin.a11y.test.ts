@@ -207,10 +207,10 @@ test("@smoke admin projects list", async ({ page }) => {
   // widths every label reads on one line and nothing pushes the page wider
   // than the viewport.
   const switches = [
-    "Accepting applicants",
-    "Student proposed",
-    "Requiring an NDA or IP agreement",
-    "Without a mentor",
+    "are accepting applicants",
+    "were proposed by a student",
+    "require an NDA or IP agreement",
+    "have no mentor recorded",
     "Show soft-deleted",
   ];
   await page.goto("/admin/projects");
@@ -244,7 +244,7 @@ test("@smoke admin projects list", async ({ page }) => {
   // returns the URL to the route's defaults and the button goes with it.
   const clearAll = sheet.getByRole("button", { name: "Clear all" });
   await expect(clearAll).toBeHidden();
-  await sheet.getByRole("switch", { name: "Accepting applicants" }).click();
+  await sheet.getByRole("switch", { name: "are accepting applicants" }).click();
   await expect(page).toHaveURL(/acceptingOnly=true/);
   await expect(clearAll).toBeVisible();
   await checkA11y(page);

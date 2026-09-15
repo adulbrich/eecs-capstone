@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }));
 
 vi.mock("@tanstack/react-router", () => ({
   // `to` becomes the href so the anchor has the link role. `search` is
@@ -23,16 +25,39 @@ vi.mock("@tanstack/react-router", () => ({
       {children}
     </a>
   ),
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigate,
 }));
 
+// Radix's RadioGroup and Switch measure themselves on mount; jsdom ships no
+// ResizeObserver.
+class ResizeObserverStub {
+  observe() {
+    // no-op
+  }
+  unobserve() {
+    // no-op
+  }
+  disconnect() {
+    // no-op
+  }
+}
+globalThis.ResizeObserver ??=
+  ResizeObserverStub as unknown as typeof ResizeObserver;
+
 import {
+  ARCHIVE_MODE_HINT,
   countActiveFilters,
+  PROJECT_SWITCH_HINT,
   PROJECT_SWITCH_LABEL,
+  PROJECT_SWITCH_LEGEND,
+  ProjectsFilters,
   RecommendationPrompt,
 } from "#/components/projects-filters";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  navigate.mockReset();
+});
 
 function renderPrompt(viewer: { canRecommend: boolean; signedIn: boolean }) {
   return render(
@@ -99,18 +124,122 @@ describe("the switch labels and the active count", () => {
     expect(countActiveFilters({ ...off, requiresNdaOnly: true })).toBe(1);
   });
 
-  it("completes the legend with one line per switch, the student one matching its badge", () => {
-    expect(PROJECT_SWITCH_LABEL.requiresNdaOnly).toBe(
-      "Requiring an NDA or IP agreement"
-    );
-    // Four switches since #402: nothing about mentorship is public.
-    expect(Object.keys(PROJECT_SWITCH_LABEL).sort()).toEqual([
-      "acceptingOnly",
-      "archivedOnly",
-      "requiresNdaOnly",
-      "studentProposedOnly",
-    ]);
-    // One string for the filter and the badge (#372).
-    expect(PROJECT_SWITCH_LABEL.studentProposedOnly).toBe("Student proposed");
+  it("completes the legend with one predicate per switch, lowercase", () => {
+    // Legend plus label read as one sentence (#383): "Only show projects
+    // that are accepting applicants". Three switches since #402 and #383:
+    // nothing about mentorship is public, and archive is a mode, not a
+    // switch.
+    expect(PROJECT_SWITCH_LEGEND).toBe("Only show projects that");
+    expect(PROJECT_SWITCH_LABEL).toEqual({
+      acceptingOnly: "are accepting applicants",
+      requiresNdaOnly: "require an NDA or IP agreement",
+      studentProposedOnly: "were proposed by a student",
+    });
+    for (const label of Object.values(PROJECT_SWITCH_LABEL)) {
+      expect(label[0]).toBe(label[0]?.toLowerCase());
+    }
+    // The one hint: "off" on that flag means the team is full.
+    expect(PROJECT_SWITCH_HINT).toEqual({
+      acceptingOnly: "Hides projects whose team is already full.",
+    });
+  });
+});
+
+function renderFilters(
+  overrides: Partial<Parameters<typeof ProjectsFilters>[0]> = {}
+) {
+  return render(
+    <ProjectsFilters
+      acceptingOnly={false}
+      allCategories={[]}
+      allPrograms={[]}
+      archivedOnly={false}
+      categories={[]}
+      program={null}
+      requiresNdaOnly={false}
+      studentProposedOnly={false}
+      {...overrides}
+    />
+  );
+}
+
+describe("ProjectsFilters archive mode and hints", () => {
+  it("offers Current and Archived as a radio above the switches, with the hint", () => {
+    renderFilters();
+    const group = screen.getByRole("radiogroup");
+    expect(
+      screen
+        .getByRole("radio", { name: "Current projects" })
+        .getAttribute("aria-checked")
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("radio", { name: "Archived projects" })
+        .getAttribute("aria-checked")
+    ).toBe("false");
+    expect(
+      document.getElementById(group.getAttribute("aria-describedby") ?? "")
+        ?.textContent
+    ).toBe(ARCHIVE_MODE_HINT);
+    // No Archived switch under the legend any more.
+    expect(screen.queryByRole("switch", { name: /archived/i })).toBeNull();
+    // The radio's fieldset comes before the switches' fieldset.
+    const [first, second] = Array.from(document.querySelectorAll("fieldset"));
+    expect(first?.contains(group)).toBe(true);
+    expect(second?.textContent).toContain(PROJECT_SWITCH_LEGEND);
+  });
+
+  it("maps the radio onto archivedOnly, so pasted links keep working", () => {
+    renderFilters();
+    fireEvent.click(screen.getByRole("radio", { name: "Archived projects" }));
+    expect(navigate).toHaveBeenCalledTimes(1);
+    const reducer = navigate.mock.calls[0]?.[0].search;
+    expect(reducer({ q: "", page: 3 })).toEqual({
+      q: "",
+      archivedOnly: true,
+      page: 1,
+    });
+    cleanup();
+    renderFilters({ archivedOnly: true });
+    expect(
+      screen
+        .getByRole("radio", { name: "Archived projects" })
+        .getAttribute("aria-checked")
+    ).toBe("true");
+  });
+
+  it("counts the archive mode as a filter and Clear all returns it to current", () => {
+    expect(
+      countActiveFilters({
+        acceptingOnly: false,
+        archivedOnly: true,
+        categories: [],
+        program: null,
+        requiresNdaOnly: false,
+        studentProposedOnly: false,
+      })
+    ).toBe(1);
+    renderFilters({ archivedOnly: true });
+    fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
+    const reducer = navigate.mock.calls[0]?.[0].search;
+    expect(
+      reducer({ archivedOnly: true, acceptingOnly: true }).archivedOnly
+    ).toBe(false);
+  });
+
+  it("describes the accepting switch by its hint", () => {
+    renderFilters();
+    const control = screen.getByRole("switch", {
+      name: PROJECT_SWITCH_LABEL.acceptingOnly,
+    });
+    expect(
+      document.getElementById(control.getAttribute("aria-describedby") ?? "")
+        ?.textContent
+    ).toBe(PROJECT_SWITCH_HINT.acceptingOnly);
+    expect(
+      screen
+        .getByRole("switch", { name: PROJECT_SWITCH_LABEL.requiresNdaOnly })
+        .getAttribute("aria-describedby")
+    ).toBeNull();
   });
 });
