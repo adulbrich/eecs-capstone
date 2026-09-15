@@ -46,6 +46,40 @@ describe("FieldError", () => {
     render(<FieldError errors={[42]} />);
     expect(screen.getByText("42")).toBeTruthy();
   });
+
+  // The `message` half, which the forty sites that used to write the paragraph
+  // by hand pass instead of an array (#411).
+  it("renders a message string", () => {
+    render(<FieldError message="Could not save" />);
+    expect(screen.getByText("Could not save")).toBeTruthy();
+  });
+
+  it.each([
+    ["null", null],
+    ["undefined", undefined],
+    ["an empty string", ""],
+  ])("renders nothing for %s, so a caller needs no guard", (_label, value) => {
+    const { container } = render(<FieldError message={value} />);
+    expect(container.textContent).toBe("");
+  });
+
+  // The reason the component exists at all: all but two of the hand-written
+  // copies announced nothing.
+  it("announces, whichever prop it was given", () => {
+    const { unmount } = render(<FieldError message="Could not save" />);
+    expect(screen.getByRole("alert").textContent).toBe("Could not save");
+    unmount();
+
+    render(<FieldError errors={["Required"]} />);
+    expect(screen.getByRole("alert").textContent).toBe("Required");
+  });
+
+  // An empty alert sitting in the DOM would announce on every later change,
+  // which is why nothing renders rather than an empty paragraph.
+  it("leaves no empty alert behind when there is nothing to say", () => {
+    render(<FieldError message={null} />);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });
 
 describe("every Input and Textarea", () => {
