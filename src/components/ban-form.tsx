@@ -4,6 +4,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { LocalTime } from "./local-time";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
+import { FieldError } from "./ui/field";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
@@ -97,7 +98,7 @@ export function BanForm({
         >
           {busy ? "Working..." : "Unban"}
         </Button>
-        {error && <p className="mt-2 text-destructive text-sm">{error}</p>}
+        <FieldError message={error} />
       </section>
     );
   }
@@ -160,7 +161,7 @@ export function BanForm({
             {busy ? "Working..." : "Ban"}
           </Button>
         </ConfirmDialog>
-        {error && <p className="text-destructive text-sm">{error}</p>}
+        <FieldError message={error} />
       </div>
     </section>
   );

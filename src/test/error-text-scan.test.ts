@@ -34,10 +34,6 @@ const ALLOWED = new Map([
     "the banner form of the same message, one component for the three copies that existed",
   ],
   [
-    "src/components/ban-form.tsx",
-    "a status panel, not a failed action: a section with a heading, a reason and an expiry, describing the state the account is in",
-  ],
-  [
     "src/routes/_authed/profile.tsx",
     "FormFeedback is an <output>, which announces politely as a status already, and says Saved and Password changed from the same element; #410 owns how that page reports a result",
   ],
