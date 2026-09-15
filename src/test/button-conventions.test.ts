@@ -146,7 +146,10 @@ function utility(token: string): string {
 // An arbitrary value is a colour unless it reads as a length: `text-[13px]` is
 // a size, `text-[var(--brand)]` and `text-[#fff]` are not, and only the second
 // kind restyles a Button.
-const ARBITRARY_LENGTH = String.raw`\[(?:length:)?[\d.]+(?:px|r?em|%|pt|ch|vw|vh)\]`;
+// `[length:...]` says so outright, whatever it holds, which covers
+// `text-[length:var(--x)]` and `text-[length:calc(1rem+2px)]`. Without the
+// hint, only a bare number and unit counts.
+const ARBITRARY_LENGTH = String.raw`\[(?:length:[^\]]+|[\d.]+(?:px|r?em|%|pt|ch|vw|vh))\]`;
 const TEXT_NOT_COLOR = new RegExp(
   String.raw`^text-(?:xs|sm|base|lg|xl|\dxl|left|center|right|start|end|justify|balance|pretty|wrap|nowrap|ellipsis|clip|${ARBITRARY_LENGTH})`
 );
@@ -389,6 +392,9 @@ describe("button conventions", () => {
         "ring-[3px]",
         "text-[13px]",
         "text-[1.25rem]",
+        "text-[length:var(--brand-size)]",
+        "text-[length:calc(1rem+2px)]",
+        "ring-[length:var(--ring-width)]",
       ]) {
         expect(setsColor(token), token).toBe(false);
       }

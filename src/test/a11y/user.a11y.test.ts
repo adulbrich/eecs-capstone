@@ -107,7 +107,24 @@ test("@smoke an outline Button and an outline asChild Link read the same", async
   // own animations is the technique `waitForSurfaceSettled` already uses.
   const settle = (locator: Locator) =>
     locator.evaluate(async (el) => {
-      await Promise.allSettled(el.getAnimations().map((a) => a.finished));
+      // A frame first: a transition is constructed during the style recalc
+      // that follows the state change, not synchronously with it, so sampling
+      // `getAnimations()` straight after a hover can return an empty list and
+      // resolve before the thing it is waiting for exists.
+      await new Promise(requestAnimationFrame);
+      const running = () =>
+        el
+          .getAnimations()
+          .filter(
+            (a) =>
+              a.playState === "running" &&
+              a.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY
+          );
+      // Loop rather than sample once, as `waitForSurfaceSettled` does: one
+      // transition finishing can leave another still going.
+      for (let batch = running(); batch.length > 0; batch = running()) {
+        await Promise.allSettled(batch.map((a) => a.finished));
+      }
     });
 
   const atRest = await read(button);
