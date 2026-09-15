@@ -244,14 +244,23 @@ test("my bookmarks, as a table with a saved project", async ({ page }) => {
   // The row keeps its place and the toggle flips to its unset state (#420),
   // which is a surface nothing else scans: the old Remove button took the row
   // with it, so there was never an un-bookmarked row to check.
-  const row = page.getByRole("row").filter({
-    has: page.getByRole("button", { name: "Remove bookmark" }),
-  });
+  //
+  // Held by the title link, not by the button: a locator filtered on "Remove
+  // bookmark" re-resolves after the click and would land on whichever row
+  // still has one. Positional would not do either, since `AdminDataTable`
+  // emits a `data-group-header` row of its own.
+  const row = page
+    .getByRole("row")
+    .filter({ has: page.locator(`a[href="/projects/${projectId}"]`) });
   const before = await page.getByRole("row").count();
-  await row.first().getByRole("button", { name: "Remove bookmark" }).click();
+  await row.getByRole("button", { name: "Remove bookmark" }).click();
+  // Enabled, not merely visible. The label flips optimistically and the
+  // toggle stays disabled until the write and the refetch land, and axe
+  // exempts a disabled control from colour contrast, so scanning on the
+  // visible-only wait would skip the state this test exists to cover.
   await expect(
-    page.getByRole("button", { name: "Bookmark", exact: true }).first()
-  ).toBeVisible();
+    row.getByRole("button", { name: "Bookmark", exact: true })
+  ).toBeEnabled();
   // Not the empty state: the seeded user may hold other bookmarks, and this
   // scan must not depend on that. The count is unchanged, which is the point.
   await expect(page.getByRole("row")).toHaveCount(before);
