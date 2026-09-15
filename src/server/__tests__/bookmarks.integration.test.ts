@@ -256,6 +256,7 @@ describe("bookmarks", () => {
       "imageUrl",
       "licenseRestrictions",
       "minQualifications",
+      "noMentorNeeded",
       "objectives",
       "prefQualifications",
       "problemStatement",

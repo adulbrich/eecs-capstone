@@ -9,7 +9,7 @@ import {
   user,
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
-import type { UserRole } from "#/lib/vocabularies";
+import type { MentorNeed, UserRole } from "#/lib/vocabularies";
 import { getAdminStatsAs } from "#/server/_internal/admin";
 import { getAnalyticsAs } from "#/server/_internal/analytics";
 import { addToCartAs, submitCartAs } from "#/server/_internal/inventory-cart";
@@ -368,29 +368,49 @@ describe("seeking a mentor", () => {
       id: string,
       columns: {
         mentorEmail: string | null;
-        seekingMentor: boolean;
+        mentorNeed: MentorNeed;
         studentProposed: boolean;
       }
     ) => db.update(projects).set(columns).where(eq(projects.id, id));
     for (const id of [flagged.id, flaggedToo.id]) {
       await mentorship(id, {
         mentorEmail: null,
-        seekingMentor: true,
+        mentorNeed: "seeking",
         studentProposed: false,
       });
     }
     await mentorship(studentOnly.id, {
       mentorEmail: null,
-      seekingMentor: false,
+      mentorNeed: "unspecified",
       studentProposed: true,
     });
     await mentorship(flaggedWithMentor.id, {
       mentorEmail: "mentor@x.test",
-      seekingMentor: true,
+      mentorNeed: "seeking",
       studentProposed: true,
     });
 
     const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
     expect(view.headline.seekingMentor).toBe(2);
+  });
+
+  it("leaves a project that runs without a mentor out of the published-without-mentor count", async () => {
+    const admin = await makeUser(`an-n-${Date.now()}@x.com`, "admin");
+    const missing = await createProjectAs(admin, baseProject());
+    const runsAlone = await createProjectAs(admin, baseProject());
+    for (const id of [missing.id, runsAlone.id]) {
+      await forceTransitionAs(admin, id, "published", undefined, {
+        sendEmail: false,
+      });
+    }
+    await db
+      .update(projects)
+      .set({ mentorNeed: "none" })
+      .where(eq(projects.id, runsAlone.id));
+
+    const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
+    // One is missing a mentor; the other does not want one (#373).
+    expect(view.headline.publishedWithoutMentor).toBe(1);
+    expect(view.headline.publishedWithMentor).toBe(0);
   });
 });

@@ -66,6 +66,7 @@ const SEARCH_DEFAULTS = {
   acceptingOnly: false,
   studentProposedOnly: false,
   seekingMentorOnly: false,
+  noMentorNeededOnly: false,
   requiresNdaOnly: false,
   page: 1,
   pageSize: 20,
@@ -164,6 +165,7 @@ describe("searchProjects", () => {
       "imageUrl",
       "licenseRestrictions",
       "minQualifications",
+      "noMentorNeeded",
       "objectives",
       "prefQualifications",
       "problemStatement",
@@ -215,13 +217,13 @@ describe("the mark filters", () => {
     await updateProjectMentorshipAs(admin, {
       id: seeking,
       mentorEmail: "",
-      seekingMentor: true,
+      mentorNeed: "seeking",
     });
     // Flag on but an address on file: no badge, so no match either.
     await updateProjectMentorshipAs(admin, {
       id: lined,
       mentorEmail: "mentor@x.test",
-      seekingMentor: true,
+      mentorNeed: "seeking",
     });
 
     const only = await searchProjectsImpl({
@@ -242,6 +244,26 @@ describe("the mark filters", () => {
       studentProposedOnly: true,
     });
     expect(both.rows).toEqual([]);
+  });
+
+  it("noMentorNeededOnly narrows to projects that run without a mentor, the badge's rule", async () => {
+    const admin = await makeAdmin(`none-${Date.now()}@x.com`);
+    const undecided = await publish(admin, "Undecided");
+    const alone = await publish(admin, "Alone");
+    await db
+      .update(projects)
+      .set({ mentorNeed: "none" })
+      .where(eq(projects.id, alone));
+
+    const only = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      pageSize: 50,
+      noMentorNeededOnly: true,
+    });
+    expect(only.rows.map((r) => r.id)).toEqual([alone]);
+    expect(only.rows[0]?.noMentorNeeded).toBe(true);
+    expect(only.rows[0]?.seekingMentor).toBe(false);
+    expect(only.rows.map((r) => r.id)).not.toContain(undecided);
   });
 
   it("requiresNdaOnly narrows to projects that require an agreement, the same fact as the badge", async () => {

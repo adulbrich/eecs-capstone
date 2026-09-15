@@ -91,6 +91,7 @@ describe("the switch labels and the active count", () => {
       acceptingOnly: false,
       archivedOnly: false,
       categories: [],
+      noMentorNeededOnly: false,
       program: null,
       requiresNdaOnly: false,
       seekingMentorOnly: false,
@@ -98,11 +99,15 @@ describe("the switch labels and the active count", () => {
     };
     expect(countActiveFilters(off)).toBe(0);
     expect(countActiveFilters({ ...off, requiresNdaOnly: true })).toBe(1);
+    expect(countActiveFilters({ ...off, noMentorNeededOnly: true })).toBe(1);
   });
 
   it("completes the legend with one line per switch, the student one matching its badge", () => {
     expect(PROJECT_SWITCH_LABEL.requiresNdaOnly).toBe(
       "Requiring an NDA or IP agreement"
+    );
+    expect(PROJECT_SWITCH_LABEL.noMentorNeededOnly).toBe(
+      "Run without a mentor"
     );
     // One string for the filter and the badge (#372).
     expect(PROJECT_SWITCH_LABEL.studentProposedOnly).toBe("Student proposed");

@@ -162,18 +162,28 @@ listing filter "Requiring an NDA or IP agreement" on both listings.
 _Avoid_: confidential, restricted, proprietary project
 
 **Seeking mentor**:
-A project staff have marked as looking for a mentor, with none recorded yet. Stored
-as a flag, shown as a badge on the card and the project page only while no address
-is on file, and offered as a listing filter on the same rule; a mentor who has not
-signed up yet counts as recorded, so the badge goes away and nothing takes its place.
-Independent of student proposed.
+A project staff have marked as looking for a mentor, with none recorded yet. One of
+the three mentor states, shown as a badge on the card and the project page only
+while no address is on file, and offered as the listing filter "Seeking a mentor" on
+the same rule; a mentor who has not signed up yet counts as recorded, so the badge
+goes away and nothing takes its place. Independent of student proposed.
 _Avoid_: unmentored, needs mentor, open for mentors
+
+**No mentor needed**:
+A project staff have marked as running without a mentor, because the instructor or
+the partner covers the role. One of the three mentor states; shown as the badge "No
+mentor needed" on the card and the project page, and offered as the listing filter
+"Run without a mentor" on both listings. Cannot sit beside a recorded mentor: the
+Mentor section refuses either order. Not counted as missing a mentor on the staff
+dashboard.
+_Avoid_: student directed, student-led, self-directed, unmentored, self-managed
 
 **Mentorship**:
 The link between a project and its mentor: a recorded address, a derived name, and
-the seeking-mentor flag, granting no permission over the project. Staff edit the
-address and the flag from the Mentor section of the staff panel, and nothing about
-the mentor, name included, is public.
+the mentor state, one of not decided, seeking a mentor and no mentor needed,
+granting no permission over the project. Staff set the address and the state from
+the Mentor section of the staff panel; the public sees only the two badges the state
+derives, and nothing about the mentor, name included.
 _Avoid_: assignment, sponsorship
 
 **Teams supported**:

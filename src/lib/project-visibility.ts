@@ -117,6 +117,7 @@ export interface ProjectRow extends VisibleProject {
   licenseRestrictions: string | null;
   mentorEmail: string | null;
   minQualifications: string | null;
+  noMentorNeeded: boolean;
   notes: string | null;
   objectives: string | null;
   prefQualifications: string | null;
@@ -143,13 +144,15 @@ export interface ProjectDetailView {
   isSponsored: boolean | null;
   licenseRestrictions: string | null;
   minQualifications: string | null;
+  /** Staff marked it as running without a mentor. Derived in SQL from the stored state (#373). */
+  noMentorNeeded: boolean;
   notes: string | null;
   objectives: string | null;
   prefQualifications: string | null;
   problemStatement: string | null;
   programId: string | null;
   requiresNdaIp: boolean;
-  /** Staff marked it as looking for a mentor and no address is on file. Derived in SQL from the stored flag. */
+  /** Staff marked it as looking for a mentor and no address is on file. Derived in SQL from the stored state. */
   seekingMentor: boolean;
   status: ProjectStatus;
   studentProposed: boolean;
@@ -216,10 +219,11 @@ export function projectDetailView(
     // here and nothing must be: the address is one staff typed, which the
     // person may never have chosen to publish, and the name follows it
     // (#336). Both stay on the staff read in projects-queries.ts, with the
-    // raw `seeking_mentor` flag; the public sees only the derived badge. See
-    // #75, #304.
+    // raw `mentor_need` state; the public sees only the derived badges. See
+    // #75, #304, #373.
     studentProposed: project.studentProposed,
     seekingMentor: project.seekingMentor,
+    noMentorNeeded: project.noMentorNeeded,
   };
 }
 

@@ -337,7 +337,7 @@ export async function updateProjectProposerForCurrentUser(data: ProposerInput) {
 }
 
 /**
- * The only writer of `seekingMentor` and `mentorEmail`.
+ * The only writer of `mentorNeed` and `mentorEmail`.
  *
  * Staff-only, and deliberately not part of `updateProjectAs`: none of the
  * keys exists on `ProjectInput`, so the shared form cannot carry them and a
@@ -363,9 +363,20 @@ export async function updateProjectMentorshipAs(
 ): Promise<{ id: string; updated: boolean }> {
   assertStaff(viewer);
   const existing = await loadProjectOr404(data.id);
+  const mentorEmail = normalizeEmailAddress(data.mentorEmail);
+  // "No mentor needed" and a recorded address can never coexist (#373).
+  // Refused before the diff, so nothing is written; the message names the
+  // half the reader has to change, which is the half they did not just set.
+  if (data.mentorNeed === "none" && mentorEmail) {
+    throw new Error(
+      existing.mentorNeed === "none"
+        ? "Clear No mentor needed before recording a mentor."
+        : "Remove the mentor before marking No mentor needed."
+    );
+  }
   const newValues: Partial<typeof projects.$inferSelect> = {
-    seekingMentor: data.seekingMentor,
-    mentorEmail: normalizeEmailAddress(data.mentorEmail),
+    mentorNeed: data.mentorNeed,
+    mentorEmail,
   };
   const { changedFields, newDiff, oldDiff } = diffRowFields(
     existing,

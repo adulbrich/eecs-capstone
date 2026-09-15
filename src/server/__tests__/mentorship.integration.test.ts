@@ -55,7 +55,7 @@ async function columns(id: string) {
   const [row] = await db
     .select({
       mentorEmail: projects.mentorEmail,
-      seekingMentor: projects.seekingMentor,
+      mentorNeed: projects.mentorNeed,
       studentProposed: projects.studentProposed,
     })
     .from(projects)
@@ -71,12 +71,12 @@ describe("updateProjectMentorshipAs", () => {
       updateProjectMentorshipAs(owner, {
         id,
         mentorEmail: "m@x.com",
-        seekingMentor: true,
+        mentorNeed: "seeking",
       })
     ).rejects.toThrow("Forbidden");
     expect(await columns(id)).toEqual({
       mentorEmail: null,
-      seekingMentor: false,
+      mentorNeed: "unspecified",
       studentProposed: false,
     });
   });
@@ -88,13 +88,13 @@ describe("updateProjectMentorshipAs", () => {
     const first = await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: "  Mentor@X.com ",
-      seekingMentor: true,
+      mentorNeed: "seeking",
     });
     expect(first.updated).toBe(true);
     // Trimmed and lowercased, since #249 chose to normalize on write.
     expect(await columns(id)).toEqual({
       mentorEmail: "mentor@x.com",
-      seekingMentor: true,
+      mentorNeed: "seeking",
       studentProposed: false,
     });
 
@@ -104,7 +104,7 @@ describe("updateProjectMentorshipAs", () => {
     const again = await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: "MENTOR@x.com",
-      seekingMentor: true,
+      mentorNeed: "seeking",
     });
     expect(again.updated).toBe(false);
 
@@ -114,7 +114,7 @@ describe("updateProjectMentorshipAs", () => {
       .where(eq(projectEditLog.projectId, id));
     expect(log).toHaveLength(1);
     expect(log[0].editorId).toBe(admin.id);
-    expect(log[0].changedFields).toEqual(["seekingMentor", "mentorEmail"]);
+    expect(log[0].changedFields).toEqual(["mentorNeed", "mentorEmail"]);
   });
 
   it("leaves the student-proposed mark to the proposer endpoint, one edit log row per save", async () => {
@@ -131,7 +131,7 @@ describe("updateProjectMentorshipAs", () => {
     await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: "",
-      seekingMentor: true,
+      mentorNeed: "seeking",
     });
     expect((await columns(id)).studentProposed).toBe(true);
     const log = await db
@@ -142,7 +142,7 @@ describe("updateProjectMentorshipAs", () => {
     // mark is what this asserts, and the mentorship row never carries it.
     expect(log).toHaveLength(2);
     expect(log[0].changedFields).toContain("studentProposed");
-    expect(log[1].changedFields).toEqual(["seekingMentor"]);
+    expect(log[1].changedFields).toEqual(["mentorNeed"]);
     expect(
       (await getProposerForEditAs(admin, { projectId: id })).studentProposed
     ).toBe(true);
@@ -154,12 +154,12 @@ describe("updateProjectMentorshipAs", () => {
     await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: "m@x.com",
-      seekingMentor: false,
+      mentorNeed: "unspecified",
     });
     await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: "",
-      seekingMentor: false,
+      mentorNeed: "unspecified",
     });
     expect((await columns(id)).mentorEmail).toBeNull();
   });
@@ -173,13 +173,13 @@ describe("updateProjectMentorshipAs", () => {
       ...baseProject(),
       id,
       mentorEmail: "smuggled@x.com",
-      seekingMentor: true,
+      mentorNeed: "seeking" as const,
       studentProposed: true,
     };
     await updateProjectAs(admin, smuggled);
     expect(await columns(id)).toEqual({
       mentorEmail: null,
-      seekingMentor: false,
+      mentorNeed: "unspecified",
       studentProposed: false,
     });
   });
@@ -204,43 +204,43 @@ describe("the six public states", () => {
   it.each([
     {
       studentProposed: true,
-      seekingMentor: true,
+      mentorNeed: "seeking" as const,
       mentorEmail: "",
       badge: true,
     },
     {
       studentProposed: true,
-      seekingMentor: true,
+      mentorNeed: "seeking" as const,
       mentorEmail: "m@x.com",
       badge: false,
     },
     {
       studentProposed: true,
-      seekingMentor: false,
+      mentorNeed: "unspecified" as const,
       mentorEmail: "",
       badge: false,
     },
     {
       studentProposed: false,
-      seekingMentor: true,
+      mentorNeed: "seeking" as const,
       mentorEmail: "",
       badge: true,
     },
     {
       studentProposed: false,
-      seekingMentor: true,
+      mentorNeed: "seeking" as const,
       mentorEmail: "m@x.com",
       badge: false,
     },
     {
       studentProposed: false,
-      seekingMentor: false,
+      mentorNeed: "unspecified" as const,
       mentorEmail: "",
       badge: false,
     },
   ])(
-    "student $studentProposed, seeking $seekingMentor, address '$mentorEmail' shows the seeking badge: $badge",
-    async ({ studentProposed, seekingMentor, mentorEmail, badge }) => {
+    "student $studentProposed, state $mentorNeed, address '$mentorEmail' shows the seeking badge: $badge",
+    async ({ studentProposed, mentorNeed, mentorEmail, badge }) => {
       const { admin, id } = await publishedProject();
       // Two writers since #336: the mark travels with the proposer link.
       await updateProjectProposerAs(admin, {
@@ -251,7 +251,7 @@ describe("the six public states", () => {
       await updateProjectMentorshipAs(admin, {
         id,
         mentorEmail,
-        seekingMentor,
+        mentorNeed,
       });
       const { project } = await getProjectAs(null, { id });
       expect(project?.studentProposed).toBe(studentProposed);
@@ -267,7 +267,74 @@ describe("the six public states", () => {
     const { project } = await getProjectAs(null, { id });
     expect(project?.studentProposed).toBe(false);
     expect(project?.seekingMentor).toBe(false);
+    expect(project?.noMentorNeeded).toBe(false);
     expect("mentorName" in (project ?? {})).toBe(false);
+  });
+
+  it("shows No mentor needed for the none state, and never the seeking badge with it", async () => {
+    const { admin, id } = await publishedProject();
+    await updateProjectMentorshipAs(admin, {
+      id,
+      mentorEmail: "",
+      mentorNeed: "none",
+    });
+    const { project } = await getProjectAs(null, { id });
+    expect(project?.noMentorNeeded).toBe(true);
+    expect(project?.seekingMentor).toBe(false);
+    expect("mentorNeed" in (project ?? {})).toBe(false);
+    const [row] = await db
+      .select(projectSummarySelect)
+      .from(projects)
+      .leftJoin(programs, eq(projects.programId, programs.id))
+      .where(eq(projects.id, id));
+    expect(row.noMentorNeeded).toBe(true);
+    expect("mentorNeed" in row).toBe(false);
+  });
+
+  it("refuses an address beside the none state, in both orders, and writes nothing", async () => {
+    const { admin, id } = await publishedProject();
+    // State first, then an address: the state is what the reader has to clear.
+    await updateProjectMentorshipAs(admin, {
+      id,
+      mentorEmail: "",
+      mentorNeed: "none",
+    });
+    await expect(
+      updateProjectMentorshipAs(admin, {
+        id,
+        mentorEmail: "m@x.com",
+        mentorNeed: "none",
+      })
+    ).rejects.toThrow("Clear No mentor needed before recording a mentor.");
+    expect(await columns(id)).toEqual({
+      mentorEmail: null,
+      mentorNeed: "none",
+      studentProposed: false,
+    });
+    // Address first, then the state: the address is what to remove.
+    await updateProjectMentorshipAs(admin, {
+      id,
+      mentorEmail: "m@x.com",
+      mentorNeed: "unspecified",
+    });
+    await expect(
+      updateProjectMentorshipAs(admin, {
+        id,
+        mentorEmail: "m@x.com",
+        mentorNeed: "none",
+      })
+    ).rejects.toThrow("Remove the mentor before marking No mentor needed.");
+    expect(await columns(id)).toEqual({
+      mentorEmail: "m@x.com",
+      mentorNeed: "unspecified",
+      studentProposed: false,
+    });
+    const log = await db
+      .select()
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
+    // Two accepted saves, two refusals that wrote no row.
+    expect(log).toHaveLength(2);
   });
 
   it("shows the public nothing about a recorded mentor, before or after they sign up", async () => {
@@ -276,7 +343,7 @@ describe("the six public states", () => {
     await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: `Mentor-${stamp}@X.com`,
-      seekingMentor: true,
+      mentorNeed: "seeking" as const,
     });
     let { project } = await getProjectAs(null, { id });
     expect(project?.seekingMentor).toBe(false);
@@ -306,7 +373,7 @@ describe("the six public states", () => {
     await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: "",
-      seekingMentor: true,
+      mentorNeed: "seeking" as const,
     });
     const [row] = await db
       .select(projectSummarySelect)
@@ -326,7 +393,7 @@ describe("the six public states", () => {
     await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: "private@x.com",
-      seekingMentor: false,
+      mentorNeed: "unspecified" as const,
     });
     const { project } = await getProjectAs(owner, { id });
     expect(project).not.toBeNull();
@@ -343,7 +410,7 @@ describe("getProjectMentorshipAs", () => {
     expect(await getProjectMentorshipAs(admin, { projectId: id })).toEqual({
       mentorEmail: "",
       mentorName: null,
-      seekingMentor: false,
+      mentorNeed: "unspecified",
     });
 
     // Typed with capitals, stored without them, and the name still resolves:
@@ -354,12 +421,12 @@ describe("getProjectMentorshipAs", () => {
     await updateProjectMentorshipAs(admin, {
       id,
       mentorEmail: owner.email.toUpperCase(),
-      seekingMentor: true,
+      mentorNeed: "seeking",
     });
     expect(await getProjectMentorshipAs(admin, { projectId: id })).toEqual({
       mentorEmail: owner.email,
       mentorName: owner.name,
-      seekingMentor: true,
+      mentorNeed: "seeking",
     });
 
     await expect(
@@ -388,7 +455,7 @@ describe("mentor email", () => {
       {
         id,
         mentorEmail: "Mentor@Example.edu",
-        seekingMentor: false,
+        mentorNeed: "unspecified",
       },
       { send }
     );
@@ -404,13 +471,13 @@ describe("mentor email", () => {
       {
         id,
         mentorEmail: "mentor@example.edu",
-        seekingMentor: true,
+        mentorNeed: "seeking",
       },
       { send }
     );
     await updateProjectMentorshipAs(
       admin,
-      { id, mentorEmail: "", seekingMentor: true },
+      { id, mentorEmail: "", mentorNeed: "seeking" },
       { send }
     );
     expect(send).not.toHaveBeenCalled();

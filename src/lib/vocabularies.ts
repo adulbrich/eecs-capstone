@@ -78,6 +78,16 @@ export type InventoryCustomLineStatus =
   (typeof INVENTORY_CUSTOM_LINE_STATUSES)[number];
 
 /**
+ * Whether a project wants a mentor (#373). `unspecified` is the default and
+ * says nothing; `seeking` shows the "Seeking mentor" badge while no address
+ * is on file; `none` says the project runs without one and shows "No mentor
+ * needed". Staff set it in the Mentor section beside the address.
+ */
+export const MENTOR_NEEDS = ["unspecified", "seeking", "none"] as const;
+
+export type MentorNeed = (typeof MENTOR_NEEDS)[number];
+
+/**
  * What a notification row is about. The first fourteen were string literals
  * scattered across `project-notifications.ts` and `inventory-notifications.ts`
  * with the column typed `text`, so a misspelled type was a row the bell could

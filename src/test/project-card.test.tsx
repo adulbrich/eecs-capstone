@@ -44,6 +44,7 @@ const base: ProjectSummary = {
   description: "A long description that should be clamped to three lines.",
   status: "published",
   acceptingApplicants: true,
+  noMentorNeeded: false,
   requiresNdaIp: false,
   seekingMentor: false,
   studentProposed: false,
@@ -138,6 +139,14 @@ describe("ProjectCard badges", () => {
     expect(getByText("Student proposed")).toBeTruthy();
     expect(getByText("Seeking mentor")).toBeTruthy();
     expect(queryByText(/@/)).toBeNull();
+  });
+
+  it("shows No mentor needed when the summary carries the flag", () => {
+    const { getByText, queryByText } = render(
+      <ProjectCard project={{ ...base, noMentorNeeded: true }} />
+    );
+    expect(getByText("No mentor needed")).toBeTruthy();
+    expect(queryByText("Seeking mentor")).toBeNull();
   });
 
   it("shows the agreement badge when the summary carries the flag", () => {

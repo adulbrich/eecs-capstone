@@ -58,6 +58,7 @@ function bookmark(
     problemStatement: null,
     programCourseId: null,
     programCourseName: null,
+    noMentorNeeded: false,
     requiresNdaIp: false,
     seekingMentor: false,
     status: "published",
@@ -84,6 +85,7 @@ const ROWS: BookmarkRow[] = [
     teamsSupported: 2,
     bookmarkedAt: new Date("2026-05-02T00:00:00.000Z"), // Saturday
     acceptingApplicants: false,
+    noMentorNeeded: false,
     requiresNdaIp: true,
     studentProposed: true,
     seekingMentor: true,
