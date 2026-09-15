@@ -139,17 +139,29 @@ function utility(token: string): string {
   return token.replace(/^(?:[^:\s]*:)+/, "").replace(/^!/, "");
 }
 
-// `text-` and `border-` are the two prefixes that are not always a colour.
-// Everything they can be instead is listed, so a new colour token is caught
-// by default rather than by being added here.
-const TEXT_NOT_COLOR =
-  /^text-(?:xs|sm|base|lg|xl|\dxl|left|center|right|start|end|justify|balance|pretty|wrap|nowrap|ellipsis|clip|\[)/;
-// Widths, sides and line styles. Everything else after `border-` is a colour.
+// `text-`, `border-`, `ring-`, `outline-` and `shadow-` are the prefixes that
+// are not always a colour. Everything they can be instead is listed, so a new
+// colour token is caught by default rather than by being added here.
+//
+// An arbitrary value is a colour unless it reads as a length: `text-[13px]` is
+// a size, `text-[var(--brand)]` and `text-[#fff]` are not, and only the second
+// kind restyles a Button.
+const ARBITRARY_LENGTH = String.raw`\[(?:length:)?[\d.]+(?:px|r?em|%|pt|ch|vw|vh)\]`;
+const TEXT_NOT_COLOR = new RegExp(
+  String.raw`^text-(?:xs|sm|base|lg|xl|\dxl|left|center|right|start|end|justify|balance|pretty|wrap|nowrap|ellipsis|clip|${ARBITRARY_LENGTH})`
+);
+// A side, a width, or both, plus the line styles. Everything else after
+// `border-` is a colour. The side and the width combine, as `border-t-4`, which
+// flattening this into one list of single tokens quietly broke.
 const BORDER_NOT_COLOR =
-  /^border-(?:[xytrbles]|0|2|4|8|px|solid|dashed|dotted|double|hidden|none)$|^border$/;
+  /^border(?:-[xytrbles])?(?:-(?:0|2|4|8|px))?$|^border-(?:solid|dashed|dotted|double|hidden|none)$/;
 const SHADOW_NOT_COLOR = /^shadow-(?:2?xs|sm|md|lg|xl|2xl|none|inner)$/;
 const OUTLINE_NOT_COLOR =
   /^outline-(?:none|hidden|offset-|solid|dashed|dotted|double|\d)/;
+// Ring widths, offsets and insets. `ring-ring/50` is the colour case.
+const RING_NOT_COLOR = new RegExp(
+  `^ring-(?:0|1|2|4|8|inset|offset-(?:0|1|2|4|8)|${ARBITRARY_LENGTH})$`
+);
 
 function setsColor(token: string): boolean {
   const u = utility(token);
@@ -159,7 +171,11 @@ function setsColor(token: string): boolean {
       u
     )
   ) {
-    return !(SHADOW_NOT_COLOR.test(u) || OUTLINE_NOT_COLOR.test(u));
+    return !(
+      SHADOW_NOT_COLOR.test(u) ||
+      OUTLINE_NOT_COLOR.test(u) ||
+      RING_NOT_COLOR.test(u)
+    );
   }
   if (u.startsWith("text-")) {
     return !TEXT_NOT_COLOR.test(u);
@@ -194,7 +210,15 @@ function restyles(token: string): string | null {
 }
 
 /**
- * An icon size class: `h-4`, `w-4`, `size-4`.
+ * An icon size class that is wrong or redundant inside a Button.
+ *
+ * An `h-`/`w-` pair is always wrong: the base rule
+ * `[&_svg:not([class*='size-'])]:size-4` stands down only for a class
+ * containing `size-`, so `h-5 w-5` loses to it on specificity and renders 16px
+ * while reading as 20. `size-3` and `size-4` are the two variant defaults, so
+ * either one restates the variant. Any other `size-N` passes, because it is
+ * the escape hatch UI-CONVENTIONS sanctions for an icon that genuinely needs a
+ * different size, and banning it would leave the documented route unusable.
  *
  * The boundary is `[\w-]` rather than whitespace, because these sit inside a
  * quoted class string: the first class after the opening quote has no space
@@ -202,7 +226,8 @@ function restyles(token: string): string | null {
  * also keeps `min-w-[1.25rem]` and `max-h-16` out, since their `w`/`h` is
  * preceded by a hyphen.
  */
-const ICON_SIZE_CLASS = /(?<![\w-])(?:h|w|size)-\d[\d.]*(?![\w-])/g;
+const ICON_SIZE_CLASS =
+  /(?<![\w-])(?:(?:h|w)-\d[\d.]*(?![\w-])|size-[34](?![\w.-]))/g;
 
 function lineOf(source: string, index: number): number {
   return source.slice(0, index).split("\n").length;
@@ -351,6 +376,33 @@ describe("button conventions", () => {
       expect(restyles("size-12")).toBe("height");
     });
 
+    // Each of these escaped or was wrongly caught by the second draft.
+    it("keeps a border side and width together, and a ring width out", () => {
+      for (const token of [
+        "border-t-4",
+        "border-x-2",
+        "border-b-8",
+        "border-l-px",
+        "ring-2",
+        "ring-inset",
+        "ring-offset-2",
+        "ring-[3px]",
+        "text-[13px]",
+        "text-[1.25rem]",
+      ]) {
+        expect(setsColor(token), token).toBe(false);
+      }
+      for (const token of [
+        "border-t-destructive",
+        "ring-ring/50",
+        "ring-destructive",
+        "text-[var(--brand-primary)]",
+        "text-[#ff8c5a]",
+      ]) {
+        expect(setsColor(token), token).toBe(true);
+      }
+    });
+
     it("tells a height, padding or radius class from a width or margin", () => {
       expect(restyles("h-9")).toBe("height");
       expect(restyles("h-auto")).toBe("height");
@@ -391,10 +443,16 @@ describe("button conventions", () => {
         [...body.matchAll(ICON_SIZE_CLASS)].map((m) => m[0]);
       expect(matches('<Icon className="h-4 w-4" />')).toEqual(["h-4", "w-4"]);
       expect(matches('<Icon className="size-4" />')).toEqual(["size-4"]);
-      expect(matches('<Icon className="size-3.5" />')).toEqual(["size-3.5"]);
+      // A size the variant does not give, so not a restatement of it.
+      expect(matches('<Icon className="size-3.5" />')).toEqual([]);
       expect(matches('<span className="min-w-[1.25rem]" />')).toEqual([]);
       expect(matches('<span className="max-h-16 w-full" />')).toEqual([]);
       expect(matches('<span className="hidden md:inline" />')).toEqual([]);
+      // The sanctioned escape hatch: a size the variant does not already give.
+      expect(matches('<Icon className="size-5" />')).toEqual([]);
+      expect(matches('<Icon className="size-6" />')).toEqual([]);
+      // ...but an h/w pair is wrong at any number, because it loses silently.
+      expect(matches('<Icon className="h-5 w-5" />')).toEqual(["h-5", "w-5"]);
     });
 
     it("finds a raw <button> and not a <Button> or an identifier", () => {

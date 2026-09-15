@@ -84,8 +84,14 @@ test("@smoke an outline Button and an outline asChild Link read the same", async
     locator.evaluate((el) => {
       const s = getComputedStyle(el);
       return {
+        // backgroundColor, borderColor and boxShadow are what `outline`
+        // actually changes on hover and on focus-visible, so leaving them out
+        // would have made those two phases assert nothing new.
+        backgroundColor: s.backgroundColor,
+        borderColor: s.borderColor,
         borderRadius: s.borderRadius,
         borderWidth: s.borderWidth,
+        boxShadow: s.boxShadow,
         color: s.color,
         cursor: s.cursor,
         fontSize: s.fontSize,
