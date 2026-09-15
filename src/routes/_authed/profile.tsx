@@ -8,13 +8,14 @@ import {
 import { MentorFields } from "#/components/mentor-fields";
 import { RecommendedProjectsLink } from "#/components/recommended-projects-link";
 import { Button } from "#/components/ui/button";
+import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
 import { authClient } from "#/lib/auth-client";
-import { errorMessage } from "#/lib/error-message";
 import { pageTitle } from "#/lib/page-title";
 import { signOut } from "#/lib/sign-out";
+import { useAction } from "#/lib/use-action";
 import { getAccountDeletionPreview } from "#/server/account";
 import { getMyInterests, saveMyInterests } from "#/server/interests";
 import { updateProfile } from "#/server/profile";
@@ -36,48 +37,51 @@ interface ProfileUser {
   wantsToMentor?: boolean | null;
 }
 
-type Feedback = { kind: "error" | "saved"; message: string } | null;
-
 /**
- * Result of a single form, rendered directly beneath that form's own submit
- * button. `output` rather than `p` so assistive tech announces the result when
- * it appears, matching the interests section.
+ * What a form on this page says when it worked, under that form's own submit
+ * button. A save that stays on the page confirms inline rather than by toast
+ * (UI-CONVENTIONS, "Mutations and feedback").
+ *
+ * `output` rather than `p` so assistive tech announces it politely when it
+ * appears: this is a result the reader asked for, not the interruption
+ * `FieldError` is. The two used to be one component switching on a `kind`,
+ * which is what put a failure in an element that announces politely and gave
+ * this page the only error paragraph in the app not shaped like the others
+ * (#411, #410).
  */
-function FormFeedback({ feedback }: { feedback: Feedback }) {
-  if (!feedback) {
+function SavedNote({ message }: { message: string | null }) {
+  if (!message) {
     return null;
   }
   return (
-    <output
-      className={
-        feedback.kind === "error"
-          ? "mt-2 block text-destructive text-sm"
-          : "mt-2 block text-sm"
-      }
-      style={
-        feedback.kind === "saved"
-          ? { color: "var(--status-success)" }
-          : undefined
-      }
-    >
-      {feedback.message}
+    <output className="mt-2 block text-sm" style={SAVED_COLOR}>
+      {message}
     </output>
   );
 }
+
+const SAVED_COLOR = { color: "var(--status-success)" };
 
 function Profile() {
   const router = useRouter();
   const ctx = Route.useRouteContext() as { user: ProfileUser };
   const user = ctx.user;
-  // One feedback slot per form. These used to be a single shared pair, which
-  // is why saving the profile printed "Saved." underneath the change-password
-  // form at the very bottom of the page.
-  const [profileFeedback, setProfileFeedback] = useState<Feedback>(null);
-  const [passwordFeedback, setPasswordFeedback] = useState<Feedback>(null);
+  // One flight and one result slot per form. These used to be a single shared
+  // pair, which is why saving the profile printed "Saved." underneath the
+  // change-password form at the very bottom of the page.
+  const profile = useAction({ fallback: "Save failed" });
+  const [profileSaved, setProfileSaved] = useState<string | null>(null);
+  const password = useAction({ fallback: "Password change failed" });
+  const [passwordSaved, setPasswordSaved] = useState<string | null>(null);
   const [interests, setInterests] = useState("");
-  const [interestsStatus, setInterestsStatus] = useState<
-    "idle" | "saving" | "saved" | "degraded" | "error"
-  >("idle");
+  const savingInterests = useAction({
+    fallback: "Could not save your interests. Please try again.",
+  });
+  // Only what succeeded. The flight and the failure are the hook's, which is
+  // what collapsed a five-state machine into one flag beside it.
+  const [interestsResult, setInterestsResult] = useState<
+    null | "saved" | "degraded"
+  >(null);
   const [wantsToMentor, setWantsToMentor] = useState(
     Boolean(user.wantsToMentor)
   );
@@ -111,11 +115,11 @@ function Profile() {
     })();
   }, []);
 
-  async function onSaveProfile(e: React.FormEvent<HTMLFormElement>) {
+  function onSaveProfile(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setProfileFeedback(null);
+    setProfileSaved(null);
     const form = new FormData(e.currentTarget);
-    try {
+    void profile.run(async () => {
       await updateProfile({
         data: {
           name: String(form.get("name") ?? ""),
@@ -125,46 +129,42 @@ function Profile() {
           mentorTeamCount,
         },
       });
-      setProfileFeedback({ kind: "saved", message: "Saved." });
-      router.invalidate();
-    } catch (err) {
-      setProfileFeedback({
-        kind: "error",
-        message: errorMessage(err, "Save failed"),
-      });
-    }
-  }
-
-  async function onChangePassword(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setPasswordFeedback(null);
-    const form = new FormData(e.currentTarget);
-    const { error: cpError } = await authClient.changePassword({
-      currentPassword: String(form.get("current") ?? ""),
-      newPassword: String(form.get("next") ?? ""),
-      revokeOtherSessions: true,
+      // Awaited inside the flight: the header reads the name from loader
+      // data, and re-enabling Save over the old one shows a stale name with
+      // a live button beside it.
+      await router.invalidate();
+      setProfileSaved("Saved.");
     });
-    if (cpError) {
-      setPasswordFeedback({
-        kind: "error",
-        message: cpError.message ?? "Password change failed",
-      });
-    } else {
-      setPasswordFeedback({ kind: "saved", message: "Password changed." });
-    }
   }
 
-  async function onSaveInterests(e: React.FormEvent<HTMLFormElement>) {
+  function onChangePassword(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setInterestsStatus("saving");
-    try {
+    setPasswordSaved(null);
+    const form = new FormData(e.currentTarget);
+    void password.run(async () => {
+      // Better Auth returns its failure rather than throwing it, so this is
+      // where it becomes a rejection the hook can report.
+      const { error: cpError } = await authClient.changePassword({
+        currentPassword: String(form.get("current") ?? ""),
+        newPassword: String(form.get("next") ?? ""),
+        revokeOtherSessions: true,
+      });
+      if (cpError) {
+        throw new Error(cpError.message ?? "Password change failed");
+      }
+      setPasswordSaved("Password changed.");
+    });
+  }
+
+  function onSaveInterests(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setInterestsResult(null);
+    void savingInterests.run(async () => {
       const result = await saveMyInterests({
         data: { interestsText: interests },
       });
-      setInterestsStatus(result.embedded ? "saved" : "degraded");
-    } catch {
-      setInterestsStatus("error");
-    }
+      setInterestsResult(result.embedded ? "saved" : "degraded");
+    });
   }
 
   return (
@@ -220,10 +220,11 @@ function Profile() {
           onToggle={setWantsToMentor}
           wants={wantsToMentor}
         />
-        <Button className="w-full" type="submit">
-          Save profile
+        <Button className="w-full" disabled={profile.busy} type="submit">
+          {profile.busy ? "Saving..." : "Save profile"}
         </Button>
-        <FormFeedback feedback={profileFeedback} />
+        <FieldError message={profile.error} />
+        <SavedNote message={profileSaved} />
       </form>
 
       <h2 className="mt-8 border-border border-t pt-8 font-semibold text-lg">
@@ -242,7 +243,8 @@ function Profile() {
           maxLength={2000}
           onChange={(e) => {
             setInterests(e.target.value);
-            setInterestsStatus("idle");
+            setInterestsResult(null);
+            savingInterests.setError(null);
           }}
           placeholder="Robotics, embedded systems, and anything involving sensor data. I have taken CS 344 and I am comfortable with C and Python."
           rows={5}
@@ -251,31 +253,27 @@ function Profile() {
         <p className="mt-1 text-muted-foreground text-xs" id="interests-count">
           {interests.length} / 2000
         </p>
-        <Button
-          className="mt-2"
-          disabled={interestsStatus === "saving"}
-          type="submit"
-        >
-          {interestsStatus === "saving" ? "Saving..." : "Save interests"}
+        <Button className="mt-2" disabled={savingInterests.busy} type="submit">
+          {savingInterests.busy ? "Saving..." : "Save interests"}
         </Button>
-        <output className="mt-2 block text-sm">
-          {interestsStatus === "saved" && (
-            <span className="text-muted-foreground">
-              Saved. <RecommendedProjectsLink />
-            </span>
-          )}
-          {interestsStatus === "degraded" && (
-            <span className="text-muted-foreground">
-              Saved, but we could not prepare your recommendations just now.
-              Save again to retry.
-            </span>
-          )}
-          {interestsStatus === "error" && (
-            <span className="text-destructive">
-              Could not save your interests. Please try again.
-            </span>
-          )}
-        </output>
+        {/*
+          The success half keeps its own output and its muted tone: it carries
+          a link on the happy path, and "Saved, but" is a caveat rather than a
+          failure. The failure half is the same FieldError as every other one
+          in the app.
+        */}
+        {interestsResult && (
+          <output className="mt-2 block text-muted-foreground text-sm">
+            {interestsResult === "saved" ? (
+              <>
+                Saved. <RecommendedProjectsLink />
+              </>
+            ) : (
+              "Saved, but we could not prepare your recommendations just now. Save again to retry."
+            )}
+          </output>
+        )}
+        <FieldError message={savingInterests.error} />
       </form>
 
       <h2 className="mt-8 border-border border-t pt-8 font-semibold text-lg">
@@ -305,10 +303,11 @@ function Profile() {
             type="password"
           />
         </div>
-        <Button className="w-full" type="submit">
-          Change password
+        <Button className="w-full" disabled={password.busy} type="submit">
+          {password.busy ? "Changing..." : "Change password"}
         </Button>
-        <FormFeedback feedback={passwordFeedback} />
+        <FieldError message={password.error} />
+        <SavedNote message={passwordSaved} />
       </form>
 
       <div className="mt-8 border-border border-t pt-8">

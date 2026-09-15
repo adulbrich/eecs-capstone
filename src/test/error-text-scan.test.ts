@@ -39,10 +39,6 @@ const ALLOWED = new Map([
     "a section heading in a danger-toned panel, an <h3> naming what the section is about rather than reporting that something failed. Found only once the scan read whole class strings: the colour and the size are separate cn() arguments",
   ],
   [
-    "src/routes/_authed/profile.tsx",
-    "FormFeedback is an <output>, which announces politely as a status already, and says Saved and Password changed from the same element; #410 owns how that page reports a result",
-  ],
-  [
     "src/routes/_authed/admin/projects/index.tsx",
     "a badge on a table row marking a soft-deleted project, not a message about an action",
   ],
