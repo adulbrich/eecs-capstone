@@ -100,18 +100,39 @@ test("@smoke an outline Button and an outline asChild Link read the same", async
       };
     });
 
+  // `styles.css` transitions background, colour, border and transform over
+  // 180ms on every button and anchor, so a computed value read the instant
+  // after a hover is a frame partway through it, and the two controls were
+  // compared at different points along the same curve. Awaiting the element's
+  // own animations is the technique `waitForSurfaceSettled` already uses.
+  const settle = (locator: Locator) =>
+    locator.evaluate(async (el) => {
+      await Promise.allSettled(el.getAnimations().map((a) => a.finished));
+    });
+
   const atRest = await read(button);
   expect(await read(link)).toEqual(atRest);
   expect(atRest.cursor).toBe("pointer");
 
   await button.hover();
+  await settle(button);
   const hovered = await read(button);
   await link.hover();
+  await settle(link);
   expect(await read(link)).toEqual(hovered);
 
+  // The pointer is still parked on the link from the hover phase, and a
+  // control that is both hovered and focused reads differently from one that
+  // is only focused. Park it off both before comparing focus rings.
+  await page.mouse.move(0, 0);
+  await settle(button);
+  await settle(link);
+
   await button.focus();
+  await settle(button);
   const focused = await read(button);
   await link.focus();
+  await settle(link);
   expect(await read(link)).toEqual(focused);
 });
 
