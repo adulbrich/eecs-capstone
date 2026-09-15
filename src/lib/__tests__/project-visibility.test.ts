@@ -157,6 +157,7 @@ const DETAIL_KEYS = [
   "isSponsored",
   "licenseRestrictions",
   "minQualifications",
+  "noMentorNeeded",
   "notes",
   "objectives",
   "prefQualifications",
@@ -188,6 +189,7 @@ function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
     teamsSupported: 2,
     programId: "prog-1",
     mentorEmail: "mentor@x.test",
+    noMentorNeeded: false,
     seekingMentor: false,
     studentProposed: false,
     acceptingApplicants: true,
@@ -233,6 +235,7 @@ describe("projectDetailView", () => {
       const view = projectDetailView(seeking, viewer);
       expect(view.studentProposed).toBe(true);
       expect(view.seekingMentor).toBe(true);
+      expect(view.noMentorNeeded).toBe(false);
       // Neither the address nor the name (#336): staff read both through
       // getProjectMentorship, and the admin projection adds the name back.
       expect("mentorEmail" in view).toBe(false);

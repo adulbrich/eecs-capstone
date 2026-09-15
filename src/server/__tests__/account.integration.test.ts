@@ -383,6 +383,7 @@ describe("deleteAccountAs", () => {
       proposer: null,
       q: "",
       seekingMentorOnly: false,
+      noMentorNeededOnly: false,
       requiresNdaOnly: false,
       statuses: [...PROJECT_STATUSES],
       studentProposedOnly: false,

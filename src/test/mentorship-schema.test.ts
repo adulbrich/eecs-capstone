@@ -9,25 +9,46 @@ describe("mentorshipSchema", () => {
       mentorshipSchema.parse({
         id: ID,
         mentorEmail: "Mentor@Example.edu",
-        seekingMentor: false,
+        mentorNeed: "unspecified",
       }).mentorEmail
     ).toBe("Mentor@Example.edu");
     expect(
       mentorshipSchema.parse({
         id: ID,
         mentorEmail: "",
-        seekingMentor: false,
+        mentorNeed: "unspecified",
         studentProposed: false,
       }).mentorEmail
     ).toBe("");
   });
 
-  it("requires the seeking flag, so a stale client cannot silently clear it", () => {
-    // Every writer sends both fields (#304); a payload without the flag is
-    // refused rather than defaulted, or an old form would reset it.
+  it("requires the mentor state, so a stale client cannot silently clear it", () => {
+    // Every writer sends both fields (#304, #373); a payload without the
+    // state is refused rather than defaulted, or an old form would reset it.
     expect(
       mentorshipSchema.safeParse({ id: ID, mentorEmail: "" }).success
     ).toBe(false);
+    // The old boolean is not a state either.
+    expect(
+      mentorshipSchema.safeParse({
+        id: ID,
+        mentorEmail: "",
+        seekingMentor: true,
+      }).success
+    ).toBe(false);
+    expect(
+      mentorshipSchema.safeParse({
+        id: ID,
+        mentorEmail: "",
+        mentorNeed: "maybe",
+      }).success
+    ).toBe(false);
+    for (const mentorNeed of ["unspecified", "seeking", "none"]) {
+      expect(
+        mentorshipSchema.parse({ id: ID, mentorEmail: "", mentorNeed })
+          .mentorNeed
+      ).toBe(mentorNeed);
+    }
   });
 
   it("no longer carries the student-proposed mark, which the proposer schema owns", () => {
@@ -36,7 +57,7 @@ describe("mentorshipSchema", () => {
     const parsed = mentorshipSchema.parse({
       id: ID,
       mentorEmail: "",
-      seekingMentor: false,
+      mentorNeed: "unspecified",
     });
     expect("studentProposed" in parsed).toBe(false);
     expect(
@@ -57,14 +78,14 @@ describe("mentorshipSchema", () => {
       mentorshipSchema.safeParse({
         id: ID,
         mentorEmail: null,
-        seekingMentor: false,
+        mentorNeed: "unspecified",
       }).success
     ).toBe(false);
     expect(
       mentorshipSchema.safeParse({
         id: ID,
         mentorEmail: "not an address",
-        seekingMentor: false,
+        mentorNeed: "unspecified",
       }).success
     ).toBe(false);
     // Exactly 200 passes and 201 fails, so the ceiling is pinned at 200 and
@@ -75,13 +96,13 @@ describe("mentorshipSchema", () => {
       mentorshipSchema.safeParse({
         id: ID,
         mentorEmail: atCeiling,
-        seekingMentor: false,
+        mentorNeed: "unspecified",
       }).success
     ).toBe(true);
     const over = mentorshipSchema.safeParse({
       id: ID,
       mentorEmail: `a${atCeiling}`,
-      seekingMentor: false,
+      mentorNeed: "unspecified",
     });
     expect(over.success).toBe(false);
     expect(over.error?.issues.map((i) => i.code)).toContain("too_big");

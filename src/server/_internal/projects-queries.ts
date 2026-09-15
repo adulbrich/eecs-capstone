@@ -33,11 +33,12 @@ import {
   projectDetailView,
 } from "#/lib/project-visibility";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
-import type { ProjectStatus } from "#/lib/vocabularies";
+import type { MentorNeed, ProjectStatus } from "#/lib/vocabularies";
 import type { AdminProjectsFilter } from "../projects-queries";
 import {
   adminProjectSummarySelect,
   mentorNameSql,
+  noMentorNeededSql,
   projectCategoriesText,
   projectSummarySelect,
   seekingMentorSql,
@@ -151,6 +152,9 @@ function buildAdminProjectScope(
     // The derived value, not the raw flag: a project with a mentor lined up
     // shows no badge and must not match the filter either.
     scope.push(seekingMentorSql);
+  }
+  if (data.noMentorNeededOnly) {
+    scope.push(noMentorNeededSql);
   }
   if (data.requiresNdaOnly) {
     scope.push(eq(projects.requiresNdaIp, true));
@@ -304,11 +308,19 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
   // project row is read for the detail page. The mentor's name is not read:
   // nothing about the mentor is public (#336).
   const [row] = await db
-    .select({ project: projects, seekingMentor: seekingMentorSql })
+    .select({
+      project: projects,
+      seekingMentor: seekingMentorSql,
+      noMentorNeeded: noMentorNeededSql,
+    })
     .from(projects)
     .where(eq(projects.id, data.id));
   const project = row
-    ? { ...row.project, seekingMentor: row.seekingMentor }
+    ? {
+        ...row.project,
+        seekingMentor: row.seekingMentor,
+        noMentorNeeded: row.noMentorNeeded,
+      }
     : undefined;
   if (!project) {
     return {
@@ -433,8 +445,8 @@ export interface ProjectMentorship {
   mentorEmail: string;
   /** The account at that address, if one exists. Null is "no account yet". */
   mentorName: string | null;
-  /** The stored flag, not the derived badge: true even while an address is on file. */
-  seekingMentor: boolean;
+  /** The stored state, not the derived badges: `seeking` even while an address is on file. */
+  mentorNeed: MentorNeed;
 }
 
 /**
@@ -451,7 +463,7 @@ export async function getProjectMentorshipAs(
     .select({
       mentorEmail: projects.mentorEmail,
       mentorName: mentorNameSql,
-      seekingMentor: projects.seekingMentor,
+      mentorNeed: projects.mentorNeed,
     })
     .from(projects)
     .where(eq(projects.id, data.projectId));
@@ -461,7 +473,7 @@ export async function getProjectMentorshipAs(
   return {
     mentorEmail: row.mentorEmail ?? "",
     mentorName: row.mentorName,
-    seekingMentor: row.seekingMentor,
+    mentorNeed: row.mentorNeed,
   };
 }
 

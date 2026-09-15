@@ -11,6 +11,7 @@ import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
 import { diffRowFields } from "#/lib/edit-diff";
 import { normalizeEmailAddress } from "#/lib/email-address";
 import { assertNoImageKeyOnCreate } from "#/lib/image-upload-policy";
+import { mentorNeedRefusal } from "#/lib/mentor-need";
 import { canEditProject, canWritePrivateNotes } from "#/lib/project-visibility";
 import {
   type ActorRole,
@@ -337,7 +338,7 @@ export async function updateProjectProposerForCurrentUser(data: ProposerInput) {
 }
 
 /**
- * The only writer of `seekingMentor` and `mentorEmail`.
+ * The only writer of `mentorNeed` and `mentorEmail`.
  *
  * Staff-only, and deliberately not part of `updateProjectAs`: none of the
  * keys exists on `ProjectInput`, so the shared form cannot carry them and a
@@ -363,9 +364,20 @@ export async function updateProjectMentorshipAs(
 ): Promise<{ id: string; updated: boolean }> {
   assertStaff(viewer);
   const existing = await loadProjectOr404(data.id);
+  const mentorEmail = normalizeEmailAddress(data.mentorEmail);
+  // "No mentor needed" and a recorded address can never coexist (#373).
+  // Refused before the diff, so nothing is written.
+  const refusal = mentorNeedRefusal(
+    existing.mentorNeed,
+    data.mentorNeed,
+    mentorEmail !== null
+  );
+  if (refusal) {
+    throw new Error(refusal);
+  }
   const newValues: Partial<typeof projects.$inferSelect> = {
-    seekingMentor: data.seekingMentor,
-    mentorEmail: normalizeEmailAddress(data.mentorEmail),
+    mentorNeed: data.mentorNeed,
+    mentorEmail,
   };
   const { changedFields, newDiff, oldDiff } = diffRowFields(
     existing,

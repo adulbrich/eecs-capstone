@@ -1,4 +1,4 @@
-import { and, eq, gte, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
   categories,
@@ -206,9 +206,16 @@ async function headline(programId: string | null) {
       .from(projects)
       .where(and(published, isNotNull(projects.mentorEmail))),
     db
+      // A project that runs without a mentor is not missing one (#373).
       .select({ unmentored: countRows() })
       .from(projects)
-      .where(and(published, isNull(projects.mentorEmail))),
+      .where(
+        and(
+          published,
+          isNull(projects.mentorEmail),
+          ne(projects.mentorNeed, "none")
+        )
+      ),
     mentorFigures(),
     // Overdue is derived, never stored (docs/QUIRKS.md, inventory): a
     // checkout past its due date, or a reservation past its pickup date.

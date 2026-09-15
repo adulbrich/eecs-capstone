@@ -45,6 +45,7 @@ describe("/admin/projects search", () => {
     expect(off).toMatchObject({
       acceptingOnly: false,
       includeSoftDeleted: false,
+      noMentorNeededOnly: false,
       requiresNdaOnly: false,
       seekingMentorOnly: false,
       studentProposedOnly: false,
@@ -52,6 +53,7 @@ describe("/admin/projects search", () => {
     // The same param names as /projects, so a pasted link narrows here too.
     const on = resolveAdminFilter(
       searchSchema.parse({
+        noMentorNeededOnly: true,
         requiresNdaOnly: true,
         seekingMentorOnly: true,
         studentProposedOnly: true,
@@ -59,6 +61,7 @@ describe("/admin/projects search", () => {
     );
     expect(on).toMatchObject({
       acceptingOnly: false,
+      noMentorNeededOnly: true,
       requiresNdaOnly: true,
       seekingMentorOnly: true,
       studentProposedOnly: true,

@@ -334,7 +334,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/projects.ts:updateProject": { level: "owner-or-staff" },
   "server/projects.ts:updateProjectMentorship": {
     level: "staff",
-    note: "The only writer of seekingMentor and mentorEmail. Neither key exists on ProjectInput, so updateProject cannot reach them; this endpoint is what keeps them staff-only.",
+    note: "The only writer of mentorNeed and mentorEmail. Neither key exists on ProjectInput, so updateProject cannot reach them; this endpoint is what keeps them staff-only.",
   },
   "server/projects.ts:updateProjectProposer": {
     level: "staff",

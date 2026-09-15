@@ -21,6 +21,7 @@ import {
   INVENTORY_CUSTOM_LINE_STATUSES,
   INVENTORY_ITEM_STATUSES,
   INVENTORY_REQUEST_ITEM_STATUSES,
+  MENTOR_NEEDS,
   NOTIFICATION_TYPES,
   PROJECT_STATUSES,
 } from "#/lib/vocabularies";
@@ -46,6 +47,8 @@ export const notificationTypeEnum = pgEnum(
   "notification_type",
   NOTIFICATION_TYPES
 );
+
+export const mentorNeedEnum = pgEnum("mentor_need", MENTOR_NEEDS);
 
 export const categoryDomainEnum = pgEnum("category_domain", [
   "project",
@@ -175,11 +178,13 @@ export const projects = pgTable(
     // Says nothing about mentorship since #304: a student project may have a
     // mentor, want one, or need none (the instructor mentors). See #75.
     studentProposed: boolean("student_proposed").notNull().default(false),
-    // Staff-set: the project is looking for a mentor. Public only through the
-    // derived `seekingMentor` (this AND mentor_email IS NULL), so a stale flag
-    // never shows a "Seeking mentor" badge beside a recorded address. Written
-    // by updateProjectMentorshipAs only, like the two columns around it. #304.
-    seekingMentor: boolean("seeking_mentor").notNull().default(false),
+    // Staff-set: whether the project wants a mentor (#373). Public only
+    // through the derived `seekingMentor` (this = 'seeking' AND mentor_email
+    // IS NULL) and `noMentorNeeded` (this = 'none'), so a stale value never
+    // shows a "Seeking mentor" badge beside a recorded address. Written by
+    // updateProjectMentorshipAs only, which also refuses 'none' beside an
+    // address, like the two columns around it. #304, #373.
+    mentorNeed: mentorNeedEnum("mentor_need").notNull().default("unspecified"),
     // Staff-only, never in a public payload. Resolved to a name at read time
     // by a case-insensitive match on user.email. No FK and no mentor_id:
     // mentorship grants no permission, so an id would be a denormalization

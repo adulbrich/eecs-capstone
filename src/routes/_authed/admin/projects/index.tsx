@@ -83,6 +83,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const SWITCH_DEFAULTS = {
   acceptingOnly: false,
   includeSoftDeleted: false,
+  noMentorNeededOnly: false,
   requiresNdaOnly: false,
   seekingMentorOnly: false,
   studentProposedOnly: false,
@@ -110,6 +111,7 @@ export const searchSchema = z.object({
   studentProposedOnly: z.boolean().default(SWITCH_DEFAULTS.studentProposedOnly),
   seekingMentorOnly: z.boolean().default(SWITCH_DEFAULTS.seekingMentorOnly),
   requiresNdaOnly: z.boolean().default(SWITCH_DEFAULTS.requiresNdaOnly),
+  noMentorNeededOnly: z.boolean().default(SWITCH_DEFAULTS.noMentorNeededOnly),
 });
 
 type Search = z.infer<typeof searchSchema>;
@@ -126,6 +128,7 @@ export function resolveAdminFilter(search: Search) {
     dateField: search.dateField,
     from: (reversed ? search.to : search.from) ?? null,
     includeSoftDeleted: search.includeSoftDeleted,
+    noMentorNeededOnly: search.noMentorNeededOnly,
     program: search.program,
     proposer: search.proposer,
     q: search.q,
@@ -155,6 +158,7 @@ function countActiveAdminFilters(search: Search): number {
     search.acceptingOnly,
     search.studentProposedOnly,
     search.seekingMentorOnly,
+    search.noMentorNeededOnly,
     search.requiresNdaOnly,
     search.includeSoftDeleted,
   ].filter(Boolean).length;
@@ -439,6 +443,14 @@ const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
     key: "seekingMentor",
     value: (row) => row.seekingMentor,
   },
+  {
+    header: "No mentor needed",
+    key: "noMentorNeeded",
+    value: (row) => row.noMentorNeeded,
+  },
+  // The stored state behind the two derived columns above, staff-only like
+  // the mentor's name (#373).
+  { header: "Mentor need", key: "mentorNeed", value: (row) => row.mentorNeed },
   // The resolved name, not the address: the export reads the same projection
   // the public listing does, and mentorEmail is not in it. See #75.
   { header: "Mentor", key: "mentorName", value: (row) => row.mentorName },
@@ -477,6 +489,7 @@ function AdminProjectsFilters({
   const {
     acceptingOnly,
     includeSoftDeleted,
+    noMentorNeededOnly,
     program,
     proposer,
     requiresNdaOnly,
@@ -696,6 +709,16 @@ function AdminProjectsFilters({
             }
           />
           <FilterSwitch
+            checked={noMentorNeededOnly}
+            id={`${uid}-no-mentor-needed-only`}
+            label={PROJECT_SWITCH_LABEL.noMentorNeededOnly}
+            onCheckedChange={(checked) =>
+              void navigate({
+                search: (prev) => ({ ...prev, noMentorNeededOnly: checked }),
+              })
+            }
+          />
+          <FilterSwitch
             checked={requiresNdaOnly}
             id={`${uid}-requires-nda-only`}
             label={PROJECT_SWITCH_LABEL.requiresNdaOnly}
@@ -732,6 +755,7 @@ function AdminProjectsFilters({
                 dateField: "published",
                 from: undefined,
                 includeSoftDeleted: false,
+                noMentorNeededOnly: false,
                 program: null,
                 proposer: null,
                 requiresNdaOnly: false,
@@ -811,6 +835,7 @@ function AdminProjects() {
   const search = Route.useSearch();
   const {
     acceptingOnly,
+    noMentorNeededOnly,
     program,
     proposer,
     q,
@@ -833,6 +858,7 @@ function AdminProjects() {
     acceptingOnly ||
     studentProposedOnly ||
     seekingMentorOnly ||
+    noMentorNeededOnly ||
     requiresNdaOnly;
   const activeFilterCount = countActiveAdminFilters(search);
   const navigate = useNavigate({ from: "/admin/projects/" });

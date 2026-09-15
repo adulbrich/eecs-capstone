@@ -103,15 +103,17 @@ Each project carries:
 - [x] Teams supported: how many student teams the project can take on (1-5,
   default 1), set and edited by staff on the project form.
 - [x] Student-proposed marker and mentor: staff mark a project as student-proposed
-  from the Proposer section of the staff panel, saved with the link, and mark it
-  as looking for a mentor or record a mentor's email from the Mentor section,
-  which previews what the public listing will show for the draft as typed. The
-  two marks are independent: a student project may have a mentor, want one, or
-  need none. The public sees a "Student proposed" badge and a "Seeking mentor"
-  badge while the flag is on and no address is on file, on the card and the
-  project page only, and can filter the listing on either. Nothing about the
-  mentor is public: the address, the raw flag and the resolved name stay on
-  staff reads, the staff list and the CSV export. (#75, #304, #336)
+  from the Proposer section of the staff panel, saved with the link, and set the
+  mentor state (not decided, seeking a mentor, no mentor needed) or record a
+  mentor's email from the Mentor section, which previews what the public listing
+  will show for the draft as typed. The marks are independent: a student project
+  may have a mentor, want one, or need none. The public sees a "Student proposed"
+  badge, a "Seeking mentor" badge while the state is seeking and no address is on
+  file, and a "No mentor needed" badge for that state, on the card and the project
+  page only, and can filter the listing on each. "No mentor needed" and a recorded
+  address cannot coexist; the section refuses either order. Nothing about the
+  mentor is public: the address, the raw state and the resolved name stay on staff
+  reads, the staff list and the CSV export. (#75, #304, #336, #373)
 - [x] `/my/bookmarks` is a small decision table: title with thumbnail, program,
   status, accepting applicants, teams supported, NDA/IP, saved-on date, and a
   remove button; the two marks are read on the card or the page (#336).
