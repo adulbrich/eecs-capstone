@@ -9,6 +9,7 @@ import {
   user,
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
+import { deleteAccountAs } from "#/server/_internal/account";
 import {
   createProjectAs,
   forceTransitionAs,
@@ -517,6 +518,29 @@ describe("status timeline visibility and changes-requested feedback", () => {
     expect(ownerView.history.every((h) => h.changedByName.length > 0)).toBe(
       true
     );
+  });
+
+  it("reads a deleted actor as Deleted user, never as an address", async () => {
+    // End to end rather than on a literal: ADR 0008 never removes the row an
+    // audit record is anchored to, it scrubs the name to "Deleted user" and
+    // the address to deleted-<id>@invalid. That is what makes the inner join
+    // total, so it is the thing worth pinning through `getProjectAs`.
+    const admin = await makeUser(`td-a-${Date.now()}@x.com`, "admin");
+    const owner = await makeUser(`td-o-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, baseProject());
+    await performTransitionAs(owner, id, "submitted");
+    await forceTransitionAs(admin, id, "published", undefined, {
+      sendEmail: false,
+    });
+
+    await deleteAccountAs(owner, { confirmEmail: owner.email });
+
+    const { history } = await getProjectAs(admin, { id });
+    const submitted = history.find((h) => h.newStatus === "submitted");
+    expect(submitted?.changedByName).toBe("Deleted user");
+    // The scrubbed address is deleted-<id>@invalid, and nothing on this
+    // surface can print it: the projection does not carry it.
+    expect(JSON.stringify(history)).not.toContain("@invalid");
   });
 
   it("requires a comment when requesting changes", async () => {

@@ -2,7 +2,7 @@ import { LocalTime } from "./local-time";
 import { StatusBadge } from "./status-badge";
 
 interface HistoryRow {
-  /** Always a string; `getProjectAs` says why the join cannot miss. */
+  /** Always a string; `getProjectAs` says why `user.name` cannot be null here. */
   changedByName: string;
   comment: string | null;
   createdAt: Date | string;
