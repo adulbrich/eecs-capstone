@@ -206,7 +206,7 @@ export function StaffProjectPanel({
       closeModal();
       onChanged();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorMessage(err, "Transition failed"));
     } finally {
       setBusy(false);
     }

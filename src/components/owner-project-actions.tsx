@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import {
   hardDeleteProject,
   returnToDraft,
@@ -52,7 +53,7 @@ export function OwnerProjectActions({
       }
       onChanged();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorMessage(err, "Save failed"));
     } finally {
       setBusy(false);
     }

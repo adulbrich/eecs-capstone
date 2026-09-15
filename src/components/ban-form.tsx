@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import { banUser, unbanUser } from "#/server/users";
 import { ConfirmDialog } from "./confirm-dialog";
 import { LocalTime } from "./local-time";
@@ -59,7 +60,7 @@ export function BanForm({
       await unbanUser({ data: { userId } });
       onChanged();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorMessage(err, "Unban failed"));
     } finally {
       setBusy(false);
     }

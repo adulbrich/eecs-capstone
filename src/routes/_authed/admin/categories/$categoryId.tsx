@@ -23,6 +23,7 @@ import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
+import { errorMessage } from "#/lib/error-message";
 import { pageTitle } from "#/lib/page-title";
 import { isStaff } from "#/lib/viewer";
 import {
@@ -76,7 +77,7 @@ function CategoryEdit() {
       }
       navigate({ search: { tab: category.domain }, to: "/admin/categories" });
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorMessage(err, "Save failed"));
     }
   }
 

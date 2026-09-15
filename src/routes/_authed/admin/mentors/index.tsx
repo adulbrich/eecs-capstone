@@ -27,6 +27,7 @@ import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
+import { errorMessage } from "#/lib/error-message";
 import { pageTitle } from "#/lib/page-title";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
@@ -86,7 +87,7 @@ function MentorControls({ mentor }: { mentor: Row }) {
       });
       router.invalidate();
     } catch (err) {
-      setError((err as Error).message || "Could not save.");
+      setError(errorMessage(err, "Could not save."));
     } finally {
       setSaving(false);
     }

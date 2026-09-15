@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import { USER_ROLES, type UserRole } from "#/lib/vocabularies";
 import { setUserRole } from "#/server/users";
 import { EMAIL_SKIP_HINT } from "./send-email-checkbox";
@@ -41,7 +42,7 @@ export function RoleSelect({ email, userId, initialRole, onChanged }: Props) {
       setConfirmOpen(false);
       onChanged();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorMessage(err, "Save failed"));
     } finally {
       setSaving(false);
     }

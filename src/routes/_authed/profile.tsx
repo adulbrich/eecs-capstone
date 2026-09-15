@@ -12,6 +12,7 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
 import { authClient } from "#/lib/auth-client";
+import { errorMessage } from "#/lib/error-message";
 import { pageTitle } from "#/lib/page-title";
 import { signOut } from "#/lib/sign-out";
 import { getAccountDeletionPreview } from "#/server/account";
@@ -127,7 +128,10 @@ function Profile() {
       setProfileFeedback({ kind: "saved", message: "Saved." });
       router.invalidate();
     } catch (err) {
-      setProfileFeedback({ kind: "error", message: (err as Error).message });
+      setProfileFeedback({
+        kind: "error",
+        message: errorMessage(err, "Save failed"),
+      });
     }
   }
 

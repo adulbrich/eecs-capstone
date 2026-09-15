@@ -22,6 +22,7 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
 import { getSession } from "#/lib/auth-guards";
+import { errorMessage } from "#/lib/error-message";
 import { pageTitle } from "#/lib/page-title";
 import { isStaff } from "#/lib/viewer";
 import { deleteProgram, getProgram, updateProgram } from "#/server/programs";
@@ -73,7 +74,7 @@ function ProgramEdit() {
       });
       navigate({ to: "/admin/programs" });
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorMessage(err, "Save failed"));
     }
   }
 

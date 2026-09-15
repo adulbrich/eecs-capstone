@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import {
   addProgramInstructor,
   listEligibleInstructors,
@@ -63,7 +64,7 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
       setPicked("");
       onChanged();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorMessage(err, "Could not add the instructor"));
     }
   }
 
@@ -73,7 +74,7 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
       await removeProgramInstructor({ data: { programId, userId } });
       onChanged();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorMessage(err, "Could not remove the instructor"));
     }
   }
 
