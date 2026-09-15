@@ -427,17 +427,17 @@ describe("listMentoredProjectsAs", () => {
     await performTransitionAs(admin, gone.id, "submitted");
     await softDeleteProjectAs(admin, gone.id);
 
-    const rows = await listMentoredProjectsAs({ email: "mentor-PERSON@x.edu" });
+    // The account's address as sign-up folded it, against a column written
+    // in another case.
+    const rows = await listMentoredProjectsAs({ email: mentor.email });
     expect(rows.map((r) => r.id).sort()).toEqual([draft.id, live.id].sort());
     // The public summary, so nothing about the mentor rides along.
     expect(Object.keys(rows[0] ?? {})).not.toContain("mentorEmail");
     expect(Object.keys(rows[0] ?? {})).not.toContain("mentorName");
     expect(rows.some((r) => r.id === other.id)).toBe(false);
-    expect(
-      await listMentoredProjectsAs({ email: "bystander-mentoring@x.edu" })
-    ).toEqual([]);
-    expect(bystander.id).toBeTruthy();
-    expect(mentor.id).toBeTruthy();
+    expect(await listMentoredProjectsAs({ email: bystander.email })).toEqual(
+      []
+    );
 
     // Changing the mentor drops the project silently.
     await updateProjectMentorshipAs(admin, {
@@ -446,9 +446,7 @@ describe("listMentoredProjectsAs", () => {
       mentorNeed: "unspecified",
     });
     expect(
-      (await listMentoredProjectsAs({ email: "mentor-person@x.edu" })).map(
-        (r) => r.id
-      )
+      (await listMentoredProjectsAs({ email: mentor.email })).map((r) => r.id)
     ).toEqual([live.id]);
   });
 });

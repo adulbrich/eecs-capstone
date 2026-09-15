@@ -31,11 +31,11 @@ export const Route = createFileRoute("/_authed/my/projects")({
   head: () => ({ meta: [{ title: pageTitle("My Projects") }] }),
   loaderDeps: ({ search }) => ({ status: search.status }),
   loader: async ({ deps }) => {
-    const [mine, mentoring] = await Promise.all([
+    const [{ rows, teamCapacity }, mentoring] = await Promise.all([
       listMyProjects({ data: { status: deps.status } }),
       listMentoredProjects(),
     ]);
-    return { ...mine, mentoring: mentoring.rows };
+    return { rows, teamCapacity, mentoring: mentoring.rows };
   },
   component: MyProjects,
 });
