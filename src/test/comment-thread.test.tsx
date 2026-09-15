@@ -149,7 +149,8 @@ describe("CommentThread internal replies", () => {
         parentId: "c1",
         content: "internal follow-up",
         isInternal: true,
-        sendEmail: true,
+        // Internal mails nobody, and the wire says so (#399).
+        sendEmail: false,
       },
     });
   });
@@ -228,19 +229,57 @@ describe("CommentThread email skip", () => {
     );
   });
 
-  it("hides the box while Internal is on, and under an internal parent", () => {
+  it("keeps the box mounted, unchecked and disabled while Internal is on, and under an internal parent", () => {
     renderThread([comment({ isInternal: true })]);
     fireEvent.click(
       screen.getByRole("checkbox", { name: "Internal (staff only)" })
     );
-    expect(
-      screen.queryByRole("checkbox", { name: "Email the proposer" })
-    ).toBeNull();
+    const box = screen.getByRole("checkbox", { name: "Email the proposer" });
+    expect(box.getAttribute("aria-checked")).toBe("false");
+    expect(box.hasAttribute("disabled")).toBe(true);
 
     openReplyAndType("internal follow-up");
-    expect(
-      replyForm().queryByRole("checkbox", { name: "Email the proposer" })
-    ).toBeNull();
+    const replyBox = replyForm().getByRole("checkbox", {
+      name: "Email the proposer",
+    });
+    expect(replyBox.getAttribute("aria-checked")).toBe("false");
+    expect(replyBox.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("returns the box to checked when Internal is unchecked, whatever it was before", () => {
+    renderThread([]);
+    const emailBox = () =>
+      screen.getByRole("checkbox", { name: "Email the proposer" });
+    const internal = screen.getByRole("checkbox", {
+      name: "Internal (staff only)",
+    });
+    fireEvent.click(emailBox());
+    expect(emailBox().getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(internal);
+    expect(emailBox().hasAttribute("disabled")).toBe(true);
+    fireEvent.click(internal);
+    expect(emailBox().getAttribute("aria-checked")).toBe("true");
+    expect(emailBox().hasAttribute("disabled")).toBe(false);
+  });
+
+  it("posts sendEmail: false for an internal comment", async () => {
+    renderThread([]);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Internal (staff only)" })
+    );
+    fireEvent.change(screen.getByPlaceholderText("Add a comment"), {
+      target: { value: "staff only" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
+    await waitFor(() => expect(addComment).toHaveBeenCalledTimes(1));
+    expect(addComment).toHaveBeenCalledWith({
+      data: {
+        projectId: PROJECT_ID,
+        content: "staff only",
+        isInternal: true,
+        sendEmail: false,
+      },
+    });
   });
 
   it("posts the reply's choice, and offers none to a non-staff viewer", async () => {
