@@ -4,6 +4,7 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { InventoryForm } from "#/components/inventory-form";
 import { getSession } from "#/lib/auth-guards";
 import type {
@@ -83,9 +84,10 @@ function EditInventoryItem() {
             imageUrl: item.imageUrl ?? "",
           }}
           itemId={item.id}
-          onSaved={(itemId) =>
-            navigate({ to: "/inventory/$itemId", params: { itemId } })
-          }
+          onSaved={(itemId) => {
+            toast.success("Item saved.");
+            return navigate({ to: "/inventory/$itemId", params: { itemId } });
+          }}
           submitLabel="Save"
         />
       </div>

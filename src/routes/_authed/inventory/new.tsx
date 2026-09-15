@@ -1,4 +1,5 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { z } from "zod";
 import { InventoryForm } from "#/components/inventory-form";
 import { getSession } from "#/lib/auth-guards";
@@ -44,11 +45,12 @@ function NewInventoryItem() {
       <div className="mt-6">
         <InventoryForm
           initial={{ description, name }}
-          onSaved={(itemId) =>
-            from === "requests"
+          onSaved={(itemId) => {
+            toast.success("Item created.");
+            return from === "requests"
               ? navigate({ to: "/admin/inventory/requests" })
-              : navigate({ to: "/inventory/$itemId", params: { itemId } })
-          }
+              : navigate({ to: "/inventory/$itemId", params: { itemId } });
+          }}
           submitLabel="Create item"
         />
       </div>

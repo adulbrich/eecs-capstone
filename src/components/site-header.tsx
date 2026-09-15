@@ -3,7 +3,7 @@ import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { authClient } from "#/lib/auth-client";
 import { brand } from "#/lib/brand";
-import { signOut } from "#/lib/sign-out";
+import { useSignOut } from "#/lib/sign-out";
 import { getPublicUrl } from "#/lib/storage";
 import { isStaff, type Viewer } from "#/lib/viewer";
 import { GithubIcon } from "./github-icon";
@@ -264,6 +264,7 @@ function SignedInMobile({
   onClose: () => void;
 }) {
   const resolvedImage = getPublicUrl(user.image);
+  const { busy, signOut } = useSignOut();
   return (
     <div className="space-y-3">
       <Link
@@ -309,11 +310,12 @@ function SignedInMobile({
       */}
       <Button
         className="w-full"
-        onClick={() => void signOut()}
+        disabled={busy}
+        onClick={signOut}
         type="button"
         variant="outline"
       >
-        Sign out
+        {busy ? "Signing out..." : "Sign out"}
       </Button>
     </div>
   );

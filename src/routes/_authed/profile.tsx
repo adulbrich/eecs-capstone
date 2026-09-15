@@ -14,7 +14,7 @@ import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
 import { authClient } from "#/lib/auth-client";
 import { pageTitle } from "#/lib/page-title";
-import { signOut } from "#/lib/sign-out";
+import { useSignOut } from "#/lib/sign-out";
 import { useAction } from "#/lib/use-action";
 import { getAccountDeletionPreview } from "#/server/account";
 import { getMyInterests, saveMyInterests } from "#/server/interests";
@@ -73,6 +73,7 @@ function Profile() {
   const [profileSaved, setProfileSaved] = useState<string | null>(null);
   const password = useAction({ fallback: "Password change failed" });
   const [passwordSaved, setPasswordSaved] = useState<string | null>(null);
+  const signingOut = useSignOut();
   const [interests, setInterests] = useState("");
   const savingInterests = useAction({
     fallback: "Could not save your interests. Please try again.",
@@ -313,11 +314,12 @@ function Profile() {
       <div className="mt-8 border-border border-t pt-8">
         <Button
           className="w-full"
-          onClick={() => void signOut()}
+          disabled={signingOut.busy}
+          onClick={signingOut.signOut}
           type="button"
           variant="outline"
         >
-          Sign out
+          {signingOut.busy ? "Signing out..." : "Sign out"}
         </Button>
         <p className="mt-3 text-center text-muted-foreground text-sm">
           <Link className="text-brand-dark underline" to="/privacy">

@@ -4,6 +4,7 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { ProjectForm } from "#/components/project-form";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
@@ -67,6 +68,7 @@ function EditProject() {
             acceptingApplicants: project.acceptingApplicants,
           }}
           onSaved={() => {
+            toast.success("Project saved.");
             navigate({ to: "/projects/$projectId", params: { projectId } });
           }}
           projectId={projectId}

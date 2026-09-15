@@ -368,7 +368,7 @@ function validateStatusInvariants(input: TransitionInput) {
  * they were there at all.
  *
  * The message is part of the contract. `inventory-lifecycle-panel.tsx` renders
- * `(e as Error).message` verbatim, so these strings reach staff on screen. The
+ * it through `errorMessage`, so these strings reach staff on screen. The
  * panel pre-checks the two rules a form can catch early, in friendlier words
  * of its own; everything else arrives from here.
  */

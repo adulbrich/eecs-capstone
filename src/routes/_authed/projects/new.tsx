@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { ProjectForm } from "#/components/project-form";
 import { pageTitle } from "#/lib/page-title";
 import { STAFF_CREATE_PROJECT_NOTE } from "#/lib/private-notes";
@@ -28,6 +29,10 @@ function NewProject() {
         <ProjectForm
           enableAiReview
           onSaved={(projectId) => {
+            // The page that would have carried an inline confirmation is
+            // gone by the time it would render, so a form that navigates
+            // says so in a toast (UI-CONVENTIONS, "Mutations and feedback").
+            toast.success("Draft created.");
             navigate({ to: "/projects/$projectId", params: { projectId } });
           }}
           showNotes

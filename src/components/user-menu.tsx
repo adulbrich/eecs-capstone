@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { signOut } from "#/lib/sign-out";
+import { useSignOut } from "#/lib/sign-out";
 import { getPublicUrl } from "#/lib/storage";
 import {
   DropdownMenu,
@@ -16,6 +16,7 @@ interface Props {
 
 export function UserMenu({ user }: Props) {
   const img = getPublicUrl(user.image);
+  const { busy, signOut } = useSignOut();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-2 rounded hover:opacity-80">
@@ -54,8 +55,8 @@ export function UserMenu({ user }: Props) {
         <DropdownMenuItem asChild>
           <Link to="/profile">Profile</Link>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => void signOut()}>
-          Sign out
+        <DropdownMenuItem disabled={busy} onClick={signOut}>
+          {busy ? "Signing out..." : "Sign out"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
