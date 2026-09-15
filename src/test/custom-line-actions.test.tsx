@@ -221,6 +221,50 @@ describe("StartSourcingAllButton", () => {
     );
     expect(screen.queryByRole("button")).toBeNull();
   });
+
+  it("says how far it got when a line part way through fails", async () => {
+    vi.mocked(startSourcingCustomLine)
+      .mockResolvedValueOnce({ ok: true })
+      .mockRejectedValueOnce(new Error("Line no longer pending"));
+    const onDone = vi.fn();
+    render(
+      <StartSourcingAllButton
+        lines={[
+          { id: "a", status: "pending" },
+          { id: "b", status: "pending" },
+          { id: "c", status: "pending" },
+        ]}
+        onDone={onDone}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Start sourcing all" }));
+
+    // "Sourcing failed" alone invited a retry that would have transitioned
+    // the line already sourcing a second time.
+    expect(
+      await screen.findByText(
+        "Started 1 of 3, then stopped: Line no longer pending"
+      )
+    ).toBeDefined();
+    // The first line is sourcing on the server whatever the rest did, so the
+    // table is refreshed either way.
+    expect(onDone).toHaveBeenCalled();
+    expect(vi.mocked(startSourcingCustomLine)).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports the failure plainly when the first line is the one that fails", async () => {
+    vi.mocked(startSourcingCustomLine).mockRejectedValue(
+      new Error("Not signed in")
+    );
+    render(
+      <StartSourcingAllButton
+        lines={[{ id: "a", status: "pending" }]}
+        onDone={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Start sourcing all" }));
+    expect(await screen.findByText("Not signed in")).toBeDefined();
+  });
 });
 
 describe("CustomLineActions: cancelling a popover", () => {

@@ -34,9 +34,7 @@ afterEach(cleanup);
 describe("SubmitBorrowListDialog", () => {
   it("collects the note and hands it over, then closes", async () => {
     const onSubmit = vi.fn();
-    render(
-      <SubmitBorrowListDialog busy={false} count={2} onSubmit={onSubmit} />
-    );
+    render(<SubmitBorrowListDialog count={2} onSubmit={onSubmit} />);
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     expect(
       screen.getByRole("dialog", { name: "Submit 2 items as one request" })
@@ -51,9 +49,7 @@ describe("SubmitBorrowListDialog", () => {
 
   it("sends null rather than an empty note", async () => {
     const onSubmit = vi.fn();
-    render(
-      <SubmitBorrowListDialog busy={false} count={1} onSubmit={onSubmit} />
-    );
+    render(<SubmitBorrowListDialog count={1} onSubmit={onSubmit} />);
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     fireEvent.click(screen.getByRole("button", { name: "Submit request" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(null));
@@ -61,9 +57,7 @@ describe("SubmitBorrowListDialog", () => {
 
   it("closes on Cancel without submitting, and keeps the typed note", async () => {
     const onSubmit = vi.fn();
-    render(
-      <SubmitBorrowListDialog busy={false} count={1} onSubmit={onSubmit} />
-    );
+    render(<SubmitBorrowListDialog count={1} onSubmit={onSubmit} />);
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     fireEvent.change(screen.getByLabelText("Note for staff (optional)"), {
       target: { value: "Half typed" },
@@ -85,10 +79,73 @@ describe("SubmitBorrowListDialog", () => {
   });
 
   it("is disabled while the page is busy", () => {
-    render(<SubmitBorrowListDialog busy={true} count={1} onSubmit={vi.fn()} />);
+    render(<SubmitBorrowListDialog count={1} disabled onSubmit={vi.fn()} />);
     expect(
       (screen.getByRole("button", { name: "Submit" }) as HTMLButtonElement)
         .disabled
     ).toBe(true);
+  });
+
+  it("stays open and says why when the submit is refused", async () => {
+    const onSubmit = vi
+      .fn()
+      .mockRejectedValue(new Error("Two of these are no longer available"));
+    render(<SubmitBorrowListDialog count={2} onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    fireEvent.change(screen.getByLabelText("Note for staff (optional)"), {
+      target: { value: "For the demo rig" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit request" }));
+
+    expect(
+      await screen.findByText("Two of these are no longer available")
+    ).toBeDefined();
+    // The dialog is where the reader is looking, and the note they typed is
+    // still in it, so a retry costs one click.
+    expect(screen.getByRole("dialog")).toBeDefined();
+    expect(
+      (
+        screen.getByLabelText(
+          "Note for staff (optional)"
+        ) as HTMLTextAreaElement
+      ).value
+    ).toBe("For the demo rig");
+  });
+
+  it("disables the confirm and says what it is doing while in flight", async () => {
+    let settle: () => void = () => undefined;
+    const onSubmit = vi.fn(
+      () =>
+        new Promise<void>((res) => {
+          settle = res;
+        })
+    );
+    render(<SubmitBorrowListDialog count={1} onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit request" }));
+
+    const busy = (await screen.findByRole("button", {
+      name: "Submitting...",
+    })) as HTMLButtonElement;
+    expect(busy.disabled).toBe(true);
+    // A second activation cannot get past the guard, so one click is one
+    // request however many arrive.
+    fireEvent.click(busy);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    settle();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("clears the refusal when the dialog is reopened", async () => {
+    const onSubmit = vi.fn().mockRejectedValue(new Error("Nope"));
+    render(<SubmitBorrowListDialog count={1} onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit request" }));
+    expect(await screen.findByText("Nope")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(screen.queryByText("Nope")).toBeNull();
   });
 });
