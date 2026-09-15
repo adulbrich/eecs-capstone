@@ -14,7 +14,10 @@ import {
 import { pageTitle } from "#/lib/page-title";
 import { PROJECT_STATUS_LABEL } from "#/lib/project-workflow";
 import { PROJECT_STATUSES } from "#/lib/vocabularies";
-import { listMyProjects } from "#/server/projects-queries";
+import {
+  listMentoredProjects,
+  listMyProjects,
+} from "#/server/projects-queries";
 
 /** The vocabulary plus the sentinel this filter adds for "no filter". */
 const STATUSES = ["all", ...PROJECT_STATUSES] as const;
@@ -27,13 +30,18 @@ export const Route = createFileRoute("/_authed/my/projects")({
   validateSearch: searchSchema,
   head: () => ({ meta: [{ title: pageTitle("My Projects") }] }),
   loaderDeps: ({ search }) => ({ status: search.status }),
-  loader: async ({ deps }) =>
-    await listMyProjects({ data: { status: deps.status } }),
+  loader: async ({ deps }) => {
+    const [mine, mentoring] = await Promise.all([
+      listMyProjects({ data: { status: deps.status } }),
+      listMentoredProjects(),
+    ]);
+    return { ...mine, mentoring: mentoring.rows };
+  },
   component: MyProjects,
 });
 
 function MyProjects() {
-  const { rows, teamCapacity } = Route.useLoaderData();
+  const { mentoring, rows, teamCapacity } = Route.useLoaderData();
   const { status } = Route.useSearch();
   const navigate = useNavigate();
 
@@ -85,6 +93,22 @@ function MyProjects() {
             <ProjectCard key={p.id} project={p} />
           ))}
         </div>
+      )}
+      {/* Hidden when empty, and outside the status filter above: the mentor
+          did not propose these, and being named is the whole reason they are
+          here (#380). Each card opens the public project page. */}
+      {mentoring.length > 0 && (
+        <section className="mt-10">
+          <h2 className="font-semibold text-xl">Mentoring</h2>
+          <p className="mt-1 text-muted-foreground text-sm">
+            Projects that list you as the mentor.
+          </p>
+          <div className="mt-4 flex flex-col gap-3">
+            {mentoring.map((p) => (
+              <ProjectCard key={p.id} project={p} />
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );

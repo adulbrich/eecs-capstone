@@ -184,7 +184,9 @@ the mentor state, one of not decided, seeking a mentor and no mentor needed,
 granting no permission over the project. Staff set the address and the state from
 the Mentor section of the staff panel; the public sees only the two badges the state
 derives, and nothing about the mentor, name included. Saving a new address emails
-it, and staff can skip that email from the confirm the save opens.
+it, and staff can skip that email from the confirm the save opens. A person whose
+account address matches the recorded one sees those projects under Mentoring on
+My Projects, and nothing more.
 _Avoid_: assignment, sponsorship
 
 **Teams supported**:

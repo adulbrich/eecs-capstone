@@ -72,6 +72,15 @@ export const listMyProjects = createServerFn({ method: "GET" })
     return listMyProjectsImpl(data);
   });
 
+export const listMentoredProjects = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const { listMentoredProjectsImpl } = await import(
+      "./_internal/projects-queries"
+    );
+    return listMentoredProjectsImpl();
+  }
+);
+
 export const listAdminProjects = createServerFn({ method: "GET" })
   .validator((data: unknown) => adminListSchema.parse(data ?? {}))
   .handler(async ({ data }) => {

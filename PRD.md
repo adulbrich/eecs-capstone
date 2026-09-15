@@ -180,7 +180,9 @@ Each project carries:
 - [x] Canonical project detail at `/projects/$id`; staff-only sections appear
   conditionally for staff viewers.
 - [x] "My projects" view (`/my/projects`) with a status filter for the signed-in
-  user's own created/proposed/submitted projects.
+  user's own created/proposed/submitted projects, and a Mentoring section,
+  hidden when empty, listing the projects whose mentor address is the
+  viewer's own, every status, each linking to the public project page (#380).
 - [x] Authenticated project create (`/projects/new`) and edit
   (`/projects/$id/edit`).
 - [x] Staff project list (`/admin/projects`) with a status set (a multi-select

@@ -347,12 +347,17 @@ async function main() {
       | "archived";
     publishedAt: Date | null;
     mentorNeed?: MentorNeed;
+    /** Lowercase, as the column is stored (ADR-0015); no writer normalizes it here. */
+    mentorEmail?: string;
     categories: string[];
   };
 
   const PROJECTS: SeedProject[] = [
     {
       title: "Autonomous Warehouse Robot Fleet Coordinator",
+      // The dev user mentors one project, so /my/projects shows its
+      // Mentoring section (#380) to the seeded and the a11y user alike.
+      mentorEmail: USERS.student.email,
       description:
         "Build a coordination service that dispatches and deconflicts a fleet of autonomous mobile robots (AMRs) moving inventory across a simulated warehouse floor. The team will work against Acme's ROS 2 simulator and deliver a scheduler plus a live operations dashboard.",
       problemStatement:
