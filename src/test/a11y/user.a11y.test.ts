@@ -241,14 +241,28 @@ test("my bookmarks, as a table with a saved project", async ({ page }) => {
   await expect(page.getByRole("table", { name: "My bookmarks" })).toBeVisible();
   await checkA11y(page);
 
-  const removes = page.getByRole("button", {
-    name: /^Remove .* from bookmarks$/,
-  });
-  const before = await removes.count();
-  await removes.first().click();
+  // The row keeps its place and the toggle flips to its unset state (#420),
+  // which is a surface nothing else scans: the old Remove button took the row
+  // with it, so there was never an un-bookmarked row to check.
+  //
+  // Held by the title link, which names the row this test saved and survives
+  // the click. A locator filtered on "Remove bookmark" would not: it
+  // re-resolves afterwards and lands on whichever row still has one.
+  const row = page
+    .getByRole("row")
+    .filter({ has: page.locator(`a[href="/projects/${projectId}"]`) });
+  const before = await page.getByRole("row").count();
+  await row.getByRole("button", { name: "Remove bookmark" }).click();
+  // Enabled, not merely visible. `BookmarkToggle` flips its label from the
+  // optimistic set update and stays disabled while the write is in flight, and
+  // axe exempts a disabled control from colour contrast, so scanning on the
+  // visible-only wait would skip the state this test exists to cover.
+  await expect(
+    row.getByRole("button", { name: "Bookmark", exact: true })
+  ).toBeEnabled();
   // Not the empty state: the seeded user may hold other bookmarks, and this
-  // scan must not depend on that.
-  await expect(removes).toHaveCount(before - 1);
+  // scan must not depend on that. The count is unchanged, which is the point.
+  await expect(page.getByRole("row")).toHaveCount(before);
   await checkA11y(page);
 });
 

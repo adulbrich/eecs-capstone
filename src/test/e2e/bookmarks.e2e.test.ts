@@ -66,6 +66,33 @@ test.describe("project bookmarks", () => {
       await user.goto("/my/bookmarks");
       await expect(user.getByText(title)).toBeVisible();
 
+      // The control here is the listing's toggle, in the Title cell, not a
+      // Remove button in a column of its own (#420). Un-bookmarking leaves the
+      // row in place showing the unset state, so a misclick costs one more
+      // click rather than a trip back to /projects to find the project again.
+      // The loader returns bookmarks, so the row goes on the next load.
+      const savedRow = user.getByRole("row").filter({ hasText: title });
+      // `BookmarkToggle` renders nothing until the provider's id set lands,
+      // so this is the row's control existing at all, in its saved state,
+      // before the click below flips it. Not a guard on `confirmed`, which
+      // matches POST only and could never have armed on that GET fetch.
+      await expect(
+        savedRow.getByRole("button", { name: "Remove bookmark" })
+      ).toBeVisible();
+      await confirmed(user, () =>
+        savedRow.getByRole("button", { name: "Remove bookmark" }).click()
+      );
+      await expect(
+        savedRow.getByRole("button", { name: "Bookmark", exact: true })
+      ).toBeVisible();
+      await expect(user.getByText(title)).toBeVisible();
+      await confirmed(user, () =>
+        savedRow.getByRole("button", { name: "Bookmark", exact: true }).click()
+      );
+      await expect(
+        savedRow.getByRole("button", { name: "Remove bookmark" })
+      ).toBeVisible();
+
       const other = await otherContext.newPage();
       await other.goto("/my/bookmarks");
 

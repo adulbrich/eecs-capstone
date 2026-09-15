@@ -1,15 +1,30 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import type * as React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { router, server } = vi.hoisted(() => ({
-  router: { invalidate: vi.fn(() => Promise.resolve()) },
-  server: { removeBookmark: vi.fn(() => Promise.resolve({ ok: true })) },
+const { server, session, toast } = vi.hoisted(() => ({
+  server: {
+    addBookmark: vi.fn(),
+    listMyBookmarkIds: vi.fn(),
+    removeBookmark: vi.fn(),
+  },
+  session: { data: null as null | { user: { id: string } } },
+  toast: { error: vi.fn() },
 }));
 
+vi.mock("#/lib/auth-client", () => ({
+  authClient: { useSession: () => session },
+}));
 vi.mock("#/server/bookmarks", () => server);
-vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({
     children,
@@ -25,16 +40,26 @@ vi.mock("@tanstack/react-router", () => ({
       {children}
     </a>
   ),
-  useRouter: () => router,
 }));
 
 import { AdminDataTable } from "#/components/admin-data-table";
+import { BookmarkSetProvider } from "#/components/bookmark-set";
 import {
   BOOKMARK_TABLE_COLUMNS,
   BOOKMARK_TABLE_DEFAULT_SORT,
   type BookmarkRow,
 } from "#/components/bookmark-table-columns";
 import type { SortState } from "#/lib/table-state";
+
+beforeEach(() => {
+  session.data = { user: { id: "u1" } };
+  // Every row on this page is a bookmark, which is what the loader returns.
+  server.listMyBookmarkIds.mockResolvedValue({
+    ids: ["Ten", "Two", "Three", "Four"],
+  });
+  server.addBookmark.mockResolvedValue({ ok: true });
+  server.removeBookmark.mockResolvedValue({ ok: true });
+});
 
 afterEach(() => {
   cleanup();
@@ -104,24 +129,34 @@ const ROWS: BookmarkRow[] = [
 
 function renderTable(sort: SortState = BOOKMARK_TABLE_DEFAULT_SORT) {
   return render(
-    <AdminDataTable
-      caption="My bookmarks"
-      columns={BOOKMARK_TABLE_COLUMNS}
-      data={ROWS}
-      defaultSort={BOOKMARK_TABLE_DEFAULT_SORT}
-      emptyMessage="Nothing."
-      getRowId={(row) => row.id}
-      hidden={[]}
-      onHiddenChange={() => {
-        // controlled by the route in production
-      }}
-      onSortChange={() => {
-        // controlled by the route in production
-      }}
-      sort={sort}
-      storageKey="test"
-    />
+    <BookmarkSetProvider>
+      <AdminDataTable
+        caption="My bookmarks"
+        columns={BOOKMARK_TABLE_COLUMNS}
+        data={ROWS}
+        defaultSort={BOOKMARK_TABLE_DEFAULT_SORT}
+        emptyMessage="Nothing."
+        getRowId={(row) => row.id}
+        hidden={[]}
+        onHiddenChange={() => {
+          // controlled by the route in production
+        }}
+        onSortChange={() => {
+          // controlled by the route in production
+        }}
+        sort={sort}
+        storageKey="test"
+      />
+    </BookmarkSetProvider>
   );
+}
+
+function rowFor(title: string): HTMLElement {
+  const row = screen.getByRole("link", { name: title }).closest("tr");
+  if (!row) {
+    throw new Error(`no row for ${title}`);
+  }
+  return row;
 }
 
 function titlesInOrder(): string[] {
@@ -162,7 +197,6 @@ describe("the bookmarks table", () => {
       "Teams supported",
       "NDA/IP required",
       "Saved on",
-      "Remove",
     ]);
     expect(screen.queryByRole("button", { name: /Columns/ })).toBeNull();
   });
@@ -190,20 +224,85 @@ describe("the bookmarks table", () => {
     expect(link.parentElement?.className).toContain("md:max-w-md");
   });
 
-  it("marks a closed roster and an NDA, and removes through the loader", async () => {
+  it("marks a closed roster and an NDA", () => {
     renderTable();
-    const two = screen.getByRole("link", { name: "Two" }).closest("tr");
-    if (!two) {
-      throw new Error("no row");
-    }
-    expect(within(two).getByText("Not accepting applicants")).toBeTruthy();
-    expect(within(two).getByText("Required")).toBeTruthy();
-    within(two)
-      .getByRole("button", { name: "Remove Two from bookmarks" })
-      .click();
-    await vi.waitFor(() => expect(router.invalidate).toHaveBeenCalled());
-    expect(server.removeBookmark).toHaveBeenCalledWith({
-      data: { projectId: "Two" },
+    expect(
+      within(rowFor("Two")).getByText("Not accepting applicants")
+    ).toBeTruthy();
+    expect(within(rowFor("Two")).getByText("Required")).toBeTruthy();
+  });
+
+  it("puts the listing's toggle in the Title cell, with no Remove column", async () => {
+    renderTable();
+    await waitFor(() =>
+      expect(
+        within(rowFor("Two")).getByRole("button", { name: "Remove bookmark" })
+      ).toBeTruthy()
+    );
+    // Right-aligned inside the Title cell, the same place /projects table mode
+    // puts it, rather than a column of its own.
+    const toggle = within(rowFor("Two")).getByRole("button", {
+      name: "Remove bookmark",
     });
+    expect(toggle.className).toContain("ml-auto");
+    expect(toggle.closest("td")).toBe(
+      screen.getByRole("link", { name: "Two" }).closest("td")
+    );
+    expect(
+      screen.queryByRole("button", { name: /^Remove .* from bookmarks$/ })
+    ).toBeNull();
+  });
+
+  it("leaves the row in place after an un-bookmark, showing the toggle unset", async () => {
+    // The point of the change: a toggle that deletes its own row can never
+    // show its unset state, so it is not a toggle. The loader still returns
+    // bookmarks, so the row goes on the next load, not on the click.
+    renderTable();
+    const toggle = () =>
+      within(rowFor("Two")).getByRole("button", {
+        name: /^(Bookmark|Remove bookmark)$/,
+      });
+    await waitFor(() =>
+      expect(toggle().getAttribute("aria-label")).toBe("Remove bookmark")
+    );
+
+    fireEvent.click(toggle());
+    await waitFor(() =>
+      expect(server.removeBookmark).toHaveBeenCalledWith({
+        data: { projectId: "Two" },
+      })
+    );
+    expect(titlesInOrder()).toEqual(["Ten", "Two", "Three", "Four"]);
+    await waitFor(() =>
+      expect(toggle().getAttribute("aria-label")).toBe("Bookmark")
+    );
+
+    // And clicking again puts it back, which the Remove button could not do.
+    fireEvent.click(toggle());
+    await waitFor(() =>
+      expect(server.addBookmark).toHaveBeenCalledWith({
+        data: { projectId: "Two" },
+      })
+    );
+    await waitFor(() =>
+      expect(toggle().getAttribute("aria-label")).toBe("Remove bookmark")
+    );
+  });
+
+  it("reverts the toggle and raises a toast when the write fails", async () => {
+    server.removeBookmark.mockRejectedValue(new Error("Nope"));
+    renderTable();
+    const toggle = () =>
+      within(rowFor("Two")).getByRole("button", {
+        name: /^(Bookmark|Remove bookmark)$/,
+      });
+    await waitFor(() =>
+      expect(toggle().getAttribute("aria-label")).toBe("Remove bookmark")
+    );
+
+    fireEvent.click(toggle());
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Nope"));
+    expect(toggle().getAttribute("aria-label")).toBe("Remove bookmark");
+    expect(titlesInOrder()).toEqual(["Ten", "Two", "Three", "Four"]);
   });
 });
