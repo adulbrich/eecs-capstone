@@ -100,6 +100,39 @@ export async function listMyProjectsImpl(data: { status: StatusFilter }) {
   return { rows, teamCapacity: capacity?.teamCapacity ?? 0 };
 }
 
+/**
+ * The projects that name the viewer's address as mentor (#380). This is the
+ * project sense of "mentor", `projects.mentor_email` matched the way
+ * `mentorNameSql` resolves the name, and not the profile's `wantsToMentor`.
+ * Every status, so a mentor sees the draft they were named on before it is
+ * public; soft-deleted rows out. Mentorship grants nothing (CONTEXT.md), so
+ * the rows are the public summary and the page links to the public project
+ * page, where the mentor sees what any visitor sees. A project whose mentor
+ * is changed drops out silently. No `mentor_id`: the schema comment on
+ * `mentor_email` rejects one on purpose, and the address is the link.
+ */
+export function listMentoredProjectsAs(viewer: { email: string }) {
+  return db
+    .select(projectSummarySelect)
+    .from(projects)
+    .leftJoin(programs, eq(projects.programId, programs.id))
+    .where(
+      and(
+        sql`lower(${projects.mentorEmail}) = lower(${viewer.email})`,
+        isNull(projects.deletedAt)
+      )
+    )
+    .orderBy(desc(projects.updatedAt));
+}
+
+export async function listMentoredProjectsImpl() {
+  const session = await readSession();
+  if (!session?.user) {
+    return { rows: [] };
+  }
+  return { rows: await listMentoredProjectsAs(session.user) };
+}
+
 /** The column each From and To pair narrows on. */
 const ADMIN_DATE_COLUMN = {
   archived: projects.archivedAt,

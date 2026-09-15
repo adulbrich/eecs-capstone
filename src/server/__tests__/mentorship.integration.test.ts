@@ -10,6 +10,8 @@ import {
 import {
   createProjectAs,
   forceTransitionAs,
+  performTransitionAs,
+  softDeleteProjectAs,
   updateProjectAs,
   updateProjectMentorshipAs,
   updateProjectProposerAs,
@@ -18,6 +20,7 @@ import {
   getProjectAs,
   getProjectMentorshipAs,
   getProposerForEditAs,
+  listMentoredProjectsAs,
 } from "#/server/_internal/projects-queries";
 
 async function makeUser(email: string, role: "user" | "admin") {
@@ -398,6 +401,53 @@ describe("the six public states", () => {
     const { project } = await getProjectAs(owner, { id });
     expect(project).not.toBeNull();
     expect("mentorEmail" in (project ?? {})).toBe(false);
+  });
+});
+
+describe("listMentoredProjectsAs", () => {
+  it("lists every live project naming the viewer's address, any status, matched case-insensitively", async () => {
+    const admin = await makeUser("admin-mentoring@x.edu", "admin");
+    // Sign-up folds the address; the case test is the column against the lookup.
+    const mentor = await makeUser("mentor-person@x.edu", "user");
+    const bystander = await makeUser("bystander-mentoring@x.edu", "user");
+    const draft = await createProjectAs(admin, baseProject());
+    const live = await createProjectAs(admin, baseProject());
+    const gone = await createProjectAs(admin, baseProject());
+    const other = await createProjectAs(admin, baseProject());
+    for (const { id } of [draft, live, gone]) {
+      await updateProjectMentorshipAs(admin, {
+        id,
+        mentorEmail: "MENTOR-person@x.edu",
+        mentorNeed: "unspecified",
+      });
+    }
+    await performTransitionAs(admin, live.id, "submitted");
+    await performTransitionAs(admin, live.id, "approved");
+    await performTransitionAs(admin, live.id, "published");
+    await performTransitionAs(admin, gone.id, "submitted");
+    await softDeleteProjectAs(admin, gone.id);
+
+    // The account's address as sign-up folded it, against a column written
+    // in another case.
+    const rows = await listMentoredProjectsAs({ email: mentor.email });
+    expect(rows.map((r) => r.id).sort()).toEqual([draft.id, live.id].sort());
+    // The public summary, so nothing about the mentor rides along.
+    expect(Object.keys(rows[0] ?? {})).not.toContain("mentorEmail");
+    expect(Object.keys(rows[0] ?? {})).not.toContain("mentorName");
+    expect(rows.some((r) => r.id === other.id)).toBe(false);
+    expect(await listMentoredProjectsAs({ email: bystander.email })).toEqual(
+      []
+    );
+
+    // Changing the mentor drops the project silently.
+    await updateProjectMentorshipAs(admin, {
+      id: draft.id,
+      mentorEmail: "someone-else@x.edu",
+      mentorNeed: "unspecified",
+    });
+    expect(
+      (await listMentoredProjectsAs({ email: mentor.email })).map((r) => r.id)
+    ).toEqual([live.id]);
   });
 });
 

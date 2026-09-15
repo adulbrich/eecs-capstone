@@ -275,6 +275,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "staff",
     note: "Reads adminProjectSummarySelect, so it carries proposerEmail and contactEmail both. Staff is what keeps the first out of a public read.",
   },
+  "server/projects-queries.ts:listMentoredProjects": {
+    level: "authenticated",
+    note: "Scoped to the projects whose mentor_email matches the viewer's own address, and reads projectSummarySelect, which carries nothing about the mentor (#380).",
+  },
   "server/projects-queries.ts:listMyProjects": {
     level: "authenticated",
     note: "Scoped to the viewer's own proposals.",
