@@ -7,6 +7,13 @@ export type SendEmailFn = (to: string, email: RenderedEmail) => Promise<void>;
 export interface EmailOptions {
   /** Test seam. Production callers omit it and the notifier resolves its own transport. */
   send?: SendEmailFn;
+  /**
+   * The staff skip for this one action (#379): `false` suppresses the email
+   * and nothing else, so a bell row is still written where one exists.
+   * Undefined sends. On an endpoint an owner can reach, the `*As` function
+   * honors it for staff only.
+   */
+  sendEmail?: boolean;
 }
 
 /**

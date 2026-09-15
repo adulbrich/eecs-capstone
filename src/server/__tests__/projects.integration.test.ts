@@ -889,6 +889,18 @@ describe("review emails", () => {
     const ownerDeleted = await createProjectAs(owner, baseProject());
     await hardDeleteProjectAs(owner, ownerDeleted.id, { send });
     expect(send).not.toHaveBeenCalled();
+
+    // The staff skip (#379): the draft still goes, the email does not.
+    send.mockClear();
+    const quietlyDeleted = await createProjectAs(owner, baseProject());
+    await hardDeleteProjectAs(admin, quietlyDeleted.id, {
+      send,
+      sendEmail: false,
+    });
+    expect(send).not.toHaveBeenCalled();
+    expect(
+      await db.select().from(projects).where(eq(projects.id, quietlyDeleted.id))
+    ).toHaveLength(0);
   });
 
   it("tells the new proposer in the bell and by email when staff reassign a project", async () => {
@@ -935,6 +947,27 @@ describe("review emails", () => {
       { send }
     );
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it("writes the new proposer's bell row and skips the email on sendEmail: false", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser("admin-reassign-skip@x.edu", "admin");
+    const next = await makeUser("next-skip@x.edu", "user");
+    const { id } = await createProjectAs(admin, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await updateProjectProposerAs(
+      admin,
+      { id, proposerEmail: "next-skip@x.edu", studentProposed: false },
+      { send, sendEmail: false }
+    );
+
+    expect(send).not.toHaveBeenCalled();
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, next.id));
+    expect(rows.map((r) => r.type)).toEqual(["proposer_reassigned"]);
   });
 
   it("tells nobody when only the student-proposed mark changes or the same address is saved again", async () => {

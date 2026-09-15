@@ -236,6 +236,7 @@ function ProjectDetail() {
             status: project.status,
             deletedAt: project.deletedAt,
           }}
+          viewerIsOwner={viewerIsOwner}
         />
       )}
     </div>

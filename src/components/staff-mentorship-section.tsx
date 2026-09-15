@@ -10,6 +10,8 @@ import {
 import { AccountLinkSummary } from "./account-link-summary";
 import { PanelSection } from "./panel";
 import { ProjectBadges } from "./project-badges";
+import { EMAIL_SKIP_HINT } from "./send-email-checkbox";
+import { SendEmailDialog } from "./send-email-dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -78,6 +80,11 @@ function PublicPreview({
  * The saved record and the draft are held apart: the summary reads the saved
  * one, because whether an address matches an account is only known after the
  * server has seen it. See #75.
+ *
+ * A save that names a new address emails it, so that save goes through a
+ * confirm carrying the skip (#379); the state alone, or the same address,
+ * saves without one. The mentor has no account to write a bell row for, so
+ * the skip is the whole notice.
  */
 export function StaffMentorshipSection({
   onChanged,
@@ -91,6 +98,7 @@ export function StaffMentorshipSection({
   const [mentorNeed, setMentorNeed] = useState<MentorNeed>("unspecified");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -108,13 +116,23 @@ export function StaffMentorshipSection({
     void load();
   }, [load]);
 
-  async function save() {
+  const trimmed = mentorEmail.trim();
+  // The server mails only when the address changes to a non-empty value,
+  // compared after normalizing; the dialog opens on exactly that, or it
+  // would announce an email that never goes out.
+  const announces =
+    record !== null &&
+    trimmed !== "" &&
+    trimmed.toLowerCase() !== record.mentorEmail;
+
+  async function save(sendEmail: boolean) {
     setBusy(true);
     setError(null);
     try {
       await updateProjectMentorship({
-        data: { id: projectId, mentorEmail: mentorEmail.trim(), mentorNeed },
+        data: { id: projectId, mentorEmail: trimmed, mentorNeed, sendEmail },
       });
+      setConfirmOpen(false);
       await load();
       onChanged();
     } catch (e) {
@@ -162,6 +180,9 @@ export function StaffMentorshipSection({
             type="email"
             value={mentorEmail}
           />
+          <p className="text-muted-foreground text-xs">
+            Saving a new address emails it.
+          </p>
         </div>
         {record && (
           <PublicPreview
@@ -170,19 +191,33 @@ export function StaffMentorshipSection({
             savedMentorNeed={record.mentorNeed}
           />
         )}
-        {error && <p className="text-destructive text-sm">{error}</p>}
+        {error && !confirmOpen && (
+          <p className="text-destructive text-sm">{error}</p>
+        )}
         <Button
           // Disabled until the saved record has arrived: the drafts start
           // blank, and posting blank drafts over a real record would clear the
           // mentor and log an edit nobody made.
           disabled={busy || record === null}
-          onClick={() => void save()}
+          onClick={() => (announces ? setConfirmOpen(true) : void save(true))}
           size="sm"
           type="button"
         >
           {busy ? "Saving..." : "Save mentor"}
         </Button>
       </div>
+      <SendEmailDialog
+        address={trimmed}
+        busy={busy}
+        confirmLabel="Save mentor"
+        description={`This names ${trimmed} as the mentor.`}
+        error={error}
+        hint={EMAIL_SKIP_HINT.emailOnly}
+        onConfirm={(sendEmail) => void save(sendEmail)}
+        onOpenChange={setConfirmOpen}
+        open={confirmOpen}
+        title="Save the mentor?"
+      />
     </PanelSection>
   );
 }

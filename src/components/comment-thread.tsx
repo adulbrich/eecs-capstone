@@ -163,6 +163,7 @@ function NewCommentForm({
 }) {
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
+  const [sendEmail, setSendEmail] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -179,9 +180,12 @@ function NewCommentForm({
     setError(null);
     setBusy(true);
     try {
-      await addComment({ data: { projectId, content, isInternal } });
+      await addComment({
+        data: { projectId, content, isInternal, sendEmail },
+      });
       setContent("");
       setIsInternal(false);
+      setSendEmail(true);
       onChanged();
     } catch (err) {
       setError((err as Error).message);
@@ -204,14 +208,31 @@ function NewCommentForm({
         value={content}
       />
       {viewerIsStaff && (
-        <Label className="font-normal">
-          <Checkbox
-            checked={isInternal}
-            disabled={busy}
-            onCheckedChange={(checked) => setIsInternal(checked === true)}
-          />
-          Internal (staff only)
-        </Label>
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          <Label className="font-normal">
+            <Checkbox
+              checked={isInternal}
+              disabled={busy}
+              onCheckedChange={(checked) => setIsInternal(checked === true)}
+            />
+            Internal (staff only)
+          </Label>
+          {/*
+            The one email skip that is a plain checkbox rather than a dialog
+            (#379): staff post many. Gone while Internal is on, which mails
+            nobody anyway.
+          */}
+          {!isInternal && (
+            <Label className="font-normal">
+              <Checkbox
+                checked={sendEmail}
+                disabled={busy}
+                onCheckedChange={(checked) => setSendEmail(checked === true)}
+              />
+              Email the proposer
+            </Label>
+          )}
+        </div>
       )}
       <Button disabled={busy} size="sm" type="submit">
         Post comment
@@ -237,6 +258,7 @@ function ReplyForm({
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
   const [isInternalChoice, setIsInternalChoice] = useState(false);
+  const [sendEmail, setSendEmail] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Cancel stays usable while a reply is in flight (#188), so a form can be
@@ -293,11 +315,12 @@ function ReplyForm({
     setBusy(true);
     try {
       await addComment({
-        data: { projectId, parentId, content, isInternal },
+        data: { projectId, parentId, content, isInternal, sendEmail },
       });
       if (isCurrent()) {
         setContent("");
         setIsInternalChoice(false);
+        setSendEmail(true);
         setOpen(false);
       }
       // Outside the guard: the reply landed whichever attempt posted it, so
@@ -330,16 +353,28 @@ function ReplyForm({
       />
       {viewerIsStaff && (
         <div>
-          <Label className="font-normal text-xs">
-            <Checkbox
-              checked={isInternal}
-              disabled={parentIsInternal || busy}
-              onCheckedChange={(checked) =>
-                setIsInternalChoice(checked === true)
-              }
-            />
-            Internal (staff only)
-          </Label>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            <Label className="font-normal text-xs">
+              <Checkbox
+                checked={isInternal}
+                disabled={parentIsInternal || busy}
+                onCheckedChange={(checked) =>
+                  setIsInternalChoice(checked === true)
+                }
+              />
+              Internal (staff only)
+            </Label>
+            {!isInternal && (
+              <Label className="font-normal text-xs">
+                <Checkbox
+                  checked={sendEmail}
+                  disabled={busy}
+                  onCheckedChange={(checked) => setSendEmail(checked === true)}
+                />
+                Email the proposer
+              </Label>
+            )}
+          </div>
           {parentIsInternal && (
             <p className="mt-1 text-muted-foreground text-xs">
               Replies to an internal comment are always internal.

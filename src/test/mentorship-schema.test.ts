@@ -72,6 +72,23 @@ describe("mentorshipSchema", () => {
     ).toBe(true);
   });
 
+  it("defaults the email skip to sending, on both schemas (#379)", () => {
+    // A partial caller mails rather than silently swallowing it; only an
+    // explicit false is a skip.
+    expect(
+      mentorshipSchema.parse({ id: ID, mentorEmail: "", mentorNeed: "none" })
+        .sendEmail
+    ).toBe(true);
+    expect(
+      proposerSchema.parse({
+        id: ID,
+        proposerEmail: "p@x.edu",
+        sendEmail: false,
+        studentProposed: true,
+      }).sendEmail
+    ).toBe(false);
+  });
+
   it("rejects null, a non-address, and an address over the shared ceiling", () => {
     // The address is a string in transit; null exists only in the column.
     expect(

@@ -27,12 +27,15 @@ import { cn } from "#/lib/utils.ts";
  * the destructive action looks like, only what confirming it looks like.
  */
 export function ConfirmDialog({
+  body,
   children,
   confirmLabel = "Delete",
   description,
   onConfirm,
   title,
 }: {
+  /** Between the description and the buttons: the email skip, when the delete emails someone (#379). */
+  body?: React.ReactNode;
   children: React.ReactNode;
   confirmLabel?: string;
   description: string;
@@ -47,6 +50,7 @@ export function ConfirmDialog({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+        {body}
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
