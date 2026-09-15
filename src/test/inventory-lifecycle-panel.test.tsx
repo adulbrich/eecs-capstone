@@ -439,6 +439,29 @@ describe("InventoryLifecyclePanel: the checkout dialog", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
   });
 
+  it("takes the refusal with it when the dialog is cancelled", async () => {
+    server.transitionInventoryItem.mockRejectedValueOnce(
+      new Error("Item is already checked out")
+    );
+    renderPanel({ status: "available" });
+    fireEvent.click(screen.getByRole("button", { name: "Check out" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Email"), {
+      target: { value: "holder@x.edu" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Due date"), {
+      target: { value: "2026-10-01" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
+    expect(await screen.findByText("Item is already checked out")).toBeTruthy();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // The panel behind shares the one error state. Left uncleared, the
+    // refusal reappears there as a failure of nothing the reader just did.
+    expect(screen.queryByText("Item is already checked out")).toBeNull();
+  });
+
   it("closes on Cancel without transitioning", async () => {
     renderPanel({ status: "available" });
     fireEvent.click(screen.getByRole("button", { name: "Check out" }));

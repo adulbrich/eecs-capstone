@@ -434,6 +434,25 @@ export function InventoryLifecyclePanel({
     setDlgOpen(true);
   }
 
+  // Every close of either dialog goes through one of these, Cancel included.
+  // Radix calls `onOpenChange` for Escape and the overlay, but a Cancel that
+  // sets the state itself would skip it and leave the last refusal to surface
+  // in the panel behind, as a failure of nothing the reader just did. A
+  // refusal belongs to one attempt (UI-CONVENTIONS, "Mutations and feedback").
+  function changeDlgOpen(next: boolean) {
+    if (!next) {
+      setError(null);
+    }
+    setDlgOpen(next);
+  }
+
+  function changeDelOpen(next: boolean) {
+    if (!next) {
+      setError(null);
+    }
+    setDelOpen(next);
+  }
+
   /**
    * Name and program belong to one address. Changing the address, whether by
    * typing or by picking from the account search, therefore drops them: the
@@ -638,7 +657,7 @@ export function InventoryLifecyclePanel({
         </div>
       </PanelSection>
 
-      <Dialog onOpenChange={setDlgOpen} open={dlgOpen}>
+      <Dialog onOpenChange={changeDlgOpen} open={dlgOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -712,7 +731,7 @@ export function InventoryLifecyclePanel({
           <DialogFooter>
             <Button
               disabled={busy}
-              onClick={() => setDlgOpen(false)}
+              onClick={() => changeDlgOpen(false)}
               type="button"
               variant="outline"
             >
@@ -733,7 +752,7 @@ export function InventoryLifecyclePanel({
           are all explained in docs/UI-CONVENTIONS.md, Destructive actions.
           Local to this dialog: the failure branch of `onHardDelete` needs it
           open to show the server's refusal, hence the explicit `setDelOpen`. */}
-      <AlertDialog onOpenChange={setDelOpen} open={delOpen}>
+      <AlertDialog onOpenChange={changeDelOpen} open={delOpen}>
         <AlertDialogContent
           onOpenAutoFocus={(e) => {
             e.preventDefault();
