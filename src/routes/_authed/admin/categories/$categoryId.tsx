@@ -80,14 +80,10 @@ function CategoryEdit() {
     }
   }
 
+  // ConfirmDialog owns the flight and the refusal (#410).
   async function onDelete() {
-    setError(null);
-    try {
-      await deleteCategory({ data: { id: category.id } });
-      navigate({ search: { tab: category.domain }, to: "/admin/categories" });
-    } catch (err) {
-      setError((err as Error).message);
-    }
+    await deleteCategory({ data: { id: category.id } });
+    navigate({ search: { tab: category.domain }, to: "/admin/categories" });
   }
 
   return (

@@ -77,14 +77,10 @@ function ProgramEdit() {
     }
   }
 
+  // ConfirmDialog owns the flight and the refusal (#410).
   async function onDelete() {
-    setError(null);
-    try {
-      await deleteProgram({ data: { id: program.id } });
-      navigate({ to: "/admin/programs" });
-    } catch (err) {
-      setError((err as Error).message);
-    }
+    await deleteProgram({ data: { id: program.id } });
+    navigate({ to: "/admin/programs" });
   }
 
   const deleteDescription =

@@ -212,30 +212,23 @@ export function StaffProjectPanel({
     }
   }
 
+  // Both branches run from a ConfirmDialog, which owns the flight and shows a
+  // refusal inside itself (#410). Restore confirms too: it is as much a change
+  // to what the public sees as the soft delete it undoes.
   async function runDelete(action: "softDelete" | "restore") {
-    setError(null);
-    try {
-      if (action === "softDelete") {
-        await softDeleteProject({ data: { id: project.id } });
-      } else {
-        await restoreProject({ data: { id: project.id } });
-      }
-      onChanged();
-    } catch (err) {
-      setError((err as Error).message);
+    if (action === "softDelete") {
+      await softDeleteProject({ data: { id: project.id } });
+    } else {
+      await restoreProject({ data: { id: project.id } });
     }
+    onChanged();
   }
 
   async function runHardDelete() {
-    setError(null);
-    try {
-      await hardDeleteProject({
-        data: { id: project.id, sendEmail: deleteEmail },
-      });
-      window.location.href = "/admin/projects";
-    } catch (err) {
-      setError((err as Error).message);
-    }
+    await hardDeleteProject({
+      data: { id: project.id, sendEmail: deleteEmail },
+    });
+    window.location.href = "/admin/projects";
   }
 
   const needsComment = commentRequired(pending);
@@ -478,14 +471,17 @@ export function StaffProjectPanel({
             </ConfirmDialog>
           )}
           {project.deletedAt && (
-            <Button
-              onClick={() => void runDelete("restore")}
-              size="sm"
-              type="button"
-              variant="outline"
+            <ConfirmDialog
+              busyLabel="Restoring..."
+              confirmLabel="Restore"
+              description="The project returns to the listings at the status it held before it was deleted."
+              onConfirm={() => runDelete("restore")}
+              title="Restore this project?"
             >
-              Restore
-            </Button>
+              <Button size="sm" type="button" variant="outline">
+                Restore
+              </Button>
+            </ConfirmDialog>
           )}
           {project.status === "draft" && !project.deletedAt && (
             <ConfirmDialog

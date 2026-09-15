@@ -58,16 +58,11 @@ export function OwnerProjectActions({
     }
   }
 
+  // No try/catch and no busy of its own: ConfirmDialog owns the flight and
+  // shows a refusal inside the dialog rather than behind it (#410).
   async function runDelete() {
-    setError(null);
-    setBusy(true);
-    try {
-      await hardDeleteProject({ data: { id: project.id } });
-      window.location.href = "/my/projects";
-    } catch (err) {
-      setError((err as Error).message);
-      setBusy(false);
-    }
+    await hardDeleteProject({ data: { id: project.id } });
+    window.location.href = "/my/projects";
   }
 
   const buttons: Array<{

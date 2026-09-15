@@ -40,22 +40,16 @@ export function BanForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ConfirmDialog owns the flight and the refusal (#410). Unban below keeps
+  // its own, because it is a plain button with no dialog around it.
   async function onBan() {
-    setBusy(true);
-    setError(null);
-    try {
-      const expires = expiresAt.length > 0 ? new Date(expiresAt) : null;
-      await banUser({
-        data: { userId, reason, expiresAt: expires, sendEmail },
-      });
-      setReason("");
-      setExpiresAt("");
-      onChanged();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    const expires = expiresAt.length > 0 ? new Date(expiresAt) : null;
+    await banUser({
+      data: { userId, reason, expiresAt: expires, sendEmail },
+    });
+    setReason("");
+    setExpiresAt("");
+    onChanged();
   }
 
   async function onUnban() {
@@ -140,6 +134,7 @@ export function BanForm({
               onCheckedChange={setSendEmail}
             />
           }
+          busyLabel="Banning..."
           confirmLabel="Ban"
           description={
             expiresAt.length > 0

@@ -147,7 +147,7 @@ describe("BanForm email skip (#386)", () => {
     );
   });
 
-  it("names the typed expiry, and shows a refusal under the form once the confirm has closed", async () => {
+  it("names the typed expiry, and keeps the dialog open on a refusal", async () => {
     banUser.mockRejectedValueOnce(new Error("Cannot ban the last admin"));
     renderForm();
     fireEvent.change(screen.getByLabelText("Reason"), {
@@ -168,9 +168,12 @@ describe("BanForm email skip (#386)", () => {
     ).toBeTruthy();
     fireEvent.click(dialog.getByRole("button", { name: "Ban" }));
 
-    // ConfirmDialog closes on the click; the refusal lands under the form.
-    expect(await screen.findByText("Cannot ban the last admin")).toBeTruthy();
-    expect(screen.queryByRole("alertdialog")).toBeNull();
+    // The dialog stays open and says why, rather than closing over a refusal
+    // that lands behind it (#410). The typed reason survives for a retry.
+    expect(await dialog.findByText("Cannot ban the last admin")).toBeTruthy();
+    expect(
+      screen.getByRole("alertdialog", { name: "Ban this user?" })
+    ).toBeTruthy();
     expect((screen.getByLabelText("Reason") as HTMLTextAreaElement).value).toBe(
       "Spam"
     );
