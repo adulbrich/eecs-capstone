@@ -1,5 +1,7 @@
 import { Bell, BellRing } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import { errorMessage } from "#/lib/error-message";
 import {
   listMyNotifications,
   markAllRead,
@@ -49,9 +51,18 @@ export function NotificationBell() {
     };
   }, [refresh]);
 
+  // Both of these were awaited from a `void` call with no catch, so a refusal
+  // was an unhandled rejection and the badge went on showing a count that was
+  // no longer true. A toast, not inline text: this is a header control with no
+  // panel to write into (#410).
   async function onClickNotification(n: Notification) {
-    if (!n.read) {
-      await markRead({ data: { id: n.id } });
+    try {
+      if (!n.read) {
+        await markRead({ data: { id: n.id } });
+      }
+    } catch (err) {
+      toast.error(errorMessage(err, "Could not mark that as read"));
+      return;
     }
     setOpen(false);
     if (n.link) {
@@ -62,7 +73,12 @@ export function NotificationBell() {
   }
 
   async function onMarkAllRead() {
-    await markAllRead();
+    try {
+      await markAllRead();
+    } catch (err) {
+      toast.error(errorMessage(err, "Could not mark them as read"));
+      return;
+    }
     await refresh();
   }
 

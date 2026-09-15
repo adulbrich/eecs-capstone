@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { authClient } from "#/lib/auth-client";
+import { errorMessage } from "#/lib/error-message";
 import { useHasMounted } from "#/lib/use-has-mounted";
 import { isBookmarked } from "#/server/bookmarks";
 import { BookmarkIcon, useWriteBookmark } from "./bookmark-set";
@@ -41,7 +43,7 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
       await writeBookmark(projectId, next);
     } catch (err) {
       setBookmarked(!next);
-      console.error(err);
+      toast.error(errorMessage(err, "Could not save the bookmark"));
     } finally {
       setLoading(false);
     }

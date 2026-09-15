@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "#/components/ui/button";
+import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
@@ -14,16 +15,30 @@ export const Route = createFileRoute("/(auth)/forgot-password")({
 function ForgotPassword() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (loading) {
+      return;
+    }
     setLoading(true);
+    setError(null);
     const form = new FormData(e.currentTarget);
-    await authClient.requestPasswordReset({
+    // Better Auth answers with an `error` rather than throwing, and this never
+    // read it, so a request that never left the browser still said "Check your
+    // email" (#410). The success screen's own wording stays deliberately
+    // vague about whether the address exists; this reports the transport
+    // failing, which is a different thing and one the reader can act on.
+    const { error: requestError } = await authClient.requestPasswordReset({
       email: String(form.get("email") ?? ""),
       redirectTo: "/reset-password",
     });
     setLoading(false);
+    if (requestError) {
+      setError(requestError.message ?? "Could not send the reset link");
+      return;
+    }
     setSubmitted(true);
   }
 
@@ -57,6 +72,7 @@ function ForgotPassword() {
               type="email"
             />
           </div>
+          <FieldError message={error} />
           <Button className="w-full" disabled={loading} type="submit">
             {loading ? "Sending..." : "Send reset link"}
           </Button>
