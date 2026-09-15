@@ -201,16 +201,16 @@ test("admin inventory requests", async ({ page }) => {
 });
 
 test("@smoke admin projects list", async ({ page }) => {
-  // The six switches live in the filters aside at the desktop width the
-  // suite runs at (1280, which is xl) and in the filters sheet at 375px
-  // (#350). At both widths every label reads on one line and nothing pushes
-  // the page wider than the viewport.
+  // The five switches (three shared with /projects, two of this page's
+  // own) live in the filters aside at the desktop width the suite runs at
+  // (1280, which is xl) and in the filters sheet at 375px (#350). At both
+  // widths every label reads on one line and nothing pushes the page wider
+  // than the viewport.
   const switches = [
     "Accepting applicants",
     "Student proposed",
-    "Seeking a mentor",
-    "Run without a mentor",
     "Requiring an NDA or IP agreement",
+    "Without a mentor",
     "Show soft-deleted",
   ];
   await page.goto("/admin/projects");

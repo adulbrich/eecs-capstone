@@ -137,7 +137,6 @@ beforeEach(() => {
   getProjectMentorship.mockResolvedValue({
     mentorEmail: "",
     mentorName: null,
-    mentorNeed: "unspecified",
   });
   getProposerForEdit.mockResolvedValue({
     accountLinked: true,
@@ -609,7 +608,6 @@ describe("StaffProjectPanel mentor block", () => {
     getProjectMentorship.mockResolvedValue({
       mentorEmail: "mentor@x.test",
       mentorName: "Dana Lee",
-      mentorNeed: "unspecified",
     });
     renderPanel("submitted");
 
@@ -621,26 +619,17 @@ describe("StaffProjectPanel mentor block", () => {
     expect(await screen.findByText("Dana Lee")).toBeTruthy();
     expect(screen.getAllByText("Account linked")).toHaveLength(2);
     expect(screen.getByText("mentor@x.test")).toBeTruthy();
-    expect(
-      screen
-        .getByRole("radio", { name: "Not decided" })
-        .getAttribute("aria-checked")
-    ).toBe("true");
-    expect(
-      screen
-        .getByRole("radio", { name: "Seeking a mentor" })
-        .getAttribute("aria-checked")
-    ).toBe("false");
+    // The address is the whole record since #402: no radio group and no
+    // preview of a public badge, since nothing about the mentor is public.
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+    expect(screen.queryByText("Public listing shows:")).toBeNull();
     // Student proposed lives in the Proposer section now (#336), not here.
-    expect(screen.getByText("Public listing shows:")).toBeTruthy();
-    expect(screen.getByText("nothing about mentorship")).toBeTruthy();
   });
 
   it("says an address has no account yet, with the proposer's wording", async () => {
     getProjectMentorship.mockResolvedValue({
       mentorEmail: "mentor@x.test",
       mentorName: null,
-      mentorNeed: "unspecified",
     });
     renderPanel("submitted");
     expect(await screen.findByText("No account yet")).toBeTruthy();
@@ -651,97 +640,12 @@ describe("StaffProjectPanel mentor block", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("previews the badge from the draft, before anything is saved", async () => {
-    getProjectMentorship.mockResolvedValue({
-      mentorEmail: "",
-      mentorName: null,
-      mentorNeed: "unspecified",
-    });
-    renderPanel("submitted");
-    expect(await screen.findByText("Mentor:", { exact: false })).toBeTruthy();
-    expect(screen.getByText("nothing about mentorship")).toBeTruthy();
-    expect(screen.queryByText("Seeking mentor")).toBeNull();
-
-    // Picking a state flips the preview to the rendered badge at once.
-    fireEvent.click(screen.getByRole("radio", { name: "Seeking a mentor" }));
-    expect(screen.getByText("Seeking mentor")).toBeTruthy();
-    expect(screen.queryByText("nothing about mentorship")).toBeNull();
-    expect(updateProjectMentorship).not.toHaveBeenCalled();
-
-    // Typing an address takes the badge away again and explains why.
-    fireEvent.change(screen.getByLabelText("Mentor email"), {
-      target: { value: "mentor@x.test" },
-    });
-    expect(screen.queryByText("Seeking mentor")).toBeNull();
-    expect(screen.getByText("nothing about mentorship")).toBeTruthy();
-    expect(
-      screen.getByText(/shows no badge while an address is on file/)
-    ).toBeTruthy();
-  });
-
-  it("warns from the saved record too when the flag is on but an address hides the badge", async () => {
-    getProjectMentorship.mockResolvedValue({
-      mentorEmail: "mentor@x.test",
-      mentorName: null,
-      mentorNeed: "seeking",
-    });
-    renderPanel("submitted");
-    expect(
-      await screen.findByText(/shows no badge while an address is on file/)
-    ).toBeTruthy();
-    expect(screen.getByText("nothing about mentorship")).toBeTruthy();
-  });
-
-  it("previews No mentor needed from the draft, and names the refusal beside an address", async () => {
-    getProjectMentorship.mockResolvedValue({
-      mentorEmail: "",
-      mentorName: null,
-      mentorNeed: "unspecified",
-    });
-    renderPanel("submitted");
-    await screen.findByText("nothing about mentorship");
-    fireEvent.click(screen.getByRole("radio", { name: "No mentor needed" }));
-    // The badge, not a description of it: the same component the card
-    // renders (#373).
-    expect(
-      screen.getByText("No mentor needed", { selector: "span" })
-    ).toBeTruthy();
-    expect(screen.queryByText("nothing about mentorship")).toBeNull();
-    // An address beside it is what the server refuses; the preview says so
-    // before Save is pressed, in the server's words.
-    fireEvent.change(screen.getByLabelText("Mentor email"), {
-      target: { value: "mentor@x.test" },
-    });
-    expect(
-      screen.getByText("Remove the mentor before marking No mentor needed.")
-    ).toBeTruthy();
-  });
-
-  it("names the other refusal when the saved state is already none and an address is typed", async () => {
-    getProjectMentorship.mockResolvedValue({
-      mentorEmail: "",
-      mentorName: null,
-      mentorNeed: "none",
-    });
-    renderPanel("submitted");
-    await screen.findByText("No mentor needed", { selector: "span" });
-    // The group is named by the section title, through aria-label (#373).
-    expect(screen.getByRole("radiogroup", { name: "Mentor" })).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Mentor email"), {
-      target: { value: "mentor@x.test" },
-    });
-    expect(
-      screen.getByText("Clear No mentor needed before recording a mentor.")
-    ).toBeTruthy();
-  });
-
-  it("saves both fields through the server function and reloads the record", async () => {
+  it("saves the address through the server function and reloads the record", async () => {
     renderPanel("submitted");
     const input = (await screen.findByLabelText(
       "Mentor email"
     )) as HTMLInputElement;
     fireEvent.change(input, { target: { value: " other@x.test " } });
-    fireEvent.click(screen.getByRole("radio", { name: "Seeking a mentor" }));
     fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
 
     // A new address is announced before it is saved, and the mentor has no
@@ -763,7 +667,6 @@ describe("StaffProjectPanel mentor block", () => {
         data: {
           id: PROJECT_ID,
           mentorEmail: "other@x.test",
-          mentorNeed: "seeking",
           sendEmail: true,
         },
       })
@@ -773,27 +676,29 @@ describe("StaffProjectPanel mentor block", () => {
     await waitFor(() => expect(getProjectMentorship).toHaveBeenCalledTimes(2));
   });
 
-  it("saves the state alone with no confirm, and sends sendEmail: false when the box is unchecked", async () => {
+  it("saves a case-only retype with no confirm, and sends sendEmail: false when the box is unchecked", async () => {
     getProjectMentorship.mockResolvedValue({
       mentorEmail: "kept@x.test",
       mentorName: null,
-      mentorNeed: "unspecified",
     });
     renderPanel("submitted");
     await screen.findByDisplayValue("kept@x.test");
     // Once under the mentor field, once under the proposer picker.
-    expect(screen.getAllByText("Saving a new address emails it.")).toHaveLength(
-      2
-    );
-    fireEvent.click(screen.getByRole("radio", { name: "Seeking a mentor" }));
+    expect(
+      screen.getAllByText("Saving a new address emails it.", { exact: false })
+    ).toHaveLength(2);
+    // The same address in another case is not a new one, compared the way
+    // the server compares (#385), so no dialog announces an email.
+    fireEvent.change(screen.getByLabelText("Mentor email"), {
+      target: { value: "Kept@x.test" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     await waitFor(() =>
       expect(updateProjectMentorship).toHaveBeenCalledWith({
         data: {
           id: PROJECT_ID,
-          mentorEmail: "kept@x.test",
-          mentorNeed: "seeking",
+          mentorEmail: "Kept@x.test",
           sendEmail: true,
         },
       })
@@ -812,7 +717,6 @@ describe("StaffProjectPanel mentor block", () => {
       expect(updateProjectMentorship.mock.calls[1]?.[0].data).toEqual({
         id: PROJECT_ID,
         mentorEmail: "next@x.test",
-        mentorNeed: "unspecified",
         sendEmail: false,
       })
     );
@@ -900,7 +804,6 @@ describe("StaffProjectPanel mentor save gate", () => {
     let resolveLoad: (value: {
       mentorEmail: string;
       mentorName: string | null;
-      mentorNeed: "unspecified" | "seeking" | "none";
     }) => void = () => {
       // replaced below
     };
@@ -919,7 +822,6 @@ describe("StaffProjectPanel mentor save gate", () => {
     resolveLoad({
       mentorEmail: "mentor@x.test",
       mentorName: null,
-      mentorNeed: "unspecified",
     });
     await waitFor(() => expect(save.hasAttribute("disabled")).toBe(false));
   });
@@ -1027,7 +929,6 @@ describe("StaffProjectPanel mentor across a project change", () => {
     getProjectMentorship.mockResolvedValueOnce({
       mentorEmail: "first@x.test",
       mentorName: null,
-      mentorNeed: "unspecified",
     });
     const view = renderPanel("submitted");
     expect(

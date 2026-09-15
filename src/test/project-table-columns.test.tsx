@@ -60,10 +60,8 @@ const ROWS: ProjectListRow[] = [
     problemStatement: null,
     programCourseId: "CS 461",
     programCourseName: "Capstone",
-    noMentorNeeded: false,
     requiresNdaIp: true,
     acceptingApplicants: true,
-    seekingMentor: false,
     status: "published",
     studentProposed: true,
     teamsSupported: 3,
@@ -85,10 +83,8 @@ const ROWS: ProjectListRow[] = [
     problemStatement: null,
     programCourseId: null,
     programCourseName: null,
-    noMentorNeeded: false,
     requiresNdaIp: false,
     acceptingApplicants: false,
-    seekingMentor: false,
     status: "published",
     studentProposed: false,
     teamsSupported: 1,
@@ -170,7 +166,7 @@ describe("the public project table", () => {
     renderTable(DEFAULT_HIDDEN);
     const row = rowFor("Rover Telemetry");
     expect(row.queryByText("Student proposed")).toBeNull();
-    expect(row.queryByText("Seeking mentor")).toBeNull();
+    expect(row.queryByText(/mentor/i)).toBeNull();
     expect(row.queryByText(/@/)).toBeNull();
   });
 

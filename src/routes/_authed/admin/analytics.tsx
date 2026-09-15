@@ -342,10 +342,10 @@ function AnalyticsPage() {
           value={h.submittedAwaiting}
         />
         <Figure
-          hint="Flagged by staff, no mentor address on file"
-          label="Seeking a mentor"
+          hint="Every live status, no mentor address on file"
+          label="Student proposed, no mentor"
           scope="program"
-          value={h.seekingMentor}
+          value={h.studentProposedWithoutMentor}
         />
         <Figure
           hint={`${h.publishedWithoutMentor} without`}

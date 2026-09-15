@@ -33,15 +33,13 @@ import {
   projectDetailView,
 } from "#/lib/project-visibility";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
-import type { MentorNeed, ProjectStatus } from "#/lib/vocabularies";
+import type { ProjectStatus } from "#/lib/vocabularies";
 import type { AdminProjectsFilter } from "../projects-queries";
 import {
   adminProjectSummarySelect,
   mentorNameSql,
-  noMentorNeededSql,
   projectCategoriesText,
   projectSummarySelect,
-  seekingMentorSql,
 } from "./project-summary";
 
 type JsonValue =
@@ -172,7 +170,7 @@ function buildAdminProjectScope(
   if (withDateRange && end) {
     scope.push(lt(column, end));
   }
-  // The same five conditions the public listing applies under the same
+  // The same three conditions the public listing applies under the same
   // param names (#340), so a link moved between the two pages narrows the
   // same way.
   if (data.acceptingOnly) {
@@ -181,16 +179,13 @@ function buildAdminProjectScope(
   if (data.studentProposedOnly) {
     scope.push(eq(projects.studentProposed, true));
   }
-  if (data.seekingMentorOnly) {
-    // The derived value, not the raw flag: a project with a mentor lined up
-    // shows no badge and must not match the filter either.
-    scope.push(seekingMentorSql);
-  }
-  if (data.noMentorNeededOnly) {
-    scope.push(noMentorNeededSql);
-  }
   if (data.requiresNdaOnly) {
     scope.push(eq(projects.requiresNdaIp, true));
+  }
+  // Staff-only: no address recorded (#402). With "Student proposed" on,
+  // this is the to-do the mentors page is matched against.
+  if (data.withoutMentorOnly) {
+    scope.push(isNull(projects.mentorEmail));
   }
   return scope;
 }
@@ -340,21 +335,10 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
   // by the view, because the view is pure and this is the only place a
   // project row is read for the detail page. The mentor's name is not read:
   // nothing about the mentor is public (#336).
-  const [row] = await db
-    .select({
-      project: projects,
-      seekingMentor: seekingMentorSql,
-      noMentorNeeded: noMentorNeededSql,
-    })
+  const [project] = await db
+    .select()
     .from(projects)
     .where(eq(projects.id, data.id));
-  const project = row
-    ? {
-        ...row.project,
-        seekingMentor: row.seekingMentor,
-        noMentorNeeded: row.noMentorNeeded,
-      }
-    : undefined;
   if (!project) {
     return {
       project: null,
@@ -478,8 +462,6 @@ export interface ProjectMentorship {
   mentorEmail: string;
   /** The account at that address, if one exists. Null is "no account yet". */
   mentorName: string | null;
-  /** The stored state, not the derived badges: `seeking` even while an address is on file. */
-  mentorNeed: MentorNeed;
 }
 
 /**
@@ -496,7 +478,6 @@ export async function getProjectMentorshipAs(
     .select({
       mentorEmail: projects.mentorEmail,
       mentorName: mentorNameSql,
-      mentorNeed: projects.mentorNeed,
     })
     .from(projects)
     .where(eq(projects.id, data.projectId));
@@ -506,7 +487,6 @@ export async function getProjectMentorshipAs(
   return {
     mentorEmail: row.mentorEmail ?? "",
     mentorName: row.mentorName,
-    mentorNeed: row.mentorNeed,
   };
 }
 

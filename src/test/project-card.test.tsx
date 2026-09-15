@@ -44,9 +44,7 @@ const base: ProjectSummary = {
   description: "A long description that should be clamped to three lines.",
   status: "published",
   acceptingApplicants: true,
-  noMentorNeeded: false,
   requiresNdaIp: false,
-  seekingMentor: false,
   studentProposed: false,
   imageUrl: null,
   contactName: "Jane Doe",
@@ -130,23 +128,12 @@ describe("ProjectCard", () => {
 });
 
 describe("ProjectCard badges", () => {
-  it("shows the badges when the summary carries them, and never an address", () => {
+  it("shows the student marker when the summary carries it, and never an address", () => {
     const { getByText, queryByText } = render(
-      <ProjectCard
-        project={{ ...base, seekingMentor: true, studentProposed: true }}
-      />
+      <ProjectCard project={{ ...base, studentProposed: true }} />
     );
     expect(getByText("Student proposed")).toBeTruthy();
-    expect(getByText("Seeking mentor")).toBeTruthy();
     expect(queryByText(/@/)).toBeNull();
-  });
-
-  it("shows No mentor needed when the summary carries the flag", () => {
-    const { getByText, queryByText } = render(
-      <ProjectCard project={{ ...base, noMentorNeeded: true }} />
-    );
-    expect(getByText("No mentor needed")).toBeTruthy();
-    expect(queryByText("Seeking mentor")).toBeNull();
   });
 
   it("shows the agreement badge when the summary carries the flag", () => {
@@ -162,7 +149,6 @@ describe("ProjectCard badges", () => {
     // name, and the card has no "Mentor:" line to put one in.
     const { queryByText } = render(<ProjectCard project={base} />);
     expect(queryByText("Student proposed")).toBeNull();
-    expect(queryByText("Seeking mentor")).toBeNull();
-    expect(queryByText(/^Mentor:/)).toBeNull();
+    expect(queryByText(/mentor/i)).toBeNull();
   });
 });

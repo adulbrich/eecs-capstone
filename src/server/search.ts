@@ -10,12 +10,9 @@ const searchInputSchema = z.object({
   // Off by default: hiding closed projects would make them vanish from a
   // catalog that is meant to be browsable. See #72.
   acceptingOnly: z.boolean().default(false),
-  // The two public marks as filters (#336). Seeking is the derived value,
-  // the same rule as the badge, so the filter and the badge always agree.
+  // The public mark as a filter (#336). The two mentor switches left with
+  // the mentor state in #402; a URL still carrying them is stripped here.
   studentProposedOnly: z.boolean().default(false),
-  seekingMentorOnly: z.boolean().default(false),
-  // The other mentorship badge as a filter (#373).
-  noMentorNeededOnly: z.boolean().default(false),
   // The agreement flag as a filter, the same fact as the badge (#372).
   requiresNdaOnly: z.boolean().default(false),
   page: z.number().int().min(1).default(1),

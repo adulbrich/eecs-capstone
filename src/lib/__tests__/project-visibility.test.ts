@@ -157,14 +157,12 @@ const DETAIL_KEYS = [
   "isSponsored",
   "licenseRestrictions",
   "minQualifications",
-  "noMentorNeeded",
   "notes",
   "objectives",
   "prefQualifications",
   "problemStatement",
   "programId",
   "requiresNdaIp",
-  "seekingMentor",
   "status",
   "studentProposed",
   "teamsSupported",
@@ -189,8 +187,6 @@ function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
     teamsSupported: 2,
     programId: "prog-1",
     mentorEmail: "mentor@x.test",
-    noMentorNeeded: false,
-    seekingMentor: false,
     studentProposed: false,
     acceptingApplicants: true,
     ...overrides,
@@ -225,21 +221,20 @@ describe("projectDetailView", () => {
     );
   });
 
-  it("carries the two marks for every viewer, and nothing about the mentor", () => {
-    const seeking = row({
-      mentorEmail: null,
-      seekingMentor: true,
+  it("carries the student mark for every viewer, and nothing about the mentor", () => {
+    const mentored = row({
+      mentorEmail: "mentor@example.edu",
       studentProposed: true,
     });
     for (const viewer of [anon, other, owner, admin]) {
-      const view = projectDetailView(seeking, viewer);
+      const view = projectDetailView(mentored, viewer);
       expect(view.studentProposed).toBe(true);
-      expect(view.seekingMentor).toBe(true);
-      expect(view.noMentorNeeded).toBe(false);
-      // Neither the address nor the name (#336): staff read both through
-      // getProjectMentorship, and the admin projection adds the name back.
-      expect("mentorEmail" in view).toBe(false);
-      expect("mentorName" in view).toBe(false);
+      // Neither the address nor the name (#336), and since #402 no derived
+      // flag either: staff read both through getProjectMentorship, and the
+      // admin projection adds the name back.
+      for (const key of Object.keys(view)) {
+        expect(key.toLowerCase()).not.toContain("mentor");
+      }
     }
   });
 

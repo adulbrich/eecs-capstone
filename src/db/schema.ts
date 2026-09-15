@@ -21,7 +21,6 @@ import {
   INVENTORY_CUSTOM_LINE_STATUSES,
   INVENTORY_ITEM_STATUSES,
   INVENTORY_REQUEST_ITEM_STATUSES,
-  MENTOR_NEEDS,
   NOTIFICATION_TYPES,
   PROJECT_STATUSES,
 } from "#/lib/vocabularies";
@@ -47,8 +46,6 @@ export const notificationTypeEnum = pgEnum(
   "notification_type",
   NOTIFICATION_TYPES
 );
-
-export const mentorNeedEnum = pgEnum("mentor_need", MENTOR_NEEDS);
 
 export const categoryDomainEnum = pgEnum("category_domain", [
   "project",
@@ -175,20 +172,16 @@ export const projects = pgTable(
     // Public. Marks a project as a student's own proposal. Written by staff
     // only, during review; a student has no reason to self-classify. Not
     // derived from the proposer's role or affiliation, both of which drift.
-    // Says nothing about mentorship since #304: a student project may have a
-    // mentor, want one, or need none (the instructor mentors). See #75.
+    // Says nothing about mentorship since #304: a student project may or may
+    // not have a mentor recorded. See #75.
     studentProposed: boolean("student_proposed").notNull().default(false),
-    // Staff-set: whether the project wants a mentor (#373). Public only
-    // through the derived `seekingMentor` (this = 'seeking' AND mentor_email
-    // IS NULL) and `noMentorNeeded` (this = 'none'), so a stale value never
-    // shows a "Seeking mentor" badge beside a recorded address. Written by
-    // updateProjectMentorshipAs only, which also refuses 'none' beside an
-    // address, like the two columns around it. #304, #373.
-    mentorNeed: mentorNeedEnum("mentor_need").notNull().default("unspecified"),
-    // Staff-only, never in a public payload. Resolved to a name at read time
-    // by a case-insensitive match on user.email. No FK and no mentor_id:
+    // Mentorship is this address and nothing else (#402): no state beside
+    // it, so a project with no mentor is one with a null here. Staff-only,
+    // never in a public payload. Resolved to a name at read time by a
+    // case-insensitive match on user.email. No FK and no mentor_id:
     // mentorship grants no permission, so an id would be a denormalization
-    // with nothing to trust it for. #84 nulls it when that account is deleted.
+    // with nothing to trust it for. Written by updateProjectMentorshipAs
+    // only; #84 nulls it when that account is deleted.
     mentorEmail: text("mentor_email"),
     // Public. A boolean rather than a status: "published and closed" is a
     // valid state, and a new enum value would force every transition guard

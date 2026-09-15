@@ -1,5 +1,7 @@
 # Mentorship is a three-state column, and "no mentor needed" excludes a recorded address
 
+Superseded by [ADR-0023](./0023-mentorship-is-the-mentor-address.md) on 2026-09-14: mentorship is the address alone, and the state is gone.
+
 A project's mentorship is `mentor_need`, a Postgres enum of `unspecified`, `seeking` and `none`, beside `mentor_email`. It replaced the boolean `seeking_mentor` because an off flag with no address could not say whether the project needs no mentor or has one lined up that nobody recorded, and students read those two as the same silence. The public sees two flags derived in SQL, `seekingMentor` (`seeking` with no address) and `noMentorNeeded` (`none`), never the state. The writer refuses `none` beside an address in either order, before the diff, so the two can never disagree and `noMentorNeeded` needs no address guard; the refusal message names the half the reader has to change, which depends on the saved state, so one pure function in `src/lib/mentor-need.ts` serves both the server that throws it and the Mentor section that shows it under the draft. The alternative, a second boolean `no_mentor_needed`, was not taken: two booleans have a fourth combination the app would have to forbid on every write. Nor was deriving the state from `studentProposed`: a student project may want a mentor and a partner project may need none. Decided 2026-09-14 in #373.
 
 ## Consequences

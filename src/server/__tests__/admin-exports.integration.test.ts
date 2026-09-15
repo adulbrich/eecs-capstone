@@ -58,12 +58,11 @@ const ALL_PROJECTS = {
   program: null,
   proposer: null,
   q: "",
-  seekingMentorOnly: false,
-  noMentorNeededOnly: false,
   requiresNdaOnly: false,
   statuses: [...PROJECT_STATUSES],
   studentProposedOnly: false,
   to: null,
+  withoutMentorOnly: false,
 };
 
 describe("admin project export", () => {

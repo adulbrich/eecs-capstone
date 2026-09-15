@@ -382,12 +382,11 @@ describe("deleteAccountAs", () => {
       program: null,
       proposer: null,
       q: "",
-      seekingMentorOnly: false,
-      noMentorNeededOnly: false,
       requiresNdaOnly: false,
       statuses: [...PROJECT_STATUSES],
       studentProposedOnly: false,
       to: null,
+      withoutMentorOnly: false,
     });
     const mine = listed.rows.find((r) => r.id === id);
     expect(mine?.proposerName).toBe("Deleted user");

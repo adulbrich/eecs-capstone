@@ -103,17 +103,15 @@ Each project carries:
 - [x] Teams supported: how many student teams the project can take on (1-5,
   default 1), set and edited by staff on the project form.
 - [x] Student-proposed marker and mentor: staff mark a project as student-proposed
-  from the Proposer section of the staff panel, saved with the link, and set the
-  mentor state (not decided, seeking a mentor, no mentor needed) or record a
-  mentor's email from the Mentor section, which previews what the public listing
-  will show for the draft as typed. The marks are independent: a student project
-  may have a mentor, want one, or need none. The public sees a "Student proposed"
-  badge, a "Seeking mentor" badge while the state is seeking and no address is on
-  file, and a "No mentor needed" badge for that state, on the card and the project
-  page only, and can filter the listing on each. "No mentor needed" and a recorded
-  address cannot coexist; the section refuses either order. Nothing about the
-  mentor is public: the address, the raw state and the resolved name stay on staff
-  reads, the staff list and the CSV export. (#75, #304, #336, #373)
+  from the Proposer section of the staff panel, saved with the link, and record a
+  mentor's email from the Mentor section. Mentorship is that address and nothing
+  else: no state beside it, so a project either has a mentor on file or it does
+  not, and an instructor who runs a team without an outside mentor records their
+  own. The public sees a "Student proposed" badge on the card and the project page
+  and can filter the listing on it; nothing about the mentor is public. The address
+  and the resolved name stay on staff reads, the staff list and the CSV export, and
+  `/admin/projects` filters "Without a mentor", which beside "Student proposed" is
+  the staff to-do. (#75, #304, #336, #402)
 - [x] `/my/bookmarks` is a small decision table: title with thumbnail, program,
   status, accepting applicants, teams supported, NDA/IP, saved-on date, and a
   remove button; the two marks are read on the card or the page (#336).
@@ -188,9 +186,10 @@ Each project carries:
 - [x] Staff project list (`/admin/projects`) with a status set (a multi-select
   that opens on every status but archived and never empties), a date range on
   Created, Published or Updated read as Pacific calendar days, program and
-  proposer filters, a show-soft-deleted switch, and the public listing's three
-  switches under the same param names (accepting applicants, student-proposed,
-  seeking a mentor as the derived badge value), all held in URL search params;
+  proposer filters, a show-soft-deleted switch, the public listing's three
+  narrowing switches under the same param names (accepting applicants,
+  student-proposed, requiring an NDA or IP agreement) and its own "Without a
+  mentor" switch, all held in URL search params;
   the CSV export and the proposer dropdown follow the same filter (#335, #340).
   The range only helps
   on legacy rows if the import (#216) writes real dates: `publishedAt` as the
@@ -543,7 +542,7 @@ catalogue that decided the matrix below; #288 shipped it.
 - [x] Staff dashboard at `/admin/analytics` over the app's own data (#34):
   headline stocks as of now (published team slots against each program's
   `expected_teams`, submitted projects and the age of the oldest wait,
-  projects seeking a mentor (flagged by staff, no address on file), mentor
+  student-proposed projects with no mentor address on file, mentor
   capacity offered and unassigned, overdue items and pending request lines
   with the age of the oldest, published projects with no bookmark since
   publication), flows over a date range with

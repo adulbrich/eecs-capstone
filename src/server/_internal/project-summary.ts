@@ -48,25 +48,6 @@ export const mentorNameSql = sql<string | null>`(
 )`;
 
 /**
- * The public "Seeking mentor": staff said the project is looking for one and
- * no address is on file yet. The address guard is what keeps a stale flag
- * from showing a badge beside a recorded mentor, and it lives here rather
- * than in the client because the public payload does not carry `mentorEmail`:
- * without this a client could not tell "no mentor" from "a mentor is lined up
- * who has not signed up yet", and the second must show nothing rather than
- * "Seeking mentor". `studentProposed` is no input since #304: a student
- * project may need no mentor, and a partner project may want one.
- */
-export const seekingMentorSql = sql<boolean>`(${projects.mentorNeed} = 'seeking' AND ${projects.mentorEmail} IS NULL)`;
-
-/**
- * The other public mentorship badge (#373): staff said the project runs
- * without a mentor. No address guard, because the writer refuses the state
- * beside an address, so the two cannot disagree.
- */
-export const noMentorNeededSql = sql<boolean>`(${projects.mentorNeed} = 'none')`;
-
-/**
  * Column projection shared by every query that feeds the project card and
  * the public table: the public listing, "my projects" and "my bookmarks".
  * Join `programs` via leftJoin before using it so the program columns
@@ -102,13 +83,11 @@ export const projectSummarySelect = {
   programCourseId: programs.courseId,
   programCourseName: programs.courseName,
   categories: projectCategoriesList,
-  // Public by design, both. Nothing about the mentor is: not the address,
-  // and since #336 not the name either, which `adminProjectSummarySelect`
-  // adds back on the staff path. See the note on proposerEmail there for
-  // the same distinction.
+  // Public by design. Nothing about the mentor is: not the address, since
+  // #336 not the name either, which `adminProjectSummarySelect` adds back on
+  // the staff path, and since #402 no derived flag. See the note on
+  // proposerEmail there for the same distinction.
   studentProposed: projects.studentProposed,
-  seekingMentor: seekingMentorSql,
-  noMentorNeeded: noMentorNeededSql,
 };
 
 /**
@@ -123,8 +102,6 @@ export const adminProjectSummarySelect = {
   // Staff only: the resolved mentor name, for the staff list and the CSV
   // export. It left the public projection in #336.
   mentorName: mentorNameSql,
-  // Staff only, the raw state behind the two derived badges (#373).
-  mentorNeed: projects.mentorNeed,
   createdAt: projects.createdAt,
   deletedAt: projects.deletedAt,
   programId: projects.programId,
