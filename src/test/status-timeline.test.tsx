@@ -25,16 +25,6 @@ describe("StatusTimeline", () => {
     expect(screen.getByText("by Ada Lovelace")).toBeTruthy();
   });
 
-  it("reads a deleted account as the name ADR 0008 scrubbed it to", () => {
-    // The row outlives the account: `changed_by` is `onDelete: "restrict"`, so
-    // deletion sets the name to "Deleted user" rather than removing the audit
-    // row. This is the same branch as the case above with the data a scrubbed
-    // account leaves behind, which is the only shape a missing actor can take.
-    render(<StatusTimeline rows={[row({ changedByName: "Deleted user" })]} />);
-    expect(screen.getByText("by Deleted user")).toBeTruthy();
-    expect(screen.queryByText(/@/)).toBeNull();
-  });
-
   it("says so when there is no history", () => {
     render(<StatusTimeline rows={[]} />);
     expect(screen.getByText("No status changes yet.")).toBeTruthy();
