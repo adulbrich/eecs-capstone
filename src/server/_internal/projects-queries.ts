@@ -373,11 +373,25 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
           id: projectStatusHistory.id,
           oldStatus: projectStatusHistory.oldStatus,
           newStatus: projectStatusHistory.newStatus,
-          changedBy: projectStatusHistory.changedBy,
+          // The name, not the id, and not the address beside it.
+          //
+          // The join is total, so it can never drop an audit row: `changed_by`
+          // is `notNull` with `onDelete: "restrict"`, and ADR 0008 scrubs a
+          // deleted account rather than removing the row the trail is anchored
+          // to. `user.name` is `notNull` too, which is what lets the caller
+          // take a plain `string`.
+          //
+          // No address: this history reaches the proposer, who is not staff
+          // (`canSeeStatusHistory`), and nothing renders it. That is the case
+          // `projectDetailView` leaves a field out for rather than nulling it.
+          // The inventory item history does carry one, but `getItemHistoryAs`
+          // is staff only, so it is not a precedent for this payload.
+          changedByName: user.name,
           comment: projectStatusHistory.comment,
           createdAt: projectStatusHistory.createdAt,
         })
         .from(projectStatusHistory)
+        .innerJoin(user, eq(projectStatusHistory.changedBy, user.id))
         .where(eq(projectStatusHistory.projectId, data.id))
         .orderBy(asc(projectStatusHistory.createdAt))
     : [];

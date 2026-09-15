@@ -9,6 +9,7 @@ import {
   user,
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
+import { deleteAccountAs } from "#/server/_internal/account";
 import {
   createProjectAs,
   forceTransitionAs,
@@ -482,6 +483,64 @@ describe("status timeline visibility and changes-requested feedback", () => {
     expect(otherView.history).toHaveLength(0);
     expect(anonView.project).not.toBeNull();
     expect(anonView.history).toHaveLength(0);
+  });
+
+  it("names the acting staff member in the history the proposer receives", async () => {
+    const admin = await makeUser(`ta-a-${Date.now()}@x.com`, "admin");
+    const owner = await makeUser(`ta-o-${Date.now()}@x.com`, "user");
+    // makeUser sets the name to the address, which would let the email
+    // fallback pass this test. A distinct name is what makes it about the
+    // join.
+    await db
+      .update(user)
+      .set({ name: "Grace Hopper" })
+      .where(eq(user.id, admin.id));
+    const { id } = await createProjectAs(owner, baseProject());
+    await performTransitionAs(owner, id, "submitted");
+    await forceTransitionAs(admin, id, "changes_requested", "Tighten it", {
+      sendEmail: false,
+    });
+
+    const ownerView = await getProjectAs(
+      { id: owner.id, role: owner.role },
+      { id }
+    );
+    const decision = ownerView.history.find(
+      (h) => h.newStatus === "changes_requested"
+    );
+    expect(decision?.changedByName).toBe("Grace Hopper");
+    // The address never leaves the server: the proposer is not staff, and the
+    // name is what the timeline renders.
+    expect(decision).not.toHaveProperty("changedByEmail");
+    expect(decision).not.toHaveProperty("changedBy");
+    // The proposer's own submission is named too, so the timeline has no
+    // anonymous rows in it.
+    expect(ownerView.history.every((h) => h.changedByName.length > 0)).toBe(
+      true
+    );
+  });
+
+  it("reads a deleted actor as Deleted user, never as an address", async () => {
+    // End to end rather than on a literal: ADR 0008 never removes the row an
+    // audit record is anchored to, it scrubs the name to "Deleted user" and
+    // the address to deleted-<id>@invalid. That is what makes the inner join
+    // total, so it is the thing worth pinning through `getProjectAs`.
+    const admin = await makeUser(`td-a-${Date.now()}@x.com`, "admin");
+    const owner = await makeUser(`td-o-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, baseProject());
+    await performTransitionAs(owner, id, "submitted");
+    await forceTransitionAs(admin, id, "published", undefined, {
+      sendEmail: false,
+    });
+
+    await deleteAccountAs(owner, { confirmEmail: owner.email });
+
+    const { history } = await getProjectAs(admin, { id });
+    const submitted = history.find((h) => h.newStatus === "submitted");
+    expect(submitted?.changedByName).toBe("Deleted user");
+    // The scrubbed address is deleted-<id>@invalid, and nothing on this
+    // surface can print it: the projection does not carry it.
+    expect(JSON.stringify(history)).not.toContain("@invalid");
   });
 
   it("requires a comment when requesting changes", async () => {

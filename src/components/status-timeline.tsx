@@ -2,7 +2,8 @@ import { LocalTime } from "./local-time";
 import { StatusBadge } from "./status-badge";
 
 interface HistoryRow {
-  changedBy: string;
+  /** Always a string; `getProjectAs` says why `user.name` cannot be null here. */
+  changedByName: string;
   comment: string | null;
   createdAt: Date | string;
   id: string;
@@ -28,6 +29,11 @@ export function StatusTimeline({ rows }: { rows: HistoryRow[] }) {
             )}
             <span className="text-muted-foreground">→</span>
             <StatusBadge status={r.newStatus} />
+            {/* Beside the timestamp, in the same wrapping row, matching the
+                inventory item history. */}
+            <span className="text-muted-foreground text-xs">
+              by {r.changedByName}
+            </span>
             <span className="text-muted-foreground text-xs">
               <LocalTime value={r.createdAt} />
             </span>
