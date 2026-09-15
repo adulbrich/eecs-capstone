@@ -19,7 +19,7 @@ import {
   userInterests,
 } from "../src/db/schema";
 import { auth } from "../src/lib/auth";
-import type { MentorNeed, UserRole } from "../src/lib/vocabularies";
+import type { UserRole } from "../src/lib/vocabularies";
 import {
   addToCartAs,
   submitCartAs,
@@ -346,7 +346,6 @@ async function main() {
       | "published"
       | "archived";
     publishedAt: Date | null;
-    mentorNeed?: MentorNeed;
     /** Lowercase, as the column is stored (ADR-0015); no writer normalizes it here. */
     mentorEmail?: string;
     categories: string[];
@@ -411,7 +410,6 @@ async function main() {
       proposerId: u.sponsorNorthstar.id,
       programId: p461.id,
       status: "published",
-      mentorNeed: "seeking",
       publishedAt: daysAgo(38),
       categories: [
         "Web Development",
@@ -561,8 +559,6 @@ async function main() {
       proposerId: u.facultyAlvarez.id,
       programId: p461.id,
       status: "published",
-      // Runs without a mentor: the instructor mentors it (#373).
-      mentorNeed: "none",
       publishedAt: daysAgo(12),
       categories: ["Web Development", "React"],
     },

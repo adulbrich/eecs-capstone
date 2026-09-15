@@ -4,7 +4,6 @@ import { db } from "#/db";
 import { programs, projects, user } from "#/db/schema";
 import { DEFAULT_ADMIN_STATUSES } from "#/lib/admin-project-filters";
 import { auth } from "#/lib/auth";
-import type { MentorNeed } from "#/lib/vocabularies";
 import { PROJECT_STATUSES } from "#/lib/vocabularies";
 import {
   createProjectAs,
@@ -75,10 +74,9 @@ function filter(
     program: null,
     proposer: null,
     q: "",
-    seekingMentorOnly: false,
-    noMentorNeededOnly: false,
     requiresNdaOnly: false,
     studentProposedOnly: false,
+    withoutMentorOnly: false,
     ...overrides,
   };
 }
@@ -697,7 +695,6 @@ async function flag(
     acceptingApplicants?: boolean;
     mentorEmail?: string | null;
     requiresNdaIp?: boolean;
-    mentorNeed?: MentorNeed;
     studentProposed?: boolean;
   }
 ) {
@@ -707,36 +704,30 @@ async function flag(
 describe("admin projects flag switches", () => {
   it("each switch alone narrows to the rows carrying its flag, and all off is the whole list", async () => {
     const admin = await makeAdmin(`f-${Date.now()}@x.com`);
-    await createProjectAs(admin, baseProject("Open", null));
+    const open = await createProjectAs(admin, baseProject("Open", null));
+    await flag(open.id, { mentorEmail: "mentor@example.edu" });
     const student = await createProjectAs(admin, baseProject("Student", null));
     await flag(student.id, {
       acceptingApplicants: false,
+      mentorEmail: "mentor@example.edu",
       studentProposed: true,
     });
-    const seeking = await createProjectAs(admin, baseProject("Seeking", null));
-    await flag(seeking.id, {
-      acceptingApplicants: false,
-      mentorNeed: "seeking",
-    });
     const nda = await createProjectAs(admin, baseProject("Agreement", null));
-    await flag(nda.id, { acceptingApplicants: false, requiresNdaIp: true });
+    await flag(nda.id, {
+      acceptingApplicants: false,
+      mentorEmail: "mentor@example.edu",
+      requiresNdaIp: true,
+    });
     const alone = await createProjectAs(admin, baseProject("Alone", null));
-    await flag(alone.id, { acceptingApplicants: false, mentorNeed: "none" });
+    await flag(alone.id, { acceptingApplicants: false });
 
     const all = await listAdminProjectsAs(admin, filter());
     expect(all.rows.map((r) => r.title).sort()).toEqual([
       "Agreement",
       "Alone",
       "Open",
-      "Seeking",
       "Student",
     ]);
-
-    const noMentor = await listAdminProjectsAs(
-      admin,
-      filter({ noMentorNeededOnly: true })
-    );
-    expect(noMentor.rows.map((r) => r.title)).toEqual(["Alone"]);
 
     const agreement = await listAdminProjectsAs(
       admin,
@@ -756,52 +747,12 @@ describe("admin projects flag switches", () => {
     );
     expect(proposed.rows.map((r) => r.title)).toEqual(["Student"]);
 
+    // The admin-only switch (#402): no address on file, nothing else.
     const mentorless = await listAdminProjectsAs(
       admin,
-      filter({ seekingMentorOnly: true })
+      filter({ withoutMentorOnly: true })
     );
-    expect(mentorless.rows.map((r) => r.title)).toEqual(["Seeking"]);
-  });
-
-  it("seeking a mentor means the flag on and no address on file, the public badge's rule", async () => {
-    const admin = await makeAdmin(`f2-${Date.now()}@x.com`);
-    const offNoAddress = await createProjectAs(
-      admin,
-      baseProject("Off, no address", null)
-    );
-    await flag(offNoAddress.id, {
-      mentorEmail: null,
-      mentorNeed: "unspecified",
-    });
-    const offWithAddress = await createProjectAs(
-      admin,
-      baseProject("Off, address", null)
-    );
-    await flag(offWithAddress.id, {
-      mentorEmail: "mentor@example.edu",
-      mentorNeed: "unspecified",
-    });
-    const onNoAddress = await createProjectAs(
-      admin,
-      baseProject("On, no address", null)
-    );
-    await flag(onNoAddress.id, { mentorEmail: null, mentorNeed: "seeking" });
-    // The flag still set with an address on file: the badge is gone, so the
-    // switch must not find it either.
-    const onWithAddress = await createProjectAs(
-      admin,
-      baseProject("On, address", null)
-    );
-    await flag(onWithAddress.id, {
-      mentorEmail: "mentor@example.edu",
-      mentorNeed: "seeking",
-    });
-
-    const { rows } = await listAdminProjectsAs(
-      admin,
-      filter({ seekingMentorOnly: true })
-    );
-    expect(rows.map((r) => r.title)).toEqual(["On, no address"]);
+    expect(mentorless.rows.map((r) => r.title)).toEqual(["Alone"]);
   });
 
   it("composes with each other, the status set and the program", async () => {
@@ -843,20 +794,20 @@ describe("admin projects flag switches", () => {
     expect(rows.map((r) => r.title)).toEqual(["Match"]);
   });
 
-  it("composes the seeking switch with the status set and the program", async () => {
+  it("finds the staff to-do: student proposed and without a mentor, across the status set and the program", async () => {
     const admin = await makeAdmin(`f7-${Date.now()}@x.com`);
     const cs461 = await makeProgram("CS 461");
     const ece441 = await makeProgram("ECE 441");
     const match = await createProjectAs(admin, baseProject("Match", cs461));
-    await flag(match.id, { mentorNeed: "seeking" });
+    await flag(match.id, { studentProposed: true });
     await publish(admin, match.id);
     const draft = await createProjectAs(admin, baseProject("Draft", cs461));
-    await flag(draft.id, { mentorNeed: "seeking" });
+    await flag(draft.id, { studentProposed: true });
     const elsewhere = await createProjectAs(
       admin,
       baseProject("Elsewhere", ece441)
     );
-    await flag(elsewhere.id, { mentorNeed: "seeking" });
+    await flag(elsewhere.id, { studentProposed: true });
     await publish(admin, elsewhere.id);
     const mentored = await createProjectAs(
       admin,
@@ -864,22 +815,39 @@ describe("admin projects flag switches", () => {
     );
     await flag(mentored.id, {
       mentorEmail: "mentor@example.edu",
-      mentorNeed: "seeking",
+      studentProposed: true,
     });
     await publish(admin, mentored.id);
+    const partner = await createProjectAs(admin, baseProject("Partner", cs461));
+    await publish(admin, partner.id);
 
     const { rows } = await listAdminProjectsAs(
       admin,
       filter({
         program: cs461,
-        seekingMentorOnly: true,
         statuses: ["published"],
+        studentProposedOnly: true,
+        withoutMentorOnly: true,
       })
     );
     expect(rows.map((r) => r.title)).toEqual(["Match"]);
+    // Without the mark, the switch alone is every published project in the
+    // program that has nobody yet.
+    const anyKind = await listAdminProjectsAs(
+      admin,
+      filter({
+        program: cs461,
+        statuses: ["published"],
+        withoutMentorOnly: true,
+      })
+    );
+    expect(anyKind.rows.map((r) => r.title).sort()).toEqual([
+      "Match",
+      "Partner",
+    ]);
   });
 
-  it("composes the seeking switch with the proposer and the search text", async () => {
+  it("composes the without-a-mentor switch with the proposer and the search text", async () => {
     const admin = await makeAdmin(`f6-${Date.now()}@x.com`);
     const alice = await makeProposer(`f6-alice-${Date.now()}@x.com`);
     const bob = await makeProposer(`f6-bob-${Date.now()}@x.com`);
@@ -887,31 +855,19 @@ describe("admin projects flag switches", () => {
       alice,
       baseProject("Glacier sensors", null)
     );
-    await flag(match.id, { mentorNeed: "seeking" });
     const mentored = await createProjectAs(
       alice,
       baseProject("Glacier drones", null)
     );
-    await flag(mentored.id, {
-      mentorEmail: "mentor@example.edu",
-      mentorNeed: "seeking",
-    });
-    const otherText = await createProjectAs(
-      alice,
-      baseProject("River sensors", null)
-    );
-    await flag(otherText.id, { mentorNeed: "seeking" });
-    const otherProposer = await createProjectAs(
-      bob,
-      baseProject("Glacier mapping", null)
-    );
-    await flag(otherProposer.id, { mentorNeed: "seeking" });
+    await flag(mentored.id, { mentorEmail: "mentor@example.edu" });
+    await createProjectAs(alice, baseProject("River sensors", null));
+    await createProjectAs(bob, baseProject("Glacier mapping", null));
 
     const { rows } = await listAdminProjectsAs(
       admin,
-      filter({ proposer: alice.id, q: "glacier", seekingMentorOnly: true })
+      filter({ proposer: alice.id, q: "glacier", withoutMentorOnly: true })
     );
-    expect(rows.map((r) => r.title)).toEqual(["Glacier sensors"]);
+    expect(rows.map((r) => r.id)).toEqual([match.id]);
   });
 
   it("narrows the proposer dropdown, the way the status set does", async () => {
@@ -937,28 +893,29 @@ describe("admin projects flag switches", () => {
     expect(accepting.proposers.map((p) => p.id)).toEqual([alice.id]);
   });
 
-  it("is followed by the CSV export", async () => {
+  it("is followed by the CSV export, which carries the Mentor column and no state", async () => {
     const admin = await makeAdmin(`f5-${Date.now()}@x.com`);
     const both = await createProjectAs(admin, baseProject("Both", null));
-    await flag(both.id, { mentorNeed: "seeking" });
     const onlyOpen = await createProjectAs(
       admin,
       baseProject("Only open", null)
     );
-    const onlySeeking = await createProjectAs(
+    await flag(onlyOpen.id, { mentorEmail: "mentor@example.edu" });
+    const onlyMentorless = await createProjectAs(
       admin,
-      baseProject("Only seeking", null)
+      baseProject("Only mentorless", null)
     );
-    await flag(onlySeeking.id, {
-      acceptingApplicants: false,
-      mentorNeed: "seeking",
-    });
-    const switches = filter({ acceptingOnly: true, seekingMentorOnly: true });
+    await flag(onlyMentorless.id, { acceptingApplicants: false });
+    const switches = filter({ acceptingOnly: true, withoutMentorOnly: true });
 
     const table = await listAdminProjectsAs(admin, switches);
     const exported = await exportAdminProjectsAs(admin, switches);
     expect(table.rows.map((r) => r.id)).toEqual([both.id]);
     expect(exported.rows.map((r) => r.id)).toEqual(table.rows.map((r) => r.id));
     expect(exported.rows.map((r) => r.id)).not.toContain(onlyOpen.id);
+    expect("mentorName" in (exported.rows[0] ?? {})).toBe(true);
+    for (const key of ["mentorNeed", "seekingMentor", "noMentorNeeded"]) {
+      expect(key in (exported.rows[0] ?? {})).toBe(false);
+    }
   });
 });

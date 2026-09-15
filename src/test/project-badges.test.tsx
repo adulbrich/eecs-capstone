@@ -6,9 +6,7 @@ import { ProjectBadges } from "#/components/project-badges";
 afterEach(cleanup);
 
 const OFF = {
-  noMentorNeeded: false,
   requiresNdaIp: false,
-  seekingMentor: false,
   studentProposed: false,
 };
 
@@ -18,32 +16,14 @@ describe("ProjectBadges", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("renders the student marker alone when a mentor is on file", () => {
+  it("renders the student marker alone, and nothing about mentorship", () => {
+    // Mentorship is a staff-only address since #402: no state, no badge.
     const { getByText, queryByText } = render(
       <ProjectBadges {...OFF} studentProposed />
     );
     expect(getByText("Student proposed")).toBeTruthy();
-    expect(queryByText("Seeking mentor")).toBeNull();
-    expect(queryByText("No mentor needed")).toBeNull();
+    expect(queryByText(/mentor/i)).toBeNull();
     expect(queryByText("NDA/IP required")).toBeNull();
-  });
-
-  it("renders both mentorship badges when a student project has no mentor", () => {
-    const { getByText } = render(
-      <ProjectBadges {...OFF} seekingMentor studentProposed />
-    );
-    expect(getByText("Student proposed")).toBeTruthy();
-    expect(getByText("Seeking mentor")).toBeTruthy();
-  });
-
-  it("renders No mentor needed alone, in the outline style of the student marker", () => {
-    const { getByText, queryByText } = render(
-      <ProjectBadges {...OFF} noMentorNeeded />
-    );
-    expect(getByText("No mentor needed").getAttribute("data-variant")).toBe(
-      "outline"
-    );
-    expect(queryByText("Seeking mentor")).toBeNull();
   });
 
   it("renders the agreement badge alone, in the outline style of the student marker", () => {
@@ -56,5 +36,14 @@ describe("ProjectBadges", () => {
         .getByText("Student proposed")
         .getAttribute("data-variant")
     );
+  });
+
+  it("renders both marks in one row", () => {
+    const { container, getByText } = render(
+      <ProjectBadges {...OFF} requiresNdaIp studentProposed />
+    );
+    expect(getByText("Student proposed")).toBeTruthy();
+    expect(getByText("NDA/IP required")).toBeTruthy();
+    expect(container.querySelectorAll("div").length).toBe(1);
   });
 });

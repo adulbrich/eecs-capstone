@@ -149,8 +149,8 @@ _Avoid_: sizing, feasibility, review (it is not one)
 A project that a student proposed rather than an industry partner or faculty member.
 Marked by staff in the Proposer section of the staff panel, saved with the proposer
 link; shown publicly as a badge on the card and the project page, and as a filter on
-the listing. Says nothing about mentorship: a student-proposed project may have a
-mentor, be seeking one, or need none because the instructor mentors it.
+the listing. Says nothing about mentorship: a student-proposed project may or may not
+have a mentor recorded, and one without is the staff to-do.
 _Avoid_: student project, student-led, self-proposed, student team managed
 
 **Requires an NDA or IP agreement**:
@@ -161,33 +161,20 @@ on the card and the project page, as a column in table view, and offered as the
 listing filter "Requiring an NDA or IP agreement" on both listings.
 _Avoid_: confidential, restricted, proprietary project
 
-**Seeking mentor**:
-A project staff have marked as looking for a mentor, with none recorded yet. One of
-the three mentor states, shown as a badge on the card and the project page only
-while no address is on file, and offered as the listing filter "Seeking a mentor" on
-the same rule; a mentor who has not signed up yet counts as recorded, so the badge
-goes away and nothing takes its place. Independent of student proposed.
-_Avoid_: unmentored, needs mentor, open for mentors
-
-**No mentor needed**:
-A project staff have marked as running without a mentor, because the instructor or
-the partner covers the role. One of the three mentor states; shown as the badge "No
-mentor needed" on the card and the project page, and offered as the listing filter
-"Run without a mentor" on both listings. Cannot sit beside a recorded mentor: the
-Mentor section refuses either order. Not counted as missing a mentor on the staff
-dashboard.
-_Avoid_: student directed, student-led, self-directed, unmentored, self-managed
-
 **Mentorship**:
-The link between a project and its mentor: a recorded address, a derived name, and
-the mentor state, one of not decided, seeking a mentor and no mentor needed,
-granting no permission over the project. Staff set the address and the state from
-the Mentor section of the staff panel; the public sees only the two badges the state
-derives, and nothing about the mentor, name included. Saving a new address emails
-it, and staff can skip that email from the confirm the save opens. A person whose
-account address matches the recorded one sees those projects under Mentoring on
-My Projects, and nothing more.
-_Avoid_: assignment, sponsorship
+The link between a project and its mentor: a recorded address and the name it
+resolves to, granting no permission over the project. Nothing else: no state beside
+the address, no "seeking" mark and no "no mentor needed" mark, so a project either has
+an address on file or it does not, and an instructor who runs a team without an
+outside mentor records their own. Staff set the address from the Mentor section of
+the staff panel; the public sees nothing about the mentor, name included. Saving a
+new address emails it, and staff can skip that email from the confirm the save opens.
+A person whose account address matches the recorded one sees those projects under
+Mentoring on My Projects, and nothing more. "Without a mentor" is the staff listing's
+switch for no address on file, and with "Student proposed" it is the to-do the
+mentors page is matched against.
+_Avoid_: assignment, sponsorship, seeking mentor, no mentor needed, unmentored,
+needs mentor, mentor state
 
 **Teams supported**:
 How many student teams a project can take on, one to five. Set by staff.

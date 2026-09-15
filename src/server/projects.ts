@@ -1,10 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import {
-  MENTOR_NEEDS,
-  PROJECT_STATUSES,
-  type ProjectStatus,
-} from "#/lib/vocabularies";
+import { PROJECT_STATUSES, type ProjectStatus } from "#/lib/vocabularies";
 import { SEND_EMAIL_FIELD } from "./send-email-field";
 
 const projectInputSchema = z.object({
@@ -46,9 +42,6 @@ export const mentorshipSchema = z.object({
   // A string in transit, null only in the column: empty is the form clearing
   // the field, and the impl folds it to null. Same ceiling as contactEmail.
   mentorEmail: z.string().email().max(200).or(z.literal("")),
-  // Required, never defaulted: every writer sends the state, or a stale
-  // client would silently reset it (#304, #373).
-  mentorNeed: z.enum(MENTOR_NEEDS),
   ...SEND_EMAIL_FIELD,
 });
 

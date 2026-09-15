@@ -66,7 +66,6 @@ describe("scan over src/", () => {
       "INVENTORY_ITEM_STATUSES",
       "INVENTORY_REQUEST_ITEM_STATUSES",
       "INVENTORY_CUSTOM_LINE_STATUSES",
-      "MENTOR_NEEDS",
       "NOTIFICATION_TYPES",
       "USER_ROLES",
     ]);

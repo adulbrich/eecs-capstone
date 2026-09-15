@@ -9,7 +9,7 @@ import {
   user,
 } from "#/db/schema";
 import { auth } from "#/lib/auth";
-import type { MentorNeed, UserRole } from "#/lib/vocabularies";
+import type { UserRole } from "#/lib/vocabularies";
 import { getAdminStatsAs } from "#/server/_internal/admin";
 import { getAnalyticsAs } from "#/server/_internal/analytics";
 import { addToCartAs, submitCartAs } from "#/server/_internal/inventory-cart";
@@ -350,67 +350,58 @@ describe("bookmarks since publication", () => {
   });
 });
 
-describe("seeking a mentor", () => {
-  it("counts the projects that show the badge: flagged by staff with no address on file", async () => {
+describe("student proposed, no mentor", () => {
+  it("counts student-proposed projects with no address on file, every live status", async () => {
     const admin = await makeUser(`an-m-${Date.now()}@x.com`, "admin");
-    // Two flagged and not student proposed, one the other way round, so the
-    // old rule (student proposed, no address) and the badge's rule (flagged,
-    // no address) give different counts: 1 against 2.
-    const flagged = await createProjectAs(admin, baseProject());
-    const flaggedToo = await createProjectAs(admin, baseProject());
-    const studentOnly = await createProjectAs(admin, baseProject());
-    const flaggedWithMentor = await createProjectAs(admin, baseProject());
-    // Written as columns rather than through `updateProjectMentorshipAs`:
-    // the figure is a rule over three columns, and #336 moves one of them to
-    // the proposer endpoint, so the test stays pinned to the columns rather
-    // than to whichever wrapper writes each.
+    // Two student proposals with nobody yet, one of them a draft; one
+    // student proposal with a mentor; one partner project with nobody. The
+    // rule is the mark and the address, nothing else (#402): 2.
+    const waiting = await createProjectAs(admin, baseProject());
+    const waitingDraft = await createProjectAs(admin, baseProject());
+    const mentoredStudent = await createProjectAs(admin, baseProject());
+    const partner = await createProjectAs(admin, baseProject());
+    await forceTransitionAs(admin, waiting.id, "published", undefined, {
+      sendEmail: false,
+    });
+    // Written as columns rather than through the two writers: the figure is
+    // a rule over two columns, and the test stays pinned to the columns
+    // rather than to whichever wrapper writes each.
     const mentorship = (
       id: string,
-      columns: {
-        mentorEmail: string | null;
-        mentorNeed: MentorNeed;
-        studentProposed: boolean;
-      }
+      columns: { mentorEmail: string | null; studentProposed: boolean }
     ) => db.update(projects).set(columns).where(eq(projects.id, id));
-    for (const id of [flagged.id, flaggedToo.id]) {
-      await mentorship(id, {
-        mentorEmail: null,
-        mentorNeed: "seeking",
-        studentProposed: false,
-      });
+    for (const id of [waiting.id, waitingDraft.id]) {
+      await mentorship(id, { mentorEmail: null, studentProposed: true });
     }
-    await mentorship(studentOnly.id, {
-      mentorEmail: null,
-      mentorNeed: "unspecified",
-      studentProposed: true,
-    });
-    await mentorship(flaggedWithMentor.id, {
+    await mentorship(mentoredStudent.id, {
       mentorEmail: "mentor@x.test",
-      mentorNeed: "seeking",
       studentProposed: true,
     });
+    await mentorship(partner.id, { mentorEmail: null, studentProposed: false });
 
     const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
-    expect(view.headline.seekingMentor).toBe(2);
+    expect(view.headline.studentProposedWithoutMentor).toBe(2);
   });
 
-  it("leaves a project that runs without a mentor out of the published-without-mentor count", async () => {
+  it("counts every published project with no address as without a mentor", async () => {
     const admin = await makeUser(`an-n-${Date.now()}@x.com`, "admin");
     const missing = await createProjectAs(admin, baseProject());
-    const runsAlone = await createProjectAs(admin, baseProject());
-    for (const id of [missing.id, runsAlone.id]) {
+    const alsoMissing = await createProjectAs(admin, baseProject());
+    const mentored = await createProjectAs(admin, baseProject());
+    for (const id of [missing.id, alsoMissing.id, mentored.id]) {
       await forceTransitionAs(admin, id, "published", undefined, {
         sendEmail: false,
       });
     }
     await db
       .update(projects)
-      .set({ mentorNeed: "none" })
-      .where(eq(projects.id, runsAlone.id));
+      .set({ mentorEmail: "mentor@x.test" })
+      .where(eq(projects.id, mentored.id));
 
     const view = await getAnalyticsAs(admin, { ...RANGE, programId: null });
-    // One is missing a mentor; the other does not want one (#373).
-    expect(view.headline.publishedWithoutMentor).toBe(1);
-    expect(view.headline.publishedWithMentor).toBe(0);
+    // No "runs without a mentor" state to exclude since #402: an address or
+    // not is the whole fact.
+    expect(view.headline.publishedWithoutMentor).toBe(2);
+    expect(view.headline.publishedWithMentor).toBe(1);
   });
 });

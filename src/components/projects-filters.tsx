@@ -32,16 +32,15 @@ export type ProjectsOrder = "relevance" | "newest" | "recommended";
 
 /**
  * The switch labels, one line each under the legend "Only show projects that
- * are". Shared with `/admin/projects`, which carries five of the six under
+ * are". Shared with `/admin/projects`, which carries three of the four under
  * the same params (#340), so the two listings cannot drift apart and the
- * accessibility tests name one string.
+ * accessibility tests name one string. The two mentor switches left with
+ * the mentor state (#402).
  */
 export const PROJECT_SWITCH_LABEL = {
   acceptingOnly: "Accepting applicants",
   archivedOnly: "Archived",
-  noMentorNeededOnly: "Run without a mentor",
   requiresNdaOnly: "Requiring an NDA or IP agreement",
-  seekingMentorOnly: "Seeking a mentor",
   // The same string as the badge, so the filter and the mark read as one
   // fact (#372).
   studentProposedOnly: "Student proposed",
@@ -52,10 +51,8 @@ export interface ProjectsFilterState {
   acceptingOnly: boolean;
   archivedOnly: boolean;
   categories: string[];
-  noMentorNeededOnly: boolean;
   program: string | null;
   requiresNdaOnly: boolean;
-  seekingMentorOnly: boolean;
   studentProposedOnly: boolean;
 }
 
@@ -70,8 +67,6 @@ export function countActiveFilters(state: ProjectsFilterState): number {
     state.acceptingOnly,
     state.archivedOnly,
     state.studentProposedOnly,
-    state.seekingMentorOnly,
-    state.noMentorNeededOnly,
     state.requiresNdaOnly,
   ].filter(Boolean).length;
 }
@@ -116,8 +111,6 @@ function useProjectsFilterNavigation() {
           acceptingOnly: false,
           archivedOnly: false,
           studentProposedOnly: false,
-          seekingMentorOnly: false,
-          noMentorNeededOnly: false,
           requiresNdaOnly: false,
           page: 1,
         }),
@@ -272,9 +265,7 @@ export function ProjectsFilters({
   archivedOnly,
   categories,
   program,
-  noMentorNeededOnly,
   requiresNdaOnly,
-  seekingMentorOnly,
   studentProposedOnly,
 }: FiltersProps) {
   const { clearAll, setFilter } = useProjectsFilterNavigation();
@@ -304,9 +295,7 @@ export function ProjectsFilters({
     archivedOnly,
     categories,
     program,
-    noMentorNeededOnly,
     requiresNdaOnly,
-    seekingMentorOnly,
     studentProposedOnly,
   });
 
@@ -354,18 +343,6 @@ export function ProjectsFilters({
             id={`${uid}-student-proposed-only`}
             label={PROJECT_SWITCH_LABEL.studentProposedOnly}
             onCheckedChange={(v) => setFilter("studentProposedOnly", v)}
-          />
-          <FilterSwitch
-            checked={seekingMentorOnly}
-            id={`${uid}-seeking-mentor-only`}
-            label={PROJECT_SWITCH_LABEL.seekingMentorOnly}
-            onCheckedChange={(v) => setFilter("seekingMentorOnly", v)}
-          />
-          <FilterSwitch
-            checked={noMentorNeededOnly}
-            id={`${uid}-no-mentor-needed-only`}
-            label={PROJECT_SWITCH_LABEL.noMentorNeededOnly}
-            onCheckedChange={(v) => setFilter("noMentorNeededOnly", v)}
           />
           <FilterSwitch
             checked={requiresNdaOnly}

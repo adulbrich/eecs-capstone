@@ -45,27 +45,33 @@ describe("/admin/projects search", () => {
     expect(off).toMatchObject({
       acceptingOnly: false,
       includeSoftDeleted: false,
-      noMentorNeededOnly: false,
       requiresNdaOnly: false,
-      seekingMentorOnly: false,
       studentProposedOnly: false,
     });
     // The same param names as /projects, so a pasted link narrows here too.
     const on = resolveAdminFilter(
       searchSchema.parse({
-        noMentorNeededOnly: true,
         requiresNdaOnly: true,
-        seekingMentorOnly: true,
         studentProposedOnly: true,
+        withoutMentorOnly: true,
       })
     );
     expect(on).toMatchObject({
       acceptingOnly: false,
-      noMentorNeededOnly: true,
       requiresNdaOnly: true,
-      seekingMentorOnly: true,
       studentProposedOnly: true,
+      withoutMentorOnly: true,
     });
+  });
+
+  it("drops the two mentor switches #402 removed rather than honoring them", () => {
+    const parsed = searchSchema.parse({
+      seekingMentorOnly: true,
+      noMentorNeededOnly: true,
+    });
+    expect("seekingMentorOnly" in parsed).toBe(false);
+    expect("noMentorNeededOnly" in parsed).toBe(false);
+    expect(resolveAdminFilter(parsed).withoutMentorOnly).toBe(false);
   });
 
   it("carries an explicit status set in full", () => {

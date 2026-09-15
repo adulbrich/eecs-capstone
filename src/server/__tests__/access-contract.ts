@@ -269,7 +269,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/projects-queries.ts:getProjectMentorship": {
     level: "staff",
-    note: "Returns mentorEmail and the resolved mentor name. Nothing about the mentor is public (#336): the public payload carries the seeking badge only.",
+    note: "Returns mentorEmail and the resolved mentor name. Nothing about the mentor is public (#336, #402): no public payload carries a mentor field.",
   },
   "server/projects-queries.ts:listAdminProjects": {
     level: "staff",
@@ -338,7 +338,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   "server/projects.ts:updateProject": { level: "owner-or-staff" },
   "server/projects.ts:updateProjectMentorship": {
     level: "staff",
-    note: "The only writer of mentorNeed and mentorEmail. Neither key exists on ProjectInput, so updateProject cannot reach them; this endpoint is what keeps them staff-only.",
+    note: "The only writer of mentorEmail, which is the whole of mentorship (#402). The key does not exist on ProjectInput, so updateProject cannot reach it; this endpoint is what keeps it staff-only.",
   },
   "server/projects.ts:updateProjectProposer": {
     level: "staff",

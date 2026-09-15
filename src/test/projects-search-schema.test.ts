@@ -35,13 +35,21 @@ describe("/projects switch params", () => {
   it("default every switch off, the agreement switch included", () => {
     expect(searchSchema.parse({})).toMatchObject({
       acceptingOnly: false,
-      noMentorNeededOnly: false,
       requiresNdaOnly: false,
-      seekingMentorOnly: false,
       studentProposedOnly: false,
     });
     expect(searchSchema.parse({ requiresNdaOnly: true }).requiresNdaOnly).toBe(
       true
     );
+  });
+
+  it("drops the two mentor switches #402 removed rather than honoring them", () => {
+    // A pasted link from before #402 loads the page unfiltered on them.
+    const parsed = searchSchema.parse({
+      seekingMentorOnly: true,
+      noMentorNeededOnly: true,
+    });
+    expect("seekingMentorOnly" in parsed).toBe(false);
+    expect("noMentorNeededOnly" in parsed).toBe(false);
   });
 });

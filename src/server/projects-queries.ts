@@ -43,14 +43,14 @@ const adminListSchema = z
     // Better Auth user ids are text, not UUIDs, so this cannot be `.uuid()`.
     proposer: z.string().max(255).nullable().default(null),
     q: z.string().max(200).default(""),
-    // Five of the public listing's six switches, under the same names
+    // Three of the public listing's four switches, under the same names
     // (#340); archived is a status here.
-    // Seeking a mentor is the derived badge value, the same rule as there.
     acceptingOnly: z.boolean().default(false),
     studentProposedOnly: z.boolean().default(false),
-    seekingMentorOnly: z.boolean().default(false),
-    noMentorNeededOnly: z.boolean().default(false),
     requiresNdaOnly: z.boolean().default(false),
+    // Admin-only: the staff to-do beside "Student proposed" (#402). Plain
+    // `mentor_email IS NULL`, the same fact the dashboard tile counts.
+    withoutMentorOnly: z.boolean().default(false),
   })
   .refine((v) => !(v.from && v.to) || v.from <= v.to, {
     message: "from must not be after to",

@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { errorMessage } from "#/lib/error-message";
-import { MENTOR_NEED_LABEL, mentorNeedRefusal } from "#/lib/mentor-need";
-import { MENTOR_NEEDS, type MentorNeed } from "#/lib/vocabularies";
 import { updateProjectMentorship } from "#/server/projects";
 import {
   getProjectMentorship,
@@ -9,73 +7,20 @@ import {
 } from "#/server/projects-queries";
 import { AccountLinkSummary } from "./account-link-summary";
 import { PanelSection } from "./panel";
-import { ProjectBadges } from "./project-badges";
 import { EMAIL_SKIP_HINT } from "./send-email-checkbox";
 import { SendEmailDialog } from "./send-email-dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 
 /**
- * What the public listing will show once this draft is saved, from the draft
- * rather than the saved record, so staff see the effect of a choice before
- * they press Save. The badge rules are the server's (`seekingMentorSql` and
- * `noMentorNeededSql`): seeking AND no address on file, or none needed. The
- * badges themselves are rendered, not described, so the preview cannot
- * drift from the card. The none-plus-address case is named here in the
- * server's own words, from `mentorNeedRefusal` against the saved state, so
- * the line under the draft is the line Save would throw (#373).
- */
-function PublicPreview({
-  mentorEmail,
-  mentorNeed,
-  savedMentorNeed,
-}: {
-  mentorEmail: string;
-  mentorNeed: MentorNeed;
-  savedMentorNeed: MentorNeed;
-}) {
-  const hasAddress = mentorEmail.trim() !== "";
-  const seeking = mentorNeed === "seeking" && !hasAddress;
-  const none = mentorNeed === "none";
-  const refusal = mentorNeedRefusal(savedMentorNeed, mentorNeed, hasAddress);
-  return (
-    <div className="space-y-1 text-muted-foreground text-xs">
-      <div className="flex flex-wrap items-center gap-2">
-        <span>Public listing shows:</span>
-        {seeking || none ? (
-          <ProjectBadges
-            noMentorNeeded={none}
-            requiresNdaIp={false}
-            seekingMentor={seeking}
-            studentProposed={false}
-          />
-        ) : (
-          <span>nothing about mentorship</span>
-        )}
-      </div>
-      {mentorNeed === "seeking" && hasAddress && (
-        <p>
-          Seeking a mentor is on, but the catalog shows no badge while an
-          address is on file. Clear the address or pick another state.
-        </p>
-      )}
-      {refusal && <p>{refusal}</p>}
-    </div>
-  );
-}
-
-/**
- * The staff edit of `mentorNeed` and `mentorEmail`, as a section of the
- * staff panel. Its own component because it owns a load, a draft and a save,
- * and the panel was already at the complexity limit before it arrived.
+ * The staff edit of `mentorEmail`, as a section of the staff panel. Its own
+ * component because it owns a load, a draft and a save, and the panel was
+ * already at the complexity limit before it arrived.
  *
  * Mentorship only, since #336: who proposed the project is the Proposer
- * section's. The state and the address are independent except that "none"
- * cannot sit beside an address, which the server refuses; the input is
- * always shown, and the preview below it says what the public sees for the
- * draft as typed (#373).
+ * section's. The address is the whole record since #402: no state beside
+ * it, nothing the public sees, so no preview under the draft.
  *
  * The saved record and the draft are held apart: the summary reads the saved
  * one, because whether an address matches an account is only known after the
@@ -95,7 +40,6 @@ export function StaffMentorshipSection({
 }) {
   const [record, setRecord] = useState<ProjectMentorship | null>(null);
   const [mentorEmail, setMentorEmail] = useState("");
-  const [mentorNeed, setMentorNeed] = useState<MentorNeed>("unspecified");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -105,7 +49,6 @@ export function StaffMentorshipSection({
       const saved = await getProjectMentorship({ data: { projectId } });
       setRecord(saved);
       setMentorEmail(saved.mentorEmail);
-      setMentorNeed(saved.mentorNeed);
     } catch (e) {
       // Reported, not swallowed, and Save stays disabled: see the gate below.
       setError(errorMessage(e, "Could not load the mentor record"));
@@ -130,7 +73,7 @@ export function StaffMentorshipSection({
     setError(null);
     try {
       await updateProjectMentorship({
-        data: { id: projectId, mentorEmail: trimmed, mentorNeed, sendEmail },
+        data: { id: projectId, mentorEmail: trimmed, sendEmail },
       });
       setConfirmOpen(false);
       await load();
@@ -154,22 +97,6 @@ export function StaffMentorshipSection({
             unlinkedHint="Links automatically when they sign up with this address."
           />
         )}
-        {/*
-          Named by the section title above it, so no legend of its own: two
-          "Mentor" headings four lines apart read as a mistake.
-        */}
-        <RadioGroup
-          aria-label="Mentor"
-          onValueChange={(value) => setMentorNeed(value as MentorNeed)}
-          value={mentorNeed}
-        >
-          {MENTOR_NEEDS.map((state) => (
-            <Label className="font-normal" key={state}>
-              <RadioGroupItem value={state} />
-              {MENTOR_NEED_LABEL[state]}
-            </Label>
-          ))}
-        </RadioGroup>
         <div className="space-y-1.5">
           <Label htmlFor="mentor-email">Mentor email</Label>
           <Input
@@ -181,16 +108,10 @@ export function StaffMentorshipSection({
             value={mentorEmail}
           />
           <p className="text-muted-foreground text-xs">
-            Saving a new address emails it.
+            Saving a new address emails it. Leave it empty for a project with no
+            mentor; an instructor who runs the team records their own.
           </p>
         </div>
-        {record && (
-          <PublicPreview
-            mentorEmail={mentorEmail}
-            mentorNeed={mentorNeed}
-            savedMentorNeed={record.mentorNeed}
-          />
-        )}
         {error && !confirmOpen && (
           <p className="text-destructive text-sm">{error}</p>
         )}

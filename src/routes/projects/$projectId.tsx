@@ -126,9 +126,7 @@ function ProjectDetail() {
       </div>
       <ProjectBadges
         className="mt-3"
-        noMentorNeeded={project.noMentorNeeded}
         requiresNdaIp={project.requiresNdaIp}
-        seekingMentor={project.seekingMentor}
         studentProposed={project.studentProposed}
       />
       <div className="mt-3 flex items-center gap-2">

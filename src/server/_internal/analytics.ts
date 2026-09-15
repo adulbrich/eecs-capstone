@@ -1,4 +1,4 @@
-import { and, eq, gte, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
   categories,
@@ -24,7 +24,6 @@ import {
 } from "#/lib/vocabularies";
 import type { AnalyticsInput } from "../analytics";
 import { countPendingRequests, countRows, countSubmitted } from "./admin";
-import { seekingMentorSql } from "./project-summary";
 
 export interface Flow {
   current: number;
@@ -93,7 +92,8 @@ export interface AnalyticsView {
     publishedWithoutBookmarks: number;
     publishedWithoutMentor: number;
     requestsWithPending: number;
-    seekingMentor: number;
+    /** Student-proposed projects with no mentor address, every live status (#402). */
+    studentProposedWithoutMentor: number;
     submittedAwaiting: number;
   };
   program: { id: string; label: string } | null;
@@ -154,7 +154,7 @@ async function headline(programId: string | null) {
     expected,
     submittedAwaiting,
     oldestSubmitted,
-    [seeking],
+    [studentProposedWithoutMentor],
     [mentored],
     [unmentored],
     mentors,
@@ -195,27 +195,26 @@ async function headline(programId: string | null) {
         ${programId ? sql`and p.program_id = ${programId}` : sql``}
     `),
     db
-      // The badge's rule, over the live scope the tile always had: every
-      // status, not only published, so staff see flagged proposals before
-      // they reach the catalog.
-      .select({ seeking: countRows() })
+      // The staff to-do, over the live scope the tile always had: every
+      // status, not only published, so staff see a student proposal with
+      // nobody yet before it reaches the catalog (#402).
+      .select({ count: countRows() })
       .from(projects)
-      .where(and(live, seekingMentorSql)),
+      .where(
+        and(
+          live,
+          eq(projects.studentProposed, true),
+          isNull(projects.mentorEmail)
+        )
+      ),
     db
       .select({ mentored: countRows() })
       .from(projects)
       .where(and(published, isNotNull(projects.mentorEmail))),
     db
-      // A project that runs without a mentor is not missing one (#373).
       .select({ unmentored: countRows() })
       .from(projects)
-      .where(
-        and(
-          published,
-          isNull(projects.mentorEmail),
-          ne(projects.mentorNeed, "none")
-        )
-      ),
+      .where(and(published, isNull(projects.mentorEmail))),
     mentorFigures(),
     // Overdue is derived, never stored (docs/QUIRKS.md, inventory): a
     // checkout past its due date, or a reservation past its pickup date.
@@ -271,7 +270,7 @@ async function headline(programId: string | null) {
     },
     submittedAwaiting,
     oldestSubmittedAt: toDate(oldestSubmitted.rows[0]?.oldest),
-    seekingMentor: seeking?.seeking ?? 0,
+    studentProposedWithoutMentor: studentProposedWithoutMentor?.count ?? 0,
     publishedWithMentor: mentored?.mentored ?? 0,
     publishedWithoutMentor: unmentored?.unmentored ?? 0,
     mentors,

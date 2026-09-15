@@ -11,7 +11,6 @@ import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
 import { diffRowFields } from "#/lib/edit-diff";
 import { normalizeEmailAddress } from "#/lib/email-address";
 import { assertNoImageKeyOnCreate } from "#/lib/image-upload-policy";
-import { mentorNeedRefusal } from "#/lib/mentor-need";
 import { canEditProject, canWritePrivateNotes } from "#/lib/project-visibility";
 import {
   type ActorRole,
@@ -348,12 +347,14 @@ export async function updateProjectProposerForCurrentUser(
 }
 
 /**
- * The only writer of `mentorNeed` and `mentorEmail`.
+ * The only writer of `mentorEmail`, which since #402 is the whole of
+ * mentorship: no state beside it, so nothing to refuse and nothing for the
+ * edit log to name but the address.
  *
- * Staff-only, and deliberately not part of `updateProjectAs`: none of the
- * keys exists on `ProjectInput`, so the shared form cannot carry them and a
- * proposer has no endpoint that accepts them. That is what makes "staff edit
- * these" structural rather than a check someone remembers to keep.
+ * Staff-only, and deliberately not part of `updateProjectAs`: the key does
+ * not exist on `ProjectInput`, so the shared form cannot carry it and a
+ * proposer has no endpoint that accepts it. That is what makes "staff edit
+ * this" structural rather than a check someone remembers to keep.
  *
  * The address is trimmed and lowercased, like every address column this app
  * writes (#249), and this function is where that costs something: the edit
@@ -375,20 +376,7 @@ export async function updateProjectMentorshipAs(
   assertStaff(viewer);
   const existing = await loadProjectOr404(data.id);
   const mentorEmail = normalizeEmailAddress(data.mentorEmail);
-  // "No mentor needed" and a recorded address can never coexist (#373).
-  // Refused before the diff, so nothing is written.
-  const refusal = mentorNeedRefusal(
-    existing.mentorNeed,
-    data.mentorNeed,
-    mentorEmail !== null
-  );
-  if (refusal) {
-    throw new Error(refusal);
-  }
-  const newValues: Partial<typeof projects.$inferSelect> = {
-    mentorNeed: data.mentorNeed,
-    mentorEmail,
-  };
+  const newValues: Partial<typeof projects.$inferSelect> = { mentorEmail };
   const { changedFields, newDiff, oldDiff } = diffRowFields(
     existing,
     newValues
@@ -409,14 +397,9 @@ export async function updateProjectMentorshipAs(
       newValues: newDiff,
     });
   });
-  // Only a new address is news to anyone: the flags beside it change what
-  // the catalog shows, not who is involved. After the transaction, and it
-  // swallows its own errors.
-  if (
-    changedFields.includes("mentorEmail") &&
-    newValues.mentorEmail &&
-    (opts?.sendEmail ?? true)
-  ) {
+  // Only a new address is news to anyone; clearing one mails nobody. After
+  // the transaction, and it swallows its own errors.
+  if (newValues.mentorEmail && (opts?.sendEmail ?? true)) {
     await notifyMentorNamedByEmail(
       {
         mentorEmail: newValues.mentorEmail,

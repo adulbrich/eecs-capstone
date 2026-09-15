@@ -117,14 +117,12 @@ export interface ProjectRow extends VisibleProject {
   licenseRestrictions: string | null;
   mentorEmail: string | null;
   minQualifications: string | null;
-  noMentorNeeded: boolean;
   notes: string | null;
   objectives: string | null;
   prefQualifications: string | null;
   problemStatement: string | null;
   programId: string | null;
   requiresNdaIp: boolean;
-  seekingMentor: boolean;
   studentProposed: boolean;
   teamsSupported: number;
   title: string;
@@ -144,16 +142,12 @@ export interface ProjectDetailView {
   isSponsored: boolean | null;
   licenseRestrictions: string | null;
   minQualifications: string | null;
-  /** Staff marked it as running without a mentor. Derived in SQL from the stored state (#373). */
-  noMentorNeeded: boolean;
   notes: string | null;
   objectives: string | null;
   prefQualifications: string | null;
   problemStatement: string | null;
   programId: string | null;
   requiresNdaIp: boolean;
-  /** Staff marked it as looking for a mentor and no address is on file. Derived in SQL from the stored state. */
-  seekingMentor: boolean;
   status: ProjectStatus;
   studentProposed: boolean;
   teamsSupported: number;
@@ -214,16 +208,12 @@ export function projectDetailView(
     isSponsored: canSeePrivateNotes(project, viewer)
       ? project.isSponsored
       : null,
-    // Public by design, both: the marker a student browsing the catalog is
-    // looking for, and the seeking badge. Nothing about the mentor is named
-    // here and nothing must be: the address is one staff typed, which the
-    // person may never have chosen to publish, and the name follows it
-    // (#336). Both stay on the staff read in projects-queries.ts, with the
-    // raw `mentor_need` state; the public sees only the derived badges. See
-    // #75, #304, #373.
+    // Public by design: the marker a student browsing the catalog is looking
+    // for. Nothing about the mentor is named here and nothing must be: the
+    // address is one staff typed, which the person may never have chosen to
+    // publish, and the name follows it (#336). Both stay on the staff read
+    // in projects-queries.ts. See #75, #304, #402.
     studentProposed: project.studentProposed,
-    seekingMentor: project.seekingMentor,
-    noMentorNeeded: project.noMentorNeeded,
   };
 }
 
