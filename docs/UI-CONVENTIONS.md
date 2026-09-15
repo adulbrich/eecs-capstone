@@ -64,7 +64,9 @@ would turn an implicit form submit into a no-op just as silently. An `asChild`
 Sizes are `xs` (h-6, inline micro-actions like Post reply), `sm` (h-8, most
 contextual buttons), `default` (h-9, standalone form submits), and `lg` (h-10,
 hero / landing CTAs). Icon-only buttons use `icon-xs`, `icon-sm`, `icon`, or
-`icon-lg` to stay square.
+`icon-lg` to stay square. `inline` is the odd one: no height and no padding at
+all, for a `link` Button that sits in a panel as a line of text, which is what
+`ClearFiltersButton` uses.
 
 The size variant also sets the icon size, so pass no size class on an icon
 inside a `Button`. The base class carries
