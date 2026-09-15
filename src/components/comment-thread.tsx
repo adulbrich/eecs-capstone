@@ -21,6 +21,12 @@ interface Props {
   comments: Comment[];
   onChanged: () => void;
   projectId: string;
+  /**
+   * Staff commenting on their own project are emailed nothing, since nobody
+   * is sent their own words (`notifyCommentByEmail`), so they get no skip to
+   * decide either (#379).
+   */
+  viewerIsOwner: boolean;
   viewerIsStaff: boolean;
 }
 
@@ -35,9 +41,11 @@ const INTERNAL_SURFACE = {
 export function CommentThread({
   projectId,
   comments,
+  viewerIsOwner,
   viewerIsStaff,
   onChanged,
 }: Props) {
+  const offersSkip = viewerIsStaff && !viewerIsOwner;
   const topLevel = comments.filter((c) => !c.parentId);
   const repliesByParent = new Map<string, Comment[]>();
   for (const c of comments) {
@@ -54,6 +62,7 @@ export function CommentThread({
         <CommentNode
           comment={c}
           key={c.id}
+          offersSkip={offersSkip}
           onChanged={onChanged}
           projectId={projectId}
           replies={repliesByParent.get(c.id) ?? []}
@@ -61,6 +70,7 @@ export function CommentThread({
         />
       ))}
       <NewCommentForm
+        offersSkip={offersSkip}
         onChanged={onChanged}
         projectId={projectId}
         viewerIsStaff={viewerIsStaff}
@@ -98,12 +108,14 @@ function CommentNode({
   comment,
   replies,
   projectId,
+  offersSkip,
   viewerIsStaff,
   onChanged,
 }: {
   comment: Comment;
   replies: Comment[];
   projectId: string;
+  offersSkip: boolean;
   viewerIsStaff: boolean;
   onChanged: () => void;
 }) {
@@ -142,6 +154,7 @@ function CommentNode({
       )}
 
       <ReplyForm
+        offersSkip={offersSkip}
         onChanged={onChanged}
         parentId={comment.id}
         parentIsInternal={isInternal}
@@ -154,10 +167,12 @@ function CommentNode({
 
 function NewCommentForm({
   projectId,
+  offersSkip,
   viewerIsStaff,
   onChanged,
 }: {
   projectId: string;
+  offersSkip: boolean;
   viewerIsStaff: boolean;
   onChanged: () => void;
 }) {
@@ -222,7 +237,7 @@ function NewCommentForm({
             (#379): staff post many. Gone while Internal is on, which mails
             nobody anyway.
           */}
-          {!isInternal && (
+          {offersSkip && !isInternal && (
             <Label className="font-normal">
               <Checkbox
                 checked={sendEmail}
@@ -246,12 +261,14 @@ function ReplyForm({
   projectId,
   parentId,
   parentIsInternal,
+  offersSkip,
   viewerIsStaff,
   onChanged,
 }: {
   projectId: string;
   parentId: string;
   parentIsInternal: boolean;
+  offersSkip: boolean;
   viewerIsStaff: boolean;
   onChanged: () => void;
 }) {
@@ -364,7 +381,7 @@ function ReplyForm({
               />
               Internal (staff only)
             </Label>
-            {!isInternal && (
+            {offersSkip && !isInternal && (
               <Label className="font-normal text-xs">
                 <Checkbox
                   checked={sendEmail}

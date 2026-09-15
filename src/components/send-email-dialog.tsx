@@ -10,6 +10,19 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 
+interface SendEmailDialogProps {
+  address: string;
+  busy: boolean;
+  confirmLabel: string;
+  description: string;
+  error: string | null;
+  hint: string;
+  onConfirm: (sendEmail: boolean) => void;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  title: string;
+}
+
 /**
  * The confirm a save opens when it would email someone (#379): it names the
  * address, carries the skip, and holds the save until staff confirm. Shaped
@@ -21,7 +34,23 @@ import {
  * `error` and `busy` are the section's: the save runs there, and a failure
  * shows in the open dialog rather than behind it.
  */
-export function SendEmailDialog({
+export function SendEmailDialog(props: SendEmailDialogProps) {
+  return (
+    <Dialog onOpenChange={props.onOpenChange} open={props.open}>
+      <DialogContent>
+        <Body {...props} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Holds the checkbox. Radix unmounts the content while the dialog is closed,
+ * so the box is checked again on every open however the last one ended:
+ * Cancel, Escape, or a save that closed it. The skip is a decision about
+ * one save.
+ */
+function Body({
   address,
   busy,
   confirmLabel,
@@ -30,63 +59,40 @@ export function SendEmailDialog({
   hint,
   onConfirm,
   onOpenChange,
-  open,
   title,
-}: {
-  address: string;
-  busy: boolean;
-  confirmLabel: string;
-  description: string;
-  error: string | null;
-  hint: string;
-  onConfirm: (sendEmail: boolean) => void;
-  onOpenChange: (open: boolean) => void;
-  open: boolean;
-  title: string;
-}) {
+}: SendEmailDialogProps) {
   const [sendEmail, setSendEmail] = useState(true);
   return (
-    <Dialog
-      onOpenChange={(next) => {
-        if (!next) {
-          // Checked again next time: the skip is a decision about one save.
-          setSendEmail(true);
-        }
-        onOpenChange(next);
-      }}
-      open={open}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-        <SendEmailCheckbox
-          address={address}
-          checked={sendEmail}
+    <>
+      <DialogHeader>
+        <DialogTitle>{title}</DialogTitle>
+        <DialogDescription>{description}</DialogDescription>
+      </DialogHeader>
+      <SendEmailCheckbox
+        address={address}
+        checked={sendEmail}
+        disabled={busy}
+        hint={hint}
+        onCheckedChange={setSendEmail}
+      />
+      {error && <p className="text-destructive text-sm">{error}</p>}
+      <DialogFooter>
+        <Button
           disabled={busy}
-          hint={hint}
-          onCheckedChange={setSendEmail}
-        />
-        {error && <p className="text-destructive text-sm">{error}</p>}
-        <DialogFooter>
-          <Button
-            disabled={busy}
-            onClick={() => onOpenChange(false)}
-            type="button"
-            variant="ghost"
-          >
-            Cancel
-          </Button>
-          <Button
-            disabled={busy}
-            onClick={() => onConfirm(sendEmail)}
-            type="button"
-          >
-            {busy ? "Saving..." : confirmLabel}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          onClick={() => onOpenChange(false)}
+          type="button"
+          variant="ghost"
+        >
+          Cancel
+        </Button>
+        <Button
+          disabled={busy}
+          onClick={() => onConfirm(sendEmail)}
+          type="button"
+        >
+          {busy ? "Saving..." : confirmLabel}
+        </Button>
+      </DialogFooter>
+    </>
   );
 }

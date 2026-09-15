@@ -818,6 +818,28 @@ describe("StaffProjectPanel mentor block", () => {
     );
   });
 
+  it("checks the box again after a Cancel, so a skip is about one save", async () => {
+    renderPanel("submitted");
+    fireEvent.change(await screen.findByLabelText("Mentor email"), {
+      target: { value: "next@x.test" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
+    let dialog = confirmDialog("Save the mentor?");
+    fireEvent.click(
+      dialog.getByRole("checkbox", { name: "Email next@x.test" })
+    );
+    fireEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
+    dialog = confirmDialog("Save the mentor?");
+    expect(
+      dialog
+        .getByRole("checkbox", { name: "Email next@x.test" })
+        .getAttribute("aria-checked")
+    ).toBe("true");
+  });
+
   it("keeps a failed save's error inside the open confirm", async () => {
     updateProjectMentorship.mockRejectedValueOnce(new Error("SES is down"));
     renderPanel("submitted");

@@ -28,6 +28,7 @@ export function ProjectPrivatePanel({
   onCommentsChanged,
   projectId,
   teamsSupported,
+  viewerIsOwner,
   viewerIsStaff,
 }: {
   canEdit: boolean;
@@ -37,6 +38,7 @@ export function ProjectPrivatePanel({
   onCommentsChanged: () => void;
   projectId: string;
   teamsSupported: number;
+  viewerIsOwner: boolean;
   viewerIsStaff: boolean;
 }) {
   return (
@@ -80,6 +82,7 @@ export function ProjectPrivatePanel({
           comments={comments}
           onChanged={onCommentsChanged}
           projectId={projectId}
+          viewerIsOwner={viewerIsOwner}
           viewerIsStaff={viewerIsStaff}
         />
       </PanelSection>

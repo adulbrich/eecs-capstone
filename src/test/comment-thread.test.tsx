@@ -54,7 +54,11 @@ function comment(overrides: Partial<ThreadComment>): ThreadComment {
   };
 }
 
-function renderThread(comments: ThreadComment[], viewerIsStaff = true) {
+function renderThread(
+  comments: ThreadComment[],
+  viewerIsStaff = true,
+  viewerIsOwner = false
+) {
   return render(
     <CommentThread
       comments={comments}
@@ -62,6 +66,7 @@ function renderThread(comments: ThreadComment[], viewerIsStaff = true) {
         // no-op
       }}
       projectId={PROJECT_ID}
+      viewerIsOwner={viewerIsOwner}
       viewerIsStaff={viewerIsStaff}
     />
   );
@@ -254,6 +259,20 @@ describe("CommentThread email skip", () => {
       screen.queryByRole("checkbox", { name: "Email the proposer" })
     ).toBeNull();
   });
+
+  it("offers no box to staff on their own project, where nobody is emailed", () => {
+    renderThread([comment({ isInternal: false })], true, true);
+    expect(
+      screen.getByRole("checkbox", { name: "Internal (staff only)" })
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("checkbox", { name: "Email the proposer" })
+    ).toBeNull();
+    openReplyAndType("own project");
+    expect(
+      replyForm().queryByRole("checkbox", { name: "Email the proposer" })
+    ).toBeNull();
+  });
 });
 
 describe("CommentThread forms while a post is in flight", () => {
@@ -338,6 +357,7 @@ describe("CommentThread forms while a post is in flight", () => {
           // no-op
         }}
         projectId={PROJECT_ID}
+        viewerIsOwner={false}
         viewerIsStaff={true}
       />
     );

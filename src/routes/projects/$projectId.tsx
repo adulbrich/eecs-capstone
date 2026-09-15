@@ -217,6 +217,7 @@ function ProjectDetail() {
           }}
           projectId={project.id}
           teamsSupported={project.teamsSupported}
+          viewerIsOwner={viewerIsOwner}
           viewerIsStaff={viewerIsStaff}
         />
       )}
