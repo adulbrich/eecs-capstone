@@ -87,9 +87,11 @@ describe("error text", () => {
         continue;
       }
       const source = readFileSync(path, "utf8");
-      for (const classes of classStrings(source)) {
-        if (DESTRUCTIVE_TEXT.test(classes)) {
-          offenders.push(`${file}: ${classes}`);
+      // `all`, not `unconditional`: a paragraph that takes the destructive
+      // colour on some renders is still that paragraph on those renders.
+      for (const { all } of classStrings(source)) {
+        if (DESTRUCTIVE_TEXT.test(all)) {
+          offenders.push(`${file}: ${all}`);
         }
       }
     }
@@ -105,7 +107,7 @@ describe("error text", () => {
     // exemption should lose it, so the list cannot grow stale.
     const stale = [...ALLOWED.keys()].filter((file) =>
       [...classStrings(readFileSync(join(process.cwd(), file), "utf8"))].every(
-        (classes) => !DESTRUCTIVE_TEXT.test(classes)
+        ({ all }) => !DESTRUCTIVE_TEXT.test(all)
       )
     );
     expect(stale).toEqual([]);

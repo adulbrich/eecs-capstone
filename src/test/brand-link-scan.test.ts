@@ -116,15 +116,20 @@ describe("brand links", () => {
         continue;
       }
       const source = readFileSync(path, "utf8");
-      for (const classes of classStrings(source)) {
+      for (const { all, unconditional } of classStrings(source)) {
+        // The underline is read from every literal, because one applied
+        // conditionally still underlines; the colour is read from the
+        // unconditional ones, because `cn("underline", on && "text-brand-dark")`
+        // renders a bare underline whenever `on` is false, which is the defect
+        // this rule exists to stop.
         if (
-          TURNS_UNDERLINE_ON.test(classes) &&
-          !classes.includes("text-brand-dark")
+          TURNS_UNDERLINE_ON.test(all) &&
+          !unconditional.includes("text-brand-dark")
         ) {
-          offenders.push(`${file}: ${classes}`);
+          offenders.push(`${file}: ${all}`);
         }
-        if (RESTATES_OFFSET.test(classes)) {
-          offenders.push(`${file}: ${classes} restates the global offset`);
+        if (RESTATES_OFFSET.test(all)) {
+          offenders.push(`${file}: ${all} restates the global offset`);
         }
       }
     }
@@ -167,16 +172,37 @@ describe("brand links", () => {
 
   // A cn() call is one class string, not several: split per literal, a
   // correctly coloured `cn("underline", "text-brand-dark")` would be reported
-  // for the half that has no colour in it.
-  it("reads a cn() call as the one class string it becomes", () => {
+  // for the half that has no colour in it. A colour behind a condition is a
+  // colour the element sometimes lacks, which is why the two readings differ.
+  it("separates what a class string always carries from what it can carry", () => {
     expect([
       ...classStrings('<Link className="underline" to="/x">y</Link>'),
-    ]).toEqual(["underline"]);
+    ]).toEqual([{ all: "underline", unconditional: "underline" }]);
+    expect([
+      ...classStrings('<a className={cn("underline", "text-brand-dark")}>'),
+    ]).toEqual([
+      {
+        all: "underline text-brand-dark",
+        unconditional: "underline text-brand-dark",
+      },
+    ]);
     expect([
       ...classStrings(
         '<a className={cn("underline", on && "text-brand-dark")}>'
       ),
-    ]).toEqual(["underline text-brand-dark"]);
+    ]).toEqual([
+      { all: "underline text-brand-dark", unconditional: "underline" },
+    ]);
     expect([...classStrings("<a className={passedIn}>")]).toEqual([]);
+  });
+
+  it("flags a colour that only some renders carry", () => {
+    const conditional = [
+      ...classStrings(
+        '<a className={cn("underline", on && "text-brand-dark")}>'
+      ),
+    ][0];
+    expect(TURNS_UNDERLINE_ON.test(conditional.all)).toBe(true);
+    expect(conditional.unconditional.includes("text-brand-dark")).toBe(false);
   });
 });
