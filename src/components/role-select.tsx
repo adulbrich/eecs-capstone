@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { errorMessage } from "#/lib/error-message";
+import { useAction } from "#/lib/use-action";
 import { USER_ROLES, type UserRole } from "#/lib/vocabularies";
 import { setUserRole } from "#/server/users";
 import { EMAIL_SKIP_HINT } from "./send-email-checkbox";
@@ -30,22 +30,15 @@ interface Props {
  */
 export function RoleSelect({ email, userId, initialRole, onChanged }: Props) {
   const [role, setRole] = useState<UserRole>(initialRole);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const { busy: saving, error, run } = useAction({ fallback: "Save failed" });
 
-  async function onSave(sendEmail: boolean) {
-    setSaving(true);
-    setError(null);
-    try {
+  function onSave(sendEmail: boolean) {
+    void run(async () => {
       await setUserRole({ data: { userId, role, sendEmail } });
       setConfirmOpen(false);
       onChanged();
-    } catch (err) {
-      setError(errorMessage(err, "Save failed"));
-    } finally {
-      setSaving(false);
-    }
+    });
   }
 
   const dirty = role !== initialRole;

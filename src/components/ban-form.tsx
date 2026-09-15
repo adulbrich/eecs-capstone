@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { errorMessage } from "#/lib/error-message";
+import { useAction } from "#/lib/use-action";
 import { banUser, unbanUser } from "#/server/users";
 import { ConfirmDialog } from "./confirm-dialog";
 import { LocalTime } from "./local-time";
@@ -38,11 +38,12 @@ export function BanForm({
   const [reason, setReason] = useState("");
   const [expiresAt, setExpiresAt] = useState<string>("");
   const [sendEmail, setSendEmail] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Unban's alone. Ban is inside a ConfirmDialog, which owns its flight and
+  // its refusal (#410), and the two branches never render together: this
+  // component returns early on `banned`. The state used to be shared, which
+  // left the Ban button reading a `busy` nothing could set.
+  const { busy, error, run } = useAction({ fallback: "Unban failed" });
 
-  // ConfirmDialog owns the flight and the refusal (#410). Unban below keeps
-  // its own, because it is a plain button with no dialog around it.
   async function onBan() {
     const expires = expiresAt.length > 0 ? new Date(expiresAt) : null;
     await banUser({
@@ -53,17 +54,11 @@ export function BanForm({
     onChanged();
   }
 
-  async function onUnban() {
-    setBusy(true);
-    setError(null);
-    try {
+  function onUnban() {
+    void run(async () => {
       await unbanUser({ data: { userId } });
       onChanged();
-    } catch (err) {
-      setError(errorMessage(err, "Unban failed"));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   if (banned) {
@@ -146,7 +141,7 @@ export function BanForm({
           title="Ban this user?"
         >
           <Button
-            disabled={busy || reason.trim().length === 0}
+            disabled={reason.trim().length === 0}
             // Checked again each time the confirm opens: the skip is a
             // decision about one ban, and a Cancel must not carry it over.
             onClick={() => setSendEmail(true)}
@@ -154,10 +149,9 @@ export function BanForm({
             type="button"
             variant="destructive"
           >
-            {busy ? "Working..." : "Ban"}
+            Ban
           </Button>
         </ConfirmDialog>
-        <FieldError message={error} />
       </div>
     </section>
   );

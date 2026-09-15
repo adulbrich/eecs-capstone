@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { errorMessage } from "#/lib/error-message";
+import { useAction } from "#/lib/use-action";
 import {
   hardDeleteProject,
   returnToDraft,
@@ -34,29 +33,17 @@ export function OwnerProjectActions({
   project,
   onChanged,
 }: Props) {
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, error, run } = useAction({ fallback: "Save failed" });
 
-  async function run(action: "submit" | "withdraw") {
-    setError(null);
-    setBusy(true);
-    try {
-      switch (action) {
-        case "submit":
-          await submitProject({ data: { id: project.id } });
-          break;
-        case "withdraw":
-          await returnToDraft({ data: { id: project.id } });
-          break;
-        default:
-          break;
+  function runTransition(action: "submit" | "withdraw") {
+    void run(async () => {
+      if (action === "submit") {
+        await submitProject({ data: { id: project.id } });
+      } else {
+        await returnToDraft({ data: { id: project.id } });
       }
       onChanged();
-    } catch (err) {
-      setError(errorMessage(err, "Save failed"));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   // No try/catch and no busy of its own: ConfirmDialog owns the flight and
@@ -136,7 +123,7 @@ export function OwnerProjectActions({
             <Button
               disabled={busy}
               key={b.id}
-              onClick={() => void run(b.id)}
+              onClick={() => runTransition(b.id)}
               size="sm"
               type="button"
               variant={b.variant ?? "outline"}

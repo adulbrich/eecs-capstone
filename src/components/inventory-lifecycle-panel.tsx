@@ -1,6 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { errorMessage } from "#/lib/error-message";
 import {
   formatHoldDetailed,
   formatHoldShort,
@@ -11,6 +10,7 @@ import {
   needsDueAt,
   needsHolder,
 } from "#/lib/inventory-workflow";
+import { useAction } from "#/lib/use-action";
 import { INVENTORY_ITEM_STATUSES, type ItemStatus } from "#/lib/vocabularies";
 import {
   hardDeleteInventoryItem,
@@ -347,8 +347,9 @@ export function InventoryLifecyclePanel({
   const status = item.status as ItemStatus;
   const rec = recommendedNext(status);
 
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The same hook every other trigger uses. `setError` comes back out for
+  // the three refusals this panel makes itself, before any server call.
+  const { busy, error, run, setError } = useAction();
 
   // Checkout / reserve dialog state
   const [dlgOpen, setDlgOpen] = useState(false);
@@ -389,9 +390,7 @@ export function InventoryLifecyclePanel({
     dueAt?: Date | null;
     comment?: string | null;
   }) {
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       await transitionInventoryItem({
         data: {
           itemId: item.id,
@@ -408,11 +407,7 @@ export function InventoryLifecyclePanel({
         },
       });
       await router.invalidate();
-    } catch (e) {
-      setError(errorMessage(e, "Transition failed"));
-    } finally {
-      setBusy(false);
-    }
+    }, "Transition failed");
   }
 
   function openDialogFor(target: ItemStatus) {
@@ -521,9 +516,7 @@ export function InventoryLifecyclePanel({
   }
 
   async function onHardDelete() {
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       await hardDeleteInventoryItem({
         data: { id: item.id, confirmName: delConfirm },
       });
@@ -534,11 +527,7 @@ export function InventoryLifecyclePanel({
       // no longer exists, so the management table is the only sensible
       // destination, and only staff can reach this button.
       await router.navigate({ to: "/admin/inventory" });
-    } catch (e) {
-      setError(errorMessage(e, "Delete failed"));
-    } finally {
-      setBusy(false);
-    }
+    }, "Delete failed");
   }
 
   const statusAllowsHardDelete = status === "available" || status === "retired";

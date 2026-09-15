@@ -45,7 +45,9 @@ export function useAction(options?: {
 
   const run = useCallback(
     async (
-      action: () => void | Promise<void>,
+      // `unknown` rather than `void`: a server function returns something,
+      // and a caller should not have to discard it to pass the call here.
+      action: () => unknown,
       /** Overrides the hook's fallback for this one action. */
       actionFallback?: string
     ): Promise<boolean> => {

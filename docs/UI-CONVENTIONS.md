@@ -1220,6 +1220,13 @@ ways of wiring one mutation and the same kind of action wired differently in
 neighbouring files (#410), so the rules below are the contract and
 `src/lib/use-action.ts` is the shared piece that keeps a handler to them.
 
+**New code uses the hook.** A handler that writes the same shape by hand
+(`setBusy(true)`, `try` / `catch` / `finally`, an inline error) is not wrong,
+and about a dozen older ones still do; what is wrong is any of the rules
+below going unmet. The hook exists so that meeting them is the short path
+rather than the careful one, and so the guard below is a ref rather than
+whatever each handler remembered.
+
 ### The flight
 
 **A trigger is disabled from the click until the promise settles, and the
@@ -1306,15 +1313,15 @@ cannot see it at all.
 rejection propagate, and it disables both buttons, swaps the label to
 `busyLabel`, keeps itself open, and renders the message in a `FieldError`
 inside. Callers do not pass `busy` or `error` and do not catch.
-`SubmitBorrowListDialog` owns its own the same way.
 
 A dialog built on `AlertDialog` or `Dialog` directly holds the same three
-things itself, through `useAction`: `delete-account-dialog.tsx` and
-`inventory-lifecycle-panel.tsx` do. The exception is
-`send-email-dialog.tsx`, which takes `busy` and `error` as props because the
-save it confirms runs in the section behind it and that section shows the
-same failure. Owning the flight is the default; taking it as props is for a
-dialog that is one step of an action belonging to something else.
+things itself, through `useAction`: `delete-account-dialog.tsx`,
+`inventory-lifecycle-panel.tsx` and `submit-borrow-list-dialog.tsx` do. The
+one exception is `send-email-dialog.tsx`, which takes `busy` and `error` as
+props because the save it confirms runs in the section behind it, and that
+section shows the same failure in its own panel. Owning the flight is the
+default; taking it as props is for a dialog that is one step of an action
+belonging to something else.
 
 ### Cache
 
