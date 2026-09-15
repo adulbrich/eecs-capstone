@@ -911,8 +911,18 @@ switches, the category or status lists, Clear all. It renders in a sticky
 layout renders it in both places, only one of which is ever displayed. Stack the
 controls (`space-y-4`) and give each `w-full`; a fixed `w-56` that fit a toolbar
 overflows an 18rem column. A `FilterSwitch` label is one line under a
-`fieldset` legend that carries the "Only show projects that are", because the
-full sentence wrapped to two lines beside its switch at that width.
+`fieldset` legend that carries the "Only show projects that", because the full
+sentence wrapped to two lines beside its switch at that width; each label
+completes the legend as a lowercase predicate ("are accepting applicants"), and
+both project listings read legend and labels from `PROJECT_SWITCH_LEGEND` and
+`PROJECT_SWITCH_LABEL` in `projects-filters.tsx`, so they cannot drift (#383).
+A switch whose label does not say what it hides takes a `hint`, one muted line
+under the label that the switch names through `aria-describedby`, the way
+`SearchHint` is wired to its input; `PROJECT_SWITCH_HINT` carries the one in
+use. A control that swaps the set rather than narrowing it is not a switch
+under that legend: the public listing's archive is a two-option `RadioGroup`
+("Show: Current projects / Archived projects") above the switches, with its own
+hint line, over the same `archivedOnly` param.
 
 `activeFilterCount` is what the button shows below `xl`, so a reader knows the
 list is narrowed without opening the sheet. Count decisions, not values: a

@@ -118,11 +118,30 @@ test("@smoke projects list, filters aside at xl", async ({ page }) => {
   await waitForHydration(page);
   const aside = page.getByRole("complementary", { name: "Filters" });
   await expect(aside.getByRole("combobox", { name: "Program" })).toBeVisible();
+  // The archive mode is a radio above the switches, and the accepting
+  // switch carries its hint as its description (#383).
+  await expect(aside.getByRole("radiogroup", { name: "Show" })).toBeVisible();
   await expect(
-    aside.getByRole("switch", { name: "Accepting applicants" })
-  ).toBeVisible();
+    aside.getByRole("radio", { name: "Current projects" })
+  ).toBeChecked();
+  const archived = aside.getByRole("radio", { name: "Archived projects" });
+  await expect(archived).toBeVisible();
+  const accepting = aside.getByRole("switch", {
+    name: "are accepting applicants",
+  });
+  await expect(accepting).toBeVisible();
+  await expect(accepting).toHaveAccessibleDescription(
+    "Hides projects whose team is already full."
+  );
   await expect(page.getByRole("button", { name: "Filters" })).toBeHidden();
   await checkA11y(page);
+  // Picking Archived lands on the same param a pasted link carries.
+  await archived.click();
+  await expect(page).toHaveURL(/archivedOnly=true/);
+  await expect(archived).toBeChecked();
+  await expect(
+    aside.getByRole("radio", { name: "Current projects" })
+  ).not.toBeChecked();
 });
 
 test("@smoke projects list, filters sheet at 375px", async ({ page }) => {
@@ -136,7 +155,9 @@ test("@smoke projects list, filters sheet at 375px", async ({ page }) => {
   ).toBeHidden();
   await page.getByRole("button", { name: "Filters" }).click();
   const sheet = page.getByRole("dialog", { name: "Filters" });
-  const accepting = sheet.getByRole("switch", { name: "Accepting applicants" });
+  const accepting = sheet.getByRole("switch", {
+    name: "are accepting applicants",
+  });
   await expect(accepting).toBeVisible();
   // Focus lands inside the sheet on open, and the page under it does not
   // grow sideways for the overlay.

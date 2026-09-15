@@ -24,11 +24,11 @@ import {
  * assertion is relative (fewer than before, back to before) because the
  * local database drifts between runs (QUIRKS, "The smoke and accessibility
  * suites share one local database"). The one row a test creates is the
- * published project with "Accepting applicants" off; `createFixtureProject`
+ * published project with "are accepting applicants" off; `createFixtureProject`
  * says why the seed cannot supply it.
  */
 test.describe("@smoke listing filters sheet", () => {
-  test("projects: Accepting applicants narrows the list, Clear all restores it", async ({
+  test("projects: are accepting applicants narrows the list, Clear all restores it", async ({
     page,
   }) => {
     await withDb(async (db) =>
@@ -42,7 +42,9 @@ test.describe("@smoke listing filters sheet", () => {
 
     const before = await openListing(page, "/projects");
     const sheet = await openSheet(page);
-    await sheet.getByRole("switch", { name: "Accepting applicants" }).click();
+    await sheet
+      .getByRole("switch", { name: "are accepting applicants" })
+      .click();
     await expect(page).toHaveURL(/acceptingOnly=true/);
     await expectNarrowed(page, sheet, before);
 
