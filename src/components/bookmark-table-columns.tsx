@@ -1,17 +1,13 @@
-import { Link, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
-import { toast } from "sonner";
+import { Link } from "@tanstack/react-router";
 import { defineAdminColumns } from "#/components/admin-data-table";
-import { errorMessage } from "#/lib/error-message";
 import { projectImageSrc } from "#/lib/project-image";
 import type { SortState } from "#/lib/table-state";
 import type { listMyBookmarks } from "#/server/bookmarks";
-import { useWriteBookmark } from "./bookmark-set";
+import { BookmarkToggle } from "./bookmark-set";
 import { ImageOrFallback } from "./image-or-fallback";
 import { LocalTime } from "./local-time";
 import { projectSummaryColumns } from "./project-summary-columns";
 import { StatusBadge } from "./status-badge";
-import { Button } from "./ui/button";
 
 /** One row of `/my/bookmarks`, as `listMyBookmarks` returns it. */
 export type BookmarkRow = Awaited<
@@ -23,44 +19,6 @@ export const BOOKMARK_TABLE_DEFAULT_SORT: SortState = {
   desc: true,
   id: "savedAt",
 };
-
-/**
- * The bookmark toggle, for a page whose rows are the bookmarks: removing one
- * removes the row, so the loader is what has to refresh, not a shared set.
- */
-function RemoveBookmarkButton({ row }: { row: BookmarkRow }) {
-  const router = useRouter();
-  const [pending, setPending] = useState(false);
-  const writeBookmark = useWriteBookmark();
-  async function remove() {
-    setPending(true);
-    try {
-      // Through the hook, not the server function: it owns the ["bookmarks"]
-      // key that the count on the /projects title row reads, which a direct
-      // call left stale after a removal (#410).
-      await writeBookmark(row.id, false);
-      await router.invalidate();
-    } catch (err) {
-      // The row stays, which is the truth; say why rather than leaving a
-      // button that seemed to do nothing.
-      toast.error(errorMessage(err, "Could not remove the bookmark"));
-    } finally {
-      setPending(false);
-    }
-  }
-  return (
-    <Button
-      aria-label={`Remove ${row.title} from bookmarks`}
-      disabled={pending}
-      onClick={() => void remove()}
-      size="sm"
-      type="button"
-      variant="ghost"
-    >
-      Remove
-    </Button>
-  );
-}
 
 const shared = projectSummaryColumns<BookmarkRow>();
 
@@ -88,6 +46,15 @@ export const BOOKMARK_TABLE_COLUMNS = defineAdminColumns<BookmarkRow>()([
         >
           {row.original.title}
         </Link>
+        {/*
+          The same control in the same place as /projects table mode, rather
+          than a Remove button in a column of its own. The row stays after an
+          un-bookmark and the toggle shows its unset state, which is what makes
+          it a toggle: one that deletes its own row can never show that state,
+          and a misclick cost a trip back to the listing to find the project
+          again. The loader still returns bookmarks, so a reload drops it.
+        */}
+        <BookmarkToggle className="ml-auto" projectId={row.original.id} />
       </div>
     ),
     cardHeader: true,
@@ -115,12 +82,5 @@ export const BOOKMARK_TABLE_COLUMNS = defineAdminColumns<BookmarkRow>()([
     // Chronological, not text: the default would compare Date strings, which
     // begin with the weekday.
     sortFn: "datetime",
-  },
-  {
-    cell: ({ row }) => <RemoveBookmarkButton row={row.original} />,
-    enableHiding: false,
-    enableSorting: false,
-    header: "Remove",
-    id: "remove",
   },
 ]);

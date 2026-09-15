@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { AdminDataTable } from "#/components/admin-data-table";
+import { BookmarkSetProvider } from "#/components/bookmark-set";
 import {
   BOOKMARK_TABLE_COLUMNS,
   BOOKMARK_TABLE_DEFAULT_SORT,
@@ -75,13 +76,21 @@ function MyBookmarks() {
           tables run their tables. */}
       {rows.length > 0 && (
         <>
-          <AdminDataTable
-            caption="My bookmarks"
-            data={rows}
-            emptyMessage="No bookmarks yet."
-            getRowId={(row) => row.id}
-            {...tableProps}
-          />
+          {/*
+            The toggle in each Title cell reads the shared set and renders
+            nothing without a provider, so the table needs one here the way
+            the listing has one. It fetches the viewer's ids once for the
+            whole table rather than once per row.
+          */}
+          <BookmarkSetProvider>
+            <AdminDataTable
+              caption="My bookmarks"
+              data={rows}
+              emptyMessage="No bookmarks yet."
+              getRowId={(row) => row.id}
+              {...tableProps}
+            />
+          </BookmarkSetProvider>
           <ListCount count={rows.length} />
           {/*
             One quiet line, no titles: a list that silently got shorter reads
