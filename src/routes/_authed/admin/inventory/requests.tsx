@@ -539,9 +539,10 @@ function sheetActions(
   onDone: () => Promise<void>,
   setOpenLineId: (id: string | null) => void
 ): ReactNode {
-  // The refresh first: closing the sheet unmounts the actions inside it, so
-  // a refusal from the refetch would have nowhere to land and the row behind
-  // would be the stale one.
+  // The refresh first, then the close. The sheet holds its own
+  // `AdminRequestActions`, so closing first hands the reader the one in the
+  // table row instead, with a busy flag of its own that is false, over a row
+  // the refetch has not reached.
   const done = async () => {
     await onDone();
     setOpenLineId(null);

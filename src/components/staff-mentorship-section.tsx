@@ -76,9 +76,9 @@ export function StaffMentorshipSection({
       await updateProjectMentorship({
         data: { id: projectId, mentorEmail: trimmed, sendEmail },
       });
+      setConfirmOpen(false);
       await load();
       await onChanged();
-      setConfirmOpen(false);
     } catch (e) {
       setError(errorMessage(e, "Save failed"));
     } finally {

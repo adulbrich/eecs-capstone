@@ -353,15 +353,21 @@ function ReplyForm({
           sendEmail: sendEmail && !isInternal,
         },
       });
-      // Before the clear below, and outside the guard: the reply landed
-      // whichever attempt posted it, so the thread refetches even when this
-      // one was cancelled, and a refusal from the refetch still has a form to
-      // land in. Closing first unmounts the FieldError with the rest of it.
-      await onChanged();
+      // The clear happens on the write, not after the refetch below. Cancel
+      // stays live in flight and bumps the attempt number, so a clear deferred
+      // past the refetch is skipped, and the posted text comes back as the next
+      // draft for the reader to post twice (#247 guards the flag, not this).
       if (isCurrent()) {
         setContent("");
         setIsInternalChoice(false);
         setSendEmail(true);
+      }
+      // Outside the guard: the reply landed whichever attempt posted it, so the
+      // thread has to refetch even when this one was cancelled. The form closes
+      // after, so it does not become a live Reply button over a thread that
+      // does not carry the reply yet.
+      await onChanged();
+      if (isCurrent()) {
         setOpen(false);
       }
     } catch (err) {

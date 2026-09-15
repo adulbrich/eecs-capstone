@@ -57,12 +57,13 @@ function comment(overrides: Partial<ThreadComment>): ThreadComment {
 function renderThread(
   comments: ThreadComment[],
   viewerIsStaff = true,
-  viewerIsOwner = false
+  viewerIsOwner = false,
+  onChanged: () => Promise<void> = () => Promise.resolve()
 ) {
   return render(
     <CommentThread
       comments={comments}
-      onChanged={() => Promise.resolve()}
+      onChanged={onChanged}
       projectId={PROJECT_ID}
       viewerIsOwner={viewerIsOwner}
       viewerIsStaff={viewerIsStaff}
@@ -420,6 +421,38 @@ describe("CommentThread forms while a post is in flight", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Reply" }));
     expect(screen.queryByText("Forbidden")).toBeNull();
+  });
+
+  it("clears a posted reply even when Cancel lands during the refresh", async () => {
+    // The clear runs on the write, not after the refetch that follows it.
+    // Deferred past the refetch, a Cancel inside that window bumps the attempt
+    // number, the clear is skipped, and reopening Reply hands back the text
+    // that already posted, one click from posting it twice.
+    let releaseRefresh = () => {
+      // replaced below, before anything awaits the promise
+    };
+    const refreshed = new Promise<void>((resolve) => {
+      releaseRefresh = resolve;
+    });
+    renderThread([comment({})], true, false, () => refreshed);
+
+    openReplyAndType("posted once");
+    fireEvent.click(replyForm().getByRole("button", { name: "Post" }));
+    await waitFor(() => expect(addComment).toHaveBeenCalledTimes(1));
+
+    // The reply has landed and the thread is refetching. Cancel is live here
+    // on purpose (#247), and the form is still open because the close waits
+    // for the refetch.
+    fireEvent.click(replyForm().getByRole("button", { name: "Cancel" }));
+    releaseRefresh();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+    const box = screen.getByPlaceholderText("Reply") as HTMLTextAreaElement;
+    expect(box.value).toBe("");
   });
 
   it("holds the second attempt disabled when a cancelled one lands", async () => {
