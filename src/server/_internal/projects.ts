@@ -36,7 +36,10 @@ import {
   notifyProposerReassignedByEmail,
   notifyTransitionByEmail,
 } from "./project-emails";
-import { refreshProjectEmbedding } from "./project-embeddings";
+import {
+  isEmbeddableStatus,
+  refreshProjectEmbedding,
+} from "./project-embeddings";
 
 export interface AuthUser {
   id: string;
@@ -249,7 +252,10 @@ export async function updateProjectAs(
     await deleteOwnedObject(existing.imageUrl, projectImageKeys(existing.id));
   }
 
-  if (existing.status === "published") {
+  // Archived counts as well as published, so editing an archived project keeps
+  // its vector truthful rather than leaving one computed from text nobody can
+  // see any more. `isEmbeddableStatus` is the single spelling of that rule.
+  if (isEmbeddableStatus(existing.status)) {
     await refreshProjectEmbedding(existing.id, embed);
   }
 
@@ -507,9 +513,14 @@ async function commitTransition(
   //
   // Inside the transaction this would not even fail loudly.
   // refreshProjectEmbedding re-reads the row and returns "skipped" unless the
-  // status is already published, so getting the order wrong gives you a
-  // project that publishes and never embeds.
-  if (target === "published") {
+  // status it finds is one `isEmbeddableStatus` names, so getting the order
+  // wrong gives you a project that publishes and never embeds.
+  //
+  // Archiving lands here too, and costs nothing: the hash still matches the
+  // text, so the refresh returns "unchanged" and the vector the project had
+  // while published stays put. The one case it does work is a project that
+  // failed to embed at publish time, which archiving now retries.
+  if (isEmbeddableStatus(target)) {
     await refreshProjectEmbedding(project.id, opts?.embed);
   }
 

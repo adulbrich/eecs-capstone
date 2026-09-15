@@ -18,6 +18,7 @@ import {
   buildProjectEmbeddingSource,
   embeddingHash,
 } from "#/lib/embedding-source";
+import type { ProjectStatus } from "#/lib/vocabularies";
 
 export type RefreshOutcome =
   | "skipped"
@@ -25,6 +26,24 @@ export type RefreshOutcome =
   | "updated"
   | "cleared"
   | "failed";
+
+/**
+ * The statuses that carry an embedding, and the single spelling of that rule:
+ * `refreshProjectEmbedding` gates on it, and both callers in `projects.ts` ask
+ * it rather than repeating the comparison.
+ *
+ * `archived` is in because the 547 projects imported from the legacy portal
+ * land there directly and would otherwise never get a vector (#427). An
+ * in-app project reaches `archived` only from `published`
+ * (`src/lib/project-workflow.ts`), so archiving keeps the vector it had; this
+ * is what lets an archived project be re-embedded when someone edits it.
+ *
+ * Adding a status here does not backfill the rows already in it. Run
+ * `scripts/backfill-embeddings.mjs` for that.
+ */
+export function isEmbeddableStatus(status: ProjectStatus): boolean {
+  return status === "published" || status === "archived";
+}
 
 /** pgvector's text input format, e.g. `[0.1,0.2]`. */
 export function toSqlVector(values: number[]): string {
@@ -34,10 +53,13 @@ export function toSqlVector(values: number[]): string {
 /**
  * The single writer of a project's embedding.
  *
+ * Writes for the statuses `isEmbeddableStatus` names and skips every other
+ * one, including a soft-deleted row.
+ *
  * Never throws. Callers run it after their transaction has committed, so a
  * Bedrock outage leaves the vector null or stale and the user's action still
  * succeeds. `scripts/backfill-embeddings.ts` sweeps up whatever this leaves
- * behind.
+ * behind on a workstation, `scripts/backfill-embeddings.mjs` in production.
  */
 export async function refreshProjectEmbedding(
   projectId: string,
@@ -48,7 +70,7 @@ export async function refreshProjectEmbedding(
       .select()
       .from(projects)
       .where(eq(projects.id, projectId));
-    if (project?.status !== "published" || project.deletedAt) {
+    if (!project || project.deletedAt || !isEmbeddableStatus(project.status)) {
       return "skipped";
     }
 

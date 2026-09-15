@@ -1,4 +1,13 @@
-import { and, eq, isNull } from "drizzle-orm";
+/**
+ * Workstation sweeper for missing or stale project embeddings, calling the
+ * app's own writer so there is nothing to keep in sync.
+ *
+ * `scripts/backfill-embeddings.mjs` is the production equivalent: this file
+ * imports from `src/` and needs `tsx`, and the runtime image has neither.
+ *
+ *   npx tsx --env-file=.env.local scripts/backfill-embeddings.ts
+ */
+import { and, inArray, isNull } from "drizzle-orm";
 import { db } from "../src/db";
 import { projects } from "../src/db/schema";
 import { refreshProjectEmbedding } from "../src/server/_internal/project-embeddings";
@@ -13,7 +22,12 @@ async function main() {
   const rows = await db
     .select({ id: projects.id, title: projects.title })
     .from(projects)
-    .where(and(eq(projects.status, "published"), isNull(projects.deletedAt)));
+    .where(
+      and(
+        inArray(projects.status, ["published", "archived"]),
+        isNull(projects.deletedAt)
+      )
+    );
 
   const tally = {
     cleared: 0,
@@ -33,7 +47,7 @@ async function main() {
   }
 
   process.stdout.write(
-    `\n${rows.length} published projects: ${tally.updated} updated, ` +
+    `\n${rows.length} published or archived projects: ${tally.updated} updated, ` +
       `${tally.unchanged} already current, ${tally.failed} failed, ` +
       `${tally.skipped} skipped.\n`
   );

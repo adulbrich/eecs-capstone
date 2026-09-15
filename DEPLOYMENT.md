@@ -486,7 +486,7 @@ aws --profile aws-capstone1 s3api put-public-access-block \
 # by design, so a run without it would crash instead of importing text only.
 #
 # `legacy*` with no separator, so it spans BOTH prefixes this runbook uses:
-# `legacy/` in 7a.2 and `legacy-live/` in 7a.6. An S3 ARN wildcard is literal
+# `legacy/` in 7a.2 and `legacy-live/` in 7a.7. An S3 ARN wildcard is literal
 # up to the `*`, so `legacy-*` would cover the second and miss the first, and
 # an AccessDenied on the projects file is not the missing-key case the script
 # handles: it crashes the task instead.
@@ -649,7 +649,40 @@ Imported 547 projects (302 with no publish date, 330 with an image)
 Everything runs in one transaction, so a failure leaves nothing behind. To
 undo, add `"--undo"` after `"scripts/import-legacy.mjs"` in the command array.
 
-### 7a.5 What to expect afterwards
+### 7a.5 Give the imported projects an embedding
+
+The import writes no embedding, and the rows land `archived`, so nothing in the
+app would ever give them one. Until they have a vector they all tie in the
+`recommended` sort, which orders on `embedding IS NULL` first (#427).
+
+Same task shape as 7a.4, no environment override: the task definition already
+carries `BEDROCK_EMBEDDING_MODEL_ID` and `BEDROCK_EMBEDDING_DIMENSIONS`, and the
+task role already holds `bedrock:InvokeModel`. `CLUSTER`, `TASKDEF` and `NETCFG`
+come from 7a.4 unchanged.
+
+```bash
+aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARGATE \
+  --task-definition "$TASKDEF" \
+  --network-configuration "$NETCFG" \
+  --overrides '{"containerOverrides":[{"name":"app","command":["node","scripts/backfill-embeddings.mjs"]}]}' \
+  --region us-west-2
+```
+
+It selects every `published` or `archived` project with no embedding, so it
+takes about five minutes for 547 rows at one Bedrock call each plus a 200ms
+politeness delay. The CloudWatch log should end with:
+
+```
+547 project(s) needed an embedding: 547 updated, 0 failed.
+```
+
+Safe and cheap to re-run: a row that already has a vector is not selected, so a
+second run reports zero and makes no Bedrock call. A row that fails stays null,
+the run continues, and the task exits non-zero to say so, which is what makes a
+partial run resumable. Run it again after any later import, including the live
+set in 7a.7.
+
+### 7a.6 What to expect afterwards
 
 - **302 projects have no `published_at` and 264 no `archived_at`.** The legacy
   event log only starts 2022-08-03, so those dates do not exist to import.
@@ -668,7 +701,7 @@ undo, add `"--undo"` after `"scripts/import-legacy.mjs"` in the command array.
   one exists for that address; the rest carry `proposer_email` alone and link
   themselves the first time that person signs in.
 
-### 7a.6 Re-running, and importing the projects still live in the old portal
+### 7a.7 Re-running, and importing the projects still live in the old portal
 
 Both are supported, with one thing to know about each.
 

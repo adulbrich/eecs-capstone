@@ -213,8 +213,11 @@ export const projects = pgTable(
       ),
     /**
      * Semantic embedding of the project's text, written only while the
-     * project is published. Null means "not embedded yet" and must never be
-     * treated as "no match": such rows sort last, they are not filtered out.
+     * project is published or archived (`isEmbeddableStatus`). Null means
+     * "not embedded yet" and must never be treated as "no match": such rows
+     * sort last, they are not filtered out. The 547 rows imported from the
+     * legacy portal landed archived with no vector, which is what
+     * `scripts/backfill-embeddings.mjs` fills in (#427).
      */
     embedding: vector("embedding", { dimensions: 1024 }),
     embeddingSourceHash: text("embedding_source_hash"),

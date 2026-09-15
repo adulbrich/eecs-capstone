@@ -21,6 +21,17 @@ function section(label: string, value: string | null): string | null {
   return trimmed ? `${label}: ${trimmed}` : null;
 }
 
+/**
+ * Assembles the exact string that gets embedded.
+ *
+ * `scripts/backfill-embeddings.mjs` carries a byte-identical copy of this
+ * body, of `section` and of `embeddingHash`, because the production image
+ * ships no `src/`. `src/test/backfill-embeddings-parity.test.ts` compares the
+ * copies with whitespace collapsed, so keep all three bodies comment-free and
+ * annotation-free: a comment inside one of them, or the type predicate that
+ * used to sit on the `filter` below, fails a comparison an `.mjs` cannot
+ * match. Explain above the function, the way this does.
+ */
 export function buildProjectEmbeddingSource(
   project: EmbeddableProject,
   categoryNames: string[],
@@ -39,7 +50,7 @@ export function buildProjectEmbeddingSource(
       "Categories",
       categoryNames.length > 0 ? categoryNames.join(", ") : null
     ),
-  ].filter((part): part is string => part !== null);
+  ].filter((part) => part !== null);
   return parts.join("\n\n").slice(0, EMBEDDING_SOURCE_LIMIT);
 }
 

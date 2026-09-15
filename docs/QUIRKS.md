@@ -978,7 +978,7 @@ Every consumer of `getProgram` and `listEligibleInstructors` is an admin-only pa
 
 ### `refreshProjectEmbedding` inside the transaction silently does nothing
 
-`commitTransition` orders notifications inside the transaction (enforced by the type: `recordStatusChangeNotifications` takes a `Tx`), the embedding refresh strictly after commit, and the email strictly after commit. The middle one is enforced by nothing: `refreshProjectEmbedding` takes no `tx`, uses the module `db`, re-reads the row, and returns `"skipped"` unless the status is already `published`. Called inside the transaction it does not throw; you get a project that publishes and never embeds. Checkable:
+`commitTransition` orders notifications inside the transaction (enforced by the type: `recordStatusChangeNotifications` takes a `Tx`), the embedding refresh strictly after commit, and the email strictly after commit. The middle one is enforced by nothing: `refreshProjectEmbedding` takes no `tx`, uses the module `db`, re-reads the row, and returns `"skipped"` unless the status it finds is one `isEmbeddableStatus` names, which since #427 is `published` or `archived`. Called inside the transaction it does not throw; you get a project that publishes and never embeds. Checkable:
 
 ```bash
 # one hit, in commitTransition
@@ -986,6 +986,12 @@ grep -rn 'insert(projectStatusHistory)' src --include='*.ts' | grep -v __tests__
 ```
 
 `update(projects)` has five legitimate non-status writers, so a grep on that proves nothing.
+
+### There are two embedding backfills, and only one of them runs in production
+
+`scripts/backfill-embeddings.ts` calls `refreshProjectEmbedding`, so it has nothing to keep in sync, and it cannot run in production: it imports from `src/`, and the runtime image installs with `npm ci --omit=dev` (no `tsx`) and ships `.output` without `src/`. `scripts/backfill-embeddings.mjs` is the one that runs as an ECS task, and it pays for that by carrying its own copy of `EMBEDDING_SOURCE_LIMIT`, `section`, `buildProjectEmbeddingSource`, `embeddingHash`, `buildEmbedConfig` and `buildEmbedRequestBody`. `src/test/backfill-embeddings-parity.test.ts` compares those bodies as text with whitespace collapsed, so **keep them free of comments and of TypeScript annotations**: a comment inside one of them, or a type predicate on the `filter` in `buildProjectEmbeddingSource`, fails a comparison an `.mjs` can never match. Explain above the function instead. The worst drift is silent: a source builder that differs stores vectors computed from text the app would never produce, and the stored hash still looks valid, so nothing recomputes them.
+
+Neither sweeper refreshes a stale vector. `.mjs` selects `embedding IS NULL` only, which is what makes a second run free, and `.ts` leans on the hash check inside `refreshProjectEmbedding`. Re-embedding a project whose text changed is `refreshProjectEmbedding`'s job on edit.
 
 ### `sendEmail` is decided by role in `performTransitionAs`, not by the schema
 
