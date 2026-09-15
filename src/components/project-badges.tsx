@@ -2,29 +2,32 @@ import { cn } from "#/lib/utils.ts";
 import { Badge } from "./ui/badge";
 
 /**
- * The public mentorship state of a project, as badges.
+ * The public marks of a project, as badges: student proposed, seeking a
+ * mentor, and requiring an NDA or IP agreement (#372).
  *
  * Two flags rather than the mentor's address because the address never
  * reaches a public payload. `seekingMentor` is derived on the server as
  * "staff marked it as looking for a mentor and no address is on file", which
  * is what lets a project whose mentor has not signed up yet show nothing
- * rather than a false "Seeking mentor". The two flags are independent since
- * #304: either badge can show alone. See #75.
+ * rather than a false "Seeking mentor". The flags are independent since
+ * #304: any badge can show alone. See #75.
  *
  * Rendered by the card and the detail page, so no surface computes the
- * badges its own way. The tables show neither; the public listing filters on
- * the same two facts instead (#336).
+ * badges its own way. The tables show none of them; the public listing
+ * filters on the same facts instead (#336, #372).
  */
-export function MentorshipBadges({
+export function ProjectBadges({
   className,
+  requiresNdaIp,
   seekingMentor,
   studentProposed,
 }: {
   className?: string;
+  requiresNdaIp: boolean;
   seekingMentor: boolean;
   studentProposed: boolean;
 }) {
-  if (!(studentProposed || seekingMentor)) {
+  if (!(studentProposed || seekingMentor || requiresNdaIp)) {
     return null;
   }
   return (
@@ -41,6 +44,7 @@ export function MentorshipBadges({
           Seeking mentor
         </Badge>
       )}
+      {requiresNdaIp && <Badge variant="outline">NDA/IP required</Badge>}
     </div>
   );
 }

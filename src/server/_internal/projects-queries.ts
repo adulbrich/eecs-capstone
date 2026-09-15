@@ -152,6 +152,9 @@ function buildAdminProjectScope(
     // shows no badge and must not match the filter either.
     scope.push(seekingMentorSql);
   }
+  if (data.requiresNdaOnly) {
+    scope.push(eq(projects.requiresNdaIp, true));
+  }
   return scope;
 }
 

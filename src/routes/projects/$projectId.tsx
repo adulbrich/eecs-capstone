@@ -9,8 +9,8 @@ import { ApplicantsBadge } from "#/components/applicants-badge";
 import { BookmarkButton } from "#/components/bookmark-button";
 import { CategoryChip } from "#/components/category-chip";
 import { Markdown } from "#/components/markdown";
-import { MentorshipBadges } from "#/components/mentorship-badges";
 import { OwnerProjectActions } from "#/components/owner-project-actions";
+import { ProjectBadges } from "#/components/project-badges";
 import { ProjectPrivatePanel } from "#/components/project-private-panel";
 import { SectionHeading } from "#/components/section-heading";
 import { StaffProjectPanel } from "#/components/staff-project-panel";
@@ -124,8 +124,9 @@ function ProjectDetail() {
           <StatusBadge status={project.status} />
         </div>
       </div>
-      <MentorshipBadges
+      <ProjectBadges
         className="mt-3"
+        requiresNdaIp={project.requiresNdaIp}
         seekingMentor={project.seekingMentor}
         studentProposed={project.studentProposed}
       />

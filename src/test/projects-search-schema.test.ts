@@ -30,3 +30,17 @@ describe("/projects categories search param", () => {
     expect(searchSchema.parse({ categories: many }).categories).toEqual([]);
   });
 });
+
+describe("/projects switch params", () => {
+  it("default every switch off, the agreement switch included", () => {
+    expect(searchSchema.parse({})).toMatchObject({
+      acceptingOnly: false,
+      requiresNdaOnly: false,
+      seekingMentorOnly: false,
+      studentProposedOnly: false,
+    });
+    expect(searchSchema.parse({ requiresNdaOnly: true }).requiresNdaOnly).toBe(
+      true
+    );
+  });
+});

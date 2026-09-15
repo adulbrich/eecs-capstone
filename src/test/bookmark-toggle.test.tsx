@@ -129,6 +129,7 @@ describe("BookmarkToggle", () => {
       title: "Rover",
       description: null,
       acceptingApplicants: true,
+      requiresNdaIp: false,
       seekingMentor: false,
       status: "published",
       studentProposed: false,

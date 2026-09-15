@@ -62,6 +62,9 @@ export async function searchProjectsImpl(
     // shows no badge and must not match the filter either.
     conditions.push(seekingMentorSql);
   }
+  if (data.requiresNdaOnly) {
+    conditions.push(eq(projects.requiresNdaIp, true));
+  }
   if (data.categoryIds.length > 0) {
     const matchingProjectIds = db
       .select({ projectId: projectCategories.projectId })

@@ -48,6 +48,7 @@ export const searchSchema = z.object({
   acceptingOnly: z.boolean().default(false),
   studentProposedOnly: z.boolean().default(false),
   seekingMentorOnly: z.boolean().default(false),
+  requiresNdaOnly: z.boolean().default(false),
   page: z.number().int().min(1).default(1),
   // The server's ordering, which also decides which twenty rows make up the
   // page. Named `order` because `sort` and `dir` are the table's, below.
@@ -76,6 +77,7 @@ export const Route = createFileRoute("/projects/")({
     page: search.page,
     program: search.program,
     q: search.q,
+    requiresNdaOnly: search.requiresNdaOnly,
     seekingMentorOnly: search.seekingMentorOnly,
     studentProposedOnly: search.studentProposedOnly,
   }),
@@ -94,6 +96,7 @@ export const Route = createFileRoute("/projects/")({
             acceptingOnly: deps.acceptingOnly,
             studentProposedOnly: deps.studentProposedOnly,
             seekingMentorOnly: deps.seekingMentorOnly,
+            requiresNdaOnly: deps.requiresNdaOnly,
             page: deps.page,
             pageSize: PAGE_SIZE_DEFAULT,
             sort: deps.order,
@@ -126,7 +129,8 @@ function isFiltered(search: Search): boolean {
     search.archivedOnly ||
     search.acceptingOnly ||
     search.studentProposedOnly ||
-    search.seekingMentorOnly
+    search.seekingMentorOnly ||
+    search.requiresNdaOnly
   );
 }
 
@@ -179,6 +183,7 @@ function ProjectsList() {
     archivedOnly: search.archivedOnly,
     categories: search.categories,
     program: search.program,
+    requiresNdaOnly: search.requiresNdaOnly,
     seekingMentorOnly: search.seekingMentorOnly,
     studentProposedOnly: search.studentProposedOnly,
   };

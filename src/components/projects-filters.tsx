@@ -39,8 +39,11 @@ export type ProjectsOrder = "relevance" | "newest" | "recommended";
 export const PROJECT_SWITCH_LABEL = {
   acceptingOnly: "Accepting applicants",
   archivedOnly: "Archived",
+  requiresNdaOnly: "Requiring an NDA or IP agreement",
   seekingMentorOnly: "Seeking a mentor",
-  studentProposedOnly: "Student-proposed",
+  // The same string as the badge, so the filter and the mark read as one
+  // fact (#372).
+  studentProposedOnly: "Student proposed",
 } as const;
 
 /** The narrowing params of `/projects`, as the route's search carries them. */
@@ -49,6 +52,7 @@ export interface ProjectsFilterState {
   archivedOnly: boolean;
   categories: string[];
   program: string | null;
+  requiresNdaOnly: boolean;
   seekingMentorOnly: boolean;
   studentProposedOnly: boolean;
 }
@@ -65,6 +69,7 @@ export function countActiveFilters(state: ProjectsFilterState): number {
     state.archivedOnly,
     state.studentProposedOnly,
     state.seekingMentorOnly,
+    state.requiresNdaOnly,
   ].filter(Boolean).length;
 }
 
@@ -109,6 +114,7 @@ function useProjectsFilterNavigation() {
           archivedOnly: false,
           studentProposedOnly: false,
           seekingMentorOnly: false,
+          requiresNdaOnly: false,
           page: 1,
         }),
       });
@@ -262,6 +268,7 @@ export function ProjectsFilters({
   archivedOnly,
   categories,
   program,
+  requiresNdaOnly,
   seekingMentorOnly,
   studentProposedOnly,
 }: FiltersProps) {
@@ -292,6 +299,7 @@ export function ProjectsFilters({
     archivedOnly,
     categories,
     program,
+    requiresNdaOnly,
     seekingMentorOnly,
     studentProposedOnly,
   });
@@ -346,6 +354,12 @@ export function ProjectsFilters({
             id={`${uid}-seeking-mentor-only`}
             label={PROJECT_SWITCH_LABEL.seekingMentorOnly}
             onCheckedChange={(v) => setFilter("seekingMentorOnly", v)}
+          />
+          <FilterSwitch
+            checked={requiresNdaOnly}
+            id={`${uid}-requires-nda-only`}
+            label={PROJECT_SWITCH_LABEL.requiresNdaOnly}
+            onCheckedChange={(v) => setFilter("requiresNdaOnly", v)}
           />
         </div>
       </fieldset>

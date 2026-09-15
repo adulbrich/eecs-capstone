@@ -48,6 +48,7 @@ const adminListSchema = z
     acceptingOnly: z.boolean().default(false),
     studentProposedOnly: z.boolean().default(false),
     seekingMentorOnly: z.boolean().default(false),
+    requiresNdaOnly: z.boolean().default(false),
   })
   .refine((v) => !(v.from && v.to) || v.from <= v.to, {
     message: "from must not be after to",

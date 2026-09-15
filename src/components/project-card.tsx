@@ -5,7 +5,7 @@ import { ApplicantsBadge } from "./applicants-badge";
 import { BookmarkToggle } from "./bookmark-set";
 import { ImageOrFallback } from "./image-or-fallback";
 import { LocalTime } from "./local-time";
-import { MentorshipBadges } from "./mentorship-badges";
+import { ProjectBadges } from "./project-badges";
 import { StatusBadge } from "./status-badge";
 import { Card } from "./ui/card";
 
@@ -17,6 +17,7 @@ interface ProjectSummary {
   imageUrl?: string | null;
   programCourseId?: string | null;
   programCourseName?: string | null;
+  requiresNdaIp: boolean;
   seekingMentor: boolean;
   status: string;
   studentProposed: boolean;
@@ -86,8 +87,9 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
               <StatusBadge status={project.status} />
             )}
           </div>
-          <MentorshipBadges
+          <ProjectBadges
             className="mt-2"
+            requiresNdaIp={project.requiresNdaIp}
             seekingMentor={project.seekingMentor}
             studentProposed={project.studentProposed}
           />
