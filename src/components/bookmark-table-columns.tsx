@@ -70,14 +70,15 @@ export const BOOKMARK_TABLE_COLUMNS = defineAdminColumns<BookmarkRow>()([
   {
     accessorFn: (row) => row.title,
     cell: ({ row }) => (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 md:min-w-xs md:max-w-md">
         <ImageOrFallback
           className="aspect-[3/2] w-16 shrink-0 rounded object-cover"
           src={projectImageSrc(row.original.imageUrl)}
         />
         <Link
-          className="hover:underline"
+          className="min-w-0 hover:underline md:line-clamp-2 md:whitespace-normal"
           params={{ projectId: row.original.id }}
+          title={row.original.title}
           to="/projects/$projectId"
         >
           {row.original.title}

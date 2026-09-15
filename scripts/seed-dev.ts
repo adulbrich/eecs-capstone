@@ -584,6 +584,32 @@ async function main() {
       publishedAt: null,
       categories: ["Robotics", "Python", "IoT / Embedded"],
     },
+    {
+      // A title at the 200-character cap, so the listings have one row that
+      // exercises the clamp on the title column (#371).
+      title:
+        "Longitudinal Multi-Site Evaluation Framework for Explainable Machine Learning Models in Precision Agriculture Decision Support Systems Across Heterogeneous Sensor Networks and Regional Growing Seasons",
+      description:
+        "Build a framework that runs the same explainability checks against crop models deployed at several field stations and reports where their explanations diverge.",
+      problemStatement:
+        "Growers get a recommendation and a confidence score, but no two stations explain the same prediction the same way, and nobody can tell whether that is the data or the model.",
+      objectives:
+        "1. Define a shared explanation format across stations.\n2. Run SHAP and counterfactual checks nightly.\n3. Surface divergences on a dashboard.",
+      minQualifications: "Python; some experience with pandas or scikit-learn.",
+      prefQualifications: "Interest in agriculture, explainable AI, or time series.",
+      url: "https://github.com/osu-students/xai-agriculture-framework",
+      contactEmail: USERS.facultyKim.email,
+      contactName: USERS.facultyKim.name,
+      imageUrl:
+        "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=60",
+      licenseRestrictions: "Apache-2.0.",
+      notes: "Seeded only so a 200-character title shows up in the tables.",
+      proposerId: u.facultyKim.id,
+      programId: p461.id,
+      status: "published",
+      publishedAt: daysAgo(3),
+      categories: ["Machine Learning", "Python", "Data Science"],
+    },
   ];
 
   let created = 0;
@@ -828,6 +854,19 @@ async function main() {
       notes: "Checked out for the camera-trap classifier team's demo rig.",
       imageUrl:
         "https://images.unsplash.com/photo-1587826080692-f439cd0b70da?auto=format&fit=crop&w=1200&q=60",
+      status: "available",
+      currentHolderId: null,
+      currentHolderLabel: null,
+    },
+    {
+      // A name at the 200-character cap, for the same reason as the long
+      // project title above (#371).
+      name: "Benchtop Programmable DC Power Supply with Four Isolated Output Channels, USB and LAN Remote Control, Data Logging to SD Card, Overvoltage and Overcurrent Protection, Rack Mount Kit and Test Leads Set",
+      description:
+        "Four isolated channels, 0 to 30 V at 5 A each, with SCPI over USB and LAN.",
+      categoryNames: ["Peripheral"],
+      serial: "PSU-4CH-0200",
+      location: "Kelley Engineering, Capstone Lab, Bench 2",
       status: "available",
       currentHolderId: null,
       currentHolderLabel: null,

@@ -198,15 +198,16 @@ export const COLUMNS = defineAdminColumns<Row>()([
     cell: ({ row }) => {
       const img = getPublicUrl(row.original.imageUrl);
       return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 md:min-w-xs md:max-w-md">
           {img ? (
             <img alt="" className="h-8 w-8 rounded object-cover" src={img} />
           ) : (
             <div className="h-8 w-8 rounded bg-secondary" />
           )}
           <Link
-            className="hover:underline"
+            className="min-w-0 hover:underline md:line-clamp-2 md:whitespace-normal"
             params={{ itemId: row.original.id }}
+            title={row.original.name}
             to="/inventory/$itemId"
           >
             {row.original.name}

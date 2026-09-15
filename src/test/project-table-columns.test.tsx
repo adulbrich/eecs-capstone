@@ -193,6 +193,7 @@ describe("the public project table", () => {
     );
     expect(cell.className).toContain("line-clamp-3");
     expect(cell.className).toContain("max-w-xs");
+    expect(cell.className).toContain("md:whitespace-normal");
   });
 
   it("renders the NDA flag as a badge and its absence as a dash", () => {
@@ -236,5 +237,23 @@ describe("the public project table", () => {
     expect(
       screen.getAllByRole("columnheader").map((h) => h.textContent?.trim())
     ).not.toContain("Bookmark");
+  });
+
+  it("bounds the Title cell and clamps the title, keeping the full text in the DOM and on the link", () => {
+    renderTable(DEFAULT_HIDDEN);
+    const link = screen.getByRole("link", { name: "Rover Telemetry" });
+    // The clamp is CSS from `md` up, so the text itself is whole: screen
+    // readers, Find-in-page and the CSV export all still see it, and the
+    // native title is what a mouse user hovers for (#371).
+    expect(link.textContent).toBe("Rover Telemetry");
+    expect(link.getAttribute("title")).toBe("Rover Telemetry");
+    expect(link.className).toContain("md:line-clamp-2");
+    expect(link.className).toContain("md:whitespace-normal");
+    expect(link.className).toContain("min-w-0");
+    // Both bounds carry the `md:` prefix: below `md` the cell is the card
+    // header strip, which must stay as wide as the card and no wider.
+    expect(link.parentElement?.className).toContain("md:min-w-xs");
+    expect(link.parentElement?.className).toContain("md:max-w-md");
+    expect(link.parentElement?.className).not.toMatch(/(^|\s)max-w-md/);
   });
 });

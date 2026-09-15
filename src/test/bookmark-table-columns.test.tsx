@@ -181,6 +181,17 @@ describe("the bookmarks table", () => {
     expect(within(two).queryByText("Seeking mentor")).toBeNull();
   });
 
+  it("bounds the Title cell and clamps the title, keeping the full text on the link", () => {
+    renderTable();
+    const link = screen.getByRole("link", { name: "Two" });
+    expect(link.getAttribute("title")).toBe("Two");
+    expect(link.className).toContain("md:line-clamp-2");
+    expect(link.className).toContain("md:whitespace-normal");
+    expect(link.className).toContain("min-w-0");
+    expect(link.parentElement?.className).toContain("md:min-w-xs");
+    expect(link.parentElement?.className).toContain("md:max-w-md");
+  });
+
   it("marks a closed roster and an NDA, and removes through the loader", async () => {
     renderTable();
     const two = screen.getByRole("link", { name: "Two" }).closest("tr");

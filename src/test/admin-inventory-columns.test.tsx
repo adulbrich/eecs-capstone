@@ -194,6 +194,18 @@ describe("the staff inventory table", () => {
     ).toBe("/admin/inventory/requests");
   });
 
+  it("bounds the Name cell and clamps the name, keeping the full text on the link", () => {
+    renderTable();
+    const link = screen.getByRole("link", { name: "Drill" });
+    expect(link.textContent).toBe("Drill");
+    expect(link.getAttribute("title")).toBe("Drill");
+    expect(link.className).toContain("md:line-clamp-2");
+    expect(link.className).toContain("md:whitespace-normal");
+    expect(link.className).toContain("min-w-0");
+    expect(link.parentElement?.className).toContain("md:min-w-xs");
+    expect(link.parentElement?.className).toContain("md:max-w-md");
+  });
+
   it("dashes each empty cell of an unheld item rather than leaving it blank", () => {
     renderTable();
     const row = rowFor("Drill");
