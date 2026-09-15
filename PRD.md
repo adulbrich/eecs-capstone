@@ -113,8 +113,10 @@ Each project carries:
   `/admin/projects` filters "Without a mentor", which beside "Student proposed" is
   the staff to-do. (#75, #304, #336, #402)
 - [x] `/my/bookmarks` is a small decision table: title with thumbnail, program,
-  status, accepting applicants, teams supported, NDA/IP, saved-on date, and a
-  remove button; the two marks are read on the card or the page (#336).
+  status, openings, teams supported, NDA/IP, and saved-on date, with the
+  listing's own bookmark toggle in the title cell rather than a remove button,
+  so un-bookmarking leaves the row in place until the next load (#336, #420);
+  the two marks are read on the card or the page (#336).
   Sorted newest save first, no view toggle and no column picker. Visibility is
   re-checked on read, and one line says how many saved projects dropped out
   rather than letting the list shrink silently. (#106)

@@ -241,14 +241,20 @@ test("my bookmarks, as a table with a saved project", async ({ page }) => {
   await expect(page.getByRole("table", { name: "My bookmarks" })).toBeVisible();
   await checkA11y(page);
 
-  const removes = page.getByRole("button", {
-    name: /^Remove .* from bookmarks$/,
+  // The row keeps its place and the toggle flips to its unset state (#420),
+  // which is a surface nothing else scans: the old Remove button took the row
+  // with it, so there was never an un-bookmarked row to check.
+  const row = page.getByRole("row").filter({
+    has: page.getByRole("button", { name: "Remove bookmark" }),
   });
-  const before = await removes.count();
-  await removes.first().click();
+  const before = await page.getByRole("row").count();
+  await row.first().getByRole("button", { name: "Remove bookmark" }).click();
+  await expect(
+    page.getByRole("button", { name: "Bookmark", exact: true }).first()
+  ).toBeVisible();
   // Not the empty state: the seeded user may hold other bookmarks, and this
-  // scan must not depend on that.
-  await expect(removes).toHaveCount(before - 1);
+  // scan must not depend on that. The count is unchanged, which is the point.
+  await expect(page.getByRole("row")).toHaveCount(before);
   await checkA11y(page);
 });
 

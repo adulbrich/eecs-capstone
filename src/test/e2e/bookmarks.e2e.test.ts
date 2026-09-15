@@ -72,6 +72,12 @@ test.describe("project bookmarks", () => {
       // click rather than a trip back to /projects to find the project again.
       // The loader returns bookmarks, so the row goes on the next load.
       const savedRow = user.getByRole("row").filter({ hasText: title });
+      // Waited for before the first `confirmed`, so the provider's own
+      // listMyBookmarkIds fetch has landed: `confirmed` arms on the next
+      // server function call of any kind, and that one would answer first.
+      await expect(
+        savedRow.getByRole("button", { name: "Remove bookmark" })
+      ).toBeVisible();
       await confirmed(user, () =>
         savedRow.getByRole("button", { name: "Remove bookmark" }).click()
       );
