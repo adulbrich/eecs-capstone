@@ -43,7 +43,8 @@ const adminListSchema = z
     // Better Auth user ids are text, not UUIDs, so this cannot be `.uuid()`.
     proposer: z.string().max(255).nullable().default(null),
     q: z.string().max(200).default(""),
-    // The public listing's three switches, under the same names (#340).
+    // Five of the public listing's six switches, under the same names
+    // (#340); archived is a status here.
     // Seeking a mentor is the derived badge value, the same rule as there.
     acceptingOnly: z.boolean().default(false),
     studentProposedOnly: z.boolean().default(false),

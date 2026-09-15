@@ -201,7 +201,7 @@ test("admin inventory requests", async ({ page }) => {
 });
 
 test("@smoke admin projects list", async ({ page }) => {
-  // The four switches live in the filters aside at the desktop width the
+  // The six switches live in the filters aside at the desktop width the
   // suite runs at (1280, which is xl) and in the filters sheet at 375px
   // (#350). At both widths every label reads on one line and nothing pushes
   // the page wider than the viewport.

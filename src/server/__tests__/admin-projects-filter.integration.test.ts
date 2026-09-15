@@ -686,9 +686,10 @@ describe("admin projects date range", () => {
 });
 
 /**
- * Writes the flags the three switches narrow on, past the form writers: the
- * project form carries `acceptingApplicants`, and the Proposer and Mentor
- * sections carry the other three, but the rule under test is the query's.
+ * Writes the flags the five switches narrow on, past the form writers: the
+ * project form carries `acceptingApplicants` and `requiresNdaIp`, and the
+ * Proposer and Mentor sections carry the rest, but the rule under test is the
+ * query's.
  */
 async function flag(
   id: string,

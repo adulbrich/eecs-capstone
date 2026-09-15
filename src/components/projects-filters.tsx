@@ -32,7 +32,7 @@ export type ProjectsOrder = "relevance" | "newest" | "recommended";
 
 /**
  * The switch labels, one line each under the legend "Only show projects that
- * are". Shared with `/admin/projects`, which carries three of the four under
+ * are". Shared with `/admin/projects`, which carries five of the six under
  * the same params (#340), so the two listings cannot drift apart and the
  * accessibility tests name one string.
  */
