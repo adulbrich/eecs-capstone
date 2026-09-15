@@ -13,8 +13,8 @@ import { Badge } from "./ui/badge";
  * #304: any badge can show alone. See #75.
  *
  * Rendered by the card and the detail page, so no surface computes the
- * badges its own way. The tables show none of them; the public listing
- * filters on the same facts instead (#336, #372).
+ * badges its own way. The tables show no badges (the agreement flag is a
+ * plain column there); both listings filter on the same facts (#336, #372).
  */
 export function ProjectBadges({
   className,

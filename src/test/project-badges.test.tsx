@@ -46,7 +46,19 @@ describe("ProjectBadges", () => {
         studentProposed={false}
       />
     );
-    const badge = getByText("NDA/IP required");
-    expect(badge.getAttribute("data-variant") ?? badge.className).toBeTruthy();
+    expect(getByText("NDA/IP required").getAttribute("data-variant")).toBe(
+      "outline"
+    );
+    expect(getByText("NDA/IP required").getAttribute("data-variant")).toBe(
+      render(
+        <ProjectBadges
+          requiresNdaIp={false}
+          seekingMentor={false}
+          studentProposed
+        />
+      )
+        .getByText("Student proposed")
+        .getAttribute("data-variant")
+    );
   });
 });

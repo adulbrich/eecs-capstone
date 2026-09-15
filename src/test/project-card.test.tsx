@@ -128,7 +128,7 @@ describe("ProjectCard", () => {
   });
 });
 
-describe("ProjectCard mentorship", () => {
+describe("ProjectCard badges", () => {
   it("shows the badges when the summary carries them, and never an address", () => {
     const { getByText, queryByText } = render(
       <ProjectCard

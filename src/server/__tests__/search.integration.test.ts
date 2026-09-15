@@ -183,7 +183,7 @@ describe("searchProjects", () => {
   });
 });
 
-describe("the two mark filters", () => {
+describe("the mark filters", () => {
   it("narrows to student-proposed projects on the raw flag", async () => {
     const admin = await makeAdmin(`sp-${Date.now()}@x.com`);
     const student = await publish(admin, "Student one");
