@@ -22,8 +22,8 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
 import { getSession } from "#/lib/auth-guards";
-import { errorMessage } from "#/lib/error-message";
 import { pageTitle } from "#/lib/page-title";
+import { useAction } from "#/lib/use-action";
 import { isStaff } from "#/lib/viewer";
 import { deleteProgram, getProgram, updateProgram } from "#/server/programs";
 
@@ -56,12 +56,11 @@ function ProgramEdit() {
   const [expectedTeams, setExpectedTeams] = useState(
     program.expectedTeams === null ? "" : String(program.expectedTeams)
   );
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAction({ fallback: "Save failed" });
 
-  async function onSave(e: React.FormEvent) {
+  function onSave(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    try {
+    void run(async () => {
       await updateProgram({
         data: {
           id: program.id,
@@ -73,9 +72,7 @@ function ProgramEdit() {
         },
       });
       navigate({ to: "/admin/programs" });
-    } catch (err) {
-      setError(errorMessage(err, "Save failed"));
-    }
+    });
   }
 
   // ConfirmDialog owns the flight and the refusal (#410).
@@ -177,7 +174,9 @@ function ProgramEdit() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button type="submit">Save</Button>
+          <Button disabled={busy} type="submit">
+            {busy ? "Saving..." : "Save"}
+          </Button>
           <ConfirmDialog
             description={deleteDescription}
             onConfirm={onDelete}
