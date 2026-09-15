@@ -2,6 +2,7 @@ import { Download } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { errorMessage } from "#/lib/error-message";
+import { FieldError } from "./ui/field";
 
 interface Props {
   /** Base filename, no extension. The current date is appended. */
@@ -100,7 +101,7 @@ export function ExportCsvButton({ filename, load }: Props) {
       <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
-      {error && <p className="text-destructive text-sm">{error}</p>}
+      <FieldError message={error} />
     </div>
   );
 }

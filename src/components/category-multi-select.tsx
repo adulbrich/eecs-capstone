@@ -10,6 +10,7 @@ import {
   listCategories,
   type listSchema,
 } from "#/server/categories";
+import { FieldError } from "./ui/field";
 
 interface Category {
   id: string;
@@ -116,7 +117,7 @@ export function CategoryMultiSelect({ domain, value, onChange }: Props) {
 
   return (
     <div className="space-y-3">
-      {loadError && <p className="text-destructive text-sm">{loadError}</p>}
+      <FieldError message={loadError} />
       {!loadError && categories.length === 0 && (
         <p className="text-muted-foreground text-sm">No categories yet.</p>
       )}
@@ -186,9 +187,7 @@ export function CategoryMultiSelect({ domain, value, onChange }: Props) {
             Create "{trimmedName}"
           </Button>
         )}
-        {createError && (
-          <p className="text-destructive text-sm">{createError}</p>
-        )}
+        {createError && <FieldError message={createError} />}
       </div>
     </div>
   );

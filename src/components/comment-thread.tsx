@@ -3,6 +3,7 @@ import { addComment } from "#/server/comments";
 import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
+import { FieldError } from "./ui/field";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
@@ -263,7 +264,7 @@ function NewCommentForm({
       <Button disabled={busy} size="sm" type="submit">
         Post comment
       </Button>
-      {error && <p className="text-destructive text-sm">{error}</p>}
+      <FieldError message={error} />
     </form>
   );
 }
@@ -426,7 +427,7 @@ function ReplyForm({
           Cancel
         </Button>
       </div>
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      <FieldError message={error} />
     </form>
   );
 }

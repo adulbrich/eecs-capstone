@@ -320,7 +320,8 @@ announced anything to a screen reader (#411).
 ```
 
 It renders nothing when there is nothing to say, so a caller does not guard it
-with `{error && ...}`.
+with `{error && ...}`, and it takes no `className`: one margin is the point,
+and none of the fifty-nine call sites needed a different one.
 
 It carries `role="alert"`, not `aria-live="polite"`. Both announce, but these
 messages are inserted in response to something the reader just did, a save they

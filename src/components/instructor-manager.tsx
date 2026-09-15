@@ -5,6 +5,7 @@ import {
   removeProgramInstructor,
 } from "#/server/programs";
 import { Button } from "./ui/button";
+import { FieldError } from "./ui/field";
 import {
   Select,
   SelectContent,
@@ -131,7 +132,7 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
           Add
         </Button>
       </div>
-      {error && <p className="mt-2 text-destructive text-sm">{error}</p>}
+      <FieldError message={error} />
     </section>
   );
 }

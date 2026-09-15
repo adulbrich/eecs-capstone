@@ -19,6 +19,7 @@ import {
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
 import { Button } from "#/components/ui/button";
+import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
@@ -161,7 +162,7 @@ function CategoryEdit() {
             </Button>
           </ConfirmDialog>
         </div>
-        {error && <p className="text-destructive text-sm">{error}</p>}
+        <FieldError message={error} />
       </form>
     </div>
   );

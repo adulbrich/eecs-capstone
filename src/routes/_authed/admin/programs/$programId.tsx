@@ -17,6 +17,7 @@ import {
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
 import { Button } from "#/components/ui/button";
+import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
@@ -190,7 +191,7 @@ function ProgramEdit() {
             </Button>
           </ConfirmDialog>
         </div>
-        {error && <p className="text-destructive text-sm">{error}</p>}
+        <FieldError message={error} />
       </form>
 
       <InstructorManager

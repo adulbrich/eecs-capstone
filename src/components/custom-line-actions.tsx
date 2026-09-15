@@ -9,6 +9,7 @@ import {
 import { FulfillCustomLineDialog } from "./fulfill-custom-line-dialog";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
+import { FieldError } from "./ui/field";
 import { Label } from "./ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Textarea } from "./ui/textarea";
@@ -97,7 +98,7 @@ export function CustomLineActions({
             rows={3}
             value={note}
           />
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          <FieldError message={error} />
           <div className="flex gap-2">
             <Button
               disabled={busy}
@@ -173,7 +174,7 @@ export function CustomLineActions({
             hint={EMAIL_SKIP_HINT.withBell}
             onCheckedChange={setSendEmail}
           />
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          <FieldError message={error} />
           <div className="flex gap-2">
             <Button
               disabled={busy}
@@ -237,7 +238,7 @@ export function StartSourcingAllButton({
   }
   return (
     <div className="flex items-center gap-2">
-      {error && <p className="text-destructive text-sm">{error}</p>}
+      <FieldError message={error} />
       <Button
         disabled={busy}
         onClick={() =>

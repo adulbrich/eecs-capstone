@@ -9,6 +9,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { OAuthErrorBanner } from "#/components/oauth-error-banner";
 import { Button } from "#/components/ui/button";
+import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
@@ -100,14 +101,9 @@ function SignIn() {
               type="password"
             />
           </div>
-          {/* `role="alert"`, like the OAuth error above: a sign-in failure has
-              to reach a screen reader, and it is the only announcement this
-              form makes. */}
-          {error && (
-            <p className="text-destructive text-sm" role="alert">
-              {error}
-            </p>
-          )}
+          {/* FieldError announces, which matters most here: a sign-in
+              failure is the only announcement this form makes. */}
+          <FieldError message={error} />
           <Button className="w-full" disabled={loading} type="submit">
             {loading ? "Signing in..." : "Sign in"}
           </Button>

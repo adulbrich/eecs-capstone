@@ -1,6 +1,7 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "#/components/ui/button";
+import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
@@ -93,7 +94,7 @@ function SignUp() {
               type="password"
             />
           </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          <FieldError message={error} />
           <Button className="w-full" disabled={loading} type="submit">
             {loading ? "Creating account..." : "Sign up"}
           </Button>

@@ -10,6 +10,7 @@ import { PanelSection } from "./panel";
 import { EMAIL_SKIP_HINT } from "./send-email-checkbox";
 import { SendEmailDialog } from "./send-email-dialog";
 import { Button } from "./ui/button";
+import { FieldError } from "./ui/field";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 
@@ -112,9 +113,7 @@ export function StaffMentorshipSection({
             mentor; an instructor who runs the team records their own.
           </p>
         </div>
-        {error && !confirmOpen && (
-          <p className="text-destructive text-sm">{error}</p>
-        )}
+        {error && !confirmOpen && <FieldError message={error} />}
         <Button
           // Disabled until the saved record has arrived: the drafts start
           // blank, and posting blank drafts over a real record would clear the

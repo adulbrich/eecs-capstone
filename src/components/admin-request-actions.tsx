@@ -3,6 +3,7 @@ import { errorMessage } from "#/lib/error-message";
 import { approveRequestItem, rejectRequestItem } from "#/server/inventory";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
+import { FieldError } from "./ui/field";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -122,7 +123,7 @@ export function AdminRequestActions({
             hint={EMAIL_SKIP_HINT.withBell}
             onCheckedChange={setSendEmail}
           />
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          <FieldError message={error} />
           <div className="flex gap-2">
             <Button
               disabled={busy}
@@ -169,7 +170,7 @@ export function AdminRequestActions({
             hint={EMAIL_SKIP_HINT.withBell}
             onCheckedChange={setSendEmail}
           />
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          <FieldError message={error} />
           <div className="flex gap-2">
             <Button
               disabled={busy}

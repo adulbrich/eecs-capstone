@@ -9,6 +9,7 @@ import { EMAIL_SKIP_HINT } from "./send-email-checkbox";
 import { SendEmailDialog } from "./send-email-dialog";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
+import { FieldError } from "./ui/field";
 import { Label } from "./ui/label";
 
 /**
@@ -56,15 +57,14 @@ export function StaffProposerSection({
           proposer={proposer}
         />
       ) : (
-        <p
-          className={
-            loadError
-              ? "text-destructive text-sm"
-              : "text-muted-foreground text-sm"
-          }
-        >
-          {loadError ?? "Loading the proposer..."}
-        </p>
+        <>
+          <FieldError message={loadError} />
+          {loadError ? null : (
+            <p className="text-muted-foreground text-sm">
+              Loading the proposer...
+            </p>
+          )}
+        </>
       )}
     </PanelSection>
   );
@@ -138,9 +138,7 @@ function ProposerDraft({
           Shown as a badge on the card and project page.
         </p>
       </div>
-      {error && !confirmOpen && (
-        <p className="text-destructive text-sm">{error}</p>
-      )}
+      {error && !confirmOpen && <FieldError message={error} />}
       <Button
         // Nothing to save until the draft differs from the record, and no
         // save while one is in flight: a second click would race the reload.

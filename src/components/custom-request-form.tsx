@@ -247,7 +247,7 @@ export function CustomRequestForm({
           </div>
         )}
       </form.Field>
-      {formError && <p className="text-destructive text-sm">{formError}</p>}
+      <FieldError message={formError} />
       <form.Subscribe selector={(state: AnyForm) => state.isSubmitting}>
         {(isSubmitting: boolean) => (
           <Button disabled={isSubmitting} type="submit">

@@ -32,6 +32,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "#/components/ui/dialog";
+import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
@@ -273,7 +274,7 @@ function ProgramsAdmin() {
                   value={description}
                 />
               </div>
-              {error && <p className="text-destructive text-sm">{error}</p>}
+              <FieldError message={error} />
               <DialogFooter>
                 <Button disabled={!(courseId && courseName)} type="submit">
                   Create program

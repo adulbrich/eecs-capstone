@@ -9,6 +9,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { SectionHeading } from "./section-heading";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
+import { FieldError } from "./ui/field";
 
 interface Project {
   id: string;
@@ -164,7 +165,7 @@ export function OwnerProjectActions({
             </ConfirmDialog>
           )}
         </div>
-        {error && <p className="mt-3 text-destructive text-sm">{error}</p>}
+        <FieldError message={error} />
       </section>
     </Card>
   );

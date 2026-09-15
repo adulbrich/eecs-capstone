@@ -9,6 +9,7 @@ import { errorMessage } from "#/lib/error-message";
 import { IMAGE_FILE_ACCEPT } from "#/lib/image-upload-policy";
 import { getPublicUrl } from "#/lib/storage";
 import { Button } from "./ui/button";
+import { FieldError } from "./ui/field";
 
 interface Props {
   aspect?: number;
@@ -167,7 +168,7 @@ export function ImageUploader({
               Cancel
             </Button>
           </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          <FieldError message={error} />
         </div>
       ) : (
         <div className="space-y-2">
@@ -207,7 +208,7 @@ export function ImageUploader({
             ref={fileInputRef}
             type="file"
           />
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          <FieldError message={error} />
         </div>
       )}
     </div>

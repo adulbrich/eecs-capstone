@@ -38,6 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import { FieldError } from "./ui/field";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
@@ -405,7 +406,7 @@ export function StaffProjectPanel({
               onCheckedChange={setSendEmail}
             />
           )}
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          <FieldError message={error} />
           <DialogFooter>
             <Button
               disabled={busy}
@@ -427,9 +428,7 @@ export function StaffProjectPanel({
         </DialogContent>
       </Dialog>
 
-      {error && !pending && (
-        <p className="mt-2 text-destructive text-sm">{error}</p>
-      )}
+      {error && !pending && <FieldError message={error} />}
 
       <StaffProposerSection
         loadError={proposerError}

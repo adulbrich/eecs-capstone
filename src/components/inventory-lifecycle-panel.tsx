@@ -41,6 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import { FieldError } from "./ui/field";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import {
@@ -599,7 +600,7 @@ export function InventoryLifecyclePanel({
             </Select>
           </div>
         </div>
-        {error && <p className="mt-3 text-destructive text-sm">{error}</p>}
+        <FieldError message={error} />
       </PanelSection>
 
       <StatusHistorySection history={history} />
@@ -702,7 +703,7 @@ export function InventoryLifecyclePanel({
               hint={EMAIL_SKIP_HINT.holder}
               onCheckedChange={setDlgSendEmail}
             />
-            {error && <p className="text-destructive text-sm">{error}</p>}
+            <FieldError message={error} />
           </div>
           <DialogFooter>
             <Button
@@ -753,7 +754,7 @@ export function InventoryLifecyclePanel({
               ref={delInputRef}
               value={delConfirm}
             />
-            {error && <p className="text-destructive text-sm">{error}</p>}
+            <FieldError message={error} />
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>

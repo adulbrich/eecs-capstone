@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ErrorBanner } from "./error-banner";
 import { SupportEmailLink } from "./support-email-link";
 
 /**
@@ -54,12 +55,5 @@ function oauthErrorMessage(code: string): ReactNode {
  * `signup_disabled` is unreachable in the current configuration.
  */
 export function OAuthErrorBanner({ code }: { code: string }) {
-  return (
-    <p
-      className="mt-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-destructive text-sm"
-      role="alert"
-    >
-      {oauthErrorMessage(code)}
-    </p>
-  );
+  return <ErrorBanner className="mt-4">{oauthErrorMessage(code)}</ErrorBanner>;
 }
