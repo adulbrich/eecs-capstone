@@ -25,7 +25,7 @@ import type {
   ProposerInput,
   UpdateProjectInput,
 } from "../projects";
-import type { EmailOptions, SendEmailFn } from "./email-dispatch";
+import type { EmailOptions } from "./email-dispatch";
 import {
   recordProposerReassignedNotification,
   recordSoftDeleteNotification,
@@ -44,11 +44,8 @@ export interface AuthUser {
   role?: string | null | undefined;
 }
 
-export interface TransitionOptions {
+export interface TransitionOptions extends EmailOptions {
   embed?: EmbedFn;
-  /** Test seam. Production callers omit it and the notifier resolves its own transport. */
-  send?: SendEmailFn;
-  sendEmail?: boolean;
 }
 
 async function loadProjectOr404(id: string) {
@@ -323,8 +320,9 @@ export async function updateProjectProposerAs(
       );
     }
   });
-  // After the transaction, never inside it; swallows its own errors.
-  if (reassigned) {
+  // After the transaction, never inside it; swallows its own errors. The
+  // skip is the email's alone: the bell row above is written regardless.
+  if (reassigned && (opts?.sendEmail ?? true)) {
     await notifyProposerReassignedByEmail(
       {
         actorId: viewer.id,
@@ -341,9 +339,12 @@ export async function updateProjectProposerAs(
   return { id: existing.id, updated: true };
 }
 
-export async function updateProjectProposerForCurrentUser(data: ProposerInput) {
+export async function updateProjectProposerForCurrentUser(
+  data: ProposerInput & { sendEmail: boolean }
+) {
   const viewer = await requireUser();
-  return updateProjectProposerAs(viewer, data);
+  const { sendEmail, ...fields } = data;
+  return updateProjectProposerAs(viewer, fields, { sendEmail });
 }
 
 /**
@@ -411,7 +412,11 @@ export async function updateProjectMentorshipAs(
   // Only a new address is news to anyone: the flags beside it change what
   // the catalog shows, not who is involved. After the transaction, and it
   // swallows its own errors.
-  if (changedFields.includes("mentorEmail") && newValues.mentorEmail) {
+  if (
+    changedFields.includes("mentorEmail") &&
+    newValues.mentorEmail &&
+    (opts?.sendEmail ?? true)
+  ) {
     await notifyMentorNamedByEmail(
       {
         mentorEmail: newValues.mentorEmail,
@@ -424,10 +429,11 @@ export async function updateProjectMentorshipAs(
 }
 
 export async function updateProjectMentorshipForCurrentUser(
-  data: MentorshipInput
+  data: MentorshipInput & { sendEmail: boolean }
 ) {
   const viewer = await requireUser();
-  return updateProjectMentorshipAs(viewer, data);
+  const { sendEmail, ...fields } = data;
+  return updateProjectMentorshipAs(viewer, fields, { sendEmail });
 }
 
 function assertChangesRequestedHasComment(
@@ -564,9 +570,10 @@ export async function performTransitionAs(
   }
   // Skipping the mail is a staff affordance, so the decision is made here from
   // the role rather than read off the request. `sendEmail` cannot be gated by
-  // the schema instead: three owner-reachable endpoints carry it, and one of
-  // them is `performTransition`, which takes its target status from the wire
-  // and so serves staff and owners through the same validator. Without this a
+  // the schema instead: five owner-reachable endpoints carry it (the three
+  // transition ones, the comment and the hard delete), and one of them is
+  // `performTransition`, which takes its target status from the wire and so
+  // serves staff and owners through the same validator. Without this a
   // proposer could submit and suppress the notice to EMAIL_STAFF_INBOX, which
   // is the only push telling staff a project arrived.
   //
@@ -654,18 +661,22 @@ export async function hardDeleteProjectAs(
   }
   // The proposer's in-app row would link to a page that now 404s, so the
   // only channel left is email. Sent last, and it swallows its own errors.
-  await notifyHardDeleteByEmail(
-    {
-      actorId: viewer.id,
-      project: {
-        id: project.id,
-        proposerEmail: project.proposerEmail,
-        proposerId: project.proposerId,
-        title: project.title,
+  // The skip is staff's, decided from the role as in `performTransitionAs`;
+  // an owner deleting their own draft is never emailed anyway.
+  if (isStaff(viewer) ? (opts?.sendEmail ?? true) : true) {
+    await notifyHardDeleteByEmail(
+      {
+        actorId: viewer.id,
+        project: {
+          id: project.id,
+          proposerEmail: project.proposerEmail,
+          proposerId: project.proposerId,
+          title: project.title,
+        },
       },
-    },
-    opts?.send
-  );
+      opts?.send
+    );
+  }
   return { id };
 }
 
@@ -728,7 +739,10 @@ export async function restoreProjectForCurrentUser(id: string) {
   return restoreProjectAs(viewer, id);
 }
 
-export async function hardDeleteProjectForCurrentUser(id: string) {
+export async function hardDeleteProjectForCurrentUser(
+  id: string,
+  sendEmail: boolean
+) {
   const viewer = await requireUser();
-  return hardDeleteProjectAs(viewer, id);
+  return hardDeleteProjectAs(viewer, id, { sendEmail });
 }

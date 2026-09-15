@@ -444,6 +444,37 @@ describe("mentor email", () => {
     process.env = { ...ORIGINAL_ENV };
   });
 
+  it("skips the email on sendEmail: false and still writes the address, and mails staff who name themselves", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser("admin-mentor-skip@x.edu", "admin");
+    const { id } = await createProjectAs(admin, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    const result = await updateProjectMentorshipAs(
+      admin,
+      {
+        id,
+        mentorEmail: "quiet-mentor@example.edu",
+        mentorNeed: "unspecified",
+      },
+      { send, sendEmail: false }
+    );
+    expect(result.updated).toBe(true);
+    expect(send).not.toHaveBeenCalled();
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.mentorEmail).toBe("quiet-mentor@example.edu");
+
+    // No actor check (#379): staff naming their own address are emailed
+    // like anyone else, with the same skip.
+    await updateProjectMentorshipAs(
+      admin,
+      { id, mentorEmail: "admin-mentor-skip@x.edu", mentorNeed: "unspecified" },
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("admin-mentor-skip@x.edu");
+  });
+
   it("emails the address when it is named, and not when only the flags change", async () => {
     process.env.BETTER_AUTH_URL = "https://app";
     const admin = await makeUser("admin-mentor-mail@x.edu", "admin");

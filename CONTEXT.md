@@ -183,7 +183,8 @@ The link between a project and its mentor: a recorded address, a derived name, a
 the mentor state, one of not decided, seeking a mentor and no mentor needed,
 granting no permission over the project. Staff set the address and the state from
 the Mentor section of the staff panel; the public sees only the two badges the state
-derives, and nothing about the mentor, name included.
+derives, and nothing about the mentor, name included. Saving a new address emails
+it, and staff can skip that email from the confirm the save opens.
 _Avoid_: assignment, sponsorship
 
 **Teams supported**:
@@ -216,7 +217,8 @@ _Avoid_: review inbox (its old name), admin email, notifications address
 **Proposer email**:
 The address a project was proposed for, kept so the project can link to that
 person's account once one exists at the address. Staff-only; not the public contact
-address.
+address. Saving a new one emails it and writes the new proposer's notification;
+staff can skip the email from the confirm the save opens.
 _Avoid_: contact email (a separate, public, hand-typed field), owner email
 
 **Claim**:

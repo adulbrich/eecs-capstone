@@ -5,6 +5,7 @@ import {
   PROJECT_STATUSES,
   type ProjectStatus,
 } from "#/lib/vocabularies";
+import { SEND_EMAIL_FIELD } from "./send-email-field";
 
 const projectInputSchema = z.object({
   title: z.string().min(1).max(200),
@@ -48,9 +49,16 @@ export const mentorshipSchema = z.object({
   // Required, never defaulted: every writer sends the state, or a stale
   // client would silently reset it (#304, #373).
   mentorNeed: z.enum(MENTOR_NEEDS),
+  ...SEND_EMAIL_FIELD,
 });
 
-export type MentorshipInput = z.infer<typeof mentorshipSchema>;
+// The row fields only: the skip rides in `EmailOptions` beside the test seam,
+// the way the transition's does, so the sixty test calls that write a row
+// need not say `sendEmail: true`.
+export type MentorshipInput = Omit<
+  z.infer<typeof mentorshipSchema>,
+  "sendEmail"
+>;
 
 export const proposerSchema = z.object({
   id: z.string().uuid(),
@@ -62,13 +70,10 @@ export const proposerSchema = z.object({
   // with the link rather than with mentorship (#336). Required, never
   // defaulted, or a stale client would silently clear it.
   studentProposed: z.boolean(),
+  ...SEND_EMAIL_FIELD,
 });
 
-export type ProposerInput = z.infer<typeof proposerSchema>;
-
-// Defaults true so a partial caller sends mail rather than silently swallowing
-// it. Staff opt out per action from the transition dialog.
-const SEND_EMAIL_FIELD = { sendEmail: z.boolean().default(true) };
+export type ProposerInput = Omit<z.infer<typeof proposerSchema>, "sendEmail">;
 
 const transitionInputSchema = z.object({
   id: z.string().uuid(),
@@ -77,6 +82,11 @@ const transitionInputSchema = z.object({
 });
 
 const idOnlySchema = z.object({ id: z.string().uuid() });
+
+const hardDeleteSchema = z.object({
+  id: z.string().uuid(),
+  ...SEND_EMAIL_FIELD,
+});
 
 export const createProject = createServerFn({ method: "POST" })
   .validator((data: unknown) => projectInputSchema.parse(data))
@@ -231,12 +241,12 @@ export const restoreProject = createServerFn({ method: "POST" })
   });
 
 export const hardDeleteProject = createServerFn({ method: "POST" })
-  .validator((data: unknown) => idOnlySchema.parse(data))
+  .validator((data: unknown) => hardDeleteSchema.parse(data))
   .handler(async ({ data }) => {
     const { hardDeleteProjectForCurrentUser } = await import(
       "./_internal/projects"
     );
-    return hardDeleteProjectForCurrentUser(data.id);
+    return hardDeleteProjectForCurrentUser(data.id, data.sendEmail);
   });
 
 const statusTransitionSchema = z.object({

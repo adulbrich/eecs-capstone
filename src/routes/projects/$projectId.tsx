@@ -217,6 +217,7 @@ function ProjectDetail() {
           }}
           projectId={project.id}
           teamsSupported={project.teamsSupported}
+          viewerIsOwner={viewerIsOwner}
           viewerIsStaff={viewerIsStaff}
         />
       )}
@@ -236,6 +237,7 @@ function ProjectDetail() {
             status: project.status,
             deletedAt: project.deletedAt,
           }}
+          viewerIsOwner={viewerIsOwner}
         />
       )}
     </div>

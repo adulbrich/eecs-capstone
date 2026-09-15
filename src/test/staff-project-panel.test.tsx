@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import type * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -154,7 +155,7 @@ function project(status: string, id = PROJECT_ID) {
 
 // Keyed on the id, as the route renders it: a rerender with a new id is the
 // remount the route relies on to drop the previous project's drafts.
-function panel(status: string, id = PROJECT_ID) {
+function panel(status: string, id = PROJECT_ID, viewerIsOwner = false) {
   return (
     <StaffProjectPanel
       key={id}
@@ -162,12 +163,18 @@ function panel(status: string, id = PROJECT_ID) {
         // no-op
       }}
       project={project(status, id)}
+      viewerIsOwner={viewerIsOwner}
     />
   );
 }
 
-function renderPanel(status: string) {
-  return render(panel(status));
+function renderPanel(status: string, viewerIsOwner = false) {
+  return render(panel(status, PROJECT_ID, viewerIsOwner));
+}
+
+/** The confirm a save that would email someone opens (#379). */
+function confirmDialog(title: string) {
+  return within(screen.getByRole("dialog", { name: title }));
 }
 
 describe("StaffProjectPanel section order", () => {
@@ -234,11 +241,15 @@ describe("StaffProjectPanel proposer block", () => {
     fireEvent.click(mark);
     await waitFor(() => expect(save.disabled).toBe(false));
     fireEvent.click(save);
+    // The mark alone mails nobody, so no confirm stands between the click
+    // and the save (#379).
+    expect(screen.queryByRole("dialog")).toBeNull();
     await waitFor(() =>
       expect(updateProjectProposer).toHaveBeenCalledWith({
         data: {
           id: PROJECT_ID,
           proposerEmail: "proposer@example.com",
+          sendEmail: true,
           studentProposed: true,
         },
       })
@@ -261,15 +272,34 @@ describe("StaffProjectPanel proposer block", () => {
     fireEvent.change(input, { target: { value: " partner@example.com " } });
     fireEvent.click(screen.getByRole("button", { name: "Save proposer" }));
 
+    // A new address is announced before it is saved (#379).
+    const dialog = confirmDialog("Save the proposer?");
+    expect(
+      dialog.getByText("This assigns the project to partner@example.com.")
+    ).toBeTruthy();
+    expect(
+      dialog
+        .getByRole("checkbox", { name: "Email partner@example.com" })
+        .getAttribute("aria-checked")
+    ).toBe("true");
+    expect(
+      dialog.getByText(
+        "Uncheck to skip the email; the in-app notification is still sent."
+      )
+    ).toBeTruthy();
+    fireEvent.click(dialog.getByRole("button", { name: "Save proposer" }));
+
     await waitFor(() =>
       expect(updateProjectProposer).toHaveBeenCalledWith({
         data: {
           id: PROJECT_ID,
           proposerEmail: "partner@example.com",
+          sendEmail: true,
           studentProposed: false,
         },
       })
     );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     // Once on mount, once after the save, and the log alongside it.
     await waitFor(() => expect(getProposerForEdit).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(listProjectEditLog).toHaveBeenCalledTimes(2));
@@ -286,11 +316,62 @@ describe("StaffProjectPanel proposer block", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Save proposer" }));
 
+    // An unlink tells nobody, so nothing asks about an email.
+    expect(screen.queryByRole("dialog")).toBeNull();
     await waitFor(() =>
       expect(updateProjectProposer).toHaveBeenCalledWith({
-        data: { id: PROJECT_ID, proposerEmail: "", studentProposed: false },
+        data: {
+          id: PROJECT_ID,
+          proposerEmail: "",
+          sendEmail: true,
+          studentProposed: false,
+        },
       })
     );
+  });
+
+  it("sends sendEmail: false when the confirm's box is unchecked, and the same address in another case asks nothing", async () => {
+    renderPanel("submitted");
+    const input = (await screen.findByLabelText(
+      "Proposer email"
+    )) as HTMLInputElement;
+    fireEvent.click(screen.getByRole("button", { name: "Re-assign" }));
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Remove the link and set an external proposer",
+      })
+    );
+    fireEvent.change(input, { target: { value: "new@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save proposer" }));
+
+    const dialog = confirmDialog("Save the proposer?");
+    fireEvent.click(
+      dialog.getByRole("checkbox", { name: "Email new@example.com" })
+    );
+    fireEvent.click(dialog.getByRole("button", { name: "Save proposer" }));
+    await waitFor(() =>
+      expect(updateProjectProposer.mock.calls[0]?.[0].data.sendEmail).toBe(
+        false
+      )
+    );
+
+    // The server lowercases before it compares, so a case-only retype of
+    // the saved address is not a change there and mails nobody: no confirm.
+    cleanup();
+    renderPanel("submitted");
+    const again = (await screen.findByLabelText(
+      "Proposer email"
+    )) as HTMLInputElement;
+    fireEvent.click(screen.getByRole("button", { name: "Re-assign" }));
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Remove the link and set an external proposer",
+      })
+    );
+    fireEvent.change(again, { target: { value: "Proposer@Example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save proposer" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(updateProjectProposer).toHaveBeenCalledTimes(2));
   });
 
   it("gives the transition dialog the new address without a reload", async () => {
@@ -314,13 +395,17 @@ describe("StaffProjectPanel proposer block", () => {
     )) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "partner@example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Save proposer" }));
+    fireEvent.click(
+      confirmDialog("Save the proposer?").getByRole("button", {
+        name: "Save proposer",
+      })
+    );
     await waitFor(() => expect(getProposerForEdit).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
     fireEvent.click(screen.getByTitle(/^Move to Approved\./));
     await waitFor(() =>
-      expect(
-        screen.getByText("Email the proposer (partner@example.com)")
-      ).toBeTruthy()
+      expect(screen.getByText("Email partner@example.com")).toBeTruthy()
     );
   });
 
@@ -346,8 +431,12 @@ describe("StaffProjectPanel proposer block", () => {
     )) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "partner@example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Save proposer" }));
+    const dialog = confirmDialog("Save the proposer?");
+    fireEvent.click(dialog.getByRole("button", { name: "Save proposer" }));
 
-    expect(await screen.findByText("Forbidden")).toBeTruthy();
+    // The failure shows in the open confirm, and only there.
+    expect(await dialog.findByText("Forbidden")).toBeTruthy();
+    expect(screen.getAllByText("Forbidden")).toHaveLength(1);
     expect(input.value).toBe("partner@example.com");
   });
 
@@ -372,13 +461,17 @@ describe("StaffProjectPanel review-email control", () => {
     fireEvent.click(screen.getByTitle(/^Move to Approved\./));
 
     await waitFor(() =>
-      expect(
-        screen.getByText("Email the proposer (proposer@example.com)")
-      ).toBeTruthy()
+      expect(screen.getByText("Email proposer@example.com")).toBeTruthy()
     );
     const checkbox = screen.getByRole("checkbox");
     expect(checkbox.getAttribute("aria-checked")).toBe("true");
     expect(checkbox.hasAttribute("disabled")).toBe(false);
+    // The bell row is not the email's to skip (#379).
+    expect(
+      screen.getByText(
+        "Uncheck to skip the email; the in-app notification is still sent."
+      )
+    ).toBeTruthy();
   });
 
   it("shows the checkbox for the Draft dialog and holds Confirm until a comment is typed", async () => {
@@ -388,9 +481,7 @@ describe("StaffProjectPanel review-email control", () => {
     fireEvent.click(screen.getByTitle(/^Move to Draft\./));
 
     await waitFor(() =>
-      expect(
-        screen.getByText("Email the proposer (proposer@example.com)")
-      ).toBeTruthy()
+      expect(screen.getByText("Email proposer@example.com")).toBeTruthy()
     );
     const confirm = screen.getByRole("button", { name: "Confirm" });
     expect(confirm.hasAttribute("disabled")).toBe(true);
@@ -653,17 +744,154 @@ describe("StaffProjectPanel mentor block", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Seeking a mentor" }));
     fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
 
+    // A new address is announced before it is saved, and the mentor has no
+    // bell row, so the line says they will not be told (#379).
+    const dialog = confirmDialog("Save the mentor?");
+    expect(
+      dialog.getByText("This names other@x.test as the mentor.")
+    ).toBeTruthy();
+    expect(
+      dialog
+        .getByRole("checkbox", { name: "Email other@x.test" })
+        .getAttribute("aria-checked")
+    ).toBe("true");
+    expect(dialog.getByText("Uncheck and they will not be told.")).toBeTruthy();
+    fireEvent.click(dialog.getByRole("button", { name: "Save mentor" }));
+
     await waitFor(() =>
       expect(updateProjectMentorship).toHaveBeenCalledWith({
         data: {
           id: PROJECT_ID,
           mentorEmail: "other@x.test",
           mentorNeed: "seeking",
+          sendEmail: true,
         },
       })
     );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     // Once on mount, once after the save.
     await waitFor(() => expect(getProjectMentorship).toHaveBeenCalledTimes(2));
+  });
+
+  it("saves the state alone with no confirm, and sends sendEmail: false when the box is unchecked", async () => {
+    getProjectMentorship.mockResolvedValue({
+      mentorEmail: "kept@x.test",
+      mentorName: null,
+      mentorNeed: "unspecified",
+    });
+    renderPanel("submitted");
+    await screen.findByDisplayValue("kept@x.test");
+    // Once under the mentor field, once under the proposer picker.
+    expect(screen.getAllByText("Saving a new address emails it.")).toHaveLength(
+      2
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "Seeking a mentor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() =>
+      expect(updateProjectMentorship).toHaveBeenCalledWith({
+        data: {
+          id: PROJECT_ID,
+          mentorEmail: "kept@x.test",
+          mentorNeed: "seeking",
+          sendEmail: true,
+        },
+      })
+    );
+
+    fireEvent.change(screen.getByLabelText("Mentor email"), {
+      target: { value: "next@x.test" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
+    const dialog = confirmDialog("Save the mentor?");
+    fireEvent.click(
+      dialog.getByRole("checkbox", { name: "Email next@x.test" })
+    );
+    fireEvent.click(dialog.getByRole("button", { name: "Save mentor" }));
+    await waitFor(() =>
+      expect(updateProjectMentorship.mock.calls[1]?.[0].data).toEqual({
+        id: PROJECT_ID,
+        mentorEmail: "next@x.test",
+        mentorNeed: "unspecified",
+        sendEmail: false,
+      })
+    );
+  });
+
+  it("checks the box again after a Cancel, so a skip is about one save", async () => {
+    renderPanel("submitted");
+    fireEvent.change(await screen.findByLabelText("Mentor email"), {
+      target: { value: "next@x.test" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
+    let dialog = confirmDialog("Save the mentor?");
+    fireEvent.click(
+      dialog.getByRole("checkbox", { name: "Email next@x.test" })
+    );
+    fireEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
+    dialog = confirmDialog("Save the mentor?");
+    expect(
+      dialog
+        .getByRole("checkbox", { name: "Email next@x.test" })
+        .getAttribute("aria-checked")
+    ).toBe("true");
+  });
+
+  it("keeps a failed save's error inside the open confirm", async () => {
+    updateProjectMentorship.mockRejectedValueOnce(new Error("SES is down"));
+    renderPanel("submitted");
+    fireEvent.change(await screen.findByLabelText("Mentor email"), {
+      target: { value: "next@x.test" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save mentor" }));
+    const dialog = confirmDialog("Save the mentor?");
+    fireEvent.click(dialog.getByRole("button", { name: "Save mentor" }));
+    expect(await dialog.findByText("SES is down")).toBeTruthy();
+    expect(screen.getAllByText("SES is down")).toHaveLength(1);
+  });
+});
+
+describe("StaffProjectPanel hard delete email", () => {
+  it("offers the skip to staff deleting someone else's draft, and sends the choice", async () => {
+    hardDeleteProject.mockResolvedValue({ id: PROJECT_ID });
+    renderPanel("draft");
+    await screen.findByLabelText("Proposer email");
+    fireEvent.click(screen.getByRole("button", { name: "Hard delete" }));
+
+    const dialog = within(
+      screen.getByRole("alertdialog", {
+        name: "Permanently delete this draft?",
+      })
+    );
+    const box = dialog.getByRole("checkbox", {
+      name: "Email proposer@example.com",
+    });
+    expect(box.getAttribute("aria-checked")).toBe("true");
+    expect(dialog.getByText("Uncheck and they will not be told.")).toBeTruthy();
+    fireEvent.click(box);
+    fireEvent.click(dialog.getByRole("button", { name: "Hard delete" }));
+
+    await waitFor(() =>
+      expect(hardDeleteProject).toHaveBeenCalledWith({
+        data: { id: PROJECT_ID, sendEmail: false },
+      })
+    );
+  });
+
+  it("offers no skip when staff delete their own draft, since nobody is emailed", async () => {
+    renderPanel("draft", true);
+    await screen.findByLabelText("Proposer email");
+    fireEvent.click(screen.getByRole("button", { name: "Hard delete" }));
+
+    const dialog = within(
+      screen.getByRole("alertdialog", {
+        name: "Permanently delete this draft?",
+      })
+    );
+    expect(dialog.queryByRole("checkbox")).toBeNull();
   });
 });
 

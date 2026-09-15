@@ -697,6 +697,41 @@ some of them are deliberately shaped in ways a route's columns never are.
 
 ## Component patterns
 
+### The email skip
+
+Every staff action that emails someone names the recipient before the click
+and can be told not to send (#379, ADR-0019). Render `SendEmailCheckbox` from
+`#/components/send-email-checkbox` inside the dialog or popover the action
+already has: "Email <address>", checked by default, over a line saying what
+unchecking leaves in place. Pick the line from `EMAIL_SKIP_HINT`: `withBell`
+when the action also writes an in-app notification, `emailOnly` when email is
+the only channel (a mentor named, a hard delete, a role change, a ban). With
+`address={null}` the box is disabled and reads "No address on file, no email
+will be sent"; keep sending `true` in that state and let the server decide
+who is reachable.
+
+A Save that had no dialog opens `SendEmailDialog` from
+`#/components/send-email-dialog`, and only when the pending change would
+actually send mail; a save that mails nobody goes straight through, or the
+dialog announces an email that never goes out. The one inline exception is
+the comment form, where staff post many: a plain "Email the proposer" box
+beside "Internal (staff only)", hidden while Internal is on.
+
+```tsx
+<SendEmailDialog
+  address={trimmed}
+  busy={busy}
+  confirmLabel="Save mentor"
+  description={`This names ${trimmed} as the mentor.`}
+  error={error}
+  hint={EMAIL_SKIP_HINT.emailOnly}
+  onConfirm={(sendEmail) => void save(sendEmail)}
+  onOpenChange={setConfirmOpen}
+  open={confirmOpen}
+  title="Save the mentor?"
+/>
+```
+
 ### Status tabs
 
 Use `Tabs`, `TabsList`, `TabsTrigger`, and `TabsContent` from
@@ -930,7 +965,10 @@ Sign-in, sign-up, forgot-password, and reset-password share an `island-shell` ca
 
 Most destructive actions confirm through `<ConfirmDialog>` from
 `#/components/confirm-dialog`. Pass the question as `title` and the consequence
-as `description`; the title is what gives the dialog its accessible name.
+as `description`; the title is what gives the dialog its accessible name. An
+optional `body` renders between the description and the buttons: the project
+hard delete puts the email skip there, since that delete emails the proposer
+(see "The email skip" above).
 
 ```tsx
 <ConfirmDialog

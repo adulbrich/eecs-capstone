@@ -406,10 +406,11 @@ catalogue that decided the matrix below; #288 shipped it.
   a warning and drops the staff-facing message.
 - [x] Every email is mandatory for its recipient. There are no notification
   preferences, no unsubscribe link and none planned; every message is
-  transactional (ADR 0019). Staff can still skip the proposer email per action
-  from the transition dialog, which names the recipient so the decision is
-  visible rather than implicit; the server ignores that flag from a non-staff
-  actor.
+  transactional (ADR 0019). Staff can still skip any email their own action
+  would send, per action, from the dialog or popover that action already has,
+  which names the recipient so the decision is visible rather than implicit;
+  the skip suppresses the email alone, and the server ignores that flag from
+  a non-staff actor (#379).
 - [x] One shared staff inbox for every staff-facing message: project submitted
   or resubmitted, a borrow list or custom request submitted, and a comment
   from the proposer. No per-staff fan-out.

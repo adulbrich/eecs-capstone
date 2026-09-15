@@ -5,6 +5,8 @@ import type { ProposerForEdit } from "#/server/projects-queries";
 import { PanelSection } from "./panel";
 import { ProposerPicker } from "./proposer-picker";
 import { ProposerSummary } from "./proposer-summary";
+import { EMAIL_SKIP_HINT } from "./send-email-checkbox";
+import { SendEmailDialog } from "./send-email-dialog";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
@@ -25,6 +27,11 @@ import { Label } from "./ui/label";
  * re-locks it against the new link, and drops a draft that no longer applies.
  * The checkbox draft rides on the same key: the two are saved together, so a
  * remount always lands on the value that was just saved.
+ *
+ * A save that changes the address to a new one emails it and writes the new
+ * proposer's bell row, so that save goes through a confirm carrying the skip
+ * (#379); the mark alone, the same address, or an unlink saves without one,
+ * and the server mails nobody for those (#385).
  */
 export function StaffProposerSection({
   loadError,
@@ -78,17 +85,27 @@ function ProposerDraft({
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const trimmed = email.trim();
   const pendingChange =
-    email.trim() !== proposer.email ||
-    studentProposed !== proposer.studentProposed;
+    trimmed !== proposer.email || studentProposed !== proposer.studentProposed;
+  // Compared after lowercasing, as the server compares: a case-only retype
+  // is not a change there and mails nobody.
+  const announces = trimmed !== "" && trimmed.toLowerCase() !== proposer.email;
 
-  async function save() {
+  async function save(sendEmail: boolean) {
     setBusy(true);
     setError(null);
     try {
       await updateProjectProposer({
-        data: { id: projectId, proposerEmail: email.trim(), studentProposed },
+        data: {
+          id: projectId,
+          proposerEmail: trimmed,
+          sendEmail,
+          studentProposed,
+        },
       });
+      setConfirmOpen(false);
       await onSaved();
     } catch (e) {
       setError(errorMessage(e, "Save failed"));
@@ -106,6 +123,9 @@ function ProposerDraft({
         onChange={setEmail}
         value={email}
       />
+      <p className="text-muted-foreground text-xs">
+        Saving a new address emails it.
+      </p>
       <div className="space-y-1">
         <Label className="font-normal">
           <Checkbox
@@ -118,17 +138,31 @@ function ProposerDraft({
           Shown as a badge on the card and project page.
         </p>
       </div>
-      {error && <p className="text-destructive text-sm">{error}</p>}
+      {error && !confirmOpen && (
+        <p className="text-destructive text-sm">{error}</p>
+      )}
       <Button
         // Nothing to save until the draft differs from the record, and no
         // save while one is in flight: a second click would race the reload.
         disabled={busy || !pendingChange}
-        onClick={() => void save()}
+        onClick={() => (announces ? setConfirmOpen(true) : void save(true))}
         size="sm"
         type="button"
       >
         {busy ? "Saving..." : "Save proposer"}
       </Button>
+      <SendEmailDialog
+        address={trimmed}
+        busy={busy}
+        confirmLabel="Save proposer"
+        description={`This assigns the project to ${trimmed}.`}
+        error={error}
+        hint={EMAIL_SKIP_HINT.withBell}
+        onConfirm={(sendEmail) => void save(sendEmail)}
+        onOpenChange={setConfirmOpen}
+        open={confirmOpen}
+        title="Save the proposer?"
+      />
     </div>
   );
 }

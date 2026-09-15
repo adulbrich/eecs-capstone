@@ -355,4 +355,37 @@ describe("comment emails", () => {
     );
     expect(send).not.toHaveBeenCalled();
   });
+
+  it("honors the staff skip for the email only, and ignores it from the proposer", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    process.env.EMAIL_STAFF_INBOX = "staff@oregonstate.edu";
+    const owner = await makeUser(`o-skip-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`a-skip-${Date.now()}@x.com`, "admin");
+    const { id: pid } = await createProjectAs(owner, baseProject());
+    await performTransitionAs(owner, pid, "submitted");
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    // The comment and the proposer's bell row are written; no email (#379).
+    const { id } = await addCommentAs(
+      admin,
+      { projectId: pid, content: "Quietly noted.", isInternal: false },
+      { send, sendEmail: false }
+    );
+    expect(send).not.toHaveBeenCalled();
+    const bell = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, owner.id));
+    expect(bell.some((n) => n.link?.endsWith(`#comment-${id}`))).toBe(true);
+
+    // A proposer's `false` is ignored: the staff inbox is still told, since
+    // that email is the only push saying a reply arrived.
+    await addCommentAs(
+      owner,
+      { projectId: pid, content: "Reply.", parentId: id, isInternal: false },
+      { send, sendEmail: false }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBe("staff@oregonstate.edu");
+  });
 });

@@ -87,29 +87,36 @@ export async function addCommentAs(
     return inserted;
   });
   // After the transaction, never inside it: a failed email must not undo a
-  // comment. notifyCommentByEmail swallows its own errors.
-  await notifyCommentByEmail(
-    {
-      authorIsStaff: isStaff(viewer),
-      comment: {
-        authorId: row.authorId,
-        content: row.content,
-        id: row.id,
-        isInternal: row.isInternal,
+  // comment. notifyCommentByEmail swallows its own errors. The skip is
+  // staff's, decided from the role as in `performTransitionAs`: a proposer's
+  // comment mails the staff inbox whatever they send (#379).
+  if (isStaff(viewer) ? (opts?.sendEmail ?? true) : true) {
+    await notifyCommentByEmail(
+      {
+        authorIsStaff: isStaff(viewer),
+        comment: {
+          authorId: row.authorId,
+          content: row.content,
+          id: row.id,
+          isInternal: row.isInternal,
+        },
+        project: {
+          id: project.id,
+          proposerEmail: project.proposerEmail,
+          proposerId: project.proposerId,
+          title: project.title,
+        },
       },
-      project: {
-        id: project.id,
-        proposerEmail: project.proposerEmail,
-        proposerId: project.proposerId,
-        title: project.title,
-      },
-    },
-    opts?.send
-  );
+      opts?.send
+    );
+  }
   return { id: row.id };
 }
 
-export async function addCommentForCurrentUser(data: AddCommentInput) {
+export async function addCommentForCurrentUser(
+  data: AddCommentInput & { sendEmail: boolean }
+) {
   const viewer = await requireUser();
-  return addCommentAs(viewer, data);
+  const { sendEmail, ...fields } = data;
+  return addCommentAs(viewer, fields, { sendEmail });
 }

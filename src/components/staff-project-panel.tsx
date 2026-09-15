@@ -25,11 +25,11 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { type EditLogEntry, EditLogList } from "./edit-log-list";
 import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { ScopeAssessmentSection } from "./scope-assessment-section";
+import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { StaffCategoriesSection } from "./staff-categories-section";
 import { StaffMentorshipSection } from "./staff-mentorship-section";
 import { StaffProposerSection } from "./staff-proposer-section";
 import { Button } from "./ui/button";
-import { Checkbox } from "./ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -96,9 +96,12 @@ function dialogDescription(pending: PendingTransition | null): string {
 export function StaffProjectPanel({
   project,
   onChanged,
+  viewerIsOwner,
 }: {
   project: Project;
   onChanged: () => void;
+  /** Staff deleting their own draft: no email goes out, so no skip is offered. */
+  viewerIsOwner: boolean;
 }) {
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +109,7 @@ export function StaffProjectPanel({
   const [busy, setBusy] = useState(false);
   const [editLog, setEditLog] = useState<EditLogEntry[]>([]);
   const [sendEmail, setSendEmail] = useState(true);
+  const [deleteEmail, setDeleteEmail] = useState(true);
   // Null until loaded: the Proposer section keeps Save disabled until then.
   const [proposer, setProposer] = useState<ProposerForEdit | null>(null);
   const [proposerError, setProposerError] = useState<string | null>(null);
@@ -224,7 +228,9 @@ export function StaffProjectPanel({
   async function runHardDelete() {
     setError(null);
     try {
-      await hardDeleteProject({ data: { id: project.id } });
+      await hardDeleteProject({
+        data: { id: project.id, sendEmail: deleteEmail },
+      });
       window.location.href = "/admin/projects";
     } catch (err) {
       setError((err as Error).message);
@@ -392,23 +398,12 @@ export function StaffProjectPanel({
             </p>
           </div>
           {proposerEmailed && (
-            <div className="space-y-1">
-              <Label className="font-normal">
-                <Checkbox
-                  checked={sendEmail && proposerAddress !== null}
-                  disabled={proposerAddress === null}
-                  onCheckedChange={(checked) => setSendEmail(checked === true)}
-                />
-                {proposerAddress
-                  ? `Email the proposer (${proposerAddress})`
-                  : "No address on file, no email will be sent"}
-              </Label>
-              {proposerAddress && (
-                <p className="text-muted-foreground text-xs">
-                  Uncheck to change the status silently.
-                </p>
-              )}
-            </div>
+            <SendEmailCheckbox
+              address={proposerAddress}
+              checked={sendEmail}
+              hint={EMAIL_SKIP_HINT.withBell}
+              onCheckedChange={setSendEmail}
+            />
           )}
           {error && <p className="text-destructive text-sm">{error}</p>}
           <DialogFooter>
@@ -495,6 +490,18 @@ export function StaffProjectPanel({
           )}
           {project.status === "draft" && !project.deletedAt && (
             <ConfirmDialog
+              body={
+                // The proposer's only channel, since the row their bell would
+                // link to is about to go: staff can still skip it (#379).
+                !viewerIsOwner && (
+                  <SendEmailCheckbox
+                    address={proposerAddress}
+                    checked={deleteEmail}
+                    hint={EMAIL_SKIP_HINT.emailOnly}
+                    onCheckedChange={setDeleteEmail}
+                  />
+                )
+              }
               confirmLabel="Hard delete"
               description="This cannot be undone."
               onConfirm={runHardDelete}

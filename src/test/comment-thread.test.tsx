@@ -54,7 +54,11 @@ function comment(overrides: Partial<ThreadComment>): ThreadComment {
   };
 }
 
-function renderThread(comments: ThreadComment[], viewerIsStaff = true) {
+function renderThread(
+  comments: ThreadComment[],
+  viewerIsStaff = true,
+  viewerIsOwner = false
+) {
   return render(
     <CommentThread
       comments={comments}
@@ -62,6 +66,7 @@ function renderThread(comments: ThreadComment[], viewerIsStaff = true) {
         // no-op
       }}
       projectId={PROJECT_ID}
+      viewerIsOwner={viewerIsOwner}
       viewerIsStaff={viewerIsStaff}
     />
   );
@@ -120,7 +125,9 @@ describe("CommentThread internal replies", () => {
     renderThread([comment({ isInternal: true })]);
     openReplyAndType("internal follow-up");
 
-    const checkbox = replyForm().getByRole("checkbox");
+    const checkbox = replyForm().getByRole("checkbox", {
+      name: "Internal (staff only)",
+    });
     expect(checkbox.getAttribute("aria-checked")).toBe("true");
     expect(checkbox.hasAttribute("disabled")).toBe(true);
     expect(
@@ -142,6 +149,7 @@ describe("CommentThread internal replies", () => {
         parentId: "c1",
         content: "internal follow-up",
         isInternal: true,
+        sendEmail: true,
       },
     });
   });
@@ -150,7 +158,9 @@ describe("CommentThread internal replies", () => {
     renderThread([comment({ isInternal: false })]);
     openReplyAndType("public follow-up");
 
-    const checkbox = replyForm().getByRole("checkbox");
+    const checkbox = replyForm().getByRole("checkbox", {
+      name: "Internal (staff only)",
+    });
     expect(checkbox.getAttribute("aria-checked")).toBe("false");
     expect(checkbox.hasAttribute("disabled")).toBe(false);
     expect(
@@ -172,7 +182,9 @@ describe("CommentThread internal replies", () => {
   it("lets staff start an internal side-thread under a public comment", async () => {
     renderThread([comment({ isInternal: false })]);
     openReplyAndType("staff aside");
-    fireEvent.click(replyForm().getByRole("checkbox"));
+    fireEvent.click(
+      replyForm().getByRole("checkbox", { name: "Internal (staff only)" })
+    );
     fireEvent.click(replyForm().getByRole("button", { name: "Post" }));
 
     await waitFor(() => expect(addComment).toHaveBeenCalledTimes(1));
@@ -183,6 +195,83 @@ describe("CommentThread internal replies", () => {
     renderThread([comment({ isInternal: false })], false);
     openReplyAndType("proposer reply");
     expect(replyForm().queryByRole("checkbox")).toBeNull();
+  });
+});
+
+describe("CommentThread email skip", () => {
+  it("posts sendEmail: false from the new-comment form when the box is unchecked", async () => {
+    renderThread([]);
+    const box = screen.getByRole("checkbox", { name: "Email the proposer" });
+    expect(box.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(box);
+    fireEvent.change(screen.getByPlaceholderText("Add a comment"), {
+      target: { value: "quiet note" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
+
+    await waitFor(() => expect(addComment).toHaveBeenCalledTimes(1));
+    expect(addComment).toHaveBeenCalledWith({
+      data: {
+        projectId: PROJECT_ID,
+        content: "quiet note",
+        isInternal: false,
+        sendEmail: false,
+      },
+    });
+    // Checked again for the next comment: the skip was about that one.
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("checkbox", { name: "Email the proposer" })
+          .getAttribute("aria-checked")
+      ).toBe("true")
+    );
+  });
+
+  it("hides the box while Internal is on, and under an internal parent", () => {
+    renderThread([comment({ isInternal: true })]);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Internal (staff only)" })
+    );
+    expect(
+      screen.queryByRole("checkbox", { name: "Email the proposer" })
+    ).toBeNull();
+
+    openReplyAndType("internal follow-up");
+    expect(
+      replyForm().queryByRole("checkbox", { name: "Email the proposer" })
+    ).toBeNull();
+  });
+
+  it("posts the reply's choice, and offers none to a non-staff viewer", async () => {
+    renderThread([comment({ isInternal: false })]);
+    openReplyAndType("reply quietly");
+    fireEvent.click(
+      replyForm().getByRole("checkbox", { name: "Email the proposer" })
+    );
+    fireEvent.click(replyForm().getByRole("button", { name: "Post" }));
+    await waitFor(() => expect(addComment).toHaveBeenCalledTimes(1));
+    expect(addComment.mock.calls[0][0].data.sendEmail).toBe(false);
+
+    cleanup();
+    renderThread([comment({ isInternal: false })], false);
+    expect(
+      screen.queryByRole("checkbox", { name: "Email the proposer" })
+    ).toBeNull();
+  });
+
+  it("offers no box to staff on their own project, where nobody is emailed", () => {
+    renderThread([comment({ isInternal: false })], true, true);
+    expect(
+      screen.getByRole("checkbox", { name: "Internal (staff only)" })
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("checkbox", { name: "Email the proposer" })
+    ).toBeNull();
+    openReplyAndType("own project");
+    expect(
+      replyForm().queryByRole("checkbox", { name: "Email the proposer" })
+    ).toBeNull();
   });
 });
 
@@ -268,6 +357,7 @@ describe("CommentThread forms while a post is in flight", () => {
           // no-op
         }}
         projectId={PROJECT_ID}
+        viewerIsOwner={false}
         viewerIsStaff={true}
       />
     );
