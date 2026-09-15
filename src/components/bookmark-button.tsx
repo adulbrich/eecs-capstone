@@ -58,7 +58,14 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
       variant="outline"
     >
       <BookmarkIcon bookmarked={bookmarked} />
-      {bookmarked ? "Bookmarked" : "Bookmark"}
+      {/*
+        Text from `md` only: on a phone this is the small icon button right
+        of the project title (#400). The aria-label above is the accessible
+        name at every width, so no role query changes.
+      */}
+      <span className="hidden md:inline">
+        {bookmarked ? "Bookmarked" : "Bookmark"}
+      </span>
     </Button>
   );
 }

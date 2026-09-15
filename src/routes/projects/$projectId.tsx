@@ -117,31 +117,51 @@ function ProjectDetail() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 md:p-8">
-      <div className="flex items-center justify-between gap-3">
+      {/*
+        One header block (#400, UI-CONVENTIONS "Detail page header"): the
+        title with the actions right of it, then every badge in one row,
+        then the chips, the owner actions, and the image. Edit renders
+        twice, once in the title row from `md` and once full width above the
+        image below it; a display-none link is out of the accessibility
+        tree, so a role query still finds exactly one.
+      */}
+      <div className="flex items-start justify-between gap-3">
         <h1 className="font-semibold text-2xl">{project.title}</h1>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-          <ApplicantsBadge acceptingApplicants={project.acceptingApplicants} />
-          <StatusBadge status={project.status} />
+        <div className="flex shrink-0 items-center gap-2">
+          <BookmarkButton projectId={project.id} />
+          {canEdit && (
+            <Button
+              asChild
+              className="hidden md:inline-flex"
+              size="sm"
+              variant="outline"
+            >
+              <Link
+                params={{ projectId: project.id }}
+                to="/projects/$projectId/edit"
+              >
+                Edit
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
       <ProjectBadges
         className="mt-3"
         requiresNdaIp={project.requiresNdaIp}
         studentProposed={project.studentProposed}
-      />
-      <div className="mt-3 flex items-center gap-2">
-        <BookmarkButton projectId={project.id} />
-        {canEdit && (
-          <Button asChild size="sm" variant="outline">
-            <Link
-              params={{ projectId: project.id }}
-              to="/projects/$projectId/edit"
-            >
-              Edit
-            </Link>
-          </Button>
-        )}
-      </div>
+      >
+        <StatusBadge status={project.status} />
+        <ApplicantsBadge acceptingApplicants={project.acceptingApplicants} />
+      </ProjectBadges>
+
+      {projectCategories.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {projectCategories.map((c) => (
+            <CategoryChip category={c} key={c.id} />
+          ))}
+        </div>
+      )}
 
       {viewerIsOwner && !viewerIsStaff && (
         <OwnerProjectActions
@@ -165,12 +185,20 @@ function ProjectDetail() {
         />
       )}
 
-      {projectCategories.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {projectCategories.map((c) => (
-            <CategoryChip category={c} key={c.id} />
-          ))}
-        </div>
+      {canEdit && (
+        <Button
+          asChild
+          className="mt-4 w-full md:hidden"
+          size="sm"
+          variant="outline"
+        >
+          <Link
+            params={{ projectId: project.id }}
+            to="/projects/$projectId/edit"
+          >
+            Edit
+          </Link>
+        </Button>
       )}
 
       <div className="mt-4 overflow-hidden rounded-lg">

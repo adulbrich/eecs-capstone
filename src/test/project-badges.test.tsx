@@ -38,6 +38,27 @@ describe("ProjectBadges", () => {
     );
   });
 
+  it("renders children before the marks in the same row, and a row for children alone", () => {
+    // The detail page passes its status and applicants badges here so the
+    // page has one badge row, not two (#400).
+    const { container, getByText } = render(
+      <ProjectBadges {...OFF} studentProposed>
+        <span>Published</span>
+      </ProjectBadges>
+    );
+    const row = container.firstElementChild;
+    expect(row?.className).toContain("flex-wrap");
+    expect(row?.children[0]?.textContent).toBe("Published");
+    expect(row?.children[1]?.textContent).toBe("Student proposed");
+    expect(getByText("Student proposed")).toBeTruthy();
+    const alone = render(
+      <ProjectBadges {...OFF}>
+        <span>Draft</span>
+      </ProjectBadges>
+    );
+    expect(alone.container.textContent).toBe("Draft");
+  });
+
   it("renders both marks in one row", () => {
     const { container, getByText } = render(
       <ProjectBadges {...OFF} requiresNdaIp studentProposed />

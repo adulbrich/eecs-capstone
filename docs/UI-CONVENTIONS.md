@@ -752,6 +752,23 @@ opens it (the checkout dialog), or the `onOpenChange` that handles the close
 />
 ```
 
+### Detail page header
+
+A detail page (`/projects/$projectId` since #400; the inventory item page is
+meant to follow) opens with one header block, top to bottom: the title row,
+`flex items-start justify-between gap-3`, with the title left and the actions
+right; one `flex flex-wrap` badge row under it holding the status badge, the
+applicants badge and the public marks in that order with one gap, which
+`ProjectBadges` renders from its `children` slot plus the marks; the category
+chips; the owner actions; then the image. The actions are Bookmark and, for a
+viewer who can edit, Edit. Bookmark keeps its icon at every width and hides its
+text below `md`, with `aria-label` and `title` as the accessible name, so it is
+the small icon button right of the title on a phone. Edit sits right of
+Bookmark from `md`; below `md` it leaves the title row and renders full width
+directly above the image. Render it twice, `hidden md:inline-flex` in the row
+and `md:hidden w-full` above the image: a display-none link is out of the
+accessibility tree, so a role query still finds exactly one.
+
 ### Status tabs
 
 Use `Tabs`, `TabsList`, `TabsTrigger`, and `TabsContent` from
