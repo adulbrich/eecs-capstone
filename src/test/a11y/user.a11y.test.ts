@@ -254,7 +254,7 @@ test("my bookmarks, as a table with a saved project", async ({ page }) => {
   const before = await page.getByRole("row").count();
   await row.getByRole("button", { name: "Remove bookmark" }).click();
   // Enabled, not merely visible. `BookmarkToggle` flips its label from the
-  // optimistic set update and stays disabled until the write resolves, and
+  // optimistic set update and stays disabled while the write is in flight, and
   // axe exempts a disabled control from colour contrast, so scanning on the
   // visible-only wait would skip the state this test exists to cover.
   await expect(
