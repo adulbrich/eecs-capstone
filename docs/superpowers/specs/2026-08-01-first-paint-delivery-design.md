@@ -2,6 +2,14 @@
 
 Date: 2026-08-01
 
+> **Superseded on the cause, 2026-09-15.** The unstyled paint this doc set out
+> to fix was not delivery size. The SSR HTML linked a stylesheet hash the image
+> did not contain, so the render-blocking request 404ed and the page styled
+> itself only after hydration. #397 has the diagnosis, the repro and the fix;
+> the `docs/QUIRKS.md` entry on Tailwind's scan set is the short version.
+> Features A and B below were real improvements and stay; Features C and D
+> were never the cause.
+
 On a cold production load the app paints unstyled content before the stylesheet
 applies, most visibly as a full-size institution logo. This design fixes the two
 things that produce that: a delivery path that ships the render-blocking

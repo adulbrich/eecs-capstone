@@ -4,10 +4,11 @@ node_modules
 .tanstack
 .nitro
 
-# VCS and CI
+# VCS and CI. `.gitignore` stays: Tailwind v4 reads it to decide what not to
+# scan, and without it the SSR pass scans `.output/` and hashes a stylesheet
+# the client pass never wrote (#397).
 .git
 .github
-.gitignore
 
 # Secrets and local env (never bake into an image)
 .env

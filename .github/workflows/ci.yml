@@ -39,6 +39,7 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run check:compression
+      - run: npm run check:assets
 
   # The integration suite is the only executable specification of the server
   # behavior in this repo, and until PR #21 it ran by hand. That is how a flaky

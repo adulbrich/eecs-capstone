@@ -19,6 +19,9 @@ COPY . .
 ARG VITE_STORAGE_PUBLIC_BASE
 ENV VITE_STORAGE_PUBLIC_BASE=${VITE_STORAGE_PUBLIC_BASE}
 RUN npm run build
+# The only place this can go red: CI builds a checkout that still has
+# `.gitignore`, this stage builds one shaped by `.dockerignore`. See #397.
+RUN node scripts/check-asset-manifest.mjs
 
 # ---- runtime stage: production deps + built server + migrations ----
 FROM node:${NODE_VERSION}-bookworm-slim AS runtime

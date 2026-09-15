@@ -24,7 +24,11 @@ Internet ──► CloudFront "app"  ──(VPC origin)──► internal ALB �
   `capstone.eecs.oregonstate.edu` (section 3.7). The ALB is internal (no public
   IP) and is reached through a CloudFront VPC origin. Uploaded assets stay on
   the second distribution's `*.cloudfront.net` name; only the app has a custom
-  domain.
+  domain. The app distribution caches `/assets/*` (the hashed build output the
+  task serves) at the edge for a year; an error under that path is sent
+  `cache-control: no-store` by `src/nitro/asset-error-headers.ts`, because
+  CloudFront would otherwise cache a 404 for the full year, which a rolling
+  deploy can produce while the old task still answers for new hashes.
 - **Data**: RDS Postgres (not publicly accessible) and a private S3 bucket
   served through a second CloudFront distribution via Origin Access Control.
 - **Secrets/identity**: app credentials come from the ECS task role (no static
@@ -333,7 +337,10 @@ The workflow:
 
 1. Assumes the AWS deploy role via OIDC.
 2. Reads the assets CloudFront base URL from SSM and builds the linux/arm64
-   image, baking it in as `VITE_STORAGE_PUBLIC_BASE`.
+   image, baking it in as `VITE_STORAGE_PUBLIC_BASE`. The build stage runs
+   `scripts/check-asset-manifest.mjs` after `npm run build`, so an image whose
+   SSR HTML links an asset the client build never wrote fails here instead of
+   shipping (the QUIRKS entry on Tailwind's scan set says how that happened).
 3. Pushes the image to ECR, tagged with the commit SHA.
 4. Registers a new task definition pointing at that image.
 5. Runs database migrations as a one-off ECS task and waits for exit code 0.
