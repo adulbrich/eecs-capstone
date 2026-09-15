@@ -359,11 +359,19 @@ export function ProjectsFilters({
       </div>
 
       <fieldset>
-        <legend className="font-medium text-muted-foreground text-xs">
+        {/*
+          The legend names the fieldset, not the radiogroup inside it, so the
+          group points at it by id for its own accessible name.
+        */}
+        <legend
+          className="font-medium text-muted-foreground text-xs"
+          id={`${uid}-archive-legend`}
+        >
           Show
         </legend>
         <RadioGroup
           aria-describedby={`${uid}-archive-hint`}
+          aria-labelledby={`${uid}-archive-legend`}
           className="mt-1 gap-1"
           onValueChange={(v) => setFilter("archivedOnly", v === "archived")}
           value={archivedOnly ? "archived" : "current"}

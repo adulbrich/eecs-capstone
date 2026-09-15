@@ -166,7 +166,7 @@ function renderFilters(
 describe("ProjectsFilters archive mode and hints", () => {
   it("offers Current and Archived as a radio above the switches, with the hint", () => {
     renderFilters();
-    const group = screen.getByRole("radiogroup");
+    const group = screen.getByRole("radiogroup", { name: "Show" });
     expect(
       screen
         .getByRole("radio", { name: "Current projects" })
