@@ -124,7 +124,7 @@ Search-driven loaders need `loaderDeps` so navigation with a new search param re
 
 ### A defaulted search param is written back to the URL as its default
 
-`navigate({ search: (prev) => ({ ...prev, acceptingOnly: checked }) })` receives the validated `prev`, so every `.default()` in the schema is spread back and serialized (`acceptingOnly=false&program=null&q=`). Setting the key to `undefined` does not remove it either: the result is validated again and the default reapplied. To keep a default out of the URL, name it in a `stripSearchParams` middleware on the route, as `/admin/projects` does for its four switches (#340):
+`navigate({ search: (prev) => ({ ...prev, acceptingOnly: checked }) })` receives the validated `prev`, so every `.default()` in the schema is spread back and serialized (`acceptingOnly=false&program=null&q=`). Setting the key to `undefined` does not remove it either: the result is validated again and the default reapplied. To keep a default out of the URL, name it in a `stripSearchParams` middleware on the route, as `/admin/projects` does for its six switches (#340):
 
 ```ts
 const SWITCH_DEFAULTS = { acceptingOnly: false, includeSoftDeleted: false };

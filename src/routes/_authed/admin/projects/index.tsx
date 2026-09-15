@@ -75,7 +75,7 @@ import {
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * The four switches, off. Stripped from the URL when they match, so a shared
+ * The six switches, off. Stripped from the URL when they match, so a shared
  * link carries only what is on (#340): the router writes every validated
  * default back on navigation otherwise, and a `false` written by the spread
  * of `prev` would survive a switch set to `undefined`.
@@ -105,7 +105,7 @@ export const searchSchema = z.object({
   from: z.string().regex(DAY).optional().catch(undefined),
   to: z.string().regex(DAY).optional().catch(undefined),
   dateField: z.enum(ADMIN_DATE_FIELDS).catch("published").default("published"),
-  // The public listing's three switches under the same names, so a link
+  // The public listing's five switches under the same names, so a link
   // pasted from /projects narrows this page the same way (#340).
   acceptingOnly: z.boolean().default(SWITCH_DEFAULTS.acceptingOnly),
   studentProposedOnly: z.boolean().default(SWITCH_DEFAULTS.studentProposedOnly),
@@ -669,7 +669,7 @@ function AdminProjectsFilters({
       )}
       <fieldset>
         {/*
-          The three switches the public listing has, under the same params, so
+          The five switches the public listing has, under the same params, so
           a link pasted from /projects narrows this page the same way (#340).
           Labels are one line each under the legend, so each fits the aside
           beside its switch. An off switch leaves the URL: see SWITCH_DEFAULTS.
