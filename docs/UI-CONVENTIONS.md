@@ -725,7 +725,8 @@ A Save that had no dialog opens `SendEmailDialog` from
 actually send mail; a save that mails nobody goes straight through, or the
 dialog announces an email that never goes out. The one inline exception is
 the comment form, where staff post many: a plain "Email the proposer" box
-beside "Internal (staff only)", hidden while Internal is on.
+beside "Internal (staff only)", unchecked and disabled while Internal is on,
+since an internal comment mails nobody; unchecking Internal checks it again.
 
 The box is checked again every time its dialog opens: the skip is a decision
 about one action, and a Cancel must not carry an unchecked box into the next.

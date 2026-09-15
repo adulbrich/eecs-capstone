@@ -196,7 +196,12 @@ function NewCommentForm({
     setBusy(true);
     try {
       await addComment({
-        data: { projectId, content, isInternal, sendEmail },
+        data: {
+          projectId,
+          content,
+          isInternal,
+          sendEmail: sendEmail && !isInternal,
+        },
       });
       setContent("");
       setIsInternal(false);
@@ -228,20 +233,26 @@ function NewCommentForm({
             <Checkbox
               checked={isInternal}
               disabled={busy}
-              onCheckedChange={(checked) => setIsInternal(checked === true)}
+              onCheckedChange={(checked) => {
+                setIsInternal(checked === true);
+                // Back to the default rather than the earlier choice: the
+                // skip is a decision about one comment (#399).
+                setSendEmail(true);
+              }}
             />
             Internal (staff only)
           </Label>
           {/*
             The one email skip that is a plain checkbox rather than a dialog
-            (#379): staff post many. Gone while Internal is on, which mails
-            nobody anyway.
+            (#379): staff post many. Stays mounted while Internal is on,
+            unchecked and disabled, so the form says that an internal comment
+            mails nobody instead of reflowing (#399).
           */}
-          {offersSkip && !isInternal && (
+          {offersSkip && (
             <Label className="font-normal">
               <Checkbox
-                checked={sendEmail}
-                disabled={busy}
+                checked={sendEmail && !isInternal}
+                disabled={busy || isInternal}
                 onCheckedChange={(checked) => setSendEmail(checked === true)}
               />
               Email the proposer
@@ -332,7 +343,13 @@ function ReplyForm({
     setBusy(true);
     try {
       await addComment({
-        data: { projectId, parentId, content, isInternal, sendEmail },
+        data: {
+          projectId,
+          parentId,
+          content,
+          isInternal,
+          sendEmail: sendEmail && !isInternal,
+        },
       });
       if (isCurrent()) {
         setContent("");
@@ -375,17 +392,19 @@ function ReplyForm({
               <Checkbox
                 checked={isInternal}
                 disabled={parentIsInternal || busy}
-                onCheckedChange={(checked) =>
-                  setIsInternalChoice(checked === true)
-                }
+                onCheckedChange={(checked) => {
+                  setIsInternalChoice(checked === true);
+                  setSendEmail(true);
+                }}
               />
               Internal (staff only)
             </Label>
-            {offersSkip && !isInternal && (
+            {/* Same shape as the new-comment form: disabled, not gone (#399). */}
+            {offersSkip && (
               <Label className="font-normal text-xs">
                 <Checkbox
-                  checked={sendEmail}
-                  disabled={busy}
+                  checked={sendEmail && !isInternal}
+                  disabled={busy || isInternal}
                   onCheckedChange={(checked) => setSendEmail(checked === true)}
                 />
                 Email the proposer
