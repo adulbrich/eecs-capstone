@@ -87,7 +87,7 @@ describe("searchProjects", () => {
     expect(order.indexOf(titleId)).toBeLessThan(order.indexOf(descId));
   });
 
-  it("acceptingOnly hides projects that are not accepting applicants", async () => {
+  it("acceptingOnly hides projects whose team is full", async () => {
     const admin = await makeAdmin(`a-acc-${Date.now()}@x.com`);
     const openId = await publish(admin, "Open roster");
     const closedId = await publish(admin, "Closed roster", {
