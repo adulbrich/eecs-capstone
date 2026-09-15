@@ -27,6 +27,15 @@
  * passes is the parent's to answer for. Classes assembled elsewhere, in a
  * constant or a variant map, are outside what a regex over one file can see,
  * and this does not pretend otherwise.
+ *
+ * Two known limits, both inert in this tree and both failing safe. The brace
+ * counter knows about strings but not about comments or regex literals, so a
+ * brace inside either, nested in a `className` expression, would miscount.
+ * `topLevelSegments` does not skip strings while splitting, so a comma inside a
+ * class string with no bracket around it would split it in the wrong place;
+ * the condition it was behind leaks into one half either way, so the literal
+ * still fails `BARE_LITERAL` and stays out of `unconditional`. Neither shape
+ * occurs in `src/`. Fix them if one ever does rather than in advance.
  */
 
 export interface ClassString {
