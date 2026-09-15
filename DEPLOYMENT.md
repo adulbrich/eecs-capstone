@@ -24,7 +24,11 @@ Internet ──► CloudFront "app"  ──(VPC origin)──► internal ALB �
   `capstone.eecs.oregonstate.edu` (section 3.7). The ALB is internal (no public
   IP) and is reached through a CloudFront VPC origin. Uploaded assets stay on
   the second distribution's `*.cloudfront.net` name; only the app has a custom
-  domain.
+  domain. The app distribution caches `/assets/*` (the hashed build output the
+  task serves) at the edge for a year; an error under that path is sent
+  `cache-control: no-store` by `src/nitro/asset-error-headers.ts`, because
+  CloudFront would otherwise cache a 404 for the full year, which a rolling
+  deploy can produce while the old task still answers for new hashes.
 - **Data**: RDS Postgres (not publicly accessible) and a private S3 bucket
   served through a second CloudFront distribution via Origin Access Control.
 - **Secrets/identity**: app credentials come from the ECS task role (no static

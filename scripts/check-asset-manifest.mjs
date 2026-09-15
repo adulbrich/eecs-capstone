@@ -46,19 +46,14 @@ async function* serverModules(dir) {
   }
 }
 
-function fail(message) {
-  console.error(message);
-  process.exit(1);
-}
-
 const onDisk = new Set(
   await readdir(ASSET_DIR).catch(() => {
-    fail(`${ASSET_DIR} not found. Run \`npm run build\` first.`);
+    throw new Error(`${ASSET_DIR} not found. Run \`npm run build\` first.`);
   })
 );
 
 if (!(await stat(SERVER_DIR).catch(() => null))?.isDirectory()) {
-  fail(`${SERVER_DIR} not found. Run \`npm run build\` first.`);
+  throw new Error(`${SERVER_DIR} not found. Run \`npm run build\` first.`);
 }
 
 const referenced = new Map();
@@ -73,13 +68,15 @@ for await (const path of serverModules(SERVER_DIR)) {
 }
 
 if (referenced.size === 0) {
-  fail(`No /assets/ URL found under ${SERVER_DIR}; that is not a Start build.`);
+  throw new Error(
+    `No /assets/ URL found under ${SERVER_DIR}; that is not a Start build.`
+  );
 }
 
 const missing = [...referenced].filter(([name]) => !onDisk.has(name));
 
 if (missing.length > 0) {
-  fail(
+  throw new Error(
     `${missing.length} of ${referenced.size} assets the server names are ` +
       `not in ${ASSET_DIR}:\n` +
       missing.map(([name, from]) => `  ${name} (from ${from})`).join("\n") +
