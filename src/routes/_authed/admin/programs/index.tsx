@@ -5,6 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
+import { FilePlus } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 import {
@@ -232,7 +233,8 @@ function ProgramsAdmin() {
         <Dialog onOpenChange={setOpen} open={open}>
           <DialogTrigger asChild>
             <Button size="sm" type="button">
-              + New program
+              <FilePlus aria-hidden="true" />
+              New program
             </Button>
           </DialogTrigger>
           <DialogContent>

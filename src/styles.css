@@ -540,4 +540,13 @@ a {
     background-color: var(--background);
     color: var(--foreground);
   }
+
+  /* Preflight leaves `button` at the browser's arrow while an anchor gets the
+     hand, so an `asChild` Button and a rendered one disagreed about whether
+     they looked clickable (#392). The base layer covers the deliberate raw
+     buttons too; a utility such as `cursor-default` on the current status pill
+     still wins, being a later layer. */
+  button:not(:disabled) {
+    cursor: pointer;
+  }
 }

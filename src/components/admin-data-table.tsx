@@ -484,7 +484,7 @@ export function AdminTableControls<T extends RowData>({
               than compact.
             */}
             <Button type="button" variant="outline">
-              <Columns3 aria-hidden className="size-4" />
+              <Columns3 aria-hidden />
               Columns
             </Button>
           </DropdownMenuTrigger>

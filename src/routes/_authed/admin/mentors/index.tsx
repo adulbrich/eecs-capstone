@@ -112,22 +112,18 @@ function MentorControls({ mentor }: { mentor: Row }) {
       />
       {/*
         Default size, not sm: these sit directly beside the capacity input,
-        which is h-9. An h-8 button next to it reads as misaligned.
+        which is h-9, so the row rule outranks Remove's usual sm
+        (UI-CONVENTIONS, "Size follows the row, not the page").
       */}
       <div className="flex gap-2">
-        <Button
-          disabled={saving}
-          onClick={() => save(true)}
-          type="button"
-          variant="outline"
-        >
+        <Button disabled={saving} onClick={() => save(true)} type="button">
           Save
         </Button>
         <Button
           disabled={saving}
           onClick={() => save(false)}
           type="button"
-          variant="outline"
+          variant="ghost"
         >
           Remove
         </Button>

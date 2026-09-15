@@ -411,7 +411,7 @@ export function StaffProjectPanel({
               disabled={busy}
               onClick={closeModal}
               type="button"
-              variant="ghost"
+              variant="outline"
             >
               Cancel
             </Button>

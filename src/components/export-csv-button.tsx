@@ -94,8 +94,8 @@ export function ExportCsvButton({ filename, load }: Props) {
         type="button"
         variant="outline"
       >
-        <Download aria-hidden className="size-4" />
-        {pending ? "Exporting…" : "Export CSV"}
+        <Download aria-hidden />
+        {pending ? "Exporting..." : "Export CSV"}
       </Button>
       <p aria-live="polite" className="sr-only">
         {announcement}

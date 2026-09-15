@@ -2,9 +2,9 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useId } from "react";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import type { ViewMode } from "#/lib/view-preference";
+import { ClearFiltersButton } from "./clear-filters-button";
 import { FilterSwitch } from "./filter-switch";
 import { SearchHint } from "./search-hint";
-import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -444,16 +444,7 @@ export function ProjectsFilters({
         </fieldset>
       )}
 
-      {active > 0 && (
-        <Button
-          className="h-auto p-0"
-          onClick={clearAll}
-          type="button"
-          variant="link"
-        >
-          Clear all
-        </Button>
-      )}
+      {active > 0 && <ClearFiltersButton onClick={clearAll} />}
     </div>
   );
 }

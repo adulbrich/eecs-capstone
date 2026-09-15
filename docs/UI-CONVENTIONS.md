@@ -94,10 +94,15 @@ button as a different action:
 
 | Action | Button |
 | --- | --- |
-| Cancel | `outline`, at the size of the button it sits beside |
-| Remove | `ghost` `sm` |
-| Save | `default` `default` |
+| Cancel | `outline` |
+| Remove | `ghost` |
+| Save | `default` |
 | Clear all | `<ClearFiltersButton>` from `#/components/clear-filters-button` |
+
+Size is the row's to decide, not the action's: Cancel takes the size of the
+button it sits beside, Remove is `sm` in a list or a table row and `default`
+where it sits next to an `Input` (the mentor capacity row is the one place the
+two rules meet). See "Size follows the row" below.
 
 Cancel was `ghost` in four dialogs and `outline` in ten, Remove was six
 different buttons including two hand-rolled red palettes, and Clear all was a

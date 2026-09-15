@@ -6,8 +6,8 @@ import {
   CategoryCheckboxList,
   type CategoryOption,
 } from "./category-checkbox-list";
+import { ClearFiltersButton } from "./clear-filters-button";
 import { SearchHint } from "./search-hint";
-import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import {
@@ -148,16 +148,7 @@ export function InventoryFilters({
         selected={selectedCategories}
       />
 
-      {active > 0 && (
-        <Button
-          className="h-auto p-0"
-          onClick={onClear}
-          type="button"
-          variant="link"
-        >
-          Clear all
-        </Button>
-      )}
+      {active > 0 && <ClearFiltersButton onClick={onClear} />}
     </div>
   );
 }

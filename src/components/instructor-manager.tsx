@@ -98,9 +98,8 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
                 </span>
               </span>
               <Button
-                className="text-destructive hover:text-destructive"
                 onClick={() => void remove(i.userId)}
-                size="xs"
+                size="sm"
                 type="button"
                 variant="ghost"
               >

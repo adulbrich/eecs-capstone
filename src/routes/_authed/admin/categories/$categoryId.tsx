@@ -150,15 +150,13 @@ function CategoryEdit() {
           />
         </div>
         <div className="flex gap-2">
-          <Button size="sm" type="submit">
-            Save
-          </Button>
+          <Button type="submit">Save</Button>
           <ConfirmDialog
             description="It will be removed from any projects and inventory items that use it. Those projects and items are unaffected otherwise."
             onConfirm={onDelete}
             title={`Delete category "${category.name}"?`}
           >
-            <Button size="sm" type="button" variant="destructive">
+            <Button type="button" variant="destructive">
               Delete
             </Button>
           </ConfirmDialog>

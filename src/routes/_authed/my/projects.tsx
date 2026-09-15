@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { FilePlus } from "lucide-react";
 import { z } from "zod";
 import { EmptyState } from "#/components/empty-state";
 import { ProjectCard } from "#/components/project-card";
@@ -50,7 +51,10 @@ function MyProjects() {
       <div className="flex items-center justify-between">
         <h1 className="font-semibold text-2xl">My Projects</h1>
         <Button asChild size="sm">
-          <Link to="/projects/new">New project</Link>
+          <Link to="/projects/new">
+            <FilePlus aria-hidden="true" />
+            New project
+          </Link>
         </Button>
       </div>
       {/* Spans every non-archived project, so it does not move with the status

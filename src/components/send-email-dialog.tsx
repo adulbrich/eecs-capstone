@@ -81,7 +81,7 @@ function Body({
           disabled={busy}
           onClick={() => onOpenChange(false)}
           type="button"
-          variant="ghost"
+          variant="outline"
         >
           Cancel
         </Button>

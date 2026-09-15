@@ -52,7 +52,6 @@ export function useWriteBookmark() {
 export function BookmarkIcon({ bookmarked }: { bookmarked: boolean }) {
   return (
     <Bookmark
-      className="h-4 w-4"
       style={{
         fill: bookmarked ? "var(--status-warning)" : "none",
         color: bookmarked ? "var(--status-warning)" : undefined,

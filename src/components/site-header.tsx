@@ -3,6 +3,7 @@ import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { authClient } from "#/lib/auth-client";
 import { brand } from "#/lib/brand";
+import { signOut } from "#/lib/sign-out";
 import { getPublicUrl } from "#/lib/storage";
 import { isStaff, type Viewer } from "#/lib/viewer";
 import { GithubIcon } from "./github-icon";
@@ -144,7 +145,7 @@ function MobileMenu({
               type="button"
               variant="ghost"
             >
-              <X className="h-4 w-4" />
+              <X />
             </Button>
           </SheetClose>
         </SheetHeader>
@@ -302,11 +303,7 @@ function SignedInMobile({
       </div>
       <Button
         className="w-full"
-        onClick={async () => {
-          await authClient.signOut();
-          window.location.href = "/sign-in";
-        }}
-        size="sm"
+        onClick={() => void signOut()}
         type="button"
         variant="outline"
       >
