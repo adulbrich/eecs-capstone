@@ -30,18 +30,33 @@ test.describe("admin user role and ban", () => {
       await expect(role).toHaveText("user");
       await role.click();
       await staff.getByRole("option", { name: "instructor" }).click();
+      // Save and Ban each open a confirm carrying the email skip (#396); the
+      // write goes out from the dialog's own button, so that is the click to
+      // wait on. Unban mails nobody and confirms nothing.
+      await staff.getByRole("button", { name: "Save", exact: true }).click();
+      const roleDialog = staff.getByRole("dialog", {
+        name: "Change the role?",
+      });
+      await expect(roleDialog).toBeVisible();
       await confirmed(staff, () =>
-        staff.getByRole("button", { name: "Save", exact: true }).click()
+        roleDialog.getByRole("button", { name: "Save role" }).click()
       );
+      await expect(roleDialog).toBeHidden();
       await expect(role).toHaveText("instructor");
       await expect(await withDb((db) => readUser(db, userId))).toMatchObject({
         role: "instructor",
       });
 
       await staff.getByLabel("Reason").fill("End-to-end ban");
+      await staff.getByRole("button", { name: "Ban", exact: true }).click();
+      const banDialog = staff.getByRole("alertdialog", {
+        name: "Ban this user?",
+      });
+      await expect(banDialog).toBeVisible();
       await confirmed(staff, () =>
-        staff.getByRole("button", { name: "Ban", exact: true }).click()
+        banDialog.getByRole("button", { name: "Ban", exact: true }).click()
       );
+      await expect(banDialog).toBeHidden();
       await expect(
         staff.getByRole("heading", { name: "Banned", exact: true })
       ).toBeVisible();
