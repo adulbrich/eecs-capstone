@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { errorMessage } from "#/lib/error-message";
+import type { MentorNeed } from "#/lib/vocabularies";
 import { updateProjectMentorship } from "#/server/projects";
 import {
   getProjectMentorship,
@@ -9,59 +10,79 @@ import { AccountLinkSummary } from "./account-link-summary";
 import { PanelSection } from "./panel";
 import { ProjectBadges } from "./project-badges";
 import { Button } from "./ui/button";
-import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+
+/**
+ * The three states of the Mentor radio group (#373), in the order they are
+ * offered. The values are the enum the column stores; the labels are what
+ * staff read.
+ */
+const MENTOR_NEED_OPTIONS: ReadonlyArray<{ label: string; value: MentorNeed }> =
+  [
+    { label: "Not decided", value: "unspecified" },
+    { label: "Seeking a mentor", value: "seeking" },
+    { label: "No mentor needed", value: "none" },
+  ];
 
 /**
  * What the public listing will show once this draft is saved, from the draft
- * rather than the saved record, so staff see the effect of a checkbox before
- * they press Save. The badge rule is the server's (`seekingMentorSql`):
- * looking for a mentor AND no address on file. The badge itself is rendered,
- * not described, so the preview cannot drift from the card.
+ * rather than the saved record, so staff see the effect of a choice before
+ * they press Save. The badge rules are the server's (`seekingMentorSql` and
+ * `noMentorNeededSql`): seeking AND no address on file, or none needed. The
+ * badges themselves are rendered, not described, so the preview cannot
+ * drift from the card. The none-plus-address case is named here because the
+ * server refuses it (#373).
  */
 function PublicPreview({
   mentorEmail,
-  seekingMentor,
+  mentorNeed,
 }: {
   mentorEmail: string;
-  seekingMentor: boolean;
+  mentorNeed: MentorNeed;
 }) {
   const hasAddress = mentorEmail.trim() !== "";
-  const badge = seekingMentor && !hasAddress;
+  const seeking = mentorNeed === "seeking" && !hasAddress;
+  const none = mentorNeed === "none";
   return (
     <div className="space-y-1 text-muted-foreground text-xs">
       <div className="flex flex-wrap items-center gap-2">
         <span>Public listing shows:</span>
-        {badge ? (
+        {seeking || none ? (
           <ProjectBadges
+            noMentorNeeded={none}
             requiresNdaIp={false}
-            seekingMentor
+            seekingMentor={seeking}
             studentProposed={false}
           />
         ) : (
           <span>nothing about mentorship</span>
         )}
       </div>
-      {seekingMentor && hasAddress && (
+      {mentorNeed === "seeking" && hasAddress && (
         <p>
-          Looking for a mentor is on, but the catalog shows no badge while an
-          address is on file. Clear the address or uncheck it.
+          Seeking a mentor is on, but the catalog shows no badge while an
+          address is on file. Clear the address or pick another state.
         </p>
+      )}
+      {none && hasAddress && (
+        <p>Remove the mentor before marking No mentor needed.</p>
       )}
     </div>
   );
 }
 
 /**
- * The staff edit of `seekingMentor` and `mentorEmail`, as a section of the
+ * The staff edit of `mentorNeed` and `mentorEmail`, as a section of the
  * staff panel. Its own component because it owns a load, a draft and a save,
  * and the panel was already at the complexity limit before it arrived.
  *
  * Mentorship only, since #336: who proposed the project is the Proposer
- * section's. The flag and the address stay independent and the input is
- * always shown; the preview below the input says what the public sees for
- * the draft as typed, and the four saved states are the table on #336.
+ * section's. The state and the address are independent except that "none"
+ * cannot sit beside an address, which the server refuses; the input is
+ * always shown, and the preview below it says what the public sees for the
+ * draft as typed (#373).
  *
  * The saved record and the draft are held apart: the summary reads the saved
  * one, because whether an address matches an account is only known after the
@@ -76,7 +97,7 @@ export function StaffMentorshipSection({
 }) {
   const [record, setRecord] = useState<ProjectMentorship | null>(null);
   const [mentorEmail, setMentorEmail] = useState("");
-  const [seekingMentor, setSeekingMentor] = useState(false);
+  const [mentorNeed, setMentorNeed] = useState<MentorNeed>("unspecified");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,7 +106,7 @@ export function StaffMentorshipSection({
       const saved = await getProjectMentorship({ data: { projectId } });
       setRecord(saved);
       setMentorEmail(saved.mentorEmail);
-      setSeekingMentor(saved.seekingMentor);
+      setMentorNeed(saved.mentorNeed);
     } catch (e) {
       // Reported, not swallowed, and Save stays disabled: see the gate below.
       setError(errorMessage(e, "Could not load the mentor record"));
@@ -101,7 +122,7 @@ export function StaffMentorshipSection({
     setError(null);
     try {
       await updateProjectMentorship({
-        data: { id: projectId, mentorEmail: mentorEmail.trim(), seekingMentor },
+        data: { id: projectId, mentorEmail: mentorEmail.trim(), mentorNeed },
       });
       await load();
       onChanged();
@@ -124,13 +145,22 @@ export function StaffMentorshipSection({
             unlinkedHint="Links automatically when they sign up with this address."
           />
         )}
-        <Label className="font-normal">
-          <Checkbox
-            checked={seekingMentor}
-            onCheckedChange={(checked) => setSeekingMentor(checked === true)}
-          />
-          Looking for a mentor
-        </Label>
+        <fieldset className="space-y-1.5">
+          <legend className="font-medium text-sm">Mentor</legend>
+          <RadioGroup
+            aria-label="Mentor"
+            className="mt-1.5"
+            onValueChange={(value) => setMentorNeed(value as MentorNeed)}
+            value={mentorNeed}
+          >
+            {MENTOR_NEED_OPTIONS.map((option) => (
+              <Label className="font-normal" key={option.value}>
+                <RadioGroupItem value={option.value} />
+                {option.label}
+              </Label>
+            ))}
+          </RadioGroup>
+        </fieldset>
         <div className="space-y-1.5">
           <Label htmlFor="mentor-email">Mentor email</Label>
           <Input
@@ -143,10 +173,7 @@ export function StaffMentorshipSection({
           />
         </div>
         {record && (
-          <PublicPreview
-            mentorEmail={mentorEmail}
-            seekingMentor={seekingMentor}
-          />
+          <PublicPreview mentorEmail={mentorEmail} mentorNeed={mentorNeed} />
         )}
         {error && <p className="text-destructive text-sm">{error}</p>}
         <Button

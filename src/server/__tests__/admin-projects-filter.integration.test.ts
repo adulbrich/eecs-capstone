@@ -4,6 +4,7 @@ import { db } from "#/db";
 import { programs, projects, user } from "#/db/schema";
 import { DEFAULT_ADMIN_STATUSES } from "#/lib/admin-project-filters";
 import { auth } from "#/lib/auth";
+import type { MentorNeed } from "#/lib/vocabularies";
 import { PROJECT_STATUSES } from "#/lib/vocabularies";
 import {
   createProjectAs,
@@ -75,6 +76,7 @@ function filter(
     proposer: null,
     q: "",
     seekingMentorOnly: false,
+    noMentorNeededOnly: false,
     requiresNdaOnly: false,
     studentProposedOnly: false,
     ...overrides,
@@ -694,7 +696,7 @@ async function flag(
     acceptingApplicants?: boolean;
     mentorEmail?: string | null;
     requiresNdaIp?: boolean;
-    seekingMentor?: boolean;
+    mentorNeed?: MentorNeed;
     studentProposed?: boolean;
   }
 ) {
@@ -711,17 +713,29 @@ describe("admin projects flag switches", () => {
       studentProposed: true,
     });
     const seeking = await createProjectAs(admin, baseProject("Seeking", null));
-    await flag(seeking.id, { acceptingApplicants: false, seekingMentor: true });
+    await flag(seeking.id, {
+      acceptingApplicants: false,
+      mentorNeed: "seeking",
+    });
     const nda = await createProjectAs(admin, baseProject("Agreement", null));
     await flag(nda.id, { acceptingApplicants: false, requiresNdaIp: true });
+    const alone = await createProjectAs(admin, baseProject("Alone", null));
+    await flag(alone.id, { acceptingApplicants: false, mentorNeed: "none" });
 
     const all = await listAdminProjectsAs(admin, filter());
     expect(all.rows.map((r) => r.title).sort()).toEqual([
       "Agreement",
+      "Alone",
       "Open",
       "Seeking",
       "Student",
     ]);
+
+    const noMentor = await listAdminProjectsAs(
+      admin,
+      filter({ noMentorNeededOnly: true })
+    );
+    expect(noMentor.rows.map((r) => r.title)).toEqual(["Alone"]);
 
     const agreement = await listAdminProjectsAs(
       admin,
@@ -754,20 +768,23 @@ describe("admin projects flag switches", () => {
       admin,
       baseProject("Off, no address", null)
     );
-    await flag(offNoAddress.id, { mentorEmail: null, seekingMentor: false });
+    await flag(offNoAddress.id, {
+      mentorEmail: null,
+      mentorNeed: "unspecified",
+    });
     const offWithAddress = await createProjectAs(
       admin,
       baseProject("Off, address", null)
     );
     await flag(offWithAddress.id, {
       mentorEmail: "mentor@example.edu",
-      seekingMentor: false,
+      mentorNeed: "unspecified",
     });
     const onNoAddress = await createProjectAs(
       admin,
       baseProject("On, no address", null)
     );
-    await flag(onNoAddress.id, { mentorEmail: null, seekingMentor: true });
+    await flag(onNoAddress.id, { mentorEmail: null, mentorNeed: "seeking" });
     // The flag still set with an address on file: the badge is gone, so the
     // switch must not find it either.
     const onWithAddress = await createProjectAs(
@@ -776,7 +793,7 @@ describe("admin projects flag switches", () => {
     );
     await flag(onWithAddress.id, {
       mentorEmail: "mentor@example.edu",
-      seekingMentor: true,
+      mentorNeed: "seeking",
     });
 
     const { rows } = await listAdminProjectsAs(
@@ -830,15 +847,15 @@ describe("admin projects flag switches", () => {
     const cs461 = await makeProgram("CS 461");
     const ece441 = await makeProgram("ECE 441");
     const match = await createProjectAs(admin, baseProject("Match", cs461));
-    await flag(match.id, { seekingMentor: true });
+    await flag(match.id, { mentorNeed: "seeking" });
     await publish(admin, match.id);
     const draft = await createProjectAs(admin, baseProject("Draft", cs461));
-    await flag(draft.id, { seekingMentor: true });
+    await flag(draft.id, { mentorNeed: "seeking" });
     const elsewhere = await createProjectAs(
       admin,
       baseProject("Elsewhere", ece441)
     );
-    await flag(elsewhere.id, { seekingMentor: true });
+    await flag(elsewhere.id, { mentorNeed: "seeking" });
     await publish(admin, elsewhere.id);
     const mentored = await createProjectAs(
       admin,
@@ -846,7 +863,7 @@ describe("admin projects flag switches", () => {
     );
     await flag(mentored.id, {
       mentorEmail: "mentor@example.edu",
-      seekingMentor: true,
+      mentorNeed: "seeking",
     });
     await publish(admin, mentored.id);
 
@@ -869,25 +886,25 @@ describe("admin projects flag switches", () => {
       alice,
       baseProject("Glacier sensors", null)
     );
-    await flag(match.id, { seekingMentor: true });
+    await flag(match.id, { mentorNeed: "seeking" });
     const mentored = await createProjectAs(
       alice,
       baseProject("Glacier drones", null)
     );
     await flag(mentored.id, {
       mentorEmail: "mentor@example.edu",
-      seekingMentor: true,
+      mentorNeed: "seeking",
     });
     const otherText = await createProjectAs(
       alice,
       baseProject("River sensors", null)
     );
-    await flag(otherText.id, { seekingMentor: true });
+    await flag(otherText.id, { mentorNeed: "seeking" });
     const otherProposer = await createProjectAs(
       bob,
       baseProject("Glacier mapping", null)
     );
-    await flag(otherProposer.id, { seekingMentor: true });
+    await flag(otherProposer.id, { mentorNeed: "seeking" });
 
     const { rows } = await listAdminProjectsAs(
       admin,
@@ -922,7 +939,7 @@ describe("admin projects flag switches", () => {
   it("is followed by the CSV export", async () => {
     const admin = await makeAdmin(`f5-${Date.now()}@x.com`);
     const both = await createProjectAs(admin, baseProject("Both", null));
-    await flag(both.id, { seekingMentor: true });
+    await flag(both.id, { mentorNeed: "seeking" });
     const onlyOpen = await createProjectAs(
       admin,
       baseProject("Only open", null)
@@ -933,7 +950,7 @@ describe("admin projects flag switches", () => {
     );
     await flag(onlySeeking.id, {
       acceptingApplicants: false,
-      seekingMentor: true,
+      mentorNeed: "seeking",
     });
     const switches = filter({ acceptingOnly: true, seekingMentorOnly: true });
 

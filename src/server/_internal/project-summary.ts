@@ -57,7 +57,14 @@ export const mentorNameSql = sql<string | null>`(
  * "Seeking mentor". `studentProposed` is no input since #304: a student
  * project may need no mentor, and a partner project may want one.
  */
-export const seekingMentorSql = sql<boolean>`(${projects.seekingMentor} AND ${projects.mentorEmail} IS NULL)`;
+export const seekingMentorSql = sql<boolean>`(${projects.mentorNeed} = 'seeking' AND ${projects.mentorEmail} IS NULL)`;
+
+/**
+ * The other public mentorship badge (#373): staff said the project runs
+ * without a mentor. No address guard, because the writer refuses the state
+ * beside an address, so the two cannot disagree.
+ */
+export const noMentorNeededSql = sql<boolean>`(${projects.mentorNeed} = 'none')`;
 
 /**
  * Column projection shared by every query that feeds the project card and
@@ -101,6 +108,7 @@ export const projectSummarySelect = {
   // the same distinction.
   studentProposed: projects.studentProposed,
   seekingMentor: seekingMentorSql,
+  noMentorNeeded: noMentorNeededSql,
 };
 
 /**
@@ -115,6 +123,8 @@ export const adminProjectSummarySelect = {
   // Staff only: the resolved mentor name, for the staff list and the CSV
   // export. It left the public projection in #336.
   mentorName: mentorNameSql,
+  // Staff only, the raw state behind the two derived badges (#373).
+  mentorNeed: projects.mentorNeed,
   createdAt: projects.createdAt,
   deletedAt: projects.deletedAt,
   programId: projects.programId,

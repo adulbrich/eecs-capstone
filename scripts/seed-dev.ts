@@ -346,6 +346,7 @@ async function main() {
       | "published"
       | "archived";
     publishedAt: Date | null;
+    mentorNeed?: "unspecified" | "seeking" | "none";
     categories: string[];
   };
 
@@ -405,6 +406,7 @@ async function main() {
       proposerId: u.sponsorNorthstar.id,
       programId: p461.id,
       status: "published",
+      mentorNeed: "seeking",
       publishedAt: daysAgo(38),
       categories: [
         "Web Development",
@@ -554,6 +556,8 @@ async function main() {
       proposerId: u.facultyAlvarez.id,
       programId: p461.id,
       status: "published",
+      // Runs without a mentor: the instructor mentors it (#373).
+      mentorNeed: "none",
       publishedAt: daysAgo(12),
       categories: ["Web Development", "React"],
     },

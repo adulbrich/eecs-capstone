@@ -35,6 +35,7 @@ describe("/projects switch params", () => {
   it("default every switch off, the agreement switch included", () => {
     expect(searchSchema.parse({})).toMatchObject({
       acceptingOnly: false,
+      noMentorNeededOnly: false,
       requiresNdaOnly: false,
       seekingMentorOnly: false,
       studentProposedOnly: false,

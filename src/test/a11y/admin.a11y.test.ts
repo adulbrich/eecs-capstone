@@ -209,6 +209,7 @@ test("@smoke admin projects list", async ({ page }) => {
     "Accepting applicants",
     "Student proposed",
     "Seeking a mentor",
+    "Run without a mentor",
     "Requiring an NDA or IP agreement",
     "Show soft-deleted",
   ];

@@ -15,6 +15,7 @@ interface ProjectSummary {
   description: string | null;
   id: string;
   imageUrl?: string | null;
+  noMentorNeeded: boolean;
   programCourseId?: string | null;
   programCourseName?: string | null;
   requiresNdaIp: boolean;
@@ -89,6 +90,7 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
           </div>
           <ProjectBadges
             className="mt-2"
+            noMentorNeeded={project.noMentorNeeded}
             requiresNdaIp={project.requiresNdaIp}
             seekingMentor={project.seekingMentor}
             studentProposed={project.studentProposed}

@@ -363,6 +363,7 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
       "isSponsored",
       "licenseRestrictions",
       "minQualifications",
+      "noMentorNeeded",
       "notes",
       "objectives",
       "prefQualifications",
