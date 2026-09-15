@@ -226,7 +226,7 @@ async function createFixtures(db: NodePgDatabase<typeof schema>) {
           "- No layout regressions\n\n```ts\nexport const done = true;\n```",
         minQualifications:
           "## Minimum Qualifications\n\n" +
-          "Applicants should be comfortable with **TypeScript** and *React*, " +
+          "Team members should be comfortable with **TypeScript** and *React*, " +
           "and have reviewed the [contribution guide]" +
           "(https://example.com/contributing).\n\n" +
           "Required skills:\n\n" +

@@ -125,9 +125,9 @@ export async function createFixtureProject(
   input: {
     /**
      * The column defaults to true and the seed never sets it, so every seeded
-     * project accepts applicants; a listing test that turns on "Accepting
-     * applicants" needs one published row with this off to see the list
-     * narrow at all.
+     * project has room on its team; a listing test that turns the "are looking
+     * for team members" switch off needs one published row with this false to
+     * see anything appear that the default hid.
      */
     acceptingApplicants?: boolean;
     proposerId: string;

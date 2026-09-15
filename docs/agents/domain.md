@@ -20,8 +20,8 @@ a decision it now points at the ADR in one line, so a decision has one home.
 
 When your output names a domain concept (an issue title, a test name, a refactor
 proposal), use the term the glossary defines, not a synonym it avoids. Two that
-already bit: the borrow list is not a cart (#197), and a project closes to
-applicants rather than being archived (#200).
+already bit: the borrow list is not a cart (#197), and a project whose
+team is full is not an archived project (#200).
 
 If the concept you need is not in the glossary, either you are inventing language
 the project does not use (reconsider) or there is a real gap (note it for

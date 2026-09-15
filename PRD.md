@@ -113,18 +113,20 @@ Each project carries:
   `/admin/projects` filters "Without a mentor", which beside "Student proposed" is
   the staff to-do. (#75, #304, #336, #402)
 - [x] `/my/bookmarks` is a small decision table: title with thumbnail, program,
-  status, accepting applicants, teams supported, NDA/IP, and saved-on date, with the
+  status, openings, teams supported, NDA/IP, and saved-on date, with the
   listing's own bookmark toggle in the title cell rather than a remove button,
   so un-bookmarking leaves the row in place until the next load (#336, #420);
   the two marks are read on the card or the page (#336).
   Sorted newest save first, no view toggle and no column picker. Visibility is
   re-checked on read, and one line says how many saved projects dropped out
   rather than letting the list shrink silently. (#106)
-- [x] Accepting applicants flag: a published project with a full roster stays
-  listed, marked "Not accepting applicants" on its page, its card and its
-  table row, with a listing filter to hide such projects. Staff and the
-  proposer edit it as an ordinary form field, so the edit log records it.
-  A boolean, not a status, so it stays orthogonal to the review workflow. (#72)
+- [x] Team-is-full flag: a published project with a full roster stays listed,
+  marked "Team is full" on its page, its card and its table row. The public
+  listing hides such projects by default; the "are looking for team members"
+  switch is what shows them, and `/admin/projects` starts with it off so staff
+  see everything. Staff and the proposer edit the flag as an ordinary form
+  field, so the edit log records it. A boolean, not a status, so it stays
+  orthogonal to the review workflow. (#72, #419)
 - [x] Collaborators table (schema present for multi-user project membership).
 - [x] Full-text search vector (Postgres generated `tsvector`, weighted across
   title, description, problem statement, objectives, and qualifications).
@@ -189,8 +191,8 @@ Each project carries:
   that opens on every status but archived and never empties), a date range on
   Created, Published or Updated read as Pacific calendar days, program and
   proposer filters, a show-soft-deleted switch, the public listing's three
-  narrowing switches under the same param names (accepting applicants,
-  student-proposed, requiring an NDA or IP agreement) and its own "Without a
+  narrowing switches under the same param names (looking for team
+  members, student-proposed, requiring an NDA or IP agreement) and its own "Without a
   mentor" switch, all held in URL search params;
   the CSV export and the proposer dropdown follow the same filter (#335, #340).
   The range only helps
