@@ -949,7 +949,9 @@ deliberately separate and must not be folded into it:
 
 - `panel.tsx` for the audience-gated panels, which carry their own tone variants
 - `.island-shell` for the auth cards
-- `.feature-card` for the landing page tiles
+- `.feature-card` for the landing page panels. It has no hover state on purpose:
+  the panel is not a link, and a lift on hover is what made the old tiles look
+  like one (#393).
 
 `Card` also takes an `asChild` prop. Admin's `NavCard` (in `admin/index.tsx`)
 has a `<Link>` as its root element; wrapping it in a plain `<Card>` would nest a

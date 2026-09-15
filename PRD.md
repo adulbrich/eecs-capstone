@@ -520,10 +520,12 @@ catalogue that decided the matrix below; #288 shipped it.
 
 ## 16. Landing Page
 
-- [x] Index page leads with the whole value proposition (propose, manage through
-  review, browse, borrow equipment) rather than framing proposals as
-  student-only, and links to Projects.
-- [x] Four feature cards: browse, propose, manage review, borrow equipment.
+- [x] Index page leads with the whole value proposition (propose, review, browse,
+  borrow equipment) rather than framing proposals as student-only.
+- [x] Two panels matching the header nav, Projects (browse, propose) and
+  Inventory (borrow), each carrying its links, and a strip that walks the
+  proposal statuses from draft to published (#393). Nothing on the page looks
+  pressable without being a link.
 - [x] Inventory linked from the site header.
 - [ ] Partial: Handbook is currently a separate Astro site; not yet linked or integrated.
 
