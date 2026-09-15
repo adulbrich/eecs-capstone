@@ -24,11 +24,11 @@ import {
  * assertion is relative (fewer than before, back to before) because the
  * local database drifts between runs (QUIRKS, "The smoke and accessibility
  * suites share one local database"). The one row a test creates is the
- * published project with "are accepting applicants" off; `createFixtureProject`
+ * published project with "are looking for team members" off; `createFixtureProject`
  * says why the seed cannot supply it.
  */
 test.describe("@smoke listing filters sheet", () => {
-  test("projects: are accepting applicants narrows the list, Clear all restores it", async ({
+  test("projects: turning off are looking for team members widens the list, Clear all restores it", async ({
     page,
   }) => {
     await withDb(async (db) =>
@@ -43,16 +43,19 @@ test.describe("@smoke listing filters sheet", () => {
     const before = await openListing(page, "/projects");
     const sheet = await openSheet(page);
     await sheet
-      .getByRole("switch", { name: "are accepting applicants" })
+      .getByRole("switch", { name: "are looking for team members" })
       .click();
-    await expect(page).toHaveURL(/acceptingOnly=true/);
-    await expectNarrowed(page, sheet, before);
+    // The switch defaults on since #419, so the listing already hides the row
+    // the fixture above created and turning it off is what changes the set.
+    // This is the only one of the four cases that runs in that direction, and
+    // the badge counts it the same way: one switch away from its default.
+    await expect(page).toHaveURL(/acceptingOnly=false/);
+    await expectWidened(page, sheet, before);
 
     await clearAll(page, sheet);
-    // Absence of the value, not of the key: `/projects` keeps its default
-    // params in the URL, so `acceptingOnly=false` is what a cleared filter
-    // reads there.
-    await expect(page).not.toHaveURL(/acceptingOnly=true/);
+    // The value, not the absence of the key: `/projects` keeps its default
+    // params in the URL, so a cleared filter reads as the default itself.
+    await expect(page).toHaveURL(/acceptingOnly=true/);
     await expectRestored(page, sheet, before);
   });
 
@@ -186,6 +189,26 @@ async function clearAll(page: Page, sheet: Locator): Promise<void> {
   await page.getByRole("button", { name: "Filters 1", exact: true }).click();
   await expect(sheet).toBeVisible();
   await sheet.getByRole("button", { name: "Clear all" }).click();
+}
+
+/**
+ * The mirror of `expectNarrowed`, for the one switch that starts on: the same
+ * sheet and badge behaviour, with the count going the other way.
+ */
+async function expectWidened(
+  page: Page,
+  sheet: Locator,
+  before: number
+): Promise<void> {
+  await expect(sheet).toBeVisible();
+  await expect
+    .poll(() => readTotal(page), { timeout: 10_000 })
+    .toBeGreaterThan(before);
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Filters 1", exact: true })
+  ).toBeVisible();
 }
 
 /**

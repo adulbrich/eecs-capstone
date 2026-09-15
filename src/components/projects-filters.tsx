@@ -34,7 +34,7 @@ export type ProjectsOrder = "relevance" | "newest" | "recommended";
 /**
  * The legend over the narrowing switches. Each label below completes it as
  * one sentence, lowercase, so a reader hears "Only show projects that are
- * accepting applicants" (#383). Shared with `/admin/projects`, which renders
+ * looking for team members" (#383). Shared with `/admin/projects`, which renders
  * the same three switches under the same params (#340) plus one of its own,
  * so the two listings cannot drift apart and the accessibility tests name
  * one string.
@@ -48,21 +48,23 @@ export const PROJECT_SWITCH_LEGEND = "Only show projects that";
  * state (#402).
  */
 export const PROJECT_SWITCH_LABEL = {
-  acceptingOnly: "are accepting applicants",
+  acceptingOnly: "are looking for team members",
   requiresNdaOnly: "require an NDA or IP agreement",
   studentProposedOnly: "were proposed by a student",
 } as const;
 
 /**
- * The line under a switch whose label alone does not say what it hides.
- * Only accepting applicants has one: "off" on that flag means the team is
- * full (CONTEXT.md, "Closed to applicants"), which nothing on the listing
- * said before (#383). Keyed like the labels so the admin page shows it too.
+ * The line under a switch whose label alone does not say what the other
+ * position does. Only this one has one, and it matters more now that the
+ * public listing turns it on by default (#419): a student who never touches
+ * the switch should still be able to find out that there are more projects
+ * behind it. Keyed like the labels so the admin page shows it too, where the
+ * default is off and the sentence reads the same way.
  */
 export const PROJECT_SWITCH_HINT: Partial<
   Record<keyof typeof PROJECT_SWITCH_LABEL, string>
 > = {
-  acceptingOnly: "Hides projects whose team is already full.",
+  acceptingOnly: "Turn off to also show projects whose team is full.",
 };
 
 /**
@@ -80,6 +82,26 @@ export const ARCHIVE_MODE_LABEL = {
 
 export const ARCHIVE_MODE_HINT =
   "Archived projects ran in a past term and no longer take teams.";
+
+/**
+ * What `/projects` shows a visitor who has touched nothing.
+ *
+ * `acceptingOnly` is the one that is not `false`: a student opening the
+ * listing is looking for a project to join, and half a first page they cannot
+ * join is worse than a switch they have to find (#419). `/admin/projects`
+ * keeps its own `SWITCH_DEFAULTS`, where every switch is off, because staff
+ * want the whole set.
+ *
+ * One source for three readers: the route's `searchSchema`, `clearAll` below,
+ * and `countActiveFilters`, which is what stops an untouched visit reporting
+ * itself as narrowed.
+ */
+export const PROJECTS_FILTER_DEFAULTS = {
+  acceptingOnly: true,
+  archivedOnly: false,
+  requiresNdaOnly: false,
+  studentProposedOnly: false,
+} as const;
 
 /** The narrowing params of `/projects`, as the route's search carries them. */
 export interface ProjectsFilterState {
@@ -99,10 +121,13 @@ export function countActiveFilters(state: ProjectsFilterState): number {
   return [
     state.program !== null,
     state.categories.length > 0,
-    state.acceptingOnly,
-    state.archivedOnly,
-    state.studentProposedOnly,
-    state.requiresNdaOnly,
+    // Against the default, not against `false`. `acceptingOnly` defaults on,
+    // so counting truth would make every untouched visit report one filter
+    // and offer a Clear that changes nothing (#419).
+    state.acceptingOnly !== PROJECTS_FILTER_DEFAULTS.acceptingOnly,
+    state.archivedOnly !== PROJECTS_FILTER_DEFAULTS.archivedOnly,
+    state.studentProposedOnly !== PROJECTS_FILTER_DEFAULTS.studentProposedOnly,
+    state.requiresNdaOnly !== PROJECTS_FILTER_DEFAULTS.requiresNdaOnly,
   ].filter(Boolean).length;
 }
 
@@ -143,10 +168,7 @@ function useProjectsFilterNavigation() {
           ...prev,
           categories: [],
           program: null,
-          acceptingOnly: false,
-          archivedOnly: false,
-          studentProposedOnly: false,
-          requiresNdaOnly: false,
+          ...PROJECTS_FILTER_DEFAULTS,
           page: 1,
         }),
       });

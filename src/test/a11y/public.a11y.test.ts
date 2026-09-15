@@ -174,7 +174,8 @@ test("@smoke projects list, filters aside at xl", async ({ page }) => {
   const aside = page.getByRole("complementary", { name: "Filters" });
   await expect(aside.getByRole("combobox", { name: "Program" })).toBeVisible();
   // The archive mode is a radio above the switches, and the accepting
-  // switch carries its hint as its description (#383).
+  // switch carries its hint as its description (#383). That switch is the
+  // one that opens on (#419), so its hint says what turning it off does.
   await expect(aside.getByRole("radiogroup", { name: "Show" })).toBeVisible();
   await expect(
     aside.getByRole("radio", { name: "Current projects" })
@@ -182,11 +183,12 @@ test("@smoke projects list, filters aside at xl", async ({ page }) => {
   const archived = aside.getByRole("radio", { name: "Archived projects" });
   await expect(archived).toBeVisible();
   const accepting = aside.getByRole("switch", {
-    name: "are accepting applicants",
+    name: "are looking for team members",
   });
   await expect(accepting).toBeVisible();
+  await expect(accepting).toBeChecked();
   await expect(accepting).toHaveAccessibleDescription(
-    "Hides projects whose team is already full."
+    "Turn off to also show projects whose team is full."
   );
   await expect(page.getByRole("button", { name: "Filters" })).toBeHidden();
   await checkA11y(page);
@@ -211,7 +213,7 @@ test("@smoke projects list, filters sheet at 375px", async ({ page }) => {
   await page.getByRole("button", { name: "Filters" }).click();
   const sheet = page.getByRole("dialog", { name: "Filters" });
   const accepting = sheet.getByRole("switch", {
-    name: "are accepting applicants",
+    name: "are looking for team members",
   });
   await expect(accepting).toBeVisible();
   // Focus lands inside the sheet on open, and the page under it does not
@@ -219,13 +221,15 @@ test("@smoke projects list, filters sheet at 375px", async ({ page }) => {
   await expect(sheet.locator(":focus")).toHaveCount(1);
   await expectNoHorizontalOverflow(page);
   await checkA11y(page);
+  // Off, not on: this switch opens checked (#419), so the click that moves it
+  // away from its default is the one the Filters badge counts below.
   await accepting.click();
-  await expect(page).toHaveURL(/acceptingOnly=true/);
+  await expect(page).toHaveURL(/acceptingOnly=false/);
   await expect(sheet).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
   // Focus returns to the button, which now carries the count of what was
-  // turned on. Tab from the search reaches it with nothing in between: the
+  // changed. Tab from the search reaches it with nothing in between: the
   // recommendation prompt renders under the row, not inside it. Four
   // stops: the sort, the two view toggle buttons, the Filters button.
   const button = page.getByRole("button", { name: "Filters 1" });

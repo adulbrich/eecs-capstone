@@ -391,7 +391,7 @@ them are redefined under the dark selector in `styles.css`.
 What the five mean, so two badges for the same kind of news cannot pick two
 colors: `success` is done or approved; `warning` is pending or missing, something
 the reader may still act on (a review waiting, "Requested"); `error` is a hard
-stop for the reader (deleted, "Not accepting applicants"); `info` is news with no
+stop for the reader (deleted, "Team is full"); `info` is news with no
 verdict in it; `neutral` is inactive (draft, archived).
 
 ---
@@ -899,7 +899,7 @@ A detail page (`/projects/$projectId` since #400; the inventory item page is
 meant to follow) opens with one header block, top to bottom: the title row,
 `flex items-start justify-between gap-3`, with the title left and the actions
 right; one `flex flex-wrap` badge row under it holding the status badge, the
-applicants badge and the public marks in that order with one gap, which
+team-full badge and the public marks in that order with one gap, which
 `ProjectBadges` renders from its `children` slot plus the marks; the category
 chips; the owner actions; then the image. The actions are Bookmark and, for a
 viewer who can edit, Edit. Bookmark keeps its icon at every width and hides its
@@ -1054,7 +1054,8 @@ controls (`space-y-4`) and give each `w-full`; a fixed `w-56` that fit a toolbar
 overflows an 18rem column. A `FilterSwitch` label is one line under a
 `fieldset` legend that carries the "Only show projects that", because the full
 sentence wrapped to two lines beside its switch at that width; each label
-completes the legend as a lowercase predicate ("are accepting applicants"), and
+completes the legend as a lowercase predicate ("are looking for team members"),
+and
 both project listings read legend and labels from `PROJECT_SWITCH_LEGEND` and
 `PROJECT_SWITCH_LABEL` in `projects-filters.tsx`, so they cannot drift (#383).
 A switch whose label does not say what it hides takes a `hint`, one muted line

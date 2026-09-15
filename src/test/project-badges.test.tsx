@@ -39,7 +39,7 @@ describe("ProjectBadges", () => {
   });
 
   it("renders children before the marks in the same row, and a row for children alone", () => {
-    // The detail page passes its status and applicants badges here so the
+    // The detail page passes its status and team-full badges here so the
     // page has one badge row, not two (#400).
     const { container, getByText } = render(
       <ProjectBadges {...OFF} studentProposed>

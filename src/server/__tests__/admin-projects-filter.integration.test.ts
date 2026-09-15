@@ -883,7 +883,7 @@ describe("admin projects flag switches", () => {
       [alice.id, bob.id].sort()
     );
 
-    // Bob has nothing accepting applicants, so the dropdown stops offering
+    // Bob has no project with room on its team, so the dropdown stops offering
     // him once the switch is on.
     const accepting = await listAdminProjectsAs(
       admin,

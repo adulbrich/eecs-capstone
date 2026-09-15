@@ -612,7 +612,8 @@ export function ProjectForm({
             </div>
             <p className="mt-1 text-muted-foreground text-xs">
               Uncheck once you have the team you need. The project stays listed,
-              but students see it is no longer taking applicants.
+              but students see that its team is full, and the listing hides it
+              unless they ask for full teams too.
             </p>
           </div>
         )}

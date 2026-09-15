@@ -949,7 +949,7 @@ A custom request reuses the envelope ([ADR-0017](./adr/0017-custom-requests-reus
 
 ## Projects
 
-The vocabulary (project, proposal, proposer, status, transition, closed to applicants, soft delete, private notes, mentorship) is in [`../CONTEXT.md`](../CONTEXT.md). The rules are two pure modules: `src/lib/project-workflow.ts` (which transitions each role may make) and `src/lib/project-visibility.ts` (who sees and edits what), with `project-notifications.ts` beside them.
+The vocabulary (project, proposal, proposer, status, transition, team is full, soft delete, private notes, mentorship) is in [`../CONTEXT.md`](../CONTEXT.md). The rules are two pure modules: `src/lib/project-workflow.ts` (which transitions each role may make) and `src/lib/project-visibility.ts` (who sees and edits what), with `project-notifications.ts` beside them.
 
 The decisions: `commitTransition` is the only status-history writer ([ADR-0004](./adr/0004-one-writer-per-status-history.md)), proposers link by email and only a verified address claims ([ADR-0007](./adr/0007-proposer-linking-by-email.md)), reads are staff-only when they reach an account column ([ADR-0003](./adr/0003-every-server-function-declares-its-access-level.md)), one image policy ([ADR-0009](./adr/0009-one-image-upload-policy.md)), one URL per project ([ADR-0010](./adr/0010-single-canonical-url-per-resource.md)), addresses are lowercased on write ([ADR-0015](./adr/0015-addresses-are-normalized-on-write.md)).
 

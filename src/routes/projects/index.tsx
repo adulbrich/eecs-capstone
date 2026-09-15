@@ -20,6 +20,7 @@ import {
   countActiveFilters,
   type FilterCategory,
   type FilterProgram,
+  PROJECTS_FILTER_DEFAULTS,
   ProjectsFilters,
   ProjectsSearchBar,
   RecommendationPrompt,
@@ -44,10 +45,17 @@ export const searchSchema = z.object({
   q: z.string().default(""),
   categories: z.array(z.string().uuid()).max(20).catch([]).default([]),
   program: z.string().uuid().nullable().default(null),
-  archivedOnly: z.boolean().default(false),
-  acceptingOnly: z.boolean().default(false),
-  studentProposedOnly: z.boolean().default(false),
-  requiresNdaOnly: z.boolean().default(false),
+  archivedOnly: z.boolean().default(PROJECTS_FILTER_DEFAULTS.archivedOnly),
+  // On by default, in both archive modes: one param, one default. A shared
+  // link carrying no `acceptingOnly` now hides full teams, which is accepted
+  // rather than shimmed (#419).
+  acceptingOnly: z.boolean().default(PROJECTS_FILTER_DEFAULTS.acceptingOnly),
+  studentProposedOnly: z
+    .boolean()
+    .default(PROJECTS_FILTER_DEFAULTS.studentProposedOnly),
+  requiresNdaOnly: z
+    .boolean()
+    .default(PROJECTS_FILTER_DEFAULTS.requiresNdaOnly),
   page: z.number().int().min(1).default(1),
   // The server's ordering, which also decides which twenty rows make up the
   // page. Named `order` because `sort` and `dir` are the table's, below.
@@ -123,10 +131,14 @@ function isFiltered(search: Search): boolean {
     search.q !== "" ||
     search.categories.length > 0 ||
     search.program !== null ||
-    search.archivedOnly ||
-    search.acceptingOnly ||
-    search.studentProposedOnly ||
-    search.requiresNdaOnly
+    // Against the defaults, so an untouched listing is not "filtered": see
+    // countActiveFilters, which this has to agree with or the Clear button
+    // and the empty state contradict each other.
+    search.archivedOnly !== PROJECTS_FILTER_DEFAULTS.archivedOnly ||
+    search.acceptingOnly !== PROJECTS_FILTER_DEFAULTS.acceptingOnly ||
+    search.studentProposedOnly !==
+      PROJECTS_FILTER_DEFAULTS.studentProposedOnly ||
+    search.requiresNdaOnly !== PROJECTS_FILTER_DEFAULTS.requiresNdaOnly
   );
 }
 

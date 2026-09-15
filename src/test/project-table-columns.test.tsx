@@ -153,7 +153,7 @@ describe("the public project table", () => {
       "Program",
       "Categories",
       "Teams supported",
-      "Accepting applicants",
+      "Openings",
       "NDA/IP required",
       "Contact name",
       "Updated",

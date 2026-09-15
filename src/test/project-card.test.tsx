@@ -116,6 +116,16 @@ describe("ProjectCard", () => {
     expect(classes).not.toContain("object-cover");
   });
 
+  it("keeps the team-full badge at its text width, not the card's", () => {
+    // The badge sits in a `flex-col`, which stretches its items, so an
+    // `inline-flex` badge fills the card and reads as a bar. jsdom resolves
+    // no Tailwind, so the class is what there is to assert.
+    const { getByText } = render(
+      <ProjectCard project={{ ...base, acceptingApplicants: false }} />
+    );
+    expect(getByText("Team is full").className).toContain("self-start");
+  });
+
   it("is a surface holding a link, not a link itself", () => {
     // The bookmark control is a sibling of the link (see
     // bookmark-toggle.test.tsx), so the card root cannot be the anchor.
