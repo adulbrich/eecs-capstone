@@ -580,6 +580,10 @@ export function InventoryLifecyclePanel({
                 Passing undefined made it uncontrolled until the first pick,
                 which React warns about on every status change. */}
             <Select
+              // Gated like every other trigger in this panel. It was the one
+              // control here that tracked `busy` without reading it, so a
+              // second pick could land on top of the first (#410).
+              disabled={busy}
               onValueChange={(v) => void onOverrideChange(v)}
               value={overrideStatus}
             >

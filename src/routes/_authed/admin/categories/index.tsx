@@ -44,9 +44,9 @@ import { ListCount } from "#/components/ui/pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
-import { errorMessage } from "#/lib/error-message";
 import { pageTitle } from "#/lib/page-title";
 import type { SortState } from "#/lib/table-state";
+import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { isStaff } from "#/lib/viewer";
 import {
@@ -204,12 +204,13 @@ function CategoriesAdmin() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAction({
+    fallback: "Could not create the category",
+  });
 
-  async function onCreate(e: React.FormEvent) {
+  function onCreate(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    try {
+    void run(async () => {
       if (tab === "project") {
         await createCategory({ data: { domain: "project", name, type } });
       } else {
@@ -217,13 +218,13 @@ function CategoriesAdmin() {
           data: { domain: "inventory", name, type: null },
         });
       }
+      // Awaited before the dialog closes and the button comes back, so the
+      // new row is on screen rather than a beat behind it.
+      await router.invalidate();
       setName("");
       setType("");
       setOpen(false);
-      router.invalidate();
-    } catch (err) {
-      setError(errorMessage(err, "Could not create the category"));
-    }
+    });
   }
 
   const columns = tab === "project" ? PROJECT_COLUMNS : INVENTORY_COLUMNS;
@@ -324,10 +325,12 @@ function CategoriesAdmin() {
               <FieldError message={error} />
               <DialogFooter>
                 <Button
-                  disabled={tab === "project" ? !(name && type) : !name}
+                  disabled={
+                    busy || (tab === "project" ? !(name && type) : !name)
+                  }
                   type="submit"
                 >
-                  Create category
+                  {busy ? "Creating..." : "Create category"}
                 </Button>
               </DialogFooter>
             </form>

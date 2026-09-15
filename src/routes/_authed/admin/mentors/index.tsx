@@ -27,9 +27,9 @@ import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
-import { errorMessage } from "#/lib/error-message";
 import { pageTitle } from "#/lib/page-title";
 import type { SortState } from "#/lib/table-state";
+import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import { isStaff } from "#/lib/viewer";
@@ -75,22 +75,21 @@ const DEFAULT_SORT: SortState = { desc: false, id: "name" };
 function MentorControls({ mentor }: { mentor: Row }) {
   const router = useRouter();
   const [count, setCount] = useState(mentor.mentorTeamCount);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const {
+    busy: saving,
+    error,
+    run,
+  } = useAction({ fallback: "Could not save." });
 
-  async function save(wantsToMentor: boolean) {
-    setSaving(true);
-    setError(null);
-    try {
+  function save(wantsToMentor: boolean) {
+    void run(async () => {
       await setUserMentorStatus({
         data: { userId: mentor.id, wantsToMentor, mentorTeamCount: count },
       });
-      router.invalidate();
-    } catch (err) {
-      setError(errorMessage(err, "Could not save."));
-    } finally {
-      setSaving(false);
-    }
+      // Awaited inside the flight: the row this control sits in is loader
+      // data, so re-enabling over the old copy shows the old capacity.
+      await router.invalidate();
+    });
   }
 
   return (

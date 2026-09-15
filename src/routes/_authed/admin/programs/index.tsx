@@ -38,9 +38,9 @@ import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
-import { errorMessage } from "#/lib/error-message";
 import { pageTitle } from "#/lib/page-title";
 import type { SortState } from "#/lib/table-state";
+import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { isStaff } from "#/lib/viewer";
 import { createProgram, listProgramsWithInstructors } from "#/server/programs";
@@ -188,23 +188,25 @@ function ProgramsAdmin() {
   const [courseId, setCourseId] = useState("");
   const [courseName, setCourseName] = useState("");
   const [description, setDescription] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAction({
+    fallback: "Could not create the program",
+  });
 
-  async function onCreate(e: React.FormEvent) {
+  function onCreate(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    try {
+    void run(async () => {
       await createProgram({
         data: { courseId, courseName, description: description || null },
       });
+      // Awaited before the dialog closes and the button comes back: the
+      // table behind it is loader data, and a fire-and-forget invalidate
+      // shows the new program's row arriving a beat after the dialog goes.
+      await router.invalidate();
       setCourseId("");
       setCourseName("");
       setDescription("");
       setOpen(false);
-      router.invalidate();
-    } catch (err) {
-      setError(errorMessage(err, "Could not create the program"));
-    }
+    });
   }
 
   const { orderRows, tableProps } = useAdminTable({
@@ -277,8 +279,11 @@ function ProgramsAdmin() {
               </div>
               <FieldError message={error} />
               <DialogFooter>
-                <Button disabled={!(courseId && courseName)} type="submit">
-                  Create program
+                <Button
+                  disabled={busy || !(courseId && courseName)}
+                  type="submit"
+                >
+                  {busy ? "Creating..." : "Create program"}
                 </Button>
               </DialogFooter>
             </form>
