@@ -317,7 +317,7 @@ function Profile() {
           Sign out
         </Button>
         <p className="mt-3 text-center text-muted-foreground text-sm">
-          <Link className="underline" to="/privacy">
+          <Link className="text-brand-dark underline" to="/privacy">
             Privacy policy
           </Link>
         </p>
@@ -327,7 +327,7 @@ function Profile() {
         <h2 className="font-semibold text-destructive text-lg">Danger zone</h2>
         <p className="mt-1 text-muted-foreground text-sm">
           Closing your account is immediate and cannot be undone. The{" "}
-          <Link className="underline" to="/privacy">
+          <Link className="text-brand-dark underline" to="/privacy">
             privacy policy
           </Link>{" "}
           says what stays.

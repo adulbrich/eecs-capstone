@@ -27,6 +27,45 @@ const TEST_DIR = join(SRC_DIR, "test");
 /** `text-brand` on its own: `text-brand-dark` and `text-brand-light` pass. */
 const BARE_BRAND = /\btext-brand\b(?!-)/;
 
+/**
+ * Files whose underline is not a link's, with the reason.
+ *
+ * The global `a` rule sets the offset for anchors, which is why a call site
+ * restating it is noise; the `link` Button variant is a `<button>` as often as
+ * an anchor, so it has to set its own.
+ */
+const UNDERLINE_EXEMPT = new Map([
+  [
+    "src/components/ui/button.tsx",
+    "the `link` variant renders a <button> as well as an anchor, so the global `a` rule does not reach it",
+  ],
+]);
+
+/**
+ * A class string that turns an underline on.
+ *
+ * `underline` alone, not `hover:underline` (which is the whole-cell rule, a
+ * different thing), not `no-underline`, and not `underline-offset-2` or
+ * `decoration-*`, which are the line's shape rather than its presence.
+ */
+const TURNS_UNDERLINE_ON = /(?<![\w:-])underline(?![\w-])/;
+/** The global `a` rule owns the offset, so a call site restating it is noise. */
+const RESTATES_OFFSET = /\bunderline-offset-/;
+/** Extract every `className="..."` and `className={...}` string literal. */
+const CLASS_STRINGS = /className=(?:"([^"]*)"|\{([\s\S]{0,400}?)\})/g;
+
+function* classStrings(source: string): Generator<string> {
+  for (const match of source.matchAll(CLASS_STRINGS)) {
+    if (match[1] !== undefined) {
+      yield match[1];
+      continue;
+    }
+    for (const literal of (match[2] ?? "").matchAll(/["'`]([^"'`]*)["'`]/g)) {
+      yield literal[1];
+    }
+  }
+}
+
 function* componentFiles(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
@@ -65,6 +104,45 @@ describe("brand links", () => {
     );
   });
 
+  /**
+   * The half of the running-text rule a regex can decide.
+   *
+   * Whether a link sits in a paragraph or fills a table cell is not something
+   * a scan can tell, so it cannot say where `underline` belongs. It can say
+   * that a class string turning the line on carries the colour with it: the
+   * thirteen links #411 fixed had a bare `underline` and no colour class at
+   * all, which is exactly what `BARE_BRAND` could not see, and they hovered to
+   * the vivid orange that rule exists to keep off a link.
+   */
+  it("no class string underlines without carrying text-brand-dark", () => {
+    const offenders: string[] = [];
+    for (const path of componentFiles(SRC_DIR)) {
+      const file = relative(process.cwd(), path);
+      if (UNDERLINE_EXEMPT.has(file)) {
+        continue;
+      }
+      const source = readFileSync(path, "utf8");
+      for (const classes of classStrings(source)) {
+        if (
+          TURNS_UNDERLINE_ON.test(classes) &&
+          !classes.includes("text-brand-dark")
+        ) {
+          offenders.push(`${file}: ${classes}`);
+        }
+        if (RESTATES_OFFSET.test(classes)) {
+          offenders.push(`${file}: ${classes} restates the global offset`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      "A link underlined at rest carries text-brand-dark, and the global `a`\n" +
+        'rule owns the offset (UI-CONVENTIONS, "A link inside running text is\n' +
+        'underlined at rest").\n\n' +
+        offenders.join("\n")
+    ).toEqual([]);
+  });
+
   // The matcher itself, against strings written to fool it. A scan that
   // agrees with the tree proves nothing about what it would notice.
   it("matches the bare token and not its dark or light sibling", () => {
@@ -78,5 +156,29 @@ describe("brand links", () => {
     expect(BARE_BRAND.test('className="bg-brand text-brand-light"')).toBe(
       false
     );
+  });
+
+  it("tells a rest underline from a hover one, an offset or a negation", () => {
+    expect(TURNS_UNDERLINE_ON.test("underline")).toBe(true);
+    expect(TURNS_UNDERLINE_ON.test("text-brand-dark underline")).toBe(true);
+    expect(
+      TURNS_UNDERLINE_ON.test("break-all underline underline-offset-2")
+    ).toBe(true);
+    expect(TURNS_UNDERLINE_ON.test("hover:underline")).toBe(false);
+    expect(TURNS_UNDERLINE_ON.test("no-underline")).toBe(false);
+    expect(TURNS_UNDERLINE_ON.test("underline-offset-2")).toBe(false);
+    expect(TURNS_UNDERLINE_ON.test("decoration-2")).toBe(false);
+    expect(TURNS_UNDERLINE_ON.test("group-hover:underline")).toBe(false);
+  });
+
+  it("reads class strings out of a bare attribute and out of cn()", () => {
+    expect([
+      ...classStrings('<Link className="underline" to="/x">y</Link>'),
+    ]).toEqual(["underline"]);
+    expect([
+      ...classStrings(
+        '<a className={cn("underline", on && "text-brand-dark")}>'
+      ),
+    ]).toEqual(["underline", "text-brand-dark"]);
   });
 });

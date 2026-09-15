@@ -126,13 +126,13 @@ function SignUp() {
         </Button>
         <p className="mt-6 text-muted-foreground text-sm">
           Already have an account?{" "}
-          <Link className="underline" to="/sign-in">
+          <Link className="text-brand-dark underline" to="/sign-in">
             Sign in
           </Link>
         </p>
         <p className="mt-2 text-muted-foreground text-sm">
           By creating an account, you agree to the{" "}
-          <Link className="underline" to="/privacy">
+          <Link className="text-brand-dark underline" to="/privacy">
             privacy policy
           </Link>
           .

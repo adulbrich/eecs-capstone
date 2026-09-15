@@ -24,7 +24,7 @@ function VerifyEmail() {
           {error === "TOKEN_EXPIRED"
             ? "This verification link has expired."
             : "This verification link is not valid."}{" "}
-          <Link className="underline" to="/sign-in">
+          <Link className="text-brand-dark underline" to="/sign-in">
             Sign in
           </Link>{" "}
           to continue.
@@ -37,7 +37,7 @@ function VerifyEmail() {
       <h1 className="font-semibold text-2xl">Email verified</h1>
       <p className="mt-4 text-sm">
         Your account is active.{" "}
-        <Link className="underline" to="/">
+        <Link className="text-brand-dark underline" to="/">
           Continue
         </Link>
         .
