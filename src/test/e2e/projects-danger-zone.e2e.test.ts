@@ -55,9 +55,18 @@ test.describe("project danger zone", () => {
       await visitor.goto(`/projects?q=${encodeURIComponent(title)}`);
       await expect(listed).toHaveCount(0);
 
+      // Restore confirms too, since #422: the button on the panel opens the
+      // dialog and writes nothing, so `confirmed` has to be given the dialog's
+      // own Restore rather than the trigger, the same way the soft delete above
+      // is written. Passing the trigger arms `waitForResponse` on a click that
+      // makes no server call, which is what it times out on.
+      await staff.getByRole("button", { name: "Restore" }).click();
+      const restoreDialog = staff.getByRole("alertdialog");
+      await expect(restoreDialog).toBeVisible();
       await confirmed(staff, () =>
-        staff.getByRole("button", { name: "Restore" }).click()
+        restoreDialog.getByRole("button", { name: "Restore" }).click()
       );
+      await expect(restoreDialog).toBeHidden();
       await expect(
         staff.getByRole("button", { name: "Soft delete" })
       ).toBeVisible();
