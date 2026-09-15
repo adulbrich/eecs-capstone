@@ -154,7 +154,7 @@ async function headline(programId: string | null) {
     expected,
     submittedAwaiting,
     oldestSubmitted,
-    [seeking],
+    [studentProposedWithoutMentor],
     [mentored],
     [unmentored],
     mentors,
@@ -198,7 +198,7 @@ async function headline(programId: string | null) {
       // The staff to-do, over the live scope the tile always had: every
       // status, not only published, so staff see a student proposal with
       // nobody yet before it reaches the catalog (#402).
-      .select({ seeking: countRows() })
+      .select({ count: countRows() })
       .from(projects)
       .where(
         and(
@@ -270,7 +270,7 @@ async function headline(programId: string | null) {
     },
     submittedAwaiting,
     oldestSubmittedAt: toDate(oldestSubmitted.rows[0]?.oldest),
-    studentProposedWithoutMentor: seeking?.seeking ?? 0,
+    studentProposedWithoutMentor: studentProposedWithoutMentor?.count ?? 0,
     publishedWithMentor: mentored?.mentored ?? 0,
     publishedWithoutMentor: unmentored?.unmentored ?? 0,
     mentors,
