@@ -187,7 +187,7 @@ export function CategoryMultiSelect({ domain, value, onChange }: Props) {
             Create "{trimmedName}"
           </Button>
         )}
-        {createError && <FieldError message={createError} />}
+        <FieldError message={createError} />
       </div>
     </div>
   );

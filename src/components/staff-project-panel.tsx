@@ -428,7 +428,7 @@ export function StaffProjectPanel({
         </DialogContent>
       </Dialog>
 
-      {error && !pending && <FieldError message={error} />}
+      {!pending && <FieldError message={error} />}
 
       <StaffProposerSection
         loadError={proposerError}

@@ -113,7 +113,7 @@ export function StaffMentorshipSection({
             mentor; an instructor who runs the team records their own.
           </p>
         </div>
-        {error && !confirmOpen && <FieldError message={error} />}
+        {!confirmOpen && <FieldError message={error} />}
         <Button
           // Disabled until the saved record has arrived: the drafts start
           // blank, and posting blank drafts over a real record would clear the

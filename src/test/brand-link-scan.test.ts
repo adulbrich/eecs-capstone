@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
+import { classStrings } from "./shared/class-strings";
 
 /**
  * Where `text-brand` may still appear, so that a link cannot pick it up again.
@@ -49,22 +50,15 @@ const UNDERLINE_EXEMPT = new Map([
  * `decoration-*`, which are the line's shape rather than its presence.
  */
 const TURNS_UNDERLINE_ON = /(?<![\w:-])underline(?![\w-])/;
-/** The global `a` rule owns the offset, so a call site restating it is noise. */
+/**
+ * The global `a` rule owns the offset, so a call site restating it is noise.
+ *
+ * Banned everywhere rather than only on an anchor, because a scan cannot tell
+ * which element a class string lands on. Something that is not a link and has
+ * its own reason to set an offset goes in `UNDERLINE_EXEMPT` with that reason,
+ * as the `link` Button variant does.
+ */
 const RESTATES_OFFSET = /\bunderline-offset-/;
-/** Extract every `className="..."` and `className={...}` string literal. */
-const CLASS_STRINGS = /className=(?:"([^"]*)"|\{([\s\S]{0,400}?)\})/g;
-
-function* classStrings(source: string): Generator<string> {
-  for (const match of source.matchAll(CLASS_STRINGS)) {
-    if (match[1] !== undefined) {
-      yield match[1];
-      continue;
-    }
-    for (const literal of (match[2] ?? "").matchAll(/["'`]([^"'`]*)["'`]/g)) {
-      yield literal[1];
-    }
-  }
-}
 
 function* componentFiles(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -171,7 +165,10 @@ describe("brand links", () => {
     expect(TURNS_UNDERLINE_ON.test("group-hover:underline")).toBe(false);
   });
 
-  it("reads class strings out of a bare attribute and out of cn()", () => {
+  // A cn() call is one class string, not several: split per literal, a
+  // correctly coloured `cn("underline", "text-brand-dark")` would be reported
+  // for the half that has no colour in it.
+  it("reads a cn() call as the one class string it becomes", () => {
     expect([
       ...classStrings('<Link className="underline" to="/x">y</Link>'),
     ]).toEqual(["underline"]);
@@ -179,6 +176,7 @@ describe("brand links", () => {
       ...classStrings(
         '<a className={cn("underline", on && "text-brand-dark")}>'
       ),
-    ]).toEqual(["underline", "text-brand-dark"]);
+    ]).toEqual(["underline text-brand-dark"]);
+    expect([...classStrings("<a className={passedIn}>")]).toEqual([]);
   });
 });

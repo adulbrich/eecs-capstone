@@ -346,7 +346,7 @@ export function ProjectForm({
             </div>
           </div>
           <output className="block">
-            {reviewError && <FieldError message={reviewError} />}
+            <FieldError message={reviewError} />
             {reviewState === "empty" && (
               <p className="mt-2 text-muted-foreground text-sm">
                 No improvements suggested.

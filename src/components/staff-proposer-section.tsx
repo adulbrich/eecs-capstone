@@ -138,7 +138,7 @@ function ProposerDraft({
           Shown as a badge on the card and project page.
         </p>
       </div>
-      {error && !confirmOpen && <FieldError message={error} />}
+      {!confirmOpen && <FieldError message={error} />}
       <Button
         // Nothing to save until the draft differs from the record, and no
         // save while one is in flight: a second click would race the reload.

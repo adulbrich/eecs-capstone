@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
+import { classStrings } from "./shared/class-strings";
 
 /**
  * One error paragraph, not forty.
@@ -32,6 +33,10 @@ const ALLOWED = new Map([
   [
     "src/components/error-banner.tsx",
     "the banner form of the same message, one component for the three copies that existed",
+  ],
+  [
+    "src/components/panel.tsx",
+    "a section heading in a danger-toned panel, an <h3> naming what the section is about rather than reporting that something failed. Found only once the scan read whole class strings: the colour and the size are separate cn() arguments",
   ],
   [
     "src/routes/_authed/profile.tsx",
@@ -82,11 +87,11 @@ describe("error text", () => {
         continue;
       }
       const source = readFileSync(path, "utf8");
-      source.split("\n").forEach((line, i) => {
-        if (DESTRUCTIVE_TEXT.test(line)) {
-          offenders.push(`${file}:${i + 1}: ${line.trim()}`);
+      for (const classes of classStrings(source)) {
+        if (DESTRUCTIVE_TEXT.test(classes)) {
+          offenders.push(`${file}: ${classes}`);
         }
-      });
+      }
     }
     expect(
       offenders,
@@ -98,9 +103,10 @@ describe("error text", () => {
 
     // The other direction: an allow-listed file that no longer needs the
     // exemption should lose it, so the list cannot grow stale.
-    const stale = [...ALLOWED.keys()].filter(
-      (file) =>
-        !DESTRUCTIVE_TEXT.test(readFileSync(join(process.cwd(), file), "utf8"))
+    const stale = [...ALLOWED.keys()].filter((file) =>
+      [...classStrings(readFileSync(join(process.cwd(), file), "utf8"))].every(
+        (classes) => !DESTRUCTIVE_TEXT.test(classes)
+      )
     );
     expect(stale).toEqual([]);
   });
@@ -128,9 +134,9 @@ describe("error text", () => {
         'className="bg-destructive text-destructive-foreground text-xs"'
       )
     ).toBe(false);
-    // Two separate strings in one cn() are two class strings, not one line.
-    expect(
-      DESTRUCTIVE_TEXT.test('cn("text-sm", "text-muted-foreground")')
-    ).toBe(false);
+    // The two halves can arrive in separate cn() literals or on separate
+    // lines, which `classStrings` joins before this ever sees them.
+    expect(DESTRUCTIVE_TEXT.test("text-destructive text-sm")).toBe(true);
+    expect(DESTRUCTIVE_TEXT.test("text-sm text-muted-foreground")).toBe(false);
   });
 });

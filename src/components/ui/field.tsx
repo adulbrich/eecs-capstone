@@ -40,6 +40,11 @@ function errorText(e: unknown): string {
  * other caller holds one `string | null` from a `catch`, and asking those forty
  * sites to write `errors={error ? [error] : []}` would be a worse component
  * than one that takes the string.
+ *
+ * `?: never` stops a caller passing both, though an explicit
+ * `message={undefined}` beside `errors` still typechecks, since an optional
+ * `never` admits `undefined`. That costs nothing at runtime: `??` reads it as
+ * absent and `errors` wins, which is the branch such a caller meant.
  */
 type FieldErrorProps =
   | { errors: readonly unknown[]; message?: never }

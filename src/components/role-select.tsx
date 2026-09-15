@@ -79,7 +79,7 @@ export function RoleSelect({ email, userId, initialRole, onChanged }: Props) {
           {saving ? "Saving..." : "Save"}
         </Button>
       </div>
-      {error && !confirmOpen && <FieldError message={error} />}
+      {!confirmOpen && <FieldError message={error} />}
       <SendEmailDialog
         address={email}
         busy={saving}
