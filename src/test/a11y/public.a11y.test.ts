@@ -19,8 +19,34 @@ const { projectId, itemId } = JSON.parse(
   )
 ) as { projectId: string; itemId: string };
 
+// Two panels named after the header nav, each carrying its links, and the
+// proposal statuses in order under them. Nothing on the page looks pressable
+// without being a link (#393), and the panels stack at a phone width.
 test("@smoke home page", async ({ page }) => {
   await page.goto("/");
+  await expect(
+    page.getByRole("link", { name: "Browse the catalog" })
+  ).toHaveAttribute("href", "/projects");
+  await expect(
+    page.getByRole("link", { name: "Propose a project" })
+  ).toHaveAttribute("href", "/projects/new");
+  await expect(
+    page.getByRole("link", { name: "See what you can borrow" })
+  ).toHaveAttribute("href", "/inventory");
+  await expect(page.getByRole("heading", { level: 3 })).toHaveText([
+    "Draft",
+    "Submitted",
+    "Changes requested",
+    "Approved",
+    "Published",
+  ]);
+  await checkA11y(page);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect(
+    page.getByRole("link", { name: "See what you can borrow" })
+  ).toBeVisible();
+  await expectNoHorizontalOverflow(page);
   await checkA11y(page);
 });
 

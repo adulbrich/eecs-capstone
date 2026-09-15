@@ -368,11 +368,6 @@ pre code {
     0 4px 14px rgba(26, 17, 0, 0.05);
 }
 
-.feature-card:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in oklab, var(--brand-primary) 35%, var(--line));
-}
-
 button,
 .island-shell,
 a {
