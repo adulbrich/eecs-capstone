@@ -31,7 +31,7 @@ export function BorrowListButton() {
   return (
     <Button asChild size="sm" variant="outline">
       <Link search={{ filter: "open" }} to="/my/items">
-        <ClipboardList aria-hidden="true" className="h-4 w-4" />
+        <ClipboardList aria-hidden="true" />
         Borrow list <CountBadge count={count} />
       </Link>
     </Button>

@@ -64,6 +64,11 @@ export function RoleSelect({ email, userId, initialRole, onChanged }: Props) {
             ))}
           </SelectContent>
         </Select>
+        {/*
+          sm, not Save's usual default: the SelectTrigger it sits beside is
+          sm too, and an h-9 button against an h-8 trigger is the misalignment
+          the rule exists to stop (UI-CONVENTIONS, "Size follows the row").
+        */}
         <Button
           disabled={!dirty || saving}
           onClick={() => setConfirmOpen(true)}

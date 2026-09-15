@@ -191,13 +191,12 @@ export function ImageUploader({
             </Button>
             {hasContent && (
               <Button
-                className="border-destructive/30 text-destructive hover:bg-[var(--status-error-bg)] hover:text-destructive"
                 onClick={onRemove}
                 size="sm"
                 type="button"
-                variant="outline"
+                variant="ghost"
               >
-                <Trash2 className="h-4 w-4" /> Remove
+                <Trash2 /> Remove
               </Button>
             )}
           </div>

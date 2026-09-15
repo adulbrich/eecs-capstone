@@ -422,7 +422,7 @@ function ReplyForm({
         <Button disabled={busy} size="xs" type="submit">
           Post
         </Button>
-        <Button onClick={close} size="xs" type="button" variant="ghost">
+        <Button onClick={close} size="xs" type="button" variant="outline">
           Cancel
         </Button>
       </div>

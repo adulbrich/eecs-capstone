@@ -1,5 +1,4 @@
 import { LayoutGrid, Table } from "lucide-react";
-import { cn } from "#/lib/utils.ts";
 import { type ViewMode, writeStoredView } from "#/lib/view-preference";
 import { Button } from "./ui/button";
 
@@ -25,32 +24,35 @@ export function ViewToggle({
   }
 
   return (
+    // The segmented look comes from the wrapper, so neither Button sets a
+    // radius, and the pressed fill comes from `aria-pressed` in the Button
+    // base class, so neither sets a colour (UI-CONVENTIONS, "`className` on a
+    // Button never restyles it").
     // biome-ignore lint/a11y/useSemanticElements: aria role=group with label is the right pattern for paired toggle buttons
-    <div aria-label="View mode" className="flex" role="group">
+    <div
+      aria-label="View mode"
+      className="flex [&>*+*]:-ml-px [&>*:not(:first-child)]:rounded-l-none [&>*:not(:last-child)]:rounded-r-none"
+      role="group"
+    >
       <Button
         aria-label="Card view"
         aria-pressed={current === "card"}
-        className={cn("rounded-r-none", current === "card" && "bg-secondary")}
         onClick={() => setMode("card")}
         size="icon"
         type="button"
         variant="outline"
       >
-        <LayoutGrid className="h-4 w-4" />
+        <LayoutGrid />
       </Button>
       <Button
         aria-label="Table view"
         aria-pressed={current === "table"}
-        className={cn(
-          "-ml-px rounded-l-none",
-          current === "table" && "bg-secondary"
-        )}
         onClick={() => setMode("table")}
         size="icon"
         type="button"
         variant="outline"
       >
-        <Table className="h-4 w-4" />
+        <Table />
       </Button>
     </div>
   );

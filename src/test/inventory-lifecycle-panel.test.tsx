@@ -344,23 +344,31 @@ describe("InventoryLifecyclePanel: the status history", () => {
     expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
   });
 
+  // The count is PaginationStatus's, the same wording every other list uses,
+  // rather than the bare "Page 1 of 2" span this pager carried before #392.
   it("pages forward and back, stopping at either end", () => {
     renderPanel({ history: historyOf(12) });
     const next = screen.getByRole("button", { name: "Next" });
     const previous = screen.getByRole("button", { name: "Previous" });
-    expect(screen.getByText("Page 1 of 2")).toBeDefined();
+    expect(
+      screen.getByText("Page 1 of 2 \u00b7 10 of 12 results")
+    ).toBeDefined();
     expect(screen.getByText("entry 1")).toBeDefined();
     expect(screen.queryByText("entry 11")).toBeNull();
     expect(previous).toHaveProperty("disabled", true);
 
     fireEvent.click(next);
-    expect(screen.getByText("Page 2 of 2")).toBeDefined();
+    expect(
+      screen.getByText("Page 2 of 2 \u00b7 2 of 12 results")
+    ).toBeDefined();
     expect(screen.getByText("entry 11")).toBeDefined();
     expect(screen.queryByText("entry 1")).toBeNull();
     expect(next).toHaveProperty("disabled", true);
 
     fireEvent.click(previous);
-    expect(screen.getByText("Page 1 of 2")).toBeDefined();
+    expect(
+      screen.getByText("Page 1 of 2 \u00b7 10 of 12 results")
+    ).toBeDefined();
     expect(screen.getByText("entry 1")).toBeDefined();
   });
 });

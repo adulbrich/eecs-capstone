@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardCheck, ClipboardPlus, Loader2 } from "lucide-react";
+import { ClipboardCheck, ClipboardPlus } from "lucide-react";
 import { authClient } from "#/lib/auth-client";
 import { useHasMounted } from "#/lib/use-has-mounted";
 import { addToCart, getCart } from "#/server/inventory";
@@ -81,7 +81,7 @@ export function AddToCartButton({
         // do here and the borrow list count on the page is the next step.
         variant={variant}
       >
-        <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
+        <ClipboardCheck aria-hidden="true" />
         <span className={labelClass}>In borrow list</span>
       </Button>
     );
@@ -100,11 +100,12 @@ export function AddToCartButton({
       type="button"
       variant={variant}
     >
-      {isPending ? (
-        <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-      ) : (
-        <ClipboardPlus aria-hidden="true" className="h-4 w-4" />
-      )}
+      {/*
+        No spinner: the label below already says "Adding...", and a glyph that
+        animates forever is the one busy signal a screen reader cannot read
+        (UI-CONVENTIONS, "Labels").
+      */}
+      <ClipboardPlus aria-hidden="true" />
       <span className={resting ? labelClass : undefined}>{label}</span>
     </Button>
   );

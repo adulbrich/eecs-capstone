@@ -86,20 +86,25 @@ export function MarkdownField({
             disabled={mode === "preview"}
             key={action}
             onClick={() => runAction(action)}
-            size="sm"
+            size="icon-sm"
             type="button"
             variant="ghost"
           >
-            <Icon aria-hidden className="size-4" />
+            <Icon aria-hidden />
           </Button>
         ))}
+        {/*
+          One variant for both, with the pressed fill coming from
+          `aria-pressed` in the Button base class. Swapping the variant instead
+          said the same thing twice and let the two disagree (#392).
+        */}
         <div className="ml-auto flex gap-1">
           <Button
             aria-pressed={mode === "edit"}
             onClick={() => setMode("edit")}
             size="sm"
             type="button"
-            variant={mode === "edit" ? "secondary" : "ghost"}
+            variant="ghost"
           >
             Edit
           </Button>
@@ -108,7 +113,7 @@ export function MarkdownField({
             onClick={() => setMode("preview")}
             size="sm"
             type="button"
-            variant={mode === "preview" ? "secondary" : "ghost"}
+            variant="ghost"
           >
             Preview
           </Button>

@@ -64,7 +64,9 @@ would turn an implicit form submit into a no-op just as silently. An `asChild`
 Sizes are `xs` (h-6, inline micro-actions like Post reply), `sm` (h-8, most
 contextual buttons), `default` (h-9, standalone form submits), and `lg` (h-10,
 hero / landing CTAs). Icon-only buttons use `icon-xs`, `icon-sm`, `icon`, or
-`icon-lg` to stay square.
+`icon-lg` to stay square. `bare` is the odd one out of the height scale: no
+height and no padding at all, for a `link` Button that sits in a panel as a
+line of text, which is what `ClearFiltersButton` uses.
 
 The size variant also sets the icon size, so pass no size class on an icon
 inside a `Button`. The base class carries
@@ -85,6 +87,99 @@ activation.
   <Link to="/projects/new">New project</Link>
 </Button>
 ```
+
+### One kind of action is one button everywhere
+
+The variant table above says which variant an action takes. These four drifted
+across pages often enough to be worth naming, because the eye reads a different
+button as a different action:
+
+| Action | Button |
+| --- | --- |
+| Cancel | `outline` |
+| Remove | `ghost` |
+| Save | `default` |
+| Clear all | `<ClearFiltersButton>` from `#/components/clear-filters-button` |
+
+Size is the row's to decide, not the action's. Cancel takes the size of the
+button it sits beside; Remove is `sm` in a list or a table row and `default`
+beside the mentor capacity `Input`; Save is `default` under a form and `sm`
+beside the `sm` `SelectTrigger` on the admin user page. Where the two rules
+meet, the row wins, because a button half a step off the control next to it is
+the misalignment this section exists to stop. See "Size follows the row" below.
+
+Cancel was `ghost` in four dialogs and `outline` in ten, Remove was six
+different buttons including two hand-rolled red palettes, and Clear all was a
+`link` Button with `h-auto p-0` copied five times. `ClearFiltersButton` exists
+so the sixth copy is an import rather than a paste.
+
+### A button shows the hand cursor, whichever element it renders
+
+Tailwind's preflight leaves `button` at the browser's default arrow, while an
+anchor gets the hand. An `asChild` Button renders a `<Link>`, so before the
+base rule in `styles.css` the cursor told the user which element the code
+happened to choose. `button:not(:disabled) { cursor: pointer }` in the base
+layer covers every button on the page, the deliberate raw ones included; a
+button that is genuinely not pressable says so with `cursor-default`, which is
+a utility and so outranks the base rule (the current status pill in
+`staff-project-panel.tsx` does this).
+
+### A variant owns its text colour at rest
+
+`outline` and `ghost` carry `text-foreground` rather than leaving the colour to
+be inherited. Without it a rendered `<button>` inherited the body colour and an
+`asChild` anchor inherited the global `a` rule, brand orange, so the same
+variant was two different buttons depending on the element underneath it.
+`secondary`, `default` and `destructive` already carried their foreground
+token; `link` is the one variant that is meant to read as a link and keeps
+`text-brand-dark`.
+
+### Size follows the row, not the page
+
+A button on a row with a form control is `default` (h-9), so it aligns with the
+`Input` and `SelectTrigger` beside it: the search row's Export CSV, Columns and
+view toggle are all `default` for this reason. A contextual button with no form
+control on its row is `sm` (h-8): the title-row actions, the buttons inside a
+table row or a panel. The rule was previously a comment in
+`export-csv-button.tsx`, which meant the next page picked either.
+
+### `className` on a Button never restyles it
+
+A Button's `className` may position it (`w-full`, `mt-2`, `xl:hidden`,
+`relative`), and may not set a colour, a height, a padding or a radius. Font
+weight is not on that list, and one call site uses it: the combobox trigger in
+`category-type-combobox.tsx` carries `font-normal`, because a trigger that
+displays a selected value reads as an input rather than as a button. Those
+four are what the variant and size own, so a call site that sets them has
+forked the primitive in one file: a Remove in a destructive palette here, an
+`h-auto p-0` there, until no two pages agree. If a call site needs a look the
+variants do not offer, the variant is what changes, or a shared component wraps
+it. `src/test/button-conventions.test.ts` scans for the four.
+
+A pressed toggle is the case this most often tempts. Style it from
+`aria-pressed` in the primitive, which the base class handles, not from a
+conditional `bg-secondary` at the call site: the attribute is what a screen
+reader reads, so styling from anything else lets the two disagree. `ViewToggle`
+and the markdown Edit/Preview pair are the two.
+
+A segmented group (buttons that read as one control) gets its radius from the
+wrapper, which carries `[&>*:not(:first-child)]:rounded-l-none`,
+`[&>*:not(:last-child)]:rounded-r-none` and `[&>*+*]:-ml-px`, so no call site
+sets a radius. Written against `:not()` rather than `:first-child` and
+`:last-child` so a third button squares on both sides instead of keeping the
+base radius in the middle of the group.
+
+### Labels
+
+Sentence case, always: "Propose project", not "Propose Project". A button that
+creates a thing carries an icon rather than a literal plus sign, because the
+icon is already the affordance and `+ New item` reads as two controls.
+
+A busy label is the verb plus three ASCII dots, in the label's own place:
+`{busy ? "Saving..." : "Save"}`. Not a real ellipsis (U+2026), which the scan
+refuses, and not a spinner in place of the words: a control whose text vanishes
+is a control a screen reader stops being able to name, and the accessible name
+is what every role query in the test suite matches on.
 
 ### A link inside running text is underlined at rest
 

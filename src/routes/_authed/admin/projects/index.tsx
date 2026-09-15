@@ -12,6 +12,7 @@ import {
   AdminTableControls,
   defineAdminColumns,
 } from "#/components/admin-data-table";
+import { ClearFiltersButton } from "#/components/clear-filters-button";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
 import { ImageOrFallback } from "#/components/image-or-fallback";
@@ -728,8 +729,7 @@ function AdminProjectsFilters({
         }
       />
       {countActiveAdminFilters(search) > 0 && (
-        <Button
-          className="h-auto p-0"
+        <ClearFiltersButton
           onClick={() =>
             void navigate({
               // Every field the count reads, to its default; the search,
@@ -751,11 +751,7 @@ function AdminProjectsFilters({
               }),
             })
           }
-          type="button"
-          variant="link"
-        >
-          Clear all
-        </Button>
+        />
       )}
     </div>
   );
@@ -797,19 +793,16 @@ function DatelessNotice({
         was imported from the legacy portal, whose event log only goes back to
         August 2022.
       </p>
-      <Button
-        className="mt-2 h-auto p-0"
+      <ClearFiltersButton
+        className="mt-2"
         onClick={() =>
           void navigate({
             search: (prev) => ({ ...prev, from: undefined, to: undefined }),
           })
         }
-        size="sm"
-        type="button"
-        variant="link"
       >
         Clear the date range
-      </Button>
+      </ClearFiltersButton>
     </div>
   );
 }

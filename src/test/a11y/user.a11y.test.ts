@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Locator } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import {
   expectNoHorizontalOverflow,
@@ -48,6 +49,132 @@ test("projects list, signed in, with bookmark controls", async ({ page }) => {
   await expect(page.locator(".admin-table")).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await checkA11y(page);
+});
+
+/**
+ * A rendered `<button>` and an `asChild` `<Link>` of the same variant and size
+ * read the same at rest, on hover and on focus (UI-CONVENTIONS, "A variant
+ * owns its text colour at rest" and "A button shows the hand cursor").
+ *
+ * The pair is `BookmarkButton` and the Edit link on a project detail page,
+ * both `outline` `sm`, which is the pair the issue names and the pair the
+ * pull request screenshots. Same size, so every box property is comparable
+ * and not only colour: on `main` the anchor is brand orange with the
+ * browser's hand cursor and the button is body colour with the arrow, so the
+ * cursor told the reader which element the code had chosen rather than
+ * whether the thing was clickable. jsdom computes none of this.
+ */
+test("@smoke an outline Button and an outline asChild Link read the same", async ({
+  page,
+}) => {
+  await page.goto(`/projects/${projectId}`);
+  await waitForHydration(page);
+  const button = page.getByRole("button", {
+    name: /^(Bookmark|Remove bookmark)$/,
+  });
+  // Scoped to the header's action row, because the page carries three Edit
+  // links: this one, a full-width copy below the image for phone widths, and
+  // the proposer's own panel further down. This is the one that shares a row
+  // with Bookmark, which is the pair the issue names.
+  const link = button.locator("xpath=..").getByRole("link", { name: "Edit" });
+  await expect(button).toBeVisible();
+  await expect(link).toBeVisible();
+
+  const read = (locator: Locator) =>
+    locator.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return {
+        // backgroundColor, borderColor and boxShadow are what `outline`
+        // actually changes on hover and on focus-visible, so leaving them out
+        // would have made those two phases assert nothing new.
+        backgroundColor: s.backgroundColor,
+        borderColor: s.borderColor,
+        borderRadius: s.borderRadius,
+        borderWidth: s.borderWidth,
+        boxShadow: s.boxShadow,
+        color: s.color,
+        cursor: s.cursor,
+        fontSize: s.fontSize,
+        fontWeight: s.fontWeight,
+        height: s.height,
+      };
+    });
+
+  // `styles.css` transitions background, colour, border and transform over
+  // 180ms on every button and anchor, so a computed value read the instant
+  // after a hover is a frame partway through it, and the two controls were
+  // compared at different points along the same curve. Awaiting the element's
+  // own animations is the technique `waitForSurfaceSettled` already uses.
+  const settle = (locator: Locator) =>
+    locator.evaluate(async (el) => {
+      // A frame first: a transition is constructed during the style recalc
+      // that follows the state change, not synchronously with it, so sampling
+      // `getAnimations()` straight after a hover can return an empty list and
+      // resolve before the thing it is waiting for exists.
+      await new Promise(requestAnimationFrame);
+      const running = () =>
+        el
+          .getAnimations()
+          .filter(
+            (a) =>
+              a.playState === "running" &&
+              a.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY
+          );
+      // Loop rather than sample once, as `waitForSurfaceSettled` does: one
+      // transition finishing can leave another still going.
+      for (let batch = running(); batch.length > 0; batch = running()) {
+        await Promise.allSettled(batch.map((a) => a.finished));
+      }
+    });
+
+  const atRest = await read(button);
+  expect(await read(link)).toEqual(atRest);
+  expect(atRest.cursor).toBe("pointer");
+
+  await button.hover();
+  await settle(button);
+  const hovered = await read(button);
+  await link.hover();
+  await settle(link);
+  expect(await read(link)).toEqual(hovered);
+
+  // The pointer is still parked on the link from the hover phase, and a
+  // control that is both hovered and focused reads differently from one that
+  // is only focused. Park it off both before comparing focus rings.
+  await page.mouse.move(0, 0);
+  await settle(button);
+  await settle(link);
+
+  await button.focus();
+  await settle(button);
+  const focused = await read(button);
+  await link.focus();
+  await settle(link);
+  expect(await read(link)).toEqual(focused);
+});
+
+/**
+ * The pressed half of a toggle is filled, and the fill comes from
+ * `aria-pressed` in the Button base class rather than a conditional class at
+ * the call site (UI-CONVENTIONS, "`className` on a Button never restyles it").
+ *
+ * The unit test asserts the attribute, which is what a screen reader reads;
+ * this asserts the attribute is also what paints, so the two cannot drift.
+ * jsdom resolves no Tailwind, so it cannot see this.
+ */
+test("@smoke the view toggle's pressed half is filled, from aria-pressed", async ({
+  page,
+}) => {
+  await page.goto("/projects");
+  await waitForHydration(page);
+  const pressed = page.getByRole("button", { name: "Card view" });
+  const unpressed = page.getByRole("button", { name: "Table view" });
+  await expect(pressed).toHaveAttribute("aria-pressed", "true");
+  await expect(unpressed).toHaveAttribute("aria-pressed", "false");
+
+  const background = (locator: Locator) =>
+    locator.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await background(pressed)).not.toBe(await background(unpressed));
 });
 
 test("projects table, signed in, with bookmark controls", async ({ page }) => {

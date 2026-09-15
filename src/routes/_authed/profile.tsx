@@ -13,6 +13,7 @@ import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
 import { authClient } from "#/lib/auth-client";
 import { pageTitle } from "#/lib/page-title";
+import { signOut } from "#/lib/sign-out";
 import { getAccountDeletionPreview } from "#/server/account";
 import { getMyInterests, saveMyInterests } from "#/server/interests";
 import { updateProfile } from "#/server/profile";
@@ -162,11 +163,6 @@ function Profile() {
     }
   }
 
-  async function onSignOut() {
-    await authClient.signOut();
-    window.location.href = "/sign-in";
-  }
-
   return (
     <div className="mx-auto max-w-md px-4 py-6 md:p-8">
       <h1 className="font-semibold text-2xl">Profile</h1>
@@ -314,7 +310,7 @@ function Profile() {
       <div className="mt-8 border-border border-t pt-8">
         <Button
           className="w-full"
-          onClick={onSignOut}
+          onClick={() => void signOut()}
           type="button"
           variant="outline"
         >

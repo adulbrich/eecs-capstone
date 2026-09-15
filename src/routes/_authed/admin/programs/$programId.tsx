@@ -179,15 +179,13 @@ function ProgramEdit() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" type="submit">
-            Save
-          </Button>
+          <Button type="submit">Save</Button>
           <ConfirmDialog
             description={deleteDescription}
             onConfirm={onDelete}
             title={`Delete program "${program.courseName}"?`}
           >
-            <Button size="sm" type="button" variant="destructive">
+            <Button type="button" variant="destructive">
               Delete
             </Button>
           </ConfirmDialog>

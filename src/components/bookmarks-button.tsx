@@ -29,7 +29,7 @@ export function BookmarksButton() {
   return (
     <Button asChild size="sm" variant="outline">
       <Link to="/my/bookmarks">
-        <Bookmark aria-hidden="true" className="h-4 w-4" />
+        <Bookmark aria-hidden="true" />
         Bookmarks <CountBadge count={count} />
       </Link>
     </Button>

@@ -136,7 +136,6 @@ export function ProposerPicker({
         />
         {locked ? (
           <Button
-            className="h-9"
             onClick={() => setReassignOpen(true)}
             type="button"
             variant="outline"
@@ -146,7 +145,7 @@ export function ProposerPicker({
         ) : (
           <Popover onOpenChange={setFindOpen} open={findOpen}>
             <PopoverTrigger asChild>
-              <Button className="h-9" type="button" variant="outline">
+              <Button type="button" variant="outline">
                 Find account
               </Button>
             </PopoverTrigger>
@@ -203,7 +202,7 @@ export function ProposerPicker({
             <Button
               onClick={() => setReassignOpen(false)}
               type="button"
-              variant="ghost"
+              variant="outline"
             >
               Cancel
             </Button>

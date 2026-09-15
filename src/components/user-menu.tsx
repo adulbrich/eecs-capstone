@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { authClient } from "#/lib/auth-client";
+import { signOut } from "#/lib/sign-out";
 import { getPublicUrl } from "#/lib/storage";
 import {
   DropdownMenu,
@@ -54,12 +54,7 @@ export function UserMenu({ user }: Props) {
         <DropdownMenuItem asChild>
           <Link to="/profile">Profile</Link>
         </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={async () => {
-            await authClient.signOut();
-            window.location.href = "/sign-in";
-          }}
-        >
+        <DropdownMenuItem onClick={() => void signOut()}>
           Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>

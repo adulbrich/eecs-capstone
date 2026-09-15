@@ -4,6 +4,7 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
+import { PackagePlus } from "lucide-react";
 import { useCallback, useId } from "react";
 import { z } from "zod";
 import {
@@ -16,6 +17,7 @@ import {
   type CategoryOption,
 } from "#/components/category-checkbox-list";
 import { CategoryChip } from "#/components/category-chip";
+import { ClearFiltersButton } from "#/components/clear-filters-button";
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
 import { INVENTORY_STATUS_OPTIONS } from "#/components/inventory-filters";
@@ -550,8 +552,7 @@ function AdminInventoryFilters({
         />
       </div>
       {active > 0 && (
-        <Button
-          className="h-auto p-0"
+        <ClearFiltersButton
           onClick={() =>
             void navigate({
               search: (prev) => ({
@@ -563,11 +564,7 @@ function AdminInventoryFilters({
               }),
             })
           }
-          type="button"
-          variant="link"
-        >
-          Clear all
-        </Button>
+        />
       )}
     </div>
   );
@@ -680,7 +677,10 @@ function AdminInventory() {
                 <Link to="/admin/inventory/requests">Request queue</Link>
               </Button>
               <Button asChild size="sm">
-                <Link to="/inventory/new">+ New item</Link>
+                <Link to="/inventory/new">
+                  <PackagePlus aria-hidden="true" />
+                  New item
+                </Link>
               </Button>
             </div>
           </div>
