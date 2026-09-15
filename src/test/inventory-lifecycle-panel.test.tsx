@@ -418,6 +418,27 @@ describe("InventoryLifecyclePanel: the checkout dialog", () => {
     );
   });
 
+  it("stays open and shows the refusal inside when the transition fails", async () => {
+    server.transitionInventoryItem.mockRejectedValueOnce(
+      new Error("Item is already checked out")
+    );
+    renderPanel({ status: "available" });
+    fireEvent.click(screen.getByRole("button", { name: "Check out" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Email"), {
+      target: { value: "holder@x.edu" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Due date"), {
+      target: { value: "2026-10-01" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
+
+    // It used to close whatever happened, which put the refusal in the panel
+    // behind a dialog that had already gone.
+    expect(await screen.findByText("Item is already checked out")).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
   it("closes on Cancel without transitioning", async () => {
     renderPanel({ status: "available" });
     fireEvent.click(screen.getByRole("button", { name: "Check out" }));

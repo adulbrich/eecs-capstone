@@ -390,7 +390,7 @@ export function InventoryLifecyclePanel({
     dueAt?: Date | null;
     comment?: string | null;
   }) {
-    await run(async () => {
+    return await run(async () => {
       await transitionInventoryItem({
         data: {
           itemId: item.id,
@@ -469,7 +469,7 @@ export function InventoryLifecyclePanel({
       setError("A due date is required to check out an item.");
       return;
     }
-    await runTransition({
+    const ok = await runTransition({
       nextStatus: dlgTargetStatus,
       // Null when the item was never requested through a cart. Staff-assigned
       // holds are first-class, so the absence of a request line is not an
@@ -485,7 +485,12 @@ export function InventoryLifecyclePanel({
       comment: dlgComment || null,
       sendEmail: dlgSendEmail,
     });
-    setDlgOpen(false);
+    // Only on success. It used to close whatever happened, which left a
+    // refused transition reported in a panel behind a dialog that had already
+    // gone (UI-CONVENTIONS, "Mutations and feedback").
+    if (ok) {
+      setDlgOpen(false);
+    }
   }
 
   async function onRecommendedClick() {
@@ -593,7 +598,13 @@ export function InventoryLifecyclePanel({
             </Select>
           </div>
         </div>
-        <FieldError message={error} />
+        {/*
+          The panel's own slot yields while either dialog is open. All three
+          read one `error`, so a refusal raised inside a dialog would
+          otherwise render twice: once where the reader is looking and once
+          on the page behind it.
+        */}
+        <FieldError message={dlgOpen || delOpen ? null : error} />
       </PanelSection>
 
       <StatusHistorySection history={history} />

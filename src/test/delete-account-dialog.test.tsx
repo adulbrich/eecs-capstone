@@ -131,6 +131,26 @@ describe("DeleteAccountDialog", () => {
     expect(second).not.toHaveBeenCalled();
   });
 
+  it("never re-arms its confirm once the delete has gone through", async () => {
+    const onDeleted = open(clear());
+    fireEvent.change(screen.getByLabelText("Confirm email"), {
+      target: { value: EMAIL },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Delete my account" }));
+    await waitFor(() => expect(onDeleted).toHaveBeenCalled());
+
+    // A full document load follows and it takes a moment. Nothing here may
+    // come back to life in the gap: the account is already gone.
+    expect(
+      (screen.getByRole("button", { name: "Deleting..." }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+  });
+
   it("shows the block and no gate while an item is out", () => {
     open(
       clear({

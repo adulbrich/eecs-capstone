@@ -45,9 +45,15 @@ export function useAction(options?: {
 
   const run = useCallback(
     async (
-      // `unknown` rather than `void`: a server function returns something,
-      // and a caller should not have to discard it to pass the call here.
-      action: () => unknown,
+      // `Promise<unknown>` rather than `Promise<void>`, because a server
+      // function returns something and a caller should not have to discard it
+      // to pass the call in. Not bare `unknown`, which would also accept
+      // `run(() => save)`, a forgotten invocation that does nothing and then
+      // reports success. The `void` arm is what lets a synchronous action in;
+      // Biome's suggested `undefined` is not the same type and rejects
+      // `run(() => close())` for a `close` that returns void.
+      // biome-ignore lint/suspicious/noConfusingVoidType: the union is the point, see above
+      action: () => Promise<unknown> | void,
       /** Overrides the hook's fallback for this one action. */
       actionFallback?: string
     ): Promise<boolean> => {

@@ -45,13 +45,16 @@ export function DeleteAccountDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
-  // The page is replaced on success, so the confirm never comes back: `run`
-  // clears `busy` in its finally, and `leaving` holds the button down for
-  // the moment between that and the document load.
   const [leaving, setLeaving] = useState(false);
   const { busy, error, run, setError } = useAction({
     fallback: "Could not delete the account",
   });
+  // The page is replaced on success, so nothing here comes back: `run` clears
+  // `busy` in its finally, and `leaving` covers the gap until the document
+  // load commits. Every control the flight gates reads this, not `busy`, or
+  // the confirm would say "Delete my account" again and Cancel would come
+  // alive for that moment.
+  const pending = busy || leaving;
 
   const blocked =
     preview !== null &&
@@ -149,15 +152,15 @@ export function DeleteAccountDialog({
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
           {!blocked && (
             <Button
-              disabled={busy || leaving || !matches}
+              disabled={pending || !matches}
               onClick={() => void runDelete()}
               type="button"
               variant="destructive"
             >
-              {busy ? "Deleting..." : "Delete my account"}
+              {pending ? "Deleting..." : "Delete my account"}
             </Button>
           )}
         </AlertDialogFooter>
