@@ -20,10 +20,18 @@ const approved: InventoryNotice = {
 };
 
 describe("notifyInventoryByEmail", () => {
+  it("sends nothing on the staff skip, which is the email's alone (#387)", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await notifyInventoryByEmail(approved, { send, sendEmail: false }, CONFIG);
+
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("mails the notice's own words to the recipient, with an absolute link", async () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
-    await notifyInventoryByEmail(approved, send, CONFIG);
+    await notifyInventoryByEmail(approved, { send }, CONFIG);
 
     expect(send).toHaveBeenCalledOnce();
     const [to, email] = send.mock.calls[0] ?? [];
@@ -38,7 +46,7 @@ describe("notifyInventoryByEmail", () => {
 
     await notifyInventoryByEmail(
       { ...approved, recipient: { accountId: null, email: "walkin@x.edu" } },
-      send,
+      { send },
       CONFIG
     );
 
@@ -50,13 +58,13 @@ describe("notifyInventoryByEmail", () => {
 
     await notifyInventoryByEmail(
       { ...approved, type: "inventory_item_returned" },
-      send,
+      { send },
       CONFIG
     );
-    await notifyInventoryByEmail(null, send, CONFIG);
+    await notifyInventoryByEmail(null, { send }, CONFIG);
     await notifyInventoryByEmail(
       { ...approved, recipient: { accountId: "u-1", email: null } },
-      send,
+      { send },
       CONFIG
     );
 
@@ -70,7 +78,7 @@ describe("notifyInventoryByEmail", () => {
     const send = vi.fn().mockRejectedValue(new Error("SES is down"));
 
     await expect(
-      notifyInventoryByEmail(approved, send, CONFIG)
+      notifyInventoryByEmail(approved, { send }, CONFIG)
     ).resolves.toBeUndefined();
 
     expect(error).toHaveBeenCalledOnce();

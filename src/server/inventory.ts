@@ -7,6 +7,7 @@ import {
   INVENTORY_ITEM_STATUSES,
   INVENTORY_REQUEST_ITEM_STATUSES,
 } from "#/lib/vocabularies";
+import { SEND_EMAIL_FIELD } from "./send-email-field";
 
 function expectFormData(data: unknown): FormData {
   if (!(data instanceof FormData)) {
@@ -204,6 +205,7 @@ export const submitCart = createServerFn({ method: "POST" })
 const approveSchema = z.object({
   requestItemId: z.string().uuid(),
   pickupBy: z.coerce.date().nullable().default(null),
+  ...SEND_EMAIL_FIELD,
 });
 
 export const approveRequestItem = createServerFn({ method: "POST" })
@@ -218,6 +220,7 @@ export const approveRequestItem = createServerFn({ method: "POST" })
 const approveLinesSchema = z.object({
   requestItemIds: z.array(z.string().uuid()).min(1).max(100),
   pickupBy: z.coerce.date().nullable().default(null),
+  ...SEND_EMAIL_FIELD,
 });
 
 export const approveRequestLines = createServerFn({ method: "POST" })
@@ -232,6 +235,7 @@ export const approveRequestLines = createServerFn({ method: "POST" })
 const rejectSchema = z.object({
   requestItemId: z.string().uuid(),
   reviewComment: z.string().min(1).max(2000),
+  ...SEND_EMAIL_FIELD,
 });
 
 export const rejectRequestItem = createServerFn({ method: "POST" })
@@ -327,6 +331,9 @@ export const transitionSchema = z.object({
   pickupBy: z.coerce.date().nullable().default(null),
   dueAt: z.coerce.date().nullable().default(null),
   comment: z.string().max(2000).nullable().default(null),
+  // The email-only skip (#387), never `silent`: that one suppresses the bell
+  // row too and stays internal.
+  ...SEND_EMAIL_FIELD,
 });
 
 export const transitionInventoryItem = createServerFn({ method: "POST" })
@@ -337,6 +344,7 @@ export const transitionInventoryItem = createServerFn({ method: "POST" })
       "./_internal/inventory-transitions"
     );
     const viewer = await requireUser();
-    await transitionItem(viewer, data);
+    const { sendEmail, ...input } = data;
+    await transitionItem(viewer, input, undefined, { sendEmail });
     return { ok: true as const };
   });

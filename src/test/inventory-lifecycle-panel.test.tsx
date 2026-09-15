@@ -366,6 +366,50 @@ describe("InventoryLifecyclePanel: the status history", () => {
 });
 
 describe("InventoryLifecyclePanel: the checkout dialog", () => {
+  it("names the typed holder on the skip, disables it for a label hold, and sends the choice (#387)", async () => {
+    renderPanel({ status: "available" });
+    fireEvent.click(screen.getByRole("button", { name: "Check out" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByText(
+        "A holder with an address receives pickup and due emails there."
+      )
+    ).toBeTruthy();
+    // Nothing typed yet: the box is disabled and says so.
+    const idle = within(dialog).getByRole("checkbox", {
+      name: "No address on file, no email will be sent",
+    });
+    expect(idle.hasAttribute("disabled")).toBe(true);
+
+    fireEvent.change(within(dialog).getByLabelText("Email"), {
+      target: { value: "holder@x.edu" },
+    });
+    const box = await within(dialog).findByRole("checkbox", {
+      name: "Email holder@x.edu",
+    });
+    expect(box.getAttribute("aria-checked")).toBe("true");
+    expect(
+      within(dialog).getByText(
+        "Uncheck to skip the email; a holder with an account still gets the in-app notification."
+      )
+    ).toBeTruthy();
+    fireEvent.click(box);
+    fireEvent.change(within(dialog).getByLabelText("Due date"), {
+      target: { value: "2026-10-01" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() =>
+      expect(server.transitionInventoryItem).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          nextStatus: "checked_out",
+          holderEmail: "holder@x.edu",
+          sendEmail: false,
+        }),
+      })
+    );
+  });
+
   it("closes on Cancel without transitioning", async () => {
     renderPanel({ status: "available" });
     fireEvent.click(screen.getByRole("button", { name: "Check out" }));

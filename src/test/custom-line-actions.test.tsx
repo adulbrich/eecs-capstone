@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
@@ -63,7 +64,13 @@ const pending = {
 
 describe("CustomLineActions", () => {
   it("offers Start sourcing, Fulfil and Reject on a pending line, and never Approve", () => {
-    render(<CustomLineActions line={pending} onDone={vi.fn()} />);
+    render(
+      <CustomLineActions
+        line={pending}
+        onDone={vi.fn()}
+        requesterEmail="requester@x.edu"
+      />
+    );
     expect(
       screen.getByRole("button", { name: "Start sourcing" })
     ).toBeDefined();
@@ -79,6 +86,7 @@ describe("CustomLineActions", () => {
       <CustomLineActions
         line={{ ...pending, sourcingNote: "Ordered", status: "sourcing" }}
         onDone={onDone}
+        requesterEmail="requester@x.edu"
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "Update note" }));
@@ -95,7 +103,13 @@ describe("CustomLineActions", () => {
   it("starts sourcing with an optional note", async () => {
     vi.mocked(startSourcingCustomLine).mockResolvedValue({ ok: true });
     const onDone = vi.fn();
-    render(<CustomLineActions line={pending} onDone={onDone} />);
+    render(
+      <CustomLineActions
+        line={pending}
+        onDone={onDone}
+        requesterEmail="requester@x.edu"
+      />
+    );
     fireEvent.click(screen.getByRole("button", { name: "Start sourcing" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm sourcing" }));
     await waitFor(() => expect(onDone).toHaveBeenCalled());
@@ -105,7 +119,13 @@ describe("CustomLineActions", () => {
   });
 
   it("refuses a rejection without a reason before it reaches the server", () => {
-    render(<CustomLineActions line={pending} onDone={vi.fn()} />);
+    render(
+      <CustomLineActions
+        line={pending}
+        onDone={vi.fn()}
+        requesterEmail="requester@x.edu"
+      />
+    );
     fireEvent.click(screen.getByRole("button", { name: "Reject" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm reject" }));
     expect(screen.getByText("Reason required")).toBeDefined();
@@ -117,9 +137,54 @@ describe("CustomLineActions", () => {
       <CustomLineActions
         line={{ ...pending, status: "fulfilled" }}
         onDone={vi.fn()}
+        requesterEmail="requester@x.edu"
       />
     );
     expect(screen.queryByRole("button")).toBeNull();
+  });
+});
+
+describe("CustomLineActions email skip (#387)", () => {
+  it("names the requester on Reject and sends the skip", async () => {
+    vi.mocked(rejectCustomLine).mockResolvedValue({ ok: true });
+    const onDone = vi.fn();
+    render(
+      <CustomLineActions
+        line={pending}
+        onDone={onDone}
+        requesterEmail="requester@x.edu"
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    const box = await screen.findByRole("checkbox", {
+      name: "Email requester@x.edu",
+    });
+    expect(box.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(box);
+    fireEvent.change(screen.getByLabelText("Reason (sent to requester)"), {
+      target: { value: "No budget" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm reject" }));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(rejectCustomLine).toHaveBeenCalledWith({
+      data: { customLineId: "c-1", outcomeNote: "No budget", sendEmail: false },
+    });
+  });
+
+  it("carries the box into the Fulfil dialog, checked", async () => {
+    render(
+      <CustomLineActions
+        line={pending}
+        onDone={vi.fn()}
+        requesterEmail="requester@x.edu"
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Fulfil" }));
+    const dialog = await screen.findByRole("dialog");
+    const box = within(dialog).getByRole("checkbox", {
+      name: "Email requester@x.edu",
+    });
+    expect(box.getAttribute("aria-checked")).toBe("true");
   });
 });
 
@@ -160,7 +225,13 @@ describe("StartSourcingAllButton", () => {
 
 describe("CustomLineActions: cancelling a popover", () => {
   it("closes the sourcing popover without writing, and keeps the note", async () => {
-    render(<CustomLineActions line={pending} onDone={vi.fn()} />);
+    render(
+      <CustomLineActions
+        line={pending}
+        onDone={vi.fn()}
+        requesterEmail="requester@x.edu"
+      />
+    );
     fireEvent.click(screen.getByRole("button", { name: "Start sourcing" }));
     fireEvent.change(
       screen.getByLabelText("Note for the requester (optional)"),
@@ -185,7 +256,13 @@ describe("CustomLineActions: cancelling a popover", () => {
   });
 
   it("closes the reject popover without writing", async () => {
-    render(<CustomLineActions line={pending} onDone={vi.fn()} />);
+    render(
+      <CustomLineActions
+        line={pending}
+        onDone={vi.fn()}
+        requesterEmail="requester@x.edu"
+      />
+    );
     fireEvent.click(screen.getByRole("button", { name: "Reject" }));
     fireEvent.change(screen.getByLabelText("Reason (sent to requester)"), {
       target: { value: "Not stocked" },
@@ -219,7 +296,13 @@ describe("FulfillCustomLineDialog", () => {
   }
 
   it("unlinks an item and offers it again", async () => {
-    render(<FulfillCustomLineDialog line={pending} onDone={vi.fn()} />);
+    render(
+      <FulfillCustomLineDialog
+        line={pending}
+        onDone={vi.fn()}
+        requesterEmail="requester@x.edu"
+      />
+    );
     await linkFirstMatch();
     // Linking takes the item out of the matches; the Add buttons left are
     // for the others.
@@ -233,7 +316,13 @@ describe("FulfillCustomLineDialog", () => {
   });
 
   it("closes on Cancel without writing, and starts over when reopened", async () => {
-    render(<FulfillCustomLineDialog line={pending} onDone={vi.fn()} />);
+    render(
+      <FulfillCustomLineDialog
+        line={pending}
+        onDone={vi.fn()}
+        requesterEmail="requester@x.edu"
+      />
+    );
     await linkFirstMatch();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -261,7 +350,13 @@ describe("FulfillCustomLineDialog", () => {
       itemIds: ["i-1"],
     });
     const onDone = vi.fn();
-    render(<FulfillCustomLineDialog line={pending} onDone={onDone} />);
+    render(
+      <FulfillCustomLineDialog
+        line={pending}
+        onDone={onDone}
+        requesterEmail="requester@x.edu"
+      />
+    );
     fireEvent.click(screen.getByRole("button", { name: "Fulfil" }));
     fireEvent.change(screen.getByLabelText("Find an available item"), {
       target: { value: "FLIR" },
@@ -291,12 +386,19 @@ describe("FulfillCustomLineDialog", () => {
         outcomeNote: null,
         pickupBy: new Date("2026-10-01"),
         reserve: true,
+        sendEmail: true,
       },
     });
   });
 
   it("refuses to confirm with nothing linked", () => {
-    render(<FulfillCustomLineDialog line={pending} onDone={vi.fn()} />);
+    render(
+      <FulfillCustomLineDialog
+        line={pending}
+        onDone={vi.fn()}
+        requesterEmail="requester@x.edu"
+      />
+    );
     fireEvent.click(screen.getByRole("button", { name: "Fulfil" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm fulfil" }));
     expect(screen.getByText("Link at least one item")).toBeDefined();

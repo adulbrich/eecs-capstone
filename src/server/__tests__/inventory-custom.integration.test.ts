@@ -697,6 +697,55 @@ describe("custom line emails", () => {
   });
 });
 
+describe("custom line email skip (#387)", () => {
+  const ORIGINAL_ENV = { ...process.env };
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  it("fulfils and rejects without an email on sendEmail: false, and still writes the bell rows", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser(`a-cl-skip-${Date.now()}@x.com`, "admin");
+    const requester = await makeUser(`r-cl-skip-${Date.now()}@x.com`, "user");
+    const send = vi.fn().mockResolvedValue(undefined);
+    const { lineIds } = await submitCustomRequestAs(requester, {
+      lines: [
+        { name: "Spectrometer", reason: "Lab", quantity: 1, link: null },
+        { name: "Oscilloscope probe", reason: "Lab", quantity: 2, link: null },
+      ],
+      note: null,
+    });
+
+    const item = await makeItem(`Spectro-${Date.now()}`);
+    await fulfillCustomLineAs(
+      admin,
+      {
+        customLineId: lineIds[0],
+        itemIds: [item.id],
+        outcomeNote: null,
+        pickupBy: null,
+        reserve: true,
+      },
+      { send, sendEmail: false }
+    );
+    await rejectCustomLineAs(
+      admin,
+      { customLineId: lineIds[1], outcomeNote: "No budget" },
+      { send, sendEmail: false }
+    );
+    expect(send).not.toHaveBeenCalled();
+
+    const bell = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, requester.id));
+    expect(bell.map((r) => r.type).sort()).toEqual([
+      "inventory_custom_fulfilled",
+      "inventory_custom_rejected",
+    ]);
+  });
+});
+
 describe("request submission emails", () => {
   const ORIGINAL_ENV = { ...process.env };
   afterEach(() => {

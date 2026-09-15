@@ -159,7 +159,11 @@ const KIND: Record<Row["kind"], KindConfig> = {
     ),
     rowActions: (row, onDone) =>
       row.kind === "custom" ? (
-        <CustomLineActions line={row.line} onDone={onDone} />
+        <CustomLineActions
+          line={row.line}
+          onDone={onDone}
+          requesterEmail={row.requester.email}
+        />
       ) : null,
     statuses: INVENTORY_CUSTOM_LINE_STATUSES,
   },
@@ -173,12 +177,15 @@ const KIND: Record<Row["kind"], KindConfig> = {
           status: row.line.status,
         }))}
         onDone={onDone}
+        // One requester per request: the rows are one group's.
+        requesterEmail={rows[0]?.requester.email ?? ""}
       />
     ),
     rowActions: (row, onDone) => (
       <AdminRequestActions
         lineId={row.line.id}
         onDone={onDone}
+        requesterEmail={row.requester.email}
         status={row.line.status}
       />
     ),
@@ -538,6 +545,7 @@ function sheetActions(
       <AdminRequestActions
         lineId={row.line.id}
         onDone={done}
+        requesterEmail={row.requester.email}
         status={row.line.status}
       />
     ) : undefined;
@@ -547,7 +555,11 @@ function sheetActions(
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <CustomLineActions line={row.line} onDone={done} />
+      <CustomLineActions
+        line={row.line}
+        onDone={done}
+        requesterEmail={row.requester.email}
+      />
       {/*
         Fulfil links items that exist. This is the path to one that does
         not: the ordinary item form, prefilled, returning here on save.

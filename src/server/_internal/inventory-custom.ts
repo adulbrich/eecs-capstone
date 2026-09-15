@@ -250,7 +250,7 @@ export async function rejectCustomLineAs(
     return rejected;
   });
   // After the commit, never inside it; swallows its own errors.
-  await notifyInventoryByEmail(notice, opts?.send);
+  await notifyInventoryByEmail(notice, opts);
   return { ok: true as const };
 }
 
@@ -353,7 +353,7 @@ export async function fulfillCustomLineAs(
   // After the commit, never inside it; swallows its own errors. The per-item
   // reservations inside were silent, so this is the one email the requester
   // gets, matching the one bell row.
-  await notifyInventoryByEmail(notice, opts?.send);
+  await notifyInventoryByEmail(notice, opts);
   return { ok: true as const, itemIds: linked };
 }
 
@@ -440,9 +440,11 @@ export async function updateSourcingNoteForCurrentUser(data: {
 export async function rejectCustomLineForCurrentUser(data: {
   customLineId: string;
   outcomeNote: string;
+  sendEmail: boolean;
 }) {
   const viewer = await requireUser();
-  return rejectCustomLineAs(viewer, data);
+  const { sendEmail, ...fields } = data;
+  return rejectCustomLineAs(viewer, fields, { sendEmail });
 }
 
 export async function fulfillCustomLineForCurrentUser(data: {
@@ -451,9 +453,11 @@ export async function fulfillCustomLineForCurrentUser(data: {
   outcomeNote: string | null;
   pickupBy: Date | null;
   reserve: boolean;
+  sendEmail: boolean;
 }) {
   const viewer = await requireUser();
-  return fulfillCustomLineAs(viewer, data);
+  const { sendEmail, ...fields } = data;
+  return fulfillCustomLineAs(viewer, fields, { sendEmail });
 }
 
 export async function cancelCustomLineForCurrentUser(data: {

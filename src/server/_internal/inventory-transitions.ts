@@ -186,7 +186,12 @@ export async function transitionItem(
   const notice = await db.transaction(async (tx) =>
     transitionItemInTx(tx, viewer, input)
   );
-  await notifyInventoryByEmail(notice, opts?.send);
+  // The skip is staff's: a self-service caller's `sendEmail` is dropped
+  // here, the way `silent` is refused for them above (#387).
+  await notifyInventoryByEmail(
+    notice,
+    input.authority ? { send: opts?.send } : opts
+  );
   return notice;
 }
 

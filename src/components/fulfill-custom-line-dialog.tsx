@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { errorMessage } from "#/lib/error-message";
 import { listAdminInventory } from "#/server/inventory";
 import { fulfillCustomLine } from "#/server/inventory-custom";
+import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import {
@@ -35,11 +36,15 @@ interface Match {
 export function FulfillCustomLineDialog({
   line,
   onDone,
+  requesterEmail,
 }: {
   line: { id: string; name: string; quantity: number };
   onDone: () => void;
+  /** Emailed once for the whole fulfilment; named on the skip (#387). */
+  requesterEmail: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [sendEmail, setSendEmail] = useState(true);
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<Match[]>([]);
   const [chosen, setChosen] = useState<Match[]>([]);
@@ -96,6 +101,7 @@ export function FulfillCustomLineDialog({
     setPickupBy("");
     setNote("");
     setError(null);
+    setSendEmail(true);
   }
 
   // One close path for Escape, the overlay and the Cancel button alike. A
@@ -123,6 +129,7 @@ export function FulfillCustomLineDialog({
           outcomeNote: note.trim() ? note : null,
           pickupBy: reserve && pickupBy ? new Date(pickupBy) : null,
           reserve,
+          sendEmail,
         },
       });
       reset();
@@ -252,6 +259,13 @@ export function FulfillCustomLineDialog({
             value={note}
           />
         </div>
+        <SendEmailCheckbox
+          address={requesterEmail}
+          checked={sendEmail}
+          disabled={busy}
+          hint={EMAIL_SKIP_HINT.withBell}
+          onCheckedChange={setSendEmail}
+        />
         {error && <p className="text-destructive text-sm">{error}</p>}
         <DialogFooter>
           <Button

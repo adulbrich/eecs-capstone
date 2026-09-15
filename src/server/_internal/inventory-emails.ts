@@ -10,7 +10,11 @@ import {
   EMAILED_INVENTORY_TYPES,
   type InventoryNotice,
 } from "#/lib/inventory-notifications";
-import { emailDispatch, type SendEmailFn } from "./email-dispatch";
+import {
+  type EmailOptions,
+  emailDispatch,
+  type SendEmailFn,
+} from "./email-dispatch";
 
 /**
  * Sends the email an inventory notice owes, if it owes one. Never throws, for
@@ -22,13 +26,20 @@ import { emailDispatch, type SendEmailFn } from "./email-dispatch";
  * the type one that goes by email, and is there an address. A walk-in holder
  * answers yes to the second with no account at all, which is the case the
  * bell cannot serve and this exists for.
+ *
+ * The staff skip (#387) is honored here, once, rather than at the six call
+ * sites: `sendEmail: false` drops the email and nothing else, since the bell
+ * row was written inside the transaction that produced the notice. It is
+ * distinct from `TransitionInput.silent`, which suppresses the notice itself
+ * and so both channels. A self-service caller never reaches this with a
+ * skip: `transitionItem` withholds it when an authority is set.
  */
 export async function notifyInventoryByEmail(
   notice: InventoryNotice | null,
-  send?: SendEmailFn,
+  opts?: EmailOptions,
   config: NotificationConfig = buildNotificationConfig()
 ): Promise<void> {
-  if (!notice) {
+  if (!notice || opts?.sendEmail === false) {
     return;
   }
   const address = notice.recipient.email;
@@ -41,7 +52,7 @@ export async function notifyInventoryByEmail(
         "BETTER_AUTH_URL is not set, so no inventory email could be addressed"
       );
     }
-    const dispatch = emailDispatch(send);
+    const dispatch = emailDispatch(opts?.send);
     await dispatch(
       address,
       notificationEmail({

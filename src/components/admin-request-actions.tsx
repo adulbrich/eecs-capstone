@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { errorMessage } from "#/lib/error-message";
 import { approveRequestItem, rejectRequestItem } from "#/server/inventory";
+import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -15,18 +16,27 @@ interface Props {
    * cannot be rendered in a test.
    */
   onDone: () => void;
+  /** Who is emailed by either decision; named on the skip (#387). */
+  requesterEmail: string;
   status: string;
 }
 
 /**
  * Approve / reject for one request line, sized for a table cell. The queue
  * used to render these forms inline in a card, which a cell has no room for,
- * so each decision opens in a popover instead.
+ * so each decision opens in a popover instead. Both decisions email the
+ * requester and write their bell row; the popover carries the skip.
  */
-export function AdminRequestActions({ lineId, onDone, status }: Props) {
+export function AdminRequestActions({
+  lineId,
+  onDone,
+  requesterEmail,
+  status,
+}: Props) {
   const [open, setOpen] = useState<null | "approve" | "reject">(null);
   const [pickupBy, setPickupBy] = useState("");
   const [reason, setReason] = useState("");
+  const [sendEmail, setSendEmail] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,9 +46,12 @@ export function AdminRequestActions({ lineId, onDone, status }: Props) {
     return <span className="text-muted-foreground">-</span>;
   }
 
+  // One close path for both popovers. The skip is a decision about one
+  // click, so it is checked again next time.
   function close() {
     setOpen(null);
     setError(null);
+    setSendEmail(true);
   }
 
   async function onApprove() {
@@ -49,6 +62,7 @@ export function AdminRequestActions({ lineId, onDone, status }: Props) {
         data: {
           requestItemId: lineId,
           pickupBy: pickupBy ? new Date(pickupBy) : null,
+          sendEmail,
         },
       });
       setPickupBy("");
@@ -70,7 +84,7 @@ export function AdminRequestActions({ lineId, onDone, status }: Props) {
     setError(null);
     try {
       await rejectRequestItem({
-        data: { requestItemId: lineId, reviewComment: reason },
+        data: { requestItemId: lineId, reviewComment: reason, sendEmail },
       });
       setReason("");
       close();
@@ -85,7 +99,7 @@ export function AdminRequestActions({ lineId, onDone, status }: Props) {
   return (
     <div className="flex gap-2">
       <Popover
-        onOpenChange={(next) => setOpen(next ? "approve" : null)}
+        onOpenChange={(next) => (next ? setOpen("approve") : close())}
         open={open === "approve"}
       >
         <PopoverTrigger asChild>
@@ -100,6 +114,13 @@ export function AdminRequestActions({ lineId, onDone, status }: Props) {
             onChange={(e) => setPickupBy(e.target.value)}
             type="date"
             value={pickupBy}
+          />
+          <SendEmailCheckbox
+            address={requesterEmail}
+            checked={sendEmail}
+            disabled={busy}
+            hint={EMAIL_SKIP_HINT.withBell}
+            onCheckedChange={setSendEmail}
           />
           {error && <p className="text-destructive text-sm">{error}</p>}
           <div className="flex gap-2">
@@ -125,7 +146,7 @@ export function AdminRequestActions({ lineId, onDone, status }: Props) {
       </Popover>
 
       <Popover
-        onOpenChange={(next) => setOpen(next ? "reject" : null)}
+        onOpenChange={(next) => (next ? setOpen("reject") : close())}
         open={open === "reject"}
       >
         <PopoverTrigger asChild>
@@ -140,6 +161,13 @@ export function AdminRequestActions({ lineId, onDone, status }: Props) {
             onChange={(e) => setReason(e.target.value)}
             rows={3}
             value={reason}
+          />
+          <SendEmailCheckbox
+            address={requesterEmail}
+            checked={sendEmail}
+            disabled={busy}
+            hint={EMAIL_SKIP_HINT.withBell}
+            onCheckedChange={setSendEmail}
           />
           {error && <p className="text-destructive text-sm">{error}</p>}
           <div className="flex gap-2">
