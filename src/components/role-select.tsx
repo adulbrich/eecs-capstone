@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { USER_ROLES, type UserRole } from "#/lib/vocabularies";
 import { setUserRole } from "#/server/users";
+import { EMAIL_SKIP_HINT } from "./send-email-checkbox";
+import { SendEmailDialog } from "./send-email-dialog";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
 import {
@@ -12,21 +14,30 @@ import {
 } from "./ui/select";
 
 interface Props {
+  /** Where the role email goes; named in the confirm so the admin can skip it (#386). */
+  email: string;
   initialRole: UserRole;
   onChanged: () => void;
   userId: string;
 }
 
-export function RoleSelect({ userId, initialRole, onChanged }: Props) {
+/**
+ * Every save here emails the person their new role, and the account has no
+ * bell row for it, so Save opens the confirm with the skip rather than
+ * writing straight away (#386).
+ */
+export function RoleSelect({ email, userId, initialRole, onChanged }: Props) {
   const [role, setRole] = useState<UserRole>(initialRole);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  async function onSave() {
+  async function onSave(sendEmail: boolean) {
     setSaving(true);
     setError(null);
     try {
-      await setUserRole({ data: { userId, role } });
+      await setUserRole({ data: { userId, role, sendEmail } });
+      setConfirmOpen(false);
       onChanged();
     } catch (err) {
       setError((err as Error).message);
@@ -55,14 +66,28 @@ export function RoleSelect({ userId, initialRole, onChanged }: Props) {
         </Select>
         <Button
           disabled={!dirty || saving}
-          onClick={() => void onSave()}
+          onClick={() => setConfirmOpen(true)}
           size="sm"
           type="button"
         >
           {saving ? "Saving..." : "Save"}
         </Button>
       </div>
-      {error && <p className="mt-2 text-destructive text-sm">{error}</p>}
+      {error && !confirmOpen && (
+        <p className="mt-2 text-destructive text-sm">{error}</p>
+      )}
+      <SendEmailDialog
+        address={email}
+        busy={saving}
+        confirmLabel="Save role"
+        description={`Sets the role of ${email} to ${role}.`}
+        error={error}
+        hint={EMAIL_SKIP_HINT.emailOnly}
+        onConfirm={(sendEmail) => void onSave(sendEmail)}
+        onOpenChange={setConfirmOpen}
+        open={confirmOpen}
+        title="Change the role?"
+      />
     </div>
   );
 }

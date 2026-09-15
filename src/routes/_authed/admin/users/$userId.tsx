@@ -138,6 +138,7 @@ function UserDetail() {
 
       {!isSelf && (
         <RoleSelect
+          email={user.email}
           initialRole={user.role as UserRole}
           onChanged={onChanged}
           userId={user.id}
@@ -149,6 +150,7 @@ function UserDetail() {
           banExpires={user.banExpires ?? null}
           banned={user.banned ?? false}
           banReason={user.banReason ?? null}
+          email={user.email}
           onChanged={onChanged}
           userId={user.id}
         />

@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX } from "#/lib/pagination";
 import { USER_ROLES } from "#/lib/vocabularies";
+import { SEND_EMAIL_FIELD } from "./send-email-field";
 
 const roleEnum = z.enum(USER_ROLES);
 
@@ -51,17 +52,23 @@ export const lookupUserByEmail = createServerFn({ method: "GET" })
 const setUserRoleSchema = z.object({
   userId: z.string(),
   role: roleEnum,
+  ...SEND_EMAIL_FIELD,
 });
 
-export type SetUserRoleInput = z.infer<typeof setUserRoleSchema>;
+// The row fields only; the skip travels in `EmailOptions` (#379, #386).
+export type SetUserRoleInput = Omit<
+  z.infer<typeof setUserRoleSchema>,
+  "sendEmail"
+>;
 
 const banUserSchema = z.object({
   userId: z.string(),
   reason: z.string().trim().min(1).max(500),
   expiresAt: z.date().nullable().default(null),
+  ...SEND_EMAIL_FIELD,
 });
 
-export type BanUserInput = z.infer<typeof banUserSchema>;
+export type BanUserInput = Omit<z.infer<typeof banUserSchema>, "sendEmail">;
 
 const unbanSchema = z.object({ userId: z.string() });
 

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { banUser, unbanUser } from "#/server/users";
+import { ConfirmDialog } from "./confirm-dialog";
 import { LocalTime } from "./local-time";
+import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -10,19 +12,30 @@ interface Props {
   banExpires: Date | string | null;
   banned: boolean;
   banReason: string | null;
+  /** Where the ban email goes; named in the confirm so the admin can skip it (#386). */
+  email: string;
   onChanged: () => void;
   userId: string;
 }
 
+/**
+ * Banning signs the person out and refuses the next sign-in, so the email is
+ * the only channel that can still reach them: Ban confirms through
+ * `ConfirmDialog`, the destructive confirm, with the skip in its body the way
+ * the project hard delete does (#386). Unban emails nobody and confirms
+ * nothing.
+ */
 export function BanForm({
   userId,
   banned,
   banReason,
   banExpires,
+  email,
   onChanged,
 }: Props) {
   const [reason, setReason] = useState("");
   const [expiresAt, setExpiresAt] = useState<string>("");
+  const [sendEmail, setSendEmail] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,8 +45,9 @@ export function BanForm({
     try {
       const expires = expiresAt.length > 0 ? new Date(expiresAt) : null;
       await banUser({
-        data: { userId, reason, expiresAt: expires },
+        data: { userId, reason, expiresAt: expires, sendEmail },
       });
+      setSendEmail(true);
       setReason("");
       setExpiresAt("");
       onChanged();
@@ -117,15 +131,36 @@ export function BanForm({
             value={expiresAt}
           />
         </div>
-        <Button
-          disabled={busy || reason.trim().length === 0}
-          onClick={() => void onBan()}
-          size="sm"
-          type="button"
-          variant="destructive"
+        <ConfirmDialog
+          body={
+            <SendEmailCheckbox
+              address={email}
+              checked={sendEmail}
+              hint={EMAIL_SKIP_HINT.emailOnly}
+              onCheckedChange={setSendEmail}
+            />
+          }
+          confirmLabel="Ban"
+          description={
+            expiresAt.length > 0
+              ? `${email} is signed out now and cannot sign in until the ban expires.`
+              : `${email} is signed out now and cannot sign in until an admin unbans them.`
+          }
+          onConfirm={onBan}
+          title="Ban this user?"
         >
-          {busy ? "Working..." : "Ban"}
-        </Button>
+          <Button
+            disabled={busy || reason.trim().length === 0}
+            // Checked again each time the confirm opens: the skip is a
+            // decision about one ban, and a Cancel must not carry it over.
+            onClick={() => setSendEmail(true)}
+            size="sm"
+            type="button"
+            variant="destructive"
+          >
+            {busy ? "Working..." : "Ban"}
+          </Button>
+        </ConfirmDialog>
         {error && <p className="text-destructive text-sm">{error}</p>}
       </div>
     </section>

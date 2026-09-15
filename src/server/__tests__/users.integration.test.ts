@@ -216,4 +216,36 @@ describe("account emails", () => {
     await unbanUserAs(admin, { userId: target.id });
     expect(send).not.toHaveBeenCalled();
   });
+
+  it("changes the role and bans without a word on sendEmail: false (#386)", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser(
+      `admin-acct-skip-${Date.now()}@x.com`,
+      "admin"
+    );
+    const target = await makeUser(
+      `target-acct-skip-${Date.now()}@x.com`,
+      "user"
+    );
+    const send = vi.fn().mockResolvedValue(undefined);
+
+    await setUserRoleAs(
+      admin,
+      { userId: target.id, role: "instructor" },
+      { send, sendEmail: false }
+    );
+    expect(send).not.toHaveBeenCalled();
+    let [row] = await db.select().from(user).where(eq(user.id, target.id));
+    expect(row.role).toBe("instructor");
+
+    await banUserAs(
+      admin,
+      { userId: target.id, reason: "Quietly", expiresAt: null },
+      { send, sendEmail: false }
+    );
+    expect(send).not.toHaveBeenCalled();
+    [row] = await db.select().from(user).where(eq(user.id, target.id));
+    expect(row.banned).toBe(true);
+    expect(row.banReason).toBe("Quietly");
+  });
 });
