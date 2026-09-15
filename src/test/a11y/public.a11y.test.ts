@@ -182,7 +182,7 @@ test("@smoke projects list, filters aside at xl", async ({ page }) => {
   const archived = aside.getByRole("radio", { name: "Archived projects" });
   await expect(archived).toBeVisible();
   const accepting = aside.getByRole("switch", {
-    name: "are accepting applicants",
+    name: "are looking for team members",
   });
   await expect(accepting).toBeVisible();
   await expect(accepting).toHaveAccessibleDescription(
@@ -211,7 +211,7 @@ test("@smoke projects list, filters sheet at 375px", async ({ page }) => {
   await page.getByRole("button", { name: "Filters" }).click();
   const sheet = page.getByRole("dialog", { name: "Filters" });
   const accepting = sheet.getByRole("switch", {
-    name: "are accepting applicants",
+    name: "are looking for team members",
   });
   await expect(accepting).toBeVisible();
   // Focus lands inside the sheet on open, and the page under it does not

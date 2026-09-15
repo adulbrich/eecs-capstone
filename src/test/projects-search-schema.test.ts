@@ -32,12 +32,18 @@ describe("/projects categories search param", () => {
 });
 
 describe("/projects switch params", () => {
-  it("default every switch off, the agreement switch included", () => {
+  it("defaults the openings switch on and the rest off", () => {
+    // `acceptingOnly` is the one default that is not false (#419): a student
+    // opening the listing wants projects they can join, so a shared link
+    // carrying no param hides the full teams.
     expect(searchSchema.parse({})).toMatchObject({
-      acceptingOnly: false,
+      acceptingOnly: true,
       requiresNdaOnly: false,
       studentProposedOnly: false,
     });
+    expect(searchSchema.parse({ acceptingOnly: false }).acceptingOnly).toBe(
+      false
+    );
     expect(searchSchema.parse({ requiresNdaOnly: true }).requiresNdaOnly).toBe(
       true
     );

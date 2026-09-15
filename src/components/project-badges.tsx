@@ -9,7 +9,7 @@ import { Badge } from "./ui/badge";
  * that a badge could show.
  *
  * Rendered by the card and the detail page, so no surface computes the
- * badges its own way. The detail page passes its status and applicants
+ * badges its own way. The detail page passes its status and team-full
  * badges as `children`, rendered before the marks, so the page has one
  * badge row under the title rather than two rows with two gaps (#400); the
  * card passes nothing and still renders nothing when no mark is set. The

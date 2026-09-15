@@ -78,14 +78,14 @@ describe("FilterSwitch", () => {
         checked={false}
         hint="Hides projects whose team is already full."
         id="accepting-only"
-        label="are accepting applicants"
+        label="are looking for team members"
         onCheckedChange={() => {
           // no-op
         }}
       />
     );
     const control = screen.getByRole("switch", {
-      name: "are accepting applicants",
+      name: "are looking for team members",
     });
     expect(control.getAttribute("aria-describedby")).toBe(
       "accepting-only-hint"

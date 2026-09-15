@@ -50,6 +50,7 @@ import {
   PROJECT_SWITCH_HINT,
   PROJECT_SWITCH_LABEL,
   PROJECT_SWITCH_LEGEND,
+  PROJECTS_FILTER_DEFAULTS,
   ProjectsFilters,
   RecommendationPrompt,
 } from "#/components/projects-filters";
@@ -111,37 +112,43 @@ describe("RecommendationPrompt", () => {
 });
 
 describe("the switch labels and the active count", () => {
-  it("counts the agreement switch with the other narrowing switches", () => {
-    const off = {
-      acceptingOnly: false,
-      archivedOnly: false,
+  it("counts a switch against its default, not against false", () => {
+    // `acceptingOnly` defaults on (#419), so an untouched listing counts zero
+    // and must not offer a Clear that would change nothing. Turning it off is
+    // a departure from the default and does count, because that is what Clear
+    // puts back.
+    const untouched = {
+      ...PROJECTS_FILTER_DEFAULTS,
       categories: [],
       program: null,
-      requiresNdaOnly: false,
-      studentProposedOnly: false,
     };
-    expect(countActiveFilters(off)).toBe(0);
-    expect(countActiveFilters({ ...off, requiresNdaOnly: true })).toBe(1);
+    expect(countActiveFilters(untouched)).toBe(0);
+    expect(countActiveFilters({ ...untouched, requiresNdaOnly: true })).toBe(1);
+    expect(countActiveFilters({ ...untouched, acceptingOnly: false })).toBe(1);
   });
 
   it("completes the legend with one predicate per switch, lowercase", () => {
     // Legend plus label read as one sentence (#383): "Only show projects
-    // that are accepting applicants". Three switches since #402 and #383:
+    // that are looking for team members". Three switches since #402 and #383:
     // nothing about mentorship is public, and archive is a mode, not a
     // switch.
     expect(PROJECT_SWITCH_LEGEND).toBe("Only show projects that");
     expect(PROJECT_SWITCH_LABEL).toEqual({
-      acceptingOnly: "are accepting applicants",
+      acceptingOnly: "are looking for team members",
       requiresNdaOnly: "require an NDA or IP agreement",
       studentProposedOnly: "were proposed by a student",
     });
     for (const label of Object.values(PROJECT_SWITCH_LABEL)) {
       expect(label[0]).toBe(label[0]?.toLowerCase());
     }
-    // The one hint: "off" on that flag means the team is full.
+    // The one hint, and it says what the other position does, because this
+    // switch is the only one that starts on.
     expect(PROJECT_SWITCH_HINT).toEqual({
-      acceptingOnly: "Hides projects whose team is already full.",
+      acceptingOnly: "Turn off to also show projects whose team is full.",
     });
+    for (const text of Object.values(PROJECT_SWITCH_HINT)) {
+      expect(text).not.toMatch(/applicant/i);
+    }
   });
 });
 
@@ -211,20 +218,19 @@ describe("ProjectsFilters archive mode and hints", () => {
   it("counts the archive mode as a filter and Clear all returns it to current", () => {
     expect(
       countActiveFilters({
-        acceptingOnly: false,
+        ...PROJECTS_FILTER_DEFAULTS,
         archivedOnly: true,
         categories: [],
         program: null,
-        requiresNdaOnly: false,
-        studentProposedOnly: false,
       })
     ).toBe(1);
     renderFilters({ archivedOnly: true });
     fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
     const reducer = navigate.mock.calls[0]?.[0].search;
-    expect(
-      reducer({ archivedOnly: true, acceptingOnly: true }).archivedOnly
-    ).toBe(false);
+    const cleared = reducer({ archivedOnly: true, acceptingOnly: false });
+    expect(cleared.archivedOnly).toBe(false);
+    // Clear puts the openings switch back on, which is where it starts.
+    expect(cleared.acceptingOnly).toBe(true);
   });
 
   it("describes the accepting switch by its hint", () => {

@@ -193,7 +193,7 @@ describe("the bookmarks table", () => {
       "Title",
       "Program",
       "Status",
-      "Accepting applicants",
+      "Openings",
       "Teams supported",
       "NDA/IP required",
       "Saved on",
@@ -226,9 +226,7 @@ describe("the bookmarks table", () => {
 
   it("marks a closed roster and an NDA", () => {
     renderTable();
-    expect(
-      within(rowFor("Two")).getByText("Not accepting applicants")
-    ).toBeTruthy();
+    expect(within(rowFor("Two")).getByText("Team is full")).toBeTruthy();
     expect(within(rowFor("Two")).getByText("Required")).toBeTruthy();
   });
 

@@ -1,6 +1,6 @@
 import type { AdminColumn } from "#/components/admin-data-table";
-import { ApplicantsBadge } from "./applicants-badge";
 import { programLabel } from "./project-card";
+import { TeamFullBadge } from "./team-full-badge";
 import { Badge } from "./ui/badge";
 
 /** The fields of `projectSummarySelect` these columns read. */
@@ -50,9 +50,12 @@ export function projectSummaryColumns<Row extends ProjectSummaryRow>() {
       row.original.acceptingApplicants ? (
         "Yes"
       ) : (
-        <ApplicantsBadge acceptingApplicants={false} />
+        <TeamFullBadge acceptingApplicants={false} />
       ),
-    header: "Accepting applicants",
+    // "Openings", not the whole phrase: this cell is a yes or no in a narrow
+    // column shared by /projects table mode, /admin/projects and
+    // /my/bookmarks, and a longer header wraps in all three.
+    header: "Openings",
     id: "accepting" as const,
     // Boolean, not text: see the Teams column.
     sortFn: "basic",

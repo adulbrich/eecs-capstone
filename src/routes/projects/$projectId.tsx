@@ -5,7 +5,6 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { ApplicantsBadge } from "#/components/applicants-badge";
 import { BookmarkButton } from "#/components/bookmark-button";
 import { CategoryChip } from "#/components/category-chip";
 import { Markdown } from "#/components/markdown";
@@ -15,6 +14,7 @@ import { ProjectPrivatePanel } from "#/components/project-private-panel";
 import { SectionHeading } from "#/components/section-heading";
 import { StaffProjectPanel } from "#/components/staff-project-panel";
 import { StatusBadge } from "#/components/status-badge";
+import { TeamFullBadge } from "#/components/team-full-badge";
 import { Button } from "#/components/ui/button";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
@@ -143,7 +143,7 @@ function ProjectDetail() {
         studentProposed={project.studentProposed}
       >
         <StatusBadge status={project.status} />
-        <ApplicantsBadge acceptingApplicants={project.acceptingApplicants} />
+        <TeamFullBadge acceptingApplicants={project.acceptingApplicants} />
       </ProjectBadges>
 
       {projectCategories.length > 0 && (

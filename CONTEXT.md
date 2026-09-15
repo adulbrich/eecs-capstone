@@ -76,7 +76,7 @@ _Avoid_: submission (except for the act of submitting), application, pitch
 
 **Status**:
 Where a project is in its review. Exactly one of the six below, spelled as the code
-spells it. Closed to applicants and soft-deleted are not statuses.
+spells it. A full team and a soft delete are not statuses.
 
 - **Draft**: written and not yet handed to staff. Visible to its proposer and staff.
 - **Submitted**: handed to staff for review. The only status that mails the review
@@ -105,18 +105,23 @@ The record of every transition a project has had, with who made it and when. Vis
 to staff and the proposer only.
 _Avoid_: audit log, timeline (as a term; the UI may call it that)
 
-**Closed to applicants**:
-A published project whose team is full, which stays in the catalog marked "Not
-accepting applicants" and which a listing filter hides. A flag on the project,
-stored as its inverse (accepting applicants, default true), edited by staff and the
-proposer alike, orthogonal to status.
-_Avoid_: full, archived (a closed project is still published), inactive
+**Team is full**:
+A published project with no room left on its team. It stays in the catalog, marked
+"Team is full" on its card and page, and the public listing hides it by default;
+the "are looking for team members" switch is what shows it. A flag on the project,
+edited by staff and the proposer alike, orthogonal to status.
 
-**Applicant**:
-A student who would apply to join a project's team. The app records whether a
-project is taking them and never who they are; bidding and assignment happen
-outside the app.
-_Avoid_: bidder, candidate
+The app never records who would join, only whether there is room: bidding and
+assignment happen outside it, which is why there is no word here for the student on
+the other side of the flag.
+
+The stored column keeps its old name, `projects.accepting_applicants`, as do the
+`acceptingApplicants` field on every wire schema and the `acceptingOnly` search
+param. It is stored as the inverse of what the badge says, and it defaults to true.
+Renaming it would cost a migration and break pasted links without buying a reader
+anything, so the code's word and the reader's word differ here on purpose.
+_Avoid_: applicant, applicants, accepting applicants, closed to applicants,
+archived (a full project is still published), inactive
 
 **Soft delete**:
 Hiding a non-draft project from everyone but staff while keeping its row, so staff

@@ -1,12 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { projectImageSrc } from "#/lib/project-image";
 import { stripMarkdown } from "#/lib/strip-markdown";
-import { ApplicantsBadge } from "./applicants-badge";
 import { BookmarkToggle } from "./bookmark-set";
 import { ImageOrFallback } from "./image-or-fallback";
 import { LocalTime } from "./local-time";
 import { ProjectBadges } from "./project-badges";
 import { StatusBadge } from "./status-badge";
+import { TeamFullBadge } from "./team-full-badge";
 import { Card } from "./ui/card";
 
 interface ProjectSummary {
@@ -91,7 +91,7 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
             requiresNdaIp={project.requiresNdaIp}
             studentProposed={project.studentProposed}
           />
-          <ApplicantsBadge
+          <TeamFullBadge
             acceptingApplicants={project.acceptingApplicants}
             className="mt-2"
           />

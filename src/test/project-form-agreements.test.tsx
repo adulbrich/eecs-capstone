@@ -68,7 +68,7 @@ describe("ProjectForm NDA/IP agreement", () => {
   });
 });
 
-describe("ProjectForm accepting applicants", () => {
+describe("ProjectForm team is full", () => {
   it("says the box is about applying, not about being listed", () => {
     // The flag is orthogonal to status: an unchecked box keeps the project
     // listed. The label names the act (apply, never bid: CONTEXT.md
@@ -83,7 +83,7 @@ describe("ProjectForm accepting applicants", () => {
     ).toBeTruthy();
     expect(
       screen.getByText(
-        /stays listed, but students see it is no longer taking applicants/i
+        /stays\s+listed, but students see that its team is full/i
       )
     ).toBeTruthy();
     expect(
