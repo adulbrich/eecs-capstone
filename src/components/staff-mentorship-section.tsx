@@ -145,22 +145,22 @@ export function StaffMentorshipSection({
             unlinkedHint="Links automatically when they sign up with this address."
           />
         )}
-        <fieldset className="space-y-1.5">
-          <legend className="font-medium text-sm">Mentor</legend>
-          <RadioGroup
-            aria-label="Mentor"
-            className="mt-1.5"
-            onValueChange={(value) => setMentorNeed(value as MentorNeed)}
-            value={mentorNeed}
-          >
-            {MENTOR_NEED_OPTIONS.map((option) => (
-              <Label className="font-normal" key={option.value}>
-                <RadioGroupItem value={option.value} />
-                {option.label}
-              </Label>
-            ))}
-          </RadioGroup>
-        </fieldset>
+        {/*
+          Named by the section title above it, so no legend of its own: two
+          "Mentor" headings four lines apart read as a mistake.
+        */}
+        <RadioGroup
+          aria-label="Mentor"
+          onValueChange={(value) => setMentorNeed(value as MentorNeed)}
+          value={mentorNeed}
+        >
+          {MENTOR_NEED_OPTIONS.map((option) => (
+            <Label className="font-normal" key={option.value}>
+              <RadioGroupItem value={option.value} />
+              {option.label}
+            </Label>
+          ))}
+        </RadioGroup>
         <div className="space-y-1.5">
           <Label htmlFor="mentor-email">Mentor email</Label>
           <Input
