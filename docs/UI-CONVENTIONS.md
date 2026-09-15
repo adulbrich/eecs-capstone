@@ -474,6 +474,14 @@ whose content already says what it is, usually a name or title beside a thumbnai
 per table may set it. A second one is logged and does not become a header strip; its cell
 still renders as an ordinary labelled field. Two title rows on one card read as a styling
 oddity and get lived with instead of reported, which is why this is checked at all.
+A row action inside that header strip is icon-only below `md`, with the label as
+its `aria-label` and `title` and the text `hidden md:inline`, so the title keeps the
+row: the public inventory table's Borrow button does this through
+`AddToCartButton`'s `compact` prop (#401). It keeps its text size rather than
+taking an `icon-*` size: the same element shows its text from `md`, and swapping
+the size at the breakpoint would cost a second class set for a button that is
+square enough at `sm` with the text hidden. A pending or error label stays visible
+at every width, because an icon alone says too little about a failure.
 
 ### A free-text column is bounded and clamped
 

@@ -65,9 +65,7 @@ test("inventory table, signed in, with borrow list controls", async ({
   await page.goto("/inventory?view=table");
   await waitForHydration(page);
   await expect(
-    page
-      .getByRole("button", { name: /^(Add to borrow list|In borrow list)$/ })
-      .first()
+    page.getByRole("button", { name: /^(Borrow|In borrow list)$/ }).first()
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /^Borrow list/ })).toBeVisible();
   await checkA11y(page);

@@ -91,8 +91,31 @@ describe("BorrowListButton", () => {
       </>
     );
     await findByRole("link", { name: "Borrow list" });
-    fireEvent.click(await findByRole("button", { name: "Add to borrow list" }));
+    fireEvent.click(await findByRole("button", { name: "Borrow" }));
     await findByRole("button", { name: "In borrow list" });
     expect(await findByRole("link", { name: "Borrow list 1" })).toBeTruthy();
+  });
+});
+
+describe("AddToCartButton compact", () => {
+  it("keeps the accessible name Borrow while hiding the text below md", async () => {
+    // The mobile row of the public inventory table (#401): the name is the
+    // aria-label at every width, and only the text goes below `md`.
+    const { findByRole } = renderWith(<AddToCartButton compact itemId="i1" />);
+    const button = await findByRole("button", { name: "Borrow" });
+    expect(button.getAttribute("title")).toBe("Borrow");
+    const text = button.querySelector("span");
+    expect(text?.textContent).toBe("Borrow");
+    expect(text?.className).toBe("hidden md:inline");
+    expect(button.querySelector("svg")).not.toBeNull();
+  });
+
+  it("shows the text at every width without compact, and once in the list", async () => {
+    const { findByRole } = renderWith(<AddToCartButton itemId="i1" />);
+    const button = await findByRole("button", { name: "Borrow" });
+    expect(button.querySelector("span")?.className).toBe("");
+    fireEvent.click(button);
+    const added = await findByRole("button", { name: "In borrow list" });
+    expect(added.querySelector("span")?.textContent).toBe("In borrow list");
   });
 });

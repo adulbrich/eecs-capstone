@@ -11,7 +11,7 @@ import { entryFor, rowFor } from "./locators";
  * The item is created here, on every attempt, rather than in global setup.
  * That is the difference between a retry that means something and one that
  * cannot pass: an attempt that dies at "Check out" leaves the item `reserved`,
- * and a retry starting there would fail at "Add to borrow list" for an unrelated
+ * and a retry starting there would fail at "Borrow" for an unrelated
  * reason, hiding the original failure.
  */
 test.describe("@smoke inventory lifecycle", () => {
@@ -33,7 +33,7 @@ test.describe("@smoke inventory lifecycle", () => {
 
       await user.goto(`/inventory/${itemId}`);
       await waitForHydration(user);
-      await user.getByRole("button", { name: "Add to borrow list" }).click();
+      await user.getByRole("button", { name: "Borrow" }).click();
       await expect(
         user.getByRole("button", { name: "In borrow list" })
       ).toBeVisible();
