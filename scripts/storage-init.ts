@@ -1,5 +1,9 @@
-// Run via `npm run storage:init` (uses tsx --env-file=.env.local).
-// Idempotent: creates the bucket and applies a public-read policy.
+// Local development only. Run via `npm run storage:init` (uses
+// tsx --env-file=.env.local), which points at the RustFS container in
+// docker-compose. Idempotent: creates the bucket and applies a public-read
+// policy to it. Nothing in the deployed path calls this script; production
+// provisions its bucket in Terraform (`infra/s3.tf`), where public access is
+// blocked and reads go through CloudFront.
 import {
   CreateBucketCommand,
   PutBucketPolicyCommand,
@@ -25,9 +29,12 @@ const client = new S3Client({
   },
 });
 
-// Public-read on GetObject so the browser can render uploaded images
-// without signed URLs. Same policy works on AWS S3; on AWS you also need
-// to disable Block Public Access at the bucket level (or use a CDN).
+// Public-read on GetObject so the browser can render uploaded images from
+// RustFS without signed URLs. This is the local shape, not the production
+// one: on AWS the bucket sets all four Block Public Access flags and its
+// policy grants `s3:GetObject` to the `cloudfront.amazonaws.com` service
+// principal for the assets distribution only, so `Principal: "*"` would be
+// rejected there and is not what production wants.
 const publicReadPolicy = {
   Version: "2012-10-17",
   Statement: [
@@ -62,7 +69,7 @@ async function ensurePublicRead() {
       Policy: JSON.stringify(publicReadPolicy),
     }),
   );
-  console.log(`Applied public-read policy to ${bucket}`);
+  console.log(`Applied the local public-read policy to ${bucket}`);
 }
 
 async function main() {

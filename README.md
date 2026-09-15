@@ -224,9 +224,13 @@ docker compose up -d rustfs
 npm run storage:init    # idempotent
 ```
 
-Production note: configure the bucket as public-read at the bucket policy level on
-AWS, or run with `S3_ENDPOINT` set to your CDN base. Set
-`VITE_STORAGE_PUBLIC_BASE` to the customer-facing URL prefix.
+`npm run storage:init` is the local RustFS path only. In production the bucket
+blocks all public access and grants `s3:GetObject` to the assets CloudFront
+distribution alone, through Origin Access Control; Terraform provisions both
+(`infra/s3.tf`, `infra/cloudfront.tf`), so there is no bucket policy to apply by
+hand and no Block Public Access setting to turn off. Set
+`VITE_STORAGE_PUBLIC_BASE` to the customer-facing URL prefix, which in
+production is the assets distribution's domain (`terraform output assets_url`).
 
 ## AI-assisted proposal review
 
