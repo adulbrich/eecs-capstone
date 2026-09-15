@@ -3868,6 +3868,14 @@ describe("inventory emails", () => {
       { send, sendEmail: false }
     );
     expect(send).not.toHaveBeenCalled();
+    const rowsOfType = async (type: string) =>
+      (
+        await db
+          .select()
+          .from(notifications)
+          .where(eq(notifications.userId, student.id))
+      ).filter((r) => r.type === type).length;
+    expect(await rowsOfType("inventory_request_approved")).toBe(3);
 
     const deniedItem = await makeItem();
     const { line: deniedLine } = await makeRequestLine(
@@ -3887,6 +3895,7 @@ describe("inventory emails", () => {
       { send, sendEmail: false }
     );
     expect(send).not.toHaveBeenCalled();
+    expect(await rowsOfType("inventory_request_rejected")).toBe(1);
 
     await transitionItem(
       admin,
@@ -3900,6 +3909,7 @@ describe("inventory emails", () => {
       { send, sendEmail: false }
     );
     expect(send).not.toHaveBeenCalled();
+    expect(await rowsOfType("inventory_item_checked_out")).toBe(1);
 
     const walkIn = await makeItem();
     await transitionItem(

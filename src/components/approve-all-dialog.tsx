@@ -39,7 +39,7 @@ export function ApproveAllDialog({
   lines: ApproveAllLine[];
   onDone: () => void;
   /** One requester per request, so one address for the whole batch (#387). */
-  requesterEmail: string;
+  requesterEmail: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [pickupBy, setPickupBy] = useState("");

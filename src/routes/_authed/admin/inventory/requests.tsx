@@ -178,7 +178,7 @@ const KIND: Record<Row["kind"], KindConfig> = {
         }))}
         onDone={onDone}
         // One requester per request: the rows are one group's.
-        requesterEmail={rows[0]?.requester.email ?? ""}
+        requesterEmail={rows[0]?.requester.email ?? null}
       />
     ),
     rowActions: (row, onDone) => (

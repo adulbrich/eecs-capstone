@@ -723,9 +723,10 @@ The box is checked again every time its dialog opens: the skip is a decision
 about one action, and a Cancel must not carry an unchecked box into the next.
 `SendEmailDialog` gets this for free by holding the state inside the content
 Radix unmounts. A `ConfirmDialog` body or a popover holds the state in the
-caller, so the caller resets it where the dialog opens: the trigger's
-`onClick` (the ban form, the project hard delete) or the `onOpenChange` that
-handles the close (the inventory popovers).
+caller, so the caller resets it where the dialog opens or closes: the
+trigger's `onClick` (the ban form, the project hard delete), the function that
+opens it (the checkout dialog), or the `onOpenChange` that handles the close
+(the inventory popovers and dialogs).
 
 ```tsx
 <SendEmailDialog
