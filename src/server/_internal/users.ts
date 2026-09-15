@@ -306,17 +306,21 @@ export async function setUserRoleAs(
     .update(user)
     .set({ role: data.role, updatedAt: new Date() })
     .where(eq(user.id, data.userId));
-  // After the write; swallows its own errors.
+  // After the write; swallows its own errors. Admin-only above, so the skip
+  // is read as sent (#386); there is no bell row, the email is the notice.
   const to = await addressOf(data.userId);
-  if (to) {
+  if (to && (opts?.sendEmail ?? true)) {
     await notifyRoleChangedByEmail({ role: data.role, to }, opts?.send);
   }
   return { id: data.userId, role: data.role };
 }
 
-export async function setUserRoleForCurrentUser(data: SetUserRoleInput) {
+export async function setUserRoleForCurrentUser(
+  data: SetUserRoleInput & { sendEmail: boolean }
+) {
   const viewer = await requireUser();
-  return setUserRoleAs(viewer, data);
+  const { sendEmail, ...fields } = data;
+  return setUserRoleAs(viewer, fields, { sendEmail });
 }
 
 export async function banUserAs(
@@ -339,9 +343,11 @@ export async function banUserAs(
     await tx.delete(session).where(eq(session.userId, data.userId));
   });
   // After the transaction, never inside it: a failed email must not undo a
-  // ban. The account can no longer sign in, so email is the only channel.
+  // ban. The account can no longer sign in, so email is the only channel,
+  // and the admin's skip (#386) is the whole difference between told and
+  // not told.
   const to = await addressOf(data.userId);
-  if (to) {
+  if (to && (opts?.sendEmail ?? true)) {
     await notifyBannedByEmail(
       { expiresAt: data.expiresAt, reason: data.reason, to },
       opts?.send
@@ -350,9 +356,12 @@ export async function banUserAs(
   return { id: data.userId, banned: true as const };
 }
 
-export async function banUserForCurrentUser(data: BanUserInput) {
+export async function banUserForCurrentUser(
+  data: BanUserInput & { sendEmail: boolean }
+) {
   const viewer = await requireUser();
-  return banUserAs(viewer, data);
+  const { sendEmail, ...fields } = data;
+  return banUserAs(viewer, fields, { sendEmail });
 }
 
 export async function unbanUserAs(viewer: AuthUser, data: { userId: string }) {

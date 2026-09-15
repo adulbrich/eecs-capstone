@@ -507,7 +507,14 @@ export function StaffProjectPanel({
               onConfirm={runHardDelete}
               title="Permanently delete this draft?"
             >
-              <Button size="sm" type="button" variant="destructive">
+              <Button
+                // Checked again each time the confirm opens, as the ban
+                // form does: a Cancel must not carry an unchecked box over.
+                onClick={() => setDeleteEmail(true)}
+                size="sm"
+                type="button"
+                variant="destructive"
+              >
                 Hard delete
               </Button>
             </ConfirmDialog>
