@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { errorMessage } from "#/lib/error-message";
-import type { MentorNeed } from "#/lib/vocabularies";
+import { MENTOR_NEED_LABEL, mentorNeedRefusal } from "#/lib/mentor-need";
+import { MENTOR_NEEDS, type MentorNeed } from "#/lib/vocabularies";
 import { updateProjectMentorship } from "#/server/projects";
 import {
   getProjectMentorship,
@@ -15,36 +16,28 @@ import { Label } from "./ui/label";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 
 /**
- * The three states of the Mentor radio group (#373), in the order they are
- * offered. The values are the enum the column stores; the labels are what
- * staff read.
- */
-const MENTOR_NEED_OPTIONS: ReadonlyArray<{ label: string; value: MentorNeed }> =
-  [
-    { label: "Not decided", value: "unspecified" },
-    { label: "Seeking a mentor", value: "seeking" },
-    { label: "No mentor needed", value: "none" },
-  ];
-
-/**
  * What the public listing will show once this draft is saved, from the draft
  * rather than the saved record, so staff see the effect of a choice before
  * they press Save. The badge rules are the server's (`seekingMentorSql` and
  * `noMentorNeededSql`): seeking AND no address on file, or none needed. The
  * badges themselves are rendered, not described, so the preview cannot
- * drift from the card. The none-plus-address case is named here because the
- * server refuses it (#373).
+ * drift from the card. The none-plus-address case is named here in the
+ * server's own words, from `mentorNeedRefusal` against the saved state, so
+ * the line under the draft is the line Save would throw (#373).
  */
 function PublicPreview({
   mentorEmail,
   mentorNeed,
+  savedMentorNeed,
 }: {
   mentorEmail: string;
   mentorNeed: MentorNeed;
+  savedMentorNeed: MentorNeed;
 }) {
   const hasAddress = mentorEmail.trim() !== "";
   const seeking = mentorNeed === "seeking" && !hasAddress;
   const none = mentorNeed === "none";
+  const refusal = mentorNeedRefusal(savedMentorNeed, mentorNeed, hasAddress);
   return (
     <div className="space-y-1 text-muted-foreground text-xs">
       <div className="flex flex-wrap items-center gap-2">
@@ -66,9 +59,7 @@ function PublicPreview({
           address is on file. Clear the address or pick another state.
         </p>
       )}
-      {none && hasAddress && (
-        <p>Remove the mentor before marking No mentor needed.</p>
-      )}
+      {refusal && <p>{refusal}</p>}
     </div>
   );
 }
@@ -154,10 +145,10 @@ export function StaffMentorshipSection({
           onValueChange={(value) => setMentorNeed(value as MentorNeed)}
           value={mentorNeed}
         >
-          {MENTOR_NEED_OPTIONS.map((option) => (
-            <Label className="font-normal" key={option.value}>
-              <RadioGroupItem value={option.value} />
-              {option.label}
+          {MENTOR_NEEDS.map((state) => (
+            <Label className="font-normal" key={state}>
+              <RadioGroupItem value={state} />
+              {MENTOR_NEED_LABEL[state]}
             </Label>
           ))}
         </RadioGroup>
@@ -173,7 +164,11 @@ export function StaffMentorshipSection({
           />
         </div>
         {record && (
-          <PublicPreview mentorEmail={mentorEmail} mentorNeed={mentorNeed} />
+          <PublicPreview
+            mentorEmail={mentorEmail}
+            mentorNeed={mentorNeed}
+            savedMentorNeed={record.mentorNeed}
+          />
         )}
         {error && <p className="text-destructive text-sm">{error}</p>}
         <Button

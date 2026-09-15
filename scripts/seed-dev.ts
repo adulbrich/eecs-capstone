@@ -19,7 +19,7 @@ import {
   userInterests,
 } from "../src/db/schema";
 import { auth } from "../src/lib/auth";
-import type { UserRole } from "../src/lib/vocabularies";
+import type { MentorNeed, UserRole } from "../src/lib/vocabularies";
 import {
   addToCartAs,
   submitCartAs,
@@ -346,7 +346,7 @@ async function main() {
       | "published"
       | "archived";
     publishedAt: Date | null;
-    mentorNeed?: "unspecified" | "seeking" | "none";
+    mentorNeed?: MentorNeed;
     categories: string[];
   };
 

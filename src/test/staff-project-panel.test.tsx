@@ -626,6 +626,24 @@ describe("StaffProjectPanel mentor block", () => {
     ).toBeTruthy();
   });
 
+  it("names the other refusal when the saved state is already none and an address is typed", async () => {
+    getProjectMentorship.mockResolvedValue({
+      mentorEmail: "",
+      mentorName: null,
+      mentorNeed: "none",
+    });
+    renderPanel("submitted");
+    await screen.findByText("No mentor needed", { selector: "span" });
+    // The group is named by the section title, through aria-label (#373).
+    expect(screen.getByRole("radiogroup", { name: "Mentor" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Mentor email"), {
+      target: { value: "mentor@x.test" },
+    });
+    expect(
+      screen.getByText("Clear No mentor needed before recording a mentor.")
+    ).toBeTruthy();
+  });
+
   it("saves both fields through the server function and reloads the record", async () => {
     renderPanel("submitted");
     const input = (await screen.findByLabelText(

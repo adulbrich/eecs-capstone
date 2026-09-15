@@ -11,6 +11,7 @@ import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
 import { diffRowFields } from "#/lib/edit-diff";
 import { normalizeEmailAddress } from "#/lib/email-address";
 import { assertNoImageKeyOnCreate } from "#/lib/image-upload-policy";
+import { mentorNeedRefusal } from "#/lib/mentor-need";
 import { canEditProject, canWritePrivateNotes } from "#/lib/project-visibility";
 import {
   type ActorRole,
@@ -365,14 +366,14 @@ export async function updateProjectMentorshipAs(
   const existing = await loadProjectOr404(data.id);
   const mentorEmail = normalizeEmailAddress(data.mentorEmail);
   // "No mentor needed" and a recorded address can never coexist (#373).
-  // Refused before the diff, so nothing is written; the message names the
-  // half the reader has to change, which is the half they did not just set.
-  if (data.mentorNeed === "none" && mentorEmail) {
-    throw new Error(
-      existing.mentorNeed === "none"
-        ? "Clear No mentor needed before recording a mentor."
-        : "Remove the mentor before marking No mentor needed."
-    );
+  // Refused before the diff, so nothing is written.
+  const refusal = mentorNeedRefusal(
+    existing.mentorNeed,
+    data.mentorNeed,
+    mentorEmail !== null
+  );
+  if (refusal) {
+    throw new Error(refusal);
   }
   const newValues: Partial<typeof projects.$inferSelect> = {
     mentorNeed: data.mentorNeed,
