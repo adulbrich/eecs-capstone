@@ -529,8 +529,9 @@ not depend on Sharp working under arm64 Fargate.
 
 ### 7a.2 Upload
 
-Images go to the app's asset bucket (they are public by design, the same as
-any uploaded project image):
+Images go to the app's asset bucket, where they are world readable through the
+assets CloudFront distribution, the same as any uploaded project image. The
+bucket itself is private (section 1); nothing here makes an object public:
 
 ```bash
 # --exclude, because this path does not go through the scripts' key-space
