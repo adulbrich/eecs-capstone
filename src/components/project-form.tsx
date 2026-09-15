@@ -19,6 +19,7 @@ import {
 import { reviewProject } from "#/server/project-review";
 import { createProject, updateProject } from "#/server/projects";
 import { uploadProjectImage } from "#/server/uploads";
+import { ErrorBanner } from "./error-banner";
 import { MarkdownField } from "./markdown-field";
 import { ProgramSelect } from "./program-select";
 import { ProjectImageUploader } from "./project-image-uploader";
@@ -345,9 +346,7 @@ export function ProjectForm({
             </div>
           </div>
           <output className="block">
-            {reviewError && (
-              <p className="mt-2 text-destructive text-sm">{reviewError}</p>
-            )}
+            <FieldError message={reviewError} />
             {reviewState === "empty" && (
               <p className="mt-2 text-muted-foreground text-sm">
                 No improvements suggested.
@@ -632,11 +631,7 @@ export function ProjectForm({
         />
       )}
 
-      {formError && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-destructive text-sm">
-          {formError}
-        </div>
-      )}
+      {formError && <ErrorBanner>{formError}</ErrorBanner>}
 
       <form.Subscribe selector={(s) => [s.canSubmit, s.isSubmitting] as const}>
         {([canSubmit, isSubmitting]) => (

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { errorMessage } from "#/lib/error-message";
 import { clearAvatar, uploadAvatar } from "#/server/uploads";
 import { ImageUploader } from "./image-uploader";
+import { FieldError } from "./ui/field";
 
 interface Props {
   currentKey: string | null;
@@ -43,7 +44,7 @@ export function AvatarUploader({ currentKey, onChanged }: Props) {
       {busy && (
         <p className="text-muted-foreground text-sm">Saving avatar...</p>
       )}
-      {error && <p className="text-destructive text-sm">{error}</p>}
+      <FieldError message={error} />
     </div>
   );
 }

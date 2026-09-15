@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import { FieldError } from "./ui/field";
 
 interface SendEmailDialogProps {
   address: string;
@@ -75,7 +76,7 @@ function Body({
         hint={hint}
         onCheckedChange={setSendEmail}
       />
-      {error && <p className="text-destructive text-sm">{error}</p>}
+      <FieldError message={error} />
       <DialogFooter>
         <Button
           disabled={busy}

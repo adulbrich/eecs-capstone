@@ -191,11 +191,16 @@ that matters: about 1.05:1 against muted text and 1.07:1 against destructive
 text in light mode, and against ordinary body text about 3.1:1 in light and
 1.9:1 in dark (`#FF8C5A` on `#EDE9E5`). The global `a` rule in `styles.css`
 already sets the underline's color, thickness and offset, so the class only
-turns the line on. These links show no hover change, because `text-brand-dark`
-outranks the base `a:hover` color and the line is already there; that is the
-intended state, and the sign-in, sign-up and profile pages have looked this
-way since before #361. Colored prose came first (#361) and body copy followed
-(#364), each PR listing the links it found.
+turns the line on, and `underline-offset-` at a call site is the global rule
+restated. These links show no hover change, because `text-brand-dark` outranks
+the base `a:hover` color and the line is already there; that is the intended
+state. Colored prose came first (#361) and body copy followed (#364), each PR
+listing the links it found. Thirteen were missed by both, on the auth pages,
+`/profile`, the account deletion dialog and two admin inventory routes: they
+carried a bare `underline` with no color class at all, which the scan looked
+for `text-brand` to find and so could not see, and hovered to the vivid orange
+this rule exists to keep off a link. This doc claimed those pages had no hover
+change while they did, from #361 until #411 made it true.
 
 `hover:underline` stays for a link that is the whole content of its cell,
 title or block, where nothing sits beside it to be confused with: the title
@@ -205,9 +210,12 @@ anywhere carries the underline everywhere, as `SupportEmailLink` does: one
 look per component, no prop to get wrong. Breadcrumbs are a navigation
 landmark rather than prose; `BreadcrumbLink` underlines in no state and
 changes color on hover instead, and stays that way. Markdown body copy is
-covered by the typography plugin, which underlines its links. No scan
-enforces this rule: whether a class sits in a `<td>` or a `<p>` is not
-something a regex over a file can tell. Color against the background is the
+covered by the typography plugin, which underlines its links. Whether a class
+sits in a `<td>` or a `<p>` is not something a regex over a file can tell, so
+no scan can enforce where this rule applies; what
+`src/test/brand-link-scan.test.ts` does enforce is the half that is decidable,
+that a class string turning an underline on carries `text-brand-dark` with it
+and does not restate `underline-offset-`. Color against the background is the
 separate rule under "Color tokens".
 
 ### Plain navigation links use `.nav-link`
@@ -294,6 +302,44 @@ component carries the syntax sentence, because every listing search runs
 through `websearch_to_tsquery`; the caller passes the fields sentence, which
 must be true of that page's query. The line is text only, so the tab order
 from the search to the Filters button is what the a11y suite asserts.
+
+### Error text goes through one component
+
+A message about something that failed renders through `FieldError` from
+`#/components/ui/field`, never as a hand-written
+`<p className="text-destructive text-sm">`. About forty call sites wrote that
+paragraph themselves and drifted: `mt-2` in five, `mt-3` in two, no margin in
+the rest, `text-xs` in two, no size class at all in one, and only two of them
+announced anything to a screen reader (#411).
+
+`FieldError` takes either shape, and never both:
+
+```tsx
+<FieldError errors={field.state.meta.errors} />   {/* a TanStack Form field */}
+<FieldError message={error} />                     {/* a string or null */}
+```
+
+It renders nothing when there is nothing to say, so a caller does not guard it
+with `{error && ...}`, and it takes no `className`: one margin is the point,
+and none of the fifty-nine call sites needed a different one.
+
+It carries `role="alert"`, not `aria-live="polite"`. Both announce, but these
+messages are inserted in response to something the reader just did, a save they
+pressed and a server that refused it, and the assertive role is what interrupts
+to say so; a polite region waits for a pause that a form with focus still in it
+may not reach. The trade is that `role="alert"` on an element already in the
+DOM announces on every content change, which is why the component returns
+`null` rather than rendering an empty paragraph.
+
+An error about a whole form or panel rather than one field renders through
+`ErrorBanner` from `#/components/error-banner`, which is the same message in a
+tinted box with one opacity pair. Three copies of that box had drifted to two
+different opacity pairs before it existed.
+
+A status panel is not an error banner even when it is tinted with the
+destructive color. The ban notice in `ban-form.tsx` is a `<section>` with a
+heading, a reason and an expiry, describing a state the account is in rather
+than an action that failed, so it keeps its own markup.
 
 ### Why not shadcn `form`
 

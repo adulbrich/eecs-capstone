@@ -1,6 +1,7 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "#/components/ui/button";
+import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
@@ -93,7 +94,7 @@ function SignUp() {
               type="password"
             />
           </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          <FieldError message={error} />
           <Button className="w-full" disabled={loading} type="submit">
             {loading ? "Creating account..." : "Sign up"}
           </Button>
@@ -126,13 +127,13 @@ function SignUp() {
         </Button>
         <p className="mt-6 text-muted-foreground text-sm">
           Already have an account?{" "}
-          <Link className="underline" to="/sign-in">
+          <Link className="text-brand-dark underline" to="/sign-in">
             Sign in
           </Link>
         </p>
         <p className="mt-2 text-muted-foreground text-sm">
           By creating an account, you agree to the{" "}
-          <Link className="underline" to="/privacy">
+          <Link className="text-brand-dark underline" to="/privacy">
             privacy policy
           </Link>
           .

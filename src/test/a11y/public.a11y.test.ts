@@ -58,6 +58,32 @@ test("@smoke sign-in page", async ({ page }) => {
   await checkA11y(page);
 });
 
+/**
+ * A save that fails announces, through `FieldError` (#411).
+ *
+ * Sign-in is the form a test can fail on demand without a fixture: wrong
+ * credentials, a real refusal from the server, and the message that comes back
+ * has to reach a screen reader. Before `FieldError` carried `role="alert"`,
+ * all but two of about forty of these paragraphs rendered silently, and the
+ * component test can only prove the role is on the element; this proves a real
+ * failed submit puts a real message inside it.
+ */
+test("@smoke a failed sign-in announces its error", async ({ page }) => {
+  await page.goto("/sign-in");
+  await waitForHydration(page, "form");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+
+  await page.getByLabel("Email").fill("nobody@example.com");
+  await page.getByLabel("Password").fill("definitely-not-the-password");
+  await page.getByRole("button", { name: /sign in/i }).click();
+
+  const alert = page.getByRole("alert");
+  await expect(alert).toBeVisible();
+  await expect(alert).not.toBeEmpty();
+  await expect(page).toHaveURL(/\/sign-in/);
+  await checkA11y(page);
+});
+
 // The banner carries the office address as a link inside `role="alert"`, so
 // the refusal and the one thing the reader can do about it are announced
 // together. An unknown code lands on the fallback, which is what a new Better

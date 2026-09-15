@@ -618,7 +618,7 @@ function customFields(row: CustomRow): LineSheetField[] {
       label: "Link",
       value: row.line.link ? (
         <a
-          className="break-all underline underline-offset-2"
+          className="break-all text-brand-dark underline"
           href={row.line.link}
           rel="noreferrer"
           target="_blank"
@@ -640,7 +640,7 @@ function customFields(row: CustomRow): LineSheetField[] {
             {row.items.map((item) => (
               <li className="flex flex-wrap items-center gap-2" key={item.id}>
                 <Link
-                  className="underline underline-offset-2"
+                  className="text-brand-dark underline"
                   params={{ itemId: item.id }}
                   to="/inventory/$itemId"
                 >

@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "./ui/dialog";
+import { FieldError } from "./ui/field";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 
@@ -122,7 +123,7 @@ export function ApproveAllDialog({
           hint={EMAIL_SKIP_HINT.withBell}
           onCheckedChange={setSendEmail}
         />
-        {error && <p className="text-destructive text-sm">{error}</p>}
+        <FieldError message={error} />
         <DialogFooter>
           <Button
             disabled={busy}

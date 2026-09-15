@@ -4,6 +4,7 @@ import { setUserRole } from "#/server/users";
 import { EMAIL_SKIP_HINT } from "./send-email-checkbox";
 import { SendEmailDialog } from "./send-email-dialog";
 import { Button } from "./ui/button";
+import { FieldError } from "./ui/field";
 import { Label } from "./ui/label";
 import {
   Select,
@@ -78,9 +79,7 @@ export function RoleSelect({ email, userId, initialRole, onChanged }: Props) {
           {saving ? "Saving..." : "Save"}
         </Button>
       </div>
-      {error && !confirmOpen && (
-        <p className="mt-2 text-destructive text-sm">{error}</p>
-      )}
+      {!confirmOpen && <FieldError message={error} />}
       <SendEmailDialog
         address={email}
         busy={saving}

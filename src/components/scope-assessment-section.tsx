@@ -13,6 +13,7 @@ import {
 import { LocalTime } from "./local-time";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { FieldError } from "./ui/field";
 
 /**
  * The staff scope assessment, beside the private notes on the staff panel
@@ -128,7 +129,7 @@ export function ScopeAssessmentSection({ projectId }: { projectId: string }) {
           </p>
         </div>
       )}
-      {error && <p className="text-destructive text-sm">{error}</p>}
+      <FieldError message={error} />
       {view !== "loading" && (
         <Button
           disabled={busy}

@@ -7,6 +7,7 @@ import {
 import { CategoryMultiSelect } from "./category-multi-select";
 import { PanelSection } from "./panel";
 import { Button } from "./ui/button";
+import { FieldError } from "./ui/field";
 
 /**
  * The staff edit of a project's categories, as a section of the staff panel
@@ -69,7 +70,7 @@ export function StaffCategoriesSection({
           onChange={setDraft}
           value={draft}
         />
-        {error && <p className="text-destructive text-sm">{error}</p>}
+        <FieldError message={error} />
         <Button
           disabled={busy || saved === null}
           onClick={() => void save()}

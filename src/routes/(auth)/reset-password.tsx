@@ -6,6 +6,7 @@ import {
 import { useState } from "react";
 import { z } from "zod";
 import { Button } from "#/components/ui/button";
+import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
@@ -59,7 +60,7 @@ function ResetPassword() {
               type="password"
             />
           </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          <FieldError message={error} />
           <Button className="w-full" disabled={loading} type="submit">
             {loading ? "Resetting..." : "Reset password"}
           </Button>

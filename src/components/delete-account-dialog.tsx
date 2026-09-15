@@ -174,7 +174,7 @@ function Blocked({ preview }: { preview: DeletionPreview }) {
           You still have equipment out:{" "}
           {preview.blockers.items.map((i) => i.name).join(", ")}. Return it, or
           ask staff to close the request, before deleting your account.{" "}
-          <Link className="underline" to="/my/items">
+          <Link className="text-brand-dark underline" to="/my/items">
             See my items
           </Link>
         </p>

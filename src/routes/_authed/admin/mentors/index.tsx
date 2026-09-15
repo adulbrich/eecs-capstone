@@ -21,6 +21,7 @@ import {
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
 import { Button } from "#/components/ui/button";
+import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { ListCount } from "#/components/ui/pagination";
@@ -128,7 +129,7 @@ function MentorControls({ mentor }: { mentor: Row }) {
           Remove
         </Button>
       </div>
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      <FieldError message={error} />
     </div>
   );
 }

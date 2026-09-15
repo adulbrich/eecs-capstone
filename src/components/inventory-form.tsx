@@ -17,6 +17,7 @@ import {
   uploadInventoryImage,
 } from "#/server/inventory";
 import { CategoryMultiSelect } from "./category-multi-select";
+import { ErrorBanner } from "./error-banner";
 import { InventoryImageUploader } from "./inventory-image-uploader";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -233,11 +234,7 @@ export function InventoryForm({
         textarea
       />
 
-      {formError && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-destructive text-sm">
-          {formError}
-        </div>
-      )}
+      {formError && <ErrorBanner>{formError}</ErrorBanner>}
 
       <form.Subscribe selector={(s) => [s.canSubmit, s.isSubmitting] as const}>
         {([canSubmit, isSubmitting]) => (
