@@ -6,10 +6,11 @@ import { applyServerErrors } from "#/lib/apply-server-errors";
 import { errorMessage } from "#/lib/error-message";
 import { imageUrlToSave } from "#/lib/image-save";
 import {
-  PRIVATE_NOTES_LABEL,
+  PRIVATE_NOTES_FIELD_LABEL,
   PRIVATE_NOTES_PROJECT_HINT,
 } from "#/lib/private-notes";
 import {
+  FIELD_LABELS,
   FIELD_MAX_LENGTHS,
   type FieldSuggestion,
   IMPROVABLE_FIELDS,
@@ -286,7 +287,7 @@ export function ProjectForm({
 
   return (
     <form
-      className="space-y-4"
+      className="space-y-6"
       onSubmit={(e) => {
         e.preventDefault();
         setFormError(null);
@@ -355,10 +356,16 @@ export function ProjectForm({
           </output>
         </div>
       )}
+      {/*
+        Three groups split by hairlines, no group headings (#375): the story
+        of the project, then how to reach the proposer, then the terms. The
+        JSX order is display only; `buildProjectValues` on the server fixes
+        the edit log's key order, and `edit-diff.test.ts` pins it.
+      */}
       <Field
         description="A short, specific name. This is the first thing students see in the catalog."
         form={form}
-        label="Title"
+        label={FIELD_LABELS.title}
         name="title"
         onApply={() => applyField("title")}
         suggestion={suggestions.title}
@@ -366,7 +373,7 @@ export function ProjectForm({
       <Field
         description="A paragraph or two on what the project is and why it matters."
         form={form}
-        label="Description"
+        label={FIELD_LABELS.description}
         markdown
         name="description"
         onApply={() => applyField("description")}
@@ -376,7 +383,7 @@ export function ProjectForm({
       <Field
         description="The problem the team is solving, and who has it today."
         form={form}
-        label="Problem statement"
+        label={FIELD_LABELS.problemStatement}
         markdown
         name="problemStatement"
         onApply={() => applyField("problemStatement")}
@@ -386,7 +393,7 @@ export function ProjectForm({
       <Field
         description="What the team should have built or handed over by the end."
         form={form}
-        label="Objectives / deliverables"
+        label={FIELD_LABELS.objectives}
         markdown
         name="objectives"
         onApply={() => applyField("objectives")}
@@ -396,7 +403,7 @@ export function ProjectForm({
       <Field
         description="What a student must already know to take this on."
         form={form}
-        label="Minimum qualifications"
+        label={FIELD_LABELS.minQualifications}
         markdown
         name="minQualifications"
         onApply={() => applyField("minQualifications")}
@@ -406,37 +413,18 @@ export function ProjectForm({
       <Field
         description="Helpful to have, but something a team could pick up along the way."
         form={form}
-        label="Preferred qualifications"
+        label={FIELD_LABELS.prefQualifications}
         markdown
         name="prefQualifications"
         onApply={() => applyField("prefQualifications")}
         rows={2}
         suggestion={suggestions.prefQualifications}
       />
-      <Field
-        description="A link to your organization, or to background reading. Optional."
-        form={form}
-        label="URL"
-        name="url"
-        placeholder="https://..."
-      />
-      <Field
-        description="Optional. Leave blank to keep private."
-        form={form}
-        label="Contact name"
-        name="contactName"
-      />
-      <Field
-        description="Optional. Leave blank to keep private."
-        form={form}
-        label="Contact email"
-        name="contactEmail"
-        placeholder="name@example.com"
-      />
+      <Divider />
       <form.Field name="imageUrl">
         {(field: AnyForm) => (
           <div>
-            <Label>Image</Label>
+            <Label className="text-base">Image</Label>
             <div className="mt-1">
               <ProjectImageUploader
                 currentKey={(field.state.value as string) || null}
@@ -456,6 +444,29 @@ export function ProjectForm({
           </div>
         )}
       </form.Field>
+      <Field
+        description="A link to your organization, or to background reading. Optional."
+        form={form}
+        label="URL"
+        name="url"
+        placeholder="https://..."
+      />
+      <div className="grid gap-6 sm:grid-cols-2">
+        <Field
+          description="Optional. Leave blank to keep private."
+          form={form}
+          label="Contact Name"
+          name="contactName"
+        />
+        <Field
+          description="Optional. Leave blank to keep private."
+          form={form}
+          label="Contact Email"
+          name="contactEmail"
+          placeholder="name@example.com"
+        />
+      </div>
+      <Divider />
       <form.Field name="requiresNdaIp">
         {(field: AnyForm) => (
           <div>
@@ -492,7 +503,7 @@ export function ProjectForm({
                 <Field
                   description="Briefly explain the restrictions a team would be agreeing to."
                   form={form}
-                  label="Licensing / IP / NDA notes"
+                  label={FIELD_LABELS.licenseRestrictions}
                   markdown
                   name="licenseRestrictions"
                   onApply={() => applyField("licenseRestrictions")}
@@ -525,62 +536,68 @@ export function ProjectForm({
           </div>
         )}
       </form.Field>
-      <form.Field name="programId">
-        {(field: AnyForm) => (
-          <div>
-            <Label htmlFor="programId">Program</Label>
-            <p
-              className="mt-0.5 text-muted-foreground text-xs"
-              id="programId-description"
-            >
-              The program this project would run in. Staff can set or change it
-              during review.
-            </p>
-            <ProgramSelect
-              describedBy="programId-description"
-              id="programId"
-              onChange={(v) => field.handleChange(v)}
-              value={field.state.value as string}
-            />
-            <FieldError errors={field.state.meta.errors} />
-          </div>
-        )}
-      </form.Field>
-      <form.Field name="teamsSupported">
-        {(field: AnyForm) => (
-          <div>
-            <Label htmlFor="teamsSupported">Teams</Label>
-            <p
-              className="mt-0.5 text-muted-foreground text-xs"
-              id="teamsSupported-description"
-            >
-              How many separate teams could work on this project at the same
-              time. They might take different parts, try different solutions, or
-              compete for the best one. More teams means a larger time
-              commitment.
-            </p>
-            <Input
-              aria-describedby="teamsSupported-description"
-              className="mt-1 w-24"
-              id="teamsSupported"
-              max={5}
-              min={1}
-              onBlur={(e) => {
-                const n = Number(e.target.value);
-                if (!Number.isFinite(n) || n < 1) {
-                  field.handleChange(1);
-                } else if (n > 5) {
-                  field.handleChange(5);
-                }
-              }}
-              onChange={(e) => field.handleChange(Number(e.target.value))}
-              type="number"
-              value={field.state.value as number}
-            />
-            <FieldError errors={field.state.meta.errors} />
-          </div>
-        )}
-      </form.Field>
+      <div className="grid gap-6 sm:grid-cols-2">
+        <form.Field name="programId">
+          {(field: AnyForm) => (
+            <div>
+              <Label className="text-base" htmlFor="programId">
+                Program
+              </Label>
+              <p
+                className="mt-0.5 text-muted-foreground text-xs"
+                id="programId-description"
+              >
+                The program this project would run in. Staff can set or change
+                it during review.
+              </p>
+              <ProgramSelect
+                describedBy="programId-description"
+                id="programId"
+                onChange={(v) => field.handleChange(v)}
+                value={field.state.value as string}
+              />
+              <FieldError errors={field.state.meta.errors} />
+            </div>
+          )}
+        </form.Field>
+        <form.Field name="teamsSupported">
+          {(field: AnyForm) => (
+            <div>
+              <Label className="text-base" htmlFor="teamsSupported">
+                Teams
+              </Label>
+              <p
+                className="mt-0.5 text-muted-foreground text-xs"
+                id="teamsSupported-description"
+              >
+                How many separate teams could work on this project at the same
+                time. They might take different parts, try different solutions,
+                or compete for the best one. More teams means a larger time
+                commitment.
+              </p>
+              <Input
+                aria-describedby="teamsSupported-description"
+                className="mt-1 w-24"
+                id="teamsSupported"
+                max={5}
+                min={1}
+                onBlur={(e) => {
+                  const n = Number(e.target.value);
+                  if (!Number.isFinite(n) || n < 1) {
+                    field.handleChange(1);
+                  } else if (n > 5) {
+                    field.handleChange(5);
+                  }
+                }}
+                onChange={(e) => field.handleChange(Number(e.target.value))}
+                type="number"
+                value={field.state.value as number}
+              />
+              <FieldError errors={field.state.meta.errors} />
+            </div>
+          )}
+        </form.Field>
+      </div>
       <form.Field name="acceptingApplicants">
         {(field: AnyForm) => (
           <div>
@@ -601,13 +618,14 @@ export function ProjectForm({
           </div>
         )}
       </form.Field>
+      {showNotes && <Divider />}
       {/* Private notes are not staff-only content: the proposer writes and
           reads them too. */}
       {showNotes && (
         <Field
           description={PRIVATE_NOTES_PROJECT_HINT}
           form={form}
-          label={PRIVATE_NOTES_LABEL}
+          label={PRIVATE_NOTES_FIELD_LABEL}
           name="notes"
           rows={3}
           textarea
@@ -633,6 +651,11 @@ export function ProjectForm({
 
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Form generics are unstable; field name comes from schema
 type AnyForm = any;
+
+/** A hairline between the form's three groups (#375). */
+function Divider() {
+  return <hr className="border-border border-t" />;
+}
 
 interface FieldProps {
   /** Helper text rendered under the label and wired up via aria-describedby. */
@@ -723,7 +746,9 @@ function Field({
     <form.Field name={name as never}>
       {(field: AnyForm) => (
         <div>
-          <Label htmlFor={field.name}>{label}</Label>
+          <Label className="text-base" htmlFor={field.name}>
+            {label}
+          </Label>
           {description && (
             <p
               className="mt-0.5 text-muted-foreground text-xs"

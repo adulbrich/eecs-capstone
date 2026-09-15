@@ -21,6 +21,12 @@ export interface ScopeSourceProgram {
   termCount: number | null;
 }
 
+/**
+ * Model-facing tags, not labels a reader sees, so they do not follow
+ * FIELD_LABELS in project-review-fields.ts: the label text is part of the
+ * source this module hashes, and renaming one marks every stored scope
+ * assessment stale (#375 kept them as they were for that reason).
+ */
 const SCOPE_FIELDS = [
   ["title", "Title"],
   ["description", "Description"],

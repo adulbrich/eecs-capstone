@@ -43,7 +43,7 @@ describe("ProjectForm NDA/IP agreement", () => {
   it("hides the restrictions textarea until the box is checked", () => {
     renderForm();
 
-    expect(screen.queryByLabelText("Licensing / IP / NDA notes")).toBeNull();
+    expect(screen.queryByLabelText("Licensing / IP / NDA Notes")).toBeNull();
 
     fireEvent.click(screen.getByLabelText(/requires an NDA or IP agreement/i));
 
@@ -55,7 +55,7 @@ describe("ProjectForm NDA/IP agreement", () => {
     // The revealed field says what to put in it, like every other field.
     expect(screen.getByText(/Briefly explain the restrictions/i)).toBeTruthy();
 
-    expect(screen.getByLabelText("Licensing / IP / NDA notes")).toBeTruthy();
+    expect(screen.getByLabelText("Licensing / IP / NDA Notes")).toBeTruthy();
   });
 
   it("shows the textarea on load for a project that already requires one", () => {
@@ -64,7 +64,7 @@ describe("ProjectForm NDA/IP agreement", () => {
       requiresNdaIp: true,
     });
 
-    expect(screen.getByLabelText("Licensing / IP / NDA notes")).toBeTruthy();
+    expect(screen.getByLabelText("Licensing / IP / NDA Notes")).toBeTruthy();
   });
 });
 
