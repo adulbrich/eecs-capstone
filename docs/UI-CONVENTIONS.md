@@ -1341,6 +1341,13 @@ never `() => void`: a `void` return type discards the parent's
 hop further out and harder to see (#421). The parent returns the promise
 (`onChanged={() => router.invalidate()}`) rather than voiding it.
 
+**The refresh is awaited before the surface closes**, not after. A handler that
+runs `close(); await onDone();` has put the popover, dialog or sheet holding its
+`FieldError` beyond reach before the refetch can fail, so a rejection lands
+nowhere, and it re-enables whatever sits behind that surface over the stale row.
+Awaiting first keeps the busy window over something the reader can still see,
+which is the same thing "a dialog closes only on success" says for the write.
+
 Go through the hook that owns a key rather than calling the server function
 underneath it: `useWriteBookmark` exists so that a bookmark write invalidates
 `["bookmarks"]` wherever it happens.

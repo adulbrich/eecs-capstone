@@ -36,8 +36,8 @@ export function RoleSelect({ email, userId, initialRole, onChanged }: Props) {
   function onSave(sendEmail: boolean) {
     void run(async () => {
       await setUserRole({ data: { userId, role, sendEmail } });
-      setConfirmOpen(false);
       await onChanged();
+      setConfirmOpen(false);
     });
   }
 

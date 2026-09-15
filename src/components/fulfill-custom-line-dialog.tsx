@@ -134,8 +134,8 @@ export function FulfillCustomLineDialog({
         },
       });
       reset();
-      setOpen(false);
       await onDone();
+      setOpen(false);
     } catch (e) {
       setError(errorMessage(e, "Fulfil failed"));
     } finally {

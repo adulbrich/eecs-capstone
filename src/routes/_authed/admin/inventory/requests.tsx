@@ -539,9 +539,12 @@ function sheetActions(
   onDone: () => Promise<void>,
   setOpenLineId: (id: string | null) => void
 ): ReactNode {
+  // The refresh first: closing the sheet unmounts the actions inside it, so
+  // a refusal from the refetch would have nowhere to land and the row behind
+  // would be the stale one.
   const done = async () => {
-    setOpenLineId(null);
     await onDone();
+    setOpenLineId(null);
   };
   if (row.kind === "item") {
     return row.line.status === "pending" ? (

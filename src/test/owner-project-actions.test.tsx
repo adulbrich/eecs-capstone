@@ -91,16 +91,19 @@ describe("OwnerProjectActions", () => {
     const refreshed = new Promise<void>((resolve) => {
       releaseRefresh = resolve;
     });
-    renderBlock("draft", null, () => refreshed);
+    const onChanged = vi.fn(() => refreshed);
+    renderBlock("draft", null, onChanged);
 
-    const button = screen.getByRole("button", {
+    const button = screen.getByRole<HTMLButtonElement>("button", {
       name: "Submit for review",
-    }) as HTMLButtonElement;
+    });
     fireEvent.click(button);
 
-    // The write has landed and the refresh has not, which is exactly the
-    // moment the reader could have clicked a live control over a stale row.
+    // The write has landed and the refresh has started but not resolved,
+    // which is exactly the moment the reader could have clicked a live
+    // control over a stale row.
     await waitFor(() => expect(submitProject).toHaveBeenCalled());
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
     expect(button.disabled).toBe(true);
 
     releaseRefresh();

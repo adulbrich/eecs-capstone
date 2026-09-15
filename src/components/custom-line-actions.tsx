@@ -61,8 +61,8 @@ export function CustomLineActions({
   function runLineAction(action: () => Promise<unknown>, failure: string) {
     return run(async () => {
       await action();
-      close();
       await onDone();
+      close();
     }, failure);
   }
 

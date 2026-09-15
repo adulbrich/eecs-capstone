@@ -203,8 +203,8 @@ export function StaffProjectPanel({
       } else {
         await performTransition({ data });
       }
-      closeModal();
       await onChanged();
+      closeModal();
     } catch (err) {
       setError(errorMessage(err, "Transition failed"));
     } finally {

@@ -353,15 +353,17 @@ function ReplyForm({
           sendEmail: sendEmail && !isInternal,
         },
       });
+      // Before the clear below, and outside the guard: the reply landed
+      // whichever attempt posted it, so the thread refetches even when this
+      // one was cancelled, and a refusal from the refetch still has a form to
+      // land in. Closing first unmounts the FieldError with the rest of it.
+      await onChanged();
       if (isCurrent()) {
         setContent("");
         setIsInternalChoice(false);
         setSendEmail(true);
         setOpen(false);
       }
-      // Outside the guard: the reply landed whichever attempt posted it, so
-      // the thread has to refetch even when this one was cancelled.
-      await onChanged();
     } catch (err) {
       if (isCurrent()) {
         setError(errorMessage(err, "Reply failed"));

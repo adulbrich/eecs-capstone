@@ -67,8 +67,8 @@ export function AdminRequestActions({
         },
       });
       setPickupBy("");
-      close();
       await onDone();
+      close();
     } catch (e) {
       setError(errorMessage(e, "Approve failed"));
     } finally {
@@ -88,8 +88,8 @@ export function AdminRequestActions({
         data: { requestItemId: lineId, reviewComment: reason, sendEmail },
       });
       setReason("");
-      close();
       await onDone();
+      close();
     } catch (e) {
       setError(errorMessage(e, "Reject failed"));
     } finally {

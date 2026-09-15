@@ -65,8 +65,8 @@ export function ApproveAllDialog({
         },
       });
       setPickupBy("");
-      setOpen(false);
       await onDone();
+      setOpen(false);
     } catch (e) {
       setError(errorMessage(e, "Approve failed"));
     } finally {
