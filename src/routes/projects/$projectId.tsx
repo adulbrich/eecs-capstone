@@ -130,19 +130,10 @@ function ProjectDetail() {
         <div className="flex shrink-0 items-center gap-2">
           <BookmarkButton projectId={project.id} />
           {canEdit && (
-            <Button
-              asChild
+            <EditLink
               className="hidden md:inline-flex"
-              size="sm"
-              variant="outline"
-            >
-              <Link
-                params={{ projectId: project.id }}
-                to="/projects/$projectId/edit"
-              >
-                Edit
-              </Link>
-            </Button>
+              projectId={project.id}
+            />
           )}
         </div>
       </div>
@@ -186,19 +177,7 @@ function ProjectDetail() {
       )}
 
       {canEdit && (
-        <Button
-          asChild
-          className="mt-4 w-full md:hidden"
-          size="sm"
-          variant="outline"
-        >
-          <Link
-            params={{ projectId: project.id }}
-            to="/projects/$projectId/edit"
-          >
-            Edit
-          </Link>
-        </Button>
+        <EditLink className="mt-4 w-full md:hidden" projectId={project.id} />
       )}
 
       <div className="mt-4 overflow-hidden rounded-lg">
@@ -267,6 +246,27 @@ function ProjectDetail() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * The Edit link of the header, rendered twice by the page: in the title row
+ * from `md` and full width above the image below it (#400). One component
+ * so the label and the route cannot drift between the two.
+ */
+function EditLink({
+  className,
+  projectId,
+}: {
+  className: string;
+  projectId: string;
+}) {
+  return (
+    <Button asChild className={className} size="sm" variant="outline">
+      <Link params={{ projectId }} to="/projects/$projectId/edit">
+        Edit
+      </Link>
+    </Button>
   );
 }
 
