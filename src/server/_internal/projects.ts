@@ -296,6 +296,11 @@ export async function updateProjectProposerAs(
   if (changedFields.length === 0) {
     return { id: existing.id, updated: false };
   }
+  // Only a new address is news to anyone. Flipping the student-proposed mark
+  // on its own, or re-saving the address that is already there, tells the
+  // proposer nothing they do not know (#385); an unlink tells nobody, as the
+  // notifiers already decide. Same gate as the mentor save.
+  const reassigned = changedFields.includes("proposerEmail") && !!proposerEmail;
   await db.transaction(async (tx) => {
     await tx
       .update(projects)
@@ -308,27 +313,31 @@ export async function updateProjectProposerAs(
       oldValues: oldDiff,
       newValues: newDiff,
     });
-    // The new proposer's bell. Nothing when the address has no account, and
-    // nothing on an unlink; the email below covers the first of those.
-    await recordProposerReassignedNotification(
-      tx,
-      { id: existing.id, title: existing.title, proposerId },
-      viewer.id
-    );
+    // The new proposer's bell. Nothing when the address has no account; the
+    // email below covers that one.
+    if (reassigned) {
+      await recordProposerReassignedNotification(
+        tx,
+        { id: existing.id, title: existing.title, proposerId },
+        viewer.id
+      );
+    }
   });
   // After the transaction, never inside it; swallows its own errors.
-  await notifyProposerReassignedByEmail(
-    {
-      actorId: viewer.id,
-      project: {
-        id: existing.id,
-        proposerEmail,
-        proposerId,
-        title: existing.title,
+  if (reassigned) {
+    await notifyProposerReassignedByEmail(
+      {
+        actorId: viewer.id,
+        project: {
+          id: existing.id,
+          proposerEmail,
+          proposerId,
+          title: existing.title,
+        },
       },
-    },
-    opts?.send
-  );
+      opts?.send
+    );
+  }
   return { id: existing.id, updated: true };
 }
 

@@ -937,6 +937,46 @@ describe("review emails", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it("tells nobody when only the student-proposed mark changes or the same address is saved again", async () => {
+    process.env.BETTER_AUTH_URL = "https://app";
+    const admin = await makeUser("admin-flag-only@x.edu", "admin");
+    const next = await makeUser("next-flag-only@x.edu", "user");
+    const { id } = await createProjectAs(admin, baseProject());
+    const send = vi.fn().mockResolvedValue(undefined);
+    const rowsFor = () =>
+      db.select().from(notifications).where(eq(notifications.userId, next.id));
+
+    await updateProjectProposerAs(
+      admin,
+      { id, proposerEmail: "next-flag-only@x.edu", studentProposed: false },
+      { send }
+    );
+    expect(send).toHaveBeenCalledOnce();
+    expect(await rowsFor()).toHaveLength(1);
+
+    // The flag alone (#385): the row is written and logged, nobody is told.
+    send.mockClear();
+    const flagged = await updateProjectProposerAs(
+      admin,
+      { id, proposerEmail: "next-flag-only@x.edu", studentProposed: true },
+      { send }
+    );
+    expect(flagged.updated).toBe(true);
+    expect(send).not.toHaveBeenCalled();
+    expect(await rowsFor()).toHaveLength(1);
+
+    // The same address in a different case is not a change at all.
+    send.mockClear();
+    const same = await updateProjectProposerAs(
+      admin,
+      { id, proposerEmail: "Next-Flag-Only@x.edu", studentProposed: true },
+      { send }
+    );
+    expect(same.updated).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+    expect(await rowsFor()).toHaveLength(1);
+  });
+
   it("does not roll back the transition when the email fails", async () => {
     process.env.BETTER_AUTH_URL = "https://app";
     const owner = await makeUser("owner-fail@x.edu", "user");
