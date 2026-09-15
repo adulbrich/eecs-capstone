@@ -51,6 +51,32 @@ type FieldErrorProps =
   | { message: unknown; errors?: never };
 
 /**
+ * What a form says when it worked, under that form's own submit button.
+ *
+ * A save that stays on the page confirms in place rather than by toast
+ * (UI-CONVENTIONS, "Mutations and feedback"). `output` rather than the
+ * `role="alert"` paragraph `FieldError` is: a result the reader asked for is
+ * announced politely, an error interrupts. The two used to be one component
+ * on `profile.tsx` switching on a `kind`, which put a failure in the polite
+ * element and gave that page the only error text in the app not shaped like
+ * the rest (#410).
+ */
+function SavedNote({ message }: { message: string | null }) {
+  if (!message) {
+    return null;
+  }
+  return (
+    <output className="mt-2 block text-sm" style={SAVED_COLOR}>
+      {message}
+    </output>
+  );
+}
+
+// The token the status badges use, for the reason UI-CONVENTIONS gives: a
+// hex code never goes in a component.
+const SAVED_COLOR = { color: "var(--status-success)" };
+
+/**
  * The one error paragraph.
  *
  * Six `form.Field` render props displayed no errors at all before this existed,
@@ -86,4 +112,4 @@ function FieldError({ errors, message }: FieldErrorProps) {
   );
 }
 
-export { FieldError };
+export { FieldError, SavedNote };

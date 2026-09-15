@@ -5,6 +5,7 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   CATEGORY_FIELD_DESCRIPTION,
   CategoryTypeCombobox,
@@ -74,6 +75,7 @@ function CategoryEdit() {
           data: { id: category.id, domain: "inventory", name, type: null },
         });
       }
+      toast.success("Category saved.");
       navigate({ search: { tab: category.domain }, to: "/admin/categories" });
     });
   }

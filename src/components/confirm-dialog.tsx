@@ -12,7 +12,7 @@ import {
 } from "#/components/ui/alert-dialog.tsx";
 import { Button } from "#/components/ui/button.tsx";
 import { FieldError } from "#/components/ui/field.tsx";
-import { errorMessage } from "#/lib/error-message.ts";
+import { useAction } from "#/lib/use-action.ts";
 
 /**
  * The one destructive confirmation in the app.
@@ -57,24 +57,14 @@ export function ConfirmDialog({
   title: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The same hook every other trigger in the app uses. Its guard is a ref
+  // read synchronously, which a `busy` state read from the render closure is
+  // not: two activations in one tick both see the old `false`.
+  const { busy, error, run, setError } = useAction();
 
   async function runConfirm() {
-    // The guard is inside the handler, not only on the button: a keyboard
-    // activation can arrive before React has re-rendered the disabled state.
-    if (busy) {
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await onConfirm();
+    if (await run(onConfirm)) {
       setOpen(false);
-    } catch (err) {
-      setError(errorMessage(err, "Something went wrong. Please try again."));
-    } finally {
-      setBusy(false);
     }
   }
 

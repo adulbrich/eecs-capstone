@@ -8,7 +8,7 @@ import {
 import { MentorFields } from "#/components/mentor-fields";
 import { RecommendedProjectsLink } from "#/components/recommended-projects-link";
 import { Button } from "#/components/ui/button";
-import { FieldError } from "#/components/ui/field";
+import { FieldError, SavedNote } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
@@ -36,31 +36,6 @@ interface ProfileUser {
   role: string | null | undefined;
   wantsToMentor?: boolean | null;
 }
-
-/**
- * What a form on this page says when it worked, under that form's own submit
- * button. A save that stays on the page confirms inline rather than by toast
- * (UI-CONVENTIONS, "Mutations and feedback").
- *
- * `output` rather than `p` so assistive tech announces it politely when it
- * appears: this is a result the reader asked for, not the interruption
- * `FieldError` is. The two used to be one component switching on a `kind`,
- * which is what put a failure in an element that announces politely and gave
- * this page the only error paragraph in the app not shaped like the others
- * (#411, #410).
- */
-function SavedNote({ message }: { message: string | null }) {
-  if (!message) {
-    return null;
-  }
-  return (
-    <output className="mt-2 block text-sm" style={SAVED_COLOR}>
-      {message}
-    </output>
-  );
-}
-
-const SAVED_COLOR = { color: "var(--status-success)" };
 
 function Profile() {
   const router = useRouter();

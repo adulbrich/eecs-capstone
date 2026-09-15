@@ -28,9 +28,12 @@ describe("useAction", () => {
     const action = vi.fn(() => promise);
     const { result } = renderHook(() => useAction());
 
-    // Both calls in one tick, which is what a held Enter key or a double
-    // click produces: React has not re-rendered, so `disabled` is still
-    // false and only the ref inside the hook can refuse the second.
+    // Both calls in one tick. This is the case `disabled` cannot cover and
+    // only the ref inside the hook can: a keyboard activation or a dropdown
+    // item whose handler runs before React has re-rendered. It has to be
+    // asserted here rather than through a component, because fireEvent
+    // flushes state between two clicks, so a DOM-level double click is
+    // refused by `disabled` whether the ref exists or not.
     let first: Promise<boolean> | undefined;
     let second: Promise<boolean> | undefined;
     await act(async () => {

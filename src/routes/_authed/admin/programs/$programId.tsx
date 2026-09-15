@@ -6,6 +6,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useState } from "react";
+import { toast } from "sonner";
 import { ConfirmDialog } from "#/components/confirm-dialog";
 import { InstructorManager } from "#/components/instructor-manager";
 import {
@@ -71,6 +72,7 @@ function ProgramEdit() {
           expectedTeams: expectedTeams === "" ? null : Number(expectedTeams),
         },
       });
+      toast.success("Program saved.");
       navigate({ to: "/admin/programs" });
     });
   }

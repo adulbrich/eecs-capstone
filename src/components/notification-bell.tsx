@@ -150,7 +150,7 @@ export function NotificationBell() {
             onClick={onMarkAllRead}
             type="button"
           >
-            {busy ? "Saving..." : "Mark all read"}
+            {busy ? "Marking..." : "Mark all read"}
           </button>
         )}
       </PopoverContent>

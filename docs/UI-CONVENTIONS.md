@@ -1283,11 +1283,17 @@ itself. `src/test/error-extraction-scan.test.ts` refuses the cast.
 - **A form that navigates away on success confirms with `toast.success`**,
   because the page that would have carried an inline confirmation is gone by
   the time it renders.
-- **A save that stays on the page confirms inline**, next to what it saved.
-  `profile.tsx` is the page this describes.
+- **A save that stays on the page confirms inline**, next to what it saved,
+  through `<SavedNote>` from `#/components/ui/field`. It is an `output`, not
+  the `role="alert"` paragraph `FieldError` is: a result the reader asked for
+  is announced politely, an error interrupts.
 
-Neither is optional. A mutation that reports nothing on success is
-indistinguishable from one that silently failed.
+Neither is optional, unless the result is itself visible where the reader is
+already looking: a row that leaves the table, a status badge that changes, a
+field that now holds what was typed. A cancelled request does not need a toast
+saying it was cancelled when the row it was on has gone. Everything else
+confirms, because a mutation that reports nothing is indistinguishable from
+one that silently failed.
 
 ### Dialogs
 
@@ -1299,10 +1305,16 @@ cannot see it at all.
 `ConfirmDialog` owns this: pass it an `onConfirm` that does the work and lets a
 rejection propagate, and it disables both buttons, swaps the label to
 `busyLabel`, keeps itself open, and renders the message in a `FieldError`
-inside. Callers do not pass `busy` or `error` and do not catch. A dialog built
-on `AlertDialog` directly (`delete-account-dialog.tsx`,
-`inventory-lifecycle-panel.tsx`, `send-email-dialog.tsx`) does the same thing
-with its own state.
+inside. Callers do not pass `busy` or `error` and do not catch.
+`SubmitBorrowListDialog` owns its own the same way.
+
+A dialog built on `AlertDialog` or `Dialog` directly holds the same three
+things itself, through `useAction`: `delete-account-dialog.tsx` and
+`inventory-lifecycle-panel.tsx` do. The exception is
+`send-email-dialog.tsx`, which takes `busy` and `error` as props because the
+save it confirms runs in the section behind it and that section shows the
+same failure. Owning the flight is the default; taking it as props is for a
+dialog that is one step of an action belonging to something else.
 
 ### Cache
 

@@ -127,7 +127,7 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
           size="sm"
           type="button"
         >
-          {busy ? "Saving..." : "Add"}
+          {busy ? "Adding..." : "Add"}
         </Button>
       </div>
       <FieldError message={error} />
