@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAction } from "#/lib/use-action";
 import {
   addProgramInstructor,
   listEligibleInstructors,
@@ -38,7 +39,9 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
   const [instructors, setInstructors] = useState(initial);
   const [eligible, setEligible] = useState<Eligible[]>([]);
   const [picked, setPicked] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  // One flight for the whole panel: Add and every Remove write the same list
+  // and share the one error slot under it.
+  const { busy, error, run } = useAction();
 
   useEffect(() => setInstructors(initial), [initial]);
 
@@ -53,28 +56,22 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
     })();
   }, []);
 
-  async function add() {
-    setError(null);
+  function add() {
     if (!picked) {
       return;
     }
-    try {
+    void run(async () => {
       await addProgramInstructor({ data: { programId, userId: picked } });
       setPicked("");
       onChanged();
-    } catch (err) {
-      setError((err as Error).message);
-    }
+    }, "Could not add the instructor");
   }
 
-  async function remove(userId: string) {
-    setError(null);
-    try {
+  function remove(userId: string) {
+    void run(async () => {
       await removeProgramInstructor({ data: { programId, userId } });
       onChanged();
-    } catch (err) {
-      setError((err as Error).message);
-    }
+    }, "Could not remove the instructor");
   }
 
   const currentIds = new Set(instructors.map((i) => i.userId));
@@ -99,7 +96,8 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
                 </span>
               </span>
               <Button
-                onClick={() => void remove(i.userId)}
+                disabled={busy}
+                onClick={() => remove(i.userId)}
                 size="sm"
                 type="button"
                 variant="ghost"
@@ -111,7 +109,7 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
         </ul>
       )}
       <div className="mt-3 flex gap-2">
-        <Select onValueChange={setPicked} value={picked}>
+        <Select disabled={busy} onValueChange={setPicked} value={picked}>
           <SelectTrigger aria-label="Add instructor" className="w-64" size="sm">
             <SelectValue placeholder="Add instructor..." />
           </SelectTrigger>
@@ -124,12 +122,12 @@ export function InstructorManager({ programId, initial, onChanged }: Props) {
           </SelectContent>
         </Select>
         <Button
-          disabled={!picked}
-          onClick={() => void add()}
+          disabled={busy || !picked}
+          onClick={add}
           size="sm"
           type="button"
         >
-          Add
+          {busy ? "Adding..." : "Add"}
         </Button>
       </div>
       <FieldError message={error} />

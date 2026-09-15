@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { errorMessage } from "#/lib/error-message";
 import { isOpenCustomLine } from "#/lib/inventory-custom-workflow";
+import { useAction } from "#/lib/use-action";
 import {
   rejectCustomLine,
   startSourcingCustomLine,
@@ -42,8 +43,9 @@ export function CustomLineActions({
   const [note, setNote] = useState(line.sourcingNote ?? "");
   const [reason, setReason] = useState("");
   const [sendEmail, setSendEmail] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Each of the three actions here fails differently and they share one
+  // error slot, so the fallback comes per call rather than per hook.
+  const { busy, error, run, setError } = useAction();
 
   if (!isOpenCustomLine(line.status)) {
     return <span className="text-muted-foreground">-</span>;
@@ -56,18 +58,12 @@ export function CustomLineActions({
     setError(null);
   }
 
-  async function run(action: () => Promise<unknown>, failure: string) {
-    setBusy(true);
-    setError(null);
-    try {
+  function runLineAction(action: () => Promise<unknown>, failure: string) {
+    return run(async () => {
       await action();
       close();
       onDone();
-    } catch (e) {
-      setError(errorMessage(e, failure));
-    } finally {
-      setBusy(false);
-    }
+    }, failure);
   }
 
   return (
@@ -103,7 +99,7 @@ export function CustomLineActions({
             <Button
               disabled={busy}
               onClick={() =>
-                void run(
+                void runLineAction(
                   () =>
                     sourcing
                       ? updateSourcingNote({
@@ -183,7 +179,7 @@ export function CustomLineActions({
                   setError("Reason required");
                   return;
                 }
-                void run(
+                void runLineAction(
                   () =>
                     rejectCustomLine({
                       data: {
@@ -230,8 +226,7 @@ export function StartSourcingAllButton({
   lines: { id: string; status: string }[];
   onDone: () => void;
 }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAction({ fallback: "Sourcing failed" });
   const pending = lines.filter((line) => line.status === "pending");
   if (pending.length === 0) {
     return null;
@@ -242,22 +237,33 @@ export function StartSourcingAllButton({
       <Button
         disabled={busy}
         onClick={() =>
-          void (async () => {
-            setBusy(true);
-            setError(null);
+          void run(async () => {
+            let done = 0;
             try {
               for (const line of pending) {
                 await startSourcingCustomLine({
                   data: { customLineId: line.id, sourcingNote: null },
                 });
+                done++;
               }
-              onDone();
             } catch (e) {
-              setError(errorMessage(e, "Sourcing failed"));
+              // One call per line and no transaction behind them, so a
+              // failure part way through leaves the earlier lines sourcing.
+              // Saying only "Sourcing failed" invited a retry that would
+              // transition them twice (#410). Making this atomic is the
+              // server's problem and out of scope; saying what happened is
+              // not.
+              const failure =
+                done === 0
+                  ? errorMessage(e, "Sourcing failed")
+                  : `Started ${done} of ${pending.length}, then stopped: ${errorMessage(e, "sourcing failed")}`;
+              throw new Error(failure, { cause: e });
             } finally {
-              setBusy(false);
+              // Whatever went through is on the server, so the table has to
+              // be refreshed even when the rest did not.
+              onDone();
             }
-          })()
+          })
         }
         size="sm"
         type="button"

@@ -9,7 +9,9 @@ import {
   useMemo,
   useState,
 } from "react";
+import { toast } from "sonner";
 import { authClient } from "#/lib/auth-client";
+import { errorMessage } from "#/lib/error-message";
 import { useHasMounted } from "#/lib/use-has-mounted";
 import {
   addBookmark,
@@ -175,7 +177,7 @@ export function BookmarkToggle({
       await writeBookmark(projectId, next);
     } catch (err) {
       set.set(projectId, !next);
-      console.error(err);
+      toast.error(errorMessage(err, "Could not save the bookmark"));
     } finally {
       setLoading(false);
     }

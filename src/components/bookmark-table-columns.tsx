@@ -2,9 +2,11 @@ import { Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { defineAdminColumns } from "#/components/admin-data-table";
+import { errorMessage } from "#/lib/error-message";
 import { projectImageSrc } from "#/lib/project-image";
 import type { SortState } from "#/lib/table-state";
-import { type listMyBookmarks, removeBookmark } from "#/server/bookmarks";
+import type { listMyBookmarks } from "#/server/bookmarks";
+import { useWriteBookmark } from "./bookmark-set";
 import { ImageOrFallback } from "./image-or-fallback";
 import { LocalTime } from "./local-time";
 import { projectSummaryColumns } from "./project-summary-columns";
@@ -29,16 +31,19 @@ export const BOOKMARK_TABLE_DEFAULT_SORT: SortState = {
 function RemoveBookmarkButton({ row }: { row: BookmarkRow }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const writeBookmark = useWriteBookmark();
   async function remove() {
     setPending(true);
     try {
-      await removeBookmark({ data: { projectId: row.id } });
+      // Through the hook, not the server function: it owns the ["bookmarks"]
+      // key that the count on the /projects title row reads, which a direct
+      // call left stale after a removal (#410).
+      await writeBookmark(row.id, false);
       await router.invalidate();
     } catch (err) {
       // The row stays, which is the truth; say why rather than leaving a
       // button that seemed to do nothing.
-      console.error(err);
-      toast.error("Could not remove the bookmark. Try again.");
+      toast.error(errorMessage(err, "Could not remove the bookmark"));
     } finally {
       setPending(false);
     }

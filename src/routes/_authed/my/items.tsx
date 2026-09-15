@@ -28,7 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
-import { errorMessage } from "#/lib/error-message";
 import { isOpenCustomLine } from "#/lib/inventory-custom-workflow";
 import type { DeadlineEntry } from "#/lib/inventory-deadlines";
 import { deadlineOf } from "#/lib/inventory-deadlines";
@@ -40,6 +39,7 @@ import {
   type MyItemsFilter,
 } from "#/lib/my-items-filter";
 import type { SortState } from "#/lib/table-state";
+import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { cn } from "#/lib/utils";
 import type {
@@ -423,24 +423,38 @@ function MyItems() {
   const navigate = useNavigate({ from: "/my/items" });
   const router = useRouter();
   const qc = useQueryClient();
-  const [busy, setBusy] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  // A table row has no panel to write a paragraph into, so a failure here is
+  // a toast (UI-CONVENTIONS, "Mutations and feedback").
+  const { busy, run: runAction } = useAction({
+    fallback: "That did not go through",
+    onError: toast.error,
+  });
+
+  // Refreshing is part of every action here, not a step each caller repeats.
+  // Both awaited before the control re-enables: a fire-and-forget invalidate
+  // hands the reader a live button over the rows it just changed.
+  const refresh = useCallback(
+    () =>
+      Promise.all([
+        // By key. The bare call refetched every query in the app, and the
+        // borrow list is the only one any of these writes: `["bookmarks"]`
+        // is the other key that exists and nothing here touches it.
+        qc.invalidateQueries({ queryKey: ["cart"] }),
+        router.invalidate(),
+      ]),
+    [qc, router]
+  );
 
   // Memoised so the Actions column below, which closes over it, is rebuilt
   // only when `busy` flips rather than on every render.
   const run = useCallback(
-    async (action: () => Promise<void>) => {
-      setBusy(true);
-      try {
+    (action: () => Promise<void>) =>
+      runAction(async () => {
         await action();
-        await Promise.all([qc.invalidateQueries(), router.invalidate()]);
-      } catch (e) {
-        toast.error(errorMessage(e, "That did not go through"));
-      } finally {
-        setBusy(false);
-      }
-    },
-    [qc, router]
+        await refresh();
+      }),
+    [refresh, runAction]
   );
 
   const cancel = useCallback(
@@ -507,18 +521,25 @@ function MyItems() {
           actions: (groupRows) =>
             groupRows[0].kind === "cart" ? (
               <SubmitBorrowListDialog
-                busy={busy}
                 count={groupRows.length}
-                onSubmit={(note) =>
-                  run(async () => {
-                    const result = await submitCart({ data: { note } });
-                    if (result.skipped.length > 0) {
-                      toast.warning(
-                        `Submitted ${result.submitted.length}, skipped ${result.skipped.length} (no longer available).`
-                      );
-                    }
-                  })
-                }
+                // No try of its own: the dialog owns this flight and keeps
+                // itself open to show a refusal, so the error propagates.
+                disabled={busy}
+                onSubmit={async (note) => {
+                  const result = await submitCart({ data: { note } });
+                  await refresh();
+                  if (result.skipped.length > 0) {
+                    toast.warning(
+                      `Submitted ${result.submitted.length}, skipped ${result.skipped.length} (no longer available).`
+                    );
+                    return;
+                  }
+                  // Full success said nothing at all before this, which
+                  // reads the same as a submit that quietly failed (#410).
+                  toast.success(
+                    `Submitted ${result.submitted.length} ${result.submitted.length === 1 ? "item" : "items"} as one request.`
+                  );
+                }}
               />
             ) : null,
           header: (groupRows) => <GroupHeader rows={groupRows} />,

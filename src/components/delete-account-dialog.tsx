@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { errorMessage } from "#/lib/error-message";
+import { useAction } from "#/lib/use-action";
 import { type DeletionPreview, deleteAccount } from "#/server/account";
 
 // Re-exported so the profile page can type the preview it holds without a
@@ -18,6 +18,7 @@ import {
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
 import { Button } from "./ui/button";
+import { FieldError } from "./ui/field";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 
@@ -44,8 +45,16 @@ export function DeleteAccountDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  const { busy, error, run, setError } = useAction({
+    fallback: "Could not delete the account",
+  });
+  // The page is replaced on success, so nothing here comes back: `run` clears
+  // `busy` in its finally, and `leaving` covers the gap until the document
+  // load commits. Every control the flight gates reads this, not `busy`, or
+  // the confirm would say "Delete my account" again and Cancel would come
+  // alive for that moment.
+  const pending = busy || leaving;
 
   const blocked =
     preview !== null &&
@@ -55,14 +64,12 @@ export function DeleteAccountDialog({
     typed.trim().toLowerCase() === preview.email.toLowerCase();
 
   async function runDelete() {
-    setBusy(true);
-    setError(null);
-    try {
-      await deleteAccount({ data: { confirmEmail: typed.trim() } });
+    const done = await run(() =>
+      deleteAccount({ data: { confirmEmail: typed.trim() } })
+    );
+    if (done) {
+      setLeaving(true);
       onDeleted();
-    } catch (e) {
-      setError(errorMessage(e, "Could not delete the account"));
-      setBusy(false);
     }
   }
 
@@ -141,19 +148,19 @@ export function DeleteAccountDialog({
                 value={typed}
               />
             </div>
-            {error && <p className="text-destructive">{error}</p>}
+            <FieldError message={error} />
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
           {!blocked && (
             <Button
-              disabled={busy || !matches}
+              disabled={pending || !matches}
               onClick={() => void runDelete()}
               type="button"
               variant="destructive"
             >
-              {busy ? "Deleting..." : "Delete my account"}
+              {pending ? "Deleting..." : "Delete my account"}
             </Button>
           )}
         </AlertDialogFooter>

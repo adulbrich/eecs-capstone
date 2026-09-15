@@ -1,5 +1,7 @@
 import { Bell, BellRing } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import { useAction } from "#/lib/use-action";
 import {
   listMyNotifications,
   markAllRead,
@@ -49,21 +51,31 @@ export function NotificationBell() {
     };
   }, [refresh]);
 
-  async function onClickNotification(n: Notification) {
-    if (!n.read) {
-      await markRead({ data: { id: n.id } });
-    }
-    setOpen(false);
-    if (n.link) {
-      window.location.href = n.link;
-    } else {
+  // Both of these were awaited from a `void` call with no catch, so a refusal
+  // was an unhandled rejection and the badge went on showing a count that was
+  // no longer true. A toast, not inline text: this is a header control with no
+  // panel to write into (#410).
+  const { busy, run } = useAction({ onError: toast.error });
+
+  function onClickNotification(n: Notification) {
+    void run(async () => {
+      if (!n.read) {
+        await markRead({ data: { id: n.id } });
+      }
+      setOpen(false);
+      if (n.link) {
+        window.location.href = n.link;
+        return;
+      }
       await refresh();
-    }
+    }, "Could not mark that as read");
   }
 
-  async function onMarkAllRead() {
-    await markAllRead();
-    await refresh();
+  function onMarkAllRead() {
+    void run(async () => {
+      await markAllRead();
+      await refresh();
+    }, "Could not mark them as read");
   }
 
   return (
@@ -117,8 +129,9 @@ export function NotificationBell() {
                 key={n.id}
               >
                 <button
-                  className="block w-full p-2 text-left text-sm outline-none hover:bg-secondary focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  onClick={() => void onClickNotification(n)}
+                  className="block w-full p-2 text-left text-sm outline-none hover:bg-secondary focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+                  disabled={busy}
+                  onClick={() => onClickNotification(n)}
                   type="button"
                 >
                   <div className="font-medium">{n.title}</div>
@@ -132,11 +145,12 @@ export function NotificationBell() {
         )}
         {rows.length > 0 && (
           <button
-            className="block w-full border-border border-t p-2 text-center text-xs outline-none hover:bg-secondary focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            onClick={() => void onMarkAllRead()}
+            className="block w-full border-border border-t p-2 text-center text-xs outline-none hover:bg-secondary focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+            disabled={busy}
+            onClick={onMarkAllRead}
             type="button"
           >
-            Mark all read
+            {busy ? "Marking..." : "Mark all read"}
           </button>
         )}
       </PopoverContent>

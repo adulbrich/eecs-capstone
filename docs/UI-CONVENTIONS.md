@@ -1204,9 +1204,136 @@ before the input, so that one points `AlertDialogContent`'s `onOpenAutoFocus`
 at the input (#66). Decide per dialog by what stands between the top of the
 body and the input.
 
-Results that need no acknowledgement use a toast: `import { toast } from "sonner"`.
+What a confirmed action reports when it succeeds, fails or is still running
+is "Mutations and feedback" below; `ConfirmDialog` implements that part, so
+a caller passes a handler and nothing else.
 
 **Native `confirm()` and `alert()` are banned.** They are unstyled, ignore the
 brand and the dark palette, block the main thread, and cannot be scanned by the
 accessibility suite, because axe cannot reach a page whose script is parked on a
 modal browser prompt. `src/test/no-native-modals.test.ts` enforces this.
+
+## Mutations and feedback
+
+Everything a trigger does between the click and the result. An audit found five
+ways of wiring one mutation and the same kind of action wired differently in
+neighbouring files (#410), so the rules below are the contract and
+`src/lib/use-action.ts` is the shared piece that keeps a handler to them.
+
+**New code uses the hook.** A handler that writes the same shape by hand
+(`setBusy(true)`, `try` / `catch` / `finally`, an inline error) is not wrong,
+and about a dozen older ones still do; what is wrong is any of the rules
+below going unmet. The hook exists so that meeting them is the short path
+rather than the careful one, and so the guard below is a ref rather than
+whatever each handler remembered.
+
+### The flight
+
+**A trigger is disabled from the click until the promise settles, and the
+handler returns early if one is already in flight.** Both, not either. The
+`disabled` prop is what the reader sees; it is not a guard, because a keyboard
+activation or a dropdown item can arrive before React has re-rendered, and a
+`disabled` button that was enabled when the key went down still fires. The
+guard has to be read and written synchronously, which is why `useAction` holds
+a ref beside the state.
+
+```tsx
+const { busy, error, run } = useAction();
+
+<Button disabled={busy} onClick={() => void run(() => save(values))}>
+  {busy ? "Saving..." : "Save"}
+</Button>
+<FieldError message={error} />
+```
+
+The label swaps to the verb in progress while busy: "Saving...", "Deleting...",
+"Banning...". Three ASCII dots, never the ellipsis character (see "Labels"
+above).
+
+`run` answers whether the action succeeded, so a caller can navigate or close a
+dialog on the true branch without a second `try` of its own:
+
+```tsx
+if (await run(() => createProgram(name))) {
+  setOpen(false);
+}
+```
+
+### Where the failure goes
+
+**Every failure reaches the reader.** Never `console.error` alone, never an
+unhandled rejection from a bare `void handler()`.
+
+Which shape it takes follows where the control sits, not what the mutation
+does:
+
+- **Inside a form, a panel or a dialog**: inline, through `<FieldError>` for one
+  message or `<ErrorBanner>` for a whole form's failure. That is the default,
+  and it is what `useAction` gives you in `error` when you pass no `onError`.
+- **On a table row, in a header, or anywhere with no panel to write into**:
+  `toast.error`, passed as `onError`. A row has nowhere to put a paragraph that
+  would not shift every row below it.
+
+```tsx
+const { busy, run } = useAction({ onError: toast.error });
+```
+
+**Error text always comes through `errorMessage`** from
+`src/lib/error-message.ts`. A `catch` binding is `unknown`, so
+`(err as Error).message` is a lie the compiler cannot check, and an `Error`
+whose message is empty renders an empty paragraph. `useAction` and
+`ConfirmDialog` both call the helper for you; a hand-written `catch` calls it
+itself. `src/test/error-extraction-scan.test.ts` refuses the cast.
+
+### Where the success goes
+
+- **A form that navigates away on success confirms with `toast.success`**,
+  because the page that would have carried an inline confirmation is gone by
+  the time it renders.
+- **A save that stays on the page confirms inline**, next to what it saved,
+  through `<SavedNote>` from `#/components/ui/field`. It is an `output`, not
+  the `role="alert"` paragraph `FieldError` is: a result the reader asked for
+  is announced politely, an error interrupts.
+
+Neither is optional, unless the result is itself visible where the reader is
+already looking: a row that leaves the table, a status badge that changes, a
+field that now holds what was typed. A cancelled request does not need a toast
+saying it was cancelled when the row it was on has gone. Everything else
+confirms, because a mutation that reports nothing is indistinguishable from
+one that silently failed.
+
+### Dialogs
+
+**A dialog that runs a mutation stays open on failure and shows the error
+inside itself. It closes only on success.** A dialog that closes on click puts
+the refusal on the page behind it, where the reader is not looking and often
+cannot see it at all.
+
+`ConfirmDialog` owns this: pass it an `onConfirm` that does the work and lets a
+rejection propagate, and it disables both buttons, swaps the label to
+`busyLabel`, keeps itself open, and renders the message in a `FieldError`
+inside. Callers do not pass `busy` or `error` and do not catch.
+
+A dialog built on `AlertDialog` or `Dialog` directly holds the same three
+things itself, through `useAction`: `delete-account-dialog.tsx`,
+`inventory-lifecycle-panel.tsx` and `submit-borrow-list-dialog.tsx` do. The
+one exception is `send-email-dialog.tsx`, which takes `busy` and `error` as
+props because the save it confirms runs in the section behind it, and that
+section shows the same failure in its own panel. Owning the flight is the
+default; taking it as props is for a dialog that is one step of an action
+belonging to something else.
+
+### Cache
+
+**Query invalidation names its keys.** A bare `queryClient.invalidateQueries()`
+refetches every query on the page, including the ones the mutation cannot have
+touched, which is slow and hides which key actually mattered.
+
+**`router.invalidate()` is awaited inside the busy window**, not fired and
+forgotten. Loader data is what the control is about to be re-enabled over; a
+fire-and-forget invalidate re-enables it over the stale copy, and the reader
+sees the old value with a live button beside it.
+
+Go through the hook that owns a key rather than calling the server function
+underneath it: `useWriteBookmark` exists so that a bookmark write invalidates
+`["bookmarks"]` wherever it happens.

@@ -2,6 +2,7 @@ import { useForm } from "@tanstack/react-form";
 import { useState } from "react";
 import { z } from "zod";
 import { FieldError } from "#/components/ui/field";
+import { applyServerErrors } from "#/lib/apply-server-errors";
 import { errorMessage } from "#/lib/error-message";
 import { submitCustomRequest } from "#/server/inventory-custom";
 import { Button } from "./ui/button";
@@ -83,7 +84,17 @@ export function CustomRequestForm({
         });
         onSubmitted(result.requestId);
       } catch (err) {
-        setFormError(errorMessage(err, "Submit failed"));
+        // The other two forms in the app already did this: a ZodError from
+        // the server carries a path per issue, and without this the whole
+        // lot landed as one lump string under the submit button, naming no
+        // card (#410).
+        const handled = applyServerErrors(
+          form as unknown as Parameters<typeof applyServerErrors>[0],
+          err
+        );
+        if (!handled) {
+          setFormError(errorMessage(err, "Submit failed"));
+        }
       }
     },
   });

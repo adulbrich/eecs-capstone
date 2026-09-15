@@ -5,6 +5,7 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   CATEGORY_FIELD_DESCRIPTION,
   CategoryTypeCombobox,
@@ -24,6 +25,7 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { useAction } from "#/lib/use-action";
 import { isStaff } from "#/lib/viewer";
 import {
   deleteCategory,
@@ -59,12 +61,11 @@ function CategoryEdit() {
   const isProject = category.domain === "project";
   const [name, setName] = useState(category.name);
   const [type, setType] = useState(category.type ?? "");
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAction({ fallback: "Save failed" });
 
-  async function onSave(e: React.FormEvent) {
+  function onSave(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    try {
+    void run(async () => {
       if (isProject) {
         await updateCategory({
           data: { id: category.id, domain: "project", name, type },
@@ -74,20 +75,15 @@ function CategoryEdit() {
           data: { id: category.id, domain: "inventory", name, type: null },
         });
       }
+      toast.success("Category saved.");
       navigate({ search: { tab: category.domain }, to: "/admin/categories" });
-    } catch (err) {
-      setError((err as Error).message);
-    }
+    });
   }
 
+  // ConfirmDialog owns the flight and the refusal (#410).
   async function onDelete() {
-    setError(null);
-    try {
-      await deleteCategory({ data: { id: category.id } });
-      navigate({ search: { tab: category.domain }, to: "/admin/categories" });
-    } catch (err) {
-      setError((err as Error).message);
-    }
+    await deleteCategory({ data: { id: category.id } });
+    navigate({ search: { tab: category.domain }, to: "/admin/categories" });
   }
 
   return (
@@ -151,7 +147,9 @@ function CategoryEdit() {
           />
         </div>
         <div className="flex gap-2">
-          <Button type="submit">Save</Button>
+          <Button disabled={busy} type="submit">
+            {busy ? "Saving..." : "Save"}
+          </Button>
           <ConfirmDialog
             description="It will be removed from any projects and inventory items that use it. Those projects and items are unaffected otherwise."
             onConfirm={onDelete}

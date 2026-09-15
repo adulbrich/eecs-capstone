@@ -38,7 +38,7 @@ const RAW_BUTTON_ALLOWED = new Map([
   ],
   [
     "src/components/notification-bell.tsx",
-    "the notification rows and Mark all read: two-line, full-width rows need the `h-auto` a Button may not carry. #392 left these for #410, which rewires this file's failure reporting",
+    "the notification rows and Mark all read: two-line, full-width rows need the `h-auto` a Button may not carry",
   ],
 ]);
 

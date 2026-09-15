@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { errorMessage } from "#/lib/error-message";
 import { addComment } from "#/server/comments";
 import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
@@ -209,7 +210,7 @@ function NewCommentForm({
       setSendEmail(true);
       onChanged();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorMessage(err, "Comment failed"));
     } finally {
       setBusy(false);
     }
@@ -363,7 +364,7 @@ function ReplyForm({
       onChanged();
     } catch (err) {
       if (isCurrent()) {
-        setError((err as Error).message);
+        setError(errorMessage(err, "Reply failed"));
       }
     } finally {
       // Only the current attempt owns the flag. A stale one skips this
