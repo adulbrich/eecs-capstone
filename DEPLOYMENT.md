@@ -333,7 +333,10 @@ The workflow:
 
 1. Assumes the AWS deploy role via OIDC.
 2. Reads the assets CloudFront base URL from SSM and builds the linux/arm64
-   image, baking it in as `VITE_STORAGE_PUBLIC_BASE`.
+   image, baking it in as `VITE_STORAGE_PUBLIC_BASE`. The build stage runs
+   `scripts/check-asset-manifest.mjs` after `npm run build`, so an image whose
+   SSR HTML links an asset the client build never wrote fails here instead of
+   shipping (the QUIRKS entry on Tailwind's scan set says how that happened).
 3. Pushes the image to ECR, tagged with the commit SHA.
 4. Registers a new task definition pointing at that image.
 5. Runs database migrations as a one-off ECS task and waits for exit code 0.

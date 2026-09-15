@@ -8,6 +8,7 @@
   "scripts": {
     "build": "vite build",
     "check": "ultracite check",
+    "check:assets": "node scripts/check-asset-manifest.mjs",
     "check:compression": "node scripts/check-compression.mjs",
     "check:prose": "node scripts/check-prose.mjs --all",
     "db:generate": "drizzle-kit generate",
