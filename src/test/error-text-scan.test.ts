@@ -51,6 +51,14 @@ const ALLOWED = new Map([
  * matters: `text-destructive-foreground` is the ink on a filled destructive
  * surface, which is what the notification bell's unread badge uses, and that is
  * a badge rather than a message about an action.
+ *
+ * Known limit: a paragraph with the colour and no size at all is not caught.
+ * `delete-account-dialog.tsx` had one, which is the "no size class at all in
+ * one" the doc's own #411 paragraph counts, and it survived this scan until a
+ * reviewer read the file (#410). Dropping the size from the rule would flag
+ * every destructive-coloured heading and badge instead, so the size stays and
+ * the gap is written down. There are none left in `src/`; widen this if one
+ * comes back rather than in advance, the way `class-strings.ts` says.
  */
 const DESTRUCTIVE = String.raw`\btext-destructive\b(?!-)`;
 const SIZE = String.raw`\btext-(?:xs|sm|base)\b`;
