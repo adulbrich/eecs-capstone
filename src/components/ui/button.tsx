@@ -43,10 +43,14 @@ const buttonVariants = cva(
         xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
         lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        // No box at all, for a `link` Button that sits in a panel as a line of
-        // text. Five call sites wrote `h-auto p-0` by hand before this (#392);
-        // a size is what owns a height and a padding, so it lives here.
-        inline: "h-auto gap-1 p-0",
+        // No box at all, for a `link` Button that sits in a panel as a line
+        // of text. Five call sites wrote `h-auto p-0` by hand before this
+        // (#392); a size is what owns a height and a padding, so it lives
+        // here. Named for the box it does not draw, not for a magnitude: the
+        // rest of this scale is heights, and `inline` would read as the CSS
+        // display value (and is already this codebase's word for
+        // `AdminDataTable`'s controls placement).
+        bare: "h-auto gap-1 p-0",
         icon: "size-9",
         "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
         "icon-sm": "size-8",

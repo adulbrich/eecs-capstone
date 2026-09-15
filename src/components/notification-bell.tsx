@@ -80,7 +80,7 @@ export function NotificationBell() {
         <Button
           aria-label="Notifications"
           className="relative"
-          size="sm"
+          size="icon-sm"
           type="button"
           variant="ghost"
         >

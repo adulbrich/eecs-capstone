@@ -25,7 +25,7 @@ export function ClearFiltersButton({
     <Button
       className={className}
       onClick={onClick}
-      size="inline"
+      size="bare"
       type="button"
       variant="link"
     >

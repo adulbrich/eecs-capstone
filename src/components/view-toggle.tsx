@@ -31,7 +31,7 @@ export function ViewToggle({
     // biome-ignore lint/a11y/useSemanticElements: aria role=group with label is the right pattern for paired toggle buttons
     <div
       aria-label="View mode"
-      className="flex [&>*+*]:-ml-px [&>*:first-child]:rounded-r-none [&>*:last-child]:rounded-l-none"
+      className="flex [&>*+*]:-ml-px [&>*:not(:first-child)]:rounded-l-none [&>*:not(:last-child)]:rounded-r-none"
       role="group"
     >
       <Button

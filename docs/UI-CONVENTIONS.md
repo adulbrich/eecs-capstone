@@ -64,9 +64,9 @@ would turn an implicit form submit into a no-op just as silently. An `asChild`
 Sizes are `xs` (h-6, inline micro-actions like Post reply), `sm` (h-8, most
 contextual buttons), `default` (h-9, standalone form submits), and `lg` (h-10,
 hero / landing CTAs). Icon-only buttons use `icon-xs`, `icon-sm`, `icon`, or
-`icon-lg` to stay square. `inline` is the odd one: no height and no padding at
-all, for a `link` Button that sits in a panel as a line of text, which is what
-`ClearFiltersButton` uses.
+`icon-lg` to stay square. `bare` is the odd one out of the height scale: no
+height and no padding at all, for a `link` Button that sits in a panel as a
+line of text, which is what `ClearFiltersButton` uses.
 
 The size variant also sets the icon size, so pass no size class on an icon
 inside a `Button`. The base class carries
@@ -101,10 +101,12 @@ button as a different action:
 | Save | `default` |
 | Clear all | `<ClearFiltersButton>` from `#/components/clear-filters-button` |
 
-Size is the row's to decide, not the action's: Cancel takes the size of the
-button it sits beside, Remove is `sm` in a list or a table row and `default`
-where it sits next to an `Input` (the mentor capacity row is the one place the
-two rules meet). See "Size follows the row" below.
+Size is the row's to decide, not the action's. Cancel takes the size of the
+button it sits beside; Remove is `sm` in a list or a table row and `default`
+beside the mentor capacity `Input`; Save is `default` under a form and `sm`
+beside the `sm` `SelectTrigger` on the admin user page. Where the two rules
+meet, the row wins, because a button half a step off the control next to it is
+the misalignment this section exists to stop. See "Size follows the row" below.
 
 Cancel was `ghost` in four dialogs and `outline` in ten, Remove was six
 different buttons including two hand-rolled red palettes, and Clear all was a
@@ -144,7 +146,10 @@ table row or a panel. The rule was previously a comment in
 ### `className` on a Button never restyles it
 
 A Button's `className` may position it (`w-full`, `mt-2`, `xl:hidden`,
-`relative`), and may not set a colour, a height, a padding or a radius. Those
+`relative`), and may not set a colour, a height, a padding or a radius. Font
+weight is not on that list, and one call site uses it: the combobox trigger in
+`category-type-combobox.tsx` carries `font-normal`, because a trigger that
+displays a selected value reads as an input rather than as a button. Those
 four are what the variant and size own, so a call site that sets them has
 forked the primitive in one file: a Remove in a destructive palette here, an
 `h-auto p-0` there, until no two pages agree. If a call site needs a look the
@@ -157,10 +162,12 @@ conditional `bg-secondary` at the call site: the attribute is what a screen
 reader reads, so styling from anything else lets the two disagree. `ViewToggle`
 and the markdown Edit/Preview pair are the two.
 
-A segmented pair (two buttons that read as one control) gets its radius from
-the wrapper, which carries `[&>*:first-child]:rounded-r-none`,
-`[&>*:last-child]:rounded-l-none` and `[&>*+*]:-ml-px`, so neither call site
-sets a radius.
+A segmented group (buttons that read as one control) gets its radius from the
+wrapper, which carries `[&>*:not(:first-child)]:rounded-l-none`,
+`[&>*:not(:last-child)]:rounded-r-none` and `[&>*+*]:-ml-px`, so no call site
+sets a radius. Written against `:not()` rather than `:first-child` and
+`:last-child` so a third button squares on both sides instead of keeping the
+base radius in the middle of the group.
 
 ### Labels
 

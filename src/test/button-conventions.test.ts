@@ -127,9 +127,16 @@ function classTokens(openingTag: string): string[] {
   return strings.flatMap((s) => s.split(/\s+/)).filter(Boolean);
 }
 
-/** `hover:`, `dark:`, `sm:`, `!` and friends are not part of the utility. */
+/**
+ * `hover:`, `dark:`, `sm:`, `!` and friends are not part of the utility.
+ *
+ * Every variant, not just the first: `^` with `/g` still only matches at
+ * position 0 in JavaScript, so the first draft turned `dark:hover:bg-secondary`
+ * into `hover:bg-secondary` and then found no `bg-` at the front of it. A
+ * stacked-variant colour override sailed through every check.
+ */
 function utility(token: string): string {
-  return token.replace(/^[^:]*:/g, "").replace(/^!/, "");
+  return token.replace(/^(?:[^:\s]*:)+/, "").replace(/^!/, "");
 }
 
 // `text-` and `border-` are the two prefixes that are not always a colour.
@@ -137,28 +144,35 @@ function utility(token: string): string {
 // by default rather than by being added here.
 const TEXT_NOT_COLOR =
   /^text-(?:xs|sm|base|lg|xl|\dxl|left|center|right|start|end|justify|balance|pretty|wrap|nowrap|ellipsis|clip|\[)/;
-const BORDER_NOT_COLOR = /^border(?:-[xytrbles])?(?:-(?:0|2|4|8|px))?$/;
+// Widths, sides and line styles. Everything else after `border-` is a colour.
+const BORDER_NOT_COLOR =
+  /^border-(?:[xytrbles]|0|2|4|8|px|solid|dashed|dotted|double|hidden|none)$|^border$/;
+const SHADOW_NOT_COLOR = /^shadow-(?:2?xs|sm|md|lg|xl|2xl|none|inner)$/;
+const OUTLINE_NOT_COLOR =
+  /^outline-(?:none|hidden|offset-|solid|dashed|dotted|double|\d)/;
 
 function setsColor(token: string): boolean {
   const u = utility(token);
+  // `from-`, `via-` and `to-` are gradient stops, which are colours too.
   if (
-    /^(?:bg|ring|fill|stroke|decoration|outline|shadow|accent|caret|divide)-/.test(
+    /^(?:bg|ring|fill|stroke|decoration|outline|shadow|accent|caret|divide|from|via|to)-/.test(
       u
     )
   ) {
-    // `shadow-xs`/`shadow-none` are depth, not colour; the rest of the list is.
-    return !/^shadow-(?:2?xs|sm|md|lg|xl|2xl|none|inner)$/.test(u);
+    return !(SHADOW_NOT_COLOR.test(u) || OUTLINE_NOT_COLOR.test(u));
   }
   if (u.startsWith("text-")) {
     return !TEXT_NOT_COLOR.test(u);
   }
-  if (u.startsWith("border-")) {
+  if (u.startsWith("border-") || u === "border") {
     return !BORDER_NOT_COLOR.test(u);
   }
   return false;
 }
 
-const SETS_HEIGHT = /^(?:min-|max-)?h-\S/;
+// `size-*` sets a height as well as a width, so it belongs here rather than
+// escaping as a width, which the rule allows.
+const SETS_HEIGHT = /^(?:(?:min-|max-)?h|size)-\S/;
 const SETS_PADDING = /^p[xytrbles]?-\S/;
 const SETS_RADIUS = /^rounded(?:$|-)/;
 
@@ -313,12 +327,28 @@ describe("button conventions", () => {
         "border",
         "border-2",
         "border-b",
+        "border-dashed",
+        "border-none",
         "shadow-xs",
+        "outline-none",
+        "outline-hidden",
         "w-full",
         "mt-2",
       ]) {
         expect(setsColor(token), token).toBe(false);
       }
+    });
+
+    // Each of these escaped an earlier draft of the matcher.
+    it("sees through a stack of variants, and knows a gradient stop", () => {
+      expect(setsColor("dark:hover:bg-secondary")).toBe(true);
+      expect(setsColor("md:dark:focus-visible:text-destructive")).toBe(true);
+      expect(restyles("md:dark:h-9")).toBe("height");
+      expect(setsColor("from-amber-400")).toBe(true);
+      expect(setsColor("via-red-500")).toBe(true);
+      expect(setsColor("to-red-600")).toBe(true);
+      // size-* is a height as much as a width, and a width is allowed.
+      expect(restyles("size-12")).toBe("height");
     });
 
     it("tells a height, padding or radius class from a width or margin", () => {

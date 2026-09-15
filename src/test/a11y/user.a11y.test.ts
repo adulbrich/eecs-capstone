@@ -52,46 +52,61 @@ test("projects list, signed in, with bookmark controls", async ({ page }) => {
 });
 
 /**
- * A rendered `<button>` and an `asChild` `<Link>` of the same variant read the
- * same (UI-CONVENTIONS, "A variant owns its text colour at rest" and "A button
- * shows the hand cursor").
+ * A rendered `<button>` and an `asChild` `<Link>` of the same variant and size
+ * read the same at rest, on hover and on focus (UI-CONVENTIONS, "A variant
+ * owns its text colour at rest" and "A button shows the hand cursor").
  *
- * Before #392 the anchor inherited the global `a` rule, brand orange, and the
- * browser's hand cursor, while the button inherited the body colour and the
- * arrow, so the cursor told the reader which element the code had chosen. Both
- * are `outline`; the sizes differ, which is why only colour and cursor are
- * compared. jsdom computes neither, so this is the suite that can see it.
+ * The pair is `BookmarkButton` and the Edit link on a project detail page,
+ * both `outline` `sm`, which is the pair the issue names and the pair the
+ * pull request screenshots. Same size, so every box property is comparable
+ * and not only colour: on `main` the anchor is brand orange with the
+ * browser's hand cursor and the button is body colour with the arrow, so the
+ * cursor told the reader which element the code had chosen rather than
+ * whether the thing was clickable. jsdom computes none of this.
  */
 test("@smoke an outline Button and an outline asChild Link read the same", async ({
   page,
 }) => {
-  await page.goto("/projects");
+  await page.goto(`/projects/${projectId}`);
   await waitForHydration(page);
-  const link = page.getByRole("link", { name: "Propose project" });
-  // The unpressed half of the view toggle: the pressed one takes the
-  // aria-pressed fill, which is a background rather than a colour.
-  const button = page.getByRole("button", { name: "Table view" });
-  await expect(link).toBeVisible();
+  const button = page.getByRole("button", {
+    name: /^(Bookmark|Remove bookmark)$/,
+  });
+  // Scoped to the header's action row, because the page carries three Edit
+  // links: this one, a full-width copy below the image for phone widths, and
+  // the proposer's own panel further down. This is the one that shares a row
+  // with Bookmark, which is the pair the issue names.
+  const link = button.locator("xpath=..").getByRole("link", { name: "Edit" });
   await expect(button).toBeVisible();
+  await expect(link).toBeVisible();
 
   const read = (locator: Locator) =>
     locator.evaluate((el) => {
-      const style = getComputedStyle(el);
-      return { color: style.color, cursor: style.cursor };
+      const s = getComputedStyle(el);
+      return {
+        borderRadius: s.borderRadius,
+        borderWidth: s.borderWidth,
+        color: s.color,
+        cursor: s.cursor,
+        fontSize: s.fontSize,
+        fontWeight: s.fontWeight,
+        height: s.height,
+      };
     });
 
-  expect(await read(link)).toEqual(await read(button));
-  expect((await read(link)).cursor).toBe("pointer");
+  const atRest = await read(button);
+  expect(await read(link)).toEqual(atRest);
+  expect(atRest.cursor).toBe("pointer");
 
-  await link.hover();
-  const hovered = await read(link);
   await button.hover();
-  expect(await read(button)).toEqual(hovered);
+  const hovered = await read(button);
+  await link.hover();
+  expect(await read(link)).toEqual(hovered);
 
-  await link.focus();
-  const focused = await read(link);
   await button.focus();
-  expect(await read(button)).toEqual(focused);
+  const focused = await read(button);
+  await link.focus();
+  expect(await read(link)).toEqual(focused);
 });
 
 /**

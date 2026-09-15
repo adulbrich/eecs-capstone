@@ -301,6 +301,12 @@ function SignedInMobile({
           My Items
         </NavItem>
       </div>
+      {/*
+        Default size, not sm: this is a full-width action at the foot of a
+        column, the same shape as the Sign out on /profile, and the two are
+        one control in two places. The sm rule is for a button sharing a row
+        with other content (UI-CONVENTIONS, "Size follows the row").
+      */}
       <Button
         className="w-full"
         onClick={() => void signOut()}
