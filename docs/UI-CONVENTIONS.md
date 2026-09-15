@@ -717,6 +717,14 @@ dialog announces an email that never goes out. The one inline exception is
 the comment form, where staff post many: a plain "Email the proposer" box
 beside "Internal (staff only)", hidden while Internal is on.
 
+The box is checked again every time its dialog opens: the skip is a decision
+about one action, and a Cancel must not carry an unchecked box into the next.
+`SendEmailDialog` gets this for free by holding the state inside the content
+Radix unmounts. A `ConfirmDialog` body or a popover holds the state in the
+caller, so the caller resets it where the dialog opens: the trigger's
+`onClick` (the ban form, the project hard delete) or the `onOpenChange` that
+handles the close (the inventory popovers).
+
 ```tsx
 <SendEmailDialog
   address={trimmed}

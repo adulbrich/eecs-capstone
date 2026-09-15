@@ -147,6 +147,35 @@ describe("BanForm email skip (#386)", () => {
     );
   });
 
+  it("names the typed expiry, and shows a refusal under the form once the confirm has closed", async () => {
+    banUser.mockRejectedValueOnce(new Error("Cannot ban the last admin"));
+    renderForm();
+    fireEvent.change(screen.getByLabelText("Reason"), {
+      target: { value: "Spam" },
+    });
+    fireEvent.change(
+      screen.getByLabelText("Expires at (leave blank for permanent)"),
+      { target: { value: "2026-10-01T09:30" } }
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Ban" }));
+    const dialog = within(
+      screen.getByRole("alertdialog", { name: "Ban this user?" })
+    );
+    expect(
+      dialog.getByText(
+        `${EMAIL} is signed out now and cannot sign in until 2026-10-01 09:30.`
+      )
+    ).toBeTruthy();
+    fireEvent.click(dialog.getByRole("button", { name: "Ban" }));
+
+    // ConfirmDialog closes on the click; the refusal lands under the form.
+    expect(await screen.findByText("Cannot ban the last admin")).toBeTruthy();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect((screen.getByLabelText("Reason") as HTMLTextAreaElement).value).toBe(
+      "Spam"
+    );
+  });
+
   it("checks the box again after a Cancel", async () => {
     renderForm();
     fireEvent.change(screen.getByLabelText("Reason"), {

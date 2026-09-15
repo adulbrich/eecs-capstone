@@ -47,7 +47,6 @@ export function BanForm({
       await banUser({
         data: { userId, reason, expiresAt: expires, sendEmail },
       });
-      setSendEmail(true);
       setReason("");
       setExpiresAt("");
       onChanged();
@@ -143,7 +142,7 @@ export function BanForm({
           confirmLabel="Ban"
           description={
             expiresAt.length > 0
-              ? `${email} is signed out now and cannot sign in until the ban expires.`
+              ? `${email} is signed out now and cannot sign in until ${expiresAt.replace("T", " ")}.`
               : `${email} is signed out now and cannot sign in until an admin unbans them.`
           }
           onConfirm={onBan}
