@@ -484,6 +484,38 @@ describe("status timeline visibility and changes-requested feedback", () => {
     expect(anonView.history).toHaveLength(0);
   });
 
+  it("names the acting staff member in the history the proposer receives", async () => {
+    const admin = await makeUser(`ta-a-${Date.now()}@x.com`, "admin");
+    const owner = await makeUser(`ta-o-${Date.now()}@x.com`, "user");
+    // makeUser sets the name to the address, which would let the email
+    // fallback pass this test. A distinct name is what makes it about the
+    // join.
+    await db
+      .update(user)
+      .set({ name: "Grace Hopper" })
+      .where(eq(user.id, admin.id));
+    const { id } = await createProjectAs(owner, baseProject());
+    await performTransitionAs(owner, id, "submitted");
+    await forceTransitionAs(admin, id, "changes_requested", "Tighten it", {
+      sendEmail: false,
+    });
+
+    const ownerView = await getProjectAs(
+      { id: owner.id, role: owner.role },
+      { id }
+    );
+    const decision = ownerView.history.find(
+      (h) => h.newStatus === "changes_requested"
+    );
+    expect(decision?.changedByName).toBe("Grace Hopper");
+    expect(decision?.changedByEmail).toBe(admin.email);
+    // The proposer's own submission is named too, so the timeline has no
+    // anonymous rows in it.
+    expect(
+      ownerView.history.every((h) => (h.changedByName ?? "").length > 0)
+    ).toBe(true);
+  });
+
   it("requires a comment when requesting changes", async () => {
     const admin = await makeUser(`cr-a-${Date.now()}@x.com`, "admin");
     const owner = await makeUser(`cr-o-${Date.now()}@x.com`, "user");
