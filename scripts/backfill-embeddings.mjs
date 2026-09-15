@@ -19,42 +19,33 @@
  *
  * ## The duplication, and what it costs
  *
- * Everything below marked `MUST match` is copied from `src/` and cannot be
- * imported across the image boundary. This is the accepted cost of shipping an
- * `.mjs` rather than compiling the TypeScript sweeper into the image, taken
- * because this is expected to run a couple of times, not continuously. See
- * `docs/adr/0024-ops-scripts-are-plain-mjs.md`.
+ * Everything below carrying a `MUST match` comment is copied from `src/` and
+ * cannot be imported across the image boundary. That is the accepted cost of
+ * shipping an `.mjs` rather than compiling the TypeScript sweeper into the
+ * image; `docs/adr/0024-ops-scripts-are-plain-mjs.md` has the reasoning and the
+ * rules the copies follow.
  *
- * Eight of them are pinned by `src/test/backfill-embeddings-parity.test.ts`,
- * because their drift is silent or expensive:
+ * `src/test/backfill-embeddings-parity.test.ts` is the inventory of which ones
+ * are pinned: its `it` names say, and it is the only list worth trusting,
+ * because a prose list here goes stale and nothing fails when it does. What is
+ * pinned is whatever drifts silently or expensively, which is why the copies
+ * whose drift throws or fails to connect (`parseEmbedResponse`,
+ * `buildBedrockConfig`, `toSqlVector`, `DEFAULT_REGION`) are left out.
  *
- * - `EMBEDDING_SOURCE_LIMIT`, `section`, `buildProgramLabel` and
- *   `buildProjectEmbeddingSource` from `src/lib/embedding-source.ts`. If these
- *   drift, the script stores vectors computed from different text than the app
- *   would use for the same project. Nothing errors, recommendations quietly
- *   get worse, and the stored hash still looks valid to the app, so nothing
- *   ever recomputes them. This is the worst failure and the only silent one.
- * - `embeddingHash` from the same file. If its inputs drift, every row looks
- *   stale to whichever side did not change, so runs re-embed rows that were
- *   already correct at one paid Bedrock call each, and the two sides can
- *   flip-flop a row indefinitely.
- * - `buildEmbedConfig` and `buildEmbedRequestBody` from
- *   `src/lib/_internal/bedrock-embed.ts`. If the dimension default drifts,
- *   pgvector rejects the insert because the column is fixed at 1024. Loud, and
- *   therefore the least dangerous.
- * - The status set in `SELECT_SQL`, against `EMBEDDABLE_STATUSES`, and the
- *   alias list in the same query against `EmbeddableProject`. A status added
- *   to the app alone is rows this never sweeps; a field added to the app alone
- *   is a section missing from every string this embeds, with no error, because
- *   `section` reads an absent key as an empty one.
+ * The three failures worth naming, worst first:
  *
- * Four more are copied and deliberately not pinned, because drift in each is
- * loud rather than silent: `parseEmbedResponse` and `buildBedrockConfig`,
- * whose TypeScript bodies carry annotations an `.mjs` cannot hold, plus
- * `toSqlVector` and `DEFAULT_REGION`.
+ * - The text that gets embedded drifts. The script stores vectors computed
+ *   from text the app would never produce for that project. Nothing errors,
+ *   the stored hash still looks valid to the app, so nothing recomputes them,
+ *   and recommendations quietly get worse. The only silent one.
+ * - The hash inputs drift. Every row looks stale to whichever side did not
+ *   change, so runs re-embed rows that were already correct at one paid
+ *   Bedrock call each, and the two sides can flip-flop a row indefinitely.
+ * - The dimension default drifts. pgvector rejects the insert, because the
+ *   column is fixed at 1024. Loud, and so the least dangerous.
  *
  * Keep every pinned body free of comments and of TypeScript annotations: the
- * comparison collapses whitespace but cannot strip either. Explain above the
+ * comparison collapses whitespace but strips neither. Explain above the
  * function.
  */
 import { createHash } from "node:crypto";
@@ -137,9 +128,10 @@ function buildEmbedRequestBody(text) {
 }
 
 /**
- * The response shape from the same file. Not compared by the parity test: the
- * TypeScript body carries a cast an `.mjs` cannot hold. Drift here is loud,
- * either this throw or a pgvector dimension error on the insert.
+ * MUST match `parseEmbedResponse` in `src/lib/_internal/bedrock-embed.ts`.
+ * Not compared by the parity test: the TypeScript body carries a cast an
+ * `.mjs` cannot hold. Drift here is loud, either this throw or a pgvector
+ * dimension error on the insert.
  */
 function parseEmbedResponse(payload) {
   const parsed = JSON.parse(new TextDecoder().decode(payload));
@@ -150,9 +142,11 @@ function parseEmbedResponse(payload) {
 }
 
 /**
- * The same credential rule as `buildBedrockConfig` in
- * `src/lib/_internal/bedrock.ts`: in production no static keys are set, so we
- * omit `credentials` and let the SDK's default chain use the ECS task role.
+ * MUST match `buildBedrockConfig` in `src/lib/_internal/bedrock.ts`. Not
+ * compared by the parity test: its TypeScript body carries a typed return an
+ * `.mjs` cannot hold. In production no static keys are set, so we omit
+ * `credentials` and let the SDK's default chain use the ECS task role, and
+ * drift shows up as a failure to reach Bedrock at all.
  */
 function buildBedrockConfig(env = process.env) {
   const accessKeyId = env.BEDROCK_ACCESS_KEY;
@@ -165,7 +159,10 @@ function buildBedrockConfig(env = process.env) {
   };
 }
 
-/** pgvector's text input format, e.g. `[0.1,0.2]`. */
+/**
+ * MUST match `toSqlVector` in `src/server/_internal/project-embeddings.ts`.
+ * pgvector's text input format, e.g. `[0.1,0.2]`.
+ */
 function toSqlVector(values) {
   return `[${values.join(",")}]`;
 }
@@ -175,6 +172,13 @@ function sleep(ms) {
 }
 
 /**
+ * MUST match `EMBEDDABLE_STATUSES` in
+ * `src/server/_internal/project-embeddings.ts` for its status set, and
+ * `EmbeddableProject` in `src/lib/embedding-source.ts` for its column list.
+ * Both are pinned; the second is the subtle one, because the body comparison
+ * forces the copied builder to read a key nothing here makes the query fetch,
+ * and `section` reads an absent key as an empty one.
+ *
  * Aliased to the camelCase keys `buildProjectEmbeddingSource` reads, so the
  * copied body stays byte-identical to the one in `src/` instead of needing a
  * remapping step here.
@@ -215,6 +219,7 @@ const CATEGORIES_SQL = `
   WHERE pc.project_id = $1
 `;
 
+/** The aliases MUST match what `buildProgramLabel` is handed in `src/`. */
 const PROGRAM_SQL = `
   SELECT course_id AS "courseId", course_name AS "courseName"
   FROM programs

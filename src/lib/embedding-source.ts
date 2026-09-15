@@ -24,8 +24,10 @@ function section(label: string, value: string | null): string | null {
 /**
  * The "Program" section's text. Here rather than inline at the two call sites
  * because it is part of the embedded source, so it has to be pinned like the
- * rest of it: change the space to a colon in the app alone and every hash the
- * script wrote silently stops matching, with nothing to say so.
+ * rest of it: change the space to a colon and every hash the script wrote
+ * stops matching, with nothing to say so. Copied and compared like
+ * `buildProjectEmbeddingSource` below, so the same rule holds: no comments and
+ * no annotations inside the body.
  */
 export function buildProgramLabel(
   courseId: string,
@@ -37,13 +39,14 @@ export function buildProgramLabel(
 /**
  * Assembles the exact string that gets embedded.
  *
- * `scripts/backfill-embeddings.mjs` carries a byte-identical copy of this
- * body, of `section` and of `embeddingHash`, because the production image
- * ships no `src/`. `src/test/backfill-embeddings-parity.test.ts` compares the
- * copies with whitespace collapsed, so keep all three bodies comment-free and
- * annotation-free: a comment inside one of them, or the type predicate that
- * used to sit on the `filter` below, fails a comparison an `.mjs` cannot
- * match. Explain above the function, the way this does.
+ * Copied byte for byte into `scripts/backfill-embeddings.mjs`, which the
+ * production image ships without any `src/` to import (ADR-0024), and compared
+ * with whitespace collapsed by `src/test/backfill-embeddings-parity.test.ts`.
+ * So keep this body comment-free and annotation-free: a comment inside it, or
+ * the type predicate that used to sit on the `filter` below, fails a
+ * comparison an `.mjs` cannot match. Explain above the function, the way this
+ * does. `section`, `buildProgramLabel` and `embeddingHash` are under the same
+ * rule; the parity test's `it` names are the inventory, not this comment.
  */
 export function buildProjectEmbeddingSource(
   project: EmbeddableProject,

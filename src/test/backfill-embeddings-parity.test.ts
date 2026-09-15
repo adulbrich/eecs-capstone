@@ -12,37 +12,34 @@ import { describe, expect, it } from "vitest";
  *   `src/`. Nothing under `#/lib` resolves there, so it carries its own copy
  *   of what it needs.
  *
- * Eight declarations cross that boundary, and each fails silently or
- * expensively if the copies drift (#427):
+ * What crosses that boundary is whatever carries a `MUST match` comment in the
+ * script, and the `it` names below are the inventory of which of those are
+ * pinned. Keeping the list here rather than in prose anywhere else is
+ * deliberate: a prose list goes stale and nothing fails when it does, which is
+ * the same failure mode this file exists to prevent
+ * ([ADR-0024](../../docs/adr/0024-ops-scripts-are-plain-mjs.md)).
  *
- * - `EMBEDDING_SOURCE_LIMIT`, `section`, `buildProgramLabel` and
- *   `buildProjectEmbeddingSource` assemble the exact text that gets embedded.
- *   Drift stores vectors computed from text the app would never produce for
- *   that project. Nothing errors, the stored hash still looks valid to the app,
- *   so nothing recomputes them, and recommendations quietly get worse. The only
- *   silent failure of the set.
- * - `embeddingHash` decides whether a project needs re-embedding. Drift in its
- *   inputs makes every row look stale to whichever side did not change, so both
- *   sides re-embed rows that were already correct at one paid Bedrock call
- *   each, and can flip-flop a row indefinitely.
- * - `buildEmbedConfig` carries the model id and dimension defaults, which are
- *   themselves hash inputs. A dimension change is loud, since pgvector rejects
- *   a vector that is not 1024 wide, but a model id change is not.
- * - The script's `SELECT_SQL` spells the embeddable status set again in SQL,
- *   and names every field `buildProjectEmbeddingSource` reads. A status added
- *   to `EMBEDDABLE_STATUSES` alone leaves rows the script never sweeps; a field
- *   added to `EmbeddableProject` alone is worse, because the parity comparison
- *   below then forces the script's builder body to read a key the query never
- *   selected, and `section` treats an absent key as an empty one. The section
- *   silently vanishes from every string the script embeds.
+ * What is pinned is whatever drifts silently or expensively. Worst first:
  *
- * Nothing else would catch any of them: the two run months apart, by different
- * people, and the `.mjs` runs where no test does.
+ * - The embedded text drifts. The script stores vectors computed from text the
+ *   app would never produce for that project. Nothing errors, the stored hash
+ *   still looks valid to the app, so nothing recomputes them, and
+ *   recommendations quietly get worse. The only silent one.
+ * - The hash inputs drift, including the model id and dimension defaults.
+ *   Every row looks stale to whichever side did not change, so both sides
+ *   re-embed rows that were already correct at one paid Bedrock call each, and
+ *   can flip-flop a row indefinitely.
+ * - The query drifts from what the builder reads. A status added to
+ *   `EMBEDDABLE_STATUSES` alone leaves rows the script never sweeps. A field
+ *   added to `EmbeddableProject` alone is worse, because the body comparison
+ *   below then forces the script's copied builder to read a key the query
+ *   never selected, and `section` treats an absent key as an empty one, so the
+ *   section silently vanishes from every string the script embeds.
  *
- * Deliberately not compared: `parseEmbedResponse` and `buildBedrockConfig`.
- * Their TypeScript bodies carry a cast and a typed return that an `.mjs`
- * cannot hold, and drift in either is loud, a throw or a connection failure
- * rather than a wrong vector.
+ * Copies whose drift is loud instead (`parseEmbedResponse`,
+ * `buildBedrockConfig`, `toSqlVector`, `DEFAULT_REGION`) are deliberately not
+ * pinned; the first two could not be anyway, since their TypeScript bodies
+ * carry annotations an `.mjs` cannot hold.
  *
  * Read as text rather than imported, following `import-legacy-parity.test.ts`,
  * since importing the `.mjs` would run it and it expects a database.
@@ -59,7 +56,8 @@ const EMBEDDINGS_FILE = readFileSync(
 const STATUS_SET_PATTERN =
   /const EMBEDDABLE_STATUSES: readonly ProjectStatus\[\] = \[([^\]]*)\]/;
 const SQL_STATUS_PATTERN = /WHERE status IN \(([^)]*)\)/;
-const INTERFACE_PATTERN = /export interface EmbeddableProject \{([^}]*)\}/;
+const INTERFACE_PATTERN = /export interface EmbeddableProject \{([\s\S]*?)\n\}/;
+const PROGRAM_SQL_PATTERN = /const PROGRAM_SQL = `([^`]*)`/;
 const SELECT_SQL_PATTERN = /const SELECT_SQL = `([^`]*)`/;
 
 /** The quoted words inside a captured `[...]` or `(...)`, in source order. */
@@ -131,6 +129,32 @@ describe("the production backfill's copies of the embedding helpers", () => {
       "embedding-source.ts"
     );
     expect(fromScript).toBe(fromSrc);
+  });
+
+  /**
+   * Pinned against a literal as well, because the label is an input to
+   * `embedding_source_hash`: turning the space into a colon on both sides at
+   * once re-keys every project that has a program, and a copy-to-copy
+   * comparison passes that happily.
+   */
+  it("label a program by exactly the pinned construction", () => {
+    expect(functionBody(SOURCE_FILE, "buildProgramLabel", "src")).toBe(
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: the pinned text of the template literal inside buildProgramLabel, not a template literal of its own.
+      "return `${courseId} ${courseName}`;"
+    );
+  });
+
+  /**
+   * The body pin above says the two spell the label the same way; it says
+   * nothing about the values handed in. The script reads them out of
+   * `PROGRAM_SQL`, so a renamed alias there leaves `courseId` undefined and
+   * the label reads "undefined Something" with no error.
+   */
+  it("select the columns the program label is built from", () => {
+    const programSql = PROGRAM_SQL_PATTERN.exec(SCRIPT_FILE)?.[1];
+    expect(programSql).toBeDefined();
+    expect(programSql).toContain('AS "courseId"');
+    expect(programSql).toContain('AS "courseName"');
   });
 
   /**
@@ -260,13 +284,19 @@ describe("the production backfill's copies of the embedding helpers", () => {
     expect(keys).toContain("title");
     expect(keys.length).toBeGreaterThan(5);
 
-    const selectSql = SELECT_SQL_PATTERN.exec(SCRIPT_FILE)?.[1];
-    expect(selectSql).toBeDefined();
+    // The select list alone, not the whole query: `id`, `status`, `embedding`
+    // and `deleted_at` all appear in the WHERE clause, so a substring test over
+    // the query would pass a field named after any of them without it ever
+    // being selected.
+    const selectList = (SELECT_SQL_PATTERN.exec(SCRIPT_FILE)?.[1] ?? "").split(
+      /\bFROM\b/
+    )[0];
+    expect(selectList).toContain("SELECT");
     for (const key of keys) {
       // Either the column is already camelCase (`title`) or the query aliases
       // it to camelCase (`problem_statement AS "problemStatement"`), so the key
-      // itself is what appears either way.
-      expect(selectSql).toContain(key);
+      // appears as a whole word either way.
+      expect(selectList).toMatch(new RegExp(`\\b${key}\\b`));
     }
   });
 
