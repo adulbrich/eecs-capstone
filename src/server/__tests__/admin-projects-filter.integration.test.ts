@@ -75,6 +75,7 @@ function filter(
     proposer: null,
     q: "",
     seekingMentorOnly: false,
+    requiresNdaOnly: false,
     studentProposedOnly: false,
     ...overrides,
   };
@@ -692,6 +693,7 @@ async function flag(
   set: {
     acceptingApplicants?: boolean;
     mentorEmail?: string | null;
+    requiresNdaIp?: boolean;
     seekingMentor?: boolean;
     studentProposed?: boolean;
   }
@@ -710,13 +712,22 @@ describe("admin projects flag switches", () => {
     });
     const seeking = await createProjectAs(admin, baseProject("Seeking", null));
     await flag(seeking.id, { acceptingApplicants: false, seekingMentor: true });
+    const nda = await createProjectAs(admin, baseProject("Agreement", null));
+    await flag(nda.id, { acceptingApplicants: false, requiresNdaIp: true });
 
     const all = await listAdminProjectsAs(admin, filter());
     expect(all.rows.map((r) => r.title).sort()).toEqual([
+      "Agreement",
       "Open",
       "Seeking",
       "Student",
     ]);
+
+    const agreement = await listAdminProjectsAs(
+      admin,
+      filter({ requiresNdaOnly: true })
+    );
+    expect(agreement.rows.map((r) => r.title)).toEqual(["Agreement"]);
 
     const accepting = await listAdminProjectsAs(
       admin,

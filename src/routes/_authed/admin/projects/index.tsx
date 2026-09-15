@@ -83,6 +83,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const SWITCH_DEFAULTS = {
   acceptingOnly: false,
   includeSoftDeleted: false,
+  requiresNdaOnly: false,
   seekingMentorOnly: false,
   studentProposedOnly: false,
 };
@@ -108,6 +109,7 @@ export const searchSchema = z.object({
   acceptingOnly: z.boolean().default(SWITCH_DEFAULTS.acceptingOnly),
   studentProposedOnly: z.boolean().default(SWITCH_DEFAULTS.studentProposedOnly),
   seekingMentorOnly: z.boolean().default(SWITCH_DEFAULTS.seekingMentorOnly),
+  requiresNdaOnly: z.boolean().default(SWITCH_DEFAULTS.requiresNdaOnly),
 });
 
 type Search = z.infer<typeof searchSchema>;
@@ -127,6 +129,7 @@ export function resolveAdminFilter(search: Search) {
     program: search.program,
     proposer: search.proposer,
     q: search.q,
+    requiresNdaOnly: search.requiresNdaOnly,
     seekingMentorOnly: search.seekingMentorOnly,
     statuses: search.status ?? [...DEFAULT_ADMIN_STATUSES],
     studentProposedOnly: search.studentProposedOnly,
@@ -152,6 +155,7 @@ function countActiveAdminFilters(search: Search): number {
     search.acceptingOnly,
     search.studentProposedOnly,
     search.seekingMentorOnly,
+    search.requiresNdaOnly,
     search.includeSoftDeleted,
   ].filter(Boolean).length;
 }
@@ -475,6 +479,7 @@ function AdminProjectsFilters({
     includeSoftDeleted,
     program,
     proposer,
+    requiresNdaOnly,
     seekingMentorOnly,
     studentProposedOnly,
   } = search;
@@ -690,6 +695,16 @@ function AdminProjectsFilters({
               })
             }
           />
+          <FilterSwitch
+            checked={requiresNdaOnly}
+            id={`${uid}-requires-nda-only`}
+            label={PROJECT_SWITCH_LABEL.requiresNdaOnly}
+            onCheckedChange={(checked) =>
+              void navigate({
+                search: (prev) => ({ ...prev, requiresNdaOnly: checked }),
+              })
+            }
+          />
         </div>
       </fieldset>
       {/* Outside the legend: it widens the view rather than narrowing it. */}
@@ -719,6 +734,7 @@ function AdminProjectsFilters({
                 includeSoftDeleted: false,
                 program: null,
                 proposer: null,
+                requiresNdaOnly: false,
                 seekingMentorOnly: false,
                 status: undefined,
                 studentProposedOnly: false,
@@ -798,6 +814,7 @@ function AdminProjects() {
     program,
     proposer,
     q,
+    requiresNdaOnly,
     seekingMentorOnly,
     studentProposedOnly,
   } = search;
@@ -815,7 +832,8 @@ function AdminProjects() {
     proposer !== null ||
     acceptingOnly ||
     studentProposedOnly ||
-    seekingMentorOnly;
+    seekingMentorOnly ||
+    requiresNdaOnly;
   const activeFilterCount = countActiveAdminFilters(search);
   const navigate = useNavigate({ from: "/admin/projects/" });
 

@@ -153,6 +153,14 @@ the listing. Says nothing about mentorship: a student-proposed project may have 
 mentor, be seeking one, or need none because the instructor mentors it.
 _Avoid_: student project, student-led, self-proposed, student team managed
 
+**Requires an NDA or IP agreement**:
+A project whose partner asks the team to sign a non-disclosure or intellectual
+property agreement before work starts. A public flag set by the proposer or staff on
+the project form, with optional notes beside it; shown as the badge "NDA/IP required"
+on the card and the project page, as a column in table view, and offered as the
+listing filter "Requiring an NDA or IP agreement" on both listings.
+_Avoid_: confidential, restricted, proprietary project
+
 **Seeking mentor**:
 A project staff have marked as looking for a mentor, with none recorded yet. Stored
 as a flag, shown as a badge on the card and the project page only while no address

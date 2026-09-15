@@ -6,8 +6,8 @@ import {
   type ProjectMentorship,
 } from "#/server/projects-queries";
 import { AccountLinkSummary } from "./account-link-summary";
-import { MentorshipBadges } from "./mentorship-badges";
 import { PanelSection } from "./panel";
+import { ProjectBadges } from "./project-badges";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
@@ -34,7 +34,11 @@ function PublicPreview({
       <div className="flex flex-wrap items-center gap-2">
         <span>Public listing shows:</span>
         {badge ? (
-          <MentorshipBadges seekingMentor studentProposed={false} />
+          <ProjectBadges
+            requiresNdaIp={false}
+            seekingMentor
+            studentProposed={false}
+          />
         ) : (
           <span>nothing about mentorship</span>
         )}

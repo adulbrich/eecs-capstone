@@ -207,8 +207,9 @@ test("@smoke admin projects list", async ({ page }) => {
   // the page wider than the viewport.
   const switches = [
     "Accepting applicants",
-    "Student-proposed",
+    "Student proposed",
     "Seeking a mentor",
+    "Requiring an NDA or IP agreement",
     "Show soft-deleted",
   ];
   await page.goto("/admin/projects");

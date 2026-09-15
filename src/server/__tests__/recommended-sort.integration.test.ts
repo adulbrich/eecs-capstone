@@ -68,6 +68,7 @@ const SEARCH_DEFAULTS = {
   acceptingOnly: false,
   studentProposedOnly: false,
   seekingMentorOnly: false,
+  requiresNdaOnly: false,
   page: 1,
   pageSize: 20,
 };

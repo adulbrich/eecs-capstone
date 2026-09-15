@@ -59,6 +59,7 @@ const ALL_PROJECTS = {
   proposer: null,
   q: "",
   seekingMentorOnly: false,
+  requiresNdaOnly: false,
   statuses: [...PROJECT_STATUSES],
   studentProposedOnly: false,
   to: null,

@@ -26,7 +26,11 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
 }));
 
-import { RecommendationPrompt } from "#/components/projects-filters";
+import {
+  countActiveFilters,
+  PROJECT_SWITCH_LABEL,
+  RecommendationPrompt,
+} from "#/components/projects-filters";
 
 afterEach(cleanup);
 
@@ -78,5 +82,29 @@ describe("RecommendationPrompt", () => {
     expect(
       screen.queryByRole("link", { name: "Sign in to get recommendations" })
     ).toBeNull();
+  });
+});
+
+describe("the switch labels and the active count", () => {
+  it("counts the agreement switch with the other narrowing switches", () => {
+    const off = {
+      acceptingOnly: false,
+      archivedOnly: false,
+      categories: [],
+      program: null,
+      requiresNdaOnly: false,
+      seekingMentorOnly: false,
+      studentProposedOnly: false,
+    };
+    expect(countActiveFilters(off)).toBe(0);
+    expect(countActiveFilters({ ...off, requiresNdaOnly: true })).toBe(1);
+  });
+
+  it("completes the legend with one line per switch, the student one matching its badge", () => {
+    expect(PROJECT_SWITCH_LABEL.requiresNdaOnly).toBe(
+      "Requiring an NDA or IP agreement"
+    );
+    // One string for the filter and the badge (#372).
+    expect(PROJECT_SWITCH_LABEL.studentProposedOnly).toBe("Student proposed");
   });
 });

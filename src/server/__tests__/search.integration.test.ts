@@ -66,6 +66,7 @@ const SEARCH_DEFAULTS = {
   acceptingOnly: false,
   studentProposedOnly: false,
   seekingMentorOnly: false,
+  requiresNdaOnly: false,
   page: 1,
   pageSize: 20,
   sort: "relevance" as const,
@@ -182,7 +183,7 @@ describe("searchProjects", () => {
   });
 });
 
-describe("the two mark filters", () => {
+describe("the mark filters", () => {
   it("narrows to student-proposed projects on the raw flag", async () => {
     const admin = await makeAdmin(`sp-${Date.now()}@x.com`);
     const student = await publish(admin, "Student one");
@@ -241,6 +242,25 @@ describe("the two mark filters", () => {
       studentProposedOnly: true,
     });
     expect(both.rows).toEqual([]);
+  });
+
+  it("requiresNdaOnly narrows to projects that require an agreement, the same fact as the badge", async () => {
+    const admin = await makeAdmin(`nda-${Date.now()}@x.com`);
+    const plain = await publish(admin, "Plain");
+    const agreement = await publish(admin, "Agreement");
+    await db
+      .update(projects)
+      .set({ requiresNdaIp: true })
+      .where(eq(projects.id, agreement));
+
+    const only = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      pageSize: 50,
+      requiresNdaOnly: true,
+    });
+    expect(only.rows.map((r) => r.id)).toEqual([agreement]);
+    expect(only.rows[0]?.requiresNdaIp).toBe(true);
+    expect(only.rows.map((r) => r.id)).not.toContain(plain);
   });
 
   it("sorts an archived project with no publish date by its creation date, not above everything", async () => {

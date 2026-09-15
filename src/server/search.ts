@@ -14,6 +14,8 @@ const searchInputSchema = z.object({
   // the same rule as the badge, so the filter and the badge always agree.
   studentProposedOnly: z.boolean().default(false),
   seekingMentorOnly: z.boolean().default(false),
+  // The agreement flag as a filter, the same fact as the badge (#372).
+  requiresNdaOnly: z.boolean().default(false),
   page: z.number().int().min(1).default(1),
   pageSize: z
     .number()
