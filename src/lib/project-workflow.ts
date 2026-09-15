@@ -94,10 +94,11 @@ export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
 
 /**
  * What each status means, in the reader's words, for the places that explain
- * a status rather than name it: the staff stepper and the proposer's actions
- * block. The public badge names and does not explain (#303 decided against a
- * tooltip there). The wording is the glossary's, in the third person, so the
- * same sentence reads correctly to staff and to the proposer.
+ * a status rather than name it: the staff stepper, the proposer's actions
+ * block and the landing page's proposal path. The public badge names and does
+ * not explain (#303 decided against a tooltip there). The wording is the
+ * glossary's, in the third person, so the same sentence reads correctly to
+ * staff, to the proposer and to a visitor.
  */
 export const PROJECT_STATUS_DESCRIPTION: Record<ProjectStatus, string> = {
   draft:
