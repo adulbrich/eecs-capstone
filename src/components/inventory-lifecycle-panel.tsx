@@ -44,6 +44,11 @@ import {
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import {
+  Pagination,
+  PaginationButton,
+  PaginationStatus,
+} from "./ui/pagination";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -300,29 +305,31 @@ function StatusHistorySection({ history }: { history: HistoryRow[] }) {
             ))}
           </ul>
           {totalPages > 1 && (
-            <div className="mt-3 flex items-center justify-between text-sm">
-              <Button
+            // The shared pager, not two outline Buttons and a bare span: the
+            // hand-rolled one disabled by the `disabled` prop but announced
+            // nothing, and its count read differently from every other list
+            // (#392). `mt-3` because this sits inside a panel, not under a
+            // page's list.
+            <Pagination className="mt-3">
+              <PaginationButton
                 disabled={safePage <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                size="sm"
-                type="button"
-                variant="outline"
               >
                 Previous
-              </Button>
-              <span className="text-muted-foreground text-xs">
-                Page {safePage} of {totalPages}
-              </span>
-              <Button
+              </PaginationButton>
+              <PaginationStatus
+                page={safePage}
+                shown={slice.length}
+                total={history.length}
+                totalPages={totalPages}
+              />
+              <PaginationButton
                 disabled={safePage >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                size="sm"
-                type="button"
-                variant="outline"
               >
                 Next
-              </Button>
-            </div>
+              </PaginationButton>
+            </Pagination>
           )}
         </>
       )}
