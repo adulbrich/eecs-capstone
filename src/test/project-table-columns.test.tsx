@@ -39,7 +39,6 @@ import {
   PROJECT_TABLE_DEFAULT_SORT,
   type ProjectListRow,
 } from "#/components/project-table-columns";
-import { parseSort } from "#/lib/table-state";
 
 afterEach(cleanup);
 
@@ -135,8 +134,24 @@ function rowFor(title: string) {
   return within(row);
 }
 
+/**
+ * The Badges cell's own text, read through the `data-label` that
+ * `AdminDataTable` puts on every body cell. Scoping to the cell is the
+ * point: a bare row already renders a dash in Program, Categories and
+ * Contact name, so a row-wide `getAllByText("-")` passes with the dash
+ * guard deleted.
+ */
+function badgesTextFor(title: string): string {
+  const row = screen.getByRole("link", { name: title }).closest("tr");
+  const cell = row?.querySelector('td[data-label="Badges"]');
+  if (!cell) {
+    throw new Error(`no Badges cell for ${title}`);
+  }
+  return cell.textContent?.trim() ?? "";
+}
+
 describe("the public project table", () => {
-  it("shows the eight scannable columns and hides the prose by default", () => {
+  it("shows the seven scannable columns and hides the prose by default", () => {
     // The literal lists come from the issue's column table, not from the
     // module, so a column added on the wrong side of the line fails here.
     expect([...DEFAULT_HIDDEN].sort()).toEqual([
@@ -211,30 +226,43 @@ describe("the public project table", () => {
     expect(bare.queryByText("Team is full")).toBeNull();
     expect(bare.queryByText("Student proposed")).toBeNull();
     expect(bare.queryByText("NDA/IP required")).toBeNull();
-    expect(bare.getAllByText("-").length).toBeGreaterThan(0);
+    expect(badgesTextFor("Bare Minimum")).toBe("-");
   });
 
   /**
-   * The criterion the issue names: `?sort=badges` and the two ids this change
-   * deleted must all render the default order rather than erroring or sorting.
-   * Asserted against `parseSort` with the table's own sortable ids, because
-   * that is the function the route hands the URL to, and the list it checks
-   * against is derived from `enableSorting` on these very columns.
+   * The criterion the issue names, in the only half of it this file can
+   * prove: a stale `?sort=accepting` degrades to the default order. That
+   * holds by composition, and this is the half that can break here. The
+   * other half, that `parseSort` drops an id outside the sortable list, is
+   * pinned in `src/lib/__tests__/table-state.test.ts`.
+   *
+   * Calling `parseSort` here as well proved nothing: it returns the
+   * `fallback` argument by reference for exactly the ids the three lines
+   * below assert are unsortable, so the assertion read `expect(F)
+   * .toEqual(F)` whatever `F` was.
    */
-  it("falls back to the default order for badges and the two removed ids", () => {
+  it("keeps badges and the two removed ids out of the sortable set", () => {
     const sortableIds = PROJECT_TABLE_COLUMNS.filter(
       (column) => column.enableSorting !== false
     ).map((column) => column.id);
     expect(sortableIds).not.toContain("badges");
     expect(sortableIds).not.toContain("accepting");
     expect(sortableIds).not.toContain("nda");
+  });
 
-    // The table's own default, not a copy of it: a changed default must not
-    // leave this test asserting the old one.
-    const fallback = PROJECT_TABLE_DEFAULT_SORT;
-    for (const stale of ["badges", "accepting", "nda"]) {
-      expect(parseSort(stale, "asc", sortableIds, fallback)).toEqual(fallback);
-    }
+  /**
+   * The Columns menu is built from `enableHiding !== false`, so this is what
+   * stands between the criterion and a `{ ...shared.badges, enableHiding:
+   * false }` copied over from `bookmark-table-columns.tsx`, where that spread
+   * is correct. The bookmarks half needs no twin: that table asserts it has
+   * no Columns button at all, which only holds while every column is
+   * unhideable.
+   */
+  it("lets the Columns menu hide the badge cluster", () => {
+    const hideableIds = PROJECT_TABLE_COLUMNS.filter(
+      (column) => column.enableHiding !== false
+    ).map((column) => column.id);
+    expect(hideableIds).toContain("badges");
   });
 
   it("does not sort on the badge cluster", () => {

@@ -49,7 +49,7 @@ import {
   BOOKMARK_TABLE_DEFAULT_SORT,
   type BookmarkRow,
 } from "#/components/bookmark-table-columns";
-import { parseSort, type SortState } from "#/lib/table-state";
+import type { SortState } from "#/lib/table-state";
 
 beforeEach(() => {
   session.data = { user: { id: "u1" } };
@@ -159,6 +159,19 @@ function rowFor(title: string): HTMLElement {
   return row;
 }
 
+/**
+ * The Badges cell's own text, through the `data-label` every body cell
+ * carries. "Ten" renders a dash in Program too, so a row-wide dash query
+ * passes with the cell's own dash guard deleted.
+ */
+function badgesTextFor(title: string): string {
+  const cell = rowFor(title).querySelector('td[data-label="Badges"]');
+  if (!cell) {
+    throw new Error(`no Badges cell for ${title}`);
+  }
+  return cell.textContent?.trim() ?? "";
+}
+
 function titlesInOrder(): string[] {
   return screen
     .getAllByRole("row")
@@ -225,24 +238,20 @@ describe("the bookmarks table", () => {
   });
 
   /**
-   * The same pin as `project-table-columns.test.tsx`. This table carried
-   * sortable `accepting` and `nda` columns before #434, so those stale URLs
-   * are just as reachable here, and the `enableSorting: false` that makes them
-   * fall back arrives through a spread rather than being written in this file.
+   * The same pin as `project-table-columns.test.tsx`, and it earns its own
+   * copy: this table carried sortable `accepting` and `nda` columns before
+   * #434, so those stale URLs are just as reachable here, and the
+   * `enableSorting: false` that makes them fall back arrives through a
+   * spread rather than being written in this file. A `{ ...shared.badges }`
+   * that lost the flag would fail here and nowhere else.
    */
-  it("falls back to the default order for badges and the two removed ids", () => {
+  it("keeps badges and the two removed ids out of the sortable set", () => {
     const sortableIds = BOOKMARK_TABLE_COLUMNS.filter(
       (column) => column.enableSorting !== false
     ).map((column) => column.id);
     expect(sortableIds).not.toContain("badges");
     expect(sortableIds).not.toContain("accepting");
     expect(sortableIds).not.toContain("nda");
-
-    for (const stale of ["badges", "accepting", "nda"]) {
-      expect(
-        parseSort(stale, "asc", sortableIds, BOOKMARK_TABLE_DEFAULT_SORT)
-      ).toEqual(BOOKMARK_TABLE_DEFAULT_SORT);
-    }
   });
 
   it("renders the card's badge row in one column, and a dash for none", () => {
@@ -257,7 +266,7 @@ describe("the bookmarks table", () => {
     expect(ten.queryByText("Team is full")).toBeNull();
     expect(ten.queryByText("Student proposed")).toBeNull();
     expect(ten.queryByText("NDA/IP required")).toBeNull();
-    expect(ten.getAllByText("-").length).toBeGreaterThan(0);
+    expect(badgesTextFor("Ten")).toBe("-");
   });
 
   it("puts the listing's toggle in the Title cell, with no Remove column", async () => {
