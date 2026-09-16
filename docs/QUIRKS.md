@@ -390,6 +390,18 @@ dedupe test drops it to create the duplicates it exists for and restores it in a
 
 **Three direct writers bypass the normalizer and are held to it by hand:** `giveFixtureHold` in `src/test/e2e/fixtures.ts` and the project insert in `src/test/a11y/global-setup.ts` both write the columns straight rather than through a server function, so both call `normalizeEmailAddress` themselves. The third is `proposerEmailOf` in `scripts/import-legacy.mjs`, which cannot call it: that script runs as a one-off ECS task from the production image, which installs with `--omit=dev` and ships `.output` without `src/`, so nothing under `src/lib` resolves there. It inlines `.trim().toLowerCase()` instead, and `export.sql` applies `LOWER()` upstream of it as well. Another added without it would put a mixed-case address in a column everything else assumes is folded. The integration suites write these columns directly too, sometimes with `toUpperCase()`, and that is deliberate: those rows exist to prove the read-side folds still work, and they are torn down with the test.
 
+### A correlated subquery in a select projection: `db.$count`, aliased, mapped
+
+Inside `.select({ ... })` Drizzle renders an interpolated column without its table, so a hand-written ``sql`(select count(*) from ${aiReviewUsage} where ${aiReviewUsage.userId} = ${user.id})` `` comes out as `where "user_id" = "id"`, which compares two columns of the subquery's own table and fails the whole query. `db.$count(table, where)` qualifies both sides. The listing on `/admin/users` is the live example (#413):
+
+```ts
+const aiCallCount = sql<number>`${db.$count(aiReviewUsage, eq(aiReviewUsage.userId, user.id))}`
+  .mapWith(Number)
+  .as("aiCallCount");
+```
+
+Both halves of the wrapper earn their place. `.as` names the output column, and a sort on the count then reads that alias rather than repeating the subquery, which Postgres would evaluate a second time because it does not notice the two copies are the same. `.mapWith(Number)` is back because wrapping `$count` drops its own mapping and node-postgres returns `count(*)` as a string. The same string problem hits any aggregate under a raw `sql`: `max(created_at)` needs `.mapWith(someTimestampColumn)` or it arrives as text where the page expected a `Date`.
+
 ### Timestamps always `withTimezone: true`
 
 Every timestamp column uses `timestamp("col", { withTimezone: true })`. Stored as `timestamptz`. Required ones chain `.notNull().defaultNow()`. Optional event timestamps (`publishedAt`, `archivedAt`, `deletedAt`, `reviewedAt`, `banExpires`) are nullable but still `withTimezone`.
