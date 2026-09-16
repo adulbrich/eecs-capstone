@@ -111,7 +111,13 @@ export async function searchProjectsImpl(
     const probe = toSqlVector(interestsVector);
     // Null embeddings sort last rather than being filtered out: a project
     // that failed to embed must stay reachable.
-    orderBy = sql`${projects.embedding} IS NULL, ${projects.embedding} <=> ${probe}::vector`;
+    //
+    // The date, so that the projects sharing the null case are ordered by
+    // something a reader would recognise before the id breaks the rest of the
+    // tie. #427 gave every published and archived project a vector, so that
+    // group should be empty now; it refills one row at a time whenever an
+    // embedding call fails.
+    orderBy = sql`${projects.embedding} IS NULL, ${projects.embedding} <=> ${probe}::vector, ${listingDate} DESC`;
   }
   // `recommended` with no vector falls through to relevance silently: a
   // hand-typed `?order=recommended` still renders a page.
@@ -122,7 +128,11 @@ export async function searchProjectsImpl(
     .from(projects)
     .leftJoin(programs, eq(projects.programId, programs.id))
     .where(and(...conditions))
-    .orderBy(orderBy)
+    // `projects.id` last, always, and passed here rather than appended to each
+    // branch above so that a fourth ordering cannot forget it. Why an ordering
+    // has to be total: "Paging a listing needs a total ordering" in
+    // docs/QUIRKS.md (#429).
+    .orderBy(orderBy, projects.id)
     .limit(data.pageSize)
     .offset(offset);
 
