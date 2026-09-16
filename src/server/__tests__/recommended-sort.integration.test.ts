@@ -257,10 +257,13 @@ describe("an absent sort resolves by the viewer's vector", () => {
     expect(order).toBe("relevance");
     // The rows, not just the label. Three things have to line up for a case
     // to catch a widened SQL branch: a vector, an explicit sort that is not
-    // recommended, and more than one row. This is the only case in the file
-    // with all three, so it is the only one where the two orders disagree:
-    // `Far` publishes second, so date-DESC puts it first, the reverse of
-    // cosine. Asserting the label alone let that widening stay green.
+    // recommended, and rows whose cosine and relevance orders disagree. The
+    // third is the one that is easy to lose: two rows are not enough, they
+    // have to be built to disagree, which is what the opposite unit vectors
+    // and the publish order below do. `Far` publishes second, so date-DESC
+    // puts it first, the reverse of cosine. This is the only case in the
+    // file with all three; asserting the label alone let that widening stay
+    // green.
     expect(rows.map((row) => row.title)).toEqual(["Far", "Near"]);
   });
 
