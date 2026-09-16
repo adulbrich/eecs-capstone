@@ -49,13 +49,20 @@ const BEDROCK_FILE = readFileSync("src/lib/_internal/bedrock-embed.ts", "utf8");
 const SCRIPT_FILE = readFileSync("scripts/backfill-embeddings.mjs", "utf8");
 
 /**
- * The script with its comments removed, for assertions a comment must not be
- * able to satisfy. Safe to do by regex here and nowhere in general: this file
- * has no `//` or block-comment opener inside any string or template literal,
- * and the guard below fails loudly if that ever stops being true.
+ * The script with its comments removed, for the assertions a comment must not
+ * be able to satisfy.
+ *
+ * Stripping comments by regex is unsafe in general, because a comment opener
+ * inside a string literal makes it eat real code. Nothing here asserts that
+ * cannot happen, because an honest check of it needs a parser: extracting the
+ * literals from text that still holds comments is circular, since an
+ * apostrophe in a comment opens one. What stands in for that proof is the two
+ * tests below, which say both strips ran, plus every assertion that uses
+ * `SCRIPT_CODE`: each looks for a call, so a strip that swallowed code fails
+ * them rather than passing quietly.
  */
 const SCRIPT_CODE = SCRIPT_FILE.replace(/\/\*[\s\S]*?\*\//g, "").replace(
-  /^[ \t]*\/\/.*$/gm,
+  /\/\/.*$/gm,
   ""
 );
 const LIMIT_PATTERN = /const EMBEDDING_SOURCE_LIMIT = ([0-9_]+);/;
@@ -123,14 +130,33 @@ function bothBodies(name: string, src: string, srcLabel: string) {
   ];
 }
 
-describe("the production backfill's copies of the embedding helpers", () => {
-  it("can have its comments stripped without losing code", () => {
+/**
+ * Not part of the inventory below. These prove the reading the inventory's
+ * assertions depend on, and pin no copied declaration of their own.
+ */
+describe("reading the production backfill as code rather than as text", () => {
+  it("still balances its braces after the strip", () => {
+    // The cheap structural check: a strip that ate a run of real code almost
+    // certainly takes a brace with it. Not a parser, and not claiming to be.
+    const opens = SCRIPT_CODE.match(/\{/g)?.length ?? 0;
+    const closes = SCRIPT_CODE.match(/\}/g)?.length ?? 0;
+    expect(opens).toBe(closes);
+    expect(opens).toBeGreaterThan(10);
+  });
+
+  it("loses every comment and keeps every statement", () => {
     expect(SCRIPT_CODE.length).toBeLessThan(SCRIPT_FILE.length);
     expect(SCRIPT_CODE).toContain("await main();");
     expect(SCRIPT_CODE).toContain("const SELECT_SQL");
+    // One of each kind, so neither strip can be deleted without a failure.
+    // The block comment carries every `MUST match` marker; the line comment is
+    // one of the explanations inside `main`.
     expect(SCRIPT_CODE).not.toContain("MUST match");
+    expect(SCRIPT_CODE).not.toContain("Per project, so one bad row");
   });
+});
 
+describe("the production backfill's copies of the embedding helpers", () => {
   it("assemble a section the same way", () => {
     const [fromSrc, fromScript] = bothBodies(
       "section",

@@ -46,7 +46,7 @@ import {
 } from "@aws-sdk/client-bedrock-runtime";
 import pg from "pg";
 
-/** Politeness delay between Bedrock calls, so a 550 row run does not burst. */
+/** Politeness delay between Bedrock calls, so a 547 row run does not burst. */
 const DELAY_MS = 200;
 
 /** MUST match `EMBEDDING_SOURCE_LIMIT` in `src/lib/embedding-source.ts`. */
