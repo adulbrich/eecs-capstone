@@ -72,9 +72,13 @@ describe("AdminRequestActions", () => {
     // `toHaveFocus` through a roving tabindex), but those tests drive it with
     // `userEvent` where these use `fireEvent.keyDown`, which is the first thing
     // to try if anyone picks this up.
-    // Nothing covers the browser behaviour today. The cheapest place to add it
-    // is `inventory-requests.e2e.test.ts`, which already opens this popover and
-    // confirms; it just never asserts where focus lands.
+    // Nothing covers the browser behaviour today, and it is not cheap to add.
+    // Both popovers on this component close through `dismiss()`, and both are
+    // driven in a browser already (`inventory.e2e.test.ts` approves,
+    // `inventory-requests.e2e.test.ts` rejects), but each follows its confirm
+    // with `toHaveCount(0)`: the queue is filtered to pending, so the row and
+    // its trigger leave the DOM and a focus assertion has nothing to land on.
+    // Covering this means holding the write open, dismissing, then asserting.
   });
 
   /**
