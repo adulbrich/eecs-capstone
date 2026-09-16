@@ -135,19 +135,23 @@ function rowFor(title: string) {
 }
 
 /**
- * The Badges cell, through the `data-label` `AdminDataTable` derives from
- * each column's header (`docs/UI-CONVENTIONS.md`). Scoping to the cell is
- * the point of the whole test: a row already renders the three badge
- * strings if they are anywhere in it and a dash if any other column is
- * empty, so a row-wide query proves nothing about "in one column".
+ * One row's cell for one column, through the `data-label` `AdminDataTable`
+ * derives from each column's header (`docs/UI-CONVENTIONS.md`). Scoping to
+ * the cell is what makes a dash assertion mean anything: a row that is
+ * empty in one column is usually empty in several, so `getAllByText("-")`
+ * over the row passes with the column's own dash deleted.
  */
-function badgesCellFor(title: string): HTMLElement {
+function cellFor(title: string, label: string): HTMLElement {
   const row = screen.getByRole("link", { name: title }).closest("tr");
-  const cell = row?.querySelector('td[data-label="Badges"]');
+  const cell = row?.querySelector(`td[data-label="${label}"]`);
   if (!cell) {
-    throw new Error(`no Badges cell for ${title}`);
+    throw new Error(`no ${label} cell for ${title}`);
   }
   return cell as HTMLElement;
+}
+
+function badgesCellFor(title: string): HTMLElement {
+  return cellFor(title, "Badges");
 }
 
 describe("the public project table", () => {
@@ -200,7 +204,7 @@ describe("the public project table", () => {
     expect(chip?.textContent).toBe("Robotics");
     expect(chip?.getAttribute("title")).toBe("field");
     expect(row.getByText("Web").closest('[data-slot="badge"]')).not.toBeNull();
-    expect(rowFor("Bare Minimum").getAllByText("-").length).toBeGreaterThan(0);
+    expect(cellFor("Bare Minimum", "Categories").textContent?.trim()).toBe("-");
   });
 
   it("clamps prose to a fixed width and strips its markdown", () => {
@@ -214,8 +218,9 @@ describe("the public project table", () => {
   });
 
   it("renders the card's badge row in one column, and a dash for none", () => {
-    // The whole row, in the card's own words, rendered by the card's own
-    // component. Two columns of "Yes" and dashes became this (#434).
+    // The card's whole badge row, in the card's own words and rendered by
+    // the card's own component. Two columns of "Yes" and dashes became this
+    // (#434). The queries below are scoped to the cell, not the table row.
     renderTable(DEFAULT_HIDDEN);
     const badged = within(badgesCellFor("Rover Telemetry"));
     expect(badged.getByText("Team is full")).toBeTruthy();
