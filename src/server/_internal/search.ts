@@ -91,9 +91,11 @@ export async function searchProjectsImpl(
    */
   const listingDate = sql`coalesce(${projects.publishedAt}, ${projects.createdAt})`;
 
-  // "relevance" is the default because ordering used to be implicit: a query
-  // ranked by ts_rank, everything else by date. Defaulting to "newest" would
-  // silently reorder every existing keyword search.
+  // "relevance" is where an unresolved sort lands for everyone without an
+  // interest vector, because ordering used to be implicit: a query ranked by
+  // ts_rank, everything else by date. Defaulting to "newest" instead would
+  // have silently reordered every existing keyword search. Since #424 a viewer
+  // who has a vector resolves to `recommended` before reaching this.
   const relevanceOrder = trimmed
     ? sql`ts_rank(${projects.searchVector}, websearch_to_tsquery('english', ${trimmed})) DESC, ${listingDate} DESC`
     : sql`${listingDate} DESC`;
@@ -104,10 +106,31 @@ export async function searchProjectsImpl(
   // on first paint for someone who already has interests (#321).
   const interestsVector = await interestsVectorFor(viewerId);
 
+  /**
+   * The ordering this call actually uses, resolved once and used for both the
+   * SQL below and the `order` the caller reads back.
+   *
+   * An absent `sort` means the reader has expressed no preference, which the
+   * URL can now say because the param no longer carries a default. For a
+   * viewer with an interest vector that resolves to `recommended`: they wrote
+   * interests and this is what those interests are for, and making them pick
+   * the sort on every visit was the whole of #424.
+   *
+   * The gate is the vector, never the text. A member whose interests saved but
+   * failed to embed resolves to `relevance`, so the default never promises an
+   * order it cannot deliver. For the same reason a hand-typed
+   * `?order=recommended` from such a viewer reports `relevance`: the page still
+   * renders, ordered by relevance, and says which ordering it used.
+   */
+  const canRecommend = interestsVector !== null;
+  const requested = data.sort ?? (canRecommend ? "recommended" : "relevance");
+  const order =
+    requested === "recommended" && !canRecommend ? "relevance" : requested;
+
   let orderBy = relevanceOrder;
-  if (data.sort === "newest") {
+  if (order === "newest") {
     orderBy = sql`${listingDate} DESC`;
-  } else if (data.sort === "recommended" && interestsVector) {
+  } else if (order === "recommended" && interestsVector) {
     const probe = toSqlVector(interestsVector);
     // Null embeddings sort last rather than being filtered out: a project
     // that failed to embed must stay reachable.
@@ -119,8 +142,6 @@ export async function searchProjectsImpl(
     // embedding call fails.
     orderBy = sql`${projects.embedding} IS NULL, ${projects.embedding} <=> ${probe}::vector, ${listingDate} DESC`;
   }
-  // `recommended` with no vector falls through to relevance silently: a
-  // hand-typed `?order=recommended` still renders a page.
 
   const offset = (data.page - 1) * data.pageSize;
   const rows = await db
@@ -146,6 +167,14 @@ export async function searchProjectsImpl(
     total: count,
     page: data.page,
     pageSize: data.pageSize,
+    /**
+     * The ordering this result is in, which is not always the one the URL
+     * asked for: absent resolves by the viewer's vector, and `recommended`
+     * without one resolves to `relevance`. The route reads this rather than
+     * re-deriving it, so the Sort select and the prompt line under the search
+     * row cannot disagree with the rows beneath them.
+     */
+    order,
     /**
      * Whether the recommended sort is open to this viewer, and if not, why:
      * the filter bar shows a sign-in prompt to a visitor and an add-your-

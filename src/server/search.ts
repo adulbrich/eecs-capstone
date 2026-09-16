@@ -22,7 +22,13 @@ const searchInputSchema = z.object({
     .min(1)
     .max(PAGE_SIZE_MAX)
     .default(PAGE_SIZE_DEFAULT),
-  sort: z.enum(["relevance", "newest", "recommended"]).default("relevance"),
+  /**
+   * Optional rather than defaulted, so the server can tell "no choice yet"
+   * from "chose relevance". An absent sort resolves in `searchProjectsImpl`:
+   * a viewer with an interest vector gets `recommended`, everyone else
+   * `relevance` (#424). The resolved value comes back as `order`.
+   */
+  sort: z.enum(["relevance", "newest", "recommended"]).optional(),
 });
 
 export type SearchProjectsInput = z.infer<typeof searchInputSchema>;

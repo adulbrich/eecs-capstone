@@ -59,7 +59,14 @@ export const searchSchema = z.object({
   page: z.number().int().min(1).default(1),
   // The server's ordering, which also decides which twenty rows make up the
   // page. Named `order` because `sort` and `dir` are the table's, below.
-  order: z.enum(["relevance", "newest", "recommended"]).default("relevance"),
+  //
+  // Optional rather than defaulted, the way `view` below is, and for the same
+  // reason: the router writes every schema default into the URL, so a default
+  // here would make "chose relevance" and "has not chosen" the same URL. The
+  // server resolves an absent one from the viewer's interest vector and hands
+  // back what it picked as `order` on the result, which is what the Sort
+  // select and the prompt line below read (#424).
+  order: z.enum(["relevance", "newest", "recommended"]).optional(),
   // Optional so a param-less visit is detectable; the stored preference then
   // seeds it. Absent from the URL defaults to "card" at render. A value the
   // enum no longer knows (`row`, until 2026-09-02) reads as absent rather than
@@ -156,7 +163,11 @@ function ProjectCards({ rows }: { rows: ProjectListRow[] }) {
 }
 
 function ProjectsList() {
-  const { rows, total, page, pageSize, viewer, categories, programs } =
+  // `order` from the loader, never from `search.order`: the URL carries no
+  // order until the reader picks one, and the server is what resolves an
+  // absent one from their interest vector. Reading the URL here would show
+  // "Most relevant" over rows that are in cosine order (#424).
+  const { rows, total, page, pageSize, viewer, order, categories, programs } =
     Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/projects/" });
@@ -208,7 +219,7 @@ function ProjectsList() {
       search={
         <ProjectsSearchBar
           canRecommend={viewer.canRecommend}
-          order={search.order}
+          order={order}
           q={search.q}
           view={view}
         />
@@ -247,7 +258,7 @@ function ProjectsList() {
     >
       <RecommendationPrompt
         canRecommend={viewer.canRecommend}
-        order={search.order}
+        order={order}
         signedIn={viewer.signedIn}
       />
       <BookmarkSetProvider>
