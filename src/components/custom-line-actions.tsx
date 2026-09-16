@@ -47,6 +47,33 @@ export function CustomLineActions({
   // error slot, so the fallback comes per call rather than per hook.
   const { busy, error, run, setError } = useAction();
 
+  /**
+   * Refuses to close while the write is in flight, in the one place every
+   * dismissal route passes through: Escape, a click outside and the Cancel
+   * button all reach `onOpenChange`, so guarding the individual routes misses
+   * whichever one nobody thought of.
+   *
+   * The trigger is `disabled` while busy, a disabled element cannot hold
+   * focus, and closing hands focus back to the trigger, so dismissing
+   * mid-write dropped the reader on `<body>` with no keyboard route back to
+   * the row (#426). Cancel was already refused, so this takes away nothing the
+   * surface offered.
+   */
+  function openChange(next: boolean, surface: "note" | "reject") {
+    if (next) {
+      setOpen(surface);
+      return;
+    }
+    if (busy) {
+      return;
+    }
+    setOpen(null);
+    if (surface === "reject") {
+      // The skip is a decision about one click.
+      setSendEmail(true);
+    }
+  }
+
   if (!isOpenCustomLine(line.status)) {
     return <span className="text-muted-foreground">-</span>;
   }
@@ -69,7 +96,7 @@ export function CustomLineActions({
   return (
     <div className="flex flex-wrap gap-2">
       <Popover
-        onOpenChange={(next) => setOpen(next ? "note" : null)}
+        onOpenChange={(next) => openChange(next, "note")}
         open={open === "note"}
       >
         <PopoverTrigger asChild>
@@ -82,11 +109,7 @@ export function CustomLineActions({
             {sourcing ? "Update note" : "Start sourcing"}
           </Button>
         </PopoverTrigger>
-        <PopoverContent
-          className="w-72 space-y-2"
-          onEscapeKeyDown={(e) => busy && e.preventDefault()}
-          onInteractOutside={(e) => busy && e.preventDefault()}
-        >
+        <PopoverContent className="w-72 space-y-2">
           <Label htmlFor={`sourcing-note-${line.id}`}>
             {sourcing
               ? "New note (sent to requester)"
@@ -144,13 +167,7 @@ export function CustomLineActions({
       />
 
       <Popover
-        onOpenChange={(next) => {
-          setOpen(next ? "reject" : null);
-          if (!next) {
-            // The skip is a decision about one click.
-            setSendEmail(true);
-          }
-        }}
+        onOpenChange={(next) => openChange(next, "reject")}
         open={open === "reject"}
       >
         <PopoverTrigger asChild>
@@ -158,11 +175,7 @@ export function CustomLineActions({
             Reject
           </Button>
         </PopoverTrigger>
-        <PopoverContent
-          className="w-72 space-y-2"
-          onEscapeKeyDown={(e) => busy && e.preventDefault()}
-          onInteractOutside={(e) => busy && e.preventDefault()}
-        >
+        <PopoverContent className="w-72 space-y-2">
           <Label htmlFor={`reject-reason-${line.id}`}>
             Reason (sent to requester)
           </Label>

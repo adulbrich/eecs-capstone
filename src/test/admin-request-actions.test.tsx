@@ -45,6 +45,38 @@ describe("AdminRequestActions", () => {
    * decision could not reach the server, so what was broken is what the
    * reader was told, not what was written.
    */
+  /**
+   * A popover restores focus to its trigger on close just as a dialog does,
+   * and the trigger is `disabled` while busy, so dismissing mid-write stranded
+   * the reader on `<body>` here too (#426). The guard sits in `close()`, the
+   * one path Escape, an outside click and Cancel all reach.
+   */
+  it("refuses to close mid-write, so focus is never stranded", async () => {
+    const write = deferred<void>();
+    vi.mocked(approveRequestItem).mockReturnValue(write.promise as never);
+    renderPending();
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm approve" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Approve" }).hasAttribute("disabled")
+      ).toBe(true)
+    );
+
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: "Escape",
+    });
+    expect(screen.getByLabelText("Pickup by (optional)")).toBeTruthy();
+
+    write.resolve();
+    await waitFor(() =>
+      expect(screen.queryByLabelText("Pickup by (optional)")).toBeNull()
+    );
+    expect(document.body.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
   it.each([
     ["Approve", "Confirm approve"],
     ["Reject", "Confirm reject"],

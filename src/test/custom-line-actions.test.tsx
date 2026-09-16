@@ -395,6 +395,51 @@ describe("FulfillCustomLineDialog", () => {
    * popovers above (#426): it stayed live through the fulfilment and the
    * refetch behind it.
    */
+  /**
+   * The other half of #426's focus problem, on the second dialog. One
+   * representative test was not enough: the first fix guarded Escape and
+   * outside clicks and left the close X, which `DialogContent` renders by
+   * default and which reaches `onOpenChange` directly, so the X is tested
+   * explicitly here rather than taken on trust.
+   */
+  it.each(["Escape", "close X"])(
+    "refuses to close mid-write via %s, so focus is never stranded",
+    async (route) => {
+      const write = deferred<void>();
+      vi.mocked(fulfillCustomLine).mockReturnValue(write.promise as never);
+      render(
+        <FulfillCustomLineDialog
+          line={pending}
+          onDone={() => Promise.resolve()}
+          requesterEmail="requester@x.edu"
+        />
+      );
+      await linkFirstMatch();
+      fireEvent.click(screen.getByRole("button", { name: "Confirm fulfil" }));
+      await waitFor(() =>
+        expect(
+          screen
+            .getByRole("button", { hidden: true, name: "Fulfil" })
+            .hasAttribute("disabled")
+        ).toBe(true)
+      );
+
+      if (route === "Escape") {
+        fireEvent.keyDown(document.activeElement ?? document.body, {
+          key: "Escape",
+        });
+      } else {
+        fireEvent.click(screen.getByRole("button", { name: /close/i }));
+      }
+      expect(screen.getByRole("dialog")).toBeTruthy();
+
+      write.resolve();
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(document.body.contains(document.activeElement)).toBe(true);
+      expect(document.activeElement).not.toBe(document.body);
+    }
+  );
+
   it("disables the Fulfil trigger until the write settles", async () => {
     const write = deferred<void>();
     vi.mocked(fulfillCustomLine).mockReturnValue(write.promise as never);

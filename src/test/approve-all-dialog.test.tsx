@@ -66,38 +66,48 @@ describe("ApproveAllDialog", () => {
    *
    * axe cannot see this: it scans a static tree, and this is a transition.
    */
-  it("refuses to close mid-write, so focus is never stranded", async () => {
-    const write = deferred<{ approved: string[] }>();
-    vi.mocked(approveRequestLines).mockReturnValue(write.promise as never);
-    render(
-      <ApproveAllDialog
-        lines={lines}
-        onDone={() => Promise.resolve()}
-        requesterEmail="student@x.edu"
-      />
-    );
-    openDialog();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Confirm approve all" })
-    );
-    await waitFor(() =>
-      expect(
-        screen
-          .getByRole("button", { hidden: true, name: "Approve all" })
-          .hasAttribute("disabled")
-      ).toBe(true)
-    );
+  it.each(["Escape", "close X"])(
+    "refuses to close mid-write via %s, so focus is never stranded",
+    async (route) => {
+      const write = deferred<{ approved: string[] }>();
+      vi.mocked(approveRequestLines).mockReturnValue(write.promise as never);
+      render(
+        <ApproveAllDialog
+          lines={lines}
+          onDone={() => Promise.resolve()}
+          requesterEmail="student@x.edu"
+        />
+      );
+      openDialog();
+      fireEvent.click(
+        screen.getByRole("button", { name: "Confirm approve all" })
+      );
+      await waitFor(() =>
+        expect(
+          screen
+            .getByRole("button", { hidden: true, name: "Approve all" })
+            .hasAttribute("disabled")
+        ).toBe(true)
+      );
 
-    fireEvent.keyDown(document.activeElement ?? document.body, {
-      key: "Escape",
-    });
-    expect(screen.getByRole("dialog")).toBeTruthy();
+      if (route === "Escape") {
+        fireEvent.keyDown(document.activeElement ?? document.body, {
+          key: "Escape",
+        });
+      } else {
+        // The route that defeated the first fix: `DialogContent` renders this
+        // by default and it goes straight to `onOpenChange`, touching neither
+        // `onEscapeKeyDown` nor `onInteractOutside`.
+        fireEvent.click(screen.getByRole("button", { name: /close/i }));
+      }
+      expect(screen.getByRole("dialog")).toBeTruthy();
 
-    write.resolve({ approved: ["a", "b"] });
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(document.body.contains(document.activeElement)).toBe(true);
-    expect(document.activeElement).not.toBe(document.body);
-  });
+      write.resolve({ approved: ["a", "b"] });
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(document.body.contains(document.activeElement)).toBe(true);
+      expect(document.activeElement).not.toBe(document.body);
+    }
+  );
 
   it("disables the Approve all trigger until the write settles", async () => {
     const write = deferred<{ approved: string[] }>();
