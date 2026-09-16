@@ -10,9 +10,9 @@ interface Props {
 
 export function AvatarUploader({ currentKey, onChanged }: Props) {
   // The crop and the preview are `ImageUploader`'s; what reaches here is one
-  // write, so the hook fits. The guard that matters is its ref: nothing here
-  // is `disabled` at all, so two files chosen in one tick would both upload
-  // and the second object would be the one nobody asked for (#443).
+  // write, so the hook fits. Nothing here is `disabled` at all, so two files
+  // chosen in one tick would both upload and the second object would be the
+  // one nobody asked for; the hook's ref is what stops it (#443).
   const { busy, error, run } = useAction({
     fallback: "Save failed. Please try again.",
   });

@@ -33,10 +33,9 @@ export function ImageUploader({
   const [pickedFile, setPickedFile] = useState<File | null>(null);
   const [cleared, setCleared] = useState(false);
   // One action, despite the several steps around it: pick, crop, then this
-  // one render-and-hand-over. The guard that matters is the hook's ref, since
-  // "Use image" is only `disabled` once React has re-rendered and a second
-  // activation inside the same tick would render the crop twice and hand the
-  // parent two files to upload (#443).
+  // one render-and-hand-over. A second activation in the same tick would
+  // render the crop twice and hand the parent two files to upload;
+  // `use-action.ts` says why the hook's ref is what stops it (#443).
   const { busy, error, run, setError } = useAction({
     fallback: "Image processing failed.",
   });

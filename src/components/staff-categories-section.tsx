@@ -29,10 +29,10 @@ export function StaffCategoriesSection({
 }) {
   const [saved, setSaved] = useState<string[] | null>(null);
   const [draft, setDraft] = useState<string[]>([]);
-  // The ref inside the hook is the guard that matters: `disabled={busy}` alone
-  // does not stop a second activation that arrives before React has
-  // re-rendered (#443). `setError` comes back out for the load below, which
-  // writes its failure into the same slot.
+  // A second activation in the same tick would write the category set twice;
+  // `use-action.ts` says why the hook's ref is what stops it (#443).
+  // `setError` comes back out for the load below, which writes its failure
+  // into the same slot.
   const { busy, error, run, setError } = useAction({ fallback: "Save failed" });
 
   const load = useCallback(async () => {

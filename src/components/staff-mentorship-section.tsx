@@ -42,10 +42,9 @@ export function StaffMentorshipSection({
 }) {
   const [record, setRecord] = useState<ProjectMentorship | null>(null);
   const [mentorEmail, setMentorEmail] = useState("");
-  // The ref inside the hook is the guard that matters: `disabled={busy}` alone
-  // does not stop a second activation that arrives before React has
-  // re-rendered, and a second save mails the mentor again (#443). `setError`
-  // comes back out for the load below, which shares the same slot.
+  // A second activation in the same tick would mail the mentor twice;
+  // `use-action.ts` says why the hook's ref is what stops it (#443).
+  // `setError` comes back out for the load below, which shares the slot.
   const { busy, error, run, setError } = useAction({ fallback: "Save failed" });
   const [confirmOpen, setConfirmOpen] = useState(false);
 

@@ -45,9 +45,8 @@ export function ApproveAllDialog({
   const [open, setOpen] = useState(false);
   const [pickupBy, setPickupBy] = useState("");
   const [sendEmail, setSendEmail] = useState(true);
-  // The ref inside the hook is the guard that matters: `disabled={busy}` alone
-  // does not stop a second activation that arrives before React has
-  // re-rendered, and this one approves a whole batch (#443).
+  // A second activation in the same tick would approve the whole batch
+  // twice; `use-action.ts` says why the hook's ref is what stops it (#443).
   const { busy, error, run, setError } = useAction({
     fallback: "Approve failed",
   });

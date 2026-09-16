@@ -83,9 +83,8 @@ function ProposerDraft({
   const [studentProposed, setStudentProposed] = useState(
     proposer.studentProposed
   );
-  // The ref inside the hook is the guard that matters: `disabled={busy}` alone
-  // does not stop a second activation that arrives before React has
-  // re-rendered, and a second save mails the proposer again (#443).
+  // A second activation in the same tick would mail the proposer twice;
+  // `use-action.ts` says why the hook's ref is what stops it (#443).
   const { busy, error, run } = useAction({ fallback: "Save failed" });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const trimmed = email.trim();

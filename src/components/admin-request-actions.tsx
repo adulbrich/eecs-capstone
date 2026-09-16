@@ -39,9 +39,9 @@ export function AdminRequestActions({
   const [reason, setReason] = useState("");
   const [sendEmail, setSendEmail] = useState(true);
   // The two decisions fail differently and share one error slot, so the
-  // fallback comes per call rather than per hook. The guard that matters is
-  // the hook's ref: `disabled={busy}` alone does not stop a second activation
-  // that arrives before React has re-rendered (#443).
+  // fallback comes per call rather than per hook. A second activation in the
+  // same tick would decide the line twice; `use-action.ts` says why the
+  // hook's ref is what stops it (#443).
   const { busy, error, run, setError } = useAction();
 
   // Approving or rejecting is a one-way door, so a decided line offers

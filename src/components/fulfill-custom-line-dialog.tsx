@@ -52,9 +52,8 @@ export function FulfillCustomLineDialog({
   const [reserve, setReserve] = useState(true);
   const [pickupBy, setPickupBy] = useState("");
   const [note, setNote] = useState("");
-  // The ref inside the hook is the guard that matters: `disabled={busy}` alone
-  // does not stop a second activation that arrives before React has
-  // re-rendered, and a second fulfilment writes a second set of links (#443).
+  // A second activation in the same tick would write a second set of item
+  // links; `use-action.ts` says why the hook's ref is what stops it (#443).
   // `setError` comes back out for the client-side refusal below, which never
   // reaches a server.
   const { busy, error, run, setError } = useAction({

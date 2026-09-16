@@ -107,10 +107,9 @@ export function StaffProjectPanel({
 }) {
   const [comment, setComment] = useState("");
   const [pending, setPending] = useState<PendingTransition | null>(null);
-  // The ref inside the hook is the guard that matters: `disabled={busy}` alone
-  // does not stop a second activation that arrives before React has
-  // re-rendered, and a second transition writes a second history row and
-  // mails again (#443).
+  // A second activation in the same tick would write a second history row
+  // and mail again; `use-action.ts` says why the hook's ref is what stops it
+  // (#443).
   const { busy, error, run, setError } = useAction({
     fallback: "Transition failed",
   });

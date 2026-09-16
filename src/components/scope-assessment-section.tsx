@@ -50,9 +50,8 @@ export function ScopeAssessmentSection({ projectId }: { projectId: string }) {
   const [view, setView] = useState<ScopeAssessmentView | null | "loading">(
     "loading"
   );
-  // The ref inside the hook is the guard that matters: `disabled={busy}` alone
-  // does not stop a second activation that arrives before React has
-  // re-rendered, and this one spends a Bedrock call (#443).
+  // A second activation in the same tick would spend a second Bedrock call;
+  // `use-action.ts` says why the hook's ref is what stops it (#443).
   const { busy, error, run } = useAction({
     fallback: "Scope assessment failed",
   });
