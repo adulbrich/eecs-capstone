@@ -8,7 +8,10 @@ import {
   createCategoryAs,
   setProjectCategoriesAs,
 } from "#/server/_internal/categories";
-import { createProjectAs } from "#/server/_internal/projects";
+import {
+  createProjectAs,
+  updateProjectProposerAs,
+} from "#/server/_internal/projects";
 import {
   exportAdminProjectsAs,
   listAdminProjectsAs,
@@ -79,6 +82,25 @@ describe("admin project export", () => {
       listed.rows.map((r) => r.id).sort()
     );
     expect(exported.rows).toHaveLength(1);
+  });
+
+  it("matches a stored proposer address the way the listing does", async () => {
+    const admin = await makeUser(`p-${Date.now()}@x.com`, "admin");
+    const project = await createProjectAs(admin, baseProject("Delta lander"));
+    await updateProjectProposerAs(admin, {
+      id: project.id,
+      proposerEmail: "unregistered@example.edu",
+      studentProposed: false,
+    });
+
+    const filter = { ...ALL_PROJECTS, q: "unregistered@example.edu" };
+    const listed = await listAdminProjectsAs(admin, filter);
+    const exported = await exportAdminProjectsAs(admin, filter);
+
+    expect(exported.rows.map((r) => r.title)).toEqual(["Delta lander"]);
+    expect(exported.rows.map((r) => r.id)).toEqual(
+      listed.rows.map((r) => r.id)
+    );
   });
 
   it("carries fields the listing projection omits", async () => {

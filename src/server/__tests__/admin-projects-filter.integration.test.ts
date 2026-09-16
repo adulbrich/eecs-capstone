@@ -82,10 +82,11 @@ function filter(
 }
 
 /**
- * A project whose proposer is an address with no account behind it: the steady
- * state after staff name a proposer who has not signed in yet.
+ * A project with an address recorded as its proposer. Whether an account
+ * answers to that address is the caller's business: `updateProjectProposerAs`
+ * links one if it finds one, and leaves the address standing alone if not.
  */
-async function projectWithUnlinkedProposer(
+async function projectWithProposerAddress(
   admin: Awaited<ReturnType<typeof makeAdmin>>,
   title: string,
   proposerEmail: string
@@ -106,11 +107,7 @@ async function projectWithDeletedProposer(
   proposerEmail: string
 ) {
   const proposer = await makeAdmin(proposerEmail);
-  const project = await projectWithUnlinkedProposer(
-    admin,
-    title,
-    proposerEmail
-  );
+  const project = await projectWithProposerAddress(admin, title, proposerEmail);
   await db.delete(user).where(eq(user.id, proposer.id));
   return project;
 }
@@ -428,7 +425,7 @@ describe("admin project search reaches people, not just text", () => {
 
   it("reports the stored proposerEmail for a proposal that matches no account yet", async () => {
     const admin = await makeAdmin("staff@example.edu");
-    await projectWithUnlinkedProposer(
+    await projectWithProposerAddress(
       admin,
       "Unlinked Proposal",
       "unregistered@example.edu"
@@ -441,7 +438,7 @@ describe("admin project search reaches people, not just text", () => {
 
   it("finds a project by the stored proposer address when no account matches it yet", async () => {
     const admin = await makeAdmin("staff@example.edu");
-    await projectWithUnlinkedProposer(
+    await projectWithProposerAddress(
       admin,
       "Unlinked Proposal",
       "unregistered@example.edu"
@@ -461,15 +458,11 @@ describe("admin project search reaches people, not just text", () => {
   it("finds a project by the stored address and by the linked account's, once the two have diverged", async () => {
     const admin = await makeAdmin("staff@example.edu");
     await makeAdmin("typed@example.edu");
-    const project = await createProjectAs(
+    await projectWithProposerAddress(
       admin,
-      baseProject("Renamed Account", null)
+      "Renamed Account",
+      "typed@example.edu"
     );
-    await updateProjectProposerAs(admin, {
-      id: project.id,
-      proposerEmail: "typed@example.edu",
-      studentProposed: false,
-    });
     // The proposer changes their own address afterwards. The project keeps
     // the address staff typed, so the two disagree and both have to find it.
     await db
