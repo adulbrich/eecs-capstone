@@ -379,6 +379,20 @@ describe("admin project search reaches people, not just text", () => {
     expect(rows.map((r) => r.title)).toEqual(["Trail Mapper"]);
   });
 
+  it("finds a project by the proposer account's name", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    const proposer = await makeAdmin("mvega@example.edu");
+    // `makeAdmin` names the account after its address, which would let an
+    // address match stand in for a name match and pin nothing.
+    await db
+      .update(user)
+      .set({ name: "Marisol Vega" })
+      .where(eq(user.id, proposer.id));
+    await createProjectAs(proposer, baseProject("Tide Gauge", null));
+    const { rows } = await listAdminProjectsAs(admin, filter({ q: "Marisol" }));
+    expect(rows.map((r) => r.title)).toEqual(["Tide Gauge"]);
+  });
+
   it("finds a project by its contact name", async () => {
     const admin = await makeAdmin("staff@example.edu");
     await createProjectAs(admin, {
