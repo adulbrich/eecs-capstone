@@ -24,15 +24,6 @@ const { projectId, bookmarkProjectIds, draftProjectId } = JSON.parse(
 };
 
 /**
- * The project this parallel slot may bookmark, and no other running test may.
- *
- * The suite's only writing scan runs twice over (once per colour scheme), and
- * again per copy under `--repeat-each`, all against the same seeded student.
- * On one shared project id those copies flipped each other's toggle mid-wait
- * (#435). `parallelIndex` is Playwright's one guarantee that two tests running
- * at the same time get different values, so it is what the pool is keyed on.
- */
-/**
  * The detail page's initial "is this bookmarked" read, by the only thing that
  * names it: a server function URL is the base64 of its module path and its
  * export.
@@ -43,6 +34,10 @@ const { projectId, bookmarkProjectIds, draftProjectId } = JSON.parse(
  * overwritten by the older answer, the label goes back to "Bookmark" and the
  * write it already sent is invisible. That is a component bug (#444) and this
  * scan is not the place to prove it, so wait the window out.
+ *
+ * The encoding is TanStack Start's, so a framework upgrade could change it.
+ * That failure is loud and lands here: the wait times out naming this
+ * function, rather than passing on a read it never saw.
  */
 function isInitialBookmarkRead(response: Response): boolean {
   const encoded = /\/_serverFn\/([^/?]+)/.exec(response.url())?.[1];
@@ -54,6 +49,15 @@ function isInitialBookmarkRead(response: Response): boolean {
     .includes("isBookmarked");
 }
 
+/**
+ * The project this parallel slot may bookmark, and no other running test may.
+ *
+ * The suite's only writing scan runs twice over (once per colour scheme), and
+ * again per copy under `--repeat-each`, all against the same seeded student.
+ * On one shared project id those copies flipped each other's toggle mid-wait
+ * (#435). `parallelIndex` is Playwright's one guarantee that two tests running
+ * at the same time get different values, so it is what the pool is keyed on.
+ */
 function bookmarkProjectIdFor(parallelIndex: number): string {
   const id = bookmarkProjectIds?.[parallelIndex];
   if (!id) {
