@@ -47,16 +47,52 @@ export function CustomLineActions({
   // error slot, so the fallback comes per call rather than per hook.
   const { busy, error, run, setError } = useAction();
 
+  /**
+   * The one cleanup, which every control that closes a surface runs: Cancel,
+   * Escape, a click outside, and the success path. `docs/QUIRKS.md` "A Cancel
+   * button that sets `open` itself skips the dialog's `onOpenChange`" is the
+   * rule, and these three resets are why it exists. The three actions share
+   * one error slot, so an error left behind lands under an untouched
+   * rejection, and the skip is a decision about one click.
+   */
+  function close() {
+    setOpen(null);
+    setError(null);
+    setSendEmail(true);
+  }
+
+  /**
+   * The dismissal path, and the only one that refuses. Escape and a click
+   * outside both arrive through `onOpenChange`, so guarding here covers every
+   * route Radix offers rather than the two anybody thought to name.
+   *
+   * Why refuse at all: the trigger is `disabled` while busy, a disabled
+   * element cannot hold focus, and closing hands focus back to the trigger, so
+   * dismissing mid-write dropped the reader on `<body>` with no keyboard route
+   * back to the row (#426).
+   *
+   * Separate from `close` on purpose. The success path closes while `busy` is
+   * still true and must not be refused; relying on its click-time closure
+   * still holding `busy === false` would work today and break the first time
+   * anyone reorders those two lines. Cancel is `disabled={busy}`, so it is
+   * unreachable mid-write and calls `close` directly.
+   */
+  function openChange(next: boolean, surface: "note" | "reject") {
+    if (next) {
+      setOpen(surface);
+      return;
+    }
+    if (busy) {
+      return;
+    }
+    close();
+  }
+
   if (!isOpenCustomLine(line.status)) {
     return <span className="text-muted-foreground">-</span>;
   }
   const sourcing = line.status === "sourcing";
   const confirmLabel = sourcing ? "Save note" : "Confirm sourcing";
-
-  function close() {
-    setOpen(null);
-    setError(null);
-  }
 
   function runLineAction(action: () => Promise<unknown>, failure: string) {
     return run(async () => {
@@ -69,11 +105,12 @@ export function CustomLineActions({
   return (
     <div className="flex flex-wrap gap-2">
       <Popover
-        onOpenChange={(next) => setOpen(next ? "note" : null)}
+        onOpenChange={(next) => openChange(next, "note")}
         open={open === "note"}
       >
         <PopoverTrigger asChild>
           <Button
+            disabled={busy}
             size="sm"
             type="button"
             variant={sourcing ? "outline" : "default"}
@@ -139,17 +176,11 @@ export function CustomLineActions({
       />
 
       <Popover
-        onOpenChange={(next) => {
-          setOpen(next ? "reject" : null);
-          if (!next) {
-            // The skip is a decision about one click.
-            setSendEmail(true);
-          }
-        }}
+        onOpenChange={(next) => openChange(next, "reject")}
         open={open === "reject"}
       >
         <PopoverTrigger asChild>
-          <Button size="sm" type="button" variant="outline">
+          <Button disabled={busy} size="sm" type="button" variant="outline">
             Reject
           </Button>
         </PopoverTrigger>

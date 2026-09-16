@@ -20,6 +20,7 @@ import {
   startSourcingCustomLine,
   updateSourcingNote,
 } from "#/server/inventory-custom";
+import { deferred } from "./shared/deferred";
 
 vi.mock("#/server/inventory", () => ({ listAdminInventory: vi.fn() }));
 vi.mock("#/server/inventory-custom", () => ({
@@ -267,6 +268,108 @@ describe("StartSourcingAllButton", () => {
   });
 });
 
+describe("CustomLineActions: the trigger during its own write", () => {
+  /**
+   * The triggers, not the confirm buttons inside their popovers. Those were
+   * always guarded; these stayed live for the whole write and the refetch
+   * behind it, offering to reopen a decision over a row the loader had not
+   * caught up with (#426). `useAction`'s in-flight ref means the second
+   * decision never reached the server, so what was broken is what the reader
+   * was offered, not what was written.
+   */
+  it.each([
+    ["Start sourcing", "Confirm sourcing", startSourcingCustomLine],
+    ["Reject", "Confirm reject", rejectCustomLine],
+  ])(
+    "disables the %s trigger until the write settles",
+    async (trigger, confirm, fn) => {
+      const write = deferred<void>();
+      vi.mocked(fn).mockReturnValue(write.promise as never);
+      render(
+        <CustomLineActions
+          line={pending}
+          onDone={() => Promise.resolve()}
+          requesterEmail="requester@x.edu"
+        />
+      );
+
+      const button = () => screen.getByRole("button", { name: trigger });
+      expect(button().hasAttribute("disabled")).toBe(false);
+
+      fireEvent.click(button());
+      if (trigger === "Reject") {
+        fireEvent.change(screen.getByLabelText("Reason (sent to requester)"), {
+          target: { value: "Cannot source it" },
+        });
+      }
+      fireEvent.click(
+        within(screen.getByRole("dialog")).getByRole("button", {
+          name: confirm,
+        })
+      );
+
+      await waitFor(() => expect(button().hasAttribute("disabled")).toBe(true));
+
+      write.resolve();
+      await waitFor(() =>
+        expect(button().hasAttribute("disabled")).toBe(false)
+      );
+    }
+  );
+});
+
+describe("CustomLineActions: dismissing during its own write", () => {
+  /**
+   * The guard in `openChange`, the last of this PR's four dismissal guards
+   * to get a test. Escape on a non-modal Radix Popover does reach
+   * `onOpenChange` in jsdom, so this can fail: drop the `busy` branch and
+   * the dialog query below throws.
+   */
+  it.each(["Start sourcing", "Reject"])(
+    "refuses to close the %s popover mid-write",
+    async (trigger) => {
+      const write = deferred<void>();
+      const fn =
+        trigger === "Reject" ? rejectCustomLine : startSourcingCustomLine;
+      vi.mocked(fn).mockReturnValue(write.promise as never);
+      render(
+        <CustomLineActions
+          line={pending}
+          onDone={() => Promise.resolve()}
+          requesterEmail="requester@x.edu"
+        />
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: trigger }));
+      if (trigger === "Reject") {
+        fireEvent.change(screen.getByLabelText("Reason (sent to requester)"), {
+          target: { value: "Cannot source it" },
+        });
+      }
+      const confirm =
+        trigger === "Reject" ? "Confirm reject" : "Confirm sourcing";
+      fireEvent.click(
+        within(screen.getByRole("dialog")).getByRole("button", {
+          name: confirm,
+        })
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: trigger }).hasAttribute("disabled")
+        ).toBe(true)
+      );
+
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
+      });
+      expect(screen.getByRole("dialog")).toBeTruthy();
+
+      write.resolve();
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    }
+  );
+});
+
 describe("CustomLineActions: cancelling a popover", () => {
   it("closes the sourcing popover without writing, and keeps the note", async () => {
     render(
@@ -317,6 +420,71 @@ describe("CustomLineActions: cancelling a popover", () => {
     );
     expect(rejectCustomLine).not.toHaveBeenCalled();
   });
+
+  /**
+   * The two halves of `docs/QUIRKS.md` "A Cancel button that sets `open`
+   * itself skips the dialog's `onOpenChange`", which asks that every control
+   * closing a surface run the same cleanup. These two ran different halves:
+   * Cancel cleared the error and left the skip, Escape reset the skip and
+   * left the error. `admin-request-actions.tsx` is the shape both now share.
+   */
+  it("checks the email box again after Cancel: the skip was one click's", async () => {
+    render(
+      <CustomLineActions
+        line={pending}
+        onDone={vi.fn()}
+        requesterEmail="requester@x.edu"
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    const box = await screen.findByRole("checkbox", {
+      name: "Email requester@x.edu",
+    });
+    fireEvent.click(box);
+    expect(box.getAttribute("aria-checked")).toBe("false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("checkbox")).toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    const reopened = await screen.findByRole("checkbox", {
+      name: "Email requester@x.edu",
+    });
+    expect(reopened.getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("does not carry a failed action's error onto the next popover", async () => {
+    vi.mocked(startSourcingCustomLine).mockRejectedValue(
+      new Error("server said no")
+    );
+    render(
+      <CustomLineActions
+        line={pending}
+        onDone={vi.fn()}
+        requesterEmail="requester@x.edu"
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Start sourcing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm sourcing" }));
+    // `useAction` shows the rejection's own message when it carries one.
+    expect(await screen.findByText("server said no")).toBeTruthy();
+
+    // Escape rather than Cancel: it is the route that skipped the reset.
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: "Escape",
+    });
+    await waitFor(() =>
+      expect(
+        screen.queryByLabelText("Note for the requester (optional)")
+      ).toBeNull()
+    );
+
+    // The three actions share one error slot, so a stale one lands under an
+    // untouched rejection.
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    await screen.findByLabelText("Reason (sent to requester)");
+    expect(screen.queryByText("server said no")).toBeNull();
+  });
 });
 
 describe("FulfillCustomLineDialog", () => {
@@ -338,6 +506,87 @@ describe("FulfillCustomLineDialog", () => {
       screen.getByRole("list", { name: "Linked items" }).textContent
     ).toContain("FLIR One");
   }
+
+  /**
+   * The trigger, not the confirm button inside the dialog. Same defect as the
+   * popovers above (#426): it stayed live through the fulfilment and the
+   * refetch behind it.
+   */
+  /**
+   * The other half of #426's focus problem, on the second dialog. One
+   * representative test was not enough: the first fix guarded Escape and
+   * outside clicks and left the close X, which `DialogContent` renders by
+   * default and which reaches `onOpenChange` directly, so the X is tested
+   * explicitly here rather than taken on trust.
+   */
+  it.each(["Escape", "close X"])(
+    "refuses to close mid-write via %s",
+    async (route) => {
+      const write = deferred<void>();
+      vi.mocked(fulfillCustomLine).mockReturnValue(write.promise as never);
+      render(
+        <FulfillCustomLineDialog
+          line={pending}
+          onDone={() => Promise.resolve()}
+          requesterEmail="requester@x.edu"
+        />
+      );
+      await linkFirstMatch();
+      fireEvent.click(screen.getByRole("button", { name: "Confirm fulfil" }));
+      await waitFor(() =>
+        expect(
+          screen
+            .getByRole("button", { hidden: true, name: "Fulfil" })
+            .hasAttribute("disabled")
+        ).toBe(true)
+      );
+
+      if (route === "Escape") {
+        fireEvent.keyDown(document.activeElement ?? document.body, {
+          key: "Escape",
+        });
+      } else {
+        fireEvent.click(screen.getByRole("button", { name: /close/i }));
+      }
+      expect(screen.getByRole("dialog")).toBeTruthy();
+
+      write.resolve();
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      // No focus assertion here. Two were tried and neither went red with the
+      // guard reverted, so they asserted nothing. The mechanism is not pinned
+      // down: focus is observable in jsdom through Radix (`tabs.test.tsx` asserts
+      // `toHaveFocus` through a roving tabindex), but those tests drive it with
+      // `userEvent` where these use `fireEvent.keyDown`, which is the first thing
+      // to try if anyone picks this up.
+      // Nothing covers the browser behaviour today, and unlike the reject
+      // popover no browser test opens this dialog at all.
+    }
+  );
+
+  it("disables the Fulfil trigger until the write settles", async () => {
+    const write = deferred<void>();
+    vi.mocked(fulfillCustomLine).mockReturnValue(write.promise as never);
+    render(
+      <FulfillCustomLineDialog
+        line={pending}
+        onDone={() => Promise.resolve()}
+        requesterEmail="requester@x.edu"
+      />
+    );
+
+    // `hidden` because this dialog is modal, unlike the popovers above: the
+    // overlay `aria-hidden`s the trigger while it is open.
+    const button = () =>
+      screen.getByRole("button", { hidden: true, name: "Fulfil" });
+    expect(button().hasAttribute("disabled")).toBe(false);
+
+    await linkFirstMatch();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm fulfil" }));
+    await waitFor(() => expect(button().hasAttribute("disabled")).toBe(true));
+
+    write.resolve();
+    await waitFor(() => expect(button().hasAttribute("disabled")).toBe(false));
+  });
 
   it("unlinks an item and offers it again", async () => {
     render(

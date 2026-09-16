@@ -17,6 +17,7 @@ import {
   vi,
 } from "vitest";
 import { ExportCsvButton } from "#/components/export-csv-button";
+import { deferred } from "./shared/deferred";
 
 /**
  * jsdom implements neither `Blob` payload introspection nor the
@@ -32,14 +33,6 @@ class BlobStub {
     this.parts = parts;
     this.options = options;
   }
-}
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
 }
 
 interface AnchorStub {

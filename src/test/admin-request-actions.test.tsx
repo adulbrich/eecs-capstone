@@ -10,6 +10,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { AdminRequestActions } from "#/components/admin-request-actions";
 import { approveRequestItem, rejectRequestItem } from "#/server/inventory";
 import { installResizeObserver } from "./radix-jsdom";
+import { deferred } from "./shared/deferred";
 
 vi.mock("#/server/inventory", () => ({
   approveRequestItem: vi.fn(),
@@ -36,6 +37,93 @@ function renderPending() {
 }
 
 describe("AdminRequestActions", () => {
+  /**
+   * A popover restores focus to its trigger on close just as a dialog does,
+   * and the trigger is `disabled` while busy, so dismissing mid-write stranded
+   * the reader on `<body>` here too (#426). The guard sits in `dismiss()`,
+   * which Escape and an outside click both reach. Cancel does not: it calls
+   * `close()` directly and is held off by `disabled={busy}` instead.
+   */
+  it("refuses to close mid-write", async () => {
+    const write = deferred<void>();
+    vi.mocked(approveRequestItem).mockReturnValue(write.promise as never);
+    renderPending();
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm approve" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Approve" }).hasAttribute("disabled")
+      ).toBe(true)
+    );
+
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: "Escape",
+    });
+    expect(screen.getByLabelText("Pickup by (optional)")).toBeTruthy();
+
+    write.resolve();
+    await waitFor(() =>
+      expect(screen.queryByLabelText("Pickup by (optional)")).toBeNull()
+    );
+    // No focus assertion here. Two were tried and neither went red with the
+    // guard reverted, so they asserted nothing. The mechanism is not pinned
+    // down: focus is observable in jsdom through Radix (`tabs.test.tsx` asserts
+    // `toHaveFocus` through a roving tabindex), but those tests drive it with
+    // `userEvent` where these use `fireEvent.keyDown`, which is the first thing
+    // to try if anyone picks this up.
+    // Nothing covers the browser behaviour today, and it is not cheap to add.
+    // Both popovers on this component close through `dismiss()`, and both are
+    // driven in a browser already (`inventory.e2e.test.ts` approves,
+    // `inventory-requests.e2e.test.ts` rejects), but each follows its confirm
+    // with `toHaveCount(0)`: the queue is filtered to pending, so the row and
+    // its trigger leave the DOM and a focus assertion has nothing to land on.
+    // Covering this means holding the write open, dismissing, then asserting.
+  });
+
+  /**
+   * The trigger, not the confirm button inside the popover. That one was
+   * always guarded; this one stayed live for the whole write and the refetch
+   * behind it, offering to reopen a decision over a row the loader had not
+   * caught up with (#426). What was broken is what the reader was told, not
+   * what was written: Confirm is `disabled={busy}` and `busy` committed many
+   * frames before a reopened surface could be confirmed, so the second
+   * decision never reached the server. That is narrower than it sounds.
+   * This component has no in-flight ref, and `src/lib/use-action.ts` is the
+   * repo's own note that a disabled prop alone does not stop a second call
+   * arriving inside one tick.
+   */
+  it.each([
+    ["Approve", "Confirm approve"],
+    ["Reject", "Confirm reject"],
+  ])(
+    "disables the %s trigger until the write settles",
+    async (trigger, confirm) => {
+      const write = deferred<void>();
+      const fn = trigger === "Approve" ? approveRequestItem : rejectRequestItem;
+      vi.mocked(fn).mockReturnValue(write.promise as never);
+      renderPending();
+
+      const button = () => screen.getByRole("button", { name: trigger });
+      expect(button().hasAttribute("disabled")).toBe(false);
+
+      fireEvent.click(button());
+      if (trigger === "Reject") {
+        fireEvent.change(screen.getByLabelText("Reason (sent to requester)"), {
+          target: { value: "Out of stock" },
+        });
+      }
+      fireEvent.click(screen.getByRole("button", { name: confirm }));
+
+      await waitFor(() => expect(button().hasAttribute("disabled")).toBe(true));
+
+      write.resolve();
+      await waitFor(() =>
+        expect(button().hasAttribute("disabled")).toBe(false)
+      );
+    }
+  );
+
   it("offers Approve and Reject for a pending line", () => {
     renderPending();
 
