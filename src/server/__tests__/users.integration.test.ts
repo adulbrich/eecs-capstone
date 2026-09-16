@@ -76,7 +76,6 @@ describe("AI usage per user (#413)", () => {
       { feature: "review", calls: 2 },
       { feature: "scope", calls: 1 },
     ]);
-    expect(aiUsage.totalCalls).toBe(3);
     expect(aiUsage.inputTokens).toBe(37);
     expect(aiUsage.reasoningTokens).toBe(6);
     expect(aiUsage.outputTokens).toBe(3 + 2 + 1);
@@ -95,7 +94,6 @@ describe("AI usage per user (#413)", () => {
 
     const quiet = await makeUser(`nocalls-${Date.now()}@x.com`, "user");
     const { aiUsage } = await getUserImpl({ id: quiet.id });
-    expect(aiUsage.totalCalls).toBe(0);
     expect(aiUsage.inputTokens).toBe(0);
     expect(aiUsage.lastCallAt).toBeNull();
     expect(aiUsage.byFeature.every((row) => row.calls === 0)).toBe(true);

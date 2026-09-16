@@ -55,11 +55,13 @@ const SEARCH_LIMIT = 10;
  * correlated subquery rather than a join, so a user who has never used the
  * feature still comes back, with a 0 (#413).
  *
- * `db.$count` rather than a `sql` template of the same shape: inside a select
- * projection Drizzle renders an interpolated column unqualified, so the
- * hand-written version compared `ai_review_usage.user_id` against
- * `ai_review_usage.id` and the query failed outright. `$count` qualifies both
- * sides.
+ * `db.$count` rather than a `sql` template of the same shape: in a select
+ * projection with no joins, Drizzle strips the table from every column
+ * interpolated at the top level, so the hand-written version compared
+ * `ai_review_usage.user_id` against `ai_review_usage.id` and the query failed
+ * outright. `$count` builds its `where` as a nested `SQL`, which the strip
+ * does not descend into, so the qualification survives. See `docs/QUIRKS.md`,
+ * Drizzle.
  *
  * Wrapped rather than used bare, for the two things the wrapper adds. `.as`
  * names the output column, which is what the ORDER BY below reads instead of
@@ -418,7 +420,6 @@ async function aiUsageFor(userId: string) {
   }, null);
   return {
     byFeature,
-    totalCalls: rows.reduce((sum, row) => sum + row.calls, 0),
     inputTokens: rows.reduce((sum, row) => sum + row.inputTokens, 0),
     reasoningTokens: rows.reduce((sum, row) => sum + row.reasoningTokens, 0),
     outputTokens: rows.reduce((sum, row) => sum + row.outputTokens, 0),
