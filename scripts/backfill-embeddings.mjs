@@ -223,11 +223,10 @@ const SELECT_SQL = `
  * batching, because the category order decides the source string and so the
  * hash. Neither side sorts, so matching the app's query shape is the closest
  * thing to matching its order. A mismatch is never a wrong vector, but its
- * cost grew when this stopped skipping rows that have one: a project whose
- * categories come back in a different order here than the app stored them now
- * re-embeds on every sweep rather than once, the next time somebody edits it.
- * Sorting both sides would fix it and would re-hash every multi-category
- * project once; it is deliberately not done here.
+ * cost grew when this stopped skipping rows that already have one: a project
+ * whose categories come back here in a different order than the app stored
+ * them used to cost one re-embed, the next time somebody edited it, and now
+ * costs one on every sweep. Sorting both sides is #457.
  */
 const CATEGORIES_SQL = `
   SELECT c.name
@@ -339,8 +338,8 @@ async function main() {
         // Bedrock at all: one skipped on its hash, and a row that threw in a
         // query above. Throttling neither is the point, and without this a
         // sweep of rows that are nearly all unchanged would spend `DELAY_MS`
-        // on every one of them. It is also the one place the two sweepers
-        // differ: `backfill-embeddings.ts` sleeps after a failure of any kind.
+        // on every one of them. It is also where the two sweepers differ:
+        // `backfill-embeddings.ts` sleeps after a failure of any kind.
         if (calledBedrock) {
           await sleep(DELAY_MS);
         }

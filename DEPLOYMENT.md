@@ -669,8 +669,8 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
 ```
 
 It checks every `published` or `archived` project and embeds the ones whose
-stored hash does not match the text they carry now, which on a first run is all
-of them. Budget about five minutes for 547 rows at one Bedrock call each plus a
+stored hash does not match the text they carry now, and the ones with no vector
+at all whatever their hash says. On a first run that is all of them. Budget about five minutes for 547 rows at one Bedrock call each plus a
 200ms politeness delay. The CloudWatch log should end with:
 
 ```
@@ -721,7 +721,7 @@ counts both groups before it writes:
   12 new, 547 already imported (will be overwritten)
 ```
 
-Two things are exempt from that replacement. `image_url` is written with
+Three things are exempt from that replacement. `image_url` is written with
 `COALESCE(excluded.image_url, projects.image_url)`, so a re-run without
 `image-keys.json` keeps the images a row already has rather than nulling them
 while the objects sit in the bucket. And a program is never created: a missing
@@ -729,6 +729,13 @@ while the objects sit in the bucket. And a program is never created: a missing
 an identifier drifted, where inserting would attach projects to a brand new
 program that merely looks right. `--create-missing-programs` opts in, for a
 fresh local database with nothing to match.
+
+The third is the three embedding columns, which the upsert never names, so a
+re-run leaves whatever vector a row is already carrying. That is not an
+oversight and it is not free: the re-run reverts the text, the vector stays
+built from the text before it, and nothing in the app re-embeds a row nobody
+edits. Running 7a.5 afterwards is what closes that, and it is why 7a.5 says to
+run it after every import rather than only the first.
 
 Pass `--skip-existing` to add only the rows that are not there yet and leave
 the rest untouched:

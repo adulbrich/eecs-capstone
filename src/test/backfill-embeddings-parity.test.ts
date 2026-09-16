@@ -24,7 +24,12 @@ import { describe, expect, it } from "vitest";
  * - The embedded text drifts. The script stores vectors computed from text the
  *   app would never produce for that project. Nothing errors, the stored hash
  *   still looks valid to the app, so nothing recomputes them, and
- *   recommendations quietly get worse. The only silent one.
+ *   recommendations quietly get worse.
+ * - The rule that decides a row needs no work drifts. Silent in one direction
+ *   and expensive in the other: lose the vector half and a row whose write was
+ *   interrupted is skipped by every sweeper forever with nothing to say so;
+ *   lose the hash half and every run re-embeds everything at one paid call
+ *   each.
  * - The hash inputs drift, including the model id and dimension defaults.
  *   Every row looks stale to whichever side did not change, so both sides
  *   re-embed rows that were already correct at one paid Bedrock call each, and
@@ -75,6 +80,23 @@ const EMBEDDINGS_FILE = readFileSync(
   "src/server/_internal/project-embeddings.ts",
   "utf8"
 );
+
+/**
+ * The same strip, applied to the `src/` side. Every other assertion against
+ * `EMBEDDINGS_FILE` matches a declaration, which a comment cannot be, so the
+ * raw text is safe for those. The skip pin below matches a statement, and
+ * `refreshProjectEmbedding`'s JSDoc already quotes a fragment of it, which is
+ * exactly the shape that satisfies a substring test without the code being
+ * there at all.
+ *
+ * Safe here for the same narrow reason it is safe for the script: this file
+ * contains no `://`, the sequence that would put a `//` inside a string, and
+ * the brace check below covers it too.
+ */
+const EMBEDDINGS_CODE = EMBEDDINGS_FILE.replace(
+  /\/\*[\s\S]*?\*\//g,
+  ""
+).replace(/\/\/.*$/gm, "");
 
 const STATUS_SET_PATTERN =
   /const EMBEDDABLE_STATUSES: readonly ProjectStatus\[\] = \[([^\]]*)\]/;
@@ -344,11 +366,14 @@ describe("the production backfill's copies of the embedding helpers", () => {
    * Compared against a literal on each side rather than against each other,
    * because the two cannot be byte-identical: the app holds the vector it
    * selected and the script selects `embedding IS NOT NULL` as a boolean, so
-   * it has no vector to test. That is the one permitted difference, and
-   * writing both out here is what makes it a decision instead of a drift.
+   * it has no vector to test. Writing both out here is what makes that a
+   * decision instead of a drift.
+   *
+   * Both sides read with their comments stripped, so neither can be satisfied
+   * by prose quoting the expression.
    */
   it("agree on when a row needs no work", () => {
-    expect(EMBEDDINGS_FILE).toContain(
+    expect(EMBEDDINGS_CODE).toContain(
       "if (project.embeddingSourceHash === hash && project.embedding) {"
     );
     expect(SCRIPT_CODE).toContain(
