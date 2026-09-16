@@ -7,7 +7,9 @@
  *
  * Satisfied when the body has a `## Screenshots` heading and, under it,
  * either one image (markdown `![...](...)` or an `<img ...>` tag) or a line
- * `Screenshots: none, because <reason>` with a non-empty reason. A pull
+ * `Screenshots: none, because <reason>` with a non-empty reason. "Under it"
+ * runs to the next `##`, so a `###` subsection per changed page counts; an
+ * image in the section after it does not. A pull
  * request that touches no UI path is exempt, and may still carry the
  * section. The template asks for a desktop and a phone image per changed
  * page; the script counts one, because it cannot tell widths apart, and the
@@ -38,7 +40,11 @@ export function isUiPath(path) {
 }
 
 const HEADING = /^##\s+Screenshots\s*$/m;
-const NEXT_HEADING = /^#{1,6}\s/m;
+// The section ends at the next heading of the same level or higher, so a
+// `###` subsection stays inside it. The template asks for an image per
+// changed page, which invites a subheading per page, and stopping at any
+// heading read those bodies as empty.
+const NEXT_HEADING = /^#{1,2}\s/m;
 const IMAGE = /!\[[^\]]*\]\([^)]+\)|<img\b[^>]*>/;
 const OPT_OUT = /^\s*Screenshots:\s*none,\s*because\s+(\S.*)$/m;
 

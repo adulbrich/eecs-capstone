@@ -42,6 +42,25 @@ const emptyOptOut = "## Screenshots\n\nScreenshots: none, because\n";
 const imageElsewhere =
   "## What changed\n\n![a](https://example.test/a.png)\n\n## Screenshots\n\nsee above\n";
 const noSection = "Closes #1\n\n## Review loop\n";
+/** A heading per changed page, which is the shape the template invites. */
+const perPageSubheadings = `## Screenshots
+
+Both changed pages, at both widths.
+
+### \`/projects?view=table\`
+
+![projects desktop](https://example.test/a.png)
+
+![projects phone](https://example.test/b.png)
+
+### \`/my/bookmarks?view=table\`
+
+![bookmarks desktop](https://example.test/c.png)
+
+## Review loop
+`;
+const imageInNextSection =
+  "## Screenshots\n\nsee below\n\n## Review loop\n\n![a](https://example.test/a.png)\n";
 
 describe("check-pr-screenshots", () => {
   it("passes a change outside the UI with no section", () => {
@@ -75,9 +94,21 @@ describe("check-pr-screenshots", () => {
   });
 
   it("fails an image outside the section", () => {
-    const result = check(imageElsewhere, UI);
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("no image");
+    for (const body of [imageElsewhere, imageInNextSection]) {
+      const result = check(body, UI);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("no image");
+    }
+  });
+
+  /**
+   * The section runs to the next `##`, not to the next heading of any level.
+   * A body with a subheading per changed page put every image below the
+   * first `###`, so the section read as empty and the check rejected a body
+   * carrying four screenshots (#440).
+   */
+  it("passes images under a subheading of the section", () => {
+    expect(check(perPageSubheadings, UI).status).toBe(0);
   });
 
   it("exempts test-only changes under a UI path", () => {
