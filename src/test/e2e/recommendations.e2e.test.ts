@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { SEED_RECOMMENDED_TITLES } from "../../../scripts/seed-recommendations";
 import { waitForHydration } from "../shared/playwright";
 import { OTHER_AUTH, USER_AUTH } from "./constants";
@@ -18,7 +18,7 @@ import { OTHER_AUTH, USER_AUTH } from "./constants";
 const RECOMMENDED = "Recommended for you";
 
 /** The Sort trigger, which renders the resolved order as its own text. */
-function sortTrigger(page: import("@playwright/test").Page) {
+function sortTrigger(page: Page): Locator {
   return page.getByRole("combobox", { name: "Sort" });
 }
 
@@ -29,7 +29,7 @@ function sortTrigger(page: import("@playwright/test").Page) {
  * listbox is modal and `aria-hidden`s the rest of the page, so anything the
  * caller looks at afterwards is missing from the accessibility tree.
  */
-async function expectRecommendedRefused(page: import("@playwright/test").Page) {
+async function expectRecommendedRefused(page: Page): Promise<void> {
   await sortTrigger(page).click();
   await expect(page.getByRole("option", { name: RECOMMENDED })).toHaveAttribute(
     "aria-disabled",
@@ -121,9 +121,10 @@ test.describe("recommended order", () => {
 
     // The trigger renders the resolved order as its own text, so the value is
     // readable with the listbox shut. Not the option's `aria-selected`: Radix
-    // sets that to `isSelected && isFocused`, so it answers which item the
-    // listbox focused on open, not what the Select's value is.
-    await expect(sortTrigger(page)).toContainText(RECOMMENDED);
+    // sets that to `isSelected && isFocused`, which does track the value but
+    // pins Radix's open-focus behaviour along with it, and can only be read
+    // through a listbox that `aria-hidden`s everything below.
+    await expect(sortTrigger(page)).toHaveText(RECOMMENDED);
 
     // The seed's published projects, nearest the interest vector first. Rows
     // with no vector (anything another test published) sort after them, so
@@ -157,7 +158,7 @@ test.describe("recommended order", () => {
     );
     expect(recommended).toEqual([...SEED_RECOMMENDED_TITLES]);
 
-    await page.getByRole("combobox", { name: "Sort" }).click();
+    await sortTrigger(page).click();
     await page.getByRole("option", { name: "Most relevant" }).click();
     await page.waitForURL(/order=relevance/);
 

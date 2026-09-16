@@ -347,7 +347,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
 
   "server/search.ts:searchProjects": {
     level: "public",
-    note: "The public listing. The viewer id picks the ordering when no sort is sent (#424), so a member with an interests vector and a visitor get the same rows in different orders. It still hides and reveals nothing: no row turns on who is asking.",
+    note: "The public listing. The viewer id picks the ordering when no sort is sent (#424), and the order decides which page a row lands on, so a member with a vector and a visitor see the same set paginated differently. It still hides and reveals nothing: no row turns on who is asking.",
   },
 
   "server/uploads.ts:clearAvatar": { level: "authenticated" },
