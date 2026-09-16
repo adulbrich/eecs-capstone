@@ -5,10 +5,11 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 /**
- * The rule from #342, driven the way `pr-text` and the `gh` hook drive it:
- * as a process with an exit code. `scripts/` sits outside the TypeScript
- * project, so the CLI is the seam rather than an import, as for the other
- * two rule scripts in `check-scripts.test.ts`.
+ * The rule from #342, driven the way `pr-text` drives it: as a process with
+ * an exit code. `scripts/` sits outside the TypeScript project, so the CLI
+ * is the seam rather than an import, as for the other two rule scripts in
+ * `check-scripts.test.ts`. The `gh` hook is the other caller and imports
+ * `checkPrScreenshots` directly, so it shares the rule but not this seam.
  */
 const env = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_"))
@@ -94,10 +95,13 @@ describe("check-pr-screenshots", () => {
   });
 
   it("fails an image outside the section", () => {
-    for (const body of [imageElsewhere, imageInNextSection]) {
+    for (const [name, body] of [
+      ["before the heading", imageElsewhere],
+      ["under the next ##", imageInNextSection],
+    ] as const) {
       const result = check(body, UI);
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain("no image");
+      expect(result.status, name).toBe(1);
+      expect(result.stderr, name).toContain("no image");
     }
   });
 
