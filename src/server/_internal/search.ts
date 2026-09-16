@@ -129,11 +129,9 @@ export async function searchProjectsImpl(
     .leftJoin(programs, eq(projects.programId, programs.id))
     .where(and(...conditions))
     // `projects.id` last, always, and passed here rather than appended to each
-    // branch above so that a fourth ordering cannot forget it. It is what makes
-    // every ordering total, and a total ordering is what makes paging correct:
-    // each page is its own `LIMIT`/`OFFSET` query, and rows tied on every key
-    // come back in whatever order Postgres likes, which differs per page. See
-    // "Paging a listing needs a total ordering" in docs/QUIRKS.md (#429).
+    // branch above so that a fourth ordering cannot forget it. Why an ordering
+    // has to be total: "Paging a listing needs a total ordering" in
+    // docs/QUIRKS.md (#429).
     .orderBy(orderBy, projects.id)
     .limit(data.pageSize)
     .offset(offset);

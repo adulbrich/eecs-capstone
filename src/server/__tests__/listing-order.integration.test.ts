@@ -12,11 +12,10 @@ import { searchProjectsImpl } from "#/server/_internal/search";
  * different relative order per page. A row then appears twice, and another
  * never appears at all (#429).
  *
- * The row count and the page size are load-bearing, and "Paging a listing needs
- * a total ordering" in docs/QUIRKS.md says why: below roughly this size the
- * planner sorts the whole set at once and the broken ordering looks correct.
+ * The row count and the page size are load-bearing; "Paging a listing needs a
+ * total ordering" in docs/QUIRKS.md says why, and this file does not repeat it.
  * Each of the five "exactly once" tests below was watched failing against the
- * unfixed ordering, at 400 rows, before the fix went in. Do not trim them.
+ * unfixed ordering, at these numbers, before the fix went in. Do not trim them.
  *
  * Rows are inserted straight rather than driven through the workflow. What is
  * under test is the `ORDER BY`, and 400 projects through four transitions each
@@ -134,7 +133,7 @@ describe("paging a listing whose rows tie on every sort key", () => {
 
   it("visits each project exactly once under recommended", async () => {
     const ids = await insertTiedProjects(unitVector(0));
-    const viewerId = await makeViewer(`rec-${Date.now()}@x.com`);
+    const viewerId = await makeViewer("viewer@x.com");
     await db.insert(userInterests).values({
       userId: viewerId,
       interestsText: "robotics",
@@ -156,7 +155,7 @@ describe("paging a listing whose rows tie on every sort key", () => {
    */
   it("visits each project exactly once under recommended with no vector on any row", async () => {
     const ids = await insertTiedProjects(null);
-    const viewerId = await makeViewer(`null-${Date.now()}@x.com`);
+    const viewerId = await makeViewer("viewer@x.com");
     await db.insert(userInterests).values({
       userId: viewerId,
       interestsText: "robotics",
