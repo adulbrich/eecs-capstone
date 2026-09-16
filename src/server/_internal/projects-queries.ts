@@ -213,7 +213,14 @@ function buildAdminProjectListConditions(data: AdminProjectsFilter): SQL[] {
       ilike(projects.contactName, like),
       ilike(projects.contactEmail, like),
       ilike(user.name, like),
-      ilike(user.email, like)
+      ilike(user.email, like),
+      // Both proposer addresses, not only the account's. The Proposer column
+      // renders `coalesce(user.email, projects.proposer_email)`, and a
+      // proposer named by address who has not signed in yet has nothing but
+      // the stored column, as does one whose account was deleted. Matching
+      // the join alone put an address on the page that the search box above
+      // it could not find (#451).
+      ilike(projects.proposerEmail, like)
     );
     if (match) {
       listConditions.push(match);

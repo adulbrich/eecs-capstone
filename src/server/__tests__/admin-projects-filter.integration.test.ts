@@ -81,6 +81,37 @@ function filter(
   };
 }
 
+/**
+ * A project with an address recorded as its proposer. Whether an account
+ * answers to that address is the caller's business: `updateProjectProposerAs`
+ * links one if it finds one, and leaves the address standing alone if not.
+ */
+async function projectWithProposerAddress(
+  admin: Awaited<ReturnType<typeof makeAdmin>>,
+  title: string,
+  proposerEmail: string
+) {
+  const project = await createProjectAs(admin, baseProject(title, null));
+  await updateProjectProposerAs(admin, {
+    id: project.id,
+    proposerEmail,
+    studentProposed: false,
+  });
+  return project;
+}
+
+/** The same shape, reached by deleting the account the project was linked to. */
+async function projectWithDeletedProposer(
+  admin: Awaited<ReturnType<typeof makeAdmin>>,
+  title: string,
+  proposerEmail: string
+) {
+  const proposer = await makeAdmin(proposerEmail);
+  const project = await projectWithProposerAddress(admin, title, proposerEmail);
+  await db.delete(user).where(eq(user.id, proposer.id));
+  return project;
+}
+
 describe("admin projects program filter", () => {
   it("returns only projects in the selected program", async () => {
     const admin = await makeAdmin(`a-${Date.now()}@x.com`);
@@ -348,6 +379,20 @@ describe("admin project search reaches people, not just text", () => {
     expect(rows.map((r) => r.title)).toEqual(["Trail Mapper"]);
   });
 
+  it("finds a project by the proposer account's name", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    const proposer = await makeAdmin("mvega@example.edu");
+    // `makeAdmin` names the account after its address, which would let an
+    // address match stand in for a name match and pin nothing.
+    await db
+      .update(user)
+      .set({ name: "Marisol Vega" })
+      .where(eq(user.id, proposer.id));
+    await createProjectAs(proposer, baseProject("Tide Gauge", null));
+    const { rows } = await listAdminProjectsAs(admin, filter({ q: "Marisol" }));
+    expect(rows.map((r) => r.title)).toEqual(["Tide Gauge"]);
+  });
+
   it("finds a project by its contact name", async () => {
     const admin = await makeAdmin("staff@example.edu");
     await createProjectAs(admin, {
@@ -381,17 +426,11 @@ describe("admin project search reaches people, not just text", () => {
 
   it("falls back to the stored proposerEmail when the proposer account is deleted", async () => {
     const admin = await makeAdmin("staff@example.edu");
-    const proposer = await makeAdmin("leaving2@example.edu");
-    const leaving = await createProjectAs(
+    await projectWithDeletedProposer(
       admin,
-      baseProject("Deleted Account Proposer", null)
+      "Deleted Account Proposer",
+      "leaving2@example.edu"
     );
-    await updateProjectProposerAs(admin, {
-      id: leaving.id,
-      proposerEmail: "leaving2@example.edu",
-      studentProposed: false,
-    });
-    await db.delete(user).where(eq(user.id, proposer.id));
     const { rows } = await listAdminProjectsAs(admin, filter({ q: "" }));
     const row = rows.find((r) => r.title === "Deleted Account Proposer");
     expect(row?.proposerId).toBeNull();
@@ -400,19 +439,75 @@ describe("admin project search reaches people, not just text", () => {
 
   it("reports the stored proposerEmail for a proposal that matches no account yet", async () => {
     const admin = await makeAdmin("staff@example.edu");
-    const unlinked = await createProjectAs(
+    await projectWithProposerAddress(
       admin,
-      baseProject("Unlinked Proposal", null)
+      "Unlinked Proposal",
+      "unregistered@example.edu"
     );
-    await updateProjectProposerAs(admin, {
-      id: unlinked.id,
-      proposerEmail: "unregistered@example.edu",
-      studentProposed: false,
-    });
     const { rows } = await listAdminProjectsAs(admin, filter({ q: "" }));
     const row = rows.find((r) => r.title === "Unlinked Proposal");
     expect(row?.proposerId).toBeNull();
     expect(row?.proposerEmail).toBe("unregistered@example.edu");
+  });
+
+  it("finds a project by the stored proposer address when no account matches it yet", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    await projectWithProposerAddress(
+      admin,
+      "Unlinked Proposal",
+      "unregistered@example.edu"
+    );
+    const whole = await listAdminProjectsAs(
+      admin,
+      filter({ q: "unregistered@example.edu" })
+    );
+    expect(whole.rows.map((r) => r.title)).toEqual(["Unlinked Proposal"]);
+    const fragment = await listAdminProjectsAs(
+      admin,
+      filter({ q: "nregistered" })
+    );
+    expect(fragment.rows.map((r) => r.title)).toEqual(["Unlinked Proposal"]);
+  });
+
+  it("finds a project by the stored address and by the linked account's, once the two have diverged", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    await makeAdmin("typed@example.edu");
+    await projectWithProposerAddress(
+      admin,
+      "Renamed Account",
+      "typed@example.edu"
+    );
+    // The proposer changes their own address afterwards. The project keeps
+    // the address staff typed, so the two disagree and both have to find it.
+    await db
+      .update(user)
+      .set({ email: "renamed@example.edu" })
+      .where(eq(user.email, "typed@example.edu"));
+
+    const byStored = await listAdminProjectsAs(
+      admin,
+      filter({ q: "typed@example.edu" })
+    );
+    expect(byStored.rows.map((r) => r.title)).toEqual(["Renamed Account"]);
+    const byAccount = await listAdminProjectsAs(
+      admin,
+      filter({ q: "renamed@example.edu" })
+    );
+    expect(byAccount.rows.map((r) => r.title)).toEqual(["Renamed Account"]);
+  });
+
+  it("finds a project by a fragment of the address left behind when the proposer account is deleted", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    await projectWithDeletedProposer(
+      admin,
+      "Handover Project",
+      "departed@example.edu"
+    );
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ q: "departed@" })
+    );
+    expect(rows.map((r) => r.title)).toEqual(["Handover Project"]);
   });
 });
 
