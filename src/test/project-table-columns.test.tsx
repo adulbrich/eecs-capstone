@@ -136,7 +136,9 @@ function rowFor(title: string) {
 
 /**
  * One row's cell for one column, through the `data-label` `AdminDataTable`
- * derives from each column's header (`docs/UI-CONVENTIONS.md`). Scoping to
+ * derives from each column's header (`docs/UI-CONVENTIONS.md`). Not the
+ * card-header column: that one cell carries no `data-label` on purpose, so
+ * `cellFor(title, "Title")` always throws. Scoping to
  * the cell is what makes a dash assertion mean anything: a row that is
  * empty in one column is usually empty in several, so `getAllByText("-")`
  * over the row passes with the column's own dash deleted.
@@ -198,12 +200,16 @@ describe("the public project table", () => {
     // it made every chip a full line and a five-category project a five-line
     // row. The chips are already ordered by facet; the title carries it.
     renderTable(DEFAULT_HIDDEN);
-    const row = rowFor("Rover Telemetry");
-    const chip = row.getByText("Robotics").closest('[data-slot="badge"]');
+    const categories = within(cellFor("Rover Telemetry", "Categories"));
+    const chip = categories
+      .getByText("Robotics")
+      .closest('[data-slot="badge"]');
     expect(chip).not.toBeNull();
     expect(chip?.textContent).toBe("Robotics");
     expect(chip?.getAttribute("title")).toBe("field");
-    expect(row.getByText("Web").closest('[data-slot="badge"]')).not.toBeNull();
+    expect(
+      categories.getByText("Web").closest('[data-slot="badge"]')
+    ).not.toBeNull();
     expect(cellFor("Bare Minimum", "Categories").textContent?.trim()).toBe("-");
   });
 
@@ -220,7 +226,10 @@ describe("the public project table", () => {
   it("renders the card's badge row in one column, and a dash for none", () => {
     // The card's whole badge row, in the card's own words and rendered by
     // the card's own component. Two columns of "Yes" and dashes became this
-    // (#434). The queries below are scoped to the cell, not the table row.
+    // (#434). The positives and the dash read the Badges cell, because
+    // "in one column" is the claim. The negatives stay row-wide on purpose:
+    // "nowhere in this row" is the stronger statement, and it is what
+    // catches the cluster being rendered into some other cell.
     renderTable(DEFAULT_HIDDEN);
     const badged = within(badgesCellFor("Rover Telemetry"));
     expect(badged.getByText("Team is full")).toBeTruthy();
