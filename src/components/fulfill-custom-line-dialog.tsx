@@ -154,7 +154,10 @@ export function FulfillCustomLineDialog({
           Fulfil
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent
+        onEscapeKeyDown={(e) => busy && e.preventDefault()}
+        onInteractOutside={(e) => busy && e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Fulfil: {line.name}</DialogTitle>
           <DialogDescription>

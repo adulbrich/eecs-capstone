@@ -56,6 +56,49 @@ describe("ApproveAllDialog", () => {
    * the whole batch write and the refetch behind it, offering to reopen a
    * decision over rows the loader had not caught up with (#426).
    */
+  /**
+   * The regression the disabled trigger nearly introduced. A disabled element
+   * cannot hold focus, so when Radix restores focus to the trigger on close it
+   * lands on nothing and the user is dropped on `<body>`, with no way back to
+   * the row by keyboard. The dialog refuses Escape and outside clicks while the
+   * write is in flight, which is what the confirm and cancel buttons already
+   * do, so the close and the re-enable can never race.
+   *
+   * axe cannot see this: it scans a static tree, and this is a transition.
+   */
+  it("refuses to close mid-write, so focus is never stranded", async () => {
+    const write = deferred<{ approved: string[] }>();
+    vi.mocked(approveRequestLines).mockReturnValue(write.promise as never);
+    render(
+      <ApproveAllDialog
+        lines={lines}
+        onDone={() => Promise.resolve()}
+        requesterEmail="student@x.edu"
+      />
+    );
+    openDialog();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm approve all" })
+    );
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { hidden: true, name: "Approve all" })
+          .hasAttribute("disabled")
+      ).toBe(true)
+    );
+
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: "Escape",
+    });
+    expect(screen.getByRole("dialog")).toBeTruthy();
+
+    write.resolve({ approved: ["a", "b"] });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.body.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
   it("disables the Approve all trigger until the write settles", async () => {
     const write = deferred<{ approved: string[] }>();
     vi.mocked(approveRequestLines).mockReturnValue(write.promise as never);

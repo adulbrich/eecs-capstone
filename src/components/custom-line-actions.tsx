@@ -82,7 +82,11 @@ export function CustomLineActions({
             {sourcing ? "Update note" : "Start sourcing"}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-72 space-y-2">
+        <PopoverContent
+          className="w-72 space-y-2"
+          onEscapeKeyDown={(e) => busy && e.preventDefault()}
+          onInteractOutside={(e) => busy && e.preventDefault()}
+        >
           <Label htmlFor={`sourcing-note-${line.id}`}>
             {sourcing
               ? "New note (sent to requester)"
@@ -154,7 +158,11 @@ export function CustomLineActions({
             Reject
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-72 space-y-2">
+        <PopoverContent
+          className="w-72 space-y-2"
+          onEscapeKeyDown={(e) => busy && e.preventDefault()}
+          onInteractOutside={(e) => busy && e.preventDefault()}
+        >
           <Label htmlFor={`reject-reason-${line.id}`}>
             Reason (sent to requester)
           </Label>

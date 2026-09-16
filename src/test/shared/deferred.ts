@@ -7,10 +7,11 @@
  * Nothing about it is specific to any of them, and a helper copied four times
  * is one that gets fixed in three places.
  *
- * `use-action.test.tsx` keeps its own, deliberately: that one also hands back a
- * `reject`, and wraps both in closures so they read the binding the executor
- * assigned rather than the placeholder that existed when it returned. It is
- * testing the hook's own flight, so it needs the failing path too.
+ * `use-action.test.tsx` keeps its own, deliberately: it tests the hook's own
+ * flight, so it needs the failing path and hands back a `reject` too. Its
+ * comment about wrapping the callbacks in closures is not the reason and is not
+ * repeated here: a promise executor runs synchronously, so the plain bindings
+ * are already assigned by the time that helper returns.
  */
 export function deferred<T>() {
   let resolve!: (value: T) => void;

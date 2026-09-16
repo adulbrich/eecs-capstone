@@ -92,7 +92,10 @@ export function ApproveAllDialog({
           Approve all
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent
+        onEscapeKeyDown={(e) => busy && e.preventDefault()}
+        onInteractOutside={(e) => busy && e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>
             Approve {count} {count === 1 ? "line" : "lines"}

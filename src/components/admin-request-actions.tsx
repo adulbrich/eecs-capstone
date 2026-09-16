@@ -108,7 +108,11 @@ export function AdminRequestActions({
             Approve
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-64 space-y-2">
+        <PopoverContent
+          className="w-64 space-y-2"
+          onEscapeKeyDown={(e) => busy && e.preventDefault()}
+          onInteractOutside={(e) => busy && e.preventDefault()}
+        >
           <Label htmlFor={`pickup-${lineId}`}>Pickup by (optional)</Label>
           <Input
             id={`pickup-${lineId}`}
@@ -155,7 +159,11 @@ export function AdminRequestActions({
             Reject
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-72 space-y-2">
+        <PopoverContent
+          className="w-72 space-y-2"
+          onEscapeKeyDown={(e) => busy && e.preventDefault()}
+          onInteractOutside={(e) => busy && e.preventDefault()}
+        >
           <Label htmlFor={`reason-${lineId}`}>Reason (sent to requester)</Label>
           <Textarea
             id={`reason-${lineId}`}

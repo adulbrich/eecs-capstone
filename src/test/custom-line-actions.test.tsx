@@ -293,8 +293,7 @@ describe("CustomLineActions: the trigger during its own write", () => {
         />
       );
 
-      const button = () =>
-        screen.getByRole("button", { hidden: true, name: trigger });
+      const button = () => screen.getByRole("button", { name: trigger });
       expect(button().hasAttribute("disabled")).toBe(false);
 
       fireEvent.click(button());
@@ -304,12 +303,9 @@ describe("CustomLineActions: the trigger during its own write", () => {
         });
       }
       fireEvent.click(
-        within(screen.getByRole("dialog", { hidden: true })).getByRole(
-          "button",
-          {
-            name: confirm,
-          }
-        )
+        within(screen.getByRole("dialog")).getByRole("button", {
+          name: confirm,
+        })
       );
 
       await waitFor(() => expect(button().hasAttribute("disabled")).toBe(true));
