@@ -159,6 +159,21 @@ function rowFor(title: string): HTMLElement {
   return row;
 }
 
+/**
+ * The Badges cell, through the `data-label` every body cell carries. "Ten"
+ * renders a dash in Program too, and a badged row would satisfy a row-wide
+ * query with the cluster rendered in any other column, so the positives and
+ * the dash read the cell. The negatives below stay row-wide deliberately,
+ * for the reason `project-table-columns.test.tsx` gives beside its own.
+ */
+function badgesCellFor(title: string): HTMLElement {
+  const cell = rowFor(title).querySelector('td[data-label="Badges"]');
+  if (!cell) {
+    throw new Error(`no Badges cell for ${title}`);
+  }
+  return cell as HTMLElement;
+}
+
 function titlesInOrder(): string[] {
   return screen
     .getAllByRole("row")
@@ -193,23 +208,23 @@ describe("the bookmarks table", () => {
       "Title",
       "Program",
       "Status",
-      "Openings",
+      "Badges",
       "Teams supported",
-      "NDA/IP required",
       "Saved on",
     ]);
     expect(screen.queryByRole("button", { name: /Columns/ })).toBeNull();
   });
 
-  it("shows neither badge: the card and the page carry them, the table does not", () => {
+  it("shows nothing about mentorship", () => {
     // #336 took the Origin column out with the public table's Mentorship
-    // column, so a saved project's marks are read on its card or its page.
+    // column, and #402 made the mentor an address staff record that is never
+    // public, so no column can carry it. "Student proposed" was in this
+    // assertion until #434 gave the table the card's badge row.
     renderTable();
     const two = screen.getByRole("link", { name: "Two" }).closest("tr");
     if (!two) {
       throw new Error("no row");
     }
-    expect(within(two).queryByText("Student proposed")).toBeNull();
     expect(within(two).queryByText(/mentor/i)).toBeNull();
   });
 
@@ -224,10 +239,36 @@ describe("the bookmarks table", () => {
     expect(link.parentElement?.className).toContain("md:max-w-md");
   });
 
-  it("marks a closed roster and an NDA", () => {
+  /**
+   * The same pin as `project-table-columns.test.tsx`, and it earns its own
+   * copy: this table carried sortable `accepting` and `nda` columns before
+   * #434, so those stale URLs are just as reachable here, and the
+   * `enableSorting: false` that makes them fall back arrives through a
+   * spread rather than being written in this file. A `{ ...shared.badges }`
+   * that lost the flag would fail here and nowhere else.
+   */
+  it("keeps badges and the two removed ids out of the sortable set", () => {
+    const sortableIds = BOOKMARK_TABLE_COLUMNS.filter(
+      (column) => column.enableSorting !== false
+    ).map((column) => column.id);
+    expect(sortableIds).not.toContain("badges");
+    expect(sortableIds).not.toContain("accepting");
+    expect(sortableIds).not.toContain("nda");
+  });
+
+  it("renders the card's badge row in one column, and a dash for none", () => {
     renderTable();
-    expect(within(rowFor("Two")).getByText("Team is full")).toBeTruthy();
-    expect(within(rowFor("Two")).getByText("Required")).toBeTruthy();
+    const two = within(badgesCellFor("Two"));
+    expect(two.getByText("Team is full")).toBeTruthy();
+    expect(two.getByText("Student proposed")).toBeTruthy();
+    expect(two.getByText("NDA/IP required")).toBeTruthy();
+
+    // "Ten" carries every default: accepting, no NDA, not student proposed.
+    const ten = within(rowFor("Ten"));
+    expect(ten.queryByText("Team is full")).toBeNull();
+    expect(ten.queryByText("Student proposed")).toBeNull();
+    expect(ten.queryByText("NDA/IP required")).toBeNull();
+    expect(badgesCellFor("Ten").textContent?.trim()).toBe("-");
   });
 
   it("puts the listing's toggle in the Title cell, with no Remove column", async () => {

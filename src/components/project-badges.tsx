@@ -12,10 +12,15 @@ import { Badge } from "./ui/badge";
  * badges its own way. The detail page passes its status and team-full
  * badges as `children`, rendered before the marks, so the page has one
  * badge row under the title rather than two rows with two gaps (#400); the
- * card passes nothing and still renders nothing when no mark is set. The
- * agreement flag is also a badge column in the public and bookmark tables
- * and a CSV field on the staff route. Both listings filter on the same
- * facts (#336, #372).
+ * card passes nothing and still renders nothing when no mark is set.
+ *
+ * Since #434 the public and bookmark tables render this same row in their
+ * Badges column, passing `TeamFullBadge` as `children` the way the detail page
+ * does, in place of the two columns that used to spell two of these facts out
+ * as text. So a caller that passes children must handle the empty case itself:
+ * an element is truthy even when it renders nothing, so `children` alone keeps
+ * this from returning null. The agreement flag is also a CSV field on the
+ * staff route, and both listings filter on the same facts (#336, #372).
  */
 export function ProjectBadges({
   children,

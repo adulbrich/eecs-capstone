@@ -70,9 +70,8 @@ export const BOOKMARK_TABLE_COLUMNS = defineAdminColumns<BookmarkRow>()([
     header: "Status",
     id: "status",
   },
-  { ...shared.accepting, enableHiding: false },
+  { ...shared.badges, enableHiding: false },
   { ...shared.teams, enableHiding: false },
-  { ...shared.nda, enableHiding: false },
   {
     accessorFn: (row) => row.bookmarkedAt,
     cell: ({ row }) => <LocalTime dateOnly value={row.original.bookmarkedAt} />,

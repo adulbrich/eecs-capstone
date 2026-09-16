@@ -1,7 +1,7 @@
 import type { AdminColumn } from "#/components/admin-data-table";
+import { ProjectBadges } from "./project-badges";
 import { programLabel } from "./project-card";
 import { TeamFullBadge } from "./team-full-badge";
-import { Badge } from "./ui/badge";
 
 /** The fields of `projectSummarySelect` these columns read. */
 export interface ProjectSummaryRow {
@@ -9,6 +9,7 @@ export interface ProjectSummaryRow {
   programCourseId: string | null;
   programCourseName: string | null;
   requiresNdaIp: boolean;
+  studentProposed: boolean;
   teamsSupported: number;
 }
 
@@ -42,39 +43,51 @@ export function projectSummaryColumns<Row extends ProjectSummaryRow>() {
     sortFn: "basic",
   } satisfies AdminColumn<Row>;
 
-  const accepting = {
-    accessorFn: (row) => row.acceptingApplicants,
-    // "Yes" rather than the dash the NDA column uses for its ordinary case:
-    // under this header a dash would read as "no", the opposite of the truth.
-    cell: ({ row }) =>
-      row.original.acceptingApplicants ? (
-        "Yes"
-      ) : (
-        <TeamFullBadge acceptingApplicants={false} />
-      ),
-    // "Openings", not the whole phrase: this cell is a yes or no in a narrow
-    // column shared by /projects table mode, /admin/projects and
-    // /my/bookmarks, and a longer header wraps in all three.
-    header: "Openings",
-    id: "accepting" as const,
-    // Boolean, not text: see the Teams column.
-    sortFn: "basic",
-  } satisfies AdminColumn<Row>;
-
-  const nda = {
-    accessorFn: (row) => row.requiresNdaIp,
-    cell: ({ row }) =>
-      row.original.requiresNdaIp ? (
-        <Badge variant="outline">Required</Badge>
-      ) : (
-        "-"
-      ),
-    header: "NDA/IP required",
-    id: "nda" as const,
-    sortFn: "basic",
+  /**
+   * The card's badge row, in a cell. It replaced two columns that each spent a
+   * header and a cell's width on a fact that is usually absent: "Openings"
+   * read "Yes" on nearly every row and "NDA/IP required" a dash, so between
+   * them they carried one badge occasionally and filler the rest of the time,
+   * on a table that already hides Contact email because eight columns
+   * overflowed 1280px (#434).
+   *
+   * `ProjectBadges` renders it, with the team badge as `children` exactly as
+   * `projects/$projectId.tsx` does, so no surface computes a badge its own
+   * way. "Student proposed" is in because the card shows it and no table did;
+   * without it this would be the card's row minus one.
+   *
+   * Unsortable, like Categories. The `acceptingOnly`, `studentProposedOnly`
+   * and `requiresNdaOnly` switches already narrow on each fact separately, and
+   * a rank over a cluster of badges is an order nobody asked for.
+   */
+  const badges = {
+    cell: ({ row }) => {
+      const { acceptingApplicants, requiresNdaIp, studentProposed } =
+        row.original;
+      // The dash is this cell's own, not `ProjectBadges`'s. That component
+      // returns null only when it has no children either, and `children` here
+      // is always a `TeamFullBadge` element, which is truthy even on the open
+      // team it renders nothing for. Without this it would emit an empty flex
+      // row where every other empty cell in these tables shows a dash.
+      if (acceptingApplicants && !(studentProposed || requiresNdaIp)) {
+        return "-";
+      }
+      return (
+        <ProjectBadges
+          className="min-w-64"
+          requiresNdaIp={requiresNdaIp}
+          studentProposed={studentProposed}
+        >
+          <TeamFullBadge acceptingApplicants={acceptingApplicants} />
+        </ProjectBadges>
+      );
+    },
+    enableSorting: false,
+    header: "Badges",
+    id: "badges" as const,
   } satisfies AdminColumn<Row>;
 
   // No mentorship column: the two badges stay on the card and the detail
   // page, and the public listing filters on them instead (#336).
-  return { accepting, nda, program, teams };
+  return { badges, program, teams };
 }

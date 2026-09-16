@@ -107,16 +107,18 @@ Each project carries:
   mentor's email from the Mentor section. Mentorship is that address and nothing
   else: no state beside it, so a project either has a mentor on file or it does
   not, and an instructor who runs a team without an outside mentor records their
-  own. The public sees a "Student proposed" badge on the card and the project page
-  and can filter the listing on it; nothing about the mentor is public. The address
+  own. The public sees a "Student proposed" badge on the card, in the
+  Badges column of table view and on the project page, and can filter the
+  listing on it; nothing about the mentor is public. The address
   and the resolved name stay on staff reads, the staff list and the CSV export, and
   `/admin/projects` filters "Without a mentor", which beside "Student proposed" is
   the staff to-do. (#75, #304, #336, #402)
 - [x] `/my/bookmarks` is a small decision table: title with thumbnail, program,
-  status, openings, teams supported, NDA/IP, and saved-on date, with the
+  status, badges, teams supported, and saved-on date, with the
   listing's own bookmark toggle in the title cell rather than a remove button,
   so un-bookmarking leaves the row in place until the next load (#336, #420);
-  the two marks are read on the card or the page (#336).
+  the badge cluster carries "Team is full", "Student proposed" and "NDA/IP
+  required" in one column, and a dash where a row has none (#434).
   Sorted newest save first, no view toggle and no column picker. Visibility is
   re-checked on read, and one line says how many saved projects dropped out
   rather than letting the list shrink silently. (#106)
