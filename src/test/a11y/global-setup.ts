@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FullConfig } from "@playwright/test";
 import { config as loadDotenv } from "dotenv";
-import { and, eq, inArray, like } from "drizzle-orm";
+import { and, eq, inArray, like, notInArray } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
@@ -25,6 +25,12 @@ const DIALOG_PROGRAM_COURSE_ID_PREFIX = "A11Y-DLG-";
 // assertion in admin.a11y.test.ts needs an actual second page to sort from,
 // not just a page=2 URL with nothing behind it.
 const PAGINATION_USER_COUNT = 15;
+// One project per parallel slot; see createBookmarkProjects at the bottom.
+const BOOKMARK_PROJECT_TITLE_PREFIX = "A11Y Bookmark Project (slot ";
+
+function bookmarkProjectTitle(slot: number): string {
+  return `${BOOKMARK_PROJECT_TITLE_PREFIX}${slot})`;
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BASE_URL = "http://localhost:3000";
@@ -412,6 +418,7 @@ async function createFixtures(
   const bookmarkProjectIds = await createBookmarkProjects(
     db,
     owner,
+    instructor,
     workerCount
   );
 
@@ -444,24 +451,30 @@ async function createFixtures(
  * picks its slot. Read-only scans keep sharing `projectId`; only the writer
  * needs a row of its own.
  *
- * Archived rather than published, which is what keeps the pool free: the
- * default `/projects` listing excludes archived projects, so a wide machine
- * seeding sixteen of these cannot push the public catalog onto a second page
- * and turn "projects list, paginated" in `public.a11y.test.ts` red. The
- * bookmark paths do not care: `canSeeProject` admits archived, and
- * `listMyBookmarksAs` counts it as available rather than as one of the
- * projects it had to drop.
+ * Two things keep the pool out of everything else the suite scans, both of
+ * which matter more the wider the machine is. It is archived, so the default
+ * `/projects` listing excludes it and sixteen of these cannot push the public
+ * catalog onto a second page and turn "projects list, paginated" in
+ * `public.a11y.test.ts` red. And the proposer is the instructor rather than
+ * the scanning student, because `/my/projects` lists a proposer's projects
+ * unpaginated and across every status, so the pool would otherwise grow that
+ * page's scan, and the fixture user's admin detail page with it.
+ *
+ * The bookmark paths do not care who proposed it: `canSeeProject` admits an
+ * archived project for everyone, and `listMyBookmarksAs` counts it as
+ * available rather than as one of the projects it had to drop.
  */
 async function createBookmarkProjects(
   db: NodePgDatabase<typeof schema>,
   owner: typeof schema.user.$inferSelect,
+  instructor: typeof schema.user.$inferSelect,
   workerCount: number
 ): Promise<string[]> {
   const bookmarkProjectIds: string[] = [];
   for (let slot = 0; slot < workerCount; slot++) {
     // No unique constraint on title, hence the select-first pattern the rest
     // of this file uses.
-    const title = `A11Y Bookmark Project (slot ${slot})`;
+    const title = bookmarkProjectTitle(slot);
     let [bookmarkProject] = await db
       .select()
       .from(schema.projects)
@@ -477,13 +490,25 @@ async function createBookmarkProjects(
             "write to the same row.",
           status: "archived",
           archivedAt: new Date(),
-          proposerId: owner.id,
-          proposerEmail: normalizeEmailAddress(owner.email),
+          proposerId: instructor.id,
+          proposerEmail: normalizeEmailAddress(instructor.email),
         })
         .returning();
     }
     bookmarkProjectIds.push(bookmarkProject.id);
   }
+
+  // A narrower run leaves the slots it no longer uses behind, and select-first
+  // never prunes, so the pool would only ever grow. Deleting takes their
+  // bookmark rows with it through the FK.
+  await db
+    .delete(schema.projects)
+    .where(
+      and(
+        like(schema.projects.title, `${BOOKMARK_PROJECT_TITLE_PREFIX}%`),
+        notInArray(schema.projects.id, bookmarkProjectIds)
+      )
+    );
 
   // Start every run unbookmarked, the same self-healing role the dialog
   // sweep at the top of this file plays. The scan reads the toggle's label to
