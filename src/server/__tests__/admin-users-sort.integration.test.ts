@@ -4,7 +4,8 @@ import { db } from "#/db";
 import { user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import type { UserRole } from "#/lib/vocabularies";
-import { listUsersImpl } from "#/server/_internal/users";
+import { recordReviewUsage } from "#/server/_internal/ai-review-usage";
+import { exportUsersImpl, listUsersImpl } from "#/server/_internal/users";
 
 async function makeUser(email: string, role: UserRole) {
   await auth.api.signUpEmail({
@@ -221,6 +222,77 @@ describe("listUsersImpl sorting", () => {
       "admin-a@example.edu",
       "admin-b@example.edu",
     ]);
+  });
+
+  /**
+   * The AI call count is a correlated subquery rather than a column, and the
+   * sort whitelist is the security boundary, so it has to go through the
+   * whitelist like a real column (#413). Both directions, and a user with no
+   * usage sorts as a zero rather than dropping off the page.
+   */
+  it("sorts by AI call count in both directions, zero included", async () => {
+    const quiet = await makeUser("quiet-ai@example.edu", "user");
+    const busy = await makeUser("busy-ai@example.edu", "user");
+    const busier = await makeUser("busier-ai@example.edu", "user");
+    for (const [target, calls] of [
+      [busy, 1],
+      [busier, 2],
+    ] as const) {
+      for (let i = 0; i < calls; i++) {
+        await recordReviewUsage({
+          userId: target.id,
+          feature: "review",
+          model: "test-model",
+          reasoningEffort: "low",
+          outcome: "ok",
+        });
+      }
+    }
+
+    const query = (dir: "asc" | "desc") =>
+      listUsersImpl({
+        q: "-ai@example.edu",
+        role: null,
+        includeBanned: true,
+        page: 1,
+        pageSize: 50,
+        sort: "aiCallCount",
+        dir,
+      });
+
+    const asc = await query("asc");
+    expect(asc.rows.map((r) => r.aiCallCount)).toEqual([0, 1, 2]);
+    expect(asc.rows[0]?.id).toBe(quiet.id);
+
+    const desc = await query("desc");
+    expect(desc.rows.map((r) => r.aiCallCount)).toEqual([2, 1, 0]);
+    expect(desc.rows.at(-1)?.id).toBe(quiet.id);
+  });
+
+  // The export shares this function but not the whole whitelist: its ORDER BY
+  // would evaluate the subquery for every user in the table, which is the
+  // ground #413 gives for keeping the CSV out of scope. A request naming the
+  // key falls back the way an unknown key does, rather than failing.
+  it("refuses the AI call count as an export sort, falling back", async () => {
+    await makeUser("export-a@example.edu", "user");
+    await makeUser("export-b@example.edu", "user");
+
+    const { rows } = await exportUsersImpl({
+      q: "export-",
+      role: null,
+      includeBanned: true,
+      page: 1,
+      pageSize: 50,
+      sort: "aiCallCount",
+      dir: "asc",
+    });
+    // createdAt desc, the fallback, rather than the count ascending.
+    expect(rows.map((r) => r.email)).toEqual([
+      "export-b@example.edu",
+      "export-a@example.edu",
+    ]);
+    // And no AI column rides along in the projection.
+    expect(Object.keys(rows[0] ?? {})).not.toContain("aiCallCount");
   });
 
   it("composes sorting with pagination", async () => {

@@ -1,13 +1,25 @@
-import { and, desc, eq, ilike, isNull, or, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  ilike,
+  isNull,
+  or,
+  type SQL,
+  type SQLWrapper,
+  sql,
+} from "drizzle-orm";
 import { db } from "#/db";
 import {
   account,
+  aiReviewUsage,
   projectBookmarks,
   projects,
   session,
   user,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
+import { AI_FEATURE_NOUN, type AiFeature } from "#/lib/ai-review-limits";
 import { assertAdmin, assertStaff } from "#/lib/viewer";
 import type { BanUserInput, ListUsersInput, SetUserRoleInput } from "../users";
 import {
@@ -38,23 +50,72 @@ function assertNotSelf(viewer: AuthUser, targetId: string, action: string) {
 
 const SEARCH_LIMIT = 10;
 
+/**
+ * All time, one row per paid Bedrock call, both features together. A
+ * correlated subquery rather than a join, so a user who has never used the
+ * feature still comes back, with a 0 (#413).
+ *
+ * `db.$count` rather than a `sql` template of the same shape: in a select
+ * projection with no joins, Drizzle strips the table from every column
+ * interpolated at the top level, so the hand-written version compared
+ * `ai_review_usage.user_id` against `ai_review_usage.id` and the query failed
+ * outright. `$count` builds its `where` as a nested `SQL`, which the strip
+ * does not descend into, so the qualification survives. See `docs/QUIRKS.md`,
+ * Drizzle.
+ *
+ * Wrapped rather than used bare, for the two things the wrapper adds. `.as`
+ * names the output column, which is what the ORDER BY below reads instead of
+ * repeating the subquery. And `.mapWith(Number)` is back because wrapping
+ * drops `$count`'s own mapping, and node-postgres hands a `count(*)` back as
+ * a string.
+ */
+const aiCallCount =
+  sql<number>`${db.$count(aiReviewUsage, eq(aiReviewUsage.userId, user.id))}`
+    .mapWith(Number)
+    .as("aiCallCount");
+
 // A whitelist, not a lookup by string: a sort key arrives from the URL as an
 // arbitrary string, and an unvalidated column name reaching ORDER BY is an
 // injection surface.
-const USER_SORT_COLUMNS = {
+/** What the listing and the export may both sort by: real columns. */
+const USER_COLUMN_SORTS = {
   banned: user.banned,
   createdAt: user.createdAt,
   email: user.email,
-  name: user.name,
   role: user.role,
+  name: user.name,
 } as const;
 
-function isUserSortColumn(key: string): key is keyof typeof USER_SORT_COLUMNS {
-  // `key in USER_SORT_COLUMNS` walks the prototype chain, so "constructor",
-  // "toString", "hasOwnProperty", "valueOf", and "__proto__" would all pass
-  // the guard and resolve to an Object.prototype value instead of a
-  // PgColumn. Object.hasOwn checks only the object's own properties.
-  return Object.hasOwn(USER_SORT_COLUMNS, key);
+/**
+ * The listing's, which adds the derived count. It goes through the whitelist
+ * rather than around it, the way a real column does.
+ *
+ * The clause reads the select alias rather than repeating the subquery.
+ * Postgres does not notice that two copies of one correlated subquery are the
+ * same subquery, so spelling it out in both the projection and the ORDER BY
+ * would count every matching user's rows twice. The alias exists only in a
+ * query that selects it, which is also why the export's whitelist above does
+ * not carry the key: #413 puts the CSV out of scope on exactly that ground,
+ * that it would make every exported row pay for the subquery.
+ */
+const USER_SORT_COLUMNS = {
+  ...USER_COLUMN_SORTS,
+  aiCallCount: sql.identifier("aiCallCount"),
+} as const;
+
+/**
+ * The whitelist is the injection guard, so its values are typed rather than
+ * left as `unknown`: everything in one is a column or a piece of SQL, and
+ * nothing else can reach ORDER BY through it.
+ */
+type SortColumns = Record<string, SQLWrapper>;
+
+function isSortColumn(columns: SortColumns, key: string): boolean {
+  // `key in columns` walks the prototype chain, so "constructor", "toString",
+  // "hasOwnProperty", "valueOf", and "__proto__" would all pass the guard and
+  // resolve to an Object.prototype value instead of a PgColumn.
+  // Object.hasOwn checks only the object's own properties.
+  return Object.hasOwn(columns, key);
 }
 
 /**
@@ -71,9 +132,17 @@ function isUserSortColumn(key: string): key is keyof typeof USER_SORT_COLUMNS {
  * supplying a valid direction, the whole request falls back together rather
  * than defaulting the direction silently.
  */
-function userOrderBy(sort: string | undefined, dir: string | undefined) {
-  if (sort && isUserSortColumn(sort) && (dir === "asc" || dir === "desc")) {
-    const column = USER_SORT_COLUMNS[sort];
+function userOrderBy(
+  sort: string | undefined,
+  dir: string | undefined,
+  columns: SortColumns = USER_SORT_COLUMNS
+) {
+  if (
+    sort &&
+    isSortColumn(columns, sort) &&
+    (dir === "asc" || dir === "desc")
+  ) {
+    const column = columns[sort];
     return dir === "desc"
       ? sql`${column} DESC NULLS LAST`
       : sql`${column} ASC NULLS LAST`;
@@ -172,10 +241,16 @@ export async function listUsersImpl(data: ListUsersInput) {
       role: user.role,
       banned: user.banned,
       createdAt: user.createdAt,
+      aiCallCount,
     })
     .from(user)
     .where(where)
-    .orderBy(userOrderBy(data.sort, data.dir))
+    // `user.id` last, always, and passed here rather than inside
+    // `userOrderBy` so that a third branch there cannot forget it. Why an
+    // ordering has to be total: "Paging a listing needs a total ordering" in
+    // docs/QUIRKS.md (#429). The AI call count is what makes it bite here,
+    // since most users share the same value of zero.
+    .orderBy(userOrderBy(data.sort, data.dir), user.id)
     .limit(data.pageSize)
     .offset(offset);
 
@@ -220,7 +295,11 @@ export async function exportUsersImpl(data: ListUsersInput) {
     })
     .from(user)
     .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(userOrderBy(data.sort, data.dir));
+    // The export's own whitelist, without the derived count: an export sorted
+    // by it would evaluate the subquery for every user in the table, and the
+    // CSV carries no column that would show the order anyway. A request
+    // naming it falls back to createdAt desc, as an unknown key does.
+    .orderBy(userOrderBy(data.sort, data.dir, USER_COLUMN_SORTS), user.id);
   return { rows };
 }
 
@@ -280,12 +359,71 @@ export async function getUserImpl(data: { id: string }) {
     .where(eq(account.userId, data.id));
   const providers = [...new Set(accounts.map((a) => a.providerId))];
 
+  const aiUsage = await aiUsageFor(data.id);
+
   return {
     user: target,
     projectCount,
     recentProjects,
     bookmarkCount,
     providers,
+    aiUsage,
+  };
+}
+
+/**
+ * One user's paid Bedrock calls, all time, beside the project and bookmark
+ * counts this page already carries.
+ *
+ * Grouped by feature and then filled out from `AI_FEATURE_NOUN`'s keys, so a
+ * feature nobody has used yet reports a zero rather than going missing, and a
+ * third feature added to the limiter's vocabulary appears here without a
+ * second edit. The window is all time on both this page and the listing: the
+ * limiter already shows the rolling hour and day where it matters, which is
+ * at the point of refusal.
+ *
+ * Deleting an account takes these rows with it, since `aiReviewUsage` is a
+ * cascade edge under ADR 0008, so the count drops to zero against the
+ * anonymized row rather than surviving it.
+ */
+async function aiUsageFor(userId: string) {
+  const rows = await db
+    .select({
+      feature: aiReviewUsage.feature,
+      calls: sql<number>`count(*)::int`,
+      inputTokens: sql<number>`coalesce(sum(${aiReviewUsage.inputTokens}), 0)::int`,
+      reasoningTokens: sql<number>`coalesce(sum(${aiReviewUsage.reasoningTokens}), 0)::int`,
+      outputTokens: sql<number>`coalesce(sum(${aiReviewUsage.outputTokens}), 0)::int`,
+      // `mapWith` or this comes back as the raw timestamp string: an
+      // aggregate has no column type for node-postgres to parse it by, and
+      // the page renders it through `LocalTime`, which wants a Date.
+      lastCallAt: sql<Date | null>`max(${aiReviewUsage.createdAt})`.mapWith(
+        aiReviewUsage.createdAt
+      ),
+    })
+    .from(aiReviewUsage)
+    .where(eq(aiReviewUsage.userId, userId))
+    .groupBy(aiReviewUsage.feature);
+
+  const features = Object.keys(AI_FEATURE_NOUN) as AiFeature[];
+  const byFeature = features.map((feature) => ({
+    feature,
+    calls: rows.find((row) => row.feature === feature)?.calls ?? 0,
+  }));
+  // A row whose `feature` is not in the vocabulary would vanish from the
+  // per-feature list but is still spend, so the totals count every row.
+  const lastCallAt = rows.reduce<Date | null>((latest, row) => {
+    if (!row.lastCallAt) {
+      return latest;
+    }
+    return latest && latest > row.lastCallAt ? latest : row.lastCallAt;
+  }, null);
+  return {
+    byFeature,
+    inputTokens: rows.reduce((sum, row) => sum + row.inputTokens, 0),
+    reasoningTokens: rows.reduce((sum, row) => sum + row.reasoningTokens, 0),
+    outputTokens: rows.reduce((sum, row) => sum + row.outputTokens, 0),
+    lastCallAt,
   };
 }
 

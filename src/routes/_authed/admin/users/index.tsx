@@ -133,6 +133,17 @@ const COLUMNS = defineAdminColumns<Row>()([
     sortFn: "basic",
   },
   {
+    // All time, both AI features together, counted by the server: this page
+    // paginates and sorts there, so a client-side sort would only order the
+    // twenty rows already on screen. Zero is a real answer and renders as
+    // `0` rather than a dash (#413).
+    accessorFn: (row) => row.aiCallCount,
+    cell: ({ row }) => row.original.aiCallCount,
+    header: "AI calls",
+    id: "aiCallCount",
+    sortFn: "basic",
+  },
+  {
     accessorFn: (row) => row.createdAt,
     cell: ({ row }) => <LocalTime dateOnly value={row.original.createdAt} />,
     // Visible by default: this is the page's default sort column, and a
