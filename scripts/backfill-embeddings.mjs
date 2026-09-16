@@ -1,6 +1,7 @@
 /**
- * Production sweeper: gives an embedding to every published or archived
- * project that has none.
+ * Production sweeper: gives every published or archived project an embedding
+ * built from the text it carries now, filling a missing vector and replacing
+ * one whose text has moved on since.
  *
  * Run as a one-off ECS task, the way `import-legacy.mjs` is:
  *
@@ -13,9 +14,10 @@
  * `scripts/backfill-embeddings.ts` is the workstation equivalent and calls the
  * app's own writer instead.
  *
- * Re-running is safe and cheap: a row that already has a vector is not
- * selected. A Bedrock failure leaves that row null, does not stop the run, and
- * exits the process non-zero, so a partial run is resumable by re-running.
+ * Re-running is safe and cheap: a row whose stored hash still matches its
+ * text is skipped before the Bedrock call, so it costs no paid call. A
+ * failure leaves that row as it was, does not stop the run, and exits the
+ * process non-zero, so a partial run is resumable by re-running.
  *
  * ## The duplication, and what it costs
  *
@@ -190,8 +192,8 @@ function sleep(ms) {
  * longer existed, and no writer anywhere would ever correct it.
  *
  * A second run is still nearly free. The hash comparison happens before the
- * Bedrock call, so an unchanged row costs three small queries and no paid
- * call, and `DELAY_MS` is not spent on it either.
+ * Bedrock call, so an unchanged row costs one small query, two if it has a
+ * program, and no paid call. `DELAY_MS` is not spent on it either.
  *
  * `hasEmbedding` is selected rather than the vector itself: 1024 floats per
  * row are not needed to decide, and the skip below must test it for the
@@ -220,8 +222,12 @@ const SELECT_SQL = `
  * One query per project, mirroring `refreshProjectEmbedding` rather than
  * batching, because the category order decides the source string and so the
  * hash. Neither side sorts, so matching the app's query shape is the closest
- * thing to matching its order; a mismatch costs one re-embed the next time
- * somebody edits that project, not a wrong vector.
+ * thing to matching its order. A mismatch is never a wrong vector, but its
+ * cost grew when this stopped skipping rows that have one: a project whose
+ * categories come back in a different order here than the app stored them now
+ * re-embeds on every sweep rather than once, the next time somebody edits it.
+ * Sorting both sides would fix it and would re-hash every multi-category
+ * project once; it is deliberately not done here.
  */
 const CATEGORIES_SQL = `
   SELECT c.name
@@ -280,10 +286,7 @@ async function main() {
     );
 
     for (const project of rows) {
-      // Whether this row reached the Bedrock call, which is what `DELAY_MS`
-      // throttles. A row skipped on its hash made no call and waits for
-      // nothing; see the `finally` below.
-      let called = false;
+      let calledBedrock = false;
       try {
         const categories = await db.query(CATEGORIES_SQL, [project.id]);
         let programLabel = null;
@@ -315,7 +318,7 @@ async function main() {
           continue;
         }
 
-        called = true;
+        calledBedrock = true;
         const vector = await embed(bedrock, source);
         await db.query(UPDATE_SQL, [toSqlVector(vector), hash, project.id]);
         tally.updated += 1;
@@ -331,13 +334,14 @@ async function main() {
         // Sleeping only on success would let exactly the run that is being
         // throttled burst through all 547 rows at full speed.
         //
-        // `called` is set immediately before the Bedrock call, so a throttled
+        // `calledBedrock` is set immediately before the call, so a throttled
         // failure still waits. What it excludes is a row that never called
-        // Bedrock at all: one skipped on its hash, and a row that threw in
-        // one of the three queries above. Throttling neither is the point,
-        // and without this a sweep of rows that are nearly all unchanged
-        // would spend `DELAY_MS` on every one of them.
-        if (called) {
+        // Bedrock at all: one skipped on its hash, and a row that threw in a
+        // query above. Throttling neither is the point, and without this a
+        // sweep of rows that are nearly all unchanged would spend `DELAY_MS`
+        // on every one of them. It is also the one place the two sweepers
+        // differ: `backfill-embeddings.ts` sleeps after a failure of any kind.
+        if (calledBedrock) {
           await sleep(DELAY_MS);
         }
       }

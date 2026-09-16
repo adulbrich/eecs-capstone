@@ -321,6 +321,19 @@ describe("the production backfill's copies of the embedding helpers", () => {
    * for a status the sweeper never selects, so every row already in that status
    * stays null forever and nothing says so.
    */
+  it("sweep exactly the statuses the app embeds", () => {
+    const fromSrc = quotedWords(
+      STATUS_SET_PATTERN.exec(EMBEDDINGS_FILE)?.[1],
+      "EMBEDDABLE_STATUSES in project-embeddings.ts"
+    );
+    const fromScript = quotedWords(
+      SQL_STATUS_PATTERN.exec(SCRIPT_FILE)?.[1],
+      "SELECT_SQL in backfill-embeddings.mjs"
+    );
+    expect(fromSrc).toEqual(["published", "archived"]);
+    expect(fromScript).toEqual(fromSrc);
+  });
+
   /**
    * The rule that decides a row needs no work. It is a copy like any other,
    * and drifting it is expensive in both directions: drop the hash half and
@@ -359,19 +372,6 @@ describe("the production backfill's copies of the embedding helpers", () => {
     expect(selectList).toMatch(
       /embedding_source_hash\s+AS "embeddingSourceHash"/
     );
-  });
-
-  it("sweep exactly the statuses the app embeds", () => {
-    const fromSrc = quotedWords(
-      STATUS_SET_PATTERN.exec(EMBEDDINGS_FILE)?.[1],
-      "EMBEDDABLE_STATUSES in project-embeddings.ts"
-    );
-    const fromScript = quotedWords(
-      SQL_STATUS_PATTERN.exec(SCRIPT_FILE)?.[1],
-      "SELECT_SQL in backfill-embeddings.mjs"
-    );
-    expect(fromSrc).toEqual(["published", "archived"]);
-    expect(fromScript).toEqual(fromSrc);
   });
 
   /**

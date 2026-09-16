@@ -677,17 +677,17 @@ of them. Budget about five minutes for 547 rows at one Bedrock call each plus a
 547 project(s) checked: 547 updated, 0 already current, 0 failed.
 ```
 
-Safe and cheap to re-run: an unchanged row costs three small queries, no
-Bedrock call and no delay, so a second run reports every row as already current
-and finishes in seconds. A row that fails is left as it was, the run continues,
-and the task exits non-zero to say so, which is what makes a partial run
-resumable.
+Safe and cheap to re-run: an unchanged row costs one small query, two if it
+has a program, no Bedrock call and no delay, so a second run reports every row
+as already current and finishes in seconds. A row that fails is left as it was,
+the run continues, and the task exits non-zero to say so, which is what makes a
+partial run resumable.
 
-**Run it after every import, not only the first.** `import-legacy.mjs` upserts
-project text and deliberately never touches the three embedding columns, so a
-re-import leaves the affected rows holding a vector built from text that no
-longer exists. This is the only thing that corrects them: nothing in the app
-re-embeds a row nobody edits. That includes the live set in 7a.7.
+**Run it after every import, not only the first,** including the live set in
+7a.7. `import-legacy.mjs` writes project text without going through
+`refreshProjectEmbedding` and leaves the embedding columns alone, so this is
+the only thing that corrects those rows. `docs/QUIRKS.md` under the embedding
+sweepers has the rest.
 
 ### 7a.6 What to expect afterwards
 
