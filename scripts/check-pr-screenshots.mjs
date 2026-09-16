@@ -10,21 +10,24 @@
  * `Screenshots: none, because <reason>` with a non-empty reason. "Under it"
  * runs to the next `#` or `##`, so a `###` subsection per changed page
  * counts and an image under the next `##` does not. A pull request that
- * touches no UI path is exempt, and may still carry the section. The template asks for a desktop and a phone image per
- * changed page; the script counts one, because it cannot tell widths
- * apart, and the second is a code-review item.
+ * touches no UI path is exempt, and may still carry the section. The
+ * template asks for a desktop and a phone image per changed page; the
+ * script counts one, because it cannot tell widths apart, and the second is
+ * a code-review item.
  *
- * One implementation, two callers: the `pr-text` workflow runs it over the
- * PR body and the changed-file list, and the Claude Code `gh` hook runs it
- * over the body of a `gh pr create` and the branch's diff, as a warning.
+ * One implementation, two callers, and only one of them uses this CLI. The
+ * `pr-text` workflow runs the second usage below, with the changed paths on
+ * stdin and the body written to a file, so a body is data and never shell.
+ * The Claude Code `gh` hook imports `checkPrScreenshots` and calls it on the
+ * body of a `gh pr create`, as a warning; it spawns nothing.
  *
  * Usage:
  *   node scripts/check-pr-screenshots.mjs --files <path>... < body
  *   node scripts/check-pr-screenshots.mjs --files-stdin --body <file>
  *
- * The body arrives on stdin (the `pr-text` convention, so it is data and
- * never shell), the paths as arguments; or the paths on stdin, one per line,
- * and the body from a file. Exits 1 with a one-line reason.
+ * The first form takes the body on stdin and the paths as arguments; the
+ * second, which is CI's, takes the paths on stdin one per line and the body
+ * from a file. Exits 1 with a one-line reason.
  */
 import { readFileSync } from "node:fs";
 

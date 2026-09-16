@@ -115,7 +115,7 @@ describe("check-pr-screenshots", () => {
   });
 
   /**
-   * The section runs to the next `##`, not to the next heading of any level.
+   * The section runs to the next `#` or `##`, not to any heading level.
    * A body with a subheading per changed page put every image below the
    * first `###`, so the section read as empty and the check rejected a body
    * carrying four screenshots (#440).
