@@ -105,8 +105,16 @@ test.describe("recommended order", () => {
     // param stays absent until the reader picks something.
     expect(new URL(page.url()).searchParams.has("order")).toBe(false);
     await expect(page.getByText("Ranked by your interests.")).toBeVisible();
+
+    // The Select shows the resolved order as its own value, so open it, read
+    // the selected option, and close it again. The close is not optional: an
+    // open Radix listbox `aria-hidden`s the rest of the page, so the card
+    // headings below are not in the accessibility tree until it goes away.
     const option = await recommendedOption(page);
     await expect(option).not.toHaveAttribute("aria-disabled", "true");
+    await expect(option).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("listbox")).toHaveCount(0);
 
     // The seed's published projects, nearest the interest vector first. Rows
     // with no vector (anything another test published) sort after them, so
