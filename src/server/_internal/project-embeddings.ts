@@ -118,10 +118,11 @@ export async function refreshProjectEmbedding(
       EMBEDDING_DIMENSIONS
     );
     // `&& project.embedding`, the way `refreshInterestsEmbedding` below does
-    // it. A row carrying a current hash and a null vector would otherwise be
-    // unreachable forever: the app reads it as up to date and never embeds it,
-    // while `scripts/backfill-embeddings.mjs` selects on `embedding IS NULL`
-    // and would. The two must not disagree about who owns that row.
+    // it. A row carrying a current hash and a null vector is an interrupted
+    // write, and without the second half it would be unreachable forever:
+    // every sweeper reads the hash as current and moves on. Both
+    // `scripts/backfill-embeddings.ts` and `scripts/backfill-embeddings.mjs`
+    // apply this same pair, so all three agree about who owns that row.
     if (project.embeddingSourceHash === hash && project.embedding) {
       return "unchanged";
     }

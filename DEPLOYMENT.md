@@ -668,19 +668,26 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
   --region us-west-2
 ```
 
-It selects every `published` or `archived` project with no embedding, so it
-takes about five minutes for 547 rows at one Bedrock call each plus a 200ms
-politeness delay. The CloudWatch log should end with:
+It checks every `published` or `archived` project and embeds the ones whose
+stored hash does not match the text they carry now, which on a first run is all
+of them. Budget about five minutes for 547 rows at one Bedrock call each plus a
+200ms politeness delay. The CloudWatch log should end with:
 
 ```
-547 project(s) needed an embedding: 547 updated, 0 failed.
+547 project(s) checked: 547 updated, 0 already current, 0 failed.
 ```
 
-Safe and cheap to re-run: a row that already has a vector is not selected, so a
-second run reports zero and makes no Bedrock call. A row that fails stays null,
-the run continues, and the task exits non-zero to say so, which is what makes a
-partial run resumable. Run it again after any later import, including the live
-set in 7a.7.
+Safe and cheap to re-run: an unchanged row costs three small queries, no
+Bedrock call and no delay, so a second run reports every row as already current
+and finishes in seconds. A row that fails is left as it was, the run continues,
+and the task exits non-zero to say so, which is what makes a partial run
+resumable.
+
+**Run it after every import, not only the first.** `import-legacy.mjs` upserts
+project text and deliberately never touches the three embedding columns, so a
+re-import leaves the affected rows holding a vector built from text that no
+longer exists. This is the only thing that corrects them: nothing in the app
+re-embeds a row nobody edits. That includes the live set in 7a.7.
 
 ### 7a.6 What to expect afterwards
 

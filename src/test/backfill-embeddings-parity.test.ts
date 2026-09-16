@@ -321,6 +321,46 @@ describe("the production backfill's copies of the embedding helpers", () => {
    * for a status the sweeper never selects, so every row already in that status
    * stays null forever and nothing says so.
    */
+  /**
+   * The rule that decides a row needs no work. It is a copy like any other,
+   * and drifting it is expensive in both directions: drop the hash half and
+   * every run re-embeds all 547 at one paid call each; drop the
+   * vector half and a row whose write was interrupted, carrying a current hash
+   * beside a null vector, is skipped by every sweeper forever.
+   *
+   * Compared against a literal on each side rather than against each other,
+   * because the two cannot be byte-identical: the app holds the vector it
+   * selected and the script selects `embedding IS NOT NULL` as a boolean, so
+   * it has no vector to test. That is the one permitted difference, and
+   * writing both out here is what makes it a decision instead of a drift.
+   */
+  it("agree on when a row needs no work", () => {
+    expect(EMBEDDINGS_FILE).toContain(
+      "if (project.embeddingSourceHash === hash && project.embedding) {"
+    );
+    expect(SCRIPT_CODE).toContain(
+      "if (project.embeddingSourceHash === hash && project.hasEmbedding) {"
+    );
+  });
+
+  /**
+   * The script's half of the rule above reads `hasEmbedding`, which is not a
+   * column. Nothing else would catch the query dropping it: `section` is not
+   * involved, so the field pin below does not cover it, and an undefined
+   * `project.hasEmbedding` makes the condition false, which reads as "this row
+   * needs work" and re-embeds every row on every run at full price.
+   */
+  it("select the boolean the skip is built from", () => {
+    const selectList = (SELECT_SQL_PATTERN.exec(SCRIPT_FILE)?.[1] ?? "").split(
+      /\bfrom\b/i
+    )[0];
+    expect(selectList).toContain("SELECT");
+    expect(selectList).toMatch(/embedding IS NOT NULL\s+AS "hasEmbedding"/);
+    expect(selectList).toMatch(
+      /embedding_source_hash\s+AS "embeddingSourceHash"/
+    );
+  });
+
   it("sweep exactly the statuses the app embeds", () => {
     const fromSrc = quotedWords(
       STATUS_SET_PATTERN.exec(EMBEDDINGS_FILE)?.[1],
@@ -368,8 +408,8 @@ describe("the production backfill's copies of the embedding helpers", () => {
       "title",
     ]);
 
-    // The select list alone, not the whole query: `id`, `status`, `embedding`
-    // and `deleted_at` all appear in the WHERE clause, so a substring test over
+    // The select list alone, not the whole query: `id`, `status` and
+    // `deleted_at` all appear in the WHERE clause, so a substring test over
     // the query would pass a field named after any of them without it ever
     // being selected.
     const selectList = (SELECT_SQL_PATTERN.exec(SCRIPT_FILE)?.[1] ?? "").split(

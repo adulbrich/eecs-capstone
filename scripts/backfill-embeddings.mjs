@@ -174,10 +174,29 @@ function sleep(ms) {
  * copied body stays byte-identical to the one in `src/` instead of needing a
  * remapping step here.
  *
- * `embedding IS NULL` is what makes a second run free: a row that already has
- * a vector is not selected, so it costs no Bedrock call. That also means this
- * never refreshes a stale vector, which is `refreshProjectEmbedding`'s job on
- * edit and is deliberately out of scope here.
+ * Selects every embeddable row, not only the ones with no vector, and decides
+ * per row by comparing the stored hash to the one it computes. That is
+ * `refreshProjectEmbedding`'s own rule, and `scripts/backfill-embeddings.ts`
+ * inherits it by calling that function; this copy is the only one that used
+ * to diverge, and the divergence was load-bearing in the wrong direction.
+ *
+ * An earlier version filtered on `embedding IS NULL`, which made a second run
+ * free but also made a stale vector permanently unreachable. Refreshing on
+ * edit is `refreshProjectEmbedding`'s job, so for anything a person edits in
+ * the app that filter was harmless. It is not harmless for a writer that does
+ * not go through that function at all: `scripts/import-legacy.mjs` upserts
+ * project text and deliberately leaves the three embedding columns alone, so
+ * after a re-import the affected rows held a vector built from text that no
+ * longer existed, and no writer anywhere would ever correct it.
+ *
+ * A second run is still nearly free. The hash comparison happens before the
+ * Bedrock call, so an unchanged row costs three small queries and no paid
+ * call, and `DELAY_MS` is not spent on it either.
+ *
+ * `hasEmbedding` is selected rather than the vector itself: 1024 floats per
+ * row are not needed to decide, and the skip below must test it for the
+ * reason `refreshProjectEmbedding` gives, that a current hash beside a null
+ * vector would otherwise be unreachable forever.
  */
 const SELECT_SQL = `
   SELECT id,
@@ -188,11 +207,12 @@ const SELECT_SQL = `
          min_qualifications  AS "minQualifications",
          pref_qualifications AS "prefQualifications",
          license_restrictions AS "licenseRestrictions",
-         program_id          AS "programId"
+         program_id          AS "programId",
+         embedding_source_hash AS "embeddingSourceHash",
+         embedding IS NOT NULL AS "hasEmbedding"
   FROM projects
   WHERE status IN ('published', 'archived')
     AND deleted_at IS NULL
-    AND embedding IS NULL
   ORDER BY created_at
 `;
 
@@ -251,15 +271,19 @@ async function main() {
   const pool = new pg.Pool({ connectionString });
   const bedrock = new BedrockRuntimeClient(buildBedrockConfig());
   const db = await pool.connect();
-  const tally = { failed: 0, updated: 0 };
+  const tally = { failed: 0, unchanged: 0, updated: 0 };
 
   try {
     const { rows } = await db.query(SELECT_SQL);
     process.stdout.write(
-      `${rows.length} published or archived project(s) with no embedding.\n`
+      `${rows.length} published or archived project(s) to check.\n`
     );
 
     for (const project of rows) {
+      // Whether this row reached the Bedrock call, which is what `DELAY_MS`
+      // throttles. A row skipped on its hash made no call and waits for
+      // nothing; see the `finally` below.
+      let called = false;
       try {
         const categories = await db.query(CATEGORIES_SQL, [project.id]);
         let programLabel = null;
@@ -281,13 +305,24 @@ async function main() {
           EMBEDDING_MODEL_ID,
           EMBEDDING_DIMENSIONS
         );
+        // MUST match the skip in `refreshProjectEmbedding`. Both halves
+        // matter: the hash says the text has not moved, and `hasEmbedding`
+        // says there is a vector to keep. A current hash beside a null vector
+        // means an interrupted write, and it must land here as work to do
+        // rather than as nothing to do.
+        if (project.embeddingSourceHash === hash && project.hasEmbedding) {
+          tally.unchanged += 1;
+          continue;
+        }
+
+        called = true;
         const vector = await embed(bedrock, source);
         await db.query(UPDATE_SQL, [toSqlVector(vector), hash, project.id]);
         tally.updated += 1;
         process.stdout.write(`updated ${project.title}\n`);
       } catch (error) {
-        // Per project, so one bad row does not cost the other 546. The row
-        // stays null and the next run picks it up again.
+        // Per project, so one bad row does not cost the other 546. The row is
+        // left as it was and the next run picks it up again.
         tally.failed += 1;
         process.stdout.write(`FAILED  ${project.title}: ${error.message}\n`);
       } finally {
@@ -296,18 +331,21 @@ async function main() {
         // Sleeping only on success would let exactly the run that is being
         // throttled burst through all 547 rows at full speed.
         //
-        // The cost is that a run failing for a reason the delay cannot help,
-        // a dead pool say, now takes its two minutes to find that out rather
-        // than seconds, because the catch above covers the three queries as
-        // well as the Bedrock call. Worth it: the loud failure is the one you
-        // watch, and the quiet one is the one that gets you rate limited.
-        await sleep(DELAY_MS);
+        // `called` is set immediately before the Bedrock call, so a throttled
+        // failure still waits. What it excludes is a row that never called
+        // Bedrock at all: one skipped on its hash, and a row that threw in
+        // one of the three queries above. Throttling neither is the point,
+        // and without this a sweep of rows that are nearly all unchanged
+        // would spend `DELAY_MS` on every one of them.
+        if (called) {
+          await sleep(DELAY_MS);
+        }
       }
     }
 
     process.stdout.write(
-      `\n${rows.length} project(s) needed an embedding: ` +
-        `${tally.updated} updated, ${tally.failed} failed.\n`
+      `\n${rows.length} project(s) checked: ${tally.updated} updated, ` +
+        `${tally.unchanged} already current, ${tally.failed} failed.\n`
     );
   } finally {
     db.release();

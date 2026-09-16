@@ -119,10 +119,10 @@ describe("refreshProjectEmbedding", () => {
   });
 
   /**
-   * A current hash beside a null vector is the one state that would otherwise
-   * be unreachable from both sides: the app reads the row as up to date and
-   * never embeds it, while the production sweeper selects `embedding IS NULL`
-   * and does. They have to agree about who owns it.
+   * A current hash beside a null vector is an interrupted write, and the one
+   * state that would otherwise be unreachable: every reader that trusts the
+   * hash alone treats the row as up to date and never embeds it. The app and
+   * both sweepers test the vector as well as the hash, for this row.
    */
   it("re-embeds a row whose hash is current but whose vector is gone", async () => {
     const admin = await makeAdmin(`nv-${Date.now()}@x.com`);
