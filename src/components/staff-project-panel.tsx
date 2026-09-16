@@ -8,6 +8,7 @@ import {
   PROJECT_STATUS_LABEL,
   PROJECT_STATUSES_IN_DISPLAY_ORDER,
 } from "#/lib/project-workflow";
+import { useAction } from "#/lib/use-action";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import {
   forceSetProjectStatus,
@@ -105,9 +106,13 @@ export function StaffProjectPanel({
   viewerIsOwner: boolean;
 }) {
   const [comment, setComment] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingTransition | null>(null);
-  const [busy, setBusy] = useState(false);
+  // A second activation in the same tick would write a second history row
+  // and mail again; `use-action.ts` says why the hook's ref is what stops it
+  // (#443).
+  const { busy, error, run, setError } = useAction({
+    fallback: "Transition failed",
+  });
   const [editLog, setEditLog] = useState<EditLogEntry[]>([]);
   const [sendEmail, setSendEmail] = useState(true);
   const [deleteEmail, setDeleteEmail] = useState(true);
@@ -179,16 +184,15 @@ export function StaffProjectPanel({
     setComment("");
   }
 
-  async function confirmTransition() {
+  function confirmTransition() {
     if (!pending) {
       return;
     }
-    setError(null);
-    setBusy(true);
-    try {
+    const target = pending;
+    return run(async () => {
       const data = {
         id: project.id,
-        status: pending.target,
+        status: target.target,
         comment,
         // Send the staff decision as-is. Do NOT also gate on whether the
         // proposer has an address: this flag mutes every email the transition
@@ -198,18 +202,14 @@ export function StaffProjectPanel({
         // The server already declines to mail a proposer it cannot resolve.
         sendEmail,
       };
-      if (pending.force) {
+      if (target.force) {
         await forceSetProjectStatus({ data });
       } else {
         await performTransition({ data });
       }
       await onChanged();
       closeModal();
-    } catch (err) {
-      setError(errorMessage(err, "Transition failed"));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   // Both branches run from a ConfirmDialog, which owns the flight and shows a

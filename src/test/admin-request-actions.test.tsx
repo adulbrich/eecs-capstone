@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -123,6 +124,46 @@ describe("AdminRequestActions", () => {
       );
     }
   );
+
+  /**
+   * Two activations inside one tick, which is the case `disabled` cannot
+   * cover: the prop only stops the second click once React has re-rendered,
+   * and a keyboard activation or a dropdown item can arrive before it does.
+   * The same shape as "refuses a second call while the first is still in
+   * flight" in `use-action.test.tsx`, asserted here because it is this
+   * component's guard that is being proved (#443).
+   */
+  it("refuses a second confirm that arrives inside one tick", async () => {
+    const write = deferred<void>();
+    vi.mocked(approveRequestItem).mockReturnValue(write.promise as never);
+    renderPending();
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    const confirm = await screen.findByRole("button", {
+      name: "Confirm approve",
+    });
+
+    // Not two `fireEvent.click` calls: those flush between, so the second
+    // lands on a button React has already disabled and the test passes with
+    // or without a guard. Dispatching both handlers inside one act body is
+    // what puts them in the same tick.
+    await act(() => {
+      confirm.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true })
+      );
+      confirm.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true })
+      );
+      return Promise.resolve();
+    });
+
+    expect(approveRequestItem).toHaveBeenCalledTimes(1);
+
+    write.resolve();
+    await waitFor(() =>
+      expect(screen.queryByLabelText("Pickup by (optional)")).toBeNull()
+    );
+  });
 
   it("offers Approve and Reject for a pending line", () => {
     renderPending();

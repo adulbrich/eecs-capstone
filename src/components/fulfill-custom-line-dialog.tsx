@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { errorMessage } from "#/lib/error-message";
+import { useAction } from "#/lib/use-action";
 import { listAdminInventory } from "#/server/inventory";
 import { fulfillCustomLine } from "#/server/inventory-custom";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
@@ -52,8 +52,13 @@ export function FulfillCustomLineDialog({
   const [reserve, setReserve] = useState(true);
   const [pickupBy, setPickupBy] = useState("");
   const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // A second activation in the same tick would write a second set of item
+  // links; `use-action.ts` says why the hook's ref is what stops it (#443).
+  // `setError` comes back out for the client-side refusal below, which never
+  // reaches a server.
+  const { busy, error, run, setError } = useAction({
+    fallback: "Fulfil failed",
+  });
 
   useEffect(() => {
     if (!(open && query.trim())) {
@@ -130,14 +135,12 @@ export function FulfillCustomLineDialog({
     }
   }
 
-  async function onConfirm() {
+  function onConfirm() {
     if (chosen.length === 0) {
       setError("Link at least one item");
       return;
     }
-    setBusy(true);
-    setError(null);
-    try {
+    return run(async () => {
       await fulfillCustomLine({
         data: {
           customLineId: line.id,
@@ -151,11 +154,7 @@ export function FulfillCustomLineDialog({
       reset();
       await onDone();
       setOpen(false);
-    } catch (e) {
-      setError(errorMessage(e, "Fulfil failed"));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const available = matches.filter(

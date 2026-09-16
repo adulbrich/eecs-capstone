@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { errorMessage } from "#/lib/error-message";
+import { useAction } from "#/lib/use-action";
 import { addComment } from "#/server/comments";
 import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
@@ -181,22 +182,20 @@ function NewCommentForm({
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  // One action with nothing to cancel, unlike the reply form below, so this
+  // one takes the hook. Its ref is the guard: `busy` alone is a state read,
+  // and a second submit inside the same tick sees the value from before the
+  // first (#443).
+  const { busy, error, run } = useAction({ fallback: "Comment failed" });
 
   // The form is disabled while the post is in flight. The clear below runs
   // when the server answers, and before this it wiped whatever had been typed
   // into the box in the meantime, which read as a second comment that failed
   // to post (#188). Disabling the box is what makes "typed after the post"
   // and "typed after the clear" the same thing.
-  async function onSubmit(e: React.FormEvent) {
+  function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (busy) {
-      return;
-    }
-    setError(null);
-    setBusy(true);
-    try {
+    return run(async () => {
       await addComment({
         data: {
           projectId,
@@ -209,17 +208,13 @@ function NewCommentForm({
       setIsInternal(false);
       setSendEmail(true);
       await onChanged();
-    } catch (err) {
-      setError(errorMessage(err, "Comment failed"));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   // No top rule here: inside the private panel the section already draws one,
   // and a second made the composer look like a separate section.
   return (
-    <form className="mt-4 space-y-2" onSubmit={onSubmit}>
+    <form className="mt-4 space-y-2" onSubmit={(e) => void onSubmit(e)}>
       <Textarea
         aria-label="Comment"
         disabled={busy}
@@ -297,6 +292,14 @@ function ReplyForm({
   // Closing bumps it, and so does the next submit, so one attempt's answer
   // can never re-enable or fail the attempt that replaced it (#247).
   const attempt = useRef(0);
+  // Not `useAction`, which does not model any of that: its `finally` clears
+  // `busy` for whichever call settles, and this form needs a cancelled
+  // attempt's answer to leave the flag alone. So the guard #443 asks for is
+  // written here instead, and it tracks `busy` exactly: set on submit,
+  // cleared by `close`, and cleared on settle only by the attempt that still
+  // owns the form. `busy` alone cannot do it, because a second submit in the
+  // same tick reads the value from before the first.
+  const inFlight = useRef<boolean>(false);
 
   // A reply inherits its parent's internal flag. The server enforces this too;
   // here it keeps the checkbox from promising something the server will
@@ -328,6 +331,7 @@ function ReplyForm({
   // so it will not clear the flag back out from under the next attempt.
   function close() {
     attempt.current += 1;
+    inFlight.current = false;
     setBusy(false);
     setOpen(false);
   }
@@ -335,9 +339,10 @@ function ReplyForm({
   // Disabled in flight for the same reason as the new-comment form above.
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (busy) {
+    if (inFlight.current) {
       return;
     }
+    inFlight.current = true;
     attempt.current += 1;
     const mine = attempt.current;
     const isCurrent = () => attempt.current === mine;
@@ -375,10 +380,11 @@ function ReplyForm({
         setError(errorMessage(err, "Reply failed"));
       }
     } finally {
-      // Only the current attempt owns the flag. A stale one skips this
-      // because close() already cleared it, or a newer submit set it for
+      // Only the current attempt owns the flags. A stale one skips this
+      // because close() already cleared them, or a newer submit set them for
       // itself and is still in flight.
       if (isCurrent()) {
+        inFlight.current = false;
         setBusy(false);
       }
     }

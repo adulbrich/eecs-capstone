@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { errorMessage } from "#/lib/error-message";
+import { useAction } from "#/lib/use-action";
 import {
   listProjectCategories,
   setProjectCategories,
@@ -28,8 +29,11 @@ export function StaffCategoriesSection({
 }) {
   const [saved, setSaved] = useState<string[] | null>(null);
   const [draft, setDraft] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // A second activation in the same tick would write the category set twice;
+  // `use-action.ts` says why the hook's ref is what stops it (#443).
+  // `setError` comes back out for the load below, which writes its failure
+  // into the same slot.
+  const { busy, error, run, setError } = useAction({ fallback: "Save failed" });
 
   const load = useCallback(async () => {
     try {
@@ -40,26 +44,22 @@ export function StaffCategoriesSection({
     } catch (e) {
       setError(errorMessage(e, "Could not load the categories"));
     }
-  }, [projectId]);
+    // `setError` is the hook's own state setter, so it is stable and the
+    // dependency costs nothing; Biome cannot see that from here.
+  }, [projectId, setError]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  async function save() {
-    setBusy(true);
-    setError(null);
-    try {
+  function save() {
+    return run(async () => {
       await setProjectCategories({
         data: { projectId, categoryIds: draft },
       });
       await load();
       await onChanged();
-    } catch (e) {
-      setError(errorMessage(e, "Save failed"));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { errorMessage } from "#/lib/error-message";
+import { useAction } from "#/lib/use-action";
 import { updateProjectMentorship } from "#/server/projects";
 import {
   getProjectMentorship,
@@ -41,8 +42,10 @@ export function StaffMentorshipSection({
 }) {
   const [record, setRecord] = useState<ProjectMentorship | null>(null);
   const [mentorEmail, setMentorEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // A second activation in the same tick would mail the mentor twice;
+  // `use-action.ts` says why the hook's ref is what stops it (#443).
+  // `setError` comes back out for the load below, which shares the slot.
+  const { busy, error, run, setError } = useAction({ fallback: "Save failed" });
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -54,7 +57,9 @@ export function StaffMentorshipSection({
       // Reported, not swallowed, and Save stays disabled: see the gate below.
       setError(errorMessage(e, "Could not load the mentor record"));
     }
-  }, [projectId]);
+    // `setError` is the hook's own state setter, so it is stable and the
+    // dependency costs nothing; Biome cannot see that from here.
+  }, [projectId, setError]);
 
   useEffect(() => {
     void load();
@@ -69,21 +74,15 @@ export function StaffMentorshipSection({
     trimmed !== "" &&
     trimmed.toLowerCase() !== record.mentorEmail;
 
-  async function save(sendEmail: boolean) {
-    setBusy(true);
-    setError(null);
-    try {
+  function save(sendEmail: boolean) {
+    return run(async () => {
       await updateProjectMentorship({
         data: { id: projectId, mentorEmail: trimmed, sendEmail },
       });
       setConfirmOpen(false);
       await load();
       await onChanged();
-    } catch (e) {
-      setError(errorMessage(e, "Save failed"));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (

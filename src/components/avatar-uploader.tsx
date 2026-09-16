@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { errorMessage } from "#/lib/error-message";
+import { useAction } from "#/lib/use-action";
 import { clearAvatar, uploadAvatar } from "#/server/uploads";
 import { ImageUploader } from "./image-uploader";
 import { FieldError } from "./ui/field";
@@ -10,13 +9,16 @@ interface Props {
 }
 
 export function AvatarUploader({ currentKey, onChanged }: Props) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The crop and the preview are `ImageUploader`'s; what reaches here is one
+  // write, so the hook fits. Nothing here is `disabled` at all, so two files
+  // chosen in one tick would both upload and the second object would be the
+  // one nobody asked for; the hook's ref is what stops it (#443).
+  const { busy, error, run } = useAction({
+    fallback: "Save failed. Please try again.",
+  });
 
-  async function handleChange(file: File | null) {
-    setBusy(true);
-    setError(null);
-    try {
+  function handleChange(file: File | null) {
+    return run(async () => {
       if (file) {
         const form = new FormData();
         form.append("file", file);
@@ -25,11 +27,7 @@ export function AvatarUploader({ currentKey, onChanged }: Props) {
         await clearAvatar();
       }
       await onChanged();
-    } catch (err) {
-      setError(errorMessage(err, "Save failed. Please try again."));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (

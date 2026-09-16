@@ -91,6 +91,52 @@ function replyForm() {
   return within(form);
 }
 
+/**
+ * Two submits inside one tick, which is the case a `busy` state read cannot
+ * cover: the flag only holds off the second submit once React has re-rendered
+ * (#443). Dispatching both on the form is what puts them in the same tick;
+ * two `fireEvent.submit` calls flush between and prove nothing.
+ *
+ * Both forms here are covered, because they guard differently. The composer
+ * took `useAction` and its ref; the reply form keeps its own, since its
+ * cancel-and-reopen behaviour needs a cancelled attempt's answer to leave the
+ * flag alone, which the hook does not model.
+ */
+describe("CommentThread double submit", () => {
+  function submitTwice(form: HTMLFormElement) {
+    return act(() => {
+      form.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true })
+      );
+      form.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true })
+      );
+      return Promise.resolve();
+    });
+  }
+
+  it("posts one comment when the composer is submitted twice in one tick", async () => {
+    renderThread([comment({})]);
+    const box = screen.getByPlaceholderText("Add a comment");
+    fireEvent.change(box, { target: { value: "One comment" } });
+
+    await submitTwice(box.closest("form") as HTMLFormElement);
+
+    expect(addComment).toHaveBeenCalledTimes(1);
+  });
+
+  it("posts one reply when the reply form is submitted twice in one tick", async () => {
+    renderThread([comment({})]);
+    openReplyAndType("One reply");
+
+    await submitTwice(
+      screen.getByPlaceholderText("Reply").closest("form") as HTMLFormElement
+    );
+
+    expect(addComment).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("CommentThread author identity", () => {
   it("shows the author's name, not their id", () => {
     renderThread([comment({})]);

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { errorMessage } from "#/lib/error-message";
+import { useAction } from "#/lib/use-action";
 import { approveRequestItem, rejectRequestItem } from "#/server/inventory";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
@@ -38,8 +38,11 @@ export function AdminRequestActions({
   const [pickupBy, setPickupBy] = useState("");
   const [reason, setReason] = useState("");
   const [sendEmail, setSendEmail] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The two decisions fail differently and share one error slot, so the
+  // fallback comes per call rather than per hook. A second activation in the
+  // same tick would decide the line twice; `use-action.ts` says why the
+  // hook's ref is what stops it (#443).
+  const { busy, error, run, setError } = useAction();
 
   // Approving or rejecting is a one-way door, so a decided line offers
   // nothing rather than a disabled control.
@@ -80,10 +83,8 @@ export function AdminRequestActions({
     close();
   }
 
-  async function onApprove() {
-    setBusy(true);
-    setError(null);
-    try {
+  function onApprove() {
+    return run(async () => {
       await approveRequestItem({
         data: {
           requestItemId: lineId,
@@ -94,32 +95,22 @@ export function AdminRequestActions({
       setPickupBy("");
       await onDone();
       close();
-    } catch (e) {
-      setError(errorMessage(e, "Approve failed"));
-    } finally {
-      setBusy(false);
-    }
+    }, "Approve failed");
   }
 
-  async function onReject() {
+  function onReject() {
     if (!reason.trim()) {
       setError("Reason required");
       return;
     }
-    setBusy(true);
-    setError(null);
-    try {
+    return run(async () => {
       await rejectRequestItem({
         data: { requestItemId: lineId, reviewComment: reason, sendEmail },
       });
       setReason("");
       await onDone();
       close();
-    } catch (e) {
-      setError(errorMessage(e, "Reject failed"));
-    } finally {
-      setBusy(false);
-    }
+    }, "Reject failed");
   }
 
   return (
