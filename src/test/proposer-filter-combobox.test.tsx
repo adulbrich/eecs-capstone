@@ -65,6 +65,25 @@ describe("ProposerFilterCombobox", () => {
     expect(await screen.findByText("No proposer matches.")).toBeTruthy();
   });
 
+  it("matches a fragment from the middle of an address", async () => {
+    open();
+    type("nstate");
+    const options = await screen.findAllByRole("option");
+    expect(
+      options.map((o) => o.textContent?.includes("@oregonstate.edu"))
+    ).toEqual([true, true]);
+  });
+
+  it("picks the highlighted proposer from the keyboard alone", async () => {
+    const onChange = open();
+    const box = screen.getByPlaceholderText("Search name or email");
+    fireEvent.change(box, { target: { value: "tanak" } });
+    await screen.findByText("Aiko Tanaka");
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledWith("u2");
+  });
+
   it("reports a query that matches nobody", async () => {
     open();
     type("nobody@nowhere.test");
