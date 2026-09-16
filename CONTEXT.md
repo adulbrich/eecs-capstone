@@ -200,7 +200,9 @@ _Avoid_: profile text, bio, preferences, skills
 **Recommendation**:
 The catalog ordered by how close each published project is to the viewer's
 interests. A sort, not a separate list, and unavailable until the viewer has written
-interests.
+interests and those interests have embedded. It is also where the listing lands for
+a viewer who has a vector and has not chosen an order, so writing interests is what
+turns it on rather than picking it each visit.
 _Avoid_: suggestion, match, personalization
 
 **Staff inbox**:

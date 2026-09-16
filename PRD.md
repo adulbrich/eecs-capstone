@@ -218,14 +218,19 @@ Each project carries:
   identically in both modes. The card is responsive (image on top below `md`,
   beside the text from `md` up); the table is the same `AdminDataTable` the
   admin pages use, with column visibility and a client-side column sort.
-- [x] Sort control on the public listing: most relevant (default), newest, and
-  "recommended for you".
+- [x] Sort control on the public listing: most relevant, newest, and
+  "recommended for you". Which one an unchosen listing lands in depends on the
+  viewer: "recommended for you" for anyone with an interest vector, most
+  relevant for everyone else.
 - [x] Personalized recommendations: signed-in users write an interests statement
   on their profile; it and every published project are embedded with Amazon
   Titan Text Embeddings V2 (pgvector), and the recommended sort ranks projects
-  by cosine similarity to the interests vector. Falls back to relevance ordering
-  when a viewer has no interest vector yet; interest vectors never leave the
-  server, and projects are embedded only on publish.
+  by cosine similarity to the interests vector. It is also the order the listing
+  defaults to once they have a vector, so the interests they wrote take effect
+  without them finding the sort on every visit; an explicit choice in the URL
+  still wins. Falls back to relevance ordering when a viewer has no interest
+  vector yet, including one whose interests saved but failed to embed; interest
+  vectors never leave the server.
 - [x] Bookmarks: bookmark button on project detail and a toggle on every row of
   the public listing (authed), and a `/my/bookmarks` view.
 

@@ -59,3 +59,33 @@ describe("/projects switch params", () => {
     expect("noMentorNeededOnly" in parsed).toBe(false);
   });
 });
+
+/**
+ * `order` carries no default, unlike every other filter param, because the
+ * router writes a schema default into the URL and that would make "chose
+ * relevance" and "has not chosen yet" the same URL. The server needs to tell
+ * them apart to resolve an absent one from the viewer's interest vector
+ * (#424).
+ */
+describe("/projects order search param", () => {
+  it("is undefined when absent, rather than defaulted", () => {
+    expect(searchSchema.parse({}).order).toBeUndefined();
+  });
+
+  it("keeps an explicit choice", () => {
+    expect(searchSchema.parse({ order: "relevance" }).order).toBe("relevance");
+    expect(searchSchema.parse({ order: "recommended" }).order).toBe(
+      "recommended"
+    );
+  });
+
+  /**
+   * Unlike `categories` and `view`, a bad `order` is a router error rather
+   * than a silent fallback. Pinned so the choice is deliberate: the value is
+   * typed into a URL by hand or not at all, and the three filters that use
+   * `.catch` do so because a stale link from a real feature could carry them.
+   */
+  it("refuses a value the enum does not know", () => {
+    expect(() => searchSchema.parse({ order: "oldest" })).toThrow();
+  });
+});

@@ -79,7 +79,14 @@ test.describe("@smoke recommendations gate", () => {
 test.describe("recommended order", () => {
   test.use({ storageState: USER_AUTH });
 
-  test("a member with interests picks the sort and sees the seeded order", async ({
+  /**
+   * Rewritten for #424. This used to pick the option and wait for
+   * `order=recommended` in the URL, which now hangs: the option is already the
+   * effective value on arrival, so choosing it writes nothing and the URL
+   * never changes. What the test is really for is that the member lands in
+   * cosine order, which is now true of a bare visit.
+   */
+  test("a member with interests lands in the seeded order without asking", async ({
     page,
   }) => {
     await page.goto("/projects");
@@ -94,11 +101,12 @@ test.describe("recommended order", () => {
       page.getByRole("link", { name: "Sign in to get recommendations" })
     ).toHaveCount(0);
 
+    // No `order` in the URL: the resolution happens on the server, and the
+    // param stays absent until the reader picks something.
+    expect(new URL(page.url()).searchParams.has("order")).toBe(false);
+    await expect(page.getByText("Ranked by your interests.")).toBeVisible();
     const option = await recommendedOption(page);
     await expect(option).not.toHaveAttribute("aria-disabled", "true");
-    await option.click();
-    await page.waitForURL(/order=recommended/);
-    await expect(page.getByText("Ranked by your interests.")).toBeVisible();
 
     // The seed's published projects, nearest the interest vector first. Rows
     // with no vector (anything another test published) sort after them, so
@@ -112,5 +120,36 @@ test.describe("recommended order", () => {
       SEED_RECOMMENDED_TITLES.length
     );
     expect(head).toEqual([...SEED_RECOMMENDED_TITLES]);
+  });
+
+  /**
+   * The other direction, which is what keeps the default from being a trap:
+   * an explicit "Most relevant" is written to the URL and changes the order,
+   * so the member who prefers relevance can still get it.
+   */
+  test("picking Most relevant writes the param and reorders", async ({
+    page,
+  }) => {
+    await page.goto("/projects");
+    await waitForHydration(page);
+    const titles = page.getByRole("heading", { level: 3 });
+    await expect(titles.first()).toBeVisible();
+    const recommended = (await titles.allTextContents()).slice(
+      0,
+      SEED_RECOMMENDED_TITLES.length
+    );
+    expect(recommended).toEqual([...SEED_RECOMMENDED_TITLES]);
+
+    await page.getByRole("combobox", { name: "Sort" }).click();
+    await page.getByRole("option", { name: "Most relevant" }).click();
+    await page.waitForURL(/order=relevance/);
+
+    await expect(page.getByText("Ranked by your interests.")).toHaveCount(0);
+    await expect(titles.first()).toBeVisible();
+    const byRelevance = (await titles.allTextContents()).slice(
+      0,
+      SEED_RECOMMENDED_TITLES.length
+    );
+    expect(byRelevance).not.toEqual(recommended);
   });
 });
