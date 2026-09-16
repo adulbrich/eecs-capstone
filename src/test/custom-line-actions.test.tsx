@@ -267,6 +267,60 @@ describe("StartSourcingAllButton", () => {
   });
 });
 
+describe("CustomLineActions: the trigger during its own write", () => {
+  /**
+   * The triggers, not the confirm buttons inside their popovers. Those were
+   * always guarded; these stayed live for the whole write and the refetch
+   * behind it, offering to reopen a decision over a row the loader had not
+   * caught up with (#426). `useAction`'s in-flight ref means the second
+   * decision never reached the server, so what was broken is what the reader
+   * was offered, not what was written.
+   */
+  it.each([
+    ["Start sourcing", "Confirm sourcing", startSourcingCustomLine],
+    ["Reject", "Confirm reject", rejectCustomLine],
+  ])(
+    "disables the %s trigger until the write settles",
+    async (trigger, confirm, fn) => {
+      const write = deferred<void>();
+      vi.mocked(fn).mockReturnValue(write.promise as never);
+      render(
+        <CustomLineActions
+          line={pending}
+          onDone={() => Promise.resolve()}
+          requesterEmail="requester@x.edu"
+        />
+      );
+
+      const button = () =>
+        screen.getByRole("button", { hidden: true, name: trigger });
+      expect(button().hasAttribute("disabled")).toBe(false);
+
+      fireEvent.click(button());
+      if (trigger === "Reject") {
+        fireEvent.change(screen.getByLabelText("Reason (sent to requester)"), {
+          target: { value: "Cannot source it" },
+        });
+      }
+      fireEvent.click(
+        within(screen.getByRole("dialog", { hidden: true })).getByRole(
+          "button",
+          {
+            name: confirm,
+          }
+        )
+      );
+
+      await waitFor(() => expect(button().hasAttribute("disabled")).toBe(true));
+
+      write.resolve();
+      await waitFor(() =>
+        expect(button().hasAttribute("disabled")).toBe(false)
+      );
+    }
+  );
+});
+
 describe("CustomLineActions: cancelling a popover", () => {
   it("closes the sourcing popover without writing, and keeps the note", async () => {
     render(
@@ -319,6 +373,15 @@ describe("CustomLineActions: cancelling a popover", () => {
   });
 });
 
+/** A promise this test resolves by hand, to observe the component mid-write. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 describe("FulfillCustomLineDialog", () => {
   /** Opens the dialog, searches, and links the first match. */
   async function linkFirstMatch() {
@@ -338,6 +401,34 @@ describe("FulfillCustomLineDialog", () => {
       screen.getByRole("list", { name: "Linked items" }).textContent
     ).toContain("FLIR One");
   }
+
+  /**
+   * The trigger, not the confirm button inside the dialog. Same defect as the
+   * popovers above (#426): it stayed live through the fulfilment and the
+   * refetch behind it.
+   */
+  it("disables the Fulfil trigger until the write settles", async () => {
+    const write = deferred<void>();
+    vi.mocked(fulfillCustomLine).mockReturnValue(write.promise as never);
+    render(
+      <FulfillCustomLineDialog
+        line={pending}
+        onDone={() => Promise.resolve()}
+        requesterEmail="requester@x.edu"
+      />
+    );
+
+    const button = () =>
+      screen.getByRole("button", { hidden: true, name: "Fulfil" });
+    expect(button().hasAttribute("disabled")).toBe(false);
+
+    await linkFirstMatch();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm fulfil" }));
+    await waitFor(() => expect(button().hasAttribute("disabled")).toBe(true));
+
+    write.resolve();
+    await waitFor(() => expect(button().hasAttribute("disabled")).toBe(false));
+  });
 
   it("unlinks an item and offers it again", async () => {
     render(

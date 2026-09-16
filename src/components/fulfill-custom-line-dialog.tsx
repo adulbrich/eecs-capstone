@@ -150,7 +150,7 @@ export function FulfillCustomLineDialog({
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogTrigger asChild>
-        <Button size="sm" type="button">
+        <Button disabled={busy} size="sm" type="button">
           Fulfil
         </Button>
       </DialogTrigger>

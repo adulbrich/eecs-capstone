@@ -104,7 +104,7 @@ export function AdminRequestActions({
         open={open === "approve"}
       >
         <PopoverTrigger asChild>
-          <Button size="sm" type="button">
+          <Button disabled={busy} size="sm" type="button">
             Approve
           </Button>
         </PopoverTrigger>
@@ -151,7 +151,7 @@ export function AdminRequestActions({
         open={open === "reject"}
       >
         <PopoverTrigger asChild>
-          <Button size="sm" type="button" variant="outline">
+          <Button disabled={busy} size="sm" type="button" variant="outline">
             Reject
           </Button>
         </PopoverTrigger>

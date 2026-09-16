@@ -35,7 +35,59 @@ function renderPending() {
   );
 }
 
+/**
+ * A promise this test resolves by hand, so the component can be observed
+ * mid-write rather than after it.
+ */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 describe("AdminRequestActions", () => {
+  /**
+   * The trigger, not the confirm button inside the popover. That one was
+   * always guarded; this one stayed live for the whole write and the refetch
+   * behind it, offering to reopen a decision over a row the loader had not
+   * caught up with (#426). `useAction`'s in-flight ref means the second
+   * decision could not reach the server, so what was broken is what the
+   * reader was told, not what was written.
+   */
+  it.each([
+    ["Approve", "Confirm approve"],
+    ["Reject", "Confirm reject"],
+  ])(
+    "disables the %s trigger until the write settles",
+    async (trigger, confirm) => {
+      const write = deferred<void>();
+      const fn = trigger === "Approve" ? approveRequestItem : rejectRequestItem;
+      vi.mocked(fn).mockReturnValue(write.promise as never);
+      renderPending();
+
+      const button = () =>
+        screen.getByRole("button", { hidden: true, name: trigger });
+      expect(button().hasAttribute("disabled")).toBe(false);
+
+      fireEvent.click(button());
+      if (trigger === "Reject") {
+        fireEvent.change(screen.getByLabelText("Reason (sent to requester)"), {
+          target: { value: "Out of stock" },
+        });
+      }
+      fireEvent.click(screen.getByRole("button", { name: confirm }));
+
+      await waitFor(() => expect(button().hasAttribute("disabled")).toBe(true));
+
+      write.resolve();
+      await waitFor(() =>
+        expect(button().hasAttribute("disabled")).toBe(false)
+      );
+    }
+  );
+
   it("offers Approve and Reject for a pending line", () => {
     renderPending();
 

@@ -74,6 +74,7 @@ export function CustomLineActions({
       >
         <PopoverTrigger asChild>
           <Button
+            disabled={busy}
             size="sm"
             type="button"
             variant={sourcing ? "outline" : "default"}
@@ -149,7 +150,7 @@ export function CustomLineActions({
         open={open === "reject"}
       >
         <PopoverTrigger asChild>
-          <Button size="sm" type="button" variant="outline">
+          <Button disabled={busy} size="sm" type="button" variant="outline">
             Reject
           </Button>
         </PopoverTrigger>

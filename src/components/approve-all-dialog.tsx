@@ -88,7 +88,7 @@ export function ApproveAllDialog({
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogTrigger asChild>
-        <Button size="sm" type="button">
+        <Button disabled={busy} size="sm" type="button">
           Approve all
         </Button>
       </DialogTrigger>

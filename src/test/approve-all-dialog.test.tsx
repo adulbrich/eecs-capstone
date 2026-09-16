@@ -49,7 +49,46 @@ function openDialog() {
   fireEvent.click(screen.getByRole("button", { name: "Approve all" }));
 }
 
+/** A promise this test resolves by hand, to observe the component mid-write. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 describe("ApproveAllDialog", () => {
+  /**
+   * The trigger, not the confirm button inside the dialog. It stayed live for
+   * the whole batch write and the refetch behind it, offering to reopen a
+   * decision over rows the loader had not caught up with (#426).
+   */
+  it("disables the Approve all trigger until the write settles", async () => {
+    const write = deferred<{ approved: string[] }>();
+    vi.mocked(approveRequestLines).mockReturnValue(write.promise as never);
+    render(
+      <ApproveAllDialog
+        lines={lines}
+        onDone={() => Promise.resolve()}
+        requesterEmail="student@x.edu"
+      />
+    );
+
+    const button = () =>
+      screen.getByRole("button", { hidden: true, name: "Approve all" });
+    expect(button().hasAttribute("disabled")).toBe(false);
+
+    openDialog();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm approve all" })
+    );
+    await waitFor(() => expect(button().hasAttribute("disabled")).toBe(true));
+
+    write.resolve({ approved: ["a", "b"] });
+    await waitFor(() => expect(button().hasAttribute("disabled")).toBe(false));
+  });
+
   it("lists only the pending lines it is about to approve", () => {
     render(
       <ApproveAllDialog
