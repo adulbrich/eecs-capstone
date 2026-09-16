@@ -510,6 +510,21 @@ That is not an accessibility violation and axe never ran: the dev server hit a t
 
 `DialogContent`, `AlertDialogContent`, `SheetContent` and `DropdownMenuContent` mount with `data-state="open"` and an `animate-in fade-in` CSS animation, and Playwright's `toBeVisible` is satisfied at that animation's first frame. A `checkA11y` that follows at once can sample a button at partial opacity, and axe reports `color-contrast` on colours that pass once settled: `my items opens by saying what needs attention` in `user.a11y.test.ts` failed that way once in twelve local runs (#294). It is the enter side of the transient `closeMenu` in `src/test/shared/playwright.ts` guards on the way out. `waitForSurfaceSettled` there takes the surface's locator and resolves when every finite animation on it and on any open overlay has finished (Radix portals the overlay and the content as separate children of `document.body`, so there is no shared wrapper to scope to); every scan with a dialog, alert dialog, sheet or menu open calls it first. A `color-contrast` failure on such a surface after that wait is a real one.
 
+### A Select item's `aria-selected` says focused, not chosen
+
+`@radix-ui/react-select` sets `"aria-selected": isSelected && isFocused` on a
+`SelectItem`, so the attribute answers which item the listbox focused, not what
+the Select's value is. Radix focuses the current value's item when the listbox
+opens, which is why asserting `aria-selected` on it looks right and passes: it
+would have gone on passing with selection broken, and would break if Radix ever
+changed what it focuses on open. Read the trigger instead, which renders the
+value as its own text and needs no listbox open. Opening one has a second cost
+in a browser suite: the listbox is modal, so it `aria-hidden`s the rest of the
+page and every role query outside it returns nothing until it closes. When a
+test must open one, close it in the same helper rather than leaving that to the
+caller. `src/test/e2e/recommendations.e2e.test.ts` is the worked example, from
+#424.
+
 ### axe skips a disabled control, so a disabled pill's colours are yours to measure
 
 axe-core's `color-contrast` rule does not evaluate a disabled form control, since WCAG 1.4.3 exempts inactive components. The current-status pill in `staff-project-panel.tsx` is a `<button disabled>`, so the scan was green with the old white on brand orange, which measures 3.48:1 and fails (#208). When a disabled element carries text a person still has to read, compute the ratio yourself and say so in the PR.

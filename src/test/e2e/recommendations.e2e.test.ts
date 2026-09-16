@@ -17,10 +17,26 @@ import { OTHER_AUTH, USER_AUTH } from "./constants";
 
 const RECOMMENDED = "Recommended for you";
 
-/** Opens the Sort select and returns the recommended option. */
-async function recommendedOption(page: import("@playwright/test").Page) {
-  await page.getByRole("combobox", { name: "Sort" }).click();
-  return page.getByRole("option", { name: RECOMMENDED });
+/** The Sort trigger, which renders the resolved order as its own text. */
+function sortTrigger(page: import("@playwright/test").Page) {
+  return page.getByRole("combobox", { name: "Sort" });
+}
+
+/**
+ * Asserts the recommended option is offered but refused, then closes the
+ * listbox again. Opening is the only way to see an option at all, and the
+ * close is part of the helper rather than the caller's job: an open Radix
+ * listbox is modal and `aria-hidden`s the rest of the page, so anything the
+ * caller looks at afterwards is missing from the accessibility tree.
+ */
+async function expectRecommendedRefused(page: import("@playwright/test").Page) {
+  await sortTrigger(page).click();
+  await expect(page.getByRole("option", { name: RECOMMENDED })).toHaveAttribute(
+    "aria-disabled",
+    "true"
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("listbox")).toHaveCount(0);
 }
 
 test.describe("@smoke recommendations gate", () => {
@@ -46,11 +62,7 @@ test.describe("@smoke recommendations gate", () => {
       ).toHaveCount(0);
       // Radix marks a disabled item rather than dropping it from the list, so
       // the option is asserted on, not its absence.
-      await expect(await recommendedOption(anonymous)).toHaveAttribute(
-        "aria-disabled",
-        "true"
-      );
-      await anonymous.keyboard.press("Escape");
+      await expectRecommendedRefused(anonymous);
 
       // A member with no interests row: the prompt points at the profile.
       const member = await memberContext.newPage();
@@ -64,11 +76,7 @@ test.describe("@smoke recommendations gate", () => {
       await expect(
         member.getByRole("link", { name: "Sign in to get recommendations" })
       ).toHaveCount(0);
-      await expect(await recommendedOption(member)).toHaveAttribute(
-        "aria-disabled",
-        "true"
-      );
-      await member.keyboard.press("Escape");
+      await expectRecommendedRefused(member);
     } finally {
       await anonymousContext.close();
       await memberContext.close();
@@ -102,19 +110,20 @@ test.describe("recommended order", () => {
     ).toHaveCount(0);
 
     // No `order` in the URL: the resolution happens on the server, and the
-    // param stays absent until the reader picks something.
+    // param stays absent until the reader picks something. Waiting on
+    // `acceptingOnly` first is what makes this discriminate: the router
+    // writes its own defaults after mount, so reading the URL before that
+    // lands would find the bare `/projects` we navigated to and pass without
+    // the resolution having run at all.
+    await expect(page).toHaveURL(/acceptingOnly=true/);
     expect(new URL(page.url()).searchParams.has("order")).toBe(false);
     await expect(page.getByText("Ranked by your interests.")).toBeVisible();
 
-    // The Select shows the resolved order as its own value, so open it, read
-    // the selected option, and close it again. The close is not optional: an
-    // open Radix listbox `aria-hidden`s the rest of the page, so the card
-    // headings below are not in the accessibility tree until it goes away.
-    const option = await recommendedOption(page);
-    await expect(option).not.toHaveAttribute("aria-disabled", "true");
-    await expect(option).toHaveAttribute("aria-selected", "true");
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("listbox")).toHaveCount(0);
+    // The trigger renders the resolved order as its own text, so the value is
+    // readable with the listbox shut. Not the option's `aria-selected`: Radix
+    // sets that to `isSelected && isFocused`, so it answers which item the
+    // listbox focused on open, not what the Select's value is.
+    await expect(sortTrigger(page)).toContainText(RECOMMENDED);
 
     // The seed's published projects, nearest the interest vector first. Rows
     // with no vector (anything another test published) sort after them, so

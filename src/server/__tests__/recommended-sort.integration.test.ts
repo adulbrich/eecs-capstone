@@ -250,11 +250,17 @@ describe("an absent sort resolves by the viewer's vector", () => {
     await publishWithVector(admin, "Near", unitVector(0));
     await publishWithVector(admin, "Far", unitVector(1));
 
-    const { order } = await searchProjectsImpl(
+    const { order, rows } = await searchProjectsImpl(
       { ...SEARCH_DEFAULTS, sort: "relevance" },
       admin.id
     );
     expect(order).toBe("relevance");
+    // The rows, not just the label. This is the one case in this file where
+    // a vector exists and must be ignored, so it is the only one where the
+    // two orders disagree: `Far` publishes second, so date-DESC puts it
+    // first, the reverse of cosine. Asserting the label alone let the SQL
+    // branch widen to every viewer with a vector and stay green.
+    expect(rows.map((row) => row.title)).toEqual(["Far", "Near"]);
   });
 
   /**
