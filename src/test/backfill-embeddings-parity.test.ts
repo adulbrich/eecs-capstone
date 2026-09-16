@@ -169,8 +169,15 @@ describe("reading the production backfill as code rather than as text", () => {
    * What makes the unanchored line strip safe here, and the only assumption
    * the stripping rests on that a reader cannot see at a glance. A URL in a
    * string would put a `//` in code the strip then truncates, silently.
+   *
+   * It refuses a URL anywhere, including in a comment, where one would in fact
+   * be harmless. That bluntness is deliberate: telling a comment from a string
+   * is the job of the strip this assertion exists to protect, so doing it here
+   * would be the circularity again. If you hit this while citing a doc URL
+   * above a copied function, put the URL in the JSDoc of the `src/` original
+   * instead, and do not delete the assertion to get past it.
    */
-  it("contains no sequence that would put a comment opener in a string", () => {
+  it("contains no URL, in a string or anywhere else", () => {
     expect(SCRIPT_FILE).not.toContain("://");
   });
 });
