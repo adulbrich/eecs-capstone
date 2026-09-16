@@ -66,12 +66,15 @@ describe("AdminRequestActions", () => {
     await waitFor(() =>
       expect(screen.queryByLabelText("Pickup by (optional)")).toBeNull()
     );
-    // No focus assertion here. Two were tried and neither went red with
-    // the guard reverted, so they asserted nothing; the mechanism was
-    // not pinned down, and `export-csv-button.test.tsx` is the only
-    // place in this repo where a jsdom focus claim has been verified.
-    // Nothing covers the browser behaviour today: the accessibility
-    // suite scans this page statically and never opens this surface.
+    // No focus assertion here. Two were tried and neither went red with the
+    // guard reverted, so they asserted nothing. The mechanism is not pinned
+    // down: focus is observable in jsdom through Radix (`tabs.test.tsx` asserts
+    // `toHaveFocus` through a roving tabindex), but those tests drive it with
+    // `userEvent` where these use `fireEvent.keyDown`, which is the first thing
+    // to try if anyone picks this up.
+    // Nothing covers the browser behaviour today. The cheapest place to add it
+    // is `inventory-requests.e2e.test.ts`, which already opens this popover and
+    // confirms; it just never asserts where focus lands.
   });
 
   /**
@@ -79,8 +82,12 @@ describe("AdminRequestActions", () => {
    * always guarded; this one stayed live for the whole write and the refetch
    * behind it, offering to reopen a decision over a row the loader had not
    * caught up with (#426). What was broken is what the reader was told, not
-   * what was written: the confirm button inside the popover was already
-   * guarded, so the second decision never reached the server.
+   * what was written: Confirm is `disabled={busy}` and `busy` committed many
+   * frames before a reopened surface could be confirmed, so the second
+   * decision never reached the server. That is narrower than it sounds.
+   * This component has no in-flight ref, and `src/lib/use-action.ts` is the
+   * repo's own note that a disabled prop alone does not stop a second call
+   * arriving inside one tick.
    */
   it.each([
     ["Approve", "Confirm approve"],
