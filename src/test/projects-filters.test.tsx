@@ -60,11 +60,14 @@ afterEach(() => {
   navigate.mockReset();
 });
 
-function renderPrompt(viewer: { canRecommend: boolean; signedIn: boolean }) {
+function renderPrompt(
+  viewer: { canRecommend: boolean; signedIn: boolean },
+  order: "relevance" | "newest" | "recommended" = "relevance"
+) {
   return render(
     <RecommendationPrompt
       canRecommend={viewer.canRecommend}
-      order="relevance"
+      order={order}
       signedIn={viewer.signedIn}
     />
   );
@@ -247,5 +250,24 @@ describe("ProjectsFilters archive mode and hints", () => {
         .getByRole("switch", { name: PROJECT_SWITCH_LABEL.requiresNdaOnly })
         .getAttribute("aria-describedby")
     ).toBeNull();
+  });
+});
+
+/**
+ * Since #424 the `order` these two read is the loader's resolved value, not
+ * the URL's, so a member with a vector and no `?order=` sees "Recommended for
+ * you" selected and the line under the search row. The assertions are the same
+ * ones that used to need an explicit param; what changed is where the value
+ * comes from, which is why they are driven by the prop here.
+ */
+describe("the effective order the loader resolved", () => {
+  it("shows the interests line when it resolved to recommended", () => {
+    renderPrompt({ canRecommend: true, signedIn: true }, "recommended");
+    expect(screen.getByText(/Ranked by your interests/)).toBeTruthy();
+  });
+
+  it("shows no line when it resolved to relevance", () => {
+    renderPrompt({ canRecommend: true, signedIn: true }, "relevance");
+    expect(screen.queryByText(/Ranked by your interests/)).toBeNull();
   });
 });

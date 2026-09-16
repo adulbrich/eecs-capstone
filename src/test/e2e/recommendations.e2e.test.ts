@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { SEED_RECOMMENDED_TITLES } from "../../../scripts/seed-recommendations";
 import { waitForHydration } from "../shared/playwright";
 import { OTHER_AUTH, USER_AUTH } from "./constants";
@@ -17,10 +17,26 @@ import { OTHER_AUTH, USER_AUTH } from "./constants";
 
 const RECOMMENDED = "Recommended for you";
 
-/** Opens the Sort select and returns the recommended option. */
-async function recommendedOption(page: import("@playwright/test").Page) {
-  await page.getByRole("combobox", { name: "Sort" }).click();
-  return page.getByRole("option", { name: RECOMMENDED });
+/** The Sort trigger, which renders the resolved order as its own text. */
+function sortTrigger(page: Page): Locator {
+  return page.getByRole("combobox", { name: "Sort" });
+}
+
+/**
+ * Asserts the recommended option is offered but refused, then closes the
+ * listbox again. Opening is the only way to see an option at all, and the
+ * close is part of the helper rather than the caller's job: an open Radix
+ * listbox is modal and `aria-hidden`s the rest of the page, so anything the
+ * caller looks at afterwards is missing from the accessibility tree.
+ */
+async function expectRecommendedRefused(page: Page): Promise<void> {
+  await sortTrigger(page).click();
+  await expect(page.getByRole("option", { name: RECOMMENDED })).toHaveAttribute(
+    "aria-disabled",
+    "true"
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("listbox")).toHaveCount(0);
 }
 
 test.describe("@smoke recommendations gate", () => {
@@ -46,11 +62,7 @@ test.describe("@smoke recommendations gate", () => {
       ).toHaveCount(0);
       // Radix marks a disabled item rather than dropping it from the list, so
       // the option is asserted on, not its absence.
-      await expect(await recommendedOption(anonymous)).toHaveAttribute(
-        "aria-disabled",
-        "true"
-      );
-      await anonymous.keyboard.press("Escape");
+      await expectRecommendedRefused(anonymous);
 
       // A member with no interests row: the prompt points at the profile.
       const member = await memberContext.newPage();
@@ -64,11 +76,7 @@ test.describe("@smoke recommendations gate", () => {
       await expect(
         member.getByRole("link", { name: "Sign in to get recommendations" })
       ).toHaveCount(0);
-      await expect(await recommendedOption(member)).toHaveAttribute(
-        "aria-disabled",
-        "true"
-      );
-      await member.keyboard.press("Escape");
+      await expectRecommendedRefused(member);
     } finally {
       await anonymousContext.close();
       await memberContext.close();
@@ -79,7 +87,14 @@ test.describe("@smoke recommendations gate", () => {
 test.describe("recommended order", () => {
   test.use({ storageState: USER_AUTH });
 
-  test("a member with interests picks the sort and sees the seeded order", async ({
+  /**
+   * Rewritten for #424. This used to pick the option and wait for
+   * `order=recommended` in the URL, which now hangs: the option is already the
+   * effective value on arrival, so choosing it writes nothing and the URL
+   * never changes. What the test is really for is that the member lands in
+   * cosine order, which is now true of a bare visit.
+   */
+  test("a member with interests lands in the seeded order without asking", async ({
     page,
   }) => {
     await page.goto("/projects");
@@ -94,11 +109,22 @@ test.describe("recommended order", () => {
       page.getByRole("link", { name: "Sign in to get recommendations" })
     ).toHaveCount(0);
 
-    const option = await recommendedOption(page);
-    await expect(option).not.toHaveAttribute("aria-disabled", "true");
-    await option.click();
-    await page.waitForURL(/order=recommended/);
+    // No `order` in the URL: the resolution happens on the server, and the
+    // param stays absent until the reader picks something. Waiting on
+    // `acceptingOnly` first is what makes this discriminate: the router
+    // writes its own defaults after mount, so reading the URL before that
+    // lands would find the bare `/projects` we navigated to and pass without
+    // the resolution having run at all.
+    await expect(page).toHaveURL(/acceptingOnly=true/);
+    expect(new URL(page.url()).searchParams.has("order")).toBe(false);
     await expect(page.getByText("Ranked by your interests.")).toBeVisible();
+
+    // The trigger renders the resolved order as its own text, so the value is
+    // readable with the listbox shut. Not the option's `aria-selected`: Radix
+    // sets that to `isSelected && isFocused`, which does track the value but
+    // pins Radix's open-focus behaviour along with it, and can only be read
+    // through a listbox that `aria-hidden`s everything below.
+    await expect(sortTrigger(page)).toHaveText(RECOMMENDED);
 
     // The seed's published projects, nearest the interest vector first. Rows
     // with no vector (anything another test published) sort after them, so
@@ -112,5 +138,36 @@ test.describe("recommended order", () => {
       SEED_RECOMMENDED_TITLES.length
     );
     expect(head).toEqual([...SEED_RECOMMENDED_TITLES]);
+  });
+
+  /**
+   * The other direction, which is what keeps the default from being a trap:
+   * an explicit "Most relevant" is written to the URL and changes the order,
+   * so the member who prefers relevance can still get it.
+   */
+  test("picking Most relevant writes the param and reorders", async ({
+    page,
+  }) => {
+    await page.goto("/projects");
+    await waitForHydration(page);
+    const titles = page.getByRole("heading", { level: 3 });
+    await expect(titles.first()).toBeVisible();
+    const recommended = (await titles.allTextContents()).slice(
+      0,
+      SEED_RECOMMENDED_TITLES.length
+    );
+    expect(recommended).toEqual([...SEED_RECOMMENDED_TITLES]);
+
+    await sortTrigger(page).click();
+    await page.getByRole("option", { name: "Most relevant" }).click();
+    await page.waitForURL(/order=relevance/);
+
+    await expect(page.getByText("Ranked by your interests.")).toHaveCount(0);
+    await expect(titles.first()).toBeVisible();
+    const byRelevance = (await titles.allTextContents()).slice(
+      0,
+      SEED_RECOMMENDED_TITLES.length
+    );
+    expect(byRelevance).not.toEqual(recommended);
   });
 });

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { projects, user, userInterests } from "#/db/schema";
@@ -179,6 +179,141 @@ describe("sort=recommended", () => {
       admin.id
     );
     expect(viewer).toEqual({ signedIn: true, canRecommend: true });
+  });
+});
+
+/**
+ * The whole of #424: a member who wrote interests should not have to find the
+ * sort in a Select on every visit. The trigger is the vector, never the text,
+ * so the default never promises an order it cannot deliver.
+ */
+describe("an absent sort resolves by the viewer's vector", () => {
+  async function viewerWithVector(email: string) {
+    const admin = await makeAdmin(email);
+    await db.insert(userInterests).values({
+      userId: admin.id,
+      interestsText: "robotics",
+      embedding: unitVector(0),
+      embeddingSourceHash: "test",
+    });
+    return admin;
+  }
+
+  it("ranks by cosine distance and says so", async () => {
+    const admin = await viewerWithVector(`d1-${Date.now()}@x.com`);
+    await publishWithVector(admin, "Near", unitVector(0));
+    await publishWithVector(admin, "Far", unitVector(1));
+
+    const { rows, order } = await searchProjectsImpl(
+      { ...SEARCH_DEFAULTS, sort: undefined },
+      admin.id
+    );
+    expect(order).toBe("recommended");
+    expect(rows.map((r) => r.title)).toEqual(["Near", "Far"]);
+  });
+
+  it("falls back to relevance for a visitor", async () => {
+    const admin = await makeAdmin(`d2-${Date.now()}@x.com`);
+    await publishWithVector(admin, "Near", unitVector(0));
+    await publishWithVector(admin, "Far", unitVector(1));
+
+    const { order } = await searchProjectsImpl(
+      { ...SEARCH_DEFAULTS, sort: undefined },
+      null
+    );
+    expect(order).toBe("relevance");
+  });
+
+  /**
+   * The case the vector gate exists for: interests saved, the embedding call
+   * failed or was off, so there is text but nothing to rank against.
+   */
+  it("falls back to relevance for a member whose interests never embedded", async () => {
+    const admin = await makeAdmin(`d3-${Date.now()}@x.com`);
+    await db.insert(userInterests).values({
+      userId: admin.id,
+      interestsText: "robotics",
+      embedding: null,
+      embeddingSourceHash: null,
+    });
+    await publishWithVector(admin, "Near", unitVector(0));
+
+    const { order } = await searchProjectsImpl(
+      { ...SEARCH_DEFAULTS, sort: undefined },
+      admin.id
+    );
+    expect(order).toBe("relevance");
+  });
+
+  it("lets an explicit relevance win over the vector", async () => {
+    const admin = await viewerWithVector(`d4-${Date.now()}@x.com`);
+    await publishWithVector(admin, "Near", unitVector(0));
+    await publishWithVector(admin, "Far", unitVector(1));
+
+    const { order, rows } = await searchProjectsImpl(
+      { ...SEARCH_DEFAULTS, sort: "relevance" },
+      admin.id
+    );
+    expect(order).toBe("relevance");
+    // The rows, not just the label. Three things have to line up for a case
+    // to catch a widened SQL branch: a vector, an explicit sort that is not
+    // recommended, and rows whose cosine and relevance orders disagree. The
+    // third is the one that is easy to lose: two rows are not enough, they
+    // have to be built to disagree, which is what the unit vectors on
+    // different axes and the publish order below do. Those are orthogonal,
+    // not opposite: `unitVector` is one-hot, so any two axes sit at cosine
+    // distance 1 and a third would tie rather than sort between them. `Far`
+    // publishes second, so date-DESC puts it first, the reverse of cosine.
+    // This is the only case in the file with all three; asserting the label
+    // alone let that widening stay green.
+    expect(rows.map((row) => row.title)).toEqual(["Far", "Near"]);
+  });
+
+  /**
+   * A hand-typed `?order=recommended` from a viewer with no vector. The page
+   * renders rather than erroring, and reports the ordering it actually used
+   * so the Select cannot claim one the rows are not in.
+   */
+  it("reports relevance when recommended is asked for without a vector", async () => {
+    const admin = await makeAdmin(`d5-${Date.now()}@x.com`);
+    await publishWithVector(admin, "Near", unitVector(0));
+
+    const { order } = await searchProjectsImpl(
+      { ...SEARCH_DEFAULTS, sort: "recommended" },
+      admin.id
+    );
+    expect(order).toBe("relevance");
+  });
+
+  it("filters by the query and still ranks by cosine", async () => {
+    const admin = await viewerWithVector(`d6-${Date.now()}@x.com`);
+    await publishWithVector(admin, "Rover near", unitVector(0));
+    await publishWithVector(admin, "Rover far", unitVector(1));
+    await publishWithVector(admin, "Greenhouse", unitVector(0));
+
+    const { rows, order } = await searchProjectsImpl(
+      { ...SEARCH_DEFAULTS, query: "rover", sort: undefined },
+      admin.id
+    );
+    expect(order).toBe("recommended");
+    expect(rows.map((r) => r.title)).toEqual(["Rover near", "Rover far"]);
+  });
+
+  it("ranks the archive by cosine too", async () => {
+    const admin = await viewerWithVector(`d7-${Date.now()}@x.com`);
+    const near = await publishWithVector(admin, "Near", unitVector(0));
+    const far = await publishWithVector(admin, "Far", unitVector(1));
+    await db
+      .update(projects)
+      .set({ status: "archived" })
+      .where(inArray(projects.id, [near, far]));
+
+    const { rows, order } = await searchProjectsImpl(
+      { ...SEARCH_DEFAULTS, archivedOnly: true, sort: undefined },
+      admin.id
+    );
+    expect(order).toBe("recommended");
+    expect(rows.map((r) => r.title)).toEqual(["Near", "Far"]);
   });
 });
 
