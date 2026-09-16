@@ -40,9 +40,6 @@ function assertNotSelf(viewer: AuthUser, targetId: string, action: string) {
 
 const SEARCH_LIMIT = 10;
 
-// A whitelist, not a lookup by string: a sort key arrives from the URL as an
-// arbitrary string, and an unvalidated column name reaching ORDER BY is an
-// injection surface.
 /**
  * All time, one row per paid Bedrock call, both features together. A
  * correlated subquery rather than a join, so a user who has never used the
@@ -52,29 +49,54 @@ const SEARCH_LIMIT = 10;
  * projection Drizzle renders an interpolated column unqualified, so the
  * hand-written version compared `ai_review_usage.user_id` against
  * `ai_review_usage.id` and the query failed outright. `$count` qualifies both
- * sides, and maps the count to a number rather than the string node-postgres
- * returns for a bigint.
+ * sides.
+ *
+ * Wrapped rather than used bare, for the two things the wrapper adds. `.as`
+ * names the output column, which is what the ORDER BY below reads instead of
+ * repeating the subquery. And `.mapWith(Number)` is back because wrapping
+ * drops `$count`'s own mapping, and node-postgres hands a `count(*)` back as
+ * a string.
  */
-const aiCallCount = db.$count(aiReviewUsage, eq(aiReviewUsage.userId, user.id));
+const aiCallCount =
+  sql<number>`${db.$count(aiReviewUsage, eq(aiReviewUsage.userId, user.id))}`
+    .mapWith(Number)
+    .as("aiCallCount");
 
-const USER_SORT_COLUMNS = {
-  // Sortable through the whitelist rather than around it: the whitelist is
-  // what keeps an arbitrary string out of ORDER BY, so a derived column has
-  // to earn its place in it like a real one.
-  aiCallCount,
+// A whitelist, not a lookup by string: a sort key arrives from the URL as an
+// arbitrary string, and an unvalidated column name reaching ORDER BY is an
+// injection surface.
+/** What the listing and the export may both sort by: real columns. */
+const USER_COLUMN_SORTS = {
   banned: user.banned,
   createdAt: user.createdAt,
   email: user.email,
-  name: user.name,
   role: user.role,
+  name: user.name,
 } as const;
 
-function isUserSortColumn(key: string): key is keyof typeof USER_SORT_COLUMNS {
-  // `key in USER_SORT_COLUMNS` walks the prototype chain, so "constructor",
-  // "toString", "hasOwnProperty", "valueOf", and "__proto__" would all pass
-  // the guard and resolve to an Object.prototype value instead of a
-  // PgColumn. Object.hasOwn checks only the object's own properties.
-  return Object.hasOwn(USER_SORT_COLUMNS, key);
+/**
+ * The listing's, which adds the derived count. It goes through the whitelist
+ * rather than around it, the way a real column does.
+ *
+ * The clause reads the select alias rather than repeating the subquery.
+ * Postgres does not notice that two copies of one correlated subquery are the
+ * same subquery, so spelling it out in both the projection and the ORDER BY
+ * would count every matching user's rows twice. The alias exists only in a
+ * query that selects it, which is also why the export's whitelist above does
+ * not carry the key: #413 puts the CSV out of scope on exactly that ground,
+ * that it would make every exported row pay for the subquery.
+ */
+const USER_SORT_COLUMNS = {
+  ...USER_COLUMN_SORTS,
+  aiCallCount: sql.identifier("aiCallCount"),
+} as const;
+
+function isSortColumn(columns: Record<string, unknown>, key: string): boolean {
+  // `key in columns` walks the prototype chain, so "constructor", "toString",
+  // "hasOwnProperty", "valueOf", and "__proto__" would all pass the guard and
+  // resolve to an Object.prototype value instead of a PgColumn.
+  // Object.hasOwn checks only the object's own properties.
+  return Object.hasOwn(columns, key);
 }
 
 /**
@@ -91,9 +113,17 @@ function isUserSortColumn(key: string): key is keyof typeof USER_SORT_COLUMNS {
  * supplying a valid direction, the whole request falls back together rather
  * than defaulting the direction silently.
  */
-function userOrderBy(sort: string | undefined, dir: string | undefined) {
-  if (sort && isUserSortColumn(sort) && (dir === "asc" || dir === "desc")) {
-    const column = USER_SORT_COLUMNS[sort];
+function userOrderBy(
+  sort: string | undefined,
+  dir: string | undefined,
+  columns: Record<string, unknown> = USER_SORT_COLUMNS
+) {
+  if (
+    sort &&
+    isSortColumn(columns, sort) &&
+    (dir === "asc" || dir === "desc")
+  ) {
+    const column = columns[sort];
     return dir === "desc"
       ? sql`${column} DESC NULLS LAST`
       : sql`${column} ASC NULLS LAST`;
@@ -246,7 +276,11 @@ export async function exportUsersImpl(data: ListUsersInput) {
     })
     .from(user)
     .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(userOrderBy(data.sort, data.dir), user.id);
+    // The export's own whitelist, without the derived count: an export sorted
+    // by it would evaluate the subquery for every user in the table, and the
+    // CSV carries no column that would show the order anyway. A request
+    // naming it falls back to createdAt desc, as an unknown key does.
+    .orderBy(userOrderBy(data.sort, data.dir, USER_COLUMN_SORTS), user.id);
   return { rows };
 }
 

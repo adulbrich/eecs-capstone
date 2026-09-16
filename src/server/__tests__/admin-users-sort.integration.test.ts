@@ -5,7 +5,7 @@ import { user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import type { UserRole } from "#/lib/vocabularies";
 import { recordReviewUsage } from "#/server/_internal/ai-review-usage";
-import { listUsersImpl } from "#/server/_internal/users";
+import { exportUsersImpl, listUsersImpl } from "#/server/_internal/users";
 
 async function makeUser(email: string, role: UserRole) {
   await auth.api.signUpEmail({
@@ -267,6 +267,32 @@ describe("listUsersImpl sorting", () => {
     const desc = await query("desc");
     expect(desc.rows.map((r) => r.aiCallCount)).toEqual([2, 1, 0]);
     expect(desc.rows.at(-1)?.id).toBe(quiet.id);
+  });
+
+  // The export shares this function but not the whole whitelist: its ORDER BY
+  // would evaluate the subquery for every user in the table, which is the
+  // ground #413 gives for keeping the CSV out of scope. A request naming the
+  // key falls back the way an unknown key does, rather than failing.
+  it("refuses the AI call count as an export sort, falling back", async () => {
+    await makeUser("export-a@example.edu", "user");
+    await makeUser("export-b@example.edu", "user");
+
+    const { rows } = await exportUsersImpl({
+      q: "export-",
+      role: null,
+      includeBanned: true,
+      page: 1,
+      pageSize: 50,
+      sort: "aiCallCount",
+      dir: "asc",
+    });
+    // createdAt desc, the fallback, rather than the count ascending.
+    expect(rows.map((r) => r.email)).toEqual([
+      "export-b@example.edu",
+      "export-a@example.edu",
+    ]);
+    // And no AI column rides along in the projection.
+    expect(Object.keys(rows[0] ?? {})).not.toContain("aiCallCount");
   });
 
   it("composes sorting with pagination", async () => {
