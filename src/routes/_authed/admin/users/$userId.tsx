@@ -179,7 +179,13 @@ function UserDetail() {
         <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
           {aiUsage.byFeature.map((row) => (
             <div key={row.feature}>
-              <dt className="text-muted-foreground text-xs">
+              {/*
+                The limiter's own words, cased for a label rather than
+                reworded: `AI_FEATURE_NOUN` is written for the middle of a
+                sentence a refusal shows the person, and rewriting it here is
+                how this page would drift from what they were told.
+              */}
+              <dt className="text-muted-foreground text-xs first-letter:uppercase">
                 {AI_FEATURE_NOUN[row.feature]}
               </dt>
               <dd className="font-medium">{row.calls}</dd>
