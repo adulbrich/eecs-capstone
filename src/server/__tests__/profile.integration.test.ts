@@ -6,6 +6,16 @@ import { auth } from "#/lib/auth";
 import { updateProfileImpl } from "#/server/_internal/profile";
 import { profileSchema } from "#/server/profile";
 
+/** A signed-in session for a fresh account, for the Better Auth own routes. */
+async function signedInHeaders(email: string) {
+  await makeUser(email);
+  const response = await auth.api.signInEmail({
+    body: { email, password: "Password1!" },
+    asResponse: true,
+  });
+  return new Headers({ cookie: response.headers.get("set-cookie") ?? "" });
+}
+
 async function makeUser(email: string) {
   await auth.api.signUpEmail({
     body: { email, password: "Password1!", name: email },
@@ -71,6 +81,39 @@ describe("profile", () => {
     ).rejects.toThrow();
     const rows = await db.select().from(user).where(eq(user.email, email));
     expect(rows).toHaveLength(0);
+  });
+
+  // Creation being narrowed says nothing about `POST /update-user`, whose own
+  // `name` is `z.any()`, or about the admin plugin's update, which takes an
+  // open record. Both reach the column through the update hook (#433).
+  it("refuses an update whose name is only spaces", async () => {
+    const email = `u-${Date.now()}@x.com`;
+    const headers = await signedInHeaders(email);
+    await expect(
+      auth.api.updateUser({ body: { name: "   " }, headers })
+    ).rejects.toThrow();
+    const [row] = await db.select().from(user).where(eq(user.email, email));
+    expect(row.name).toBe(email);
+  });
+
+  it("stores a padded update name trimmed", async () => {
+    const email = `v-${Date.now()}@x.com`;
+    const headers = await signedInHeaders(email);
+    await auth.api.updateUser({ body: { name: "  Grace  " }, headers });
+    const [row] = await db.select().from(user).where(eq(user.email, email));
+    expect(row.name).toBe("Grace");
+  });
+
+  // An update that never mentions the name must pass through, or every ban,
+  // role change and verification flag would be judged on a field it does not
+  // carry.
+  it("lets an update that carries no name through", async () => {
+    const email = `w-${Date.now()}@x.com`;
+    const headers = await signedInHeaders(email);
+    await auth.api.updateUser({ body: { image: "avatars/w.png" }, headers });
+    const [row] = await db.select().from(user).where(eq(user.email, email));
+    expect(row.image).toBe("avatars/w.png");
+    expect(row.name).toBe(email);
   });
 
   it("stores a padded sign-up name trimmed", async () => {

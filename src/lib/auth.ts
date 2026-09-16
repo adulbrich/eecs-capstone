@@ -105,10 +105,11 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        // The one place every provider passes through, which is why the name
+        // The one place every provider creates through, which is why the name
         // rule sits here rather than once per sign-up path: email, GitHub and
         // ONID all land in this hook. `profileSchema` in `src/server/profile.ts`
-        // states the same rule for the other way a name is written.
+        // states the same rule for the profile form, which does not come
+        // through Better Auth at all.
         before: async (created) => ({
           data: { ...created, name: requireUserName(created.name) },
         }),
@@ -131,6 +132,22 @@ export const auth = betterAuth({
             await claimProjectsFor(created.id, created.email);
           }
         },
+      },
+      update: {
+        // `POST /update-user` types its `name` as `z.any()` and the admin
+        // plugin's update takes an open record, so creation being narrowed
+        // says nothing about either. Only when a name is actually being
+        // written: most updates through here are a verification flag, a ban
+        // or a role, and one that does not touch the column must pass through
+        // rather than be judged on a field it is not writing.
+        //
+        // The test is `undefined`, not `"name" in updates`: the update route
+        // builds its payload with every optional key present, so the `in`
+        // check refused an update that carried an avatar and nothing else.
+        before: async (updates) =>
+          updates.name === undefined
+            ? { data: updates }
+            : { data: { ...updates, name: requireUserName(updates.name) } },
       },
     },
   },
