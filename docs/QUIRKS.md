@@ -978,7 +978,7 @@ Every consumer of `getProgram` and `listEligibleInstructors` is an admin-only pa
 
 ### `refreshProjectEmbedding` inside the transaction silently does nothing
 
-`commitTransition` orders notifications inside the transaction (enforced by the type: `recordStatusChangeNotifications` takes a `Tx`), the embedding refresh strictly after commit, and the email strictly after commit. The middle one is enforced by nothing: `refreshProjectEmbedding` takes no `tx`, uses the module `db`, re-reads the row, and returns `"skipped"` unless the status is already `published`. Called inside the transaction it does not throw; you get a project that publishes and never embeds. Checkable:
+`commitTransition` orders notifications inside the transaction (enforced by the type: `recordStatusChangeNotifications` takes a `Tx`), the embedding refresh strictly after commit, and the email strictly after commit. The middle one is enforced by nothing: `refreshProjectEmbedding` takes no `tx`, uses the module `db`, re-reads the row, and returns `"skipped"` unless the status it finds is one `isEmbeddableStatus` names, which since #427 is `published` or `archived`. Called inside the transaction it does not throw; you get a project that publishes and never embeds. Checkable:
 
 ```bash
 # one hit, in commitTransition
@@ -986,6 +986,14 @@ grep -rn 'insert(projectStatusHistory)' src --include='*.ts' | grep -v __tests__
 ```
 
 `update(projects)` has five legitimate non-status writers, so a grep on that proves nothing.
+
+### A declaration a parity test compares carries no comment and no type annotation
+
+`src/test/backfill-embeddings-parity.test.ts` and `src/test/import-legacy-parity.test.ts` compare whole function bodies as text with whitespace collapsed ([ADR-0024](./adr/0024-ops-scripts-are-plain-mjs.md)), and that comparison strips neither. So a comment inside `buildProjectEmbeddingSource`, or the `(part): part is string` predicate its `filter` used to carry, fails against an `.mjs` copy that can hold neither. Put the explanation in the JSDoc above the function.
+
+### There are two embedding backfills, and only the `.mjs` runs in production
+
+`scripts/backfill-embeddings.ts` calls `refreshProjectEmbedding` and needs `tsx` and `src/`, so it is workstation only; `scripts/backfill-embeddings.mjs` is the ECS task, and pays for that with the copies ADR-0024 describes. **They do different amounts of work, and the difference is not a detail.** The `.ts` selects every embeddable row and hands each to `refreshProjectEmbedding`, which re-embeds anything whose hash no longer matches its text, so it refreshes stale vectors as well as missing ones and a full run costs a Bedrock call per drifted row. The `.mjs` selects `embedding IS NULL` and nothing else, so it fills gaps only, never notices a stale vector, and a second run is free. Use the `.mjs` after an import, which is the case it was written for; reach for the `.ts` when text may have changed underneath the hashes. Routinely, re-embedding a project whose text changed is `refreshProjectEmbedding`'s own job on edit, and neither sweeper is meant to be the thing that catches it.
 
 ### `sendEmail` is decided by role in `performTransitionAs`, not by the schema
 

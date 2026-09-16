@@ -15,9 +15,11 @@ import {
 } from "#/lib/_internal/bedrock-embed";
 import {
   buildInterestsEmbeddingSource,
+  buildProgramLabel,
   buildProjectEmbeddingSource,
   embeddingHash,
 } from "#/lib/embedding-source";
+import type { ProjectStatus } from "#/lib/vocabularies";
 
 export type RefreshOutcome =
   | "skipped"
@@ -25,6 +27,36 @@ export type RefreshOutcome =
   | "updated"
   | "cleared"
   | "failed";
+
+/**
+ * The statuses that carry an embedding. `refreshProjectEmbedding` gates on it,
+ * both callers in `projects.ts` ask it rather than repeating the comparison,
+ * and `scripts/backfill-embeddings.ts` selects on it.
+ *
+ * `archived` is in because the 547 projects imported from the legacy portal
+ * land there directly and would otherwise never get a vector (#427). An
+ * in-app project reaches `archived` only from `published`
+ * (`src/lib/project-workflow.ts`), so archiving keeps the vector it had; this
+ * is what lets an archived project be re-embedded when someone edits it.
+ *
+ * `canSeeProject` in `src/lib/project-visibility.ts` names the same two
+ * statuses today and is a different rule (who may read a project, not what
+ * carries a vector). They are free to diverge; do not merge them.
+ *
+ * Two things this does not reach. `scripts/backfill-embeddings.mjs` spells the
+ * set again in SQL, because the production image ships no `src/`, and
+ * `src/test/backfill-embeddings-parity.test.ts` pins that copy against this
+ * one. And adding a status here embeds nothing that is already in it: run
+ * either sweeper for that.
+ */
+export const EMBEDDABLE_STATUSES: readonly ProjectStatus[] = [
+  "published",
+  "archived",
+];
+
+export function isEmbeddableStatus(status: ProjectStatus): boolean {
+  return EMBEDDABLE_STATUSES.includes(status);
+}
 
 /** pgvector's text input format, e.g. `[0.1,0.2]`. */
 export function toSqlVector(values: number[]): string {
@@ -34,10 +66,13 @@ export function toSqlVector(values: number[]): string {
 /**
  * The single writer of a project's embedding.
  *
+ * Writes for the statuses `isEmbeddableStatus` names and skips every other
+ * one, including a soft-deleted row.
+ *
  * Never throws. Callers run it after their transaction has committed, so a
  * Bedrock outage leaves the vector null or stale and the user's action still
  * succeeds. `scripts/backfill-embeddings.ts` sweeps up whatever this leaves
- * behind.
+ * behind on a workstation, `scripts/backfill-embeddings.mjs` in production.
  */
 export async function refreshProjectEmbedding(
   projectId: string,
@@ -48,7 +83,7 @@ export async function refreshProjectEmbedding(
       .select()
       .from(projects)
       .where(eq(projects.id, projectId));
-    if (project?.status !== "published" || project.deletedAt) {
+    if (!project || project.deletedAt || !isEmbeddableStatus(project.status)) {
       return "skipped";
     }
 
@@ -68,7 +103,7 @@ export async function refreshProjectEmbedding(
         .from(programs)
         .where(eq(programs.id, project.programId));
       programLabel = program
-        ? `${program.courseId} ${program.courseName}`
+        ? buildProgramLabel(program.courseId, program.courseName)
         : null;
     }
 

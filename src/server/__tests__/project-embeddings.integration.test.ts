@@ -118,6 +118,56 @@ describe("refreshProjectEmbedding", () => {
     expect((await readRow(id)).embedding).toBeNull();
   });
 
+  /**
+   * The case the whole of #427 exists for: the 547 legacy rows were written
+   * straight to `archived` by `scripts/import-legacy.mjs`, never passing
+   * through `published`, so this is set directly rather than transitioned.
+   */
+  it("embeds an archived project that has no vector", async () => {
+    const admin = await makeAdmin(`arch-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Imported"));
+    await db
+      .update(projects)
+      .set({ status: "archived" })
+      .where(eq(projects.id, id));
+    const embed = vi.fn().mockResolvedValue(VECTOR);
+
+    expect(await refreshProjectEmbedding(id, embed)).toBe("updated");
+    expect((await readRow(id)).embedding?.length).toBe(1024);
+  });
+
+  /**
+   * Every status `isEmbeddableStatus` leaves out, not only `draft`. Set
+   * directly: reaching `changes_requested` through the workflow needs a
+   * comment and three transitions, and what is under test is the guard.
+   */
+  it.each(["submitted", "approved", "changes_requested"] as const)(
+    "skips a %s project",
+    async (status) => {
+      const admin = await makeAdmin(`${status}-${Date.now()}@x.com`);
+      const { id } = await createProjectAs(admin, baseProject("Pending"));
+      await db.update(projects).set({ status }).where(eq(projects.id, id));
+      const embed = vi.fn();
+
+      expect(await refreshProjectEmbedding(id, embed)).toBe("skipped");
+      expect(embed).not.toHaveBeenCalled();
+      expect((await readRow(id)).embedding).toBeNull();
+    }
+  );
+
+  it("skips a soft-deleted archived project", async () => {
+    const admin = await makeAdmin(`da-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Imported"));
+    await db
+      .update(projects)
+      .set({ status: "archived", deletedAt: new Date() })
+      .where(eq(projects.id, id));
+    const embed = vi.fn();
+
+    expect(await refreshProjectEmbedding(id, embed)).toBe("skipped");
+    expect(embed).not.toHaveBeenCalled();
+  });
+
   it("skips a soft-deleted project", async () => {
     const admin = await makeAdmin(`f-${Date.now()}@x.com`);
     const { id } = await createProjectAs(admin, baseProject("Live"));
@@ -204,6 +254,62 @@ describe("embedding triggers", () => {
     await updateProjectAs(
       admin,
       { ...baseProject("Draft"), id, description: "Changed." },
+      embed
+    );
+
+    expect(embed).not.toHaveBeenCalled();
+  });
+
+  it("leaves the vector in place when a published project is archived", async () => {
+    const admin = await makeAdmin(`ar-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Live"));
+    const embed = vi.fn().mockResolvedValue(VECTOR);
+    await publish(admin, id);
+    await refreshProjectEmbedding(id, embed);
+    const before = await readRow(id);
+    embed.mockClear();
+
+    await performTransitionAs(admin, id, "archived", undefined, { embed });
+
+    // The refresh runs and finds the hash still matches, so it returns
+    // "unchanged" and writes nothing. Archiving never clears a vector.
+    expect(embed).not.toHaveBeenCalled();
+    const after = await readRow(id);
+    expect(after.status).toBe("archived");
+    expect(after.embeddingSourceHash).toBe(before.embeddingSourceHash);
+    expect(after.embeddingUpdatedAt).toEqual(before.embeddingUpdatedAt);
+  });
+
+  it("re-embeds when an archived project's indexed text is edited", async () => {
+    const admin = await makeAdmin(`ae-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Live"));
+    const embed = vi.fn().mockResolvedValue(VECTOR);
+    await publish(admin, id);
+    await refreshProjectEmbedding(id, embed);
+    await performTransitionAs(admin, id, "archived", undefined, { embed });
+    embed.mockClear();
+
+    await updateProjectAs(
+      admin,
+      { ...baseProject("Live"), id, description: "Greenhouses now." },
+      embed
+    );
+
+    expect(embed).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not embed when an archived project's untracked fields change", async () => {
+    const admin = await makeAdmin(`au-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Live"));
+    const embed = vi.fn().mockResolvedValue(VECTOR);
+    await publish(admin, id);
+    await refreshProjectEmbedding(id, embed);
+    await performTransitionAs(admin, id, "archived", undefined, { embed });
+    embed.mockClear();
+
+    await updateProjectAs(
+      admin,
+      { ...baseProject("Live"), id, notes: "internal only" },
       embed
     );
 

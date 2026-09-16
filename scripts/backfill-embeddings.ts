@@ -1,7 +1,19 @@
-import { and, eq, isNull } from "drizzle-orm";
+/**
+ * Workstation sweeper for missing or stale project embeddings, calling the
+ * app's own writer so there is nothing to keep in sync.
+ *
+ * `scripts/backfill-embeddings.mjs` is the production equivalent: this file
+ * imports from `src/` and needs `tsx`, and the runtime image has neither.
+ *
+ *   npx tsx --env-file=.env.local scripts/backfill-embeddings.ts
+ */
+import { and, inArray, isNull } from "drizzle-orm";
 import { db } from "../src/db";
 import { projects } from "../src/db/schema";
-import { refreshProjectEmbedding } from "../src/server/_internal/project-embeddings";
+import {
+  EMBEDDABLE_STATUSES,
+  refreshProjectEmbedding,
+} from "../src/server/_internal/project-embeddings";
 
 const DELAY_MS = 200;
 
@@ -13,7 +25,12 @@ async function main() {
   const rows = await db
     .select({ id: projects.id, title: projects.title })
     .from(projects)
-    .where(and(eq(projects.status, "published"), isNull(projects.deletedAt)));
+    .where(
+      and(
+        inArray(projects.status, [...EMBEDDABLE_STATUSES]),
+        isNull(projects.deletedAt)
+      )
+    );
 
   const tally = {
     cleared: 0,
@@ -27,13 +44,18 @@ async function main() {
     const outcome = await refreshProjectEmbedding(row.id);
     tally[outcome] += 1;
     process.stdout.write(`${outcome.padEnd(9)} ${row.title}\n`);
-    if (outcome === "updated") {
+    // "failed" as well as "updated": both made a Bedrock call, and a throttled
+    // one fails in milliseconds, so sleeping only on success lets exactly the
+    // run that is being throttled burst. "unchanged" and "skipped" made no
+    // call, and delaying those would add two minutes to a sweep that does
+    // nothing.
+    if (outcome === "updated" || outcome === "failed") {
       await sleep(DELAY_MS);
     }
   }
 
   process.stdout.write(
-    `\n${rows.length} published projects: ${tally.updated} updated, ` +
+    `\n${rows.length} embeddable projects: ${tally.updated} updated, ` +
       `${tally.unchanged} already current, ${tally.failed} failed, ` +
       `${tally.skipped} skipped.\n`
   );
