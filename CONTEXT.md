@@ -107,7 +107,8 @@ _Avoid_: audit log, timeline (as a term; the UI may call it that)
 
 **Team is full**:
 A published project with no room left on its team. It stays in the catalog, marked
-"Team is full" on its card and page, and the public listing hides it by default;
+"Team is full" on its card, page and the Badges column of table view, and the
+public listing hides it by default;
 the "are looking for team members" switch is what shows it. A flag on the project,
 edited by staff and the proposer alike, orthogonal to status.
 
@@ -153,8 +154,8 @@ _Avoid_: sizing, feasibility, review (it is not one)
 **Student proposed**:
 A project that a student proposed rather than an industry partner or faculty member.
 Marked by staff in the Proposer section of the staff panel, saved with the proposer
-link; shown publicly as a badge on the card and the project page, and as a filter on
-the listing. Says nothing about mentorship: a student-proposed project may or may not
+link; shown publicly as a badge on the card, the project page and the Badges column
+of table view, and as a filter on the listing. Says nothing about mentorship: a student-proposed project may or may not
 have a mentor recorded, and one without is the staff to-do.
 _Avoid_: student project, student-led, self-proposed, student team managed
 
@@ -162,8 +163,8 @@ _Avoid_: student project, student-led, self-proposed, student team managed
 A project whose partner asks the team to sign a non-disclosure or intellectual
 property agreement before work starts. A public flag set by the proposer or staff on
 the project form, with optional notes beside it; shown as the badge "NDA/IP required"
-on the card and the project page, as a column in table view, and offered as the
-listing filter "Requiring an NDA or IP agreement" on both listings.
+on the card, the project page and the Badges column of table view, and offered as
+the listing filter "Requiring an NDA or IP agreement" on both listings.
 _Avoid_: confidential, restricted, proprietary project
 
 **Mentorship**:

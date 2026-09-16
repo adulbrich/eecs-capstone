@@ -61,7 +61,9 @@ const ROWS: ProjectListRow[] = [
     programCourseId: "CS 461",
     programCourseName: "Capstone",
     requiresNdaIp: true,
-    acceptingApplicants: true,
+    // Not accepting, so this row carries all three badges at once and the
+    // Badges column has something to get wrong.
+    acceptingApplicants: false,
     status: "published",
     studentProposed: true,
     teamsSupported: 3,
@@ -84,7 +86,8 @@ const ROWS: ProjectListRow[] = [
     programCourseId: null,
     programCourseName: null,
     requiresNdaIp: false,
-    acceptingApplicants: false,
+    // The bare row: no badge of any kind, so the cell shows a dash.
+    acceptingApplicants: true,
     status: "published",
     studentProposed: false,
     teamsSupported: 1,
@@ -153,19 +156,19 @@ describe("the public project table", () => {
       "Program",
       "Categories",
       "Teams supported",
-      "Openings",
-      "NDA/IP required",
+      "Badges",
       "Contact name",
       "Updated",
     ]);
   });
 
-  it("shows nothing about mentorship or the proposer's kind", () => {
-    // Both badges stay on the card and the detail page, and the listing
-    // filters on the two facts instead; the table carries neither (#336).
+  it("shows nothing about mentorship", () => {
+    // The mentor is an address staff record and never public, so no badge and
+    // no column can carry it (#402). "Student proposed" used to be in this
+    // assertion and is not any more: the Badges column shows it, which is the
+    // point of #434.
     renderTable(DEFAULT_HIDDEN);
     const row = rowFor("Rover Telemetry");
-    expect(row.queryByText("Student proposed")).toBeNull();
     expect(row.queryByText(/mentor/i)).toBeNull();
     expect(row.queryByText(/@/)).toBeNull();
   });
@@ -194,12 +197,30 @@ describe("the public project table", () => {
     expect(cell.className).toContain("md:whitespace-normal");
   });
 
-  it("renders the NDA flag as a badge and its absence as a dash", () => {
+  it("renders the card's badge row in one column, and a dash for none", () => {
+    // The whole row, in the card's own words, rendered by the card's own
+    // component. Two columns of "Yes" and dashes became this (#434).
     renderTable(DEFAULT_HIDDEN);
-    expect(rowFor("Rover Telemetry").getByText("Required")).toBeTruthy();
+    const row = rowFor("Rover Telemetry");
+    expect(row.getByText("Team is full")).toBeTruthy();
+    expect(row.getByText("Student proposed")).toBeTruthy();
+    expect(row.getByText("NDA/IP required")).toBeTruthy();
+
     const bare = rowFor("Bare Minimum");
-    expect(bare.queryByText("Required")).toBeNull();
+    expect(bare.queryByText("Team is full")).toBeNull();
+    expect(bare.queryByText("Student proposed")).toBeNull();
+    expect(bare.queryByText("NDA/IP required")).toBeNull();
     expect(bare.getAllByText("-").length).toBeGreaterThan(0);
+  });
+
+  it("does not sort on the badge cluster", () => {
+    renderTable(DEFAULT_HIDDEN);
+    const header = screen
+      .getAllByRole("columnheader")
+      .find((h) => h.textContent?.trim() === "Badges");
+    expect(header).toBeDefined();
+    // Every sortable header in this table renders its label inside a button.
+    expect(within(header as HTMLElement).queryByRole("button")).toBeNull();
   });
 
   it("renders the contact email as a mailto link and the URL as an external link", () => {

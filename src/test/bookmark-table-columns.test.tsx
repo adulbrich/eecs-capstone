@@ -193,23 +193,23 @@ describe("the bookmarks table", () => {
       "Title",
       "Program",
       "Status",
-      "Openings",
+      "Badges",
       "Teams supported",
-      "NDA/IP required",
       "Saved on",
     ]);
     expect(screen.queryByRole("button", { name: /Columns/ })).toBeNull();
   });
 
-  it("shows neither badge: the card and the page carry them, the table does not", () => {
+  it("shows nothing about mentorship", () => {
     // #336 took the Origin column out with the public table's Mentorship
-    // column, so a saved project's marks are read on its card or its page.
+    // column, and #402 made the mentor an address staff record that is never
+    // public, so no column can carry it. "Student proposed" was in this
+    // assertion until #434 gave the table the card's badge row.
     renderTable();
     const two = screen.getByRole("link", { name: "Two" }).closest("tr");
     if (!two) {
       throw new Error("no row");
     }
-    expect(within(two).queryByText("Student proposed")).toBeNull();
     expect(within(two).queryByText(/mentor/i)).toBeNull();
   });
 
@@ -224,10 +224,19 @@ describe("the bookmarks table", () => {
     expect(link.parentElement?.className).toContain("md:max-w-md");
   });
 
-  it("marks a closed roster and an NDA", () => {
+  it("renders the card's badge row in one column, and a dash for none", () => {
     renderTable();
-    expect(within(rowFor("Two")).getByText("Team is full")).toBeTruthy();
-    expect(within(rowFor("Two")).getByText("Required")).toBeTruthy();
+    const two = within(rowFor("Two"));
+    expect(two.getByText("Team is full")).toBeTruthy();
+    expect(two.getByText("Student proposed")).toBeTruthy();
+    expect(two.getByText("NDA/IP required")).toBeTruthy();
+
+    // "Ten" carries every default: accepting, no NDA, not student proposed.
+    const ten = within(rowFor("Ten"));
+    expect(ten.queryByText("Team is full")).toBeNull();
+    expect(ten.queryByText("Student proposed")).toBeNull();
+    expect(ten.queryByText("NDA/IP required")).toBeNull();
+    expect(ten.getAllByText("-").length).toBeGreaterThan(0);
   });
 
   it("puts the listing's toggle in the Title cell, with no Remove column", async () => {
