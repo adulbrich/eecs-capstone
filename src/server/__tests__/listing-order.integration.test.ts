@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { projects, user, userInterests } from "#/db/schema";
@@ -12,13 +12,11 @@ import { searchProjectsImpl } from "#/server/_internal/search";
  * different relative order per page. A row then appears twice, and another
  * never appears at all (#429).
  *
- * The row count is load-bearing and was arrived at empirically, so do not trim
- * it. At 25 tied rows over a page of 10 these tests pass against the unfixed
- * ordering, because the whole set fits one sort and Postgres happens to return
- * it consistently. At 400 over a page of 20 the planner uses a top-N heapsort,
- * whose contents differ per `OFFSET`, and the unfixed ordering returns 400 rows
- * of which only 392 are distinct: 8 projects twice and 8 not at all. Every
- * assertion below was watched failing that way before the fix went in.
+ * The row count and the page size are load-bearing, and "Paging a listing needs
+ * a total ordering" in docs/QUIRKS.md says why: below roughly this size the
+ * planner sorts the whole set at once and the broken ordering looks correct.
+ * Each of the five "exactly once" tests below was watched failing against the
+ * unfixed ordering, at 400 rows, before the fix went in. Do not trim them.
  *
  * Rows are inserted straight rather than driven through the workflow. What is
  * under test is the `ORDER BY`, and 400 projects through four transitions each
@@ -172,6 +170,13 @@ describe("paging a listing whose rows tie on every sort key", () => {
     );
   });
 
+  /**
+   * Weaker than the five above on purpose, and it was never watched failing:
+   * two identical queries over unchanged data take the same plan and return
+   * the same rows, duplicates and all. It is here because the issue asks for
+   * it, and because it would catch an ordering made total by something that is
+   * not stable, a random or a clock, which the id is not.
+   */
   it("returns the same order when the same query runs twice", async () => {
     await insertTiedProjects(null);
     const first = await pageThrough("newest", "", null);
@@ -179,47 +184,28 @@ describe("paging a listing whose rows tie on every sort key", () => {
     expect(second).toEqual(first);
   });
 
-  /**
-   * The tie break must not reorder anything that was already ordered. Three
-   * distinct dates, so nothing reaches the terminal key at all.
-   */
+  /** The tie break must not reorder anything that was already ordered. */
   it("leaves projects that were never tied in date order", async () => {
-    const [older] = await db
-      .insert(projects)
-      .values({
-        title: "Older",
+    // Three distinct dates, so nothing reaches the terminal key at all and the
+    // ordering is entirely the one that existed before this change.
+    for (const [title, day] of [
+      ["Older", "2026-01-01"],
+      ["Middle", "2026-02-01"],
+      ["Newer", "2026-03-01"],
+    ] as const) {
+      await db.insert(projects).values({
+        title,
         status: "published",
-        publishedAt: new Date("2026-01-01T00:00:00.000Z"),
-      })
-      .returning({ id: projects.id });
-    const [middle] = await db
-      .insert(projects)
-      .values({
-        title: "Middle",
-        status: "published",
-        publishedAt: new Date("2026-02-01T00:00:00.000Z"),
-      })
-      .returning({ id: projects.id });
-    const [newer] = await db
-      .insert(projects)
-      .values({
-        title: "Newer",
-        status: "published",
-        publishedAt: new Date("2026-03-01T00:00:00.000Z"),
-      })
-      .returning({ id: projects.id });
+        publishedAt: new Date(`${day}T00:00:00.000Z`),
+      });
+    }
 
+    // No filtering and no cleanup: `setup.integration.ts` truncates in
+    // `beforeEach`, so these three are the only projects that exist.
     const { rows } = await searchProjectsImpl(
       { ...SEARCH_DEFAULTS, sort: "newest", query: "", page: 1 },
       null
     );
-    const ours = rows
-      .filter((row) => [older.id, middle.id, newer.id].includes(row.id))
-      .map((row) => row.title);
-    expect(ours).toEqual(["Newer", "Middle", "Older"]);
-
-    await db
-      .delete(projects)
-      .where(inArray(projects.id, [older.id, middle.id, newer.id]));
+    expect(rows.map((row) => row.title)).toEqual(["Newer", "Middle", "Older"]);
   });
 });

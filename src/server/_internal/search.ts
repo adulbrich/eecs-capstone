@@ -91,32 +91,12 @@ export async function searchProjectsImpl(
    */
   const listingDate = sql`coalesce(${projects.publishedAt}, ${projects.createdAt})`;
 
-  /**
-   * The terminal key on every ordering below, and the only thing that makes
-   * paging correct. Each page is its own `LIMIT`/`OFFSET` query, and where
-   * rows tie on every sort key Postgres promises nothing about their relative
-   * order, so one row can come back on two pages and another on none.
-   *
-   * Not hypothetical: 271 of the 699 legacy projects share a listing date with
-   * at least one other, the largest clusters being 17, 12 and 10 on a single
-   * timestamp, because rows imported with no publish date fall back to a
-   * `created_at` that carries a fixed noon time. `PAGE_SIZE_DEFAULT` is 20, so
-   * a 17-way tie straddles a page boundary, and filtering re-splits the set so
-   * it straddles at a different place. An anonymous visitor reaches this on the
-   * public archived listing at the default sort (#429).
-   *
-   * `id` fixes all three orderings because it is unique, which is what makes an
-   * ordering ending in it total. Its direction is arbitrary: it only ever runs
-   * when everything before it has tied.
-   */
-  const tieBreak = sql`${projects.id}`;
-
   // "relevance" is the default because ordering used to be implicit: a query
   // ranked by ts_rank, everything else by date. Defaulting to "newest" would
   // silently reorder every existing keyword search.
   const relevanceOrder = trimmed
-    ? sql`ts_rank(${projects.searchVector}, websearch_to_tsquery('english', ${trimmed})) DESC, ${listingDate} DESC, ${tieBreak}`
-    : sql`${listingDate} DESC, ${tieBreak}`;
+    ? sql`ts_rank(${projects.searchVector}, websearch_to_tsquery('english', ${trimmed})) DESC, ${listingDate} DESC`
+    : sql`${listingDate} DESC`;
 
   // Read for every signed-in viewer, not only under `recommended`: the
   // listing tells the reader whether the recommended sort is open to them,
@@ -126,18 +106,18 @@ export async function searchProjectsImpl(
 
   let orderBy = relevanceOrder;
   if (data.sort === "newest") {
-    orderBy = sql`${listingDate} DESC, ${tieBreak}`;
+    orderBy = sql`${listingDate} DESC`;
   } else if (data.sort === "recommended" && interestsVector) {
     const probe = toSqlVector(interestsVector);
     // Null embeddings sort last rather than being filtered out: a project
     // that failed to embed must stay reachable.
     //
-    // The date sits between the distance and the tie break so that the
-    // projects sharing the null case are at least ordered by something a
-    // reader would recognise. #427 gave every published and archived project a
-    // vector, so that group should be empty now; it refills one row at a time
-    // whenever an embedding call fails.
-    orderBy = sql`${projects.embedding} IS NULL, ${projects.embedding} <=> ${probe}::vector, ${listingDate} DESC, ${tieBreak}`;
+    // The date, so that the projects sharing the null case are ordered by
+    // something a reader would recognise before the id breaks the rest of the
+    // tie. #427 gave every published and archived project a vector, so that
+    // group should be empty now; it refills one row at a time whenever an
+    // embedding call fails.
+    orderBy = sql`${projects.embedding} IS NULL, ${projects.embedding} <=> ${probe}::vector, ${listingDate} DESC`;
   }
   // `recommended` with no vector falls through to relevance silently: a
   // hand-typed `?order=recommended` still renders a page.
@@ -148,7 +128,13 @@ export async function searchProjectsImpl(
     .from(projects)
     .leftJoin(programs, eq(projects.programId, programs.id))
     .where(and(...conditions))
-    .orderBy(orderBy)
+    // `projects.id` last, always, and passed here rather than appended to each
+    // branch above so that a fourth ordering cannot forget it. It is what makes
+    // every ordering total, and a total ordering is what makes paging correct:
+    // each page is its own `LIMIT`/`OFFSET` query, and rows tied on every key
+    // come back in whatever order Postgres likes, which differs per page. See
+    // "Paging a listing needs a total ordering" in docs/QUIRKS.md (#429).
+    .orderBy(orderBy, projects.id)
     .limit(data.pageSize)
     .offset(offset);
 
