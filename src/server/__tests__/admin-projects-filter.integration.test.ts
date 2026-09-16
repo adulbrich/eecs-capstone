@@ -81,6 +81,40 @@ function filter(
   };
 }
 
+/**
+ * A project whose proposer is an address with no account behind it: the steady
+ * state after staff name a proposer who has not signed in yet.
+ */
+async function projectWithUnlinkedProposer(
+  admin: Awaited<ReturnType<typeof makeAdmin>>,
+  title: string,
+  proposerEmail: string
+) {
+  const project = await createProjectAs(admin, baseProject(title, null));
+  await updateProjectProposerAs(admin, {
+    id: project.id,
+    proposerEmail,
+    studentProposed: false,
+  });
+  return project;
+}
+
+/** The same shape, reached by deleting the account the project was linked to. */
+async function projectWithDeletedProposer(
+  admin: Awaited<ReturnType<typeof makeAdmin>>,
+  title: string,
+  proposerEmail: string
+) {
+  const proposer = await makeAdmin(proposerEmail);
+  const project = await projectWithUnlinkedProposer(
+    admin,
+    title,
+    proposerEmail
+  );
+  await db.delete(user).where(eq(user.id, proposer.id));
+  return project;
+}
+
 describe("admin projects program filter", () => {
   it("returns only projects in the selected program", async () => {
     const admin = await makeAdmin(`a-${Date.now()}@x.com`);
@@ -381,17 +415,11 @@ describe("admin project search reaches people, not just text", () => {
 
   it("falls back to the stored proposerEmail when the proposer account is deleted", async () => {
     const admin = await makeAdmin("staff@example.edu");
-    const proposer = await makeAdmin("leaving2@example.edu");
-    const leaving = await createProjectAs(
+    await projectWithDeletedProposer(
       admin,
-      baseProject("Deleted Account Proposer", null)
+      "Deleted Account Proposer",
+      "leaving2@example.edu"
     );
-    await updateProjectProposerAs(admin, {
-      id: leaving.id,
-      proposerEmail: "leaving2@example.edu",
-      studentProposed: false,
-    });
-    await db.delete(user).where(eq(user.id, proposer.id));
     const { rows } = await listAdminProjectsAs(admin, filter({ q: "" }));
     const row = rows.find((r) => r.title === "Deleted Account Proposer");
     expect(row?.proposerId).toBeNull();
@@ -400,15 +428,11 @@ describe("admin project search reaches people, not just text", () => {
 
   it("reports the stored proposerEmail for a proposal that matches no account yet", async () => {
     const admin = await makeAdmin("staff@example.edu");
-    const unlinked = await createProjectAs(
+    await projectWithUnlinkedProposer(
       admin,
-      baseProject("Unlinked Proposal", null)
+      "Unlinked Proposal",
+      "unregistered@example.edu"
     );
-    await updateProjectProposerAs(admin, {
-      id: unlinked.id,
-      proposerEmail: "unregistered@example.edu",
-      studentProposed: false,
-    });
     const { rows } = await listAdminProjectsAs(admin, filter({ q: "" }));
     const row = rows.find((r) => r.title === "Unlinked Proposal");
     expect(row?.proposerId).toBeNull();
@@ -417,15 +441,11 @@ describe("admin project search reaches people, not just text", () => {
 
   it("finds a project by the stored proposer address when no account matches it yet", async () => {
     const admin = await makeAdmin("staff@example.edu");
-    const unlinked = await createProjectAs(
+    await projectWithUnlinkedProposer(
       admin,
-      baseProject("Unlinked Proposal", null)
+      "Unlinked Proposal",
+      "unregistered@example.edu"
     );
-    await updateProjectProposerAs(admin, {
-      id: unlinked.id,
-      proposerEmail: "unregistered@example.edu",
-      studentProposed: false,
-    });
     const { rows } = await listAdminProjectsAs(
       admin,
       filter({ q: "unregistered@example.edu" })
@@ -433,19 +453,13 @@ describe("admin project search reaches people, not just text", () => {
     expect(rows.map((r) => r.title)).toEqual(["Unlinked Proposal"]);
   });
 
-  it("finds a project by the address left behind when the proposer account is deleted", async () => {
+  it("finds a project by a fragment of the address left behind when the proposer account is deleted", async () => {
     const admin = await makeAdmin("staff@example.edu");
-    const proposer = await makeAdmin("departed@example.edu");
-    const project = await createProjectAs(
+    await projectWithDeletedProposer(
       admin,
-      baseProject("Handover Project", null)
+      "Handover Project",
+      "departed@example.edu"
     );
-    await updateProjectProposerAs(admin, {
-      id: project.id,
-      proposerEmail: "departed@example.edu",
-      studentProposed: false,
-    });
-    await db.delete(user).where(eq(user.id, proposer.id));
     const { rows } = await listAdminProjectsAs(
       admin,
       filter({ q: "departed@" })
