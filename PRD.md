@@ -114,7 +114,7 @@ Each project carries:
   `/admin/projects` filters "Without a mentor", which beside "Student proposed" is
   the staff to-do. (#75, #304, #336, #402)
 - [x] `/my/bookmarks` is a small decision table: title with thumbnail, program,
-  status, teams supported, badges, and saved-on date, with the
+  status, badges, teams supported, and saved-on date, with the
   listing's own bookmark toggle in the title cell rather than a remove button,
   so un-bookmarking leaves the row in place until the next load (#336, #420);
   the badge cluster carries "Team is full", "Student proposed" and "NDA/IP

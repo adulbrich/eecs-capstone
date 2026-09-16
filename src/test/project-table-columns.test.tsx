@@ -135,19 +135,19 @@ function rowFor(title: string) {
 }
 
 /**
- * The Badges cell's own text, read through the `data-label` that
- * `AdminDataTable` puts on every body cell. Scoping to the cell is the
- * point: a bare row already renders a dash in Program, Categories and
- * Contact name, so a row-wide `getAllByText("-")` passes with the dash
- * guard deleted.
+ * The Badges cell, through the `data-label` `AdminDataTable` derives from
+ * each column's header (`docs/UI-CONVENTIONS.md`). Scoping to the cell is
+ * the point of the whole test: a row already renders the three badge
+ * strings if they are anywhere in it and a dash if any other column is
+ * empty, so a row-wide query proves nothing about "in one column".
  */
-function badgesTextFor(title: string): string {
+function badgesCellFor(title: string): HTMLElement {
   const row = screen.getByRole("link", { name: title }).closest("tr");
   const cell = row?.querySelector('td[data-label="Badges"]');
   if (!cell) {
     throw new Error(`no Badges cell for ${title}`);
   }
-  return cell.textContent?.trim() ?? "";
+  return cell as HTMLElement;
 }
 
 describe("the public project table", () => {
@@ -217,16 +217,16 @@ describe("the public project table", () => {
     // The whole row, in the card's own words, rendered by the card's own
     // component. Two columns of "Yes" and dashes became this (#434).
     renderTable(DEFAULT_HIDDEN);
-    const row = rowFor("Rover Telemetry");
-    expect(row.getByText("Team is full")).toBeTruthy();
-    expect(row.getByText("Student proposed")).toBeTruthy();
-    expect(row.getByText("NDA/IP required")).toBeTruthy();
+    const badged = within(badgesCellFor("Rover Telemetry"));
+    expect(badged.getByText("Team is full")).toBeTruthy();
+    expect(badged.getByText("Student proposed")).toBeTruthy();
+    expect(badged.getByText("NDA/IP required")).toBeTruthy();
 
     const bare = rowFor("Bare Minimum");
     expect(bare.queryByText("Team is full")).toBeNull();
     expect(bare.queryByText("Student proposed")).toBeNull();
     expect(bare.queryByText("NDA/IP required")).toBeNull();
-    expect(badgesTextFor("Bare Minimum")).toBe("-");
+    expect(badgesCellFor("Bare Minimum").textContent?.trim()).toBe("-");
   });
 
   /**

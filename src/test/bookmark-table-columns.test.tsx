@@ -160,16 +160,17 @@ function rowFor(title: string): HTMLElement {
 }
 
 /**
- * The Badges cell's own text, through the `data-label` every body cell
- * carries. "Ten" renders a dash in Program too, so a row-wide dash query
- * passes with the cell's own dash guard deleted.
+ * The Badges cell, through the `data-label` every body cell carries. "Ten"
+ * renders a dash in Program too, and a badged row would satisfy a row-wide
+ * query with the cluster rendered in any other column, so both halves of
+ * the test read the cell rather than the row.
  */
-function badgesTextFor(title: string): string {
+function badgesCellFor(title: string): HTMLElement {
   const cell = rowFor(title).querySelector('td[data-label="Badges"]');
   if (!cell) {
     throw new Error(`no Badges cell for ${title}`);
   }
-  return cell.textContent?.trim() ?? "";
+  return cell as HTMLElement;
 }
 
 function titlesInOrder(): string[] {
@@ -256,7 +257,7 @@ describe("the bookmarks table", () => {
 
   it("renders the card's badge row in one column, and a dash for none", () => {
     renderTable();
-    const two = within(rowFor("Two"));
+    const two = within(badgesCellFor("Two"));
     expect(two.getByText("Team is full")).toBeTruthy();
     expect(two.getByText("Student proposed")).toBeTruthy();
     expect(two.getByText("NDA/IP required")).toBeTruthy();
@@ -266,7 +267,7 @@ describe("the bookmarks table", () => {
     expect(ten.queryByText("Team is full")).toBeNull();
     expect(ten.queryByText("Student proposed")).toBeNull();
     expect(ten.queryByText("NDA/IP required")).toBeNull();
-    expect(badgesTextFor("Ten")).toBe("-");
+    expect(badgesCellFor("Ten").textContent?.trim()).toBe("-");
   });
 
   it("puts the listing's toggle in the Title cell, with no Remove column", async () => {
