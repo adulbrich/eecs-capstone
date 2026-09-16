@@ -414,6 +414,44 @@ describe("admin project search reaches people, not just text", () => {
     expect(row?.proposerId).toBeNull();
     expect(row?.proposerEmail).toBe("unregistered@example.edu");
   });
+
+  it("finds a project by the stored proposer address when no account matches it yet", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    const unlinked = await createProjectAs(
+      admin,
+      baseProject("Unlinked Proposal", null)
+    );
+    await updateProjectProposerAs(admin, {
+      id: unlinked.id,
+      proposerEmail: "unregistered@example.edu",
+      studentProposed: false,
+    });
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ q: "unregistered@example.edu" })
+    );
+    expect(rows.map((r) => r.title)).toEqual(["Unlinked Proposal"]);
+  });
+
+  it("finds a project by the address left behind when the proposer account is deleted", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    const proposer = await makeAdmin("departed@example.edu");
+    const project = await createProjectAs(
+      admin,
+      baseProject("Handover Project", null)
+    );
+    await updateProjectProposerAs(admin, {
+      id: project.id,
+      proposerEmail: "departed@example.edu",
+      studentProposed: false,
+    });
+    await db.delete(user).where(eq(user.id, proposer.id));
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ q: "departed@" })
+    );
+    expect(rows.map((r) => r.title)).toEqual(["Handover Project"]);
+  });
 });
 
 async function publish(admin: { id: string; role: string }, id: string) {
