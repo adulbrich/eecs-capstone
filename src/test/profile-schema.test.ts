@@ -53,6 +53,31 @@ describe("profileSchema mentor rules", () => {
     ).toBe(false);
   });
 
+  it("stores a name without its padding", () => {
+    expect(profileSchema.parse({ ...base, name: "  Ada  " }).name).toBe("Ada");
+  });
+
+  it("refuses a name of spaces, with the message an empty one gets", () => {
+    const blank = profileSchema.safeParse({ ...base, name: "   " });
+    const empty = profileSchema.safeParse({ ...base, name: "" });
+    expect(blank.success).toBe(false);
+    expect(empty.success).toBe(false);
+    if (!(blank.success || empty.success)) {
+      expect(blank.error.issues[0].path).toEqual(["name"]);
+      expect(blank.error.issues[0].message).toBe(empty.error.issues[0].message);
+    }
+  });
+
+  it("measures the 120 character limit after trimming", () => {
+    const name = "a".repeat(120);
+    expect(
+      profileSchema.safeParse({ ...base, name: `  ${name}  ` }).success
+    ).toBe(true);
+    expect(profileSchema.safeParse({ ...base, name: `${name}a` }).success).toBe(
+      false
+    );
+  });
+
   it("defaults wantsToMentor to false and mentorTeamCount to 1", () => {
     const r = profileSchema.parse({ name: "Dana Lee" });
     expect(r.wantsToMentor).toBe(false);

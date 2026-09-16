@@ -8,6 +8,7 @@ import {
   warnUnconfiguredProviders,
 } from "#/lib/_internal/auth-config";
 import { onidProfileFromIdToken } from "#/lib/_internal/onid-profile";
+import { requireUserName } from "#/lib/_internal/user-name";
 import { getEmailSender } from "#/lib/email/sender";
 import { passwordResetEmail, verificationEmail } from "#/lib/email/templates";
 import type { UserRole } from "#/lib/vocabularies";
@@ -104,6 +105,13 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
+        // The one place every provider passes through, which is why the name
+        // rule sits here rather than once per sign-up path: email, GitHub and
+        // ONID all land in this hook. `profileSchema` in `src/server/profile.ts`
+        // states the same rule for the other way a name is written.
+        before: async (created) => ({
+          data: { ...created, name: requireUserName(created.name) },
+        }),
         // Covers OAuth, which never visits the email-verification routes and so
         // never fires afterEmailVerification. The guard is what keeps this from
         // claiming for an unverified password sign-up, where emailVerified is
