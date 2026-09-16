@@ -228,8 +228,10 @@ describe("the public project table", () => {
     // the card's own component. Two columns of "Yes" and dashes became this
     // (#434). The positives and the dash read the Badges cell, because
     // "in one column" is the claim. The negatives stay row-wide on purpose:
-    // "nowhere in this row" is the stronger statement, and it is what
-    // catches the cluster being rendered into some other cell.
+    // a badge on a row that should carry none is worth catching wherever it
+    // lands. They do not pin the column, though, and cannot: an all-defaults
+    // row takes the dash branch before `ProjectBadges` renders, so no badge
+    // text exists anywhere in it either way. The dash is what pins it.
     renderTable(DEFAULT_HIDDEN);
     const badged = within(badgesCellFor("Rover Telemetry"));
     expect(badged.getByText("Team is full")).toBeTruthy();

@@ -162,8 +162,9 @@ function rowFor(title: string): HTMLElement {
 /**
  * The Badges cell, through the `data-label` every body cell carries. "Ten"
  * renders a dash in Program too, and a badged row would satisfy a row-wide
- * query with the cluster rendered in any other column, so both halves of
- * the test read the cell rather than the row.
+ * query with the cluster rendered in any other column, so the positives and
+ * the dash read the cell. The negatives below stay row-wide deliberately,
+ * for the reason `project-table-columns.test.tsx` gives beside its own.
  */
 function badgesCellFor(title: string): HTMLElement {
   const cell = rowFor(title).querySelector('td[data-label="Badges"]');
