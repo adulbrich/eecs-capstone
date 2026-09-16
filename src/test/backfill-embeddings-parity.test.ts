@@ -53,13 +53,18 @@ const SCRIPT_FILE = readFileSync("scripts/backfill-embeddings.mjs", "utf8");
  * be able to satisfy.
  *
  * Stripping comments by regex is unsafe in general, because a comment opener
- * inside a string literal makes it eat real code. Nothing here asserts that
- * cannot happen, because an honest check of it needs a parser: extracting the
+ * inside a string literal makes it eat real code. Nothing here proves that
+ * cannot happen, because an honest proof needs a parser: extracting the
  * literals from text that still holds comments is circular, since an
- * apostrophe in a comment opens one. What stands in for that proof is the two
- * tests below, which say both strips ran, plus every assertion that uses
- * `SCRIPT_CODE`: each looks for a call, so a strip that swallowed code fails
- * them rather than passing quietly.
+ * apostrophe in a comment opens one. What stands in for a proof is narrower
+ * and testable, and the first `describe` below checks all three parts. The
+ * file contains no `://`, which is the sequence that would put a `//` inside a
+ * string here. Both strips are shown to run. The braces still balance
+ * afterwards, which a swallowed run of code would almost certainly break.
+ *
+ * The line strip is not anchored to the start of a line, so it also removes a
+ * comment trailing real code. Nothing in the script does that today, and the
+ * `://` check is what keeps the unanchored form safe.
  */
 const SCRIPT_CODE = SCRIPT_FILE.replace(/\/\*[\s\S]*?\*\//g, "").replace(
   /\/\/.*$/gm,
@@ -144,15 +149,29 @@ describe("reading the production backfill as code rather than as text", () => {
     expect(opens).toBeGreaterThan(10);
   });
 
+  /**
+   * Structural, not textual. An earlier version looked for two particular
+   * sentences, which meant rewording a comment quietly uncovered the strip it
+   * was standing in for: the needle was gone, so `not.toContain` passed and
+   * said nothing. These fail while any comment of either kind survives, and
+   * the `toMatch` pair on `SCRIPT_FILE` fails if there was nothing to strip.
+   */
   it("loses every comment and keeps every statement", () => {
-    expect(SCRIPT_CODE.length).toBeLessThan(SCRIPT_FILE.length);
+    expect(SCRIPT_FILE).toMatch(/\/\*/);
+    expect(SCRIPT_FILE).toMatch(/^[ \t]*\/\//m);
+    expect(SCRIPT_CODE).not.toMatch(/\/\*/);
+    expect(SCRIPT_CODE).not.toMatch(/\/\//);
     expect(SCRIPT_CODE).toContain("await main();");
     expect(SCRIPT_CODE).toContain("const SELECT_SQL");
-    // One of each kind, so neither strip can be deleted without a failure.
-    // The block comment carries every `MUST match` marker; the line comment is
-    // one of the explanations inside `main`.
-    expect(SCRIPT_CODE).not.toContain("MUST match");
-    expect(SCRIPT_CODE).not.toContain("Per project, so one bad row");
+  });
+
+  /**
+   * What makes the unanchored line strip safe here, and the only assumption
+   * the stripping rests on that a reader cannot see at a glance. A URL in a
+   * string would put a `//` in code the strip then truncates, silently.
+   */
+  it("contains no sequence that would put a comment opener in a string", () => {
+    expect(SCRIPT_FILE).not.toContain("://");
   });
 });
 
