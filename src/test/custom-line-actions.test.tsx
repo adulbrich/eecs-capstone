@@ -320,8 +320,8 @@ describe("CustomLineActions: the trigger during its own write", () => {
 
 describe("CustomLineActions: dismissing during its own write", () => {
   /**
-   * The guard in `openChange`, which is the fourth of the four and was the
-   * last to get a test. Escape on a non-modal Radix Popover does reach
+   * The guard in `openChange`, the last of this PR's four dismissal guards
+   * to get a test. Escape on a non-modal Radix Popover does reach
    * `onOpenChange` in jsdom, so this can fail: drop the `busy` branch and
    * the dialog query below throws.
    */
@@ -552,8 +552,12 @@ describe("FulfillCustomLineDialog", () => {
 
       write.resolve();
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-      // No focus assertion: jsdom does not move focus on a Radix close, so
-      // one here cannot fail. The accessibility suite is where that is checked.
+      // No focus assertion here. Two were tried and neither went red with
+      // the guard reverted, so they asserted nothing; the mechanism was
+      // not pinned down, and `export-csv-button.test.tsx` is the only
+      // place in this repo where a jsdom focus claim has been verified.
+      // Nothing covers the browser behaviour today: the accessibility
+      // suite scans this page statically and never opens this surface.
     }
   );
 

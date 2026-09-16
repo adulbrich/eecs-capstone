@@ -66,17 +66,21 @@ describe("AdminRequestActions", () => {
     await waitFor(() =>
       expect(screen.queryByLabelText("Pickup by (optional)")).toBeNull()
     );
-    // No focus assertion: jsdom does not move focus on a Radix close, so
-    // one here cannot fail. The accessibility suite is where that is checked.
+    // No focus assertion here. Two were tried and neither went red with
+    // the guard reverted, so they asserted nothing; the mechanism was
+    // not pinned down, and `export-csv-button.test.tsx` is the only
+    // place in this repo where a jsdom focus claim has been verified.
+    // Nothing covers the browser behaviour today: the accessibility
+    // suite scans this page statically and never opens this surface.
   });
 
   /**
    * The trigger, not the confirm button inside the popover. That one was
    * always guarded; this one stayed live for the whole write and the refetch
    * behind it, offering to reopen a decision over a row the loader had not
-   * caught up with (#426). This component holds `busy` in `useState` with no
-   * in-flight ref, unlike `CustomLineActions`, so the disabled attribute is
-   * the whole of the protection here.
+   * caught up with (#426). What was broken is what the reader was told, not
+   * what was written: the confirm button inside the popover was already
+   * guarded, so the second decision never reached the server.
    */
   it.each([
     ["Approve", "Confirm approve"],
