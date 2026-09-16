@@ -108,9 +108,9 @@ _Avoid_: audit log, timeline (as a term; the UI may call it that)
 **Team is full**:
 A published project with no room left on its team. It stays in the catalog, marked
 "Team is full" on its card, page and the Badges column of table view, and the
-public listing hides it by default;
-the "are looking for team members" switch is what shows it. A flag on the project,
-edited by staff and the proposer alike, orthogonal to status.
+public listing hides it by default; the "are looking for team members" switch is
+what shows it. A flag on the project, edited by staff and the proposer alike,
+orthogonal to status.
 
 The app never records who would join, only whether there is room: bidding and
 assignment happen outside it, which is why there is no word here for the student on
@@ -154,9 +154,10 @@ _Avoid_: sizing, feasibility, review (it is not one)
 **Student proposed**:
 A project that a student proposed rather than an industry partner or faculty member.
 Marked by staff in the Proposer section of the staff panel, saved with the proposer
-link; shown publicly as a badge on the card, the project page and the Badges column
-of table view, and as a filter on the listing. Says nothing about mentorship: a student-proposed project may or may not
-have a mentor recorded, and one without is the staff to-do.
+link; shown publicly as a badge on the card, the project page and the Badges
+column of table view, and as a filter on the listing. Says nothing about
+mentorship: a student-proposed project may or may not have a mentor recorded,
+and one without is the staff to-do.
 _Avoid_: student project, student-led, self-proposed, student team managed
 
 **Requires an NDA or IP agreement**:

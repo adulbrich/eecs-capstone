@@ -39,6 +39,7 @@ import {
   PROJECT_TABLE_DEFAULT_SORT,
   type ProjectListRow,
 } from "#/components/project-table-columns";
+import { parseSort } from "#/lib/table-state";
 
 afterEach(cleanup);
 
@@ -211,6 +212,27 @@ describe("the public project table", () => {
     expect(bare.queryByText("Student proposed")).toBeNull();
     expect(bare.queryByText("NDA/IP required")).toBeNull();
     expect(bare.getAllByText("-").length).toBeGreaterThan(0);
+  });
+
+  /**
+   * The criterion the issue names: `?sort=badges` and the two ids this change
+   * deleted must all render the default order rather than erroring or sorting.
+   * Asserted against `parseSort` with the table's own sortable ids, because
+   * that is the function the route hands the URL to, and the list it checks
+   * against is derived from `enableSorting` on these very columns.
+   */
+  it("falls back to the default order for badges and the two removed ids", () => {
+    const sortableIds = PROJECT_TABLE_COLUMNS.filter(
+      (column) => column.enableSorting !== false
+    ).map((column) => column.id);
+    expect(sortableIds).not.toContain("badges");
+    expect(sortableIds).not.toContain("accepting");
+    expect(sortableIds).not.toContain("nda");
+
+    const fallback = { desc: true, id: "updatedAt" };
+    for (const stale of ["badges", "accepting", "nda"]) {
+      expect(parseSort(stale, "asc", sortableIds, fallback)).toEqual(fallback);
+    }
   });
 
   it("does not sort on the badge cluster", () => {
