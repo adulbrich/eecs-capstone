@@ -8,10 +8,9 @@
  * Satisfied when the body has a `## Screenshots` heading and, under it,
  * either one image (markdown `![...](...)` or an `<img ...>` tag) or a line
  * `Screenshots: none, because <reason>` with a non-empty reason. "Under it"
- * runs to the next heading that can close a level-2 section, so a `###`
- * subsection per changed page counts and an image in the next `##` does
- * not. A pull request that touches no UI path is exempt, and may still
- * carry the section. The template asks for a desktop and a phone image per
+ * runs to the next `#` or `##`, so a `###` subsection per changed page
+ * counts and an image under the next `##` does not. A pull request that
+ * touches no UI path is exempt, and may still carry the section. The template asks for a desktop and a phone image per
  * changed page; the script counts one, because it cannot tell widths
  * apart, and the second is a code-review item.
  *
@@ -40,10 +39,11 @@ export function isUiPath(path) {
 }
 
 const HEADING = /^##\s+Screenshots\s*$/m;
-// `HEADING` pins the section to level 2, so `#` and `##` are the headings
-// that can close it and a `###` subsection stays inside. Stopping at any
-// heading read a body with one subheading per changed page as empty, which
-// is the shape an image per page invites once two pages change.
+// `HEADING` pins the section to level 2, so an ATX `#` or `##` closes it
+// and a `###` subsection stays inside. Stopping at any heading read a body
+// with one subheading per changed page as empty, which is the shape an
+// image per page invites once two pages change. Setext headings do not
+// close it, here as before; every body in this repo is ATX.
 const NEXT_HEADING = /^#{1,2}\s/m;
 const IMAGE = /!\[[^\]]*\]\([^)]+\)|<img\b[^>]*>/;
 const OPT_OUT = /^\s*Screenshots:\s*none,\s*because\s+(\S.*)$/m;

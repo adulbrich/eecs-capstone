@@ -5,11 +5,17 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 /**
- * The rule from #342, driven the way `pr-text` drives it: as a process with
- * an exit code. `scripts/` sits outside the TypeScript project, so the CLI
- * is the seam rather than an import, as for the other two rule scripts in
- * `check-scripts.test.ts`. The `gh` hook is the other caller and imports
- * `checkPrScreenshots` directly, so it shares the rule but not this seam.
+ * The rule from #342, driven as a process with an exit code. `scripts/` sits
+ * outside the TypeScript project, so the CLI is the seam rather than an
+ * import, as for the other rule scripts in `check-scripts.test.ts`.
+ *
+ * Which caller uses which, because it is not obvious and the two describes
+ * below are split on it: `pr-text` runs `--files-stdin --body <file>`, which
+ * is the shape the second describe covers, and the `gh` hook does not use
+ * the CLI at all, importing `checkPrScreenshots` directly. The first
+ * describe uses the other argument form, `--files <path>... < body`, because
+ * it is the terser one to write a table of cases against; both forms reach
+ * the same pure function, which is what the rule actually lives in.
  */
 const env = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_"))
@@ -62,6 +68,8 @@ Both changed pages, at both widths.
 `;
 const imageInNextSection =
   "## Screenshots\n\nsee below\n\n## Review loop\n\n![a](https://example.test/a.png)\n";
+const imageUnderNextH1 =
+  "## Screenshots\n\nsee below\n\n# Appendix\n\n![a](https://example.test/a.png)\n";
 
 describe("check-pr-screenshots", () => {
   it("passes a change outside the UI with no section", () => {
@@ -98,6 +106,7 @@ describe("check-pr-screenshots", () => {
     for (const [name, body] of [
       ["before the heading", imageElsewhere],
       ["under the next ##", imageInNextSection],
+      ["under the next #", imageUnderNextH1],
     ] as const) {
       const result = check(body, UI);
       expect(result.status, name).toBe(1);
@@ -126,7 +135,7 @@ describe("check-pr-screenshots", () => {
   });
 });
 
-describe("the hook's shape: files on stdin, body from a file", () => {
+describe("the `pr-text` shape: files on stdin, body from a file", () => {
   const dirs: string[] = [];
   afterAll(() => {
     for (const dir of dirs) {
@@ -135,6 +144,7 @@ describe("the hook's shape: files on stdin, body from a file", () => {
   });
 
   it("reads the files one per line and the body from the path given", () => {
+    // The form CI depends on, so it is the one whose breakage is loudest.
     const dir = mkdtempSync(join(tmpdir(), "shots-"));
     dirs.push(dir);
     const body = join(dir, "body.md");
