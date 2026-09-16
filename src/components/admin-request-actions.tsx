@@ -49,25 +49,34 @@ export function AdminRequestActions({
 
   // One close path for both popovers. The skip is a decision about one
   // click, so it is checked again next time.
-  /**
-   * Refuses to close while the write is in flight, in the one place every
-   * dismissal route passes through: Escape, a click outside and the Cancel
-   * button all reach `onOpenChange`, so guarding the individual routes misses
-   * whichever one nobody thought of.
-   *
-   * The trigger is `disabled` while busy, a disabled element cannot hold
-   * focus, and closing hands focus back to the trigger, so dismissing
-   * mid-write dropped the reader on `<body>` with no keyboard route back to
-   * the row (#426). Cancel was already refused, so this takes away nothing the
-   * surface offered.
-   */
+  /** Closes and resets. Called by Cancel and by the success path. */
   function close() {
-    if (busy) {
-      return;
-    }
     setOpen(null);
     setError(null);
     setSendEmail(true);
+  }
+
+  /**
+   * The dismissal path, and the only one that refuses. Escape and a click
+   * outside both arrive through `onOpenChange`, so guarding here covers every
+   * route Radix offers rather than the two anybody thought to name.
+   *
+   * Why refuse at all: the trigger is `disabled` while busy, a disabled
+   * element cannot hold focus, and closing hands focus back to the trigger, so
+   * dismissing mid-write dropped the reader on `<body>` with no keyboard route
+   * back to the row (#426). Cancel was already refused, so this takes away
+   * nothing the surface offered.
+   *
+   * Separate from `close` on purpose. The success path closes while `busy` is
+   * still true and must not be refused; relying on its click-time closure
+   * still holding `busy === false` would work today and break the first time
+   * anyone reorders those two lines.
+   */
+  function dismiss() {
+    if (busy) {
+      return;
+    }
+    close();
   }
 
   async function onApprove() {
@@ -115,7 +124,7 @@ export function AdminRequestActions({
   return (
     <div className="flex gap-2">
       <Popover
-        onOpenChange={(next) => (next ? setOpen("approve") : close())}
+        onOpenChange={(next) => (next ? setOpen("approve") : dismiss())}
         open={open === "approve"}
       >
         <PopoverTrigger asChild>
@@ -162,7 +171,7 @@ export function AdminRequestActions({
       </Popover>
 
       <Popover
-        onOpenChange={(next) => (next ? setOpen("reject") : close())}
+        onOpenChange={(next) => (next ? setOpen("reject") : dismiss())}
         open={open === "reject"}
       >
         <PopoverTrigger asChild>

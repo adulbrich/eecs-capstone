@@ -51,7 +51,7 @@ describe("AdminRequestActions", () => {
    * the reader on `<body>` here too (#426). The guard sits in `close()`, the
    * one path Escape, an outside click and Cancel all reach.
    */
-  it("refuses to close mid-write, so focus is never stranded", async () => {
+  it("refuses to close mid-write", async () => {
     const write = deferred<void>();
     vi.mocked(approveRequestItem).mockReturnValue(write.promise as never);
     renderPending();

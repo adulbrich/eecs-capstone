@@ -48,16 +48,19 @@ export function CustomLineActions({
   const { busy, error, run, setError } = useAction();
 
   /**
-   * Refuses to close while the write is in flight, in the one place every
-   * dismissal route passes through: Escape, a click outside and the Cancel
-   * button all reach `onOpenChange`, so guarding the individual routes misses
-   * whichever one nobody thought of.
+   * The dismissal path, and the only one that refuses. Escape and a click
+   * outside both arrive through `onOpenChange`, so guarding here covers every
+   * route Radix offers rather than the two anybody thought to name.
    *
-   * The trigger is `disabled` while busy, a disabled element cannot hold
-   * focus, and closing hands focus back to the trigger, so dismissing
-   * mid-write dropped the reader on `<body>` with no keyboard route back to
-   * the row (#426). Cancel was already refused, so this takes away nothing the
-   * surface offered.
+   * Why refuse at all: the trigger is `disabled` while busy, a disabled
+   * element cannot hold focus, and closing hands focus back to the trigger, so
+   * dismissing mid-write dropped the reader on `<body>` with no keyboard route
+   * back to the row (#426).
+   *
+   * Cancel does not come through here, it calls `close` below, and the success
+   * path calls the same. That is deliberate: `close` must not be refused while
+   * `busy` is still true. Cancel is `disabled={busy}`, so it is unreachable
+   * mid-write anyway.
    */
   function openChange(next: boolean, surface: "note" | "reject") {
     if (next) {

@@ -67,7 +67,7 @@ describe("ApproveAllDialog", () => {
    * axe cannot see this: it scans a static tree, and this is a transition.
    */
   it.each(["Escape", "close X"])(
-    "refuses to close mid-write via %s, so focus is never stranded",
+    "refuses to close mid-write via %s",
     async (route) => {
       const write = deferred<{ approved: string[] }>();
       vi.mocked(approveRequestLines).mockReturnValue(write.promise as never);

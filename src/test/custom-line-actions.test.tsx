@@ -318,6 +318,57 @@ describe("CustomLineActions: the trigger during its own write", () => {
   );
 });
 
+describe("CustomLineActions: dismissing during its own write", () => {
+  /**
+   * The guard in `openChange`. It had none until review pass 4 found the PR
+   * claiming every guard had been reverted and watched failing, which was true
+   * of three of the four.
+   */
+  it.each(["Start sourcing", "Reject"])(
+    "refuses to close the %s popover mid-write",
+    async (trigger) => {
+      const write = deferred<void>();
+      const fn =
+        trigger === "Reject" ? rejectCustomLine : startSourcingCustomLine;
+      vi.mocked(fn).mockReturnValue(write.promise as never);
+      render(
+        <CustomLineActions
+          line={pending}
+          onDone={() => Promise.resolve()}
+          requesterEmail="requester@x.edu"
+        />
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: trigger }));
+      if (trigger === "Reject") {
+        fireEvent.change(screen.getByLabelText("Reason (sent to requester)"), {
+          target: { value: "Cannot source it" },
+        });
+      }
+      const confirm =
+        trigger === "Reject" ? "Confirm reject" : "Confirm sourcing";
+      fireEvent.click(
+        within(screen.getByRole("dialog")).getByRole("button", {
+          name: confirm,
+        })
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: trigger }).hasAttribute("disabled")
+        ).toBe(true)
+      );
+
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
+      });
+      expect(screen.getByRole("dialog")).toBeTruthy();
+
+      write.resolve();
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    }
+  );
+});
+
 describe("CustomLineActions: cancelling a popover", () => {
   it("closes the sourcing popover without writing, and keeps the note", async () => {
     render(
@@ -403,7 +454,7 @@ describe("FulfillCustomLineDialog", () => {
    * explicitly here rather than taken on trust.
    */
   it.each(["Escape", "close X"])(
-    "refuses to close mid-write via %s, so focus is never stranded",
+    "refuses to close mid-write via %s",
     async (route) => {
       const write = deferred<void>();
       vi.mocked(fulfillCustomLine).mockReturnValue(write.promise as never);
