@@ -1,4 +1,14 @@
-import { and, desc, eq, ilike, isNull, or, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  ilike,
+  isNull,
+  or,
+  type SQL,
+  type SQLWrapper,
+  sql,
+} from "drizzle-orm";
 import { db } from "#/db";
 import {
   account,
@@ -91,7 +101,14 @@ const USER_SORT_COLUMNS = {
   aiCallCount: sql.identifier("aiCallCount"),
 } as const;
 
-function isSortColumn(columns: Record<string, unknown>, key: string): boolean {
+/**
+ * The whitelist is the injection guard, so its values are typed rather than
+ * left as `unknown`: everything in one is a column or a piece of SQL, and
+ * nothing else can reach ORDER BY through it.
+ */
+type SortColumns = Record<string, SQLWrapper>;
+
+function isSortColumn(columns: SortColumns, key: string): boolean {
   // `key in columns` walks the prototype chain, so "constructor", "toString",
   // "hasOwnProperty", "valueOf", and "__proto__" would all pass the guard and
   // resolve to an Object.prototype value instead of a PgColumn.
@@ -116,7 +133,7 @@ function isSortColumn(columns: Record<string, unknown>, key: string): boolean {
 function userOrderBy(
   sort: string | undefined,
   dir: string | undefined,
-  columns: Record<string, unknown> = USER_SORT_COLUMNS
+  columns: SortColumns = USER_SORT_COLUMNS
 ) {
   if (
     sort &&
