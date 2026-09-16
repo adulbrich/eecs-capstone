@@ -25,6 +25,10 @@ import {
   PROJECT_SWITCH_LABEL,
   PROJECT_SWITCH_LEGEND,
 } from "#/components/projects-filters";
+import {
+  type FilterProposer,
+  ProposerFilterCombobox,
+} from "#/components/proposer-filter-combobox";
 import { SearchHint } from "#/components/search-hint";
 import { StatusBadge } from "#/components/status-badge";
 import {
@@ -467,7 +471,7 @@ function AdminProjectsFilters({
   proposers,
 }: {
   programs: FilterProgram[];
-  proposers: { email: string; id: string; name: string }[];
+  proposers: FilterProposer[];
 }) {
   const uid = useId();
   const navigate = useNavigate({ from: "/admin/projects/" });
@@ -490,12 +494,6 @@ function AdminProjectsFilters({
     studentProposedOnly,
     withoutMentorOnly,
   } = search;
-  // The chosen proposer can fall outside the current status/program/deleted
-  // scope, which would leave the Select showing a blank trigger. Keep the row
-  // count honest by surfacing it as a still-selected option.
-  const proposerMissing =
-    !!proposer && !proposers.some((p) => p.id === proposer);
-
   return (
     <div className="space-y-4">
       <fieldset>
@@ -553,34 +551,16 @@ function AdminProjectsFilters({
       </div>
       <div className="space-y-1.5">
         <Label htmlFor={`${uid}-proposer`}>Proposer</Label>
-        <Select
-          onValueChange={(v) =>
+        <ProposerFilterCombobox
+          id={`${uid}-proposer`}
+          onChange={(next) =>
             void navigate({
-              search: (prev) => ({
-                ...prev,
-                proposer: v === "_all_" ? null : v,
-              }),
+              search: (prev) => ({ ...prev, proposer: next }),
             })
           }
-          value={proposer ?? "_all_"}
-        >
-          <SelectTrigger className="w-full" id={`${uid}-proposer`}>
-            <SelectValue placeholder="All proposers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all_">All proposers</SelectItem>
-            {proposers.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name} ({p.email})
-              </SelectItem>
-            ))}
-            {proposerMissing && proposer && (
-              <SelectItem value={proposer}>
-                Selected proposer (outside current filters)
-              </SelectItem>
-            )}
-          </SelectContent>
-        </Select>
+          proposers={proposers}
+          value={proposer ?? null}
+        />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor={`${uid}-date-field`}>Date</Label>

@@ -147,14 +147,15 @@ table row or a panel. The rule was previously a comment in
 
 A Button's `className` may position it (`w-full`, `mt-2`, `xl:hidden`,
 `relative`), and may not set a colour, a height, a padding or a radius. Font
-weight is not on that list, and one call site uses it: the combobox trigger in
-`category-type-combobox.tsx` carries `font-normal`, because a trigger that
-displays a selected value reads as an input rather than as a button. Those
-four are what the variant and size own, so a call site that sets them has
-forked the primitive in one file: a Remove in a destructive palette here, an
-`h-auto p-0` there, until no two pages agree. If a call site needs a look the
-variants do not offer, the variant is what changes, or a shared component wraps
-it. `src/test/button-conventions.test.ts` scans for the four.
+weight is not on that list, and the combobox triggers use it:
+`category-type-combobox.tsx` and `proposer-filter-combobox.tsx` both carry
+`font-normal`, because a trigger that displays a selected value reads as an
+input rather than as a button. Those four are what the variant and size own,
+so a call site that sets them has forked the primitive in one file: a Remove
+in a destructive palette here, an `h-auto p-0` there, until no two pages
+agree. If a call site needs a look the variants do not offer, the variant is
+what changes, or a shared component wraps it.
+`src/test/button-conventions.test.ts` scans for the four.
 
 A pressed toggle is the case this most often tempts. Style it from
 `aria-pressed` in the primitive, which the base class handles, not from a
