@@ -117,7 +117,12 @@ export async function refreshProjectEmbedding(
       EMBEDDING_MODEL_ID,
       EMBEDDING_DIMENSIONS
     );
-    if (project.embeddingSourceHash === hash) {
+    // `&& project.embedding`, the way `refreshInterestsEmbedding` below does
+    // it. A row carrying a current hash and a null vector would otherwise be
+    // unreachable forever: the app reads it as up to date and never embeds it,
+    // while `scripts/backfill-embeddings.mjs` selects on `embedding IS NULL`
+    // and would. The two must not disagree about who owns that row.
+    if (project.embeddingSourceHash === hash && project.embedding) {
       return "unchanged";
     }
 

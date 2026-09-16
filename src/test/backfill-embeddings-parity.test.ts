@@ -47,6 +47,17 @@ import { describe, expect, it } from "vitest";
 const SOURCE_FILE = readFileSync("src/lib/embedding-source.ts", "utf8");
 const BEDROCK_FILE = readFileSync("src/lib/_internal/bedrock-embed.ts", "utf8");
 const SCRIPT_FILE = readFileSync("scripts/backfill-embeddings.mjs", "utf8");
+
+/**
+ * The script with its comments removed, for assertions a comment must not be
+ * able to satisfy. Safe to do by regex here and nowhere in general: this file
+ * has no `//` or block-comment opener inside any string or template literal,
+ * and the guard below fails loudly if that ever stops being true.
+ */
+const SCRIPT_CODE = SCRIPT_FILE.replace(/\/\*[\s\S]*?\*\//g, "").replace(
+  /^[ \t]*\/\/.*$/gm,
+  ""
+);
 const LIMIT_PATTERN = /const EMBEDDING_SOURCE_LIMIT = ([0-9_]+);/;
 const EMBEDDINGS_FILE = readFileSync(
   "src/server/_internal/project-embeddings.ts",
@@ -113,6 +124,13 @@ function bothBodies(name: string, src: string, srcLabel: string) {
 }
 
 describe("the production backfill's copies of the embedding helpers", () => {
+  it("can have its comments stripped without losing code", () => {
+    expect(SCRIPT_CODE.length).toBeLessThan(SCRIPT_FILE.length);
+    expect(SCRIPT_CODE).toContain("await main();");
+    expect(SCRIPT_CODE).toContain("const SELECT_SQL");
+    expect(SCRIPT_CODE).not.toContain("MUST match");
+  });
+
   it("assemble a section the same way", () => {
     const [fromSrc, fromScript] = bothBodies(
       "section",
@@ -279,12 +297,16 @@ describe("the production backfill's copies of the embedding helpers", () => {
     const keys = [
       ...(interfaceBody as string).matchAll(/^\s*(?:readonly )?(\w+)\s*[?:]/gm),
     ].map((match) => match[1]);
-    // The exact list, not a floor. A key the regex silently stopped matching,
+    // The exact set, not a floor. A key the regex silently stopped matching,
     // which `readonly` used to do, shrinks the coverage below with nothing to
     // say so, and a floor cannot tell that from a field being removed. Adding
     // a field to the interface is meant to fail here: it is the step that
     // sends you to `SELECT_SQL`.
-    expect(keys).toEqual([
+    //
+    // Sorted, because the declaration order is not a rule this repo has:
+    // `useSortedTypeFields` is off (docs/QUIRKS.md), so reordering the
+    // interface is legal and must not fail a test about coverage.
+    expect([...keys].sort()).toEqual([
       "description",
       "licenseRestrictions",
       "minQualifications",
@@ -318,18 +340,25 @@ describe("the production backfill's copies of the embedding helpers", () => {
    * Every pin above compares a declaration. None of them says the script
    * reaches it: inline the label at the call site and leave the copied
    * function sitting there unused, and all three program pins still pass.
-   * Checked as a call rather than by comparing the call text, which any
-   * reformat breaks.
+   *
+   * Searched with the comments stripped, because ADR-0024 puts the
+   * explanation of every copy in the JSDoc directly above it, which is exactly
+   * where somebody writes `buildProgramLabel(courseId, courseName)` in prose
+   * and satisfies this check with no call anywhere.
+   *
+   * `section` is deliberately absent. Its only calls are inside
+   * `buildProjectEmbeddingSource`, whose body is pinned byte for byte, so the
+   * assertion could not fail independently of that pin: it would be the
+   * vacuous pass this test is here to stop.
    */
   it.each([
-    "section",
     "buildProgramLabel",
     "buildProjectEmbeddingSource",
     "embeddingHash",
     "buildEmbedConfig",
     "buildEmbedRequestBody",
   ])("actually call their copy of %s", (name) => {
-    const calls = SCRIPT_FILE.match(
+    const calls = SCRIPT_CODE.match(
       new RegExp(`(?<!function )\\b${name}\\(`, "g")
     );
     expect(calls?.length ?? 0).toBeGreaterThan(0);

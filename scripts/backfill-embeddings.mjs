@@ -286,7 +286,7 @@ async function main() {
         tally.updated += 1;
         process.stdout.write(`updated ${project.title}\n`);
       } catch (error) {
-        // Per project, so one bad row does not cost the other 549. The row
+        // Per project, so one bad row does not cost the other 546. The row
         // stays null and the next run picks it up again.
         tally.failed += 1;
         process.stdout.write(`FAILED  ${project.title}: ${error.message}\n`);
@@ -295,6 +295,12 @@ async function main() {
         // the delay exists for, and a throttled call fails in milliseconds.
         // Sleeping only on success would let exactly the run that is being
         // throttled burst through all 547 rows at full speed.
+        //
+        // The cost is that a run failing for a reason the delay cannot help,
+        // a dead pool say, now takes its two minutes to find that out rather
+        // than seconds, because the catch above covers the three queries as
+        // well as the Bedrock call. Worth it: the loud failure is the one you
+        // watch, and the quiet one is the one that gets you rate limited.
         await sleep(DELAY_MS);
       }
     }

@@ -44,11 +44,13 @@ async function main() {
     const outcome = await refreshProjectEmbedding(row.id);
     tally[outcome] += 1;
     process.stdout.write(`${outcome.padEnd(9)} ${row.title}\n`);
-    // "failed" as well as "updated": both made a Bedrock call, and a throttled
-    // one fails in milliseconds, so sleeping only on success lets exactly the
-    // run that is being throttled burst. "unchanged" and "skipped" made no
-    // call, and delaying those would add two minutes to a sweep that does
-    // nothing.
+    // "failed" as well as "updated". A throttled Bedrock call fails in
+    // milliseconds, so sleeping only on success lets exactly the run that is
+    // being throttled burst through every row. "failed" also covers errors
+    // before Bedrock, a dead connection say, which over-sleeps rather than
+    // under-sleeps and is the safe direction. "unchanged" and "skipped" never
+    // reach Bedrock at all, and delaying those would add two minutes to a
+    // sweep that does nothing.
     if (outcome === "updated" || outcome === "failed") {
       await sleep(DELAY_MS);
     }

@@ -119,6 +119,29 @@ describe("refreshProjectEmbedding", () => {
   });
 
   /**
+   * A current hash beside a null vector is the one state that would otherwise
+   * be unreachable from both sides: the app reads the row as up to date and
+   * never embeds it, while the production sweeper selects `embedding IS NULL`
+   * and does. They have to agree about who owns it.
+   */
+  it("re-embeds a row whose hash is current but whose vector is gone", async () => {
+    const admin = await makeAdmin(`nv-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Live"));
+    await publish(admin, id);
+    const embed = vi.fn().mockResolvedValue(VECTOR);
+    await refreshProjectEmbedding(id, embed);
+    await db
+      .update(projects)
+      .set({ embedding: null })
+      .where(eq(projects.id, id));
+    embed.mockClear();
+
+    expect(await refreshProjectEmbedding(id, embed)).toBe("updated");
+    expect(embed).toHaveBeenCalledTimes(1);
+    expect((await readRow(id)).embedding?.length).toBe(1024);
+  });
+
+  /**
    * The case the whole of #427 exists for: the 547 legacy rows were written
    * straight to `archived` by `scripts/import-legacy.mjs`, never passing
    * through `published`, so this is set directly rather than transitioned.
