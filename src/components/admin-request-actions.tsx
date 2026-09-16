@@ -47,9 +47,9 @@ export function AdminRequestActions({
     return <span className="text-muted-foreground">-</span>;
   }
 
-  // One close path for both popovers. The skip is a decision about one
-  // click, so it is checked again next time.
-  /** Closes and resets. Called by Cancel and by the success path. */
+  // One cleanup for both popovers, run by every control that closes one.
+  // The skip is a decision about one click, so it is checked again next time.
+  /** Closes and resets. Called by Cancel, by `dismiss` and by the success path. */
   function close() {
     setOpen(null);
     setError(null);
@@ -64,8 +64,9 @@ export function AdminRequestActions({
    * Why refuse at all: the trigger is `disabled` while busy, a disabled
    * element cannot hold focus, and closing hands focus back to the trigger, so
    * dismissing mid-write dropped the reader on `<body>` with no keyboard route
-   * back to the row (#426). Cancel was already refused, so this takes away
-   * nothing the surface offered.
+   * back to the row (#426). Cancel does not come through here: it calls
+   * `close` directly and is `disabled={busy}`, so it is unreachable mid-write
+   * anyway.
    *
    * Separate from `close` on purpose. The success path closes while `busy` is
    * still true and must not be refused; relying on its click-time closure

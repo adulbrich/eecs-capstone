@@ -419,6 +419,71 @@ describe("CustomLineActions: cancelling a popover", () => {
     );
     expect(rejectCustomLine).not.toHaveBeenCalled();
   });
+
+  /**
+   * The two halves of `docs/QUIRKS.md` "A Cancel button that sets `open`
+   * itself skips the dialog's `onOpenChange`", which asks that every control
+   * closing a surface run the same cleanup. These two ran different halves:
+   * Cancel cleared the error and left the skip, Escape reset the skip and
+   * left the error. `admin-request-actions.tsx` is the shape both now share.
+   */
+  it("checks the email box again after Cancel: the skip was one click's", async () => {
+    render(
+      <CustomLineActions
+        line={pending}
+        onDone={vi.fn()}
+        requesterEmail="requester@x.edu"
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    const box = await screen.findByRole("checkbox", {
+      name: "Email requester@x.edu",
+    });
+    fireEvent.click(box);
+    expect(box.getAttribute("aria-checked")).toBe("false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("checkbox")).toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    const reopened = await screen.findByRole("checkbox", {
+      name: "Email requester@x.edu",
+    });
+    expect(reopened.getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("does not carry a failed action's error onto the next popover", async () => {
+    vi.mocked(startSourcingCustomLine).mockRejectedValue(
+      new Error("server said no")
+    );
+    render(
+      <CustomLineActions
+        line={pending}
+        onDone={vi.fn()}
+        requesterEmail="requester@x.edu"
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Start sourcing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm sourcing" }));
+    // `useAction` shows the rejection's own message when it carries one.
+    expect(await screen.findByText("server said no")).toBeTruthy();
+
+    // Escape rather than Cancel: it is the route that skipped the reset.
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: "Escape",
+    });
+    await waitFor(() =>
+      expect(
+        screen.queryByLabelText("Note for the requester (optional)")
+      ).toBeNull()
+    );
+
+    // The three actions share one error slot, so a stale one lands under an
+    // untouched rejection.
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    await screen.findByLabelText("Reason (sent to requester)");
+    expect(screen.queryByText("server said no")).toBeNull();
+  });
 });
 
 describe("FulfillCustomLineDialog", () => {
@@ -486,6 +551,11 @@ describe("FulfillCustomLineDialog", () => {
 
       write.resolve();
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      // Kept, not trusted: pass 4 falsified these two and neither goes red
+      // in jsdom, which does not move focus on a Radix close the way a
+      // browser does. They say what the refusal is for; the assertion that
+      // actually discriminates is the one above, that the surface stayed
+      // open. The real focus check is the accessibility suite's.
       expect(document.body.contains(document.activeElement)).toBe(true);
       expect(document.activeElement).not.toBe(document.body);
     }

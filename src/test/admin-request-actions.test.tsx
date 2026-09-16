@@ -38,18 +38,11 @@ function renderPending() {
 
 describe("AdminRequestActions", () => {
   /**
-   * The trigger, not the confirm button inside the popover. That one was
-   * always guarded; this one stayed live for the whole write and the refetch
-   * behind it, offering to reopen a decision over a row the loader had not
-   * caught up with (#426). `useAction`'s in-flight ref means the second
-   * decision could not reach the server, so what was broken is what the
-   * reader was told, not what was written.
-   */
-  /**
    * A popover restores focus to its trigger on close just as a dialog does,
    * and the trigger is `disabled` while busy, so dismissing mid-write stranded
-   * the reader on `<body>` here too (#426). The guard sits in `close()`, the
-   * one path Escape, an outside click and Cancel all reach.
+   * the reader on `<body>` here too (#426). The guard sits in `dismiss()`,
+   * which Escape and an outside click both reach. Cancel does not: it calls
+   * `close()` directly and is held off by `disabled={busy}` instead.
    */
   it("refuses to close mid-write", async () => {
     const write = deferred<void>();
@@ -73,10 +66,23 @@ describe("AdminRequestActions", () => {
     await waitFor(() =>
       expect(screen.queryByLabelText("Pickup by (optional)")).toBeNull()
     );
+    // Kept, not trusted: pass 4 falsified these two and neither goes red
+    // in jsdom, which does not move focus on a Radix close the way a
+    // browser does. They say what the refusal is for; the assertion that
+    // actually discriminates is the one above, that the surface stayed
+    // open. The real focus check is the accessibility suite's.
     expect(document.body.contains(document.activeElement)).toBe(true);
     expect(document.activeElement).not.toBe(document.body);
   });
 
+  /**
+   * The trigger, not the confirm button inside the popover. That one was
+   * always guarded; this one stayed live for the whole write and the refetch
+   * behind it, offering to reopen a decision over a row the loader had not
+   * caught up with (#426). `useAction`'s in-flight ref means the second
+   * decision could not reach the server, so what was broken is what the
+   * reader was told, not what was written.
+   */
   it.each([
     ["Approve", "Confirm approve"],
     ["Reject", "Confirm reject"],

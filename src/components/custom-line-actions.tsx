@@ -48,6 +48,20 @@ export function CustomLineActions({
   const { busy, error, run, setError } = useAction();
 
   /**
+   * The one cleanup, which every control that closes a surface runs: Cancel,
+   * Escape, a click outside, and the success path. `docs/QUIRKS.md` "A Cancel
+   * button that sets `open` itself skips the dialog's `onOpenChange`" is the
+   * rule, and these three resets are why it exists. The three actions share
+   * one error slot, so an error left behind lands under an untouched
+   * rejection, and the skip is a decision about one click.
+   */
+  function close() {
+    setOpen(null);
+    setError(null);
+    setSendEmail(true);
+  }
+
+  /**
    * The dismissal path, and the only one that refuses. Escape and a click
    * outside both arrive through `onOpenChange`, so guarding here covers every
    * route Radix offers rather than the two anybody thought to name.
@@ -57,10 +71,11 @@ export function CustomLineActions({
    * dismissing mid-write dropped the reader on `<body>` with no keyboard route
    * back to the row (#426).
    *
-   * Cancel does not come through here, it calls `close` below, and the success
-   * path calls the same. That is deliberate: `close` must not be refused while
-   * `busy` is still true. Cancel is `disabled={busy}`, so it is unreachable
-   * mid-write anyway.
+   * Separate from `close` on purpose. The success path closes while `busy` is
+   * still true and must not be refused; relying on its click-time closure
+   * still holding `busy === false` would work today and break the first time
+   * anyone reorders those two lines. Cancel is `disabled={busy}`, so it is
+   * unreachable mid-write and calls `close` directly.
    */
   function openChange(next: boolean, surface: "note" | "reject") {
     if (next) {
@@ -70,11 +85,7 @@ export function CustomLineActions({
     if (busy) {
       return;
     }
-    setOpen(null);
-    if (surface === "reject") {
-      // The skip is a decision about one click.
-      setSendEmail(true);
-    }
+    close();
   }
 
   if (!isOpenCustomLine(line.status)) {
@@ -82,11 +93,6 @@ export function CustomLineActions({
   }
   const sourcing = line.status === "sourcing";
   const confirmLabel = sourcing ? "Save note" : "Confirm sourcing";
-
-  function close() {
-    setOpen(null);
-    setError(null);
-  }
 
   function runLineAction(action: () => Promise<unknown>, failure: string) {
     return run(async () => {
