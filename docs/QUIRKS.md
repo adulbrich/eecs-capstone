@@ -392,7 +392,7 @@ dedupe test drops it to create the duplicates it exists for and restores it in a
 
 ### A correlated subquery in a select projection: `db.$count`, aliased, mapped
 
-Inside `.select({ ... })` Drizzle renders an interpolated column without its table, so a hand-written ``sql`(select count(*) from ${aiReviewUsage} where ${aiReviewUsage.userId} = ${user.id})` `` comes out as `where "user_id" = "id"`, which compares two columns of the subquery's own table and fails the whole query. `db.$count(table, where)` qualifies both sides. The listing on `/admin/users` is the live example (#413):
+Inside a `.select({ ... })` whose outer query has no joins, Drizzle renders an interpolated column without its table, so a hand-written ``sql`(select count(*) from ${aiReviewUsage} where ${aiReviewUsage.userId} = ${user.id})` `` comes out as `where "user_id" = "id"`, which compares two columns of the subquery's own table and fails the whole query. `db.$count(table, where)` survives it, because `buildSelection` rewrites only the top-level chunks of a projected `sql` and never descends into the nested `eq()` that `$count` builds. Add a join to the outer select and the rewrite stops entirely (`isSingleTable` in `pg-core/dialect.js` is `!joins || joins.length === 0`), so the hand-written form would work there; `$count` is correct either way, which is why it is the form to reach for. The listing on `/admin/users` is the live example (#413):
 
 ```ts
 const aiCallCount = sql<number>`${db.$count(aiReviewUsage, eq(aiReviewUsage.userId, user.id))}`
