@@ -49,7 +49,7 @@ import {
   BOOKMARK_TABLE_DEFAULT_SORT,
   type BookmarkRow,
 } from "#/components/bookmark-table-columns";
-import type { SortState } from "#/lib/table-state";
+import { parseSort, type SortState } from "#/lib/table-state";
 
 beforeEach(() => {
   session.data = { user: { id: "u1" } };
@@ -222,6 +222,27 @@ describe("the bookmarks table", () => {
     expect(link.className).toContain("min-w-0");
     expect(link.parentElement?.className).toContain("md:min-w-xs");
     expect(link.parentElement?.className).toContain("md:max-w-md");
+  });
+
+  /**
+   * The same pin as `project-table-columns.test.tsx`. This table carried
+   * sortable `accepting` and `nda` columns before #434, so those stale URLs
+   * are just as reachable here, and the `enableSorting: false` that makes them
+   * fall back arrives through a spread rather than being written in this file.
+   */
+  it("falls back to the default order for badges and the two removed ids", () => {
+    const sortableIds = BOOKMARK_TABLE_COLUMNS.filter(
+      (column) => column.enableSorting !== false
+    ).map((column) => column.id);
+    expect(sortableIds).not.toContain("badges");
+    expect(sortableIds).not.toContain("accepting");
+    expect(sortableIds).not.toContain("nda");
+
+    for (const stale of ["badges", "accepting", "nda"]) {
+      expect(
+        parseSort(stale, "asc", sortableIds, BOOKMARK_TABLE_DEFAULT_SORT)
+      ).toEqual(BOOKMARK_TABLE_DEFAULT_SORT);
+    }
   });
 
   it("renders the card's badge row in one column, and a dash for none", () => {

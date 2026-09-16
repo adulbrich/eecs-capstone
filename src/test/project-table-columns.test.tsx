@@ -229,7 +229,9 @@ describe("the public project table", () => {
     expect(sortableIds).not.toContain("accepting");
     expect(sortableIds).not.toContain("nda");
 
-    const fallback = { desc: true, id: "updatedAt" };
+    // The table's own default, not a copy of it: a changed default must not
+    // leave this test asserting the old one.
+    const fallback = PROJECT_TABLE_DEFAULT_SORT;
     for (const stale of ["badges", "accepting", "nda"]) {
       expect(parseSort(stale, "asc", sortableIds, fallback)).toEqual(fallback);
     }
