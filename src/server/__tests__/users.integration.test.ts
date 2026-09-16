@@ -4,8 +4,10 @@ import { db } from "#/db";
 import { session, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import type { UserRole } from "#/lib/vocabularies";
+import { recordReviewUsage } from "#/server/_internal/ai-review-usage";
 import {
   banUserAs,
+  getUserImpl,
   listUsersImpl,
   setUserRoleAs,
   unbanUserAs,
@@ -22,6 +24,83 @@ async function makeUser(email: string, role: UserRole) {
   const [u] = await db.select().from(user).where(eq(user.email, email));
   return { id: u.id, role: u.role };
 }
+
+/** One paid Bedrock call, written the way the review path writes it. */
+function recordCall(
+  userId: string,
+  feature: "review" | "scope",
+  tokens: { input: number; reasoning: number; output: number }
+) {
+  return recordReviewUsage({
+    userId,
+    feature,
+    model: "test-model",
+    reasoningEffort: "low",
+    inputTokens: tokens.input,
+    reasoningTokens: tokens.reasoning,
+    outputTokens: tokens.output,
+    outcome: "ok",
+  });
+}
+
+describe("AI usage per user (#413)", () => {
+  it("counts every row for the user, both features together", async () => {
+    const heavy = await makeUser(`heavy-${Date.now()}@x.com`, "user");
+    const quiet = await makeUser(`quiet-${Date.now()}@x.com`, "user");
+    const tokens = { input: 10, reasoning: 5, output: 2 };
+    await recordCall(heavy.id, "review", tokens);
+    await recordCall(heavy.id, "review", tokens);
+    await recordCall(heavy.id, "scope", tokens);
+
+    const { rows } = await listUsersImpl({
+      q: "",
+      role: null,
+      includeBanned: true,
+      page: 1,
+      pageSize: 50,
+    });
+    expect(rows.find((r) => r.id === heavy.id)?.aiCallCount).toBe(3);
+    // Zero is a real answer, and a user with none stays in the listing rather
+    // than being dropped by the count.
+    expect(rows.find((r) => r.id === quiet.id)?.aiCallCount).toBe(0);
+  });
+
+  it("splits the detail figures per feature and totals the tokens", async () => {
+    const u = await makeUser(`detail-${Date.now()}@x.com`, "user");
+    await recordCall(u.id, "review", { input: 10, reasoning: 5, output: 2 });
+    await recordCall(u.id, "review", { input: 20, reasoning: 1, output: 3 });
+    await recordCall(u.id, "scope", { input: 7, reasoning: 0, output: 1 });
+
+    const { aiUsage } = await getUserImpl({ id: u.id });
+    expect(aiUsage.byFeature).toEqual([
+      { feature: "review", calls: 2 },
+      { feature: "scope", calls: 1 },
+    ]);
+    expect(aiUsage.totalCalls).toBe(3);
+    expect(aiUsage.inputTokens).toBe(37);
+    expect(aiUsage.reasoningTokens).toBe(6);
+    expect(aiUsage.outputTokens).toBe(3 + 2 + 1);
+    expect(aiUsage.lastCallAt).toBeInstanceOf(Date);
+  });
+
+  it("reports a feature nobody used as zero, and no last call at all", async () => {
+    const u = await makeUser(`onefeature-${Date.now()}@x.com`, "user");
+    await recordCall(u.id, "scope", { input: 1, reasoning: 0, output: 1 });
+
+    const used = await getUserImpl({ id: u.id });
+    expect(used.aiUsage.byFeature).toEqual([
+      { feature: "review", calls: 0 },
+      { feature: "scope", calls: 1 },
+    ]);
+
+    const quiet = await makeUser(`nocalls-${Date.now()}@x.com`, "user");
+    const { aiUsage } = await getUserImpl({ id: quiet.id });
+    expect(aiUsage.totalCalls).toBe(0);
+    expect(aiUsage.inputTokens).toBe(0);
+    expect(aiUsage.lastCallAt).toBeNull();
+    expect(aiUsage.byFeature.every((row) => row.calls === 0)).toBe(true);
+  });
+});
 
 describe("listUsersImpl", () => {
   it("q matches email and name (separately)", async () => {

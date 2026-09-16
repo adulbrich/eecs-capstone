@@ -15,6 +15,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
+import { AI_FEATURE_NOUN } from "#/lib/ai-review-limits";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { isAdmin } from "#/lib/viewer";
@@ -49,8 +50,14 @@ export const Route = createFileRoute("/_authed/admin/users/$userId")({
 
 function UserDetail() {
   const router = useRouter();
-  const { user, projectCount, recentProjects, bookmarkCount, providers } =
-    Route.useLoaderData();
+  const {
+    user,
+    projectCount,
+    recentProjects,
+    bookmarkCount,
+    providers,
+    aiUsage,
+  } = Route.useLoaderData();
   const { actorId } = Route.useRouteContext();
   const isSelf = actorId === user.id;
 
@@ -155,6 +162,57 @@ function UserDetail() {
           userId={user.id}
         />
       )}
+
+      <section className="mt-8">
+        <h2 className="font-medium text-sm">AI usage</h2>
+        {/*
+          All time, the same window the AI calls column on /admin/users
+          counts, and no cost in dollars: no per-model price exists in this
+          repo and an invented one is a number nobody can defend (#413). The
+          feature names come from the limiter's own vocabulary, so this page
+          cannot drift from what a refusal tells the person.
+        */}
+        <p className="mt-2 text-muted-foreground text-xs">
+          All time. The hourly and daily limits are shown to the person when a
+          call is refused.
+        </p>
+        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
+          {aiUsage.byFeature.map((row) => (
+            <div key={row.feature}>
+              <dt className="text-muted-foreground text-xs">
+                {AI_FEATURE_NOUN[row.feature]}
+              </dt>
+              <dd className="font-medium">{row.calls}</dd>
+            </div>
+          ))}
+          <div>
+            <dt className="text-muted-foreground text-xs">Input tokens</dt>
+            <dd className="font-medium">
+              {aiUsage.inputTokens.toLocaleString()}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs">Reasoning tokens</dt>
+            <dd className="font-medium">
+              {aiUsage.reasoningTokens.toLocaleString()}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs">Output tokens</dt>
+            <dd className="font-medium">
+              {aiUsage.outputTokens.toLocaleString()}
+            </dd>
+          </div>
+        </dl>
+        <p className="mt-2 text-sm">
+          <span className="text-muted-foreground">Last call: </span>
+          {aiUsage.lastCallAt ? (
+            <LocalTime dateOnly value={aiUsage.lastCallAt} />
+          ) : (
+            "no AI calls yet"
+          )}
+        </p>
+      </section>
 
       <section className="mt-8">
         <h2 className="font-medium text-sm">Recent projects</h2>
