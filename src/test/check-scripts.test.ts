@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * The two rule scripts under `scripts/` are driven the way lefthook, CI and
+ * The rule scripts covered here are driven the way lefthook, CI and
  * the Claude Code hooks drive them: as a process with an exit code. Testing
  * the CLI rather than an import is deliberate, because the exit code is the
  * contract every caller reads, and `scripts/` sits outside Biome and the

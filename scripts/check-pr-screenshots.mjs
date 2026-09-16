@@ -7,23 +7,29 @@
  *
  * Satisfied when the body has a `## Screenshots` heading and, under it,
  * either one image (markdown `![...](...)` or an `<img ...>` tag) or a line
- * `Screenshots: none, because <reason>` with a non-empty reason. A pull
- * request that touches no UI path is exempt, and may still carry the
- * section. The template asks for a desktop and a phone image per changed
- * page; the script counts one, because it cannot tell widths apart, and the
- * second is a code-review item.
+ * `Screenshots: none, because <reason>` with a non-empty reason. "Under it"
+ * runs to the next `#` or `##`, so a `###` subsection per changed page
+ * counts and an image under the next `##` does not. A pull request that
+ * touches no UI path is exempt, and may still carry the section. The
+ * template asks for a desktop and a phone image per changed page; the
+ * script counts one, because it cannot tell widths apart, and the second is
+ * a code-review item.
  *
- * One implementation, two callers: the `pr-text` workflow runs it over the
- * PR body and the changed-file list, and the Claude Code `gh` hook runs it
- * over the body of a `gh pr create` and the branch's diff, as a warning.
+ * One implementation, two callers, and only one of them uses this CLI. The
+ * `pr-text` workflow runs the second usage below, with the changed paths on
+ * stdin and the body written to a file, so a body is data and never shell.
+ * The Claude Code `gh` hook imports `checkPrScreenshots` and calls it on the
+ * body of a `gh pr create` and the branch's changed paths, as a warning; it
+ * never spawns this CLI. The paths are what let the warning exempt a pull
+ * request that touches no UI path, exactly as the workflow's list does.
  *
  * Usage:
  *   node scripts/check-pr-screenshots.mjs --files <path>... < body
  *   node scripts/check-pr-screenshots.mjs --files-stdin --body <file>
  *
- * The body arrives on stdin (the `pr-text` convention, so it is data and
- * never shell), the paths as arguments; or the paths on stdin, one per line,
- * and the body from a file. Exits 1 with a one-line reason.
+ * The first form takes the body on stdin and the paths as arguments; the
+ * second, which is CI's, takes the paths on stdin one per line and the body
+ * from a file. Exits 1 with a one-line reason.
  */
 import { readFileSync } from "node:fs";
 
@@ -38,7 +44,12 @@ export function isUiPath(path) {
 }
 
 const HEADING = /^##\s+Screenshots\s*$/m;
-const NEXT_HEADING = /^#{1,6}\s/m;
+// `HEADING` pins the section to level 2, so an ATX `#` or `##` closes it
+// and a `###` subsection stays inside. Stopping at any heading read a body
+// with one subheading per changed page as empty, which is the shape an
+// image per page invites once two pages change. Setext headings do not
+// close it, here as before; every body in this repo is ATX.
+const NEXT_HEADING = /^#{1,2}\s/m;
 const IMAGE = /!\[[^\]]*\]\([^)]+\)|<img\b[^>]*>/;
 const OPT_OUT = /^\s*Screenshots:\s*none,\s*because\s+(\S.*)$/m;
 
