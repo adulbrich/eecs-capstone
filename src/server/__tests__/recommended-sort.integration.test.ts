@@ -259,8 +259,11 @@ describe("an absent sort resolves by the viewer's vector", () => {
     // to catch a widened SQL branch: a vector, an explicit sort that is not
     // recommended, and rows whose cosine and relevance orders disagree. The
     // third is the one that is easy to lose: two rows are not enough, they
-    // have to be built to disagree, which is what the opposite unit vectors
-    // and the publish order below do. `Far` publishes second, so date-DESC
+    // have to be built to disagree, which is what the unit vectors on
+    // different axes and the publish order below do. Those are orthogonal,
+    // not opposite: `unitVector` is one-hot, so any two axes sit at cosine
+    // distance 1 and a third would tie rather than sort between them.
+    // `Far` publishes second, so date-DESC
     // puts it first, the reverse of cosine. This is the only case in the
     // file with all three; asserting the label alone let that widening stay
     // green.
