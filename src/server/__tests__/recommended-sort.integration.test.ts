@@ -262,11 +262,10 @@ describe("an absent sort resolves by the viewer's vector", () => {
     // have to be built to disagree, which is what the unit vectors on
     // different axes and the publish order below do. Those are orthogonal,
     // not opposite: `unitVector` is one-hot, so any two axes sit at cosine
-    // distance 1 and a third would tie rather than sort between them.
-    // `Far` publishes second, so date-DESC
-    // puts it first, the reverse of cosine. This is the only case in the
-    // file with all three; asserting the label alone let that widening stay
-    // green.
+    // distance 1 and a third would tie rather than sort between them. `Far`
+    // publishes second, so date-DESC puts it first, the reverse of cosine.
+    // This is the only case in the file with all three; asserting the label
+    // alone let that widening stay green.
     expect(rows.map((row) => row.title)).toEqual(["Far", "Near"]);
   });
 
