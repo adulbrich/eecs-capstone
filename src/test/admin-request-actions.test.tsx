@@ -66,22 +66,17 @@ describe("AdminRequestActions", () => {
     await waitFor(() =>
       expect(screen.queryByLabelText("Pickup by (optional)")).toBeNull()
     );
-    // Kept, not trusted: pass 4 falsified these two and neither goes red
-    // in jsdom, which does not move focus on a Radix close the way a
-    // browser does. They say what the refusal is for; the assertion that
-    // actually discriminates is the one above, that the surface stayed
-    // open. The real focus check is the accessibility suite's.
-    expect(document.body.contains(document.activeElement)).toBe(true);
-    expect(document.activeElement).not.toBe(document.body);
+    // No focus assertion: jsdom does not move focus on a Radix close, so
+    // one here cannot fail. The accessibility suite is where that is checked.
   });
 
   /**
    * The trigger, not the confirm button inside the popover. That one was
    * always guarded; this one stayed live for the whole write and the refetch
    * behind it, offering to reopen a decision over a row the loader had not
-   * caught up with (#426). `useAction`'s in-flight ref means the second
-   * decision could not reach the server, so what was broken is what the
-   * reader was told, not what was written.
+   * caught up with (#426). This component holds `busy` in `useState` with no
+   * in-flight ref, unlike `CustomLineActions`, so the disabled attribute is
+   * the whole of the protection here.
    */
   it.each([
     ["Approve", "Confirm approve"],

@@ -320,9 +320,10 @@ describe("CustomLineActions: the trigger during its own write", () => {
 
 describe("CustomLineActions: dismissing during its own write", () => {
   /**
-   * The guard in `openChange`. It had none until review pass 4 found the PR
-   * claiming every guard had been reverted and watched failing, which was true
-   * of three of the four.
+   * The guard in `openChange`, which is the fourth of the four and was the
+   * last to get a test. Escape on a non-modal Radix Popover does reach
+   * `onOpenChange` in jsdom, so this can fail: drop the `busy` branch and
+   * the dialog query below throws.
    */
   it.each(["Start sourcing", "Reject"])(
     "refuses to close the %s popover mid-write",
@@ -551,13 +552,8 @@ describe("FulfillCustomLineDialog", () => {
 
       write.resolve();
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-      // Kept, not trusted: pass 4 falsified these two and neither goes red
-      // in jsdom, which does not move focus on a Radix close the way a
-      // browser does. They say what the refusal is for; the assertion that
-      // actually discriminates is the one above, that the surface stayed
-      // open. The real focus check is the accessibility suite's.
-      expect(document.body.contains(document.activeElement)).toBe(true);
-      expect(document.activeElement).not.toBe(document.body);
+      // No focus assertion: jsdom does not move focus on a Radix close, so
+      // one here cannot fail. The accessibility suite is where that is checked.
     }
   );
 

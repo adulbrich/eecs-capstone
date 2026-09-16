@@ -104,13 +104,8 @@ describe("ApproveAllDialog", () => {
 
       write.resolve({ approved: ["a", "b"] });
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-      // Kept, not trusted: pass 4 falsified these two and neither goes red
-      // in jsdom, which does not move focus on a Radix close the way a
-      // browser does. They say what the refusal is for; the assertion that
-      // actually discriminates is the one above, that the surface stayed
-      // open. The real focus check is the accessibility suite's.
-      expect(document.body.contains(document.activeElement)).toBe(true);
-      expect(document.activeElement).not.toBe(document.body);
+      // No focus assertion: jsdom does not move focus on a Radix close, so
+      // one here cannot fail. The accessibility suite is where that is checked.
     }
   );
 
