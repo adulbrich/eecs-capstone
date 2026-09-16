@@ -90,7 +90,8 @@ async function createFixtures(
       "instructor@example.com not found in database. Run: npm run db:seed:dev"
     );
   }
-  // instructor is only used as a program_instructors DB fixture: no auth session needed.
+  // instructor is a DB fixture only, never a session: a row in
+  // program_instructors, and the proposer of the bookmark pool below.
 
   const [adminUser] = await db
     .select()
