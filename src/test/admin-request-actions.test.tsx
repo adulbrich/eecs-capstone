@@ -10,6 +10,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { AdminRequestActions } from "#/components/admin-request-actions";
 import { approveRequestItem, rejectRequestItem } from "#/server/inventory";
 import { installResizeObserver } from "./radix-jsdom";
+import { deferred } from "./shared/deferred";
 
 vi.mock("#/server/inventory", () => ({
   approveRequestItem: vi.fn(),
@@ -35,18 +36,6 @@ function renderPending() {
   );
 }
 
-/**
- * A promise this test resolves by hand, so the component can be observed
- * mid-write rather than after it.
- */
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
-}
-
 describe("AdminRequestActions", () => {
   /**
    * The trigger, not the confirm button inside the popover. That one was
@@ -67,8 +56,7 @@ describe("AdminRequestActions", () => {
       vi.mocked(fn).mockReturnValue(write.promise as never);
       renderPending();
 
-      const button = () =>
-        screen.getByRole("button", { hidden: true, name: trigger });
+      const button = () => screen.getByRole("button", { name: trigger });
       expect(button().hasAttribute("disabled")).toBe(false);
 
       fireEvent.click(button());

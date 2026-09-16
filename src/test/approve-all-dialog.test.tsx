@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ApproveAllDialog } from "#/components/approve-all-dialog";
 import { approveRequestLines } from "#/server/inventory";
+import { deferred } from "./shared/deferred";
 
 vi.mock("#/server/inventory", () => ({
   approveRequestLines: vi.fn(),
@@ -49,15 +50,6 @@ function openDialog() {
   fireEvent.click(screen.getByRole("button", { name: "Approve all" }));
 }
 
-/** A promise this test resolves by hand, to observe the component mid-write. */
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
-}
-
 describe("ApproveAllDialog", () => {
   /**
    * The trigger, not the confirm button inside the dialog. It stayed live for
@@ -75,6 +67,10 @@ describe("ApproveAllDialog", () => {
       />
     );
 
+    // `hidden` because this dialog is modal: while it is open the overlay
+    // `aria-hidden`s the trigger, so the accessibility tree does not carry it.
+    // That is also why the prop matters less here than on the popovers, and
+    // where it does matter: a reader who dismisses with Escape mid-write.
     const button = () =>
       screen.getByRole("button", { hidden: true, name: "Approve all" });
     expect(button().hasAttribute("disabled")).toBe(false);

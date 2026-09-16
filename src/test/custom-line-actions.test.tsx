@@ -20,6 +20,7 @@ import {
   startSourcingCustomLine,
   updateSourcingNote,
 } from "#/server/inventory-custom";
+import { deferred } from "./shared/deferred";
 
 vi.mock("#/server/inventory", () => ({ listAdminInventory: vi.fn() }));
 vi.mock("#/server/inventory-custom", () => ({
@@ -373,15 +374,6 @@ describe("CustomLineActions: cancelling a popover", () => {
   });
 });
 
-/** A promise this test resolves by hand, to observe the component mid-write. */
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
-}
-
 describe("FulfillCustomLineDialog", () => {
   /** Opens the dialog, searches, and links the first match. */
   async function linkFirstMatch() {
@@ -418,6 +410,8 @@ describe("FulfillCustomLineDialog", () => {
       />
     );
 
+    // `hidden` because this dialog is modal, unlike the popovers above: the
+    // overlay `aria-hidden`s the trigger while it is open.
     const button = () =>
       screen.getByRole("button", { hidden: true, name: "Fulfil" });
     expect(button().hasAttribute("disabled")).toBe(false);
