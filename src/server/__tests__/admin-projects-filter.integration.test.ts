@@ -446,11 +446,47 @@ describe("admin project search reaches people, not just text", () => {
       "Unlinked Proposal",
       "unregistered@example.edu"
     );
-    const { rows } = await listAdminProjectsAs(
+    const whole = await listAdminProjectsAs(
       admin,
       filter({ q: "unregistered@example.edu" })
     );
-    expect(rows.map((r) => r.title)).toEqual(["Unlinked Proposal"]);
+    expect(whole.rows.map((r) => r.title)).toEqual(["Unlinked Proposal"]);
+    const fragment = await listAdminProjectsAs(
+      admin,
+      filter({ q: "nregistered" })
+    );
+    expect(fragment.rows.map((r) => r.title)).toEqual(["Unlinked Proposal"]);
+  });
+
+  it("finds a project by the stored address and by the linked account's, once the two have diverged", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    await makeAdmin("typed@example.edu");
+    const project = await createProjectAs(
+      admin,
+      baseProject("Renamed Account", null)
+    );
+    await updateProjectProposerAs(admin, {
+      id: project.id,
+      proposerEmail: "typed@example.edu",
+      studentProposed: false,
+    });
+    // The proposer changes their own address afterwards. The project keeps
+    // the address staff typed, so the two disagree and both have to find it.
+    await db
+      .update(user)
+      .set({ email: "renamed@example.edu" })
+      .where(eq(user.email, "typed@example.edu"));
+
+    const byStored = await listAdminProjectsAs(
+      admin,
+      filter({ q: "typed@example.edu" })
+    );
+    expect(byStored.rows.map((r) => r.title)).toEqual(["Renamed Account"]);
+    const byAccount = await listAdminProjectsAs(
+      admin,
+      filter({ q: "renamed@example.edu" })
+    );
+    expect(byAccount.rows.map((r) => r.title)).toEqual(["Renamed Account"]);
   });
 
   it("finds a project by a fragment of the address left behind when the proposer account is deleted", async () => {
