@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { errorMessage } from "#/lib/error-message";
+import { useAction } from "#/lib/use-action";
 import { updateProjectProposer } from "#/server/projects";
 import type { ProposerForEdit } from "#/server/projects-queries";
 import { PanelSection } from "./panel";
@@ -83,8 +83,10 @@ function ProposerDraft({
   const [studentProposed, setStudentProposed] = useState(
     proposer.studentProposed
   );
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The ref inside the hook is the guard that matters: `disabled={busy}` alone
+  // does not stop a second activation that arrives before React has
+  // re-rendered, and a second save mails the proposer again (#443).
+  const { busy, error, run } = useAction({ fallback: "Save failed" });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const trimmed = email.trim();
   const pendingChange =
@@ -93,10 +95,8 @@ function ProposerDraft({
   // is not a change there and mails nobody.
   const announces = trimmed !== "" && trimmed.toLowerCase() !== proposer.email;
 
-  async function save(sendEmail: boolean) {
-    setBusy(true);
-    setError(null);
-    try {
+  function save(sendEmail: boolean) {
+    return run(async () => {
       await updateProjectProposer({
         data: {
           id: projectId,
@@ -107,11 +107,7 @@ function ProposerDraft({
       });
       setConfirmOpen(false);
       await onSaved();
-    } catch (e) {
-      setError(errorMessage(e, "Save failed"));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (

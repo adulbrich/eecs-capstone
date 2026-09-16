@@ -5,9 +5,9 @@ import ReactCrop, {
   centerCrop,
   makeAspectCrop,
 } from "react-image-crop";
-import { errorMessage } from "#/lib/error-message";
 import { IMAGE_FILE_ACCEPT } from "#/lib/image-upload-policy";
 import { getPublicUrl } from "#/lib/storage";
+import { useAction } from "#/lib/use-action";
 import { Button } from "./ui/button";
 import { FieldError } from "./ui/field";
 
@@ -32,8 +32,14 @@ export function ImageUploader({
   const [crop, setCrop] = useState<Crop | null>(null);
   const [pickedFile, setPickedFile] = useState<File | null>(null);
   const [cleared, setCleared] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // One action, despite the several steps around it: pick, crop, then this
+  // one render-and-hand-over. The guard that matters is the hook's ref, since
+  // "Use image" is only `disabled` once React has re-rendered and a second
+  // activation inside the same tick would render the crop twice and hand the
+  // parent two files to upload (#443).
+  const { busy, error, run, setError } = useAction({
+    fallback: "Image processing failed.",
+  });
   const imgRef = useRef<HTMLImageElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -91,30 +97,20 @@ export function ImageUploader({
     }
   }
 
-  async function onConfirmCrop() {
-    if (!(imgRef.current && crop)) {
+  function onConfirmCrop() {
+    const image = imgRef.current;
+    if (!(image && crop)) {
       return;
     }
-    setBusy(true);
-    setError(null);
-    try {
-      const blob = await renderCropToWebpBlob(
-        imgRef.current,
-        crop,
-        maxWidth,
-        maxHeight
-      );
+    return run(async () => {
+      const blob = await renderCropToWebpBlob(image, crop, maxWidth, maxHeight);
       const file = new File([blob], "upload.webp", { type: "image/webp" });
       setPickedFile(file);
       setCleared(false);
       setSourceUrl(null);
       setCrop(null);
       onChange(file);
-    } catch (err) {
-      setError(errorMessage(err, "Image processing failed."));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   function onCancelCrop() {

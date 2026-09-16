@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { errorMessage } from "#/lib/error-message";
 import {
   confidenceLabel,
   SCOPE_VERDICT_LABELS,
   type ScopeAssessmentView,
   type ScopeVerdict,
 } from "#/lib/scope-assessment";
+import { useAction } from "#/lib/use-action";
 import {
   assessProjectScope,
   getScopeAssessment,
@@ -50,8 +50,12 @@ export function ScopeAssessmentSection({ projectId }: { projectId: string }) {
   const [view, setView] = useState<ScopeAssessmentView | null | "loading">(
     "loading"
   );
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The ref inside the hook is the guard that matters: `disabled={busy}` alone
+  // does not stop a second activation that arrives before React has
+  // re-rendered, and this one spends a Bedrock call (#443).
+  const { busy, error, run } = useAction({
+    fallback: "Scope assessment failed",
+  });
 
   useEffect(() => {
     void (async () => {
@@ -65,16 +69,10 @@ export function ScopeAssessmentSection({ projectId }: { projectId: string }) {
     })();
   }, [projectId]);
 
-  async function assess() {
-    setError(null);
-    setBusy(true);
-    try {
+  function assess() {
+    return run(async () => {
       setView(await assessProjectScope({ data: { projectId } }));
-    } catch (e) {
-      setError(errorMessage(e, "Scope assessment failed"));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const assessed = view !== "loading" && view !== null ? view : null;

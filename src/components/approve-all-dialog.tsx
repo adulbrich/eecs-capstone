@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { errorMessage } from "#/lib/error-message";
+import { useAction } from "#/lib/use-action";
 import { approveRequestLines } from "#/server/inventory";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { Button } from "./ui/button";
@@ -45,18 +45,20 @@ export function ApproveAllDialog({
   const [open, setOpen] = useState(false);
   const [pickupBy, setPickupBy] = useState("");
   const [sendEmail, setSendEmail] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The ref inside the hook is the guard that matters: `disabled={busy}` alone
+  // does not stop a second activation that arrives before React has
+  // re-rendered, and this one approves a whole batch (#443).
+  const { busy, error, run, setError } = useAction({
+    fallback: "Approve failed",
+  });
   const pending = lines.filter((line) => line.status === "pending");
   if (pending.length === 0) {
     return null;
   }
   const count = pending.length;
 
-  async function onConfirm() {
-    setBusy(true);
-    setError(null);
-    try {
+  function onConfirm() {
+    return run(async () => {
       await approveRequestLines({
         data: {
           requestItemIds: pending.map((line) => line.id),
@@ -67,11 +69,7 @@ export function ApproveAllDialog({
       setPickupBy("");
       await onDone();
       setOpen(false);
-    } catch (e) {
-      setError(errorMessage(e, "Approve failed"));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   // One close path for Escape, the overlay and the Cancel button alike. A
