@@ -44,7 +44,12 @@ async function main() {
     const outcome = await refreshProjectEmbedding(row.id);
     tally[outcome] += 1;
     process.stdout.write(`${outcome.padEnd(9)} ${row.title}\n`);
-    if (outcome === "updated") {
+    // "failed" as well as "updated": both made a Bedrock call, and a throttled
+    // one fails in milliseconds, so sleeping only on success lets exactly the
+    // run that is being throttled burst. "unchanged" and "skipped" made no
+    // call, and delaying those would add two minutes to a sweep that does
+    // nothing.
+    if (outcome === "updated" || outcome === "failed") {
       await sleep(DELAY_MS);
     }
   }

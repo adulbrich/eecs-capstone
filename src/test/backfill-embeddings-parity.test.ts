@@ -277,27 +277,62 @@ describe("the production backfill's copies of the embedding helpers", () => {
     const interfaceBody = INTERFACE_PATTERN.exec(SOURCE_FILE)?.[1];
     expect(interfaceBody).toBeDefined();
     const keys = [
-      ...(interfaceBody as string).matchAll(/^\s*(\w+)\s*[?:]/gm),
+      ...(interfaceBody as string).matchAll(/^\s*(?:readonly )?(\w+)\s*[?:]/gm),
     ].map((match) => match[1]);
-    // Guards the regex itself: an interface that stopped matching would
-    // otherwise pass this test with nothing to check.
-    expect(keys).toContain("title");
-    expect(keys.length).toBeGreaterThan(5);
+    // The exact list, not a floor. A key the regex silently stopped matching,
+    // which `readonly` used to do, shrinks the coverage below with nothing to
+    // say so, and a floor cannot tell that from a field being removed. Adding
+    // a field to the interface is meant to fail here: it is the step that
+    // sends you to `SELECT_SQL`.
+    expect(keys).toEqual([
+      "description",
+      "licenseRestrictions",
+      "minQualifications",
+      "objectives",
+      "prefQualifications",
+      "problemStatement",
+      "title",
+    ]);
 
     // The select list alone, not the whole query: `id`, `status`, `embedding`
     // and `deleted_at` all appear in the WHERE clause, so a substring test over
     // the query would pass a field named after any of them without it ever
     // being selected.
     const selectList = (SELECT_SQL_PATTERN.exec(SCRIPT_FILE)?.[1] ?? "").split(
-      /\bFROM\b/
+      /\bfrom\b/i
     )[0];
+    // Guards the split, not the exec. A split that quietly failed to find its
+    // delimiter leaves the whole query here, which is the vacuous pass this
+    // test exists to avoid.
     expect(selectList).toContain("SELECT");
+    expect(selectList).not.toMatch(/\bwhere\b/i);
     for (const key of keys) {
       // Either the column is already camelCase (`title`) or the query aliases
       // it to camelCase (`problem_statement AS "problemStatement"`), so the key
       // appears as a whole word either way.
       expect(selectList).toMatch(new RegExp(`\\b${key}\\b`));
     }
+  });
+
+  /**
+   * Every pin above compares a declaration. None of them says the script
+   * reaches it: inline the label at the call site and leave the copied
+   * function sitting there unused, and all three program pins still pass.
+   * Checked as a call rather than by comparing the call text, which any
+   * reformat breaks.
+   */
+  it.each([
+    "section",
+    "buildProgramLabel",
+    "buildProjectEmbeddingSource",
+    "embeddingHash",
+    "buildEmbedConfig",
+    "buildEmbedRequestBody",
+  ])("actually call their copy of %s", (name) => {
+    const calls = SCRIPT_FILE.match(
+      new RegExp(`(?<!function )\\b${name}\\(`, "g")
+    );
+    expect(calls?.length ?? 0).toBeGreaterThan(0);
   });
 
   /**

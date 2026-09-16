@@ -993,7 +993,7 @@ grep -rn 'insert(projectStatusHistory)' src --include='*.ts' | grep -v __tests__
 
 ### There are two embedding backfills, and only the `.mjs` runs in production
 
-`scripts/backfill-embeddings.ts` calls `refreshProjectEmbedding` and needs `tsx` and `src/`, so it is workstation only; `scripts/backfill-embeddings.mjs` is the ECS task, and pays for that with the copies ADR-0024 describes. Neither refreshes a stale vector: the `.mjs` selects `embedding IS NULL` only, which is what makes a second run free, and the `.ts` leans on the hash check inside `refreshProjectEmbedding`. Re-embedding a project whose text changed is `refreshProjectEmbedding`'s job on edit.
+`scripts/backfill-embeddings.ts` calls `refreshProjectEmbedding` and needs `tsx` and `src/`, so it is workstation only; `scripts/backfill-embeddings.mjs` is the ECS task, and pays for that with the copies ADR-0024 describes. **They do different amounts of work, and the difference is not a detail.** The `.ts` selects every embeddable row and hands each to `refreshProjectEmbedding`, which re-embeds anything whose hash no longer matches its text, so it refreshes stale vectors as well as missing ones and a full run costs a Bedrock call per drifted row. The `.mjs` selects `embedding IS NULL` and nothing else, so it fills gaps only, never notices a stale vector, and a second run is free. Use the `.mjs` after an import, which is the case it was written for; reach for the `.ts` when text may have changed underneath the hashes. Routinely, re-embedding a project whose text changed is `refreshProjectEmbedding`'s own job on edit, and neither sweeper is meant to be the thing that catches it.
 
 ### `sendEmail` is decided by role in `performTransitionAs`, not by the schema
 

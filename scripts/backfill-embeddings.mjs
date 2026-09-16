@@ -32,17 +32,8 @@
  * whose drift throws or fails to connect (`parseEmbedResponse`,
  * `buildBedrockConfig`, `toSqlVector`, `DEFAULT_REGION`) are left out.
  *
- * The three failures worth naming, worst first:
- *
- * - The text that gets embedded drifts. The script stores vectors computed
- *   from text the app would never produce for that project. Nothing errors,
- *   the stored hash still looks valid to the app, so nothing recomputes them,
- *   and recommendations quietly get worse. The only silent one.
- * - The hash inputs drift. Every row looks stale to whichever side did not
- *   change, so runs re-embed rows that were already correct at one paid
- *   Bedrock call each, and the two sides can flip-flop a row indefinitely.
- * - The dimension default drifts. pgvector rejects the insert, because the
- *   column is fixed at 1024. Loud, and so the least dangerous.
+ * Which drift matters and why is in that test's header, next to the pins that
+ * catch it, and is not restated here.
  *
  * Keep every pinned body free of comments and of TypeScript annotations: the
  * comparison collapses whitespace but strips neither. Explain above the
@@ -294,12 +285,17 @@ async function main() {
         await db.query(UPDATE_SQL, [toSqlVector(vector), hash, project.id]);
         tally.updated += 1;
         process.stdout.write(`updated ${project.title}\n`);
-        await sleep(DELAY_MS);
       } catch (error) {
         // Per project, so one bad row does not cost the other 549. The row
         // stays null and the next run picks it up again.
         tally.failed += 1;
         process.stdout.write(`FAILED  ${project.title}: ${error.message}\n`);
+      } finally {
+        // After the failures too, and that is the point: throttling is what
+        // the delay exists for, and a throttled call fails in milliseconds.
+        // Sleeping only on success would let exactly the run that is being
+        // throttled burst through all 547 rows at full speed.
+        await sleep(DELAY_MS);
       }
     }
 
