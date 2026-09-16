@@ -19,7 +19,9 @@
  * `pr-text` workflow runs the second usage below, with the changed paths on
  * stdin and the body written to a file, so a body is data and never shell.
  * The Claude Code `gh` hook imports `checkPrScreenshots` and calls it on the
- * body of a `gh pr create`, as a warning; it spawns nothing.
+ * body of a `gh pr create` and the branch's changed paths, as a warning; it
+ * never spawns this CLI. The paths are what let the warning exempt a pull
+ * request that touches no UI path, exactly as the workflow's list does.
  *
  * Usage:
  *   node scripts/check-pr-screenshots.mjs --files <path>... < body
