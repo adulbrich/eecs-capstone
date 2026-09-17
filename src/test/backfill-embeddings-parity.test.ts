@@ -62,10 +62,11 @@ const SCRIPT_FILE = readFileSync("scripts/backfill-embeddings.mjs", "utf8");
  * cannot happen, because an honest proof needs a parser: extracting the
  * literals from text that still holds comments is circular, since an
  * apostrophe in a comment opens one. What stands in for a proof is narrower
- * and testable, and the first `describe` below checks all three parts. The
- * file contains no `://`, which is the sequence that would put a `//` inside a
- * string here. Both strips are shown to run. The braces still balance
- * afterwards, which a swallowed run of code would almost certainly break.
+ * and testable, and the first `describe` below checks all three parts, over
+ * this file and over `EMBEDDINGS_CODE` alike. Neither file contains `://`,
+ * which is the sequence that would put a `//` inside a string here. Both
+ * strips are shown to run. The braces still balance afterwards, which a
+ * swallowed run of code would almost certainly break.
  *
  * The line strip is not anchored to the start of a line, so it also removes a
  * comment trailing real code. Nothing in the script does that today, and the
@@ -89,9 +90,10 @@ const EMBEDDINGS_FILE = readFileSync(
  * exactly the shape that satisfies a substring test without the code being
  * there at all.
  *
- * Safe here for the same narrow reason it is safe for the script: this file
- * contains no `://`, the sequence that would put a `//` inside a string, and
- * the brace check below covers it too.
+ * Safe for the same narrow reason as the script's strip, and by the same
+ * assertions: the first `describe` below runs all three over both files, so
+ * "contains no `://`" and "braces still balance" are checks here rather than
+ * claims.
  */
 const EMBEDDINGS_CODE = EMBEDDINGS_FILE.replace(
   /\/\*[\s\S]*?\*\//g,
@@ -160,13 +162,20 @@ function bothBodies(name: string, src: string, srcLabel: string) {
 /**
  * Not part of the inventory below. These prove the reading the inventory's
  * assertions depend on, and pin no copied declaration of their own.
+ *
+ * Both stripped files go through all three, because a guard that covers one
+ * of two identically stripped files is the prose-shaped assertion this file
+ * exists to refuse.
  */
-describe("reading the production backfill as code rather than as text", () => {
-  it("still balances its braces after the strip", () => {
+describe("reading the two stripped files as code rather than as text", () => {
+  it.each([
+    ["backfill-embeddings.mjs", SCRIPT_CODE],
+    ["project-embeddings.ts", EMBEDDINGS_CODE],
+  ])("still balances %s's braces after the strip", (_label, code) => {
     // The cheap structural check: a strip that ate a run of real code almost
     // certainly takes a brace with it. Not a parser, and not claiming to be.
-    const opens = SCRIPT_CODE.match(/\{/g)?.length ?? 0;
-    const closes = SCRIPT_CODE.match(/\}/g)?.length ?? 0;
+    const opens = code.match(/\{/g)?.length ?? 0;
+    const closes = code.match(/\}/g)?.length ?? 0;
     expect(opens).toBe(closes);
     expect(opens).toBeGreaterThan(10);
   });
@@ -176,16 +185,30 @@ describe("reading the production backfill as code rather than as text", () => {
    * sentences, which meant rewording a comment quietly uncovered the strip it
    * was standing in for: the needle was gone, so `not.toContain` passed and
    * said nothing. These fail while any comment of either kind survives, and
-   * the `toMatch` pair on `SCRIPT_FILE` fails if there was nothing to strip.
+   * the `toMatch` pair on the raw file fails if there was nothing to strip.
+   *
+   * The kept statement differs per file, so it is passed in: asserting only
+   * that the strip removed things would pass on a strip that removed
+   * everything.
    */
-  it("loses every comment and keeps every statement", () => {
-    expect(SCRIPT_FILE).toMatch(/\/\*/);
-    expect(SCRIPT_FILE).toMatch(/^[ \t]*\/\//m);
-    expect(SCRIPT_CODE).not.toMatch(/\/\*/);
-    expect(SCRIPT_CODE).not.toMatch(/\/\//);
-    expect(SCRIPT_CODE).toContain("await main();");
-    expect(SCRIPT_CODE).toContain("const SELECT_SQL");
-  });
+  it.each([
+    ["backfill-embeddings.mjs", SCRIPT_FILE, SCRIPT_CODE, "await main();"],
+    [
+      "project-embeddings.ts",
+      EMBEDDINGS_FILE,
+      EMBEDDINGS_CODE,
+      "export async function refreshProjectEmbedding(",
+    ],
+  ])(
+    "lose every comment in %s and keep every statement",
+    (_l, raw, code, kept) => {
+      expect(raw).toMatch(/\/\*/);
+      expect(raw).toMatch(/^[ \t]*\/\//m);
+      expect(code).not.toMatch(/\/\*/);
+      expect(code).not.toMatch(/\/\//);
+      expect(code).toContain(kept);
+    }
+  );
 
   /**
    * What makes the unanchored line strip safe here, and the only assumption
@@ -195,12 +218,17 @@ describe("reading the production backfill as code rather than as text", () => {
    * It refuses a URL anywhere, including in a comment, where one would in fact
    * be harmless. That bluntness is deliberate: telling a comment from a string
    * is the job of the strip this assertion exists to protect, so doing it here
-   * would be the circularity again. If you hit this while citing a doc URL
-   * above a copied function, put the URL in the JSDoc of the `src/` original
-   * instead, and do not delete the assertion to get past it.
+   * would be the circularity again. Both stripped files are scanned, so the
+   * `src/` original is no longer the place to put a URL out of reach either.
+   * A doc reference in one of these two spells the path or the ADR number
+   * rather than a link, and the assertion is not to be deleted to get past
+   * this. Every other file in the repo is untouched by it.
    */
-  it("contains no URL, in a string or anywhere else", () => {
-    expect(SCRIPT_FILE).not.toContain("://");
+  it.each([
+    ["backfill-embeddings.mjs", SCRIPT_FILE],
+    ["project-embeddings.ts", EMBEDDINGS_FILE],
+  ])("contains no URL in %s, in a string or anywhere else", (_label, raw) => {
+    expect(raw).not.toContain("://");
   });
 });
 

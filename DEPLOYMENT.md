@@ -670,18 +670,21 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
 
 It checks every `published` or `archived` project and embeds the ones whose
 stored hash does not match the text they carry now, and the ones with no vector
-at all whatever their hash says. On a first run that is all of them. Budget about five minutes for 547 rows at one Bedrock call each plus a
-200ms politeness delay. The CloudWatch log should end with:
+at all whatever their hash says. On a first run that is all of them. Budget
+about five minutes for 547 rows at one Bedrock call each plus a 200ms
+politeness delay. The CloudWatch log should end with:
 
 ```
 547 project(s) checked: 547 updated, 0 already current, 0 failed.
 ```
 
 Safe and cheap to re-run: an unchanged row costs one small query, two if it
-has a program, no Bedrock call and no delay, so a second run reports every row
-as already current and finishes in seconds. A row that fails is left as it was,
-the run continues, and the task exits non-zero to say so, which is what makes a
-partial run resumable.
+has a program, no Bedrock call and no delay, so a second run reports nearly
+every row as already current and finishes in seconds. Nearly, not every: a
+project whose categories come back from Postgres in a different order than the
+app stored them re-embeds each time, which is issue #457. A row that fails is
+left as it was, the run continues, and the task exits non-zero to say so, which
+is what makes a partial run resumable.
 
 **Run it after every import, not only the first,** including the live set in
 7a.7. `import-legacy.mjs` writes project text without going through
