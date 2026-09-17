@@ -3,7 +3,7 @@
  *
  * Run as a one-off ECS task, the way `promote-admin.mjs` is:
  *
- *   node scripts/import-legacy.mjs                 # import, or refresh a prior run
+ *   node scripts/import-legacy.mjs                 # a cohort's FIRST import only
  *   node scripts/import-legacy.mjs --undo          # delete exactly the imported rows
  *   node scripts/import-legacy.mjs --skip-existing # add only rows not already imported
  *
@@ -12,8 +12,8 @@
  * the three embedding columns are not among them and `image_url` is COALESCEd,
  * so a soft delete, a vector and an image survive it; anything anyone typed
  * does not. It is for a cohort's FIRST import. Every run after that passes
- * `--skip-existing`, with no standing exception; DEPLOYMENT.md's 7a.7 says
- * why, and names the one case that would ever justify going back.
+ * `--skip-existing`, with no standing exception. ADR-0027 is the decision and
+ * DEPLOYMENT.md's 7a.7 is the operational detail.
  *
  * The only thing that writes the imported rows to the database, and plain
  * `.mjs` so it runs from the production image: that installs with

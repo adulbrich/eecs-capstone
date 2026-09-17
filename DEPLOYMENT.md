@@ -713,19 +713,24 @@ sweepers has the rest.
 
 Both are supported, with one thing to know about each.
 
-**A re-run replaces every column on a row it already imported**, including
-anything staff edited in this app since. That is what you want when correcting
-a bad mapping and not what you want for a routine top-up, so the importer
-counts both groups before it writes:
+**Every import after a cohort's first one passes `--skip-existing`** (ADR-0027).
+The bare form is a full upsert: on a row it already imported it rewrites the 24
+columns its `ON CONFLICT` names, including anything staff edited in this app
+since. The importer counts both groups before it writes, so you can see which
+you are about to do:
 
 ```
   12 new, 557 already imported (will be overwritten)
 ```
 
-Three things are exempt from that replacement. `image_url` is written with
+Four things are exempt from that replacement, which is why the bare form is
+recoverable rather than catastrophic: `deleted_at` and the three embedding
+columns are not in the upsert at all, so a soft delete and a vector survive it.
+`image_url` is written with
 `COALESCE(excluded.image_url, projects.image_url)`, so a re-run without
 `image-keys.json` keeps the images a row already has rather than nulling them
-while the objects sit in the bucket. And a program is never created: a missing
+while the objects sit in the bucket, so an image survives it too. A program is
+never created either: a missing
 `course_id` is an error, because in production all four exist and a miss means
 an identifier drifted, where inserting would attach projects to a brand new
 program that merely looks right. `--create-missing-programs` opts in, for a
@@ -738,18 +743,11 @@ built from the text before it, and nothing in the app re-embeds a row nobody
 edits. Running 7a.5 afterwards is what closes that, and it is why 7a.5 says to
 run it after every import rather than only the first.
 
-**Decided 2026-09-17: every import after a cohort's first one passes
-`--skip-existing`.** The bare full upsert is for the run that creates a cohort,
-and for nothing else afterwards.
-
-It is the wrong tool for a top-up because it reverts whatever staff have edited
-here, silently, across the 24 columns its `ON CONFLICT` names. Not every
-column: `deleted_at` and the three embedding columns are not in the upsert at
-all, and `image_url` is COALESCEd, so a soft delete, a vector and an image all
-survive it. Everything a proposer or a staff member can type does not. That
-stopped being hypothetical when four rows carrying the literal string `0` in a
-proposer name or email were left to be fixed in this app rather than in the old
-portal: a later full upsert would put the `0` back and report nothing unusual.
+Everything a proposer or a staff member can type is in those 24 columns, which
+is why the rule above exists. It stopped being hypothetical when four rows
+carrying the literal string `0` in a proposer name or email were left to be
+fixed in this app rather than in the old portal: a later full upsert would put
+the `0` back and report nothing unusual.
 
 The rule has no standing exception, and the case that would want one is worth
 naming so nobody reinvents it quietly. If the pipeline is ever found to have
@@ -971,7 +969,7 @@ that are in fact open to CS467. The `approved` ones are not listed at all, so
 the filter cannot miss them until somebody publishes one, which is the moment
 to file it. Filing them by hand from the notes is the fix either way.
 
-Three things to decide before doing that, none of which this import settles:
+Five things this import does not settle:
 
 - Those projects are still being edited in the old portal, so the two systems
   diverge from the moment you copy. Either the old portal becomes read-only or
