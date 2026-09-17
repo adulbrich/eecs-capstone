@@ -240,7 +240,10 @@ function ProjectDetail() {
         // Keyed so a navigation between two project pages remounts it: the
         // route component is reused across a param change (see QUIRKS), and
         // the panel holds the transition dialog's target and comment, which
-        // would otherwise be posted onto the next project.
+        // would otherwise be posted onto the next project. The Program
+        // section depends on this too, and less obviously: it seeds its draft
+        // from `programId` once, with no load of its own, so without the
+        // remount it would show the previous project's program (#450).
         <StaffProjectPanel
           key={project.id}
           onChanged={() => router.invalidate()}

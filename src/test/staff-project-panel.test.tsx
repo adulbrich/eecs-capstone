@@ -89,6 +89,22 @@ vi.mock("#/server/scope-assessment", () => ({
   assessProjectScope: vi.fn(() => Promise.resolve(null)),
   getScopeAssessment: vi.fn(() => Promise.resolve(null)),
 }));
+const PROGRAM_A = "00000000-0000-0000-0000-00000000pg01";
+
+vi.mock("#/server/programs", () => ({
+  listPrograms: () =>
+    Promise.resolve({
+      rows: [
+        { id: PROGRAM_A, courseId: "Program", courseName: "A" },
+        {
+          id: "00000000-0000-0000-0000-00000000pg02",
+          courseId: "Program",
+          courseName: "B",
+        },
+      ],
+    }),
+}));
+
 vi.mock("#/server/projects-queries", () => ({
   listProjectEditLog,
   getProposerForEdit,
@@ -148,18 +164,27 @@ beforeEach(() => {
 
 const PROJECT_ID = "00000000-0000-0000-0000-0000000000p1";
 
-function project(status: string, id = PROJECT_ID) {
-  return { id, status, deletedAt: null, programId: null };
+function project(
+  status: string,
+  id = PROJECT_ID,
+  programId: string | null = null
+) {
+  return { id, status, deletedAt: null, programId };
 }
 
 // Keyed on the id, as the route renders it: a rerender with a new id is the
 // remount the route relies on to drop the previous project's drafts.
-function panel(status: string, id = PROJECT_ID, viewerIsOwner = false) {
+function panel(
+  status: string,
+  id = PROJECT_ID,
+  viewerIsOwner = false,
+  programId: string | null = null
+) {
   return (
     <StaffProjectPanel
       key={id}
       onChanged={() => Promise.resolve()}
-      project={project(status, id)}
+      project={project(status, id, programId)}
       viewerIsOwner={viewerIsOwner}
     />
   );
@@ -891,6 +916,29 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
         .getByRole("button", { name: "Save categories" })
         .hasAttribute("disabled")
     ).toBe(true);
+  });
+
+  // The Program section seeds its draft from the payload once and never
+  // loads, so the panel's key is the only thing that stops it showing the
+  // previous project's program. That key is on the route for the transition
+  // dialog's sake, which is why this asserts the consequence rather than
+  // trusting the comment beside it (#450).
+  it("shows the next project's program rather than the previous one's", async () => {
+    const view = render(panel("submitted", PROJECT_ID, false, PROGRAM_A));
+    await screen.findByLabelText("Proposer email");
+    expect(screen.getByRole("combobox", { name: "Program" }).textContent).toBe(
+      "Program A"
+    );
+
+    view.rerender(
+      panel("submitted", "00000000-0000-0000-0000-0000000000p2", false, null)
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("combobox", { name: "Program" }).textContent
+      ).toBe("(no program)")
+    );
   });
 });
 

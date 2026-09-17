@@ -10,7 +10,7 @@ import { FieldError } from "./ui/field";
  * The staff edit of `programId`, as a section of the staff panel (#450).
  * Placing a project in a program is staff judgement about how the course
  * runs, so the picker left the proposer's form and this is the only way to
- * set it after create; ADR-0025 records the trade.
+ * set it after create; ADR-0026 records the trade.
  *
  * No load of its own, unlike the Mentor and Categories sections: the
  * program is already on the detail payload every viewer gets, so the draft

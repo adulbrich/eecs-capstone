@@ -9,6 +9,7 @@ import {
   forceTransitionAs,
   performTransitionAs,
   updateProjectAs,
+  updateProjectProgramAs,
 } from "#/server/_internal/projects";
 
 const VECTOR = Array.from({ length: 1024 }, (_, i) => (i === 0 ? 1 : 0));
@@ -373,8 +374,8 @@ describe("embedding triggers", () => {
     await publish(admin, id);
     await refreshProjectEmbedding(id, embed);
     // The precondition, asserted rather than assumed: if `publish` had missed,
-    // `updateProjectAs` would skip the embed path on status alone and the
-    // "not called" below would pass without testing anything.
+    // the project would not be embeddable at all and the "not called" below
+    // would pass without testing anything.
     expect(embed).toHaveBeenCalledTimes(1);
     embed.mockClear();
 
@@ -382,11 +383,12 @@ describe("embedding triggers", () => {
       .insert(programs)
       .values({ courseId: `CS46X-${Date.now()}`, courseName: "Capstone" })
       .returning();
-    await updateProjectAs(
-      admin,
-      { ...baseProject("Live"), id, programId: program.id },
-      embed
-    );
+    // Through the staff writer, because #450 took `programId` off
+    // `ProjectInput`, so `updateProjectAs` cannot attach a program at all any
+    // more. That makes this assertion hold for two reasons now: the program
+    // is not in the embedding source, and the writer that sets it runs no
+    // embed path.
+    await updateProjectProgramAs(admin, { id, programId: program.id });
 
     expect(embed).not.toHaveBeenCalled();
     const [row] = await db.select().from(projects).where(eq(projects.id, id));

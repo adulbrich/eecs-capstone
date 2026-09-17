@@ -432,7 +432,7 @@ export async function updateProjectMentorshipForCurrentUser(
  * The only writer of `projects.program_id` after create (#450), and staff
  * only. Placing a project in a program is a staff judgement about how the
  * course runs, not a fact the proposer reports, which is the same line #322
- * drew for the proposer and the categories; ADR-0025 records the trade.
+ * drew for the proposer and the categories; ADR-0026 records the trade.
  *
  * Not part of `updateProjectAs`: the key left `ProjectInput`, so the shared
  * form cannot carry it and a proposer has no endpoint that moves their own
@@ -444,14 +444,13 @@ export async function updateProjectMentorshipForCurrentUser(
  * for its no-program choice. One edit-log row per change, and a save that
  * changes nothing writes none.
  *
- * No embedding refresh, unlike `updateProjectAs`. The program label is on
- * its way out of `buildProjectEmbeddingSource`, so refreshing here would buy
- * a vector that is about to stop depending on this column at all. Until that
- * lands, a project moved between programs keeps a vector naming the course
- * it left, which is a deliberate and short-lived cost.
+ * No embedding refresh, for the reason the proposer and mentor writers skip
+ * one: the column is not part of the embedded text. The program left
+ * `buildProjectEmbeddingSource` in #463 (ADR-0025), which embeds a project's
+ * prose and not its categories or program.
  *
- * The scope assessment needs no call either, for a better reason: its source
- * hash covers the program's `term_count` and `getScopeAssessmentAs`
+ * The scope assessment needs no call either, for a different reason: its
+ * source hash covers the program's `term_count` and `getScopeAssessmentAs`
  * recomputes that hash on read, so a move already reports the stored verdict
  * as stale.
  */
