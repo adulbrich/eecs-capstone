@@ -107,7 +107,15 @@ export const searchSchema = z.object({
   cols: z.string().optional(),
   dir: z.enum(["asc", "desc"]).optional(),
   includeSoftDeleted: z.boolean().default(SWITCH_DEFAULTS.includeSoftDeleted),
-  program: z.string().uuid().nullable().default(null),
+  // Three states, one field: absent is every program, "none" is the projects
+  // nobody has filed yet, a UUID is that program (#458). `.catch` for the same
+  // reason the four below carry one: a stale or hand-edited link degrades to
+  // "All programs" rather than erroring the route.
+  program: z
+    .union([z.literal("none"), z.string().uuid()])
+    .nullable()
+    .default(null)
+    .catch(null),
   // Better Auth user ids are text, not UUIDs.
   proposer: z.string().max(255).nullable().default(null),
   q: z.string().max(200).default(""),
@@ -541,6 +549,13 @@ function AdminProjectsFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="_all_">All programs</SelectItem>
+            {/*
+              No sentinel, unlike "_all_" above: "none" is the value the URL
+              actually carries, where "all" is the absent param. `program-select.tsx`
+              needs one for the same choice because there the empty string is
+              the stored value and Radix reserves it (#458).
+            */}
+            <SelectItem value="none">No program</SelectItem>
             {programs.map((p) => (
               <SelectItem key={p.id} value={p.id}>
                 {p.courseId} {p.courseName}

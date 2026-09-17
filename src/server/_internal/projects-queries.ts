@@ -159,7 +159,13 @@ function buildAdminProjectScope(
   if (!data.includeSoftDeleted) {
     scope.push(isNull(projects.deletedAt));
   }
-  if (data.program) {
+  // "none" is the third state of the Program control, not a fourth switch:
+  // projects nobody has filed under a program yet, which is a staff to-do the
+  // same shape as `withoutMentorOnly` below (#458). A program deleted out from
+  // under a project lands here too, since `program_id` is `on delete set null`.
+  if (data.program === "none") {
+    scope.push(isNull(projects.programId));
+  } else if (data.program) {
     scope.push(eq(projects.programId, data.program));
   }
   const column = ADMIN_DATE_COLUMN[data.dateField];
