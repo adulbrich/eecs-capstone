@@ -671,14 +671,29 @@ describe("StaffProjectPanel mentor block", () => {
     });
     renderPanel("submitted");
     expect(await screen.findAllByText("No account yet")).toHaveLength(2);
+    // Scoped to each section, because the unlinked summary renders no label:
+    // counting the two literals across the whole panel would pass just as
+    // well with the hints swapped between the two components, which is the
+    // regression this exists to catch.
+    const sectionFor = (title: string) => {
+      const section = screen
+        .getByRole("heading", { level: 3, name: title })
+        .closest("section");
+      if (!section) {
+        throw new Error(`No section for ${title}`);
+      }
+      return within(section as HTMLElement);
+    };
     expect(
-      screen.getAllByText(
+      sectionFor("Proposer").getByText(
+        "Links automatically when they verify this address."
+      )
+    ).toBeTruthy();
+    expect(
+      sectionFor("Mentor").getByText(
         "Links automatically when they sign up with this address."
       )
-    ).toHaveLength(1);
-    expect(
-      screen.getAllByText("Links automatically when they verify this address.")
-    ).toHaveLength(1);
+    ).toBeTruthy();
   });
 
   it("saves the address through the server function and reloads the record", async () => {
