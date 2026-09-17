@@ -2,21 +2,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-// A real control, unlike the null stub the other suites use: this suite
-// asserts that the Program description is wired to its input.
-vi.mock("#/components/program-select", () => ({
-  ProgramSelect: ({
-    describedBy,
-    id,
-  }: {
-    describedBy?: string;
-    id?: string;
-  }) => (
-    <select aria-describedby={describedBy} id={id}>
-      <option value="">(no program)</option>
-    </select>
-  ),
-}));
 vi.mock("#/components/category-multi-select", () => ({
   CategoryMultiSelect: () => null,
 }));
@@ -83,12 +68,12 @@ describe("ProjectForm field guidance", () => {
     );
   });
 
-  it("describes the program and team-count fields", () => {
+  it("describes the team-count field", () => {
     renderForm();
 
-    expect(describedText("Program").length).toBeGreaterThan(0);
     // Shortened from "Teams this project can support", which was doing the
-    // description's job in the label.
+    // description's job in the label. The Program field left this form in
+    // #450; its description is on the staff panel's section now.
     expect(describedText("Teams").length).toBeGreaterThan(0);
   });
 

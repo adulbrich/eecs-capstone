@@ -3,9 +3,6 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { installResizeObserver } from "./radix-jsdom";
 
-vi.mock("#/components/program-select", () => ({
-  ProgramSelect: () => null,
-}));
 vi.mock("#/components/project-image-uploader", () => ({
   ProjectImageUploader: () => null,
 }));
@@ -49,7 +46,6 @@ describe("ProjectForm layout", () => {
       "Contact Email",
       "This project requires an NDA or IP agreement",
       "This is a sponsored project",
-      "Program",
       "Teams",
       "Students can apply to join this project",
       "Private Notes",
@@ -69,19 +65,22 @@ describe("ProjectForm layout", () => {
     expect(screen.getByText("Problem Statement").className).toContain(
       "text-base"
     );
-    expect(screen.getByText("Program").className).toContain("text-base");
+    expect(screen.getByText("Teams").className).toContain("text-base");
     expect(
       screen.getByText("This is a sponsored project").className
     ).not.toContain("text-base");
   });
 
-  it("puts the contact pair and the program pair in two-column grids from sm", () => {
+  // The second grid holds one field since #450 took the Program picker out of
+  // this form. It stays a grid so Teams keeps the half-width column its number
+  // input is sized for, rather than stretching to the form's full width.
+  it("puts the contact pair in a two-column grid, and leaves Teams in its own", () => {
     render(<ProjectForm showNotes={false} submitLabel="Save" />);
     const grids = document.querySelectorAll("form .sm\\:grid-cols-2");
     expect(grids.length).toBe(2);
     expect(grids[0].textContent).toContain("Contact Name");
     expect(grids[0].textContent).toContain("Contact Email");
-    expect(grids[1].textContent).toContain("Program");
     expect(grids[1].textContent).toContain("Teams");
+    expect(grids[1].textContent).not.toContain("Program");
   });
 });

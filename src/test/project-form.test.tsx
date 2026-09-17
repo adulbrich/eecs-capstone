@@ -8,9 +8,6 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-vi.mock("#/components/program-select", () => ({
-  ProgramSelect: () => null,
-}));
 // Renders a button rather than null, because a pending image is the only way
 // to reach the upload-then-save ordering the tests below are about. Same shape
 // as the inventory form's stub.
@@ -72,10 +69,11 @@ function fillTitle(value = "A project") {
 }
 
 describe("ProjectForm create", () => {
-  it("sends null, not an empty string, for a blank program and notes", async () => {
-    // Both columns are nullable and "" is not the same as unset to a filter or
-    // to `??`. Each route used to spell this coercion out for itself, which is
-    // what let the two drift.
+  it("sends null, not an empty string, for blank notes, and no program at all", async () => {
+    // `notes` is nullable and "" is not the same as unset to a filter or to
+    // `??`. Each route used to spell this coercion out for itself, which is
+    // what let the two drift. `programId` is not sent at all since #450: it
+    // left `ProjectInput`, so the form cannot carry it even as a null.
     createMock.mockResolvedValue({ id: PROJECT_ID });
 
     render(<ProjectForm showNotes submitLabel="Create draft" />);
@@ -84,8 +82,8 @@ describe("ProjectForm create", () => {
 
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
     const sent = createMock.mock.calls[0][0].data;
-    expect(sent.programId).toBeNull();
     expect(sent.notes).toBeNull();
+    expect("programId" in sent).toBe(false);
   });
 
   it("uploads after create, then saves the key in a second write", async () => {
