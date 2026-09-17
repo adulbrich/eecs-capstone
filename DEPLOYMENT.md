@@ -738,6 +738,16 @@ built from the text before it, and nothing in the app re-embeds a row nobody
 edits. Running 7a.5 afterwards is what closes that, and it is why 7a.5 says to
 run it after every import rather than only the first.
 
+**Decided 2026-09-17: every import after a cohort's first one passes
+`--skip-existing`.** The full upsert is for the run that creates a cohort, and
+for correcting a mapping that was wrong for every row in it. It is the wrong
+tool for a top-up, because it reverts whatever staff have edited here since,
+silently and on every column. That stopped being hypothetical when four rows
+carrying the literal string `0` in a proposer name or email were left to be
+fixed in this app rather than in the old portal: a later full upsert would put
+the `0` back and report nothing unusual. Use the full upsert deliberately, or
+not at all.
+
 Pass `--skip-existing` to add only the rows that are not there yet and leave
 the rest untouched:
 

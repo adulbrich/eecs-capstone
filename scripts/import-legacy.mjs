@@ -7,6 +7,11 @@
  *   node scripts/import-legacy.mjs --undo          # delete exactly the imported rows
  *   node scripts/import-legacy.mjs --skip-existing # add only rows not already imported
  *
+ * The bare form is a full upsert and reverts every column on a row that
+ * already exists, staff edits included. It is for a cohort's FIRST import and
+ * for correcting a mapping that was wrong across the board. Every run after
+ * that passes `--skip-existing`; DEPLOYMENT.md's 7a.7 says why.
+ *
  * The only thing that writes the imported rows to the database, and plain
  * `.mjs` so it runs from the production image: that installs with
  * `--omit=dev`, so there is no `tsx`, and it ships `.output` without `src/`,
