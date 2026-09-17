@@ -77,6 +77,18 @@ const SCRIPT_CODE = SCRIPT_FILE.replace(/\/\*[\s\S]*?\*\//g, "").replace(
   /\/\/.*$/gm,
   ""
 );
+
+/**
+ * `embedding-source.ts` with its comments stripped, for the same reason
+ * `SCRIPT_CODE` exists: the negative pin below matches a call expression, and
+ * a JSDoc explaining why that call is absent would otherwise satisfy it. Safe
+ * on the same narrow grounds, and checked rather than claimed: the URL and
+ * brace guards in the first `describe` run over this file too.
+ */
+const SOURCE_CODE = SOURCE_FILE.replace(/\/\*[\s\S]*?\*\//g, "").replace(
+  /\/\/.*$/gm,
+  ""
+);
 const LIMIT_PATTERN = /const EMBEDDING_SOURCE_LIMIT = ([0-9_]+);/;
 const EMBEDDINGS_FILE = readFileSync(
   "src/server/_internal/project-embeddings.ts",
@@ -171,6 +183,7 @@ describe("reading the two stripped files as code rather than as text", () => {
   it.each([
     ["backfill-embeddings.mjs", SCRIPT_CODE],
     ["project-embeddings.ts", EMBEDDINGS_CODE],
+    ["embedding-source.ts", SOURCE_CODE],
   ])("lose no brace in %s to the strip", (_label, code) => {
     // The cheap structural check: a strip that ate a run of real code almost
     // certainly takes a brace with it. Not a parser, and not claiming to be.
@@ -192,18 +205,40 @@ describe("reading the two stripped files as code rather than as text", () => {
    * everything.
    */
   it.each([
-    ["backfill-embeddings.mjs", SCRIPT_FILE, SCRIPT_CODE, "await main();"],
+    [
+      "backfill-embeddings.mjs",
+      SCRIPT_FILE,
+      SCRIPT_CODE,
+      "await main();",
+      true,
+    ],
     [
       "project-embeddings.ts",
       EMBEDDINGS_FILE,
       EMBEDDINGS_CODE,
       "export async function refreshProjectEmbedding(",
+      true,
+    ],
+    [
+      "embedding-source.ts",
+      SOURCE_FILE,
+      SOURCE_CODE,
+      "export function buildProjectEmbeddingSource(",
+      false,
     ],
   ])(
     "lose every comment in %s and keep every statement",
-    (_label, raw, code, kept) => {
+    (_label, raw, code, kept, hasLineComment) => {
+      // Every one of the three carries JSDoc, so the block strip always has
+      // something to remove and the "there was something to strip" proof rests
+      // on that. The line strip is different: `embedding-source.ts` is all
+      // JSDoc and carries no `//` at all, and demanding one would be this file
+      // inventing a rule about another file rather than describing one. So the
+      // presence check is per-file and the removal check is not.
       expect(raw).toMatch(/\/\*/);
-      expect(raw).toMatch(/^[ \t]*\/\//m);
+      if (hasLineComment) {
+        expect(raw).toMatch(/^[ \t]*\/\//m);
+      }
       expect(code).not.toMatch(/\/\*/);
       expect(code).not.toMatch(/\/\//);
       expect(code).toContain(kept);
@@ -227,6 +262,7 @@ describe("reading the two stripped files as code rather than as text", () => {
   it.each([
     ["backfill-embeddings.mjs", SCRIPT_FILE],
     ["project-embeddings.ts", EMBEDDINGS_FILE],
+    ["embedding-source.ts", SOURCE_FILE],
   ])("contains no URL in %s, in a string or anywhere else", (_label, raw) => {
     expect(raw).not.toContain("://");
   });
@@ -246,16 +282,19 @@ describe("the production backfill's copies of the embedding helpers", () => {
    * The negative, pinned on both sides. ADR-0025 took the project's categories
    * and its program out of the embedded text, and putting either back is the
    * most expensive edit anybody can make to this string: every stored hash
-   * stops matching at once and the next sweep re-embeds all 564 at one paid
-   * call each. The body comparison below would notice a change on ONE side;
+   * stops matching at once and the next sweep re-embeds every project at one
+   * paid call each. The body comparison below would notice a change on ONE side;
    * this notices a change applied to both, which is exactly how a section gets
    * reintroduced.
    */
   it("carry no Categories or Program section on either side", () => {
-    for (const source of [SOURCE_FILE, SCRIPT_CODE]) {
-      expect(source).not.toContain('section("Program"');
-      expect(source).not.toContain('section(\n      "Categories"');
-      expect(source).not.toContain('section("Categories"');
+    for (const source of [SOURCE_CODE, SCRIPT_CODE]) {
+      // The call, not the label: a formatter is free to wrap the arguments,
+      // so anchoring on `section("Program"` with its argument on the same line
+      // would pass the moment Biome broke the line. `section(` plus the label
+      // in either order is what a reintroduced section cannot avoid.
+      expect(source).not.toMatch(/section\(\s*"Program"/);
+      expect(source).not.toMatch(/section\(\s*"Categories"/);
     }
   });
 

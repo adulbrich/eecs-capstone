@@ -1029,7 +1029,7 @@ grep -rn 'insert(projectStatusHistory)' src --include='*.ts' | grep -v __tests__
 
 ### Editing a project's categories or its program does not re-embed it
 
-The embedded text is the seven prose fields and nothing else ([ADR-0025](./adr/0025-the-embedded-text-is-prose-only.md)), so changing a category or a program leaves `embedding_source_hash` matching and `refreshProjectEmbedding` returns `"unchanged"`. That is the intended answer, not a missed refresh: neither fact is in the string any more, and both are already exact filters on the listing. Expect it when a staff edit to tagging does not move the recommended order. Both used to be sections, which is why `scripts/import-legacy.mjs` writing a program to 203 archived rows once required a full re-embed.
+The embedded text is the seven prose fields and nothing else, so changing a category or a program leaves `embedding_source_hash` matching and `refreshProjectEmbedding` returns `"unchanged"`. That is the intended answer, not a missed refresh. Expect it when a staff edit to tagging does not move the recommended order. [ADR-0025](./adr/0025-the-embedded-text-is-prose-only.md) is why.
 
 ### `sendEmail` is decided by role in `performTransitionAs`, not by the schema
 
