@@ -3,6 +3,19 @@ import { createHash } from "node:crypto";
 /**
  * Pure source-text and hash helpers for embeddings. No DB and no AWS imports,
  * so this is trivially unit-testable and safe to import from either side.
+ *
+ * READ AS TEXT by `src/test/backfill-embeddings-parity.test.ts`, which pins
+ * what `scripts/backfill-embeddings.mjs` copies across the production image
+ * boundary (ADR-0024). Two constraints on this file follow from that and would
+ * otherwise be invisible from here:
+ *
+ * - No URL anywhere, in a string or a comment. The test strips comments by
+ *   regex before matching, and the two slashes in a scheme, inside a string
+ *   literal, would make the strip eat real code. Cite a doc by path or by ADR
+ *   number, as the JSDoc below does.
+ * - Keep `export function buildProjectEmbeddingSource(` spelled exactly that
+ *   way. The test looks for it to prove the strip kept the code it removed the
+ *   comments from, so a rename has to move in both places at once.
  */
 export const EMBEDDING_SOURCE_LIMIT = 45_000;
 

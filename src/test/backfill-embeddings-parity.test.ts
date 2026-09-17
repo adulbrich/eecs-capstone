@@ -63,9 +63,9 @@ const SCRIPT_FILE = readFileSync("scripts/backfill-embeddings.mjs", "utf8");
  * literals from text that still holds comments is circular, since an
  * apostrophe in a comment opens one. What stands in for a proof is narrower
  * and testable, and the first `describe` below checks all three parts over
- * both stripped sources, `backfill-embeddings.mjs` and
- * `project-embeddings.ts`. Neither contains `://`, which is the sequence that
- * would put a `//` inside a string. Both strips are shown to run. The braces
+ * every stripped source: `backfill-embeddings.mjs`, `project-embeddings.ts`
+ * and `embedding-source.ts`. None of them contains `://`, the sequence that
+ * would put a `//` inside a string. Each strip is shown to run. The braces
  * still balance afterwards, which a swallowed run of code would almost
  * certainly break.
  *
@@ -104,9 +104,9 @@ const EMBEDDINGS_FILE = readFileSync(
  * there at all.
  *
  * Safe for the same narrow reason as the script's strip, and by the same
- * assertions: the first `describe` below runs all three over both files, so
- * "contains no `://`" and "braces still balance" are checks here rather than
- * claims.
+ * assertions: the first `describe` below runs all three over every stripped
+ * file, so "contains no `://`" and "braces still balance" are checks here
+ * rather than claims.
  */
 const EMBEDDINGS_CODE = EMBEDDINGS_FILE.replace(
   /\/\*[\s\S]*?\*\//g,
@@ -175,11 +175,11 @@ function bothBodies(name: string, src: string, srcLabel: string) {
  * Not part of the inventory below. These prove the reading the inventory's
  * assertions depend on, and pin no copied declaration of their own.
  *
- * Both stripped files go through all three, because a guard that covers one
- * of two identically stripped files is the prose-shaped assertion this file
- * exists to refuse.
+ * Every stripped file goes through all three, because a guard that covers
+ * some of a set of identically stripped files is the prose-shaped assertion
+ * this file exists to refuse.
  */
-describe("reading the two stripped files as code rather than as text", () => {
+describe("reading the three stripped files as code rather than as text", () => {
   it.each([
     ["backfill-embeddings.mjs", SCRIPT_CODE],
     ["project-embeddings.ts", EMBEDDINGS_CODE],
@@ -253,9 +253,9 @@ describe("reading the two stripped files as code rather than as text", () => {
    * It refuses a URL anywhere, including in a comment, where one would in fact
    * be harmless. That bluntness is deliberate: telling a comment from a string
    * is the job of the strip this assertion exists to protect, so doing it here
-   * would be the circularity again. Both stripped files are scanned, so the
+   * would be the circularity again. Every stripped file is scanned, so the
    * `src/` original is no longer the place to put a URL out of reach either.
-   * A doc reference in one of these two spells the path or the ADR number
+   * A doc reference in any of the three spells the path or the ADR number
    * rather than a link, and the assertion is not to be deleted to get past
    * this. Every other file in the repo is untouched by it.
    */

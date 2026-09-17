@@ -372,6 +372,10 @@ describe("embedding triggers", () => {
     const embed = vi.fn().mockResolvedValue(VECTOR);
     await publish(admin, id);
     await refreshProjectEmbedding(id, embed);
+    // The precondition, asserted rather than assumed: if `publish` had missed,
+    // `updateProjectAs` would skip the embed path on status alone and the
+    // "not called" below would pass without testing anything.
+    expect(embed).toHaveBeenCalledTimes(1);
     embed.mockClear();
 
     const [program] = await db
