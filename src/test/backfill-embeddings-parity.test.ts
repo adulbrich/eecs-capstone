@@ -24,7 +24,12 @@ import { describe, expect, it } from "vitest";
  * - The embedded text drifts. The script stores vectors computed from text the
  *   app would never produce for that project. Nothing errors, the stored hash
  *   still looks valid to the app, so nothing recomputes them, and
- *   recommendations quietly get worse. The only silent one.
+ *   recommendations quietly get worse.
+ * - The rule that decides a row needs no work drifts. Silent in one direction
+ *   and expensive in the other: lose the vector half and a row whose write was
+ *   interrupted is skipped by every sweeper forever with nothing to say so;
+ *   lose the hash half and every run re-embeds everything at one paid call
+ *   each.
  * - The hash inputs drift, including the model id and dimension defaults.
  *   Every row looks stale to whichever side did not change, so both sides
  *   re-embed rows that were already correct at one paid Bedrock call each, and
@@ -57,10 +62,12 @@ const SCRIPT_FILE = readFileSync("scripts/backfill-embeddings.mjs", "utf8");
  * cannot happen, because an honest proof needs a parser: extracting the
  * literals from text that still holds comments is circular, since an
  * apostrophe in a comment opens one. What stands in for a proof is narrower
- * and testable, and the first `describe` below checks all three parts. The
- * file contains no `://`, which is the sequence that would put a `//` inside a
- * string here. Both strips are shown to run. The braces still balance
- * afterwards, which a swallowed run of code would almost certainly break.
+ * and testable, and the first `describe` below checks all three parts over
+ * both stripped sources, `backfill-embeddings.mjs` and
+ * `project-embeddings.ts`. Neither contains `://`, which is the sequence that
+ * would put a `//` inside a string. Both strips are shown to run. The braces
+ * still balance afterwards, which a swallowed run of code would almost
+ * certainly break.
  *
  * The line strip is not anchored to the start of a line, so it also removes a
  * comment trailing real code. Nothing in the script does that today, and the
@@ -75,6 +82,24 @@ const EMBEDDINGS_FILE = readFileSync(
   "src/server/_internal/project-embeddings.ts",
   "utf8"
 );
+
+/**
+ * The same strip, applied to the `src/` side. Every other assertion against
+ * `EMBEDDINGS_FILE` matches a declaration, which a comment cannot be, so the
+ * raw text is safe for those. The skip pin below matches a statement, and
+ * `refreshProjectEmbedding`'s JSDoc already quotes a fragment of it, which is
+ * exactly the shape that satisfies a substring test without the code being
+ * there at all.
+ *
+ * Safe for the same narrow reason as the script's strip, and by the same
+ * assertions: the first `describe` below runs all three over both files, so
+ * "contains no `://`" and "braces still balance" are checks here rather than
+ * claims.
+ */
+const EMBEDDINGS_CODE = EMBEDDINGS_FILE.replace(
+  /\/\*[\s\S]*?\*\//g,
+  ""
+).replace(/\/\/.*$/gm, "");
 
 const STATUS_SET_PATTERN =
   /const EMBEDDABLE_STATUSES: readonly ProjectStatus\[\] = \[([^\]]*)\]/;
@@ -138,13 +163,20 @@ function bothBodies(name: string, src: string, srcLabel: string) {
 /**
  * Not part of the inventory below. These prove the reading the inventory's
  * assertions depend on, and pin no copied declaration of their own.
+ *
+ * Both stripped files go through all three, because a guard that covers one
+ * of two identically stripped files is the prose-shaped assertion this file
+ * exists to refuse.
  */
-describe("reading the production backfill as code rather than as text", () => {
-  it("still balances its braces after the strip", () => {
+describe("reading the two stripped files as code rather than as text", () => {
+  it.each([
+    ["backfill-embeddings.mjs", SCRIPT_CODE],
+    ["project-embeddings.ts", EMBEDDINGS_CODE],
+  ])("lose no brace in %s to the strip", (_label, code) => {
     // The cheap structural check: a strip that ate a run of real code almost
     // certainly takes a brace with it. Not a parser, and not claiming to be.
-    const opens = SCRIPT_CODE.match(/\{/g)?.length ?? 0;
-    const closes = SCRIPT_CODE.match(/\}/g)?.length ?? 0;
+    const opens = code.match(/\{/g)?.length ?? 0;
+    const closes = code.match(/\}/g)?.length ?? 0;
     expect(opens).toBe(closes);
     expect(opens).toBeGreaterThan(10);
   });
@@ -154,16 +186,30 @@ describe("reading the production backfill as code rather than as text", () => {
    * sentences, which meant rewording a comment quietly uncovered the strip it
    * was standing in for: the needle was gone, so `not.toContain` passed and
    * said nothing. These fail while any comment of either kind survives, and
-   * the `toMatch` pair on `SCRIPT_FILE` fails if there was nothing to strip.
+   * the `toMatch` pair on the raw file fails if there was nothing to strip.
+   *
+   * The kept statement differs per file, so it is passed in: asserting only
+   * that the strip removed things would pass on a strip that removed
+   * everything.
    */
-  it("loses every comment and keeps every statement", () => {
-    expect(SCRIPT_FILE).toMatch(/\/\*/);
-    expect(SCRIPT_FILE).toMatch(/^[ \t]*\/\//m);
-    expect(SCRIPT_CODE).not.toMatch(/\/\*/);
-    expect(SCRIPT_CODE).not.toMatch(/\/\//);
-    expect(SCRIPT_CODE).toContain("await main();");
-    expect(SCRIPT_CODE).toContain("const SELECT_SQL");
-  });
+  it.each([
+    ["backfill-embeddings.mjs", SCRIPT_FILE, SCRIPT_CODE, "await main();"],
+    [
+      "project-embeddings.ts",
+      EMBEDDINGS_FILE,
+      EMBEDDINGS_CODE,
+      "export async function refreshProjectEmbedding(",
+    ],
+  ])(
+    "lose every comment in %s and keep every statement",
+    (_label, raw, code, kept) => {
+      expect(raw).toMatch(/\/\*/);
+      expect(raw).toMatch(/^[ \t]*\/\//m);
+      expect(code).not.toMatch(/\/\*/);
+      expect(code).not.toMatch(/\/\//);
+      expect(code).toContain(kept);
+    }
+  );
 
   /**
    * What makes the unanchored line strip safe here, and the only assumption
@@ -173,12 +219,17 @@ describe("reading the production backfill as code rather than as text", () => {
    * It refuses a URL anywhere, including in a comment, where one would in fact
    * be harmless. That bluntness is deliberate: telling a comment from a string
    * is the job of the strip this assertion exists to protect, so doing it here
-   * would be the circularity again. If you hit this while citing a doc URL
-   * above a copied function, put the URL in the JSDoc of the `src/` original
-   * instead, and do not delete the assertion to get past it.
+   * would be the circularity again. Both stripped files are scanned, so the
+   * `src/` original is no longer the place to put a URL out of reach either.
+   * A doc reference in one of these two spells the path or the ADR number
+   * rather than a link, and the assertion is not to be deleted to get past
+   * this. Every other file in the repo is untouched by it.
    */
-  it("contains no URL, in a string or anywhere else", () => {
-    expect(SCRIPT_FILE).not.toContain("://");
+  it.each([
+    ["backfill-embeddings.mjs", SCRIPT_FILE],
+    ["project-embeddings.ts", EMBEDDINGS_FILE],
+  ])("contains no URL in %s, in a string or anywhere else", (_label, raw) => {
+    expect(raw).not.toContain("://");
   });
 });
 
@@ -335,6 +386,49 @@ describe("the production backfill's copies of the embedding helpers", () => {
   });
 
   /**
+   * The rule that decides a row needs no work. It is a copy like any other,
+   * and drifting it is expensive in both directions: drop the hash half and
+   * every run re-embeds all 547 at one paid call each; drop the
+   * vector half and a row whose write was interrupted, carrying a current hash
+   * beside a null vector, is skipped by every sweeper forever.
+   *
+   * Compared against a literal on each side rather than against each other,
+   * because the two cannot be byte-identical: the app holds the vector it
+   * selected and the script selects `embedding IS NOT NULL` as a boolean, so
+   * it has no vector to test. Writing both out here is what makes that a
+   * decision instead of a drift.
+   *
+   * Both sides read with their comments stripped, so neither can be satisfied
+   * by prose quoting the expression.
+   */
+  it("agree on when a row needs no work", () => {
+    expect(EMBEDDINGS_CODE).toContain(
+      "if (project.embeddingSourceHash === hash && project.embedding) {"
+    );
+    expect(SCRIPT_CODE).toContain(
+      "if (project.embeddingSourceHash === hash && project.hasEmbedding) {"
+    );
+  });
+
+  /**
+   * The script's half of the rule above reads `hasEmbedding`, which is not a
+   * column. Nothing else would catch the query dropping it: `section` is not
+   * involved, so the field pin below does not cover it, and an undefined
+   * `project.hasEmbedding` makes the condition false, which reads as "this row
+   * needs work" and re-embeds every row on every run at full price.
+   */
+  it("select the boolean the skip is built from", () => {
+    const selectList = (SELECT_SQL_PATTERN.exec(SCRIPT_FILE)?.[1] ?? "").split(
+      /\bfrom\b/i
+    )[0];
+    expect(selectList).toContain("SELECT");
+    expect(selectList).toMatch(/embedding IS NOT NULL\s+AS "hasEmbedding"/);
+    expect(selectList).toMatch(
+      /embedding_source_hash\s+AS "embeddingSourceHash"/
+    );
+  });
+
+  /**
    * The nastiest of the pins, because the body comparison above actively hides
    * this one. Add a field to `EmbeddableProject` and to the builder, and the
    * script's copied body has to read `project.newField` to stay byte-identical,
@@ -368,8 +462,8 @@ describe("the production backfill's copies of the embedding helpers", () => {
       "title",
     ]);
 
-    // The select list alone, not the whole query: `id`, `status`, `embedding`
-    // and `deleted_at` all appear in the WHERE clause, so a substring test over
+    // The select list alone, not the whole query: `id`, `status` and
+    // `deleted_at` all appear in the WHERE clause, so a substring test over
     // the query would pass a field named after any of them without it ever
     // being selected.
     const selectList = (SELECT_SQL_PATTERN.exec(SCRIPT_FILE)?.[1] ?? "").split(

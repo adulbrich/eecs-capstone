@@ -668,19 +668,27 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
   --region us-west-2
 ```
 
-It selects every `published` or `archived` project with no embedding, so it
-takes about five minutes for 547 rows at one Bedrock call each plus a 200ms
+It checks every `published` or `archived` project and embeds the ones whose
+stored hash does not match the text they carry now, and the ones with no vector
+at all whatever their hash says. On a first run that is all of them. Budget
+about five minutes for 547 rows at one Bedrock call each plus a 200ms
 politeness delay. The CloudWatch log should end with:
 
 ```
-547 project(s) needed an embedding: 547 updated, 0 failed.
+547 project(s) checked: 547 updated, 0 already current, 0 failed.
 ```
 
-Safe and cheap to re-run: a row that already has a vector is not selected, so a
-second run reports zero and makes no Bedrock call. A row that fails stays null,
+Safe and cheap to re-run: an unchanged row costs one small query, two if it
+has a program, no Bedrock call and no delay, so a second run reports every row
+as already current and finishes in seconds. A row that fails is left as it was,
 the run continues, and the task exits non-zero to say so, which is what makes a
-partial run resumable. Run it again after any later import, including the live
-set in 7a.7.
+partial run resumable.
+
+**Run it after every import, not only the first,** including the live set in
+7a.7. `import-legacy.mjs` writes project text without going through
+`refreshProjectEmbedding` and leaves the embedding columns alone, so this is
+the only thing that corrects those rows. `docs/QUIRKS.md` under the embedding
+sweepers has the rest.
 
 ### 7a.6 What to expect afterwards
 
@@ -714,7 +722,7 @@ counts both groups before it writes:
   12 new, 547 already imported (will be overwritten)
 ```
 
-Two things are exempt from that replacement. `image_url` is written with
+Three things are exempt from that replacement. `image_url` is written with
 `COALESCE(excluded.image_url, projects.image_url)`, so a re-run without
 `image-keys.json` keeps the images a row already has rather than nulling them
 while the objects sit in the bucket. And a program is never created: a missing
@@ -722,6 +730,13 @@ while the objects sit in the bucket. And a program is never created: a missing
 an identifier drifted, where inserting would attach projects to a brand new
 program that merely looks right. `--create-missing-programs` opts in, for a
 fresh local database with nothing to match.
+
+The third is the three embedding columns, which the upsert never names, so a
+re-run leaves whatever vector a row is already carrying. That is not an
+oversight and it is not free: the re-run reverts the text, the vector stays
+built from the text before it, and nothing in the app re-embeds a row nobody
+edits. Running 7a.5 afterwards is what closes that, and it is why 7a.5 says to
+run it after every import rather than only the first.
 
 Pass `--skip-existing` to add only the rows that are not there yet and leave
 the rest untouched:
