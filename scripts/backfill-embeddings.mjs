@@ -222,11 +222,14 @@ const SELECT_SQL = `
  * One query per project, mirroring `refreshProjectEmbedding` rather than
  * batching, because the category order decides the source string and so the
  * hash. Neither side sorts, so matching the app's query shape is the closest
- * thing to matching its order. A mismatch is never a wrong vector, but its
- * cost grew when this stopped skipping rows that already have one: a project
- * whose categories come back here in a different order than the app stored
- * them used to cost one re-embed, the next time somebody edited it, and now
- * costs one on every sweep. Sorting both sides is #457.
+ * thing to matching its order. A mismatch is never a wrong vector, and it
+ * does not compound: this writes back the hash of the order IT read, so the
+ * next sweep reads the same order and skips the row. The cost is one re-embed
+ * each time the writer changes hands, sweeper to app or back, which this
+ * branch made reachable by sweeping rows that already have a vector. Sorting
+ * both sides ends it, and is #457. None of the imported legacy rows can hit
+ * it: `import-legacy.mjs` never writes `project_categories`, so they have no
+ * categories at all.
  */
 const CATEGORIES_SQL = `
   SELECT c.name

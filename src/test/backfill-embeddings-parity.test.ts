@@ -62,11 +62,12 @@ const SCRIPT_FILE = readFileSync("scripts/backfill-embeddings.mjs", "utf8");
  * cannot happen, because an honest proof needs a parser: extracting the
  * literals from text that still holds comments is circular, since an
  * apostrophe in a comment opens one. What stands in for a proof is narrower
- * and testable, and the first `describe` below checks all three parts, over
- * this file and over `EMBEDDINGS_CODE` alike. Neither file contains `://`,
- * which is the sequence that would put a `//` inside a string here. Both
- * strips are shown to run. The braces still balance afterwards, which a
- * swallowed run of code would almost certainly break.
+ * and testable, and the first `describe` below checks all three parts over
+ * both stripped sources, `backfill-embeddings.mjs` and
+ * `project-embeddings.ts`. Neither contains `://`, which is the sequence that
+ * would put a `//` inside a string. Both strips are shown to run. The braces
+ * still balance afterwards, which a swallowed run of code would almost
+ * certainly break.
  *
  * The line strip is not anchored to the start of a line, so it also removes a
  * comment trailing real code. Nothing in the script does that today, and the
@@ -171,7 +172,7 @@ describe("reading the two stripped files as code rather than as text", () => {
   it.each([
     ["backfill-embeddings.mjs", SCRIPT_CODE],
     ["project-embeddings.ts", EMBEDDINGS_CODE],
-  ])("still balances %s's braces after the strip", (_label, code) => {
+  ])("lose no brace in %s to the strip", (_label, code) => {
     // The cheap structural check: a strip that ate a run of real code almost
     // certainly takes a brace with it. Not a parser, and not claiming to be.
     const opens = code.match(/\{/g)?.length ?? 0;
@@ -201,7 +202,7 @@ describe("reading the two stripped files as code rather than as text", () => {
     ],
   ])(
     "lose every comment in %s and keep every statement",
-    (_l, raw, code, kept) => {
+    (_label, raw, code, kept) => {
       expect(raw).toMatch(/\/\*/);
       expect(raw).toMatch(/^[ \t]*\/\//m);
       expect(code).not.toMatch(/\/\*/);

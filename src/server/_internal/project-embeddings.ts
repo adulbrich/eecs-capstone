@@ -1,3 +1,25 @@
+/**
+ * READ AS TEXT by `src/test/backfill-embeddings-parity.test.ts`, which pins
+ * the parts `scripts/backfill-embeddings.mjs` has to copy because it cannot
+ * import across the production image boundary (ADR-0024). That puts two
+ * constraints on this file that no editor would otherwise guess, so they are
+ * written here rather than only in the test:
+ *
+ * - No URL anywhere, in a string or a comment. The test strips comments by
+ *   regex before matching, and the two slashes in a scheme, inside a string
+ *   literal, would make the strip eat real code. It refuses the sequence
+ *   rather than trying to tell a comment from a string, which is the job of
+ *   the strip it protects. Cite a doc by path or by ADR number, not by link.
+ *   You cannot even write the sequence here to explain it, as this comment
+ *   found out.
+ * - Keep at least one `//` comment at the start of a line, and the
+ *   `export async function refreshProjectEmbedding(` signature intact. The
+ *   test proves the strip actually removed something and kept something, and
+ *   those are what it looks for.
+ *
+ * The statement the pin compares is the skip inside `refreshProjectEmbedding`.
+ * Change it and the script has to change with it, in the same commit.
+ */
 import { eq } from "drizzle-orm";
 import { db } from "#/db";
 import {
