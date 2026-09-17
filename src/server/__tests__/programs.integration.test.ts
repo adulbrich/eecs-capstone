@@ -15,7 +15,10 @@ import {
   removeProgramInstructorAs,
   updateProgramAs,
 } from "#/server/_internal/programs";
-import { createProjectAs } from "#/server/_internal/projects";
+import {
+  createProjectAs,
+  updateProjectProgramAs,
+} from "#/server/_internal/projects";
 
 async function makeUser(email: string, role: UserRole) {
   await auth.api.signUpEmail({
@@ -217,9 +220,11 @@ describe("programs", () => {
       contactName: null,
       imageUrl: "",
       licenseRestrictions: null,
-      programId,
       notes: null,
     });
+    // Placed by the staff writer, the only one that sets the column after
+    // create since #450.
+    await updateProjectProgramAs(admin, { id: projId, programId });
 
     const result = await deleteProgramAs(admin, programId);
     expect(result.unlinkedProjectCount).toBe(1);

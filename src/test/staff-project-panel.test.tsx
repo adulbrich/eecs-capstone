@@ -149,7 +149,7 @@ beforeEach(() => {
 const PROJECT_ID = "00000000-0000-0000-0000-0000000000p1";
 
 function project(status: string, id = PROJECT_ID) {
-  return { id, status, deletedAt: null };
+  return { id, status, deletedAt: null, programId: null };
 }
 
 // Keyed on the id, as the route renders it: a rerender with a new id is the

@@ -9,6 +9,7 @@ import {
   createProjectAs,
   performTransitionAs,
   softDeleteProjectAs,
+  updateProjectProgramAs,
   updateProjectProposerAs,
 } from "#/server/_internal/projects";
 import {
@@ -39,7 +40,7 @@ async function makeProgram(courseId: string) {
   return row.id;
 }
 
-function baseProject(title: string, programId: string | null) {
+function baseProject(title: string) {
   return {
     title,
     description: null,
@@ -52,9 +53,32 @@ function baseProject(title: string, programId: string | null) {
     contactName: null,
     imageUrl: "",
     licenseRestrictions: null,
-    programId,
     notes: null,
   };
+}
+
+/**
+ * A project, placed in a program when one is named. Two writes since #450:
+ * `createProjectAs` cannot carry a program any more, so the staff writer
+ * places it afterwards, which is the order the panel works in.
+ *
+ * `placedBy` defaults to the creator because most projects here are made by
+ * an admin, but it is separate because the two acts have different rules: a
+ * proposer may create a project and may not place one, so a fixture whose
+ * creator is a plain proposer has to name the staff member who placed it, as
+ * it would in the application.
+ */
+async function makeProject(
+  creator: Awaited<ReturnType<typeof makeAdmin>>,
+  title: string,
+  programId: string | null = null,
+  placedBy: Awaited<ReturnType<typeof makeAdmin>> = creator
+) {
+  const project = await createProjectAs(creator, baseProject(title));
+  if (programId) {
+    await updateProjectProgramAs(placedBy, { id: project.id, programId });
+  }
+  return project;
 }
 
 /**
@@ -91,7 +115,7 @@ async function projectWithProposerAddress(
   title: string,
   proposerEmail: string
 ) {
-  const project = await createProjectAs(admin, baseProject(title, null));
+  const project = await makeProject(admin, title);
   await updateProjectProposerAs(admin, {
     id: project.id,
     proposerEmail,
@@ -118,8 +142,8 @@ describe("admin projects program filter", () => {
     const cs461 = await makeProgram("CS 461");
     const ece441 = await makeProgram("ECE 441");
 
-    await createProjectAs(admin, baseProject("In CS 461", cs461));
-    await createProjectAs(admin, baseProject("In ECE 441", ece441));
+    await makeProject(admin, "In CS 461", cs461);
+    await makeProject(admin, "In ECE 441", ece441);
 
     const { rows } = await listAdminProjectsAs(
       admin,
@@ -133,8 +157,8 @@ describe("admin projects program filter", () => {
     const admin = await makeAdmin(`b-${Date.now()}@x.com`);
     const cs461 = await makeProgram("CS 461");
 
-    await createProjectAs(admin, baseProject("In CS 461", cs461));
-    await createProjectAs(admin, baseProject("No program", null));
+    await makeProject(admin, "In CS 461", cs461);
+    await makeProject(admin, "No program");
 
     const { rows } = await listAdminProjectsAs(admin, filter());
 
@@ -148,11 +172,8 @@ describe("admin projects program filter", () => {
     const admin = await makeAdmin(`np-${Date.now()}@x.com`);
     const cs461 = await makeProgram("CS 461");
 
-    const placed = await createProjectAs(
-      admin,
-      baseProject("In CS 461", cs461)
-    );
-    await createProjectAs(admin, baseProject("Unplaced", null));
+    const placed = await makeProject(admin, "In CS 461", cs461);
+    await makeProject(admin, "Unplaced");
 
     const { rows } = await listAdminProjectsAs(
       admin,
@@ -170,11 +191,8 @@ describe("admin projects program filter", () => {
     const admin = await makeAdmin(`np2-${Date.now()}@x.com`);
     const cs461 = await makeProgram("CS 461");
 
-    await createProjectAs(admin, baseProject("In CS 461", cs461));
-    const unplaced = await createProjectAs(
-      admin,
-      baseProject("Unplaced", null)
-    );
+    await makeProject(admin, "In CS 461", cs461);
+    const unplaced = await makeProject(admin, "Unplaced");
 
     const { rows } = await listAdminProjectsAs(
       admin,
@@ -191,10 +209,7 @@ describe("admin projects program filter", () => {
     const admin = await makeAdmin(`np3-${Date.now()}@x.com`);
     const doomed = await makeProgram("CS 461");
 
-    const orphan = await createProjectAs(
-      admin,
-      baseProject("Program deleted", doomed)
-    );
+    const orphan = await makeProject(admin, "Program deleted", doomed);
     await db.delete(programs).where(eq(programs.id, doomed));
 
     const { rows } = await listAdminProjectsAs(
@@ -211,8 +226,8 @@ describe("admin projects program filter", () => {
     const admin = await makeAdmin(`np4-${Date.now()}@x.com`);
     const cs461 = await makeProgram("CS 461");
 
-    await createProjectAs(admin, baseProject("In CS 461", cs461));
-    await createProjectAs(admin, baseProject("Unplaced", null));
+    await makeProject(admin, "In CS 461", cs461);
+    await makeProject(admin, "Unplaced");
 
     const chosen = filter({ program: "none" });
     const listed = await listAdminProjectsAs(admin, chosen);
@@ -227,14 +242,8 @@ describe("admin projects program filter", () => {
   it("composes the none choice with the status filter", async () => {
     const admin = await makeAdmin(`np5-${Date.now()}@x.com`);
 
-    const draft = await createProjectAs(
-      admin,
-      baseProject("Unplaced draft", null)
-    );
-    const live = await createProjectAs(
-      admin,
-      baseProject("Unplaced live", null)
-    );
+    const draft = await makeProject(admin, "Unplaced draft");
+    const live = await makeProject(admin, "Unplaced live");
     await performTransitionAs(admin, live.id, "submitted");
     await performTransitionAs(admin, live.id, "approved");
     await performTransitionAs(admin, live.id, "published");
@@ -253,16 +262,13 @@ describe("admin projects program filter", () => {
     const cs461 = await makeProgram("CS 461");
     const ece441 = await makeProgram("ECE 441");
 
-    const draft = await createProjectAs(admin, baseProject("Draft", cs461));
-    const live = await createProjectAs(admin, baseProject("Live", cs461));
+    const draft = await makeProject(admin, "Draft", cs461);
+    const live = await makeProject(admin, "Live", cs461);
     await performTransitionAs(admin, live.id, "submitted");
     await performTransitionAs(admin, live.id, "approved");
     await performTransitionAs(admin, live.id, "published");
 
-    const otherProgram = await createProjectAs(
-      admin,
-      baseProject("Live elsewhere", ece441)
-    );
+    const otherProgram = await makeProject(admin, "Live elsewhere", ece441);
     await performTransitionAs(admin, otherProgram.id, "submitted");
     await performTransitionAs(admin, otherProgram.id, "approved");
     await performTransitionAs(admin, otherProgram.id, "published");
@@ -281,10 +287,7 @@ describe("admin projects program filter", () => {
     const admin = await makeAdmin(`e-${Date.now()}@x.com`);
     const cs461 = await makeProgram("CS 461");
 
-    const deleted = await createProjectAs(
-      admin,
-      baseProject("Soft-deleted", cs461)
-    );
+    const deleted = await makeProject(admin, "Soft-deleted", cs461);
     await performTransitionAs(admin, deleted.id, "submitted");
     await softDeleteProjectAs(admin, deleted.id);
 
@@ -319,10 +322,7 @@ describe("admin projects program filter", () => {
 describe("getProjectAs", () => {
   it("never returns the embedding vector, even to a staff viewer after the project has been embedded", async () => {
     const admin = await makeAdmin(`staff-getproject-${Date.now()}@x.com`);
-    const { id } = await createProjectAs(
-      admin,
-      baseProject("Embedded project", null)
-    );
+    const { id } = await makeProject(admin, "Embedded project");
     await performTransitionAs(admin, id, "submitted");
     await performTransitionAs(admin, id, "approved");
     await performTransitionAs(admin, id, "published");
@@ -362,10 +362,10 @@ describe("admin projects search", () => {
   it("matches on title and on body text", async () => {
     const admin = await makeAdmin(`s-${Date.now()}@x.com`);
     await createProjectAs(admin, {
-      ...baseProject("Warehouse Robot Fleet", null),
+      ...baseProject("Warehouse Robot Fleet"),
       description: "Coordinates autonomous forklifts in a distribution centre.",
     });
-    await createProjectAs(admin, baseProject("Wildlife Camera Trap", null));
+    await makeProject(admin, "Wildlife Camera Trap");
 
     const byTitle = await listAdminProjectsAs(
       admin,
@@ -379,7 +379,7 @@ describe("admin projects search", () => {
 
   it("matches a partial word, which the tsvector alone would not", async () => {
     const admin = await makeAdmin(`s2-${Date.now()}@x.com`);
-    await createProjectAs(admin, baseProject("Telemetry Platform", null));
+    await makeProject(admin, "Telemetry Platform");
 
     const { rows } = await listAdminProjectsAs(admin, filter({ q: "eleme" }));
     expect(rows.map((r) => r.title)).toEqual(["Telemetry Platform"]);
@@ -387,11 +387,8 @@ describe("admin projects search", () => {
 
   it("composes search with the status filter", async () => {
     const admin = await makeAdmin(`s3-${Date.now()}@x.com`);
-    const live = await createProjectAs(
-      admin,
-      baseProject("Sensor Draft", null)
-    );
-    await createProjectAs(admin, baseProject("Sensor Other", null));
+    const live = await makeProject(admin, "Sensor Draft");
+    await makeProject(admin, "Sensor Other");
     await performTransitionAs(admin, live.id, "submitted");
 
     const { rows } = await listAdminProjectsAs(
@@ -407,8 +404,8 @@ describe("admin projects proposer filter", () => {
     const admin = await makeAdmin(`p-a-${Date.now()}@x.com`);
     const alice = await makeProposer(`p-alice-${Date.now()}@x.com`);
     const bob = await makeProposer(`p-bob-${Date.now()}@x.com`);
-    await createProjectAs(alice, baseProject("Alice project", null));
-    await createProjectAs(bob, baseProject("Bob project", null));
+    await makeProject(alice, "Alice project");
+    await makeProject(bob, "Bob project");
 
     const { rows } = await listAdminProjectsAs(
       admin,
@@ -421,14 +418,11 @@ describe("admin projects proposer filter", () => {
     const admin = await makeAdmin(`p2-a-${Date.now()}@x.com`);
     const alice = await makeProposer(`p2-alice-${Date.now()}@x.com`);
     const bob = await makeProposer(`p2-bob-${Date.now()}@x.com`);
-    const alicePublished = await createProjectAs(
-      alice,
-      baseProject("Alice published", null)
-    );
+    const alicePublished = await makeProject(alice, "Alice published");
     await performTransitionAs(alice, alicePublished.id, "submitted");
     await performTransitionAs(admin, alicePublished.id, "approved");
     await performTransitionAs(admin, alicePublished.id, "published");
-    await createProjectAs(bob, baseProject("Bob draft", null));
+    await makeProject(bob, "Bob draft");
 
     const all = await listAdminProjectsAs(admin, filter());
     expect(all.proposers.map((p) => p.id).sort()).toEqual(
@@ -448,8 +442,8 @@ describe("admin projects proposer filter", () => {
     const admin = await makeAdmin(`p3-a-${Date.now()}@x.com`);
     const alice = await makeProposer(`p3-alice-${Date.now()}@x.com`);
     const bob = await makeProposer(`p3-bob-${Date.now()}@x.com`);
-    await createProjectAs(alice, baseProject("Quantum compiler", null));
-    await createProjectAs(bob, baseProject("Garden sensors", null));
+    await makeProject(alice, "Quantum compiler");
+    await makeProject(bob, "Garden sensors");
 
     // Searching for one project must not empty the dropdown of the other's
     // proposer, or picking from it becomes impossible.
@@ -475,7 +469,7 @@ describe("admin project search reaches people, not just text", () => {
   it("finds a project by its proposer's email", async () => {
     const admin = await makeAdmin("staff@example.edu");
     const proposer = await makeAdmin("rivera@example.edu");
-    await createProjectAs(proposer, baseProject("Trail Mapper", null));
+    await makeProject(proposer, "Trail Mapper");
     const { rows } = await listAdminProjectsAs(
       admin,
       filter({ q: "rivera@example.edu" })
@@ -492,7 +486,7 @@ describe("admin project search reaches people, not just text", () => {
       .update(user)
       .set({ name: "Marisol Vega" })
       .where(eq(user.id, proposer.id));
-    await createProjectAs(proposer, baseProject("Tide Gauge", null));
+    await makeProject(proposer, "Tide Gauge");
     const { rows } = await listAdminProjectsAs(admin, filter({ q: "Marisol" }));
     expect(rows.map((r) => r.title)).toEqual(["Tide Gauge"]);
   });
@@ -500,7 +494,7 @@ describe("admin project search reaches people, not just text", () => {
   it("finds a project by its contact name", async () => {
     const admin = await makeAdmin("staff@example.edu");
     await createProjectAs(admin, {
-      ...baseProject("Weather Station", null),
+      ...baseProject("Weather Station"),
       contactName: "Priya Raman",
     });
     const { rows } = await listAdminProjectsAs(admin, filter({ q: "Priya" }));
@@ -510,7 +504,7 @@ describe("admin project search reaches people, not just text", () => {
   it("still lists a project whose proposer account was deleted", async () => {
     const admin = await makeAdmin("staff@example.edu");
     const proposer = await makeAdmin("leaving@example.edu");
-    await createProjectAs(proposer, baseProject("Orphan Project", null));
+    await makeProject(proposer, "Orphan Project");
     await db.delete(user).where(eq(user.id, proposer.id));
     const { rows } = await listAdminProjectsAs(admin, filter({ q: "" }));
     expect(rows.map((r) => r.title)).toContain("Orphan Project");
@@ -519,7 +513,7 @@ describe("admin project search reaches people, not just text", () => {
   it("carries the proposer and contact fields the table shows", async () => {
     const admin = await makeAdmin("staff@example.edu");
     await createProjectAs(admin, {
-      ...baseProject("Rich Row", null),
+      ...baseProject("Rich Row"),
       contactEmail: "contact@example.edu",
     });
     const { rows } = await listAdminProjectsAs(admin, filter({ q: "" }));
@@ -637,10 +631,10 @@ async function stamp(
 describe("admin projects status set", () => {
   it("lists every status but archived by default, and archived alone on request", async () => {
     const admin = await makeAdmin(`s-${Date.now()}@x.com`);
-    const draft = await createProjectAs(admin, baseProject("Draft", null));
-    const live = await createProjectAs(admin, baseProject("Live", null));
+    const draft = await makeProject(admin, "Draft");
+    const live = await makeProject(admin, "Live");
     await publish(admin, live.id);
-    const old = await createProjectAs(admin, baseProject("Old", null));
+    const old = await makeProject(admin, "Old");
     await publish(admin, old.id);
     await performTransitionAs(admin, old.id, "archived");
 
@@ -671,10 +665,10 @@ describe("admin projects status set", () => {
 
   it("takes any explicit set", async () => {
     const admin = await makeAdmin(`s2-${Date.now()}@x.com`);
-    await createProjectAs(admin, baseProject("Draft", null));
-    const live = await createProjectAs(admin, baseProject("Live", null));
+    await makeProject(admin, "Draft");
+    const live = await makeProject(admin, "Live");
     await publish(admin, live.id);
-    const waiting = await createProjectAs(admin, baseProject("Waiting", null));
+    const waiting = await makeProject(admin, "Waiting");
     await performTransitionAs(admin, waiting.id, "submitted");
 
     const { rows } = await listAdminProjectsAs(
@@ -693,8 +687,8 @@ describe("admin projects date range", () => {
 
   it("narrows on the chosen timestamp, and only that one", async () => {
     const admin = await makeAdmin(`d-${Date.now()}@x.com`);
-    const a = await createProjectAs(admin, baseProject("A", null));
-    const b = await createProjectAs(admin, baseProject("B", null));
+    const a = await makeProject(admin, "A");
+    const b = await makeProject(admin, "B");
     await publish(admin, a.id);
     await publish(admin, b.id);
     // A: created in June, published in July, updated in June.
@@ -730,7 +724,7 @@ describe("admin projects date range", () => {
 
   it("keeps the whole of the last day in Pacific time", async () => {
     const admin = await makeAdmin(`d2-${Date.now()}@x.com`);
-    const late = await createProjectAs(admin, baseProject("Late", null));
+    const late = await makeProject(admin, "Late");
     await publish(admin, late.id);
     await stamp(late.id, { publishedAt: lateJune });
 
@@ -748,7 +742,7 @@ describe("admin projects date range", () => {
 
   it("leaves an open side open", async () => {
     const admin = await makeAdmin(`d3-${Date.now()}@x.com`);
-    const late = await createProjectAs(admin, baseProject("Late", null));
+    const late = await makeProject(admin, "Late");
     await publish(admin, late.id);
     await stamp(late.id, { publishedAt: lateJune });
 
@@ -766,7 +760,7 @@ describe("admin projects date range", () => {
 
   it("excludes never-published rows on Published and keeps them on Created", async () => {
     const admin = await makeAdmin(`d4-${Date.now()}@x.com`);
-    const draft = await createProjectAs(admin, baseProject("Draft", null));
+    const draft = await makeProject(admin, "Draft");
     await stamp(draft.id, { createdAt: midJuly, publishedAt: null });
     const july = { from: "2026-07-01", to: "2026-07-31" };
 
@@ -784,10 +778,7 @@ describe("admin projects date range", () => {
 
   it("counts the rows a nullable date range hides, so an empty result is explained", async () => {
     const admin = await makeAdmin(`d4b-${Date.now()}@x.com`);
-    const dateless = await createProjectAs(
-      admin,
-      baseProject("Dateless", null)
-    );
+    const dateless = await makeProject(admin, "Dateless");
     await stamp(dateless.id, { createdAt: midJuly, publishedAt: null });
     const july = { from: "2026-07-01", to: "2026-07-31" };
 
@@ -818,17 +809,14 @@ describe("admin projects date range", () => {
 
   it("narrows on Archived, which is its own field and not Updated", async () => {
     const admin = await makeAdmin(`d4c-${Date.now()}@x.com`);
-    const retired = await createProjectAs(admin, baseProject("Retired", null));
+    const retired = await makeProject(admin, "Retired");
     await stamp(retired.id, {
       archivedAt: lateJune,
       createdAt: midJuly,
       publishedAt: null,
       updatedAt: midJuly,
     });
-    const neverArchived = await createProjectAs(
-      admin,
-      baseProject("Still here", null)
-    );
+    const neverArchived = await makeProject(admin, "Still here");
     await stamp(neverArchived.id, { archivedAt: null, updatedAt: lateJune });
     const june = { from: "2026-06-01", to: "2026-06-30" };
 
@@ -846,23 +834,17 @@ describe("admin projects date range", () => {
     const admin = await makeAdmin(`d5-${Date.now()}@x.com`);
     const other = await makeProposer(`d5p-${Date.now()}@x.com`);
     const cs461 = await makeProgram("CS 461");
-    const inRange = await createProjectAs(admin, baseProject("In", cs461));
+    const inRange = await makeProject(admin, "In", cs461);
     await publish(admin, inRange.id);
     await stamp(inRange.id, { publishedAt: midJuly });
-    const wrongStatus = await createProjectAs(
-      admin,
-      baseProject("Archived", cs461)
-    );
+    const wrongStatus = await makeProject(admin, "Archived", cs461);
     await publish(admin, wrongStatus.id);
     await performTransitionAs(admin, wrongStatus.id, "archived");
     await stamp(wrongStatus.id, { publishedAt: midJuly });
-    const wrongProgram = await createProjectAs(
-      other,
-      baseProject("Elsewhere", null)
-    );
+    const wrongProgram = await makeProject(other, "Elsewhere");
     await publish(admin, wrongProgram.id);
     await stamp(wrongProgram.id, { publishedAt: midJuly });
-    const wrongMonth = await createProjectAs(other, baseProject("June", cs461));
+    const wrongMonth = await makeProject(other, "June", cs461, admin);
     await publish(admin, wrongMonth.id);
     await stamp(wrongMonth.id, { publishedAt: lateJune });
 
@@ -903,21 +885,21 @@ async function flag(
 describe("admin projects flag switches", () => {
   it("each switch alone narrows to the rows carrying its flag, and all off is the whole list", async () => {
     const admin = await makeAdmin(`f-${Date.now()}@x.com`);
-    const open = await createProjectAs(admin, baseProject("Open", null));
+    const open = await makeProject(admin, "Open");
     await flag(open.id, { mentorEmail: "mentor@example.edu" });
-    const student = await createProjectAs(admin, baseProject("Student", null));
+    const student = await makeProject(admin, "Student");
     await flag(student.id, {
       acceptingApplicants: false,
       mentorEmail: "mentor@example.edu",
       studentProposed: true,
     });
-    const nda = await createProjectAs(admin, baseProject("Agreement", null));
+    const nda = await makeProject(admin, "Agreement");
     await flag(nda.id, {
       acceptingApplicants: false,
       mentorEmail: "mentor@example.edu",
       requiresNdaIp: true,
     });
-    const alone = await createProjectAs(admin, baseProject("Alone", null));
+    const alone = await makeProject(admin, "Alone");
     await flag(alone.id, { acceptingApplicants: false });
 
     const all = await listAdminProjectsAs(admin, filter());
@@ -958,26 +940,20 @@ describe("admin projects flag switches", () => {
     const admin = await makeAdmin(`f3-${Date.now()}@x.com`);
     const cs461 = await makeProgram("CS 461");
     const ece441 = await makeProgram("ECE 441");
-    const match = await createProjectAs(admin, baseProject("Match", cs461));
+    const match = await makeProject(admin, "Match", cs461);
     await flag(match.id, { studentProposed: true });
     await publish(admin, match.id);
-    const notStudent = await createProjectAs(
-      admin,
-      baseProject("Not student", cs461)
-    );
+    const notStudent = await makeProject(admin, "Not student", cs461);
     await publish(admin, notStudent.id);
-    const closed = await createProjectAs(admin, baseProject("Closed", cs461));
+    const closed = await makeProject(admin, "Closed", cs461);
     await flag(closed.id, {
       acceptingApplicants: false,
       studentProposed: true,
     });
     await publish(admin, closed.id);
-    const draft = await createProjectAs(admin, baseProject("Draft", cs461));
+    const draft = await makeProject(admin, "Draft", cs461);
     await flag(draft.id, { studentProposed: true });
-    const elsewhere = await createProjectAs(
-      admin,
-      baseProject("Elsewhere", ece441)
-    );
+    const elsewhere = await makeProject(admin, "Elsewhere", ece441);
     await flag(elsewhere.id, { studentProposed: true });
     await publish(admin, elsewhere.id);
 
@@ -997,27 +973,21 @@ describe("admin projects flag switches", () => {
     const admin = await makeAdmin(`f7-${Date.now()}@x.com`);
     const cs461 = await makeProgram("CS 461");
     const ece441 = await makeProgram("ECE 441");
-    const match = await createProjectAs(admin, baseProject("Match", cs461));
+    const match = await makeProject(admin, "Match", cs461);
     await flag(match.id, { studentProposed: true });
     await publish(admin, match.id);
-    const draft = await createProjectAs(admin, baseProject("Draft", cs461));
+    const draft = await makeProject(admin, "Draft", cs461);
     await flag(draft.id, { studentProposed: true });
-    const elsewhere = await createProjectAs(
-      admin,
-      baseProject("Elsewhere", ece441)
-    );
+    const elsewhere = await makeProject(admin, "Elsewhere", ece441);
     await flag(elsewhere.id, { studentProposed: true });
     await publish(admin, elsewhere.id);
-    const mentored = await createProjectAs(
-      admin,
-      baseProject("Mentored", cs461)
-    );
+    const mentored = await makeProject(admin, "Mentored", cs461);
     await flag(mentored.id, {
       mentorEmail: "mentor@example.edu",
       studentProposed: true,
     });
     await publish(admin, mentored.id);
-    const partner = await createProjectAs(admin, baseProject("Partner", cs461));
+    const partner = await makeProject(admin, "Partner", cs461);
     await publish(admin, partner.id);
 
     const { rows } = await listAdminProjectsAs(
@@ -1050,17 +1020,11 @@ describe("admin projects flag switches", () => {
     const admin = await makeAdmin(`f6-${Date.now()}@x.com`);
     const alice = await makeProposer(`f6-alice-${Date.now()}@x.com`);
     const bob = await makeProposer(`f6-bob-${Date.now()}@x.com`);
-    const match = await createProjectAs(
-      alice,
-      baseProject("Glacier sensors", null)
-    );
-    const mentored = await createProjectAs(
-      alice,
-      baseProject("Glacier drones", null)
-    );
+    const match = await makeProject(alice, "Glacier sensors");
+    const mentored = await makeProject(alice, "Glacier drones");
     await flag(mentored.id, { mentorEmail: "mentor@example.edu" });
-    await createProjectAs(alice, baseProject("River sensors", null));
-    await createProjectAs(bob, baseProject("Glacier mapping", null));
+    await makeProject(alice, "River sensors");
+    await makeProject(bob, "Glacier mapping");
 
     const { rows } = await listAdminProjectsAs(
       admin,
@@ -1073,8 +1037,8 @@ describe("admin projects flag switches", () => {
     const admin = await makeAdmin(`f4-${Date.now()}@x.com`);
     const alice = await makeProposer(`f4-alice-${Date.now()}@x.com`);
     const bob = await makeProposer(`f4-bob-${Date.now()}@x.com`);
-    await createProjectAs(alice, baseProject("Alice open", null));
-    const bobs = await createProjectAs(bob, baseProject("Bob closed", null));
+    await makeProject(alice, "Alice open");
+    const bobs = await makeProject(bob, "Bob closed");
     await flag(bobs.id, { acceptingApplicants: false });
 
     const all = await listAdminProjectsAs(admin, filter());
@@ -1094,16 +1058,10 @@ describe("admin projects flag switches", () => {
 
   it("is followed by the CSV export, which carries the Mentor column and no state", async () => {
     const admin = await makeAdmin(`f5-${Date.now()}@x.com`);
-    const both = await createProjectAs(admin, baseProject("Both", null));
-    const onlyOpen = await createProjectAs(
-      admin,
-      baseProject("Only open", null)
-    );
+    const both = await makeProject(admin, "Both");
+    const onlyOpen = await makeProject(admin, "Only open");
     await flag(onlyOpen.id, { mentorEmail: "mentor@example.edu" });
-    const onlyMentorless = await createProjectAs(
-      admin,
-      baseProject("Only mentorless", null)
-    );
+    const onlyMentorless = await makeProject(admin, "Only mentorless");
     await flag(onlyMentorless.id, { acceptingApplicants: false });
     const switches = filter({ acceptingOnly: true, withoutMentorOnly: true });
 

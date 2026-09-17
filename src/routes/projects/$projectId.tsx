@@ -248,6 +248,7 @@ function ProjectDetail() {
             id: project.id,
             status: project.status,
             deletedAt: project.deletedAt,
+            programId: project.programId,
           }}
           viewerIsOwner={viewerIsOwner}
         />

@@ -29,6 +29,7 @@ import { ScopeAssessmentSection } from "./scope-assessment-section";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
 import { StaffCategoriesSection } from "./staff-categories-section";
 import { StaffMentorshipSection } from "./staff-mentorship-section";
+import { StaffProgramSection } from "./staff-program-section";
 import { StaffProposerSection } from "./staff-proposer-section";
 import { Button } from "./ui/button";
 import {
@@ -48,6 +49,8 @@ const WORKFLOW = PROJECT_STATUSES_IN_DISPLAY_ORDER;
 interface Project {
   deletedAt: Date | string | null;
   id: string;
+  /** The Program section's starting value; the payload already carries it. */
+  programId: string | null;
   status: string;
 }
 
@@ -422,6 +425,17 @@ export function StaffProjectPanel({
       </Dialog>
 
       {!pending && <FieldError message={error} />}
+
+      {/*
+        Between Status and Proposer: placing a project in a program is the
+        decision staff make right after deciding whether to take it, and
+        before deciding whose it is (#450).
+      */}
+      <StaffProgramSection
+        onChanged={onSectionChanged}
+        programId={project.programId}
+        projectId={project.id}
+      />
 
       <StaffProposerSection
         loadError={proposerError}

@@ -21,7 +21,6 @@ import { createProject, updateProject } from "#/server/projects";
 import { uploadProjectImage } from "#/server/uploads";
 import { ErrorBanner } from "./error-banner";
 import { MarkdownField } from "./markdown-field";
-import { ProgramSelect } from "./program-select";
 import { ProjectImageUploader } from "./project-image-uploader";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
@@ -37,11 +36,6 @@ const optionalUrl = z.union([
 const optionalEmail = z.union([
   z.literal(""),
   z.string().email("Must be a valid email").max(200),
-]);
-
-const optionalUuid = z.union([
-  z.literal(""),
-  z.string().uuid("Must be a UUID"),
 ]);
 
 // No `.default()` anywhere on purpose. A default makes that field optional on
@@ -62,7 +56,6 @@ export const projectFormSchema = z.object({
   licenseRestrictions: z.string().max(FIELD_MAX_LENGTHS.licenseRestrictions),
   requiresNdaIp: z.boolean(),
   isSponsored: z.boolean(),
-  programId: optionalUuid,
   // Not in FIELD_MAX_LENGTHS on purpose: notes are staff-private and never sent
   // to the model, so they do not belong in a map the review reads.
   notes: z.string().max(5000),
@@ -73,9 +66,10 @@ export const projectFormSchema = z.object({
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
 
 /**
- * The form carries no staff-only control (#322). The proposer and the
- * categories are set from the staff panel on the project page, each through
- * its own writer, so nothing here decides what is sent by who is looking.
+ * The form carries no staff-only control (#322, #450). The proposer, the
+ * categories and now the program are set from the staff panel on the project
+ * page, each through its own writer, so nothing here decides what is sent by
+ * who is looking. A proposer proposes; staff place.
  */
 interface Props {
   enableAiReview?: boolean;
@@ -125,7 +119,6 @@ export function ProjectForm({
       licenseRestrictions: initial?.licenseRestrictions ?? "",
       requiresNdaIp: initial?.requiresNdaIp ?? false,
       isSponsored: initial?.isSponsored ?? false,
-      programId: initial?.programId ?? "",
       notes: initial?.notes ?? "",
       teamsSupported: initial?.teamsSupported ?? 1,
       acceptingApplicants: initial?.acceptingApplicants ?? true,
@@ -163,13 +156,11 @@ export function ProjectForm({
    * the order here is for the reader rather than for the runtime.
    */
   async function save(value: ProjectFormValues): Promise<string> {
-    // `programId` and `notes` are blank-to-null because the columns are
-    // nullable and an empty string is not the same as "unset" to a filter or
-    // to `??`. Both routes used to spell this out separately, which is what
-    // let them drift.
+    // `notes` is blank-to-null because the column is nullable and an empty
+    // string is not the same as "unset" to a filter or to `??`. Both routes
+    // used to spell this out separately, which is what let them drift.
     const payload = {
       ...value,
-      programId: value.programId || null,
       notes: value.notes || null,
     };
     if (projectId) {
@@ -535,30 +526,12 @@ export function ProjectForm({
           </div>
         )}
       </form.Field>
+      {/*
+        One column since #450 took the Program picker out of this form. The
+        grid stays because Teams keeps its half-width column from `sm`, which
+        is what its number input is sized for.
+      */}
       <div className="grid gap-6 sm:grid-cols-2">
-        <form.Field name="programId">
-          {(field: AnyForm) => (
-            <div>
-              <Label className="text-base" htmlFor="programId">
-                Program
-              </Label>
-              <p
-                className="mt-0.5 text-muted-foreground text-xs"
-                id="programId-description"
-              >
-                The program this project would run in. Staff can set or change
-                it during review.
-              </p>
-              <ProgramSelect
-                describedBy="programId-description"
-                id="programId"
-                onChange={(v) => field.handleChange(v)}
-                value={field.state.value as string}
-              />
-              <FieldError errors={field.state.meta.errors} />
-            </div>
-          )}
-        </form.Field>
         <form.Field name="teamsSupported">
           {(field: AnyForm) => (
             <div>
