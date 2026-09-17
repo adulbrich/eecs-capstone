@@ -23,7 +23,6 @@ const projectInputSchema = z.object({
   licenseRestrictions: z.string().max(1000).nullable().optional(),
   requiresNdaIp: z.boolean().optional(),
   isSponsored: z.boolean().optional(),
-  programId: z.string().uuid().nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
   teamsSupported: z.number().int().min(1).max(5).optional(),
   acceptingApplicants: z.boolean().optional(),
@@ -67,6 +66,17 @@ export const proposerSchema = z.object({
 });
 
 export type ProposerInput = Omit<z.infer<typeof proposerSchema>, "sendEmail">;
+
+export const programSchema = z.object({
+  id: z.string().uuid(),
+  // A string in transit, null only in the column: the empty string is the
+  // picker's no-program choice and the impl folds it, the same shape
+  // `mentorshipSchema` uses. Never on ProjectInput since #450: the form
+  // cannot carry it and only this endpoint writes it.
+  programId: z.string().uuid().nullable().or(z.literal("")),
+});
+
+export type ProgramInput = z.infer<typeof programSchema>;
 
 const transitionInputSchema = z.object({
   id: z.string().uuid(),
@@ -115,6 +125,15 @@ export const updateProjectProposer = createServerFn({ method: "POST" })
       "./_internal/projects"
     );
     return updateProjectProposerForCurrentUser(data);
+  });
+
+export const updateProjectProgram = createServerFn({ method: "POST" })
+  .validator((data: unknown) => programSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { updateProjectProgramForCurrentUser } = await import(
+      "./_internal/projects"
+    );
+    return updateProjectProgramForCurrentUser(data);
   });
 
 export const submitProject = createServerFn({ method: "POST" })

@@ -62,7 +62,6 @@ function EditProject() {
             // Absent for a viewer who may not see it, but only staff and the
             // proposer reach this page, and both of those get the field.
             isSponsored: project.isSponsored ?? false,
-            programId: project.programId ?? "",
             notes: project.notes ?? "",
             teamsSupported: project.teamsSupported ?? 1,
             acceptingApplicants: project.acceptingApplicants,

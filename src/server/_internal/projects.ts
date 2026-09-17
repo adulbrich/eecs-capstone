@@ -20,6 +20,7 @@ import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import type {
   MentorshipInput,
+  ProgramInput,
   ProjectInput,
   ProposerInput,
   UpdateProjectInput,
@@ -144,7 +145,10 @@ export async function createProjectAs(
       imageUrl: null,
       ...ndaFields(data),
       isSponsored: data.isSponsored ?? false,
-      programId: data.programId ?? null,
+      // Always null on create, and staff place it afterwards from the panel
+      // (#450). A staff-created project is in the same position as any other:
+      // proposed first, placed second.
+      programId: null,
       notes: allowedNotes,
       proposerId,
       proposerEmail: null,
@@ -187,7 +191,6 @@ function buildProjectValues(
     imageUrl: data.imageUrl || null,
     ...ndaFields(data),
     isSponsored: data.isSponsored ?? false,
-    programId: data.programId ?? null,
     teamsSupported: data.teamsSupported ?? 1,
     acceptingApplicants: data.acceptingApplicants ?? true,
   };
@@ -423,6 +426,68 @@ export async function updateProjectMentorshipForCurrentUser(
   const viewer = await requireUser();
   const { sendEmail, ...fields } = data;
   return updateProjectMentorshipAs(viewer, fields, { sendEmail });
+}
+
+/**
+ * The only writer of `projects.program_id` after create (#450), and staff
+ * only. Placing a project in a program is a staff judgement about how the
+ * course runs, not a fact the proposer reports, which is the same line #322
+ * drew for the proposer and the categories; ADR-0026 records the trade.
+ *
+ * Not part of `updateProjectAs`: the key left `ProjectInput`, so the shared
+ * form cannot carry it and a proposer has no endpoint that moves their own
+ * project between programs. `createProjectAs` still writes a null, so a new
+ * project arrives unplaced and the panel is where it gets placed.
+ *
+ * An empty string clears the program, the same "string in transit, null only
+ * in the column" rule mentorship follows, because `ProgramSelect` emits one
+ * for its no-program choice. One edit-log row per change, and a save that
+ * changes nothing writes none.
+ *
+ * No embedding refresh, for the reason the proposer and mentor writers skip
+ * one: the column is not part of the embedded text. The program left
+ * `buildProjectEmbeddingSource` in #463 (ADR-0025), which embeds a project's
+ * prose and not its categories or program.
+ *
+ * The scope assessment needs no call either, for a different reason: its
+ * source hash covers the program's `term_count` and `getScopeAssessmentAs`
+ * recomputes that hash on read, so a move already reports the stored verdict
+ * as stale.
+ */
+export async function updateProjectProgramAs(
+  viewer: Viewer,
+  data: ProgramInput
+): Promise<{ id: string; updated: boolean }> {
+  assertStaff(viewer);
+  const existing = await loadProjectOr404(data.id);
+  const newValues: Partial<typeof projects.$inferSelect> = {
+    programId: data.programId || null,
+  };
+  const { changedFields, newDiff, oldDiff } = diffRowFields(
+    existing,
+    newValues
+  );
+  if (changedFields.length === 0) {
+    return { id: existing.id, updated: false };
+  }
+  await db.transaction(async (tx) => {
+    await tx
+      .update(projects)
+      .set({ ...newValues, updatedAt: new Date() })
+      .where(eq(projects.id, existing.id));
+    await tx.insert(projectEditLog).values({
+      projectId: existing.id,
+      editorId: viewer.id,
+      changedFields,
+      oldValues: oldDiff,
+      newValues: newDiff,
+    });
+  });
+  return { id: existing.id, updated: true };
+}
+
+export async function updateProjectProgramForCurrentUser(data: ProgramInput) {
+  return updateProjectProgramAs(await requireUser(), data);
 }
 
 function assertChangesRequestedHasComment(

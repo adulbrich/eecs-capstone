@@ -9,6 +9,7 @@ import {
   forceTransitionAs,
   performTransitionAs,
   updateProjectAs,
+  updateProjectProgramAs,
 } from "#/server/_internal/projects";
 
 const VECTOR = Array.from({ length: 1024 }, (_, i) => (i === 0 ? 1 : 0));
@@ -359,37 +360,46 @@ describe("embedding triggers", () => {
   /**
    * The headline consequence of [ADR-0025](../../../docs/adr/0025-the-embedded-text-is-prose-only.md),
    * on the writer path rather than only in the pure builder's unit test. A
-   * program is a column on `projects`, so attaching one is an ordinary update
-   * that used to change the embedded text and now does not.
+   * program is a column on `projects`, and attaching one used to change the
+   * embedded text and now does not.
    *
-   * Asserted as "no call", which is stronger than "hash unchanged": a call
-   * would mean the text moved, and the paid re-embed is the cost this decision
-   * was weighed against.
+   * Asserted on the stored hash rather than on a spy. It was a spy when the
+   * attach went through `updateProjectAs`, which takes an `embed` and gates a
+   * call on the diff; #450 moved the attach to `updateProjectProgramAs`,
+   * which takes no `embed` at all, so "no call" became true by construction.
+   * The hash is what still knows whether the text moved, and the paid
+   * re-embed a moved hash would cause is the cost this decision was weighed
+   * against.
    */
-  it("does not embed when a program is attached to a published project", async () => {
+  it("leaves the embedded text alone when a program is attached", async () => {
     const admin = await makeAdmin(`pg-${Date.now()}@x.com`);
     const { id } = await createProjectAs(admin, baseProject("Live"));
     const embed = vi.fn().mockResolvedValue(VECTOR);
     await publish(admin, id);
     await refreshProjectEmbedding(id, embed);
-    // The precondition, asserted rather than assumed: if `publish` had missed,
-    // `updateProjectAs` would skip the embed path on status alone and the
-    // "not called" below would pass without testing anything.
+    // The precondition, asserted rather than assumed: without a first vector
+    // there is no hash to compare against and the rest proves nothing.
     expect(embed).toHaveBeenCalledTimes(1);
+    const before = await readRow(id);
+    expect(before.embeddingSourceHash).toBeTruthy();
     embed.mockClear();
 
     const [program] = await db
       .insert(programs)
       .values({ courseId: `CS46X-${Date.now()}`, courseName: "Capstone" })
       .returning();
-    await updateProjectAs(
-      admin,
-      { ...baseProject("Live"), id, programId: program.id },
-      embed
-    );
+    // Through the staff writer, because #450 took `programId` off
+    // `ProjectInput`, so `updateProjectAs` cannot attach a program any more.
+    await updateProjectProgramAs(admin, { id, programId: program.id });
 
+    // Then recompute. Asserting that the writer did not call `embed` would
+    // prove nothing: it takes no embed parameter, so that holds whatever the
+    // source text contains. Running the refresh again and finding the hash
+    // unmoved is what actually pins the program outside the embedded text.
+    await refreshProjectEmbedding(id, embed);
+    const after = await readRow(id);
+    expect(after.programId).toBe(program.id);
+    expect(after.embeddingSourceHash).toBe(before.embeddingSourceHash);
     expect(embed).not.toHaveBeenCalled();
-    const [row] = await db.select().from(projects).where(eq(projects.id, id));
-    expect(row.programId).toBe(program.id);
   });
 });

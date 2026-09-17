@@ -13,6 +13,7 @@ import { createProgramAs } from "#/server/_internal/programs";
 import {
   createProjectAs,
   forceTransitionAs,
+  updateProjectProgramAs,
 } from "#/server/_internal/projects";
 import { getProjectAs } from "#/server/_internal/projects-queries";
 import {
@@ -128,10 +129,8 @@ describe("the stored assessment and its staleness", () => {
       description: null,
       termCount: 3,
     });
-    const { id } = await createProjectAs(admin, {
-      ...baseProject(),
-      programId: program.id,
-    });
+    const { id } = await createProjectAs(admin, baseProject());
+    await updateProjectProgramAs(admin, { id, programId: program.id });
     expect(await getScopeAssessmentAs(admin, { projectId: id })).toBeNull();
 
     const fresh = await assessProjectScopeAs(admin, { projectId: id }, invoke);
@@ -168,10 +167,8 @@ describe("the stored assessment and its staleness", () => {
       description: null,
       termCount: 1,
     });
-    const { id } = await createProjectAs(admin, {
-      ...baseProject(),
-      programId: program.id,
-    });
+    const { id } = await createProjectAs(admin, baseProject());
+    await updateProjectProgramAs(admin, { id, programId: program.id });
     await assessProjectScopeAs(admin, { projectId: id }, invoke);
     // The term count is part of what was judged against, so moving it is a
     // reason the verdict may no longer hold.

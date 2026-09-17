@@ -19,6 +19,7 @@ import {
   restoreProjectAs,
   softDeleteProjectAs,
   updateProjectAs,
+  updateProjectProgramAs,
   updateProjectProposerAs,
 } from "#/server/_internal/projects";
 import {
@@ -358,6 +359,26 @@ describe("the program on the public project payload", () => {
     return prog.id;
   }
 
+  /**
+   * A project filed under a program. Two writes since #450: `ProjectInput`
+   * carries no program, so staff place it after create, which is the order
+   * the panel works in. The placer is an admin because placing is staff
+   * work, even when a proposer created the project.
+   */
+  async function placedProject(
+    owner: Awaited<ReturnType<typeof makeUser>>,
+    admin: Awaited<ReturnType<typeof makeUser>>,
+    programId: string,
+    overrides: Partial<ReturnType<typeof baseProject>> = {}
+  ) {
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      ...overrides,
+    });
+    await updateProjectProgramAs(admin, { id, programId });
+    return id;
+  }
+
   // The pair the card and the Program column have always shown. An anonymous
   // reader is the whole point: a student who clicked through from a card was
   // the only viewer the program was hidden from (#449).
@@ -368,10 +389,7 @@ describe("the program on the public project payload", () => {
       "CS 461",
       "Software Engineering Project"
     );
-    const { id } = await createProjectAs(owner, {
-      ...baseProject(),
-      programId,
-    });
+    const id = await placedProject(owner, admin, programId);
     await forceTransitionAs(admin, id, "published", undefined, {
       sendEmail: false,
     });
@@ -399,11 +417,9 @@ describe("the program on the public project payload", () => {
   // from under a project reads as no program rather than as a dangling id.
   it("reports null once the program is deleted", async () => {
     const owner = await makeUser(`pg-d-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`pg-da-${Date.now()}@x.com`, "admin");
     const programId = await makeProgram("ECE 441", "Capstone");
-    const { id } = await createProjectAs(owner, {
-      ...baseProject(),
-      programId,
-    });
+    const id = await placedProject(owner, admin, programId);
     await db.delete(programs).where(eq(programs.id, programId));
 
     const { project } = await getProjectAs(owner, { id });
@@ -417,10 +433,9 @@ describe("the program on the public project payload", () => {
   // what the detail read returns beside the program.
   it("returns one project, with the rest of the payload intact", async () => {
     const owner = await makeUser(`pg-1-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`pg-1a-${Date.now()}@x.com`, "admin");
     const programId = await makeProgram("CS 462", "Capstone II");
-    const { id } = await createProjectAs(owner, {
-      ...baseProject(),
-      programId,
+    const id = await placedProject(owner, admin, programId, {
       title: "Joined once",
     });
 
@@ -429,6 +444,79 @@ describe("the program on the public project payload", () => {
     expect(project?.id).toBe(id);
     expect(project?.title).toBe("Joined once");
     expect(project?.programId).toBe(programId);
+  });
+});
+
+describe("updateProjectProgramAs", () => {
+  async function makeProgram(courseId: string) {
+    const [prog] = await db
+      .insert(programs)
+      .values({ courseId, courseName: "Capstone" })
+      .returning();
+    return prog.id;
+  }
+
+  async function programOf(id: string) {
+    const [row] = await db
+      .select({ programId: projects.programId })
+      .from(projects)
+      .where(eq(projects.id, id));
+    return row.programId;
+  }
+
+  // The whole point of #450: the proposer proposes, staff place. A proposer
+  // who could call this would have the field back by another door.
+  it("refuses a non-staff viewer, the proposer included", async () => {
+    const owner = await makeUser(`pr-o-${Date.now()}@x.com`, "user");
+    const programId = await makeProgram(`PR-${Date.now()}`);
+    const { id } = await createProjectAs(owner, baseProject());
+
+    await expect(
+      updateProjectProgramAs(owner, { id, programId })
+    ).rejects.toThrow("Forbidden");
+    expect(await programOf(id)).toBeNull();
+  });
+
+  it("creates unplaced, because ProjectInput no longer carries a program", async () => {
+    const admin = await makeUser(`pr-c-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(admin, baseProject());
+
+    expect(await programOf(id)).toBeNull();
+  });
+
+  it("places, logs one row naming the field, and writes none for an unchanged save", async () => {
+    const admin = await makeUser(`pr-p-${Date.now()}@x.com`, "admin");
+    const programId = await makeProgram(`PP-${Date.now()}`);
+    const { id } = await createProjectAs(admin, baseProject());
+
+    const first = await updateProjectProgramAs(admin, { id, programId });
+    expect(first.updated).toBe(true);
+    expect(await programOf(id)).toBe(programId);
+
+    const again = await updateProjectProgramAs(admin, { id, programId });
+    expect(again.updated).toBe(false);
+
+    const log = await db
+      .select()
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
+    expect(log).toHaveLength(1);
+    expect(log[0].editorId).toBe(admin.id);
+    expect(log[0].changedFields).toEqual(["programId"]);
+  });
+
+  // The empty string is what `ProgramSelect` emits for its no-program
+  // choice, and it has to reach the column as a null rather than as a value.
+  it("clears the program on an empty string", async () => {
+    const admin = await makeUser(`pr-x-${Date.now()}@x.com`, "admin");
+    const programId = await makeProgram(`PX-${Date.now()}`);
+    const { id } = await createProjectAs(admin, baseProject());
+    await updateProjectProgramAs(admin, { id, programId });
+
+    const cleared = await updateProjectProgramAs(admin, { id, programId: "" });
+
+    expect(cleared.updated).toBe(true);
+    expect(await programOf(id)).toBeNull();
   });
 });
 

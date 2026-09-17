@@ -17,6 +17,7 @@ import { createProgramAs } from "#/server/_internal/programs";
 import {
   createProjectAs,
   forceTransitionAs,
+  updateProjectProgramAs,
 } from "#/server/_internal/projects";
 
 async function makeUser(email: string, role: UserRole) {
@@ -31,7 +32,7 @@ async function makeUser(email: string, role: UserRole) {
   return { id: u.id, role: u.role };
 }
 
-function baseProject(programId: string | null = null) {
+function baseProject() {
   return {
     title: "T",
     description: "D",
@@ -47,7 +48,6 @@ function baseProject(programId: string | null = null) {
     isSponsored: false,
     teamsSupported: 2,
     acceptingApplicants: true,
-    programId,
     imageUrl: null,
     notes: null,
     categoryIds: [],
@@ -77,8 +77,12 @@ describe("the program selector", () => {
       description: null,
       expectedTeams: null,
     });
-    const inA = await createProjectAs(admin, baseProject(a.id));
-    const inB = await createProjectAs(admin, baseProject(b.id));
+    // Placed after create: `createProjectAs` stopped carrying a program in
+    // #450, so the staff writer is the only one that sets the column.
+    const inA = await createProjectAs(admin, baseProject());
+    await updateProjectProgramAs(admin, { id: inA.id, programId: a.id });
+    const inB = await createProjectAs(admin, baseProject());
+    await updateProjectProgramAs(admin, { id: inB.id, programId: b.id });
     await forceTransitionAs(admin, inA.id, "published", undefined, {
       sendEmail: false,
     });
