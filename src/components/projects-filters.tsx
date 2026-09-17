@@ -234,7 +234,17 @@ export function ProjectsSearchBar({
         id={hintId}
       />
       <Select onValueChange={(v) => setOrder(v as ProjectsOrder)} value={order}>
-        <SelectTrigger aria-label="Sort" className="w-44" id="filter-sort">
+        {/*
+          w-52 because this trigger has to hold "Recommended for you".
+          Under the w-44 it carried before, after px-3, the gap-2 and the
+          16px chevron, the value got 126px against the 146px the label
+          needs at text-sm, so the sort a signed-in reader picked was the
+          one they could not read back (#454). The trigger is a fixed 176px
+          at 375 as well as at desktop, so the clipping was the same at both
+          widths and so is the fix. The row still fits at 768 in table view,
+          because the input beside it absorbs the 32px; see its basis-40.
+        */}
+        <SelectTrigger aria-label="Sort" className="w-52" id="filter-sort">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
