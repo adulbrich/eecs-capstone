@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { projectImageSrc } from "#/lib/project-image";
-import { type ProjectProgram, programLabel } from "#/lib/project-visibility";
+import type { ProjectProgram } from "#/lib/project-visibility";
 import { stripMarkdown } from "#/lib/strip-markdown";
 import { BookmarkToggle } from "./bookmark-set";
 import { ImageOrFallback } from "./image-or-fallback";
@@ -22,15 +22,6 @@ interface ProjectSummary {
   studentProposed: boolean;
   title: string;
   updatedAt?: Date | string | null;
-}
-
-/**
- * The full label of each program a project runs in, in the `course_id`
- * order the aggregate already sorted them into (#462). The detail page maps
- * these into one badge each; the card shows course ids only, below.
- */
-function programLabels(project: { programs: ProjectProgram[] }): string[] {
-  return project.programs.map(programLabel);
 }
 
 /**
@@ -135,4 +126,4 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
 }
 
 export type { ProjectSummary };
-export { programCourseIds, programLabels };
+export { programCourseIds };

@@ -548,9 +548,7 @@ function AdminProjectsFilters({
             <SelectItem value="_all_">All programs</SelectItem>
             {/*
               No sentinel, unlike "_all_" above: "none" is the value the URL
-              actually carries, where "all" is the absent param. `program-select.tsx`
-              needs one for the same choice because there the empty string is
-              the stored value and Radix reserves it (#458).
+              actually carries, where "all" is the absent param (#458).
             */}
             <SelectItem value={PROGRAM_FILTER_NONE}>No program</SelectItem>
             {programs.map((p) => (

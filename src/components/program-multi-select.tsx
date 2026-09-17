@@ -20,10 +20,11 @@ interface Props {
  * of a handful of courses, so every option fits on screen and a combobox
  * would add a search affordance over five items.
  *
- * It also retires the `_none_` sentinel `ProgramSelect` needs, because
- * unchecking everything is the cleared set and no value has to stand in for
- * the absence of one. `ProgramSelect` itself stays: the listing filters are
- * still single-valued.
+ * It also retires the `_none_` sentinel the old single picker needed,
+ * because unchecking everything is the cleared set and no value has to
+ * stand in for the absence of one. That picker, `program-select.tsx`, is
+ * deleted with this: the staff panel was its only consumer, since both
+ * listing filters hand roll their own `Select` over `listPrograms`.
  *
  * The last-good list survives a failed load, the same reason
  * `CategoryMultiSelect` keeps its own: `value` still references those ids

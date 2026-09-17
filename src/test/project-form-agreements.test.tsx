@@ -2,9 +2,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-vi.mock("#/components/program-select", () => ({
-  ProgramSelect: () => null,
-}));
 vi.mock("#/components/category-multi-select", () => ({
   CategoryMultiSelect: () => null,
 }));

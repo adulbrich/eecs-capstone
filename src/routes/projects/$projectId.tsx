@@ -10,7 +10,6 @@ import { CategoryChip } from "#/components/category-chip";
 import { Markdown } from "#/components/markdown";
 import { OwnerProjectActions } from "#/components/owner-project-actions";
 import { ProjectBadges } from "#/components/project-badges";
-import { programLabels } from "#/components/project-card";
 import { ProjectPrivatePanel } from "#/components/project-private-panel";
 import { SectionHeading } from "#/components/section-heading";
 import { StaffProjectPanel } from "#/components/staff-project-panel";
@@ -22,6 +21,7 @@ import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
 import { projectImageSrc } from "#/lib/project-image";
 import { FIELD_HEADINGS } from "#/lib/project-review-fields";
+import { programLabel } from "#/lib/project-visibility";
 import { listProjectCategories } from "#/server/categories";
 import { getProject, listProjectComments } from "#/server/projects-queries";
 
@@ -94,7 +94,6 @@ function ProjectDetail() {
   } = Route.useLoaderData() as unknown as ProjectDetailData;
   const [comments, setComments] = useState<Comment[]>([]);
   const projectId = project.id;
-  const programs = programLabels(project);
 
   const refreshComments = useCallback(async () => {
     if (!projectId) {
@@ -157,9 +156,9 @@ function ProjectDetail() {
           listing does take `?program=<uuid>`, but a way off the page does
           not belong three lines under the title.
         */}
-        {programs.map((label) => (
-          <Badge key={label} variant="outline">
-            {label}
+        {project.programs.map((p) => (
+          <Badge key={p.id} variant="outline">
+            {programLabel(p)}
           </Badge>
         ))}
         <TeamFullBadge acceptingApplicants={project.acceptingApplicants} />
