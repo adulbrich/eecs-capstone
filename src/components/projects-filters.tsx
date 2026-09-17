@@ -235,22 +235,14 @@ export function ProjectsSearchBar({
       />
       <Select onValueChange={(v) => setOrder(v as ProjectsOrder)} value={order}>
         {/*
-          w-52 because this trigger has to hold "Recommended for you", which
-          needs 146px at text-sm. The trigger spends 50 of its own width
-          before the value gets any: 24 for px-3, 8 for the gap-2, 16 for
-          the chevron and 2 for the border, which is the term the subtraction
-          is easy to forget. So w-44 left 126px and clipped, through the
-          line-clamp-1 on SelectValue in ui/select.tsx, and w-52 leaves 158.
-
-          One width, not a width per breakpoint: the trigger measures a fixed
-          176px at 375 as well as at desktop, so the clipping was the same at
-          both and so is the fix.
-
-          At 768 in table view, the tightest case, the row still holds input,
-          sort, view toggle, Filters and Columns on one line, but with no
-          slack left: the last of them ends exactly where the row does. The
-          input's basis-40 absorbed the 32px this took; a sixth control, or a
-          longer label on one of these, wraps the row.
+          w-52 because "Recommended for you" needs 146px at text-sm, and the
+          trigger spends 50px before the value gets any: 24 px-3, 8 gap-2, 16
+          chevron, 2 border (the easy term to forget). So w-44 left 126 and
+          clipped it through SelectValue's line-clamp-1; w-52 leaves 158. The
+          trigger is a fixed 176px at 375 as well as at desktop, so one width
+          covers both. It costs the row its last slack at 768 in table view,
+          where the five controls now end exactly where the row does. See
+          #454, and the input's basis-40 for the budget this spent.
         */}
         <SelectTrigger aria-label="Sort" className="w-52" id="filter-sort">
           <SelectValue />
