@@ -52,6 +52,12 @@ async function loadScopeInput(projectId: string) {
     .innerJoin(programs, eq(programs.id, projectPrograms.programId))
     .where(eq(projectPrograms.projectId, project.id))
     .orderBy(asc(programs.courseId));
+  // Built here rather than through `programLabel`, on purpose. This string
+  // is part of the text `scopeSourceHash` covers, so binding it to the
+  // formatter the badges use would let a change made for the UI silently
+  // stale every stored verdict and charge staff a Bedrock call each. Same
+  // reason `SCOPE_FIELDS` in `scope-assessment-source.ts` does not follow
+  // `FIELD_LABELS` (#375).
   const programList: ScopeSourceProgram[] = rows.map((row) => ({
     label: `${row.courseId} ${row.courseName}`,
     termCount: row.termCount,
