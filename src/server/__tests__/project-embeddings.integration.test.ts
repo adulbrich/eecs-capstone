@@ -360,12 +360,16 @@ describe("embedding triggers", () => {
   /**
    * The headline consequence of [ADR-0025](../../../docs/adr/0025-the-embedded-text-is-prose-only.md),
    * on the writer path rather than only in the pure builder's unit test. A
-   * program is a column on `projects`, so attaching one is an ordinary update
-   * that used to change the embedded text and now does not.
+   * program is a column on `projects`, and attaching one used to change the
+   * embedded text and now does not.
    *
-   * Asserted as "no call", which is stronger than "hash unchanged": a call
-   * would mean the text moved, and the paid re-embed is the cost this decision
-   * was weighed against.
+   * Asserted on the stored hash rather than on a spy. It was a spy when the
+   * attach went through `updateProjectAs`, which takes an `embed` and gates a
+   * call on the diff; #450 moved the attach to `updateProjectProgramAs`,
+   * which takes no `embed` at all, so "no call" became true by construction.
+   * The hash is what still knows whether the text moved, and the paid
+   * re-embed a moved hash would cause is the cost this decision was weighed
+   * against.
    */
   it("leaves the embedded text alone when a program is attached", async () => {
     const admin = await makeAdmin(`pg-${Date.now()}@x.com`);
