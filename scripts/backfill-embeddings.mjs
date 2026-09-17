@@ -40,6 +40,21 @@
  * Keep every pinned body free of comments and of TypeScript annotations: the
  * comparison collapses whitespace but strips neither. Explain above the
  * function.
+ *
+ * Two more constraints follow from that test READING THIS FILE AS TEXT, and
+ * they bind the whole file rather than any one copy:
+ *
+ * - No URL anywhere, in a string or a comment. The test strips comments by
+ *   regex before matching, and the two slashes in a scheme, inside a string
+ *   literal, would make the strip eat real code. Cite a doc by path or by ADR
+ *   number, the way the paragraphs above do.
+ * - Keep `await main();` at the end and at least one `//` comment at the start
+ *   of a line. The test looks for both to prove the two strips ran and kept
+ *   the code they removed the comments from.
+ *
+ * `src/lib/embedding-source.ts` and `src/server/_internal/project-embeddings.ts`
+ * carry the same note, for the same reason: the constraint lives in a test in
+ * another directory and is invisible from the file it binds.
  */
 import { createHash } from "node:crypto";
 import {
