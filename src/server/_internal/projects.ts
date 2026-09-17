@@ -444,18 +444,20 @@ export async function updateProjectMentorshipForCurrentUser(
  * for its no-program choice. One edit-log row per change, and a save that
  * changes nothing writes none.
  *
- * The embedding is refreshed for the same reason `updateProjectAs` refreshes
- * it: `buildProjectEmbeddingSource` folds the program label into the text a
- * vector is computed from, so a project moved between programs would
- * otherwise keep a vector describing the course it left. The scope
- * assessment needs no such call: its source hash covers the program's
- * `term_count` and `getScopeAssessmentAs` recomputes that hash on read, so a
- * move already reports the stored verdict as stale.
+ * No embedding refresh, unlike `updateProjectAs`. The program label is on
+ * its way out of `buildProjectEmbeddingSource`, so refreshing here would buy
+ * a vector that is about to stop depending on this column at all. Until that
+ * lands, a project moved between programs keeps a vector naming the course
+ * it left, which is a deliberate and short-lived cost.
+ *
+ * The scope assessment needs no call either, for a better reason: its source
+ * hash covers the program's `term_count` and `getScopeAssessmentAs`
+ * recomputes that hash on read, so a move already reports the stored verdict
+ * as stale.
  */
 export async function updateProjectProgramAs(
   viewer: Viewer,
-  data: ProgramInput,
-  embed?: EmbedFn
+  data: ProgramInput
 ): Promise<{ id: string; updated: boolean }> {
   assertStaff(viewer);
   const existing = await loadProjectOr404(data.id);
@@ -482,9 +484,6 @@ export async function updateProjectProgramAs(
       newValues: newDiff,
     });
   });
-  if (isEmbeddableStatus(existing.status)) {
-    await refreshProjectEmbedding(existing.id, embed);
-  }
   return { id: existing.id, updated: true };
 }
 

@@ -99,9 +99,14 @@ Each project carries:
   a `proposerEmail` link key for proposers without an account yet. The creator
   is the proposer on create; staff link, reassign or unlink from the Proposer
   section of the staff panel on the project page, never from the form (#322).
-- [x] Program association.
+- [x] Program association: which program a project runs in, set by staff from
+  the Program section of the staff panel and never from the form (#450,
+  [ADR-0026](./docs/adr/0026-the-program-is-staff-placed-not-proposed.md)). A
+  project is created unplaced and staff place it during review.
 - [x] Teams supported: how many student teams the project can take on (1-5,
-  default 1), set and edited by staff on the project form.
+  default 1), on the project form, where anyone who may edit the project sets
+  it. This line used to say staff set it on the form, which matched neither
+  the form's gating nor the field's intent.
 - [x] Student-proposed marker and mentor: staff mark a project as student-proposed
   from the Proposer section of the staff panel, saved with the link, and record a
   mentor's email from the Mentor section. Mentorship is that address and nothing
