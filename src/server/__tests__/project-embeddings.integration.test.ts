@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 import { db } from "#/db";
-import { projects, user } from "#/db/schema";
+import { programs, projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { refreshProjectEmbedding } from "#/server/_internal/project-embeddings";
 import {
@@ -354,5 +354,42 @@ describe("embedding triggers", () => {
     );
 
     expect(embed).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The headline consequence of [ADR-0025](../../../docs/adr/0025-the-embedded-text-is-prose-only.md),
+   * on the writer path rather than only in the pure builder's unit test. A
+   * program is a column on `projects`, so attaching one is an ordinary update
+   * that used to change the embedded text and now does not.
+   *
+   * Asserted as "no call", which is stronger than "hash unchanged": a call
+   * would mean the text moved, and the paid re-embed is the cost this decision
+   * was weighed against.
+   */
+  it("does not embed when a program is attached to a published project", async () => {
+    const admin = await makeAdmin(`pg-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Live"));
+    const embed = vi.fn().mockResolvedValue(VECTOR);
+    await publish(admin, id);
+    await refreshProjectEmbedding(id, embed);
+    // The precondition, asserted rather than assumed: if `publish` had missed,
+    // `updateProjectAs` would skip the embed path on status alone and the
+    // "not called" below would pass without testing anything.
+    expect(embed).toHaveBeenCalledTimes(1);
+    embed.mockClear();
+
+    const [program] = await db
+      .insert(programs)
+      .values({ courseId: `CS46X-${Date.now()}`, courseName: "Capstone" })
+      .returning();
+    await updateProjectAs(
+      admin,
+      { ...baseProject("Live"), id, programId: program.id },
+      embed
+    );
+
+    expect(embed).not.toHaveBeenCalled();
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.programId).toBe(program.id);
   });
 });

@@ -19,7 +19,7 @@ const project: EmbeddableProject = {
 
 describe("buildProjectEmbeddingSource", () => {
   it("includes every text field", () => {
-    const source = buildProjectEmbeddingSource(project, [], null);
+    const source = buildProjectEmbeddingSource(project);
     expect(source).toContain("Autonomous Rover Telemetry");
     expect(source).toContain("streams sensor data");
     expect(source).toContain("collected by hand");
@@ -29,33 +29,35 @@ describe("buildProjectEmbeddingSource", () => {
     expect(source).toContain("MIT");
   });
 
-  it("includes category names and the program label", () => {
-    const source = buildProjectEmbeddingSource(
-      project,
-      ["Robotics", "Embedded"],
-      "CS 461 Capstone"
-    );
-    expect(source).toContain("Robotics");
-    expect(source).toContain("Embedded");
-    expect(source).toContain("CS 461 Capstone");
+  /**
+   * The negative is the point, and it is asserted on the labels rather than on
+   * the values: a project whose description happens to say "Robotics" is still
+   * correct, and an assertion on the word would fail for the wrong reason.
+   * ADR-0025 is why they are out, and this is what would notice them coming
+   * back by accident: every stored hash would stop matching at once, at one
+   * paid Bedrock call per project, with nothing else to say so.
+   */
+  it("carries no Categories or Program section", () => {
+    const source = buildProjectEmbeddingSource(project);
+    expect(source).not.toContain("Categories:");
+    expect(source).not.toContain("Program:");
   });
 
   it("omits empty fields rather than emitting bare labels", () => {
-    const source = buildProjectEmbeddingSource(
-      { ...project, objectives: null, licenseRestrictions: null },
-      [],
-      null
-    );
+    const source = buildProjectEmbeddingSource({
+      ...project,
+      objectives: null,
+      licenseRestrictions: null,
+    });
     expect(source).not.toContain("Objectives:");
     expect(source).not.toContain("License:");
   });
 
   it("truncates at the source limit", () => {
-    const source = buildProjectEmbeddingSource(
-      { ...project, description: "x".repeat(60_000) },
-      [],
-      null
-    );
+    const source = buildProjectEmbeddingSource({
+      ...project,
+      description: "x".repeat(60_000),
+    });
     expect(source.length).toBe(EMBEDDING_SOURCE_LIMIT);
   });
 });

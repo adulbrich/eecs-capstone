@@ -40,6 +40,21 @@
  * Keep every pinned body free of comments and of TypeScript annotations: the
  * comparison collapses whitespace but strips neither. Explain above the
  * function.
+ *
+ * Two more constraints follow from that test READING THIS FILE AS TEXT, and
+ * they bind the whole file rather than any one copy:
+ *
+ * - No URL anywhere, in a string or a comment. The test strips comments by
+ *   regex before matching, and the two slashes in a scheme, inside a string
+ *   literal, would make the strip eat real code. Cite a doc by path or by ADR
+ *   number, the way the paragraphs above do.
+ * - Keep `await main();` at the end and at least one `//` comment at the start
+ *   of a line. The test looks for both to prove the two strips ran and kept
+ *   the code they removed the comments from.
+ *
+ * `src/lib/embedding-source.ts` and `src/server/_internal/project-embeddings.ts`
+ * carry the same note, for the same reason: the constraint lives in a test in
+ * another directory and is invisible from the file it binds.
  */
 import { createHash } from "node:crypto";
 import {
@@ -57,11 +72,6 @@ const EMBEDDING_SOURCE_LIMIT = 45_000;
 /** MUST match `DEFAULT_REGION` in `src/lib/_internal/bedrock.ts`. */
 const DEFAULT_REGION = "us-east-1";
 
-/** MUST match `buildProgramLabel` in `src/lib/embedding-source.ts`. */
-function buildProgramLabel(courseId, courseName) {
-  return `${courseId} ${courseName}`;
-}
-
 /** MUST match `section` in `src/lib/embedding-source.ts`. */
 function section(label, value) {
   const trimmed = value?.trim();
@@ -69,7 +79,7 @@ function section(label, value) {
 }
 
 /** MUST match `buildProjectEmbeddingSource` in `src/lib/embedding-source.ts`. */
-function buildProjectEmbeddingSource(project, categoryNames, programLabel) {
+function buildProjectEmbeddingSource(project) {
   const parts = [
     section("Title", project.title),
     section("Description", project.description),
@@ -78,11 +88,6 @@ function buildProjectEmbeddingSource(project, categoryNames, programLabel) {
     section("Minimum qualifications", project.minQualifications),
     section("Preferred qualifications", project.prefQualifications),
     section("License", project.licenseRestrictions),
-    section("Program", programLabel),
-    section(
-      "Categories",
-      categoryNames.length > 0 ? categoryNames.join(", ") : null
-    ),
   ].filter((part) => part !== null);
   return parts.join("\n\n").slice(0, EMBEDDING_SOURCE_LIMIT);
 }
@@ -192,8 +197,9 @@ function sleep(ms) {
  * longer existed, and no writer anywhere would ever correct it.
  *
  * A second run is still nearly free. The hash comparison happens before the
- * Bedrock call, so an unchanged row costs one small query, two if it has a
- * program, and no paid call. `DELAY_MS` is not spent on it either.
+ * Bedrock call, so an unchanged row costs no further query at all, no paid
+ * call, and no `DELAY_MS`: everything the source string is built from comes
+ * back in this one select.
  *
  * `hasEmbedding` is selected rather than the vector itself: 1024 floats per
  * row are not needed to decide, and the skip below must test it for the
@@ -209,40 +215,12 @@ const SELECT_SQL = `
          min_qualifications  AS "minQualifications",
          pref_qualifications AS "prefQualifications",
          license_restrictions AS "licenseRestrictions",
-         program_id          AS "programId",
          embedding_source_hash AS "embeddingSourceHash",
          embedding IS NOT NULL AS "hasEmbedding"
   FROM projects
   WHERE status IN ('published', 'archived')
     AND deleted_at IS NULL
   ORDER BY created_at
-`;
-
-/**
- * One query per project, mirroring `refreshProjectEmbedding` rather than
- * batching, because the category order decides the source string and so the
- * hash. Neither side sorts, so matching the app's query shape is the closest
- * thing to matching its order. A mismatch is never a wrong vector, and it
- * does not compound: this writes back the hash of the order IT read, so the
- * next sweep reads the same order and skips the row. The cost is one re-embed
- * each time the writer changes hands, sweeper to app or back, which this
- * branch made reachable by sweeping rows that already have a vector. Sorting
- * both sides ends it, and is #457. None of the imported legacy rows can hit
- * it: `import-legacy.mjs` never writes `project_categories`, so they have no
- * categories at all.
- */
-const CATEGORIES_SQL = `
-  SELECT c.name
-  FROM project_categories pc
-  JOIN categories c ON c.id = pc.category_id
-  WHERE pc.project_id = $1
-`;
-
-/** The aliases MUST match what `buildProgramLabel` is handed in `src/`. */
-const PROGRAM_SQL = `
-  SELECT course_id AS "courseId", course_name AS "courseName"
-  FROM programs
-  WHERE id = $1
 `;
 
 /**
@@ -290,21 +268,7 @@ async function main() {
     for (const project of rows) {
       let calledBedrock = false;
       try {
-        const categories = await db.query(CATEGORIES_SQL, [project.id]);
-        let programLabel = null;
-        if (project.programId) {
-          const programs = await db.query(PROGRAM_SQL, [project.programId]);
-          const program = programs.rows[0];
-          programLabel = program
-            ? buildProgramLabel(program.courseId, program.courseName)
-            : null;
-        }
-
-        const source = buildProjectEmbeddingSource(
-          project,
-          categories.rows.map((row) => row.name),
-          programLabel
-        );
+        const source = buildProjectEmbeddingSource(project);
         const hash = embeddingHash(
           source,
           EMBEDDING_MODEL_ID,
@@ -338,10 +302,10 @@ async function main() {
         //
         // `calledBedrock` is set immediately before the call, so a throttled
         // failure still waits. What it excludes is a row that never called
-        // Bedrock at all: one skipped on its hash, and a row that threw in a
-        // query above. Throttling neither is the point, and without this a
-        // sweep of rows that are nearly all unchanged would spend `DELAY_MS`
-        // on every one of them. It is also where the two sweepers differ:
+        // Bedrock at all, which since ADR-0025 means one skipped on its hash.
+        // Throttling that is not the point, and without this a sweep of rows
+        // that are nearly all unchanged would spend `DELAY_MS` on every one of
+        // them. It is also where the two sweepers differ:
         // `backfill-embeddings.ts` sleeps after a failure of any kind.
         if (calledBedrock) {
           await sleep(DELAY_MS);

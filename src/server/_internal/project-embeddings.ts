@@ -22,13 +22,7 @@
  */
 import { eq } from "drizzle-orm";
 import { db } from "#/db";
-import {
-  categories,
-  programs,
-  projectCategories,
-  projects,
-  userInterests,
-} from "#/db/schema";
+import { projects, userInterests } from "#/db/schema";
 import {
   bedrockEmbed,
   EMBEDDING_DIMENSIONS,
@@ -37,7 +31,6 @@ import {
 } from "#/lib/_internal/bedrock-embed";
 import {
   buildInterestsEmbeddingSource,
-  buildProgramLabel,
   buildProjectEmbeddingSource,
   embeddingHash,
 } from "#/lib/embedding-source";
@@ -109,31 +102,11 @@ export async function refreshProjectEmbedding(
       return "skipped";
     }
 
-    const categoryRows = await db
-      .select({ name: categories.name })
-      .from(projectCategories)
-      .innerJoin(categories, eq(projectCategories.categoryId, categories.id))
-      .where(eq(projectCategories.projectId, projectId));
-
-    let programLabel: string | null = null;
-    if (project.programId) {
-      const [program] = await db
-        .select({
-          courseId: programs.courseId,
-          courseName: programs.courseName,
-        })
-        .from(programs)
-        .where(eq(programs.id, project.programId));
-      programLabel = program
-        ? buildProgramLabel(program.courseId, program.courseName)
-        : null;
-    }
-
-    const source = buildProjectEmbeddingSource(
-      project,
-      categoryRows.map((row) => row.name),
-      programLabel
-    );
+    // The row and nothing else: the embedded text is the project's own prose,
+    // so neither its categories nor its program is read here any more
+    // (ADR-0025). Editing either leaves the hash alone and this returns
+    // "unchanged", which is correct rather than a miss.
+    const source = buildProjectEmbeddingSource(project);
     const hash = embeddingHash(
       source,
       EMBEDDING_MODEL_ID,

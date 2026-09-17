@@ -3,6 +3,19 @@ import { createHash } from "node:crypto";
 /**
  * Pure source-text and hash helpers for embeddings. No DB and no AWS imports,
  * so this is trivially unit-testable and safe to import from either side.
+ *
+ * READ AS TEXT by `src/test/backfill-embeddings-parity.test.ts`, which pins
+ * what `scripts/backfill-embeddings.mjs` copies across the production image
+ * boundary (ADR-0024). Two constraints on this file follow from that and would
+ * otherwise be invisible from here:
+ *
+ * - No URL anywhere, in a string or a comment. The test strips comments by
+ *   regex before matching, and the two slashes in a scheme, inside a string
+ *   literal, would make the strip eat real code. Cite a doc by path or by ADR
+ *   number, as the JSDoc below does.
+ * - Keep `export function buildProjectEmbeddingSource(` spelled exactly that
+ *   way. The test looks for it to prove the strip kept the code it removed the
+ *   comments from, so a rename has to move in both places at once.
  */
 export const EMBEDDING_SOURCE_LIMIT = 45_000;
 
@@ -22,22 +35,13 @@ function section(label: string, value: string | null): string | null {
 }
 
 /**
- * The "Program" section's text. Here rather than inline at the two call sites
- * because it is part of the embedded source, so it has to be pinned like the
- * rest of it: change the space to a colon and every hash the script wrote
- * stops matching, with nothing to say so. Copied and compared like
- * `buildProjectEmbeddingSource` below, so the same rule holds: no comments and
- * no annotations inside the body.
- */
-export function buildProgramLabel(
-  courseId: string,
-  courseName: string
-): string {
-  return `${courseId} ${courseName}`;
-}
-
-/**
  * Assembles the exact string that gets embedded.
+ *
+ * The project's own prose and nothing else. Its categories and its program are
+ * deliberately left out, and `docs/adr/0025-the-embedded-text-is-prose-only.md`
+ * is why. In short: both are exact filters on the listing already, the category
+ * vocabulary is generic enough that a project carrying a tag almost always says
+ * so in its own description, and a course identifier is not language.
  *
  * Copied byte for byte into `scripts/backfill-embeddings.mjs`, which the
  * production image ships without any `src/` to import (ADR-0024), and compared
@@ -45,13 +49,11 @@ export function buildProgramLabel(
  * So keep this body comment-free and annotation-free: a comment inside it, or
  * the type predicate that used to sit on the `filter` below, fails a
  * comparison an `.mjs` cannot match. Explain above the function, the way this
- * does. `section`, `buildProgramLabel` and `embeddingHash` are under the same
- * rule; the parity test's `it` names are the inventory, not this comment.
+ * does. `section` and `embeddingHash` are under the same rule; the parity
+ * test's `it` names are the inventory, not this comment.
  */
 export function buildProjectEmbeddingSource(
-  project: EmbeddableProject,
-  categoryNames: string[],
-  programLabel: string | null
+  project: EmbeddableProject
 ): string {
   const parts = [
     section("Title", project.title),
@@ -61,11 +63,6 @@ export function buildProjectEmbeddingSource(
     section("Minimum qualifications", project.minQualifications),
     section("Preferred qualifications", project.prefQualifications),
     section("License", project.licenseRestrictions),
-    section("Program", programLabel),
-    section(
-      "Categories",
-      categoryNames.length > 0 ? categoryNames.join(", ") : null
-    ),
   ].filter((part) => part !== null);
   return parts.join("\n\n").slice(0, EMBEDDING_SOURCE_LIMIT);
 }

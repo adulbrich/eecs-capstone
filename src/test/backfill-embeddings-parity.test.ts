@@ -63,9 +63,9 @@ const SCRIPT_FILE = readFileSync("scripts/backfill-embeddings.mjs", "utf8");
  * literals from text that still holds comments is circular, since an
  * apostrophe in a comment opens one. What stands in for a proof is narrower
  * and testable, and the first `describe` below checks all three parts over
- * both stripped sources, `backfill-embeddings.mjs` and
- * `project-embeddings.ts`. Neither contains `://`, which is the sequence that
- * would put a `//` inside a string. Both strips are shown to run. The braces
+ * every stripped source: `backfill-embeddings.mjs`, `project-embeddings.ts`
+ * and `embedding-source.ts`. None of them contains `://`, the sequence that
+ * would put a `//` inside a string. Each strip is shown to run. The braces
  * still balance afterwards, which a swallowed run of code would almost
  * certainly break.
  *
@@ -74,6 +74,18 @@ const SCRIPT_FILE = readFileSync("scripts/backfill-embeddings.mjs", "utf8");
  * `://` check is what keeps the unanchored form safe.
  */
 const SCRIPT_CODE = SCRIPT_FILE.replace(/\/\*[\s\S]*?\*\//g, "").replace(
+  /\/\/.*$/gm,
+  ""
+);
+
+/**
+ * `embedding-source.ts` with its comments stripped, for the same reason
+ * `SCRIPT_CODE` exists: the negative pin below matches a call expression, and
+ * a JSDoc explaining why that call is absent would otherwise satisfy it. Safe
+ * on the same narrow grounds, and checked rather than claimed: the URL and
+ * brace guards in the first `describe` run over this file too.
+ */
+const SOURCE_CODE = SOURCE_FILE.replace(/\/\*[\s\S]*?\*\//g, "").replace(
   /\/\/.*$/gm,
   ""
 );
@@ -92,9 +104,9 @@ const EMBEDDINGS_FILE = readFileSync(
  * there at all.
  *
  * Safe for the same narrow reason as the script's strip, and by the same
- * assertions: the first `describe` below runs all three over both files, so
- * "contains no `://`" and "braces still balance" are checks here rather than
- * claims.
+ * assertions: the first `describe` below runs all three over every stripped
+ * file, so "contains no `://`" and "braces still balance" are checks here
+ * rather than claims.
  */
 const EMBEDDINGS_CODE = EMBEDDINGS_FILE.replace(
   /\/\*[\s\S]*?\*\//g,
@@ -105,7 +117,6 @@ const STATUS_SET_PATTERN =
   /const EMBEDDABLE_STATUSES: readonly ProjectStatus\[\] = \[([^\]]*)\]/;
 const SQL_STATUS_PATTERN = /WHERE status IN \(([^)]*)\)/;
 const INTERFACE_PATTERN = /export interface EmbeddableProject \{([\s\S]*?)\n\}/;
-const PROGRAM_SQL_PATTERN = /const PROGRAM_SQL = `([^`]*)`/;
 const SELECT_SQL_PATTERN = /const SELECT_SQL = `([^`]*)`/;
 
 /** The quoted words inside a captured `[...]` or `(...)`, in source order. */
@@ -164,14 +175,15 @@ function bothBodies(name: string, src: string, srcLabel: string) {
  * Not part of the inventory below. These prove the reading the inventory's
  * assertions depend on, and pin no copied declaration of their own.
  *
- * Both stripped files go through all three, because a guard that covers one
- * of two identically stripped files is the prose-shaped assertion this file
- * exists to refuse.
+ * Every stripped file goes through all three, because a guard that covers
+ * some of a set of identically stripped files is the prose-shaped assertion
+ * this file exists to refuse.
  */
-describe("reading the two stripped files as code rather than as text", () => {
+describe("reading the three stripped files as code rather than as text", () => {
   it.each([
     ["backfill-embeddings.mjs", SCRIPT_CODE],
     ["project-embeddings.ts", EMBEDDINGS_CODE],
+    ["embedding-source.ts", SOURCE_CODE],
   ])("lose no brace in %s to the strip", (_label, code) => {
     // The cheap structural check: a strip that ate a run of real code almost
     // certainly takes a brace with it. Not a parser, and not claiming to be.
@@ -193,18 +205,40 @@ describe("reading the two stripped files as code rather than as text", () => {
    * everything.
    */
   it.each([
-    ["backfill-embeddings.mjs", SCRIPT_FILE, SCRIPT_CODE, "await main();"],
+    [
+      "backfill-embeddings.mjs",
+      SCRIPT_FILE,
+      SCRIPT_CODE,
+      "await main();",
+      true,
+    ],
     [
       "project-embeddings.ts",
       EMBEDDINGS_FILE,
       EMBEDDINGS_CODE,
       "export async function refreshProjectEmbedding(",
+      true,
+    ],
+    [
+      "embedding-source.ts",
+      SOURCE_FILE,
+      SOURCE_CODE,
+      "export function buildProjectEmbeddingSource(",
+      false,
     ],
   ])(
     "lose every comment in %s and keep every statement",
-    (_label, raw, code, kept) => {
+    (_label, raw, code, kept, hasLineComment) => {
+      // Every one of the three carries JSDoc, so the block strip always has
+      // something to remove and the "there was something to strip" proof rests
+      // on that. The line strip is different: `embedding-source.ts` is all
+      // JSDoc and carries no `//` at all, and demanding one would be this file
+      // inventing a rule about another file rather than describing one. So the
+      // presence check is per-file and the removal check is not.
       expect(raw).toMatch(/\/\*/);
-      expect(raw).toMatch(/^[ \t]*\/\//m);
+      if (hasLineComment) {
+        expect(raw).toMatch(/^[ \t]*\/\//m);
+      }
       expect(code).not.toMatch(/\/\*/);
       expect(code).not.toMatch(/\/\//);
       expect(code).toContain(kept);
@@ -219,15 +253,16 @@ describe("reading the two stripped files as code rather than as text", () => {
    * It refuses a URL anywhere, including in a comment, where one would in fact
    * be harmless. That bluntness is deliberate: telling a comment from a string
    * is the job of the strip this assertion exists to protect, so doing it here
-   * would be the circularity again. Both stripped files are scanned, so the
+   * would be the circularity again. Every stripped file is scanned, so the
    * `src/` original is no longer the place to put a URL out of reach either.
-   * A doc reference in one of these two spells the path or the ADR number
+   * A doc reference in any of the three spells the path or the ADR number
    * rather than a link, and the assertion is not to be deleted to get past
    * this. Every other file in the repo is untouched by it.
    */
   it.each([
     ["backfill-embeddings.mjs", SCRIPT_FILE],
     ["project-embeddings.ts", EMBEDDINGS_FILE],
+    ["embedding-source.ts", SOURCE_FILE],
   ])("contains no URL in %s, in a string or anywhere else", (_label, raw) => {
     expect(raw).not.toContain("://");
   });
@@ -243,39 +278,24 @@ describe("the production backfill's copies of the embedding helpers", () => {
     expect(fromScript).toBe(fromSrc);
   });
 
-  it("label a program the same way", () => {
-    const [fromSrc, fromScript] = bothBodies(
-      "buildProgramLabel",
-      SOURCE_FILE,
-      "embedding-source.ts"
-    );
-    expect(fromScript).toBe(fromSrc);
-  });
-
   /**
-   * Pinned against a literal as well, because the label is an input to
-   * `embedding_source_hash`: turning the space into a colon on both sides at
-   * once re-keys every project that has a program, and a copy-to-copy
-   * comparison passes that happily.
+   * The negative, pinned on both sides. ADR-0025 took the project's categories
+   * and its program out of the embedded text, and putting either back is the
+   * most expensive edit anybody can make to this string: every stored hash
+   * stops matching at once and the next sweep re-embeds every project at one
+   * paid call each. The body comparison below would notice a change on ONE side;
+   * this notices a change applied to both, which is exactly how a section gets
+   * reintroduced.
    */
-  it("label a program by exactly the pinned construction", () => {
-    expect(functionBody(SOURCE_FILE, "buildProgramLabel", "src")).toBe(
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: the pinned text of the template literal inside buildProgramLabel, not a template literal of its own.
-      "return `${courseId} ${courseName}`;"
-    );
-  });
-
-  /**
-   * The body pin above says the two spell the label the same way; it says
-   * nothing about the values handed in. The script reads them out of
-   * `PROGRAM_SQL`, so a renamed alias there leaves `courseId` undefined and
-   * the label reads "undefined Something" with no error.
-   */
-  it("select the columns the program label is built from", () => {
-    const programSql = PROGRAM_SQL_PATTERN.exec(SCRIPT_FILE)?.[1];
-    expect(programSql).toBeDefined();
-    expect(programSql).toContain('AS "courseId"');
-    expect(programSql).toContain('AS "courseName"');
+  it("carry no Categories or Program section on either side", () => {
+    for (const source of [SOURCE_CODE, SCRIPT_CODE]) {
+      // The call, not the label: a formatter is free to wrap the arguments,
+      // so anchoring on `section("Program"` with its argument on the same line
+      // would pass the moment Biome broke the line. `section(` plus the label
+      // in either order is what a reintroduced section cannot avoid.
+      expect(source).not.toMatch(/section\(\s*"Program"/);
+      expect(source).not.toMatch(/section\(\s*"Categories"/);
+    }
   });
 
   /**
@@ -484,13 +504,13 @@ describe("the production backfill's copies of the embedding helpers", () => {
 
   /**
    * Every pin above compares a declaration. None of them says the script
-   * reaches it: inline the label at the call site and leave the copied
-   * function sitting there unused, and all three program pins still pass.
+   * reaches it: inline a copied function at its call site and leave the
+   * original sitting there unused, and its body pin still passes.
    *
    * Searched with the comments stripped, because ADR-0024 puts the
    * explanation of every copy in the JSDoc directly above it, which is exactly
-   * where somebody writes `buildProgramLabel(courseId, courseName)` in prose
-   * and satisfies this check with no call anywhere.
+   * where somebody writes `embeddingHash(source, modelId, dimensions)` in
+   * prose and satisfies this check with no call anywhere.
    *
    * `section` is deliberately absent. Its only calls are inside
    * `buildProjectEmbeddingSource`, whose body is pinned byte for byte, so the
@@ -498,7 +518,6 @@ describe("the production backfill's copies of the embedding helpers", () => {
    * vacuous pass this test is here to stop.
    */
   it.each([
-    "buildProgramLabel",
     "buildProjectEmbeddingSource",
     "embeddingHash",
     "buildEmbedConfig",
