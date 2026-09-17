@@ -175,7 +175,7 @@ function confirmDialog(title: string) {
 }
 
 describe("StaffProjectPanel section order", () => {
-  it("shows the seven sections in the order #322 asked for", async () => {
+  it("shows the eight sections in the order #322 and #450 asked for", async () => {
     renderPanel("submitted");
     await screen.findByLabelText("Proposer email");
     const titles = Array.from(document.querySelectorAll("h3")).map(
@@ -183,6 +183,9 @@ describe("StaffProjectPanel section order", () => {
     );
     expect(titles).toEqual([
       "Status",
+      // Placing a project is the decision staff make right after deciding
+      // whether to take it, and before deciding whose it is (#450).
+      "Program",
       "Proposer",
       "Mentor",
       "Scope assessment",
