@@ -22,22 +22,13 @@ function section(label: string, value: string | null): string | null {
 }
 
 /**
- * The "Program" section's text. Here rather than inline at the two call sites
- * because it is part of the embedded source, so it has to be pinned like the
- * rest of it: change the space to a colon and every hash the script wrote
- * stops matching, with nothing to say so. Copied and compared like
- * `buildProjectEmbeddingSource` below, so the same rule holds: no comments and
- * no annotations inside the body.
- */
-export function buildProgramLabel(
-  courseId: string,
-  courseName: string
-): string {
-  return `${courseId} ${courseName}`;
-}
-
-/**
  * Assembles the exact string that gets embedded.
+ *
+ * The project's own prose and nothing else. Its categories and its program are
+ * deliberately left out, and `docs/adr/0025-the-embedded-text-is-prose-only.md`
+ * is why. In short: both are exact filters on the listing already, the category
+ * vocabulary is generic enough that a project carrying a tag almost always says
+ * so in its own description, and a course identifier is not language.
  *
  * Copied byte for byte into `scripts/backfill-embeddings.mjs`, which the
  * production image ships without any `src/` to import (ADR-0024), and compared
@@ -45,13 +36,11 @@ export function buildProgramLabel(
  * So keep this body comment-free and annotation-free: a comment inside it, or
  * the type predicate that used to sit on the `filter` below, fails a
  * comparison an `.mjs` cannot match. Explain above the function, the way this
- * does. `section`, `buildProgramLabel` and `embeddingHash` are under the same
- * rule; the parity test's `it` names are the inventory, not this comment.
+ * does. `section` and `embeddingHash` are under the same rule; the parity
+ * test's `it` names are the inventory, not this comment.
  */
 export function buildProjectEmbeddingSource(
-  project: EmbeddableProject,
-  categoryNames: string[],
-  programLabel: string | null
+  project: EmbeddableProject
 ): string {
   const parts = [
     section("Title", project.title),
@@ -61,11 +50,6 @@ export function buildProjectEmbeddingSource(
     section("Minimum qualifications", project.minQualifications),
     section("Preferred qualifications", project.prefQualifications),
     section("License", project.licenseRestrictions),
-    section("Program", programLabel),
-    section(
-      "Categories",
-      categoryNames.length > 0 ? categoryNames.join(", ") : null
-    ),
   ].filter((part) => part !== null);
   return parts.join("\n\n").slice(0, EMBEDDING_SOURCE_LIMIT);
 }

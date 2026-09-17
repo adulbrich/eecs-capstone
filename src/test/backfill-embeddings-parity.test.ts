@@ -105,7 +105,6 @@ const STATUS_SET_PATTERN =
   /const EMBEDDABLE_STATUSES: readonly ProjectStatus\[\] = \[([^\]]*)\]/;
 const SQL_STATUS_PATTERN = /WHERE status IN \(([^)]*)\)/;
 const INTERFACE_PATTERN = /export interface EmbeddableProject \{([\s\S]*?)\n\}/;
-const PROGRAM_SQL_PATTERN = /const PROGRAM_SQL = `([^`]*)`/;
 const SELECT_SQL_PATTERN = /const SELECT_SQL = `([^`]*)`/;
 
 /** The quoted words inside a captured `[...]` or `(...)`, in source order. */
@@ -243,39 +242,21 @@ describe("the production backfill's copies of the embedding helpers", () => {
     expect(fromScript).toBe(fromSrc);
   });
 
-  it("label a program the same way", () => {
-    const [fromSrc, fromScript] = bothBodies(
-      "buildProgramLabel",
-      SOURCE_FILE,
-      "embedding-source.ts"
-    );
-    expect(fromScript).toBe(fromSrc);
-  });
-
   /**
-   * Pinned against a literal as well, because the label is an input to
-   * `embedding_source_hash`: turning the space into a colon on both sides at
-   * once re-keys every project that has a program, and a copy-to-copy
-   * comparison passes that happily.
+   * The negative, pinned on both sides. ADR-0025 took the project's categories
+   * and its program out of the embedded text, and putting either back is the
+   * most expensive edit anybody can make to this string: every stored hash
+   * stops matching at once and the next sweep re-embeds all 564 at one paid
+   * call each. The body comparison below would notice a change on ONE side;
+   * this notices a change applied to both, which is exactly how a section gets
+   * reintroduced.
    */
-  it("label a program by exactly the pinned construction", () => {
-    expect(functionBody(SOURCE_FILE, "buildProgramLabel", "src")).toBe(
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: the pinned text of the template literal inside buildProgramLabel, not a template literal of its own.
-      "return `${courseId} ${courseName}`;"
-    );
-  });
-
-  /**
-   * The body pin above says the two spell the label the same way; it says
-   * nothing about the values handed in. The script reads them out of
-   * `PROGRAM_SQL`, so a renamed alias there leaves `courseId` undefined and
-   * the label reads "undefined Something" with no error.
-   */
-  it("select the columns the program label is built from", () => {
-    const programSql = PROGRAM_SQL_PATTERN.exec(SCRIPT_FILE)?.[1];
-    expect(programSql).toBeDefined();
-    expect(programSql).toContain('AS "courseId"');
-    expect(programSql).toContain('AS "courseName"');
+  it("carry no Categories or Program section on either side", () => {
+    for (const source of [SOURCE_FILE, SCRIPT_CODE]) {
+      expect(source).not.toContain('section("Program"');
+      expect(source).not.toContain('section(\n      "Categories"');
+      expect(source).not.toContain('section("Categories"');
+    }
   });
 
   /**
@@ -484,13 +465,13 @@ describe("the production backfill's copies of the embedding helpers", () => {
 
   /**
    * Every pin above compares a declaration. None of them says the script
-   * reaches it: inline the label at the call site and leave the copied
-   * function sitting there unused, and all three program pins still pass.
+   * reaches it: inline a copied function at its call site and leave the
+   * original sitting there unused, and its body pin still passes.
    *
    * Searched with the comments stripped, because ADR-0024 puts the
    * explanation of every copy in the JSDoc directly above it, which is exactly
-   * where somebody writes `buildProgramLabel(courseId, courseName)` in prose
-   * and satisfies this check with no call anywhere.
+   * where somebody writes `embeddingHash(source, modelId, dimensions)` in
+   * prose and satisfies this check with no call anywhere.
    *
    * `section` is deliberately absent. Its only calls are inside
    * `buildProjectEmbeddingSource`, whose body is pinned byte for byte, so the
@@ -498,7 +479,6 @@ describe("the production backfill's copies of the embedding helpers", () => {
    * vacuous pass this test is here to stop.
    */
   it.each([
-    "buildProgramLabel",
     "buildProjectEmbeddingSource",
     "embeddingHash",
     "buildEmbedConfig",
