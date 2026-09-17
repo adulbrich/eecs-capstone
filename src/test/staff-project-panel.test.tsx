@@ -682,7 +682,7 @@ describe("StaffProjectPanel mentor block", () => {
       if (!section) {
         throw new Error(`No section for ${title}`);
       }
-      return within(section as HTMLElement);
+      return within(section);
     };
     expect(
       sectionFor("Proposer").getByText(
