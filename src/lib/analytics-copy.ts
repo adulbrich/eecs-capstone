@@ -5,6 +5,15 @@ export interface SlotsFigure {
   expectedTeams: number | null;
   expectedTeamsPrograms: { set: number; total: number };
   publishedTeamSlots: number;
+  /**
+   * Published projects in scope that run in more than one program (#462).
+   * `teams_supported` is one number on the project, shared across its
+   * programs, so such a project contributes all of it to every program it
+   * runs in and the per program figures stop summing to the global one.
+   * That is the intended reading, so the hint says it out loud rather than
+   * leaving staff to find the discrepancy.
+   */
+  sharedProjects: number;
 }
 
 /**
@@ -13,6 +22,12 @@ export interface SlotsFigure {
  * programs set, some not) is named rather than passed off as the whole.
  */
 export function slotsHint(figure: SlotsFigure): string {
+  return [base(figure), sharedNote(figure.sharedProjects)]
+    .filter(Boolean)
+    .join("; ");
+}
+
+function base(figure: SlotsFigure): string {
   const { expectedTeams, expectedTeamsPrograms: p } = figure;
   if (expectedTeams === null) {
     return p.total > 1
@@ -25,4 +40,12 @@ export function slotsHint(figure: SlotsFigure): string {
     return `${expectedTeams} expected across ${p.set} of ${p.total} programs with a value set, ${verdict} against that`;
   }
   return `${expectedTeams} expected, ${verdict}`;
+}
+
+function sharedNote(shared: number): string {
+  if (shared === 0) {
+    return "";
+  }
+  const one = shared === 1;
+  return `${shared} ${one ? "project runs" : "projects run"} in more than one program and ${one ? "counts" : "count"} in full under each`;
 }

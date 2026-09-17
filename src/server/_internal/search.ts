@@ -1,15 +1,10 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "#/db";
-import {
-  programs,
-  projectCategories,
-  projects,
-  userInterests,
-} from "#/db/schema";
+import { projectCategories, projects, userInterests } from "#/db/schema";
 import { readSession } from "#/lib/_internal/auth-guards";
 import type { SearchProjectsInput } from "../search";
 import { toSqlVector } from "./project-embeddings";
-import { projectSummarySelect } from "./project-summary";
+import { projectSummarySelect, runsInProgram } from "./project-summary";
 
 /**
  * Request entry point: resolves the viewer, then delegates. Tests call
@@ -48,8 +43,10 @@ export async function searchProjectsImpl(
       sql`${projects.searchVector} @@ websearch_to_tsquery('english', ${trimmed})`
     );
   }
+  // Any-match: a project shared between two programs answers to both, and
+  // the filter itself stays single-valued (#462).
   if (data.programId) {
-    conditions.push(eq(projects.programId, data.programId));
+    conditions.push(runsInProgram(data.programId));
   }
   if (data.acceptingOnly) {
     conditions.push(eq(projects.acceptingApplicants, true));
@@ -147,7 +144,6 @@ export async function searchProjectsImpl(
   const rows = await db
     .select(projectSummarySelect)
     .from(projects)
-    .leftJoin(programs, eq(projects.programId, programs.id))
     .where(and(...conditions))
     // `projects.id` last, always, and passed here rather than appended to each
     // branch above so that a fourth ordering cannot forget it. Why an ordering

@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "#/db";
-import { programs, projectBookmarks, projects } from "#/db/schema";
+import { projectBookmarks, projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { canSeeProject } from "#/lib/project-visibility";
 import type { Viewer } from "#/lib/viewer";
@@ -111,7 +111,6 @@ export async function listMyBookmarksAs(viewer: BookmarkViewer) {
     })
     .from(projectBookmarks)
     .innerJoin(projects, eq(projectBookmarks.projectId, projects.id))
-    .leftJoin(programs, eq(projects.programId, programs.id))
     // A project soft-deleted after it was bookmarked drops out of the listing
     // rather than rendering as a dead row. Kept in SQL rather than left to
     // canSeeProject, which returns true for staff on a deleted project: a dead

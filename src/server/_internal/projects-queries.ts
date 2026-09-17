@@ -16,7 +16,6 @@ import {
 } from "drizzle-orm";
 import { db } from "#/db";
 import {
-  programs,
   projectComments,
   projectEditLog,
   projectStatusHistory,
@@ -41,9 +40,13 @@ import type { ProjectStatus } from "#/lib/vocabularies";
 import type { AdminProjectsFilter } from "../projects-queries";
 import {
   adminProjectSummarySelect,
+  inNoProgram,
   mentorNameSql,
   projectCategoriesText,
+  projectProgramsList,
+  projectProgramsText,
   projectSummarySelect,
+  runsInProgram,
 } from "./project-summary";
 
 /** The vocabulary plus the sentinel this filter adds for "no filter". */
@@ -72,7 +75,6 @@ export async function listMyProjectsImpl(data: { status: StatusFilter }) {
     db
       .select(projectSummarySelect)
       .from(projects)
-      .leftJoin(programs, eq(projects.programId, programs.id))
       .where(and(...conditions))
       .orderBy(desc(projects.updatedAt)),
     // Deliberately NOT filtered by `data.status`: this is the owner's standing
@@ -109,7 +111,6 @@ export function listMentoredProjectsAs(viewer: { email: string }) {
   return db
     .select(projectSummarySelect)
     .from(projects)
-    .leftJoin(programs, eq(projects.programId, programs.id))
     .where(
       and(
         sql`lower(${projects.mentorEmail}) = lower(${viewer.email})`,
@@ -157,12 +158,17 @@ function buildAdminProjectScope(
   }
   // "none" is the third state of the Program control, not a fourth switch:
   // projects nobody has filed under a program yet, which is a staff to-do the
-  // same shape as `withoutMentorOnly` below (#458). A program deleted out from
-  // under a project lands here too, since `program_id` is `on delete set null`.
+  // same shape as `withoutMentorOnly` below (#458). A project whose last
+  // program was deleted lands here too, since the join row is
+  // `on delete cascade`.
+  //
+  // A project runs in a set of programs (#462), so a UUID is an any-match:
+  // the filter is still single-valued and a project shared between two
+  // programs answers to both.
   if (data.program === PROGRAM_FILTER_NONE) {
-    scope.push(isNull(projects.programId));
+    scope.push(inNoProgram);
   } else if (data.program) {
-    scope.push(eq(projects.programId, data.program));
+    scope.push(runsInProgram(data.program));
   }
   const column = ADMIN_DATE_COLUMN[data.dateField];
   const { start, end } = dayRange(data.from, data.to);
@@ -275,7 +281,6 @@ export async function listAdminProjectsAs(
     db
       .select(adminProjectSummarySelect)
       .from(projects)
-      .leftJoin(programs, eq(projects.programId, programs.id))
       // Left, not inner: `proposerId` is `onDelete: "set null"`, so an inner join
       // would silently drop projects whose proposer account was removed.
       .leftJoin(user, eq(projects.proposerId, user.id))
@@ -317,13 +322,14 @@ export async function exportAdminProjectsAs(
   const rows = await db
     .select({
       ...adminProjectSummarySelect,
-      // The CSV wants text, not the chip objects the listing renders.
+      // The CSV wants text, not the chip objects and program objects the
+      // listing renders.
       categories: projectCategoriesText,
+      programs: projectProgramsText,
       notes: projects.notes,
       archivedAt: projects.archivedAt,
     })
     .from(projects)
-    .leftJoin(programs, eq(projects.programId, programs.id))
     .leftJoin(user, eq(projects.proposerId, user.id))
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(projects.updatedAt));
@@ -345,21 +351,19 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
   // project row is read for the detail page. The mentor's name is not read:
   // nothing about the mentor is public (#336).
   //
-  // The program is joined for its two label columns, the same pair and the
-  // same join `projectSummarySelect` carries for the card and the table, so
-  // the detail page names the program with the string the listing showed
-  // (#449). `getTableColumns` keeps the selection flat, which is what stops
-  // the join folding the row under table names, the shape `getProgram` was
+  // The programs come from the same correlated subquery
+  // `projectSummarySelect` carries for the card and the table, so the detail
+  // page names them with the strings the listing showed (#449).
+  // `getTableColumns` keeps the selection flat, which is what stopped the
+  // old join folding the row under table names, the shape `getProgram` was
   // caught by (docs/QUIRKS.md). `projectDetailView` still names every field
-  // it passes on, so the join widens this projection's input, not its output.
+  // it passes on, so this widens the projection's input, not its output.
   const [project] = await db
     .select({
       ...getTableColumns(projects),
-      programCourseId: programs.courseId,
-      programCourseName: programs.courseName,
+      programs: projectProgramsList,
     })
     .from(projects)
-    .leftJoin(programs, eq(projects.programId, programs.id))
     .where(eq(projects.id, data.id));
   if (!project) {
     return {

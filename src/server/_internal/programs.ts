@@ -1,6 +1,11 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "#/db";
-import { programInstructors, programs, projects, user } from "#/db/schema";
+import {
+  programInstructors,
+  programs,
+  projectPrograms,
+  user,
+} from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { assertStaff, isStaff, STAFF_ROLES } from "#/lib/viewer";
 import type { ProgramInput, ProgramUpdateInput } from "../programs";
@@ -106,10 +111,12 @@ export async function getProgramAs(viewer: AuthUser, data: { id: string }) {
     .innerJoin(user, eq(programInstructors.userId, user.id))
     .where(eq(programInstructors.programId, data.id))
     .orderBy(user.name);
+  // Join rows, not projects with this in a column: a project that runs in
+  // this program and another counts here too (#462).
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
-    .from(projects)
-    .where(eq(projects.programId, data.id));
+    .from(projectPrograms)
+    .where(eq(projectPrograms.programId, data.id));
   return { program, instructors, projectCount: count };
 }
 
@@ -162,14 +169,21 @@ export async function updateProgramForCurrentUser(data: ProgramUpdateInput) {
   return updateProgramAs(viewer, data);
 }
 
+/**
+ * Deleting a program cascades its join rows away, so a project that ran
+ * only here is left unplaced and one that also runs elsewhere simply loses
+ * this program (#462). The returned count is every project affected either
+ * way, which is why it is not called "unlinked": for a shared project that
+ * would be false.
+ */
 export async function deleteProgramAs(viewer: AuthUser, id: string) {
   assertStaff(viewer);
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
-    .from(projects)
-    .where(eq(projects.programId, id));
+    .from(projectPrograms)
+    .where(eq(projectPrograms.programId, id));
   await db.delete(programs).where(eq(programs.id, id));
-  return { id, unlinkedProjectCount: count };
+  return { id, affectedProjectCount: count };
 }
 
 export async function deleteProgramForCurrentUser(id: string) {

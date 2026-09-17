@@ -1,5 +1,6 @@
-import { sql } from "drizzle-orm";
-import { programs, projects, user } from "#/db/schema";
+import { type SQL, sql } from "drizzle-orm";
+import { projects, user } from "#/db/schema";
+import type { ProjectProgram } from "#/lib/project-visibility";
 
 export interface ProjectCategory {
   id: string;
@@ -33,6 +34,71 @@ export const projectCategoriesText = sql<string | null>`(
 )`;
 
 /**
+ * The programs the project runs in, ordered by course id, as the badges and
+ * the table column render them. Correlated rather than joined for the same
+ * reason as the categories above: a join would multiply project rows by
+ * their program count.
+ *
+ * The three parts stay separate keys. The listings render `courseId` alone
+ * and the detail badge renders both halves, so pre-joining them into one
+ * label here would lose a renderer's half of the answer.
+ */
+export const projectProgramsList = sql<ProjectProgram[]>`coalesce((
+  SELECT json_agg(json_build_object('id', pr.id, 'courseId', pr.course_id, 'courseName', pr.course_name) ORDER BY pr.course_id)
+  FROM project_programs pp
+  JOIN programs pr ON pr.id = pp.program_id
+  WHERE pp.project_id = ${projects.id}
+), '[]'::json)`;
+
+/**
+ * The same programs as one `; `-separated string of course ids, for the
+ * shared table column and the staff CSV export, whose cell is text. Course
+ * ids alone: a spreadsheet loses the course names, and the course id is
+ * what staff sort and pivot on. The separator matches the categories cell
+ * beside it, and is not a comma so a CSV cell cannot split on a value.
+ */
+export const projectProgramsText = sql<string | null>`(
+  SELECT string_agg(pr.course_id, '; ' ORDER BY pr.course_id)
+  FROM project_programs pp
+  JOIN programs pr ON pr.id = pp.program_id
+  WHERE pp.project_id = ${projects.id}
+)`;
+
+/**
+ * "This project runs in that program", as a filter predicate. An any-match:
+ * the `?program=` filter stays single-valued, and a project shared between
+ * two programs answers to both (#462).
+ *
+ * `exists` rather than a join, for the same fan-out reason as the aggregates
+ * above, and so the predicate composes into a scope array beside plain
+ * column comparisons.
+ */
+export function runsInProgram(programId: string): SQL {
+  return sql`EXISTS (
+    SELECT 1 FROM project_programs pp
+    WHERE pp.project_id = ${projects.id} AND pp.program_id = ${programId}
+  )`;
+}
+
+/**
+ * The admin Program filter's `none` state: a project nobody has filed yet,
+ * which is a staff to-do. A project whose only program was deleted lands
+ * here too, since the join row is `on delete cascade`.
+ */
+export const inNoProgram: SQL = sql`NOT EXISTS (
+  SELECT 1 FROM project_programs pp WHERE pp.project_id = ${projects.id}
+)`;
+
+/**
+ * How many programs a project runs in, for the staff panel's warning and
+ * the analytics footnote. Both ask "more than one", never for the list.
+ */
+export const projectProgramCount = sql<number>`(
+  SELECT count(*)::int FROM project_programs pp
+  WHERE pp.project_id = ${projects.id}
+)`;
+
+/**
  * The mentor, resolved at read time. A correlated subquery rather than a join
  * so the four consumers of `projectSummarySelect` pick it up without each
  * adding a join, same as `categories` in the admin export. Case-insensitive
@@ -50,8 +116,8 @@ export const mentorNameSql = sql<string | null>`(
 /**
  * Column projection shared by every query that feeds the project card and
  * the public table: the public listing, "my projects" and "my bookmarks".
- * Join `programs` via leftJoin before using it so the program columns
- * resolve (null for projects without a program).
+ * The programs come from a correlated subquery, so no caller joins anything
+ * to use it.
  *
  * What may be in here is decided by `projectDetailView` and pinned by a
  * key-set test; `docs/QUIRKS.md` ("The listing projection is bounded by
@@ -80,8 +146,7 @@ export const projectSummarySelect = {
   contactEmail: projects.contactEmail,
   contactName: projects.contactName,
   updatedAt: projects.updatedAt,
-  programCourseId: programs.courseId,
-  programCourseName: programs.courseName,
+  programs: projectProgramsList,
   categories: projectCategoriesList,
   // Public by design. Nothing about the mentor is: not the address, since
   // #336 not the name either, which `adminProjectSummarySelect` adds back on
@@ -95,7 +160,7 @@ export const projectSummarySelect = {
  * the lifecycle dates. Proposer identity is staff information and is what
  * keeps this separate from `projectSummarySelect`.
  *
- * Join `programs` and `user` (on `projects.proposerId`) before using it.
+ * Join `user` (on `projects.proposerId`) before using it.
  */
 export const adminProjectSummarySelect = {
   ...projectSummarySelect,
@@ -104,7 +169,6 @@ export const adminProjectSummarySelect = {
   mentorName: mentorNameSql,
   createdAt: projects.createdAt,
   deletedAt: projects.deletedAt,
-  programId: projects.programId,
   // `proposerId IS NULL AND proposerEmail IS NOT NULL` is a normal steady
   // state, not just a deleted-account edge case: staff can name a proposer by
   // email who has no account yet, and the project links up automatically the
