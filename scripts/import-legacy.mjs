@@ -7,10 +7,13 @@
  *   node scripts/import-legacy.mjs --undo          # delete exactly the imported rows
  *   node scripts/import-legacy.mjs --skip-existing # add only rows not already imported
  *
- * The bare form is a full upsert and reverts every column on a row that
- * already exists, staff edits included. It is for a cohort's FIRST import and
- * for correcting a mapping that was wrong across the board. Every run after
- * that passes `--skip-existing`; DEPLOYMENT.md's 7a.7 says why.
+ * The bare form is a full upsert: on a row that already exists it rewrites the
+ * 24 columns its `ON CONFLICT` names, staff edits included. `deleted_at` and
+ * the three embedding columns are not among them and `image_url` is COALESCEd,
+ * so a soft delete, a vector and an image survive it; anything anyone typed
+ * does not. It is for a cohort's FIRST import, and for correcting a mapping
+ * that was wrong across the board. Every run after that passes
+ * `--skip-existing`; DEPLOYMENT.md's 7a.7 says why.
  *
  * The only thing that writes the imported rows to the database, and plain
  * `.mjs` so it runs from the production image: that installs with

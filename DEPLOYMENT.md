@@ -741,12 +741,21 @@ run it after every import rather than only the first.
 **Decided 2026-09-17: every import after a cohort's first one passes
 `--skip-existing`.** The full upsert is for the run that creates a cohort, and
 for correcting a mapping that was wrong for every row in it. It is the wrong
-tool for a top-up, because it reverts whatever staff have edited here since,
-silently and on every column. That stopped being hypothetical when four rows
+tool for a top-up, because it reverts whatever staff have edited here, silently
+and across the 24 columns its `ON CONFLICT` names. Not every column:
+`deleted_at` and the three embedding columns are not in the upsert at all, and
+`image_url` is COALESCEd, so a soft delete, a vector and an image all survive a
+full re-run. Everything a proposer or a staff member can type does not. That stopped being hypothetical when four rows
 carrying the literal string `0` in a proposer name or email were left to be
 fixed in this app rather than in the old portal: a later full upsert would put
 the `0` back and report nothing unusual. Use the full upsert deliberately, or
 not at all.
+
+Read its tally with care: the closing `Imported N projects` counts every row in
+the file, not the rows this run wrote, because the check queries
+`WHERE id = ANY($1)` over all of them. A top-up that adds 12 rows to a
+203-row file still prints `Imported 203`. The line above it is the one that
+says what happened: `12 new, 191 already imported (skipped)`.
 
 Know what that costs. `--skip-existing` skips the whole row, not the columns
 staff touched, so an existing project picks up nothing from a later export: not
@@ -770,9 +779,10 @@ shell has neither `DATABASE_URL` nor a data location and exits immediately)
 Re-running is otherwise safe: the primary key is derived from the legacy
 `cp_id`, so no run can duplicate a row, and the derived image keys mean a
 second image upload overwrites the same object rather than orphaning it. Note
-that a re-run also re-links proposers, so someone whose account was deleted
-since (which nulls `proposer_id`) gets linked again if a matching account
-exists.
+that a FULL re-run also re-links proposers, so someone whose account was
+deleted since (which nulls `proposer_id`) gets linked again if a matching
+account exists. A `--skip-existing` run does not: it never writes the row at
+all, so `proposer_id` stays as it is.
 
 Two things about re-exporting the ARCHIVED set now that the live set exists.
 `export.sql`'s WHERE is currently `cp.cp_archived = 0 AND cp.cp_cps_id = 4`, so
@@ -875,7 +885,10 @@ need the 7a.0b grant to still exist, which it does not if you ran the takedown
 after the archived import.
 
 Then run 7a.4 with both variables set, rather than composing the override by
-hand. `CLUSTER`, `TASKDEF` and `NETCFG` come from 7a.4 unchanged:
+hand. `CLUSTER`, `TASKDEF` and `NETCFG` come from 7a.4 unchanged. The command
+below is the bare full upsert, which is right for this cohort's FIRST run and
+wrong for every run after it: add `"--skip-existing"` to the command array next
+time, for the reasons in 7a.7.
 
 ```bash
 aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARGATE \
