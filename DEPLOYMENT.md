@@ -748,6 +748,14 @@ fixed in this app rather than in the old portal: a later full upsert would put
 the `0` back and report nothing unusual. Use the full upsert deliberately, or
 not at all.
 
+Know what that costs. `--skip-existing` skips the whole row, not the columns
+staff touched, so an existing project picks up nothing from a later export: not
+a retitled project, not a description the proposer rewrote in the old portal,
+not an image uploaded there after the first run. New rows arrive, existing ones
+freeze. If a specific project does need its legacy text again, the honest move
+is to edit it here from the export rather than to reach for the full upsert and
+take every other row with it.
+
 Pass `--skip-existing` to add only the rows that are not there yet and leave
 the rest untouched:
 
