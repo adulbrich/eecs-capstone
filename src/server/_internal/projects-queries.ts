@@ -352,8 +352,10 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
   // nothing about the mentor is public (#336).
   //
   // The programs come from the same correlated subquery
-  // `projectSummarySelect` carries for the card and the table, so the detail
-  // page names them with the strings the listing showed (#449).
+  // `projectSummarySelect` carries for the card and the table. The rendered
+  // strings differ on purpose: the detail page badges the full labels where
+  // the card and the tables show course ids alone, which is #462 breaking
+  // the continuity #449 established. `project-card.tsx` has the reasoning.
   // `getTableColumns` keeps the selection flat, which is what stopped the
   // old join folding the row under table names, the shape `getProgram` was
   // caught by (docs/QUIRKS.md). `projectDetailView` still names every field
