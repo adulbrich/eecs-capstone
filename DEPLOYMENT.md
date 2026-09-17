@@ -756,6 +756,17 @@ that a re-run also re-links proposers, so someone whose account was deleted
 since (which nulls `proposer_id`) gets linked again if a matching account
 exists.
 
+Two things about re-exporting the ARCHIVED set now that the live set exists.
+`export.sql`'s WHERE is currently `cp_archived = 0`, so put it back to
+`cp_archived = 1` first, and write the result to `archived-projects.jsonl` so
+`clean-export.py` derives the archived filenames rather than the live ones.
+And expect a diff: `resolve_program` now recovers a course the app has no
+`programs` row for into staff notes instead of dropping it, which adds an
+ENGR41X note to exactly two of the 557 archived rows (`xWf4xJi2vUwh8oDh` and
+`5FaLvacaTmSA2hLQ`). Everything else in that file is byte-identical to what the
+2026-09-16 import received, which is worth re-checking against
+`backup-20260917/` in Box rather than assuming.
+
 `--undo` hard-deletes the rows rather than soft-deleting them, which is right
 for backing out an import nobody has used yet and wrong once anyone has. It
 refuses when a row has bids or assignments, and it leaves the image objects in
@@ -789,7 +800,9 @@ reads the raw export: the raw file carries `created_at_pacific` rather than
 
 Each row carries `target_status`. `export.sql` sets it to `archived` or
 `published` from `cp_archived`, and `clean-export.py` then rewrites a live
-hidden row to `approved`. The importer accepts all three; nothing is hardcoded.
+hidden row to `approved`. The importer accepts all three, and nothing is
+hardcoded to `archived` except the default it falls back to when the field is
+absent, which only an export made before the field existed can be.
 `export.sql` and `clean-export.py` live beside the data in Box, not in this
 repo.
 
@@ -844,6 +857,24 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
   --region us-west-2
 ```
 
+**What this import deliberately leaves in the old portal**, as of 2026-09-17.
+Each of these needs a decision that the import itself does not settle, and none
+is lost: the portal still holds them, and the two sets the cleaner writes out
+are in Box beside the data.
+
+| set | rows | where it is |
+| --- | ---: | --- |
+| Hidden archived projects | 146 | `archived-projects-hidden.jsonl` |
+| Rejected, live and archived | 49 | the portal only |
+| Drafts, live and archived | 138 | the portal only |
+| Pending approval, live and archived | 32 | the portal only |
+| DigiClips working notes | 11 | `archived-projects-excluded.jsonl` |
+
+376 rows in total, against 557 archived and 203 live already accounted for.
+Nothing in this app's status vocabulary fits a rejected or a draft legacy
+project: `softDeleteProjectAs` refuses a `draft` outright, and
+`changes_requested` means "resubmit", where the portal's Rejected is terminal.
+
 Hidden rows are handled differently in the two sets, and `clean-export.py` is
 where that lives because `export.sql` serves both. `cp_is_hidden` means "not on
 the portal's Browse page". On a LIVE row that is this app's `approved`: the old
@@ -858,6 +889,16 @@ An `approved` row is not in `EMBEDDABLE_STATUSES`, so 7a.5's backfill skips it
 and publishing it later embeds it through `commitTransition`. Size the backfill
 against the `published` count, not the row count.
 
+Two things carry over from the archived set without needing a decision. A
+project the old portal published and later unpublished imports as `approved`
+carrying its original `published_at`, which is true and which
+`commitTransition` preserves rather than resetting, since it only stamps that
+column when it is still null. A project it archived and later unarchived
+imports carrying its `archived_at` for the same reason: `commitTransition` sets
+that column on every archive and nothing ever clears it, so this app holds one
+on a republished project too. Both columns mean "was X on", not "is X", and the
+admin date filters read them that way for imported and app-created rows alike.
+
 Three things to decide before doing that, none of which this import settles:
 
 - Those projects are still being edited in the old portal, so the two systems
@@ -868,12 +909,8 @@ Three things to decide before doing that, none of which this import settles:
   history.
 - `accepting_applicants` is imported as `true` for the same reason as the
   archived set (the legacy schema has no closed flag), and for a `published`
-  row that claim is load-bearing rather than inert. On an `approved` row it is
-  inert again, since nothing outside the listing filters reads it.
-- A project the old portal published and later unpublished imports as
-  `approved` carrying the original `published_at`. That is deliberate: the date
-  is true, and `commitTransition` only stamps `publishedAt` when it is still
-  null, so publishing it here keeps the original rather than resetting it.
+  row that claim is load-bearing rather than inert. An `approved` row renders
+  `TeamFullBadge` from it too, on a page staff and the owner can reach.
 
 ---
 

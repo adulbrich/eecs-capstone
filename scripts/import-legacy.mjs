@@ -187,17 +187,15 @@ const PROGRAMS = {
  * the value arrives from a SQL file, and an unrecognised one would otherwise
  * fail against the enum halfway through the transaction.
  *
- * `approved` is here for the legacy portal's hidden-but-accepting projects.
- * That portal splits approval from publication the same way this app does:
- * its Approve button writes only the status and its Publish button only clears
- * `cp_is_hidden`, so a project sits approved and unlisted between the two
- * clicks. `search.ts` filters on `published`, or `archived` when archivedOnly
- * is set, so importing one exposes nothing publicly.
+ * `approved` is here for the legacy portal's hidden-but-accepting projects,
+ * which that portal keeps on a flag separate from its status the same way this
+ * app keeps approval separate from publication. DEPLOYMENT.md's live-import
+ * section is the source of truth for that mapping and why it exposes nothing.
  *
- * Note what an `approved` row does NOT get: `EMBEDDABLE_STATUSES` is
- * `published` and `archived` only, so neither `refreshProjectEmbedding` nor
- * `scripts/backfill-embeddings.mjs` will ever embed it. Publishing it later
- * goes through `commitTransition`, which embeds it then.
+ * What an `approved` row does NOT get is worth knowing here rather than there:
+ * `EMBEDDABLE_STATUSES` is `published` and `archived` only, so neither
+ * `refreshProjectEmbedding` nor `scripts/backfill-embeddings.mjs` will ever
+ * embed it. Publishing it later goes through `commitTransition`, which does.
  */
 const IMPORTABLE_STATUSES = ["approved", "archived", "published"];
 
@@ -503,13 +501,15 @@ async function main() {
         row.license_restrictions,
         row.requires_nda_ip,
         row.is_sponsored,
-// True, because that is what the source says: the legacy schema has
+        // True, because that is what the source says: the legacy schema has
         // no closed-to-applicants column, every row any export selects carries
         // status 4 ("Accepting Applicants"), and `capstone_application` is
         // empty. The flag means "published but not closed", not "students can
         // apply"; `archived` settles the latter and so does `approved`, which
-        // is not publicly listed at all. Nothing reads this outside the
-        // listing filters, so it is inert on a row that does not appear there.
+        // is not publicly listed at all. It is not inert on an `approved` row,
+        // though: the project page renders `TeamFullBadge` from it, and staff
+        // and the owner can reach that page. It says "accepting", which is
+        // what status 4 means, so the badge is right for the wrong reason.
         true,
         row.teams_supported,
         buildNotes(row),
@@ -525,12 +525,15 @@ async function main() {
         // and one we guessed. `search.ts` orders on
         // coalesce(published_at, created_at) so the nulls still sort sanely.
         //
-        // An `approved` row can carry one, and 58 of the 64 do. They were
-        // published in the old portal and unpublished again later, which is
-        // what its Unpublish button does, so the date is true and worth
-        // keeping. `commitTransition` only stamps `publishedAt` when it is
-        // still null, so publishing one here preserves the original date
-        // rather than resetting it to today.
+        // An `approved` row can carry one, and most do. They were published in
+        // the old portal and unpublished again later, which is what its
+        // Unpublish button does, so the date is true and worth keeping.
+        // `commitTransition` only stamps `publishedAt` when it is still null,
+        // so publishing one here preserves the original rather than resetting
+        // it to today. An admin "published between" filter does return these,
+        // which is the same thing it does for a project this app published and
+        // moved back out of `published`: the column means "was published on",
+        // not "is published", and nothing ever clears it.
         row.published_at,
         row.archived_at,
         row.created_at,
