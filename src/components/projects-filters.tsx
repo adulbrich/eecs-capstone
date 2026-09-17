@@ -238,9 +238,9 @@ export function ProjectsSearchBar({
           w-52 because "Recommended for you" needs 146px at text-sm, and the
           trigger spends 50px before the value gets any: 24 px-3, 8 gap-2, 16
           chevron, 2 border (the easy term to forget). So w-44 left 126 and
-          clipped it through SelectValue's line-clamp-1; w-52 leaves 158. The
-          trigger is a fixed 176px at 375 as well as at desktop, so one width
-          covers both. It costs the row its last slack at 768 in table view,
+          clipped it through SelectValue's line-clamp-1; w-52 leaves 158. It
+          is a fixed 208px at 375 as well as at desktop, never flex-sized, so
+          one width covers both. It costs the row its last slack at 768 in table view,
           where the five controls now end exactly where the row does. See
           #454, and the input's basis-40 for the budget this spent.
         */}
