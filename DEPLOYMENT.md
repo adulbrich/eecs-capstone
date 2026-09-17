@@ -421,7 +421,7 @@ Repeat with the second admin's email. Check the task's CloudWatch log for
 
 ## 7a. Importing the legacy portal archive
 
-A one-time job: 547 archived projects and 330 images from the old PHP capstone
+A one-time job: 557 archived projects and 338 images from the old PHP capstone
 portal. Run it after the first deploy and after the admins exist, since the
 importer links a project to an account only where one already exists.
 
@@ -435,7 +435,7 @@ The whole thing is idempotent: every project's primary key is a UUIDv5 derived
 from its legacy `cp_id`, so a second run refreshes the same rows and `--undo`
 deletes exactly them. The `NAMESPACE` constant is shared by
 `scripts/import-legacy-images.ts` and `scripts/import-legacy.mjs` and **must
-never change**: a different value re-keys all 547 rows and orphans every image
+never change**: a different value re-keys all 557 rows and orphans every image
 object already in the bucket.
 
 ### 7a.0 The values the rest of this section uses
@@ -699,7 +699,7 @@ sweepers has the rest.
   `/admin/projects` says how many rows a date range is hiding.
 - **The archive is public.** `searchProjects` has no auth guard and
   `archivedOnly` resolves to `status = 'archived'`, so a signed-out visitor
-  can browse all 547. That is the intent; it is also why the 141 projects the
+  can browse all 557. That is the intent; it is also why the 146 projects the
   old portal kept hidden are held back in `archived-hidden-projects.jsonl` and
   are not part of this import.
 - **No `contact_email` is set.** The old portal published proposer names and
@@ -757,15 +757,17 @@ since (which nulls `proposer_id`) gets linked again if a matching account
 exists.
 
 Two things about re-exporting the ARCHIVED set now that the live set exists.
-`export.sql`'s WHERE is currently `cp_archived = 0`, so put it back to
-`cp_archived = 1` first, and write the result to `archived-projects.jsonl` so
+`export.sql`'s WHERE is currently `cp_archived = 0 AND cp_cps_id = 4`, so put
+it back to `cp_archived = 1 AND cp_cps_id = 4` first, keeping the status
+clause, and write the result to `archived-projects.jsonl` so
 `clean-export.py` derives the archived filenames rather than the live ones.
 And expect a diff: `resolve_program` now recovers a course the app has no
 `programs` row for into staff notes instead of dropping it, which adds an
 ENGR41X note to exactly two of the 557 archived rows (`xWf4xJi2vUwh8oDh` and
 `5FaLvacaTmSA2hLQ`). Everything else in that file is byte-identical to what the
-2026-09-16 import received, which is worth re-checking against
-`backup-20260917/` in Box rather than assuming.
+2026-09-16 import received, which is worth re-checking against the 557-row
+copy in Box's `backup-20260917/` rather than assuming. That directory is dated
+the day it was taken, not the day of the import it holds.
 
 `--undo` hard-deletes the rows rather than soft-deleting them, which is right
 for backing out an import nobody has used yet and wrong once anyone has. It
@@ -864,13 +866,20 @@ are in Box beside the data.
 
 | set | rows | where it is |
 | --- | ---: | --- |
-| Hidden archived projects | 146 | `archived-projects-hidden.jsonl` |
+| Hidden archived projects | 146 | `archived-hidden-projects.jsonl` |
 | Rejected, live and archived | 49 | the portal only |
 | Drafts, live and archived | 138 | the portal only |
-| Pending approval, live and archived | 32 | the portal only |
-| DigiClips working notes | 11 | `archived-projects-excluded.jsonl` |
+| Pending approval, archived only | 30 | the portal only |
+| DigiClips working notes | 11 | `excluded-projects.jsonl` |
 
-376 rows in total, against 557 archived and 203 live already accounted for.
+374 rows in total, against 557 archived and 203 live already accounted for,
+which is the portal's 1134. Those two filenames are what the cleaner wrote
+before it derived its outputs from its input; a re-export writes
+`archived-projects-hidden.jsonl` and `archived-projects-excluded.jsonl`
+instead, with the same contents. Re-derive these counts before the production
+run rather than trusting them: the portal is written daily, and the live figure
+moved from 201 to 203 between the assessment and this paragraph because two
+pending proposals were approved.
 Nothing in this app's status vocabulary fits a rejected or a draft legacy
 project: `softDeleteProjectAs` refuses a `draft` outright, and
 `changes_requested` means "resubmit", where the portal's Rejected is terminal.
@@ -899,6 +908,16 @@ that column on every archive and nothing ever clears it, so this app holds one
 on a republished project too. Both columns mean "was X on", not "is X", and the
 admin date filters read them that way for imported and app-created rows alike.
 
+52 of the 203 land with no program: 26 because more than one course applies,
+21 because the course is ENGR41X, which gets no `programs` row because that
+group has left the portal, 4 with a program plus an extra course, and 1 with
+nothing in the portal to recover. Every one of those keeps its course in
+staff-only notes rather than losing it. This matters more than it did for the
+archived set, because these are published: the project page renders no program
+badge for them, and the listing's `program` filter will not return them, so a
+student filtering for CS467 does not see the rows that are in fact open to
+CS467. Filing them by hand from the notes is the fix.
+
 Three things to decide before doing that, none of which this import settles:
 
 - Those projects are still being edited in the old portal, so the two systems
@@ -909,8 +928,16 @@ Three things to decide before doing that, none of which this import settles:
   history.
 - `accepting_applicants` is imported as `true` for the same reason as the
   archived set (the legacy schema has no closed flag), and for a `published`
-  row that claim is load-bearing rather than inert. An `approved` row renders
-  `TeamFullBadge` from it too, on a page staff and the owner can reach.
+  row that claim is load-bearing rather than inert, because `search.ts`'s
+  `acceptingOnly` filter reads it. It is inert on an `approved` row: the
+  project page reads it as well, but `TeamFullBadge` renders the full case and
+  returns null for the open one, so `true` puts no badge on anything.
+- 68 of the 203 were created by an admin account, 43 of them by one person, so
+  they import with that admin as the proposer rather than the partner who
+  wanted the project. The export carries `proposer_is_admin` and the importer
+  does not read it, deliberately: reassigning a proposer is a staff judgement
+  about who the real contact is, and 47 rows carry additional contact emails in
+  their notes to make that judgement from.
 
 ---
 

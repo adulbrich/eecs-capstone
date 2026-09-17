@@ -192,7 +192,7 @@ const PROGRAMS = {
  * app keeps approval separate from publication. DEPLOYMENT.md's live-import
  * section is the source of truth for that mapping and why it exposes nothing.
  *
- * What an `approved` row does NOT get is worth knowing here rather than there:
+ * What an `approved` row does NOT get:
  * `EMBEDDABLE_STATUSES` is `published` and `archived` only, so neither
  * `refreshProjectEmbedding` nor `scripts/backfill-embeddings.mjs` will ever
  * embed it. Publishing it later goes through `commitTransition`, which does.
@@ -506,10 +506,12 @@ async function main() {
         // status 4 ("Accepting Applicants"), and `capstone_application` is
         // empty. The flag means "published but not closed", not "students can
         // apply"; `archived` settles the latter and so does `approved`, which
-        // is not publicly listed at all. It is not inert on an `approved` row,
-        // though: the project page renders `TeamFullBadge` from it, and staff
-        // and the owner can reach that page. It says "accepting", which is
-        // what status 4 means, so the badge is right for the wrong reason.
+        // is not publicly listed at all.
+        //
+        // Where it bites is `search.ts`'s `acceptingOnly` filter, so only on a
+        // `published` row. The project page reads it too, but `TeamFullBadge`
+        // renders the FULL case and returns null for the open one, so writing
+        // `true` puts no badge on any imported project either way.
         true,
         row.teams_supported,
         buildNotes(row),
