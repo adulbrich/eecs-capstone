@@ -94,6 +94,7 @@ function ProjectDetail() {
   } = Route.useLoaderData() as unknown as ProjectDetailData;
   const [comments, setComments] = useState<Comment[]>([]);
   const projectId = project.id;
+  const program = programLabel(project);
 
   const refreshComments = useCallback(async () => {
     if (!projectId) {
@@ -154,9 +155,7 @@ function ProjectDetail() {
           (#449). No link: the listing does take `?program=<uuid>`, but a
           way off the page does not belong three lines under the title.
         */}
-        {programLabel(project) && (
-          <Badge variant="outline">{programLabel(project)}</Badge>
-        )}
+        {program && <Badge variant="outline">{program}</Badge>}
         <TeamFullBadge acceptingApplicants={project.acceptingApplicants} />
       </ProjectBadges>
 

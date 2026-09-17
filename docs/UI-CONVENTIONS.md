@@ -900,8 +900,12 @@ A detail page (`/projects/$projectId` since #400; the inventory item page is
 meant to follow) opens with one header block, top to bottom: the title row,
 `flex items-start justify-between gap-3`, with the title left and the actions
 right; one `flex flex-wrap` badge row under it holding the status badge, the
-team-full badge and the public marks in that order with one gap, which
-`ProjectBadges` renders from its `children` slot plus the marks; the category
+program badge, the team-full badge and the public marks in that order with one
+gap, which `ProjectBadges` renders from its `children` slot plus the marks; the
+program badge is the only one of those that names a value rather than asserting
+a fact, which is why it sits directly after the status rather than with the
+marks, and it is absent rather than empty for a project filed under none
+(#449); the category
 chips; the owner actions; then the image. The actions are Bookmark and, for a
 viewer who can edit, Edit. Bookmark keeps its icon at every width and hides its
 text below `md`, with `aria-label` and `title` as the accessible name, so it is
