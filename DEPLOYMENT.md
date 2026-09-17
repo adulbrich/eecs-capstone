@@ -723,28 +723,28 @@ you are about to do:
   12 new, 557 already imported (will be overwritten)
 ```
 
-Four things are exempt from that replacement, which is why the bare form is
-recoverable rather than catastrophic: `deleted_at` and the three embedding
-columns are not in the upsert at all, so a soft delete and a vector survive it.
-`image_url` is written with
-`COALESCE(excluded.image_url, projects.image_url)`, so a re-run without
-`image-keys.json` keeps the images a row already has rather than nulling them
-while the objects sit in the bucket, so an image survives it too. A program is
-never created either: a missing
-`course_id` is an error, because in production all four exist and a miss means
-an identifier drifted, where inserting would attach projects to a brand new
-program that merely looks right. `--create-missing-programs` opts in, for a
-fresh local database with nothing to match.
+`projects` has 32 columns and the upsert names 24, so what a bare re-run
+cannot touch is worth naming rather than counting. It never writes
+`student_proposed`, `mentor_email`, `deleted_at`, the three embedding columns
+or the two `scope_assessment` ones, so a mentor, a student-proposed flag, a
+soft delete, a vector and a scope assessment all survive it. `image_url` is
+named but written with `COALESCE(excluded.image_url, projects.image_url)`, so a
+re-run without `image-keys.json` keeps the images a row already has rather than
+nulling them while the objects sit in the bucket. A program is never created:
+a missing `course_id` is an error, because in production all four exist and a
+miss means an identifier drifted, where inserting would attach projects to a
+brand new program that merely looks right. `--create-missing-programs` opts in,
+for a fresh local database with nothing to match.
 
-The third is the three embedding columns, which the upsert never names, so a
-re-run leaves whatever vector a row is already carrying. That is not an
-oversight and it is not free: the re-run reverts the text, the vector stays
-built from the text before it, and nothing in the app re-embeds a row nobody
-edits. Running 7a.5 afterwards is what closes that, and it is why 7a.5 says to
-run it after every import rather than only the first.
+Surviving the upsert is not the same as being correct after it. The vector is
+the case that matters: a re-run reverts the text, the vector stays built from
+the text before it, and nothing in the app re-embeds a row nobody edits.
+Running 7a.5 afterwards is what closes that, and it is why 7a.5 says to run it
+after every import rather than only the first.
 
-Everything a proposer or a staff member can type is in those 24 columns, which
-is why the rule above exists. It stopped being hypothetical when four rows
+The 24 it does write are the project's own text, its flags, its dates, its
+proposer and its program, which is most of what anyone would correct here and
+why the rule above exists. It stopped being hypothetical when four rows
 carrying the literal string `0` in a proposer name or email were left to be
 fixed in this app rather than in the old portal: a later full upsert would put
 the `0` back and report nothing unusual.

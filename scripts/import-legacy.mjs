@@ -8,10 +8,11 @@
  *   node scripts/import-legacy.mjs --skip-existing # add only rows not already imported
  *
  * The bare form is a full upsert: on a row that already exists it rewrites the
- * 24 columns its `ON CONFLICT` names, staff edits included. `deleted_at` and
- * the three embedding columns are not among them and `image_url` is COALESCEd,
- * so a soft delete, a vector and an image survive it; anything anyone typed
- * does not. It is for a cohort's FIRST import. Every run after that passes
+ * 24 of the table's 32 columns its `ON CONFLICT` names, staff edits to the
+ * project's own text included. `student_proposed`, `mentor_email`,
+ * `deleted_at`, the three embedding columns and the two `scope_assessment`
+ * ones are not among them, and `image_url` is COALESCEd, so all of those
+ * survive. It is for a cohort's FIRST import. Every run after that passes
  * `--skip-existing`, with no standing exception. ADR-0027 is the decision and
  * DEPLOYMENT.md's 7a.7 is the operational detail.
  *
