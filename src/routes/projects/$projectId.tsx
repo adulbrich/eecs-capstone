@@ -10,7 +10,7 @@ import { CategoryChip } from "#/components/category-chip";
 import { Markdown } from "#/components/markdown";
 import { OwnerProjectActions } from "#/components/owner-project-actions";
 import { ProjectBadges } from "#/components/project-badges";
-import { programLabel } from "#/components/project-card";
+import { programLabels } from "#/components/project-card";
 import { ProjectPrivatePanel } from "#/components/project-private-panel";
 import { SectionHeading } from "#/components/section-heading";
 import { StaffProjectPanel } from "#/components/staff-project-panel";
@@ -94,7 +94,7 @@ function ProjectDetail() {
   } = Route.useLoaderData() as unknown as ProjectDetailData;
   const [comments, setComments] = useState<Comment[]>([]);
   const projectId = project.id;
-  const program = programLabel(project);
+  const programs = programLabels(project);
 
   const refreshComments = useCallback(async () => {
     if (!projectId) {
@@ -147,15 +147,21 @@ function ProjectDetail() {
       >
         <StatusBadge status={project.status} />
         {/*
-          After the status, and only when there is one to name: a project
-          with no program renders nothing here rather than a placeholder,
-          and so does one whose program was deleted, since the column is
-          `on delete set null`. `programLabel` is the card's formatter, so
-          the badge reads as the string the listing showed on the way in
-          (#449). No link: the listing does take `?program=<uuid>`, but a
-          way off the page does not belong three lines under the title.
+          After the status, one badge per program in `course_id` order: a
+          project with no programs renders nothing here rather than a
+          placeholder, and a deleted program simply drops out, since the
+          join row is `on delete cascade` (#462). The full label, unlike the
+          card and the table, which show the course ids alone; watch the
+          wrap at mobile width, where a third program pushes the
+          accepting-applicants badge onto a second line. No link: the
+          listing does take `?program=<uuid>`, but a way off the page does
+          not belong three lines under the title.
         */}
-        {program && <Badge variant="outline">{program}</Badge>}
+        {programs.map((label) => (
+          <Badge key={label} variant="outline">
+            {label}
+          </Badge>
+        ))}
         <TeamFullBadge acceptingApplicants={project.acceptingApplicants} />
       </ProjectBadges>
 
@@ -242,8 +248,8 @@ function ProjectDetail() {
         // the panel holds the transition dialog's target and comment, which
         // would otherwise be posted onto the next project. The Program
         // section depends on this too, and less obviously: it seeds its draft
-        // from `programId` once, with no load of its own, so without the
-        // remount it would show the previous project's program (#450).
+        // from `programs` once, with no load of its own, so without the
+        // remount it would show the previous project's programs (#450).
         <StaffProjectPanel
           key={project.id}
           onChanged={() => router.invalidate()}
@@ -251,7 +257,8 @@ function ProjectDetail() {
             id: project.id,
             status: project.status,
             deletedAt: project.deletedAt,
-            programId: project.programId,
+            programs: project.programs,
+            teamsSupported: project.teamsSupported,
           }}
           viewerIsOwner={viewerIsOwner}
         />
