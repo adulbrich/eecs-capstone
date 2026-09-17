@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { waitForHydration } from "../shared/playwright";
 import { ADMIN_AUTH, OTHER_AUTH, USER_AUTH } from "./constants";
 import {
+  createFixtureProgram,
   createFixtureProject,
   fixtureName,
   openDb,
@@ -206,6 +207,87 @@ test.describe("project staff override", () => {
       ).toBeDisabled();
     } finally {
       await staffContext.close();
+    }
+  });
+});
+
+/**
+ * Where a project's program is set, which since #450 is the staff panel and
+ * nowhere else (ADR-0026). Two halves, and the second is the point: staff can
+ * place a project, and the proposer who owns it has no control to do the same.
+ * A server test can prove the endpoint refuses them; only a browser can prove
+ * the picker is not on the form they actually use.
+ */
+test.describe("project program placement", () => {
+  test("staff place a project from the panel, and the proposer has no picker", async ({
+    browser,
+  }) => {
+    const title = fixtureName("Project");
+    const { db, close } = openDb();
+    let projectId: string;
+    let courseName: string;
+    try {
+      const proposerId = await userIdByEmail(db, "user@example.com");
+      ({ id: projectId } = await createFixtureProject(db, {
+        title,
+        proposerId,
+        status: "draft",
+      }));
+      ({ courseName } = await createFixtureProgram(db));
+    } finally {
+      await close();
+    }
+
+    const staffContext = await browser.newContext({ storageState: ADMIN_AUTH });
+    try {
+      const staff = await staffContext.newPage();
+      await staff.goto(`/projects/${projectId}`);
+      await waitForHydration(staff);
+
+      // Created unplaced: `ProjectInput` carries no program any more, so the
+      // picker opens on its no-program choice however the project was made.
+      const picker = staff.getByRole("combobox", { name: "Program" });
+      await expect(picker).toContainText("(no program)");
+
+      await picker.click();
+      await staff.getByRole("option", { name: courseName }).click();
+      await staff.getByRole("button", { name: "Save program" }).click();
+
+      // Reload rather than trust the control: this asserts the stored column,
+      // not optimistic client state.
+      await staff.reload();
+      await waitForHydration(staff);
+      await expect(
+        staff.getByRole("combobox", { name: "Program" })
+      ).toContainText(courseName);
+
+      // The save is in the edit log, which is what makes a placement
+      // traceable to who made it.
+      await expect(staff.getByText("Changed: programId")).toBeVisible();
+    } finally {
+      await staffContext.close();
+    }
+
+    // The other half of the decision. The proposer owns this project and may
+    // still edit it, and the Program picker is gone from the form they use.
+    const ownerContext = await browser.newContext({ storageState: USER_AUTH });
+    try {
+      const owner = await ownerContext.newPage();
+      await owner.goto(`/projects/${projectId}/edit`);
+      await waitForHydration(owner);
+
+      // They are on their own edit form, not bounced off it.
+      await expect(owner.getByLabel("Title")).toHaveValue(title);
+      await expect(
+        owner.getByRole("combobox", { name: "Program" })
+      ).toHaveCount(0);
+      // The panel is staff-only, so the section is not reachable that way
+      // either.
+      await owner.goto(`/projects/${projectId}`);
+      await waitForHydration(owner);
+      await expect(owner.getByText("Staff panel")).toHaveCount(0);
+    } finally {
+      await ownerContext.close();
     }
   });
 });

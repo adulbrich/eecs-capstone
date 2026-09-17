@@ -156,6 +156,11 @@ test("project detail (staff panel, scope assessment)", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Save categories" })
   ).toBeEnabled();
+  // The Program section (#450) needs no such wait: it reads its value from
+  // the project payload rather than its own load. Asserted anyway, so a
+  // regression that drops the section fails here rather than passing a scan
+  // of a page that no longer has the control on it.
+  await expect(page.getByRole("combobox", { name: "Program" })).toBeVisible();
   await checkA11y(page);
 });
 
