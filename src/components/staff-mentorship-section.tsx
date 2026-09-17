@@ -94,6 +94,10 @@ export function StaffMentorshipSection({
             accountName={record.mentorName}
             email={record.mentorEmail || null}
             label="Mentor"
+            // Sign-up, not the proposer's verify: mentorship has no
+            // `mentor_id` and no claim, so registering is the moment a mentor
+            // links. See "Mentorship is one nullable address" in
+            // docs/QUIRKS.md, and #466.
             unlinkedHint="Links automatically when they sign up with this address."
           />
         )}
@@ -108,8 +112,9 @@ export function StaffMentorshipSection({
             value={mentorEmail}
           />
           <p className="text-muted-foreground text-xs">
-            Saving a new address emails it. Leave it empty for a project with no
-            mentor; an instructor who runs the team records their own.
+            Saving a new address emails it; the confirm that opens lets you skip
+            the email. Leave it empty for a project with no mentor; an
+            instructor who runs the team records their own.
           </p>
         </div>
         {!confirmOpen && <FieldError message={error} />}

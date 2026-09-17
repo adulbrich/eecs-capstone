@@ -119,7 +119,8 @@ function ProposerDraft({
         value={email}
       />
       <p className="text-muted-foreground text-xs">
-        Saving a new address emails it.
+        Saving a new address emails it; the confirm that opens lets you skip the
+        email.
       </p>
       <div className="space-y-1">
         <Label className="font-normal">

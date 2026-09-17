@@ -652,18 +652,48 @@ describe("StaffProjectPanel mentor block", () => {
     // Student proposed lives in the Proposer section now (#336), not here.
   });
 
-  it("says an address has no account yet, with the proposer's wording", async () => {
+  it("says a mentor with no account links on sign-up while the proposer's says verify", async () => {
+    // Both unlinked at once, so the assertion is a divergence rather than an
+    // absence. Mentorship has no `mentor_id` and no claim, so the name
+    // resolves by address at read time and sign-up really is the moment a
+    // mentor links; a project is claimed only by a verified address
+    // (ADR-0007). See "Mentorship is one nullable address" in
+    // docs/QUIRKS.md, and #466.
     getProjectMentorship.mockResolvedValue({
       mentorEmail: "mentor@x.test",
       mentorName: null,
     });
+    getProposerForEdit.mockResolvedValue({
+      accountLinked: false,
+      accountName: null,
+      email: "outsider@example.com",
+      studentProposed: false,
+    });
     renderPanel("submitted");
-    expect(await screen.findByText("No account yet")).toBeTruthy();
+    expect(await screen.findAllByText("No account yet")).toHaveLength(2);
+    // Scoped to each section, because the unlinked summary renders no label:
+    // counting the two literals across the whole panel would pass just as
+    // well with the hints swapped between the two components, which is the
+    // regression this exists to catch.
+    const sectionFor = (title: string) => {
+      const section = screen
+        .getByRole("heading", { level: 3, name: title })
+        .closest("section");
+      if (!section) {
+        throw new Error(`No section for ${title}`);
+      }
+      return within(section);
+    };
     expect(
-      screen.getAllByText(
+      sectionFor("Proposer").getByText(
+        "Links automatically when they verify this address."
+      )
+    ).toBeTruthy();
+    expect(
+      sectionFor("Mentor").getByText(
         "Links automatically when they sign up with this address."
-      ).length
-    ).toBeGreaterThan(0);
+      )
+    ).toBeTruthy();
   });
 
   it("saves the address through the server function and reloads the record", async () => {
@@ -709,9 +739,13 @@ describe("StaffProjectPanel mentor block", () => {
     });
     renderPanel("submitted");
     await screen.findByDisplayValue("kept@x.test");
-    // Once under the mentor field, once under the proposer picker.
+    // Once under the mentor field, once under the proposer picker, and both
+    // say the confirm carries a skip (#466).
     expect(
-      screen.getAllByText("Saving a new address emails it.", { exact: false })
+      screen.getAllByText(
+        "Saving a new address emails it; the confirm that opens lets you skip",
+        { exact: false }
+      )
     ).toHaveLength(2);
     // The same address in another case is not a new one, compared the way
     // the server compares (#385), so no dialog announces an email.
