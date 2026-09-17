@@ -170,7 +170,7 @@ export function ProposerPicker({
               ? `This project will be re-assigned to ${value} when saved.`
               : "The link will be removed when saved. Enter an external proposer's address, or leave it blank.";
           }
-          return "Links to the proposer's account once they verify this email address. Leave blank for an external proposer.";
+          return "Links to this person's account when they verify this address. Leave it blank for a project with no proposer yet.";
         })()}
       </p>
 

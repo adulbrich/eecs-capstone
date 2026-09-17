@@ -652,7 +652,11 @@ describe("StaffProjectPanel mentor block", () => {
     // Student proposed lives in the Proposer section now (#336), not here.
   });
 
-  it("says an address has no account yet, with the proposer's wording", async () => {
+  it("says a mentor with no account links when they sign up, not when they verify", async () => {
+    // Mentorship has no `mentor_id` and no claim: `mentorNameSql` matches
+    // `lower(user.email)` at read time with no verification check, so signing
+    // up really is the moment a mentor links. The proposer's copy of this
+    // hint says verify, and the test below pins that difference (#466).
     getProjectMentorship.mockResolvedValue({
       mentorEmail: "mentor@x.test",
       mentorName: null,
@@ -660,10 +664,32 @@ describe("StaffProjectPanel mentor block", () => {
     renderPanel("submitted");
     expect(await screen.findByText("No account yet")).toBeTruthy();
     expect(
-      screen.getAllByText(
+      screen.getByText(
         "Links automatically when they sign up with this address."
-      ).length
-    ).toBeGreaterThan(0);
+      )
+    ).toBeTruthy();
+  });
+
+  it("says a proposer with no account links when they verify the address", async () => {
+    // A project is claimed only by a verified address (ADR-0007), so a
+    // proposer who registers and never verifies stays unlinked.
+    getProposerForEdit.mockResolvedValue({
+      accountLinked: false,
+      accountName: null,
+      email: "outsider@example.com",
+      studentProposed: false,
+    });
+    renderPanel("submitted");
+    expect(
+      await screen.findByText(
+        "Links automatically when they verify this address."
+      )
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(
+        "Links automatically when they sign up with this address."
+      )
+    ).toBeNull();
   });
 
   it("saves the address through the server function and reloads the record", async () => {
@@ -709,9 +735,13 @@ describe("StaffProjectPanel mentor block", () => {
     });
     renderPanel("submitted");
     await screen.findByDisplayValue("kept@x.test");
-    // Once under the mentor field, once under the proposer picker.
+    // Once under the mentor field, once under the proposer picker, and both
+    // say the confirm carries a skip (#466).
     expect(
-      screen.getAllByText("Saving a new address emails it.", { exact: false })
+      screen.getAllByText(
+        "Saving a new address emails it; the confirm that opens lets you skip",
+        { exact: false }
+      )
     ).toHaveLength(2);
     // The same address in another case is not a new one, compared the way
     // the server compares (#385), so no dialog announces an email.

@@ -94,6 +94,11 @@ export function StaffMentorshipSection({
             accountName={record.mentorName}
             email={record.mentorEmail || null}
             label="Mentor"
+            // Sign-up, not verification, and deliberately not the proposer's
+            // wording: mentorship has no `mentor_id` and no claim, so
+            // `mentorNameSql` resolves the name by a case-insensitive match on
+            // `user.email` at read time. Registering really is the moment a
+            // mentor links. The proposer's copy of this hint says verify (#466).
             unlinkedHint="Links automatically when they sign up with this address."
           />
         )}
@@ -108,8 +113,9 @@ export function StaffMentorshipSection({
             value={mentorEmail}
           />
           <p className="text-muted-foreground text-xs">
-            Saving a new address emails it. Leave it empty for a project with no
-            mentor; an instructor who runs the team records their own.
+            Saving a new address emails it; the confirm that opens lets you skip
+            the email. Leave it empty for a project with no mentor; an
+            instructor who runs the team records their own.
           </p>
         </div>
         {!confirmOpen && <FieldError message={error} />}

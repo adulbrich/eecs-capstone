@@ -232,6 +232,27 @@ describe("ProposerPicker when an account is linked", () => {
     expect(input.readOnly).toBe(false);
     expect(getByText("Find account")).toBeTruthy();
   });
+
+  it("names the three states of the field without claiming blank records a proposer", () => {
+    // The resting hint, which the two branches above never reach. An address
+    // with no account links on verification, and blank means no proposer on
+    // file rather than one who has no account: the address of someone with
+    // no account goes in the field like any other (#466).
+    const { getByText } = render(
+      <ProposerPicker
+        accountLinked={false}
+        accountName={null}
+        onChange={vi.fn()}
+        value="outsider@example.com"
+      />
+    );
+
+    expect(
+      getByText(
+        "Links to this person's account when they verify this address. Leave it blank for a project with no proposer yet."
+      )
+    ).toBeTruthy();
+  });
 });
 
 describe("ProposerPicker when the on-screen value has diverged from the saved link", () => {

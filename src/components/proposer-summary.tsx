@@ -4,9 +4,9 @@ import { AccountLinkSummary } from "./account-link-summary";
 /**
  * Who a project belongs to, and whether that person has an account.
  *
- * A project whose proposer never signed up stays unlinked, and an unlinked
- * proposer gets no "My projects" entry, no status notifications and no review
- * emails (see `docs/QUIRKS.md`, "Projects are claimed only by a verified
+ * A project whose proposer never verified the address stays unlinked, and an
+ * unlinked proposer gets no "My projects" entry, no status notifications and
+ * no review emails (see `docs/QUIRKS.md`, "Projects are claimed only by a verified
  * address"). Without this, the only signal was an address that looked the
  * same either way.
  *
@@ -21,7 +21,7 @@ export function ProposerSummary({ proposer }: { proposer: ProposerForEdit }) {
       accountName={proposer.accountName}
       email={proposer.email}
       label="Proposer"
-      unlinkedHint="Links automatically when they sign up with this address."
+      unlinkedHint="Links automatically when they verify this address."
     />
   );
 }
