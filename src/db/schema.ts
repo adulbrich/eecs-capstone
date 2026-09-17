@@ -198,9 +198,6 @@ export const projects = pgTable(
       onDelete: "set null",
     }),
     proposerEmail: text("proposer_email"),
-    programId: uuid("program_id").references(() => programs.id, {
-      onDelete: "set null",
-    }),
     status: projectStatusEnum("status").notNull().default("draft"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
@@ -248,7 +245,6 @@ export const projects = pgTable(
     index("projects_deleted_at_idx").on(t.deletedAt),
     index("projects_proposer_id_idx").on(t.proposerId),
     index("projects_proposer_email_idx").on(t.proposerEmail),
-    index("projects_program_id_idx").on(t.programId),
     index("projects_published_at_idx").on(t.publishedAt),
     index("projects_embedding_idx").using(
       "hnsw",
@@ -298,6 +294,35 @@ export const projectCategories = pgTable(
     // projects carry this category" reads the other way, exactly as
     // inventory_item_categories_category_idx already serves the item side.
     index("project_categories_category_idx").on(t.categoryId),
+  ]
+);
+
+/**
+ * Which programs a project runs in (#462). A CS46X section offered both in
+ * Corvallis and on Ecampus is one proposal filed under two courses, so this
+ * is a set, not a column: zero, one or many rows per project, unordered and
+ * displayed in `course_id` order.
+ *
+ * `on delete cascade` on the program side replaces the `on delete set null`
+ * that `projects.program_id` carried. For a project in one program the
+ * outcome is the same, and for a shared one it removes only that program.
+ */
+export const projectPrograms = pgTable(
+  "project_programs",
+  {
+    projectId: uuid("project_id")
+      .references(() => projects.id, { onDelete: "cascade" })
+      .notNull(),
+    programId: uuid("program_id")
+      .references(() => programs.id, { onDelete: "cascade" })
+      .notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.programId] }),
+    // The primary key only serves project -> programs. Counting "how many
+    // projects run in this program" reads the other way, the same reason
+    // project_categories_category_idx exists.
+    index("project_programs_program_idx").on(t.programId),
   ]
 );
 
