@@ -57,6 +57,7 @@ import {
   type AdminDateField,
   DEFAULT_ADMIN_STATUSES,
   isDefaultStatusSelection,
+  PROGRAM_FILTER_NONE,
   statusSelectionLabel,
   toggleStatus,
 } from "#/lib/admin-project-filters";
@@ -112,7 +113,7 @@ export const searchSchema = z.object({
   // reason the four below carry one: a stale or hand-edited link degrades to
   // "All programs" rather than erroring the route.
   program: z
-    .union([z.literal("none"), z.string().uuid()])
+    .union([z.literal(PROGRAM_FILTER_NONE), z.string().uuid()])
     .nullable()
     .default(null)
     .catch(null),
@@ -555,7 +556,7 @@ function AdminProjectsFilters({
               needs one for the same choice because there the empty string is
               the stored value and Radix reserves it (#458).
             */}
-            <SelectItem value="none">No program</SelectItem>
+            <SelectItem value={PROGRAM_FILTER_NONE}>No program</SelectItem>
             {programs.map((p) => (
               <SelectItem key={p.id} value={p.id}>
                 {p.courseId} {p.courseName}

@@ -14,6 +14,20 @@ export const DEFAULT_ADMIN_STATUSES: readonly ProjectStatus[] =
   PROJECT_STATUSES.filter((s) => s !== "archived");
 
 /**
+ * The third state of the Program control on `/admin/projects`: the projects
+ * filed under no program (#458). The `program` param is this literal, a
+ * program's UUID, or absent for every program, and the three are one field
+ * because they are mutually exclusive.
+ *
+ * Here rather than inline because three modules have to agree on it: the
+ * route's `searchSchema`, `adminListSchema` on the server, and the branch in
+ * `buildAdminProjectScope` that turns it into `program_id IS NULL`. That is
+ * what makes it different from the `_all_` and `_none_` sentinels elsewhere,
+ * which each live and die inside one component.
+ */
+export const PROGRAM_FILTER_NONE = "none";
+
+/**
  * The timestamp a From and To pair narrows on.
  *
  * `archived` is here because "what did we retire last summer" is a question

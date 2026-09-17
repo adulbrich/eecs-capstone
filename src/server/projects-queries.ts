@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   ADMIN_DATE_FIELDS,
   DEFAULT_ADMIN_STATUSES,
+  PROGRAM_FILTER_NONE,
 } from "#/lib/admin-project-filters";
 import { PROJECT_STATUSES } from "#/lib/vocabularies";
 
@@ -45,7 +46,7 @@ const adminListSchema = z
     // same time as a UUID, which describes the empty set and leaves a reader
     // guessing which control wins (#458).
     program: z
-      .union([z.literal("none"), z.string().uuid()])
+      .union([z.literal(PROGRAM_FILTER_NONE), z.string().uuid()])
       .nullable()
       .default(null),
     // Better Auth user ids are text, not UUIDs, so this cannot be `.uuid()`.

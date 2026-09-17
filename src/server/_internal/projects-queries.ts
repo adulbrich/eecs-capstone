@@ -23,7 +23,10 @@ import {
   user,
 } from "#/db/schema";
 import { readSession } from "#/lib/_internal/auth-guards";
-import { dateFieldIsNullable } from "#/lib/admin-project-filters";
+import {
+  dateFieldIsNullable,
+  PROGRAM_FILTER_NONE,
+} from "#/lib/admin-project-filters";
 import { dayRange } from "#/lib/day-range";
 import {
   canEditProject,
@@ -163,7 +166,7 @@ function buildAdminProjectScope(
   // projects nobody has filed under a program yet, which is a staff to-do the
   // same shape as `withoutMentorOnly` below (#458). A program deleted out from
   // under a project lands here too, since `program_id` is `on delete set null`.
-  if (data.program === "none") {
+  if (data.program === PROGRAM_FILTER_NONE) {
     scope.push(isNull(projects.programId));
   } else if (data.program) {
     scope.push(eq(projects.programId, data.program));
