@@ -161,7 +161,7 @@ test("project detail (staff panel, scope assessment)", async ({ page }) => {
   // (#462), so wait for an option before scanning. Asserted anyway, so a
   // regression that drops the section fails here rather than passing a scan
   // of a page that no longer has the control on it.
-  await expect(page.getByRole("checkbox", { name: /A11Y-101/ })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: /A11Y-101/ })).toBeChecked();
   await checkA11y(page);
 });
 

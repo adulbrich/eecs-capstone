@@ -290,12 +290,16 @@ test.describe("project program placement", () => {
       ).toBeChecked();
 
       // One badge per program on the public half of the page, full labels.
+      // Scoped to the badges rather than `getByText`, because the checkbox
+      // labels in the panel below carry the same strings and a page-wide
+      // text match would pass without a badge rendering at all.
+      const badges = staff.locator('[data-slot="badge"]');
       await expect(
-        staff.getByText(`${first.courseId} ${first.courseName}`).first()
-      ).toBeVisible();
+        badges.filter({ hasText: `${first.courseId} ${first.courseName}` })
+      ).toHaveCount(1);
       await expect(
-        staff.getByText(`${second.courseId} ${second.courseName}`).first()
-      ).toBeVisible();
+        badges.filter({ hasText: `${second.courseId} ${second.courseName}` })
+      ).toHaveCount(1);
 
       // Still there after a reload, which is the point of reading it off
       // the saved set rather than the draft.

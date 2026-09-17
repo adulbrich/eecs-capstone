@@ -342,7 +342,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/projects.ts:updateProjectPrograms": {
     level: "staff",
-    note: "The only writer of project_programs (#450, #462, ADR-0026, ADR-0027). The key never entered ProjectInput, so updateProject cannot reach it and a proposer has no endpoint that moves their own project between programs; createProject writes no join rows, so every project arrives unplaced.",
+    note: "The only writer of project_programs (#450, #462, ADR-0026, ADR-0028). The key never entered ProjectInput, so updateProject cannot reach it and a proposer has no endpoint that moves their own project between programs; createProject writes no join rows, so every project arrives unplaced.",
   },
   "server/projects.ts:updateProjectProposer": {
     level: "staff",

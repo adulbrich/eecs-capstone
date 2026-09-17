@@ -209,11 +209,10 @@ async function headline(programId: string | null) {
       ) h on true
       where p.status = 'submitted' and p.deleted_at is null
         ${
+          // The same predicate the Drizzle queries use, told which name the
+          // outer row goes by here: this query aliases `projects` as `p`.
           programId
-            ? sql`and exists (
-                select 1 from project_programs pp
-                where pp.project_id = p.id and pp.program_id = ${programId}
-              )`
+            ? sql`and ${runsInProgram(programId, sql.raw("p.id"))}`
             : sql``
         }
     `),

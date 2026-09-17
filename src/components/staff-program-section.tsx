@@ -11,7 +11,7 @@ import { FieldError } from "./ui/field";
  * The staff edit of a project's programs, as a section of the staff panel
  * (#450, #462). Placing a project is staff judgement about how the course
  * runs, so the picker left the proposer's form and this is the only way to
- * set it after create; ADR-0026 records the trade and ADR-0027 records the
+ * set it after create; ADR-0026 records the trade and ADR-0028 records the
  * move from one program to a set.
  *
  * No load of its own, unlike the Mentor and Categories sections: the

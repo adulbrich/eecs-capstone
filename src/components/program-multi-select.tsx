@@ -1,14 +1,9 @@
 import { useEffect, useState } from "react";
+import { type ProjectProgram, programLabel } from "#/lib/project-visibility";
 import { listPrograms } from "#/server/programs";
 import { Checkbox } from "./ui/checkbox";
 import { FieldError } from "./ui/field";
 import { Label } from "./ui/label";
-
-interface Program {
-  courseId: string;
-  courseName: string;
-  id: string;
-}
 
 interface Props {
   /** Id of the helper text describing this control, for aria-describedby. */
@@ -35,14 +30,14 @@ interface Props {
  * and Save will still write them.
  */
 export function ProgramMultiSelect({ describedBy, value, onChange }: Props) {
-  const [programs, setPrograms] = useState<Program[]>([]);
+  const [programs, setPrograms] = useState<ProjectProgram[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
       try {
         const { rows } = await listPrograms();
-        setPrograms(rows as Program[]);
+        setPrograms(rows as ProjectProgram[]);
         setLoadError(null);
       } catch (err) {
         setLoadError(
@@ -86,7 +81,7 @@ export function ProgramMultiSelect({ describedBy, value, onChange }: Props) {
                   checked={value.includes(p.id)}
                   onCheckedChange={() => toggle(p.id)}
                 />
-                {p.courseId} {p.courseName}
+                {programLabel(p)}
               </Label>
             ))}
           </div>

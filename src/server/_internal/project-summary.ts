@@ -14,9 +14,10 @@ import type { ProjectProgram } from "#/lib/project-visibility";
  * anywhere. It stayed hidden until #462 only because every consumer
  * happened to join `programs`, which qualified everything.
  *
- * Every consumer selects from `projects` unaliased, so the qualified name
- * is right whether or not the outer query joins anything. Use it for any
- * reference to the outer row from inside one of these subqueries.
+ * Every consumer that selects from `projects` under that name gets the
+ * right reference whether or not the outer query joins anything. A query
+ * that aliases the table instead passes its own reference in; the
+ * oldest-wait query in `analytics.ts` is the one that does.
  */
 const OUTER_PROJECT_ID = sql.raw('"projects"."id"');
 
@@ -94,10 +95,13 @@ export const projectProgramsText = sql<string | null>`(
  * above, and so the predicate composes into a scope array beside plain
  * column comparisons.
  */
-export function runsInProgram(programId: string): SQL {
+export function runsInProgram(
+  programId: string,
+  outerProjectId: SQL = OUTER_PROJECT_ID
+): SQL {
   return sql`EXISTS (
     SELECT 1 FROM project_programs pp
-    WHERE pp.project_id = ${OUTER_PROJECT_ID} AND pp.program_id = ${programId}
+    WHERE pp.project_id = ${outerProjectId} AND pp.program_id = ${programId}
   )`;
 }
 
@@ -111,8 +115,9 @@ export const inNoProgram: SQL = sql`NOT EXISTS (
 )`;
 
 /**
- * How many programs a project runs in, for the staff panel's warning and
- * the analytics footnote. Both ask "more than one", never for the list.
+ * How many programs a project runs in, for the analytics footnote, which
+ * asks "more than one" and never for the list. The staff panel's warning
+ * counts the array it already has rather than asking SQL again.
  */
 export const projectProgramCount = sql<number>`(
   SELECT count(*)::int FROM project_programs pp

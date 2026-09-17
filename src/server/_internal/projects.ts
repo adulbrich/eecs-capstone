@@ -13,7 +13,11 @@ import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
 import { diffRowFields } from "#/lib/edit-diff";
 import { normalizeEmailAddress } from "#/lib/email-address";
 import { assertNoImageKeyOnCreate } from "#/lib/image-upload-policy";
-import { canEditProject, canWritePrivateNotes } from "#/lib/project-visibility";
+import {
+  canEditProject,
+  canWritePrivateNotes,
+  programLabel,
+} from "#/lib/project-visibility";
 import {
   type ActorRole,
   assertTransitionAllowed,
@@ -443,7 +447,7 @@ async function programLabelsFor(
     .from(programs)
     .where(inArray(programs.id, programIds))
     .orderBy(asc(programs.courseId));
-  return rows.map((r) => `${r.courseId} ${r.courseName}`);
+  return rows.map(programLabel);
 }
 
 /**
@@ -451,7 +455,7 @@ async function programLabelsFor(
  * Placing a project in a program is a staff judgement about how the course
  * runs, not a fact the proposer reports, which is the same line #322 drew
  * for the proposer and the categories; ADR-0026 records the trade and
- * ADR-0027 records the move to a set.
+ * ADR-0028 records the move to a set.
  *
  * Not part of `updateProjectAs`: the key never entered `ProjectInput`, so
  * the shared form cannot carry it and a proposer has no endpoint that moves

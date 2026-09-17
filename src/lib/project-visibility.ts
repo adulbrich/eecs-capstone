@@ -43,6 +43,20 @@ export interface ProjectProgram {
   id: string;
 }
 
+/**
+ * How a program reads wherever it is named in full: the detail page badges,
+ * the staff checkbox list, and the label arrays the edit log stores. One
+ * function because those three have to agree, and the edit log's rows are
+ * read back long after the fact. Takes the two halves rather than a whole
+ * `ProjectProgram` so the server can call it on a bare query row.
+ */
+export function programLabel(program: {
+  courseId: string;
+  courseName: string;
+}): string {
+  return `${program.courseId} ${program.courseName}`;
+}
+
 function isOwner(project: VisibleProject, viewer: Viewer): boolean {
   return !!viewer && project.proposerId === viewer.id;
 }
