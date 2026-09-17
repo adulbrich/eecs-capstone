@@ -71,9 +71,14 @@ export function ProgramMultiSelect({ describedBy, value, onChange }: Props) {
           aria-describedby={describedBy}
           className="border border-border p-2"
         >
-          <legend className="px-1 font-medium text-muted-foreground text-xs">
-            Programs
-          </legend>
+          {/*
+            Named for assistive tech but not drawn: the panel section above
+            is already headed "Programs", and a visible legend repeats the
+            word directly under it. `CategoryMultiSelect` shows its legend
+            because there the text is the category type, which is new
+            information.
+          */}
+          <legend className="sr-only">Programs</legend>
           <div className="flex flex-wrap gap-2">
             {programs.map((p) => (
               <Label className="font-normal" key={p.id}>

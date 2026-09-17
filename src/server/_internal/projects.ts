@@ -431,11 +431,14 @@ export async function updateProjectMentorshipForCurrentUser(
  * stores them and the panel reads them back. Labels rather than ids, so a
  * row still reads as course names after a program is deleted.
  */
-async function programLabelsFor(programIds: string[]): Promise<string[]> {
+async function programLabelsFor(
+  tx: Pick<typeof db, "select">,
+  programIds: string[]
+): Promise<string[]> {
   if (programIds.length === 0) {
     return [];
   }
-  const rows = await db
+  const rows = await tx
     .select({ courseId: programs.courseId, courseName: programs.courseName })
     .from(programs)
     .where(inArray(programs.id, programIds))
@@ -497,11 +500,13 @@ export async function updateProjectProgramsAs(
   ) {
     return { id: existing.id, updated: false };
   }
-  const [oldLabels, newLabels] = await Promise.all([
-    programLabelsFor(savedIds),
-    programLabelsFor(wanted),
-  ]);
   await db.transaction(async (tx) => {
+    // Inside the transaction, so a program deleted between the read and the
+    // insert cannot leave the logged labels one short of the rows written.
+    const [oldLabels, newLabels] = await Promise.all([
+      programLabelsFor(tx, savedIds),
+      programLabelsFor(tx, wanted),
+    ]);
     await tx
       .delete(projectPrograms)
       .where(eq(projectPrograms.projectId, existing.id));

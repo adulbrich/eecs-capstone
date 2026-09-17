@@ -289,6 +289,11 @@ describe("programs", () => {
       programIds: [doomed, kept],
     });
 
+    // The program detail page's counter reads join rows, so a project that
+    // runs here and elsewhere is counted here too.
+    const before = await getProgramAs(admin, { id: doomed });
+    expect(before.projectCount).toBe(1);
+
     const result = await deleteProgramAs(admin, doomed);
     expect(result.affectedProjectCount).toBe(1);
 
