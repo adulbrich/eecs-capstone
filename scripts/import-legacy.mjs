@@ -11,9 +11,9 @@
  * 24 columns its `ON CONFLICT` names, staff edits included. `deleted_at` and
  * the three embedding columns are not among them and `image_url` is COALESCEd,
  * so a soft delete, a vector and an image survive it; anything anyone typed
- * does not. It is for a cohort's FIRST import, and for correcting a mapping
- * that was wrong across the board. Every run after that passes
- * `--skip-existing`; DEPLOYMENT.md's 7a.7 says why.
+ * does not. It is for a cohort's FIRST import. Every run after that passes
+ * `--skip-existing`, with no standing exception; DEPLOYMENT.md's 7a.7 says
+ * why, and names the one case that would ever justify going back.
  *
  * The only thing that writes the imported rows to the database, and plain
  * `.mjs` so it runs from the production image: that installs with

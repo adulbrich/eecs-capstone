@@ -739,17 +739,25 @@ edits. Running 7a.5 afterwards is what closes that, and it is why 7a.5 says to
 run it after every import rather than only the first.
 
 **Decided 2026-09-17: every import after a cohort's first one passes
-`--skip-existing`.** The full upsert is for the run that creates a cohort, and
-for correcting a mapping that was wrong for every row in it. It is the wrong
-tool for a top-up, because it reverts whatever staff have edited here, silently
-and across the 24 columns its `ON CONFLICT` names. Not every column:
-`deleted_at` and the three embedding columns are not in the upsert at all, and
-`image_url` is COALESCEd, so a soft delete, a vector and an image all survive a
-full re-run. Everything a proposer or a staff member can type does not. That stopped being hypothetical when four rows
-carrying the literal string `0` in a proposer name or email were left to be
-fixed in this app rather than in the old portal: a later full upsert would put
-the `0` back and report nothing unusual. Use the full upsert deliberately, or
-not at all.
+`--skip-existing`.** The bare full upsert is for the run that creates a cohort,
+and for nothing else afterwards.
+
+It is the wrong tool for a top-up because it reverts whatever staff have edited
+here, silently, across the 24 columns its `ON CONFLICT` names. Not every
+column: `deleted_at` and the three embedding columns are not in the upsert at
+all, and `image_url` is COALESCEd, so a soft delete, a vector and an image all
+survive it. Everything a proposer or a staff member can type does not. That
+stopped being hypothetical when four rows carrying the literal string `0` in a
+proposer name or email were left to be fixed in this app rather than in the old
+portal: a later full upsert would put the `0` back and report nothing unusual.
+
+The rule has no standing exception, and the case that would want one is worth
+naming so nobody reinvents it quietly. If the pipeline is ever found to have
+mapped something wrong for every row, the way `export.sql` read a dead column
+and left half the catalog with no program, a full upsert is the only way to
+push the corrected mapping onto a whole cohort at once. That is a deliberate
+call to make at the time, against the staff edits it will discard and with a
+`pg_dump` taken first, not a permission this runbook grants in advance.
 
 Read its tally with care: the closing `Imported N projects` counts every row in
 the file, not the rows this run wrote, because the check queries
