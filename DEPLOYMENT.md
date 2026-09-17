@@ -770,11 +770,26 @@ source, which needs curation rather than a mapping), and the `studentProposed`
 flag (four candidates are identifiable only from prose in the legacy comments,
 so they want a staff eye rather than a hardcoded id list).
 
-**To import the projects that are still live in the old portal**, drop the
-`cp_archived = 1` condition from `export.sql` and write the result to a
-different filename, then name that file with `LEGACY_DATA_PROJECTS_FILE`. Each
-row carries `target_status`, computed as `archived` or `published` from
-`cp_archived`, and the importer reads it; nothing is hardcoded to `archived`.
+**To import the projects that are still live in the old portal**, set
+`export.sql`'s WHERE to `cp.cp_archived = 0 AND cp.cp_cps_id = 4` and write the
+result to `live-projects.jsonl`. Do not drop `cp_cps_id = 4` as well: 85 of the
+111 live drafts have a NULL `cp_date_updated`, and `clean-export.py` treats a
+null timestamp as the silent CONVERT_TZ failure it was written to catch.
+
+`clean-export.py` takes the export as its first argument and derives the three
+outputs from it, so the two sets can never overwrite each other:
+
+```bash
+python3 clean-export.py live-projects.jsonl   # -> live-projects-clean.jsonl
+```
+
+Name the CLEANED file with `LEGACY_DATA_PROJECTS_FILE`. The importer never
+reads the raw export: the raw file carries `created_at_pacific` rather than
+`created_at`, and its text is still HTML.
+
+Each row carries `target_status`. `export.sql` sets it to `archived` or
+`published` from `cp_archived`, and `clean-export.py` then rewrites a live
+hidden row to `approved`. The importer accepts all three; nothing is hardcoded.
 `export.sql` and `clean-export.py` live beside the data in Box, not in this
 repo.
 
@@ -788,13 +803,13 @@ overwrite the archived cohort's manifest in Box and its key map in
 
 ```bash
 # Must hold `legacy-images-manifest.jsonl`, a `legacy-images/` directory of
-# the image files, and `live-projects.jsonl`. `prepare` hardcodes the first
-# two names, so a differently named directory reports every row as
-# "file missing" rather than failing outright.
+# the image files. `prepare` hardcodes the first two names, so a differently
+# named directory reports every row as "file missing" rather than failing
+# outright.
 LIVE="$BOX/Capstone Portal Migration/live"
 npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
   prepare "$LIVE" ./live-out
-cp "$LIVE/live-projects.jsonl" ./live-out/
+cp "$LIVE/live-projects-clean.jsonl" ./live-out/
 ```
 
 That leaves `./live-out` holding both files the import needs. Give the set its
@@ -806,7 +821,7 @@ costs nothing.
 aws --profile aws-capstone1 s3 sync ./live-out/projects \
   "s3://$ASSETS_BUCKET/projects/" --region us-west-2 \
   --exclude "*" --include "*.webp"
-aws --profile aws-capstone1 s3 cp ./live-out/live-projects.jsonl \
+aws --profile aws-capstone1 s3 cp ./live-out/live-projects-clean.jsonl \
   "s3://$OPS_BUCKET/legacy-live/" --region us-west-2
 aws --profile aws-capstone1 s3 cp ./live-out/image-keys.json \
   "s3://$OPS_BUCKET/legacy-live/" --region us-west-2
@@ -825,13 +840,23 @@ hand. `CLUSTER`, `TASKDEF` and `NETCFG` come from 7a.4 unchanged:
 aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARGATE \
   --task-definition "$TASKDEF" \
   --network-configuration "$NETCFG" \
-  --overrides '{"containerOverrides":[{"name":"app","command":["node","scripts/import-legacy.mjs"],"environment":[{"name":"LEGACY_DATA_S3_URI","value":"s3://'"$OPS_BUCKET"'/legacy-live/"},{"name":"LEGACY_DATA_PROJECTS_FILE","value":"live-projects.jsonl"}]}]}' \
+  --overrides '{"containerOverrides":[{"name":"app","command":["node","scripts/import-legacy.mjs"],"environment":[{"name":"LEGACY_DATA_S3_URI","value":"s3://'"$OPS_BUCKET"'/legacy-live/"},{"name":"LEGACY_DATA_PROJECTS_FILE","value":"live-projects-clean.jsonl"}]}]}' \
   --region us-west-2
 ```
 
-`clean-export.py` still routes hidden rows to their own file, which matters
-more here: a hidden live project has never been public, and importing it as
-`published` would list it immediately.
+Hidden rows are handled differently in the two sets, and `clean-export.py` is
+where that lives because `export.sql` serves both. `cp_is_hidden` means "not on
+the portal's Browse page". On a LIVE row that is this app's `approved`: the old
+portal's Approve button writes only the status and its Publish button only
+clears the flag, so a project sits approved and unlisted between the two
+clicks, and `search.ts` filters on `published` (or `archived` when
+`archivedOnly` is set) so nothing is exposed. On an ARCHIVED row there is no
+such status, since `archived` is public here, so those stay in the hidden file
+pending a decision.
+
+An `approved` row is not in `EMBEDDABLE_STATUSES`, so 7a.5's backfill skips it
+and publishing it later embeds it through `commitTransition`. Size the backfill
+against the `published` count, not the row count.
 
 Three things to decide before doing that, none of which this import settles:
 
@@ -842,8 +867,13 @@ Three things to decide before doing that, none of which this import settles:
   filter, so they are visible to every visitor immediately rather than as
   history.
 - `accepting_applicants` is imported as `true` for the same reason as the
-  archived set (the legacy schema has no closed flag), and for a live project
-  that claim is load-bearing rather than inert.
+  archived set (the legacy schema has no closed flag), and for a `published`
+  row that claim is load-bearing rather than inert. On an `approved` row it is
+  inert again, since nothing outside the listing filters reads it.
+- A project the old portal published and later unpublished imports as
+  `approved` carrying the original `published_at`. That is deliberate: the date
+  is true, and `commitTransition` only stamps `publishedAt` when it is still
+  null, so publishing it here keeps the original rather than resetting it.
 
 ---
 

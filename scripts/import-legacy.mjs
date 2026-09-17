@@ -1,5 +1,5 @@
 /**
- * Production importer for the legacy PHP capstone portal's archived projects.
+ * Production importer for the legacy PHP capstone portal's projects.
  *
  * Run as a one-off ECS task, the way `promote-admin.mjs` is:
  *
@@ -27,7 +27,10 @@
  * DEPLOYMENT.md); this reads the small `image-keys.json` that step emits and
  * sets `image_url` from it.
  *
- * Inputs: `archived-projects-clean.jsonl` and, optionally, `image-keys.json`.
+ * Inputs: the cleaned JSONL named by `LEGACY_DATA_PROJECTS_FILE`, defaulting
+ * to `archived-projects-clean.jsonl`, and optionally `image-keys.json`. The
+ * live set exports to its own filename (`live-projects-clean.jsonl`) so a run
+ * over one set can never overwrite the other.
  *
  * They are read at runtime from a PRIVATE S3 prefix named by
  * `LEGACY_DATA_S3_URI` (for example `s3://eecs-capstone-ops/legacy/`), using
@@ -183,8 +186,20 @@ const PROGRAMS = {
  * The statuses this importer will write. A guard rather than a pass-through:
  * the value arrives from a SQL file, and an unrecognised one would otherwise
  * fail against the enum halfway through the transaction.
+ *
+ * `approved` is here for the legacy portal's hidden-but-accepting projects.
+ * That portal splits approval from publication the same way this app does:
+ * its Approve button writes only the status and its Publish button only clears
+ * `cp_is_hidden`, so a project sits approved and unlisted between the two
+ * clicks. `search.ts` filters on `published`, or `archived` when archivedOnly
+ * is set, so importing one exposes nothing publicly.
+ *
+ * Note what an `approved` row does NOT get: `EMBEDDABLE_STATUSES` is
+ * `published` and `archived` only, so neither `refreshProjectEmbedding` nor
+ * `scripts/backfill-embeddings.mjs` will ever embed it. Publishing it later
+ * goes through `commitTransition`, which embeds it then.
  */
-const IMPORTABLE_STATUSES = ["archived", "published"];
+const IMPORTABLE_STATUSES = ["approved", "archived", "published"];
 
 function statusOf(row) {
   // Absent means an export made before `target_status` existed, and every one
@@ -488,11 +503,13 @@ async function main() {
         row.license_restrictions,
         row.requires_nda_ip,
         row.is_sponsored,
-        // True, because that is what the source says: the legacy schema has
-        // no closed-to-applicants column, every one of the 547 carries status
-        // 4 ("Accepting Applicants") which is what this import selects on,
-        // and `capstone_application` is empty. The flag means "published but
-        // not closed", not "students can apply"; archived settles the latter.
+// True, because that is what the source says: the legacy schema has
+        // no closed-to-applicants column, every row any export selects carries
+        // status 4 ("Accepting Applicants"), and `capstone_application` is
+        // empty. The flag means "published but not closed", not "students can
+        // apply"; `archived` settles the latter and so does `approved`, which
+        // is not publicly listed at all. Nothing reads this outside the
+        // listing filters, so it is inert on a row that does not appear there.
         true,
         row.teams_supported,
         buildNotes(row),
@@ -507,6 +524,13 @@ async function main() {
         // backfilled: that would erase the difference between a date we know
         // and one we guessed. `search.ts` orders on
         // coalesce(published_at, created_at) so the nulls still sort sanely.
+        //
+        // An `approved` row can carry one, and 58 of the 64 do. They were
+        // published in the old portal and unpublished again later, which is
+        // what its Unpublish button does, so the date is true and worth
+        // keeping. `commitTransition` only stamps `publishedAt` when it is
+        // still null, so publishing one here preserves the original date
+        // rather than resetting it to today.
         row.published_at,
         row.archived_at,
         row.created_at,
