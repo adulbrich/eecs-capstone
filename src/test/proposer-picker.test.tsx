@@ -233,11 +233,11 @@ describe("ProposerPicker when an account is linked", () => {
     expect(getByText("Find account")).toBeTruthy();
   });
 
-  it("names the three states of the field without claiming blank records a proposer", () => {
-    // The resting hint, which the two branches above never reach. An address
-    // with no account links on verification, and blank means no proposer on
-    // file rather than one who has no account: the address of someone with
-    // no account goes in the field like any other (#466).
+  it("says what blank means without claiming it records a proposer", () => {
+    // The resting hint, which the locked and pending branches never reach. An
+    // address with no account links on verification, and blank means no
+    // proposer on file rather than one who has no account: the address of
+    // someone with no account goes in the field like any other (#466).
     const { getByText } = render(
       <ProposerPicker
         accountLinked={false}

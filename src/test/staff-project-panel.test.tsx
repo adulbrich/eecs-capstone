@@ -652,27 +652,17 @@ describe("StaffProjectPanel mentor block", () => {
     // Student proposed lives in the Proposer section now (#336), not here.
   });
 
-  it("says a mentor with no account links when they sign up, not when they verify", async () => {
-    // Mentorship has no `mentor_id` and no claim: `mentorNameSql` matches
-    // `lower(user.email)` at read time with no verification check, so signing
-    // up really is the moment a mentor links. The proposer's copy of this
-    // hint says verify, and the test below pins that difference (#466).
+  it("says a mentor with no account links on sign-up while the proposer's says verify", async () => {
+    // Both unlinked at once, so the assertion is a divergence rather than an
+    // absence. Mentorship has no `mentor_id` and no claim, so the name
+    // resolves by address at read time and sign-up really is the moment a
+    // mentor links; a project is claimed only by a verified address
+    // (ADR-0007). See "Mentorship is one nullable address" in
+    // docs/QUIRKS.md, and #466.
     getProjectMentorship.mockResolvedValue({
       mentorEmail: "mentor@x.test",
       mentorName: null,
     });
-    renderPanel("submitted");
-    expect(await screen.findByText("No account yet")).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Links automatically when they sign up with this address."
-      )
-    ).toBeTruthy();
-  });
-
-  it("says a proposer with no account links when they verify the address", async () => {
-    // A project is claimed only by a verified address (ADR-0007), so a
-    // proposer who registers and never verifies stays unlinked.
     getProposerForEdit.mockResolvedValue({
       accountLinked: false,
       accountName: null,
@@ -680,16 +670,15 @@ describe("StaffProjectPanel mentor block", () => {
       studentProposed: false,
     });
     renderPanel("submitted");
+    expect(await screen.findAllByText("No account yet")).toHaveLength(2);
     expect(
-      await screen.findByText(
-        "Links automatically when they verify this address."
-      )
-    ).toBeTruthy();
-    expect(
-      screen.queryByText(
+      screen.getAllByText(
         "Links automatically when they sign up with this address."
       )
-    ).toBeNull();
+    ).toHaveLength(1);
+    expect(
+      screen.getAllByText("Links automatically when they verify this address.")
+    ).toHaveLength(1);
   });
 
   it("saves the address through the server function and reloads the record", async () => {

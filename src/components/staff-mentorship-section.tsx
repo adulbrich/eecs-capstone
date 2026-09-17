@@ -94,11 +94,10 @@ export function StaffMentorshipSection({
             accountName={record.mentorName}
             email={record.mentorEmail || null}
             label="Mentor"
-            // Sign-up, not verification, and deliberately not the proposer's
-            // wording: mentorship has no `mentor_id` and no claim, so
-            // `mentorNameSql` resolves the name by a case-insensitive match on
-            // `user.email` at read time. Registering really is the moment a
-            // mentor links. The proposer's copy of this hint says verify (#466).
+            // Sign-up, not the proposer's verify: mentorship has no
+            // `mentor_id` and no claim, so registering is the moment a mentor
+            // links. See "Mentorship is one nullable address" in
+            // docs/QUIRKS.md, and #466.
             unlinkedHint="Links automatically when they sign up with this address."
           />
         )}
