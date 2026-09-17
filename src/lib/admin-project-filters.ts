@@ -21,9 +21,10 @@ export const DEFAULT_ADMIN_STATUSES: readonly ProjectStatus[] =
  *
  * Here rather than inline because three modules have to agree on it: the
  * route's `searchSchema`, `adminListSchema` on the server, and the branch in
- * `buildAdminProjectScope` that turns it into `program_id IS NULL`. That is
- * what makes it different from the `_all_` and `_none_` sentinels elsewhere,
- * which each live and die inside one component.
+ * `buildAdminProjectScope` that turns it into a `not exists` against
+ * `project_programs`. That is
+ * what makes it different from the `_all_` sentinel on the two listing
+ * filters, which lives and dies inside one component.
  */
 export const PROGRAM_FILTER_NONE = "none";
 

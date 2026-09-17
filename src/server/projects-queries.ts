@@ -40,8 +40,9 @@ const adminListSchema = z
     from: z.string().regex(DAY).nullable().default(null),
     to: z.string().regex(DAY).nullable().default(null),
     includeSoftDeleted: z.boolean().default(false),
-    // Three states in one field, because they are mutually exclusive: null is
-    // every program, "none" is `program_id IS NULL`, a UUID is that program.
+    // Three states in one field, because they are mutually exclusive: null
+    // is every program, "none" is a project with no `project_programs` rows,
+    // a UUID is any project that runs in that program (#462).
     // A separate boolean beside `withoutMentorOnly` could have been set at the
     // same time as a UUID, which describes the empty set and leaves a reader
     // guessing which control wins (#458).

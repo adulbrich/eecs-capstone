@@ -306,7 +306,7 @@ export async function createFixtureCategory(
 export async function createFixtureProgram(
   db: Db,
   input: { instructorId?: string } = {}
-): Promise<{ id: string; courseName: string }> {
+): Promise<{ courseId: string; courseName: string; id: string }> {
   const [row] = await db
     .insert(schema.programs)
     .values({
@@ -319,7 +319,7 @@ export async function createFixtureProgram(
       .insert(schema.programInstructors)
       .values({ programId: row.id, userId: input.instructorId });
   }
-  return { id: row.id, courseName: row.courseName };
+  return { id: row.id, courseId: row.courseId, courseName: row.courseName };
 }
 
 /**

@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { errorMessage } from "#/lib/error-message";
 import { STAFF_PANEL_AUDIENCE_HINT } from "#/lib/private-notes";
+import type { ProjectProgram } from "#/lib/project-visibility";
 import {
   canTransition,
   PROJECT_STATUS_DESCRIPTION,
@@ -49,9 +50,11 @@ const WORKFLOW = PROJECT_STATUSES_IN_DISPLAY_ORDER;
 interface Project {
   deletedAt: Date | string | null;
   id: string;
-  /** The Program section's starting value; the payload already carries it. */
-  programId: string | null;
+  /** The Programs section's starting set; the payload already carries it. */
+  programs: ProjectProgram[];
   status: string;
+  /** Read only here: the Programs section warns when the set outgrows it. */
+  teamsSupported: number;
 }
 
 /**
@@ -433,8 +436,9 @@ export function StaffProjectPanel({
       */}
       <StaffProgramSection
         onChanged={onSectionChanged}
-        programId={project.programId}
+        programs={project.programs}
         projectId={project.id}
+        teamsSupported={project.teamsSupported}
       />
 
       <StaffProposerSection

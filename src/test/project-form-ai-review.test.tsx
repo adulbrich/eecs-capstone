@@ -3,9 +3,6 @@ import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 // Stub the heavy child components and the server function.
-vi.mock("#/components/program-select", () => ({
-  ProgramSelect: () => null,
-}));
 vi.mock("#/components/category-multi-select", () => ({
   CategoryMultiSelect: () => null,
 }));

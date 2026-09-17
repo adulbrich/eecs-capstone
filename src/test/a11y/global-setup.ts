@@ -265,6 +265,14 @@ async function createFixtures(
       .returning();
   }
 
+  // The project runs in the program, so the public detail scan has a badge
+  // row to look at and the staff panel has a checked box (#462). Composite
+  // PK, so onConflictDoNothing makes a re-run safe.
+  await db
+    .insert(schema.projectPrograms)
+    .values({ projectId: project.id, programId: program.id })
+    .onConflictDoNothing();
+
   // Inventory item (no unique constraint on name, hence the select-first pattern)
   let [item] = await db
     .select()

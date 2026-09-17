@@ -83,9 +83,15 @@ function ProgramEdit() {
     navigate({ to: "/admin/programs" });
   }
 
+  // A project runs in a set of programs (#462), so deleting this one does
+  // not unlink anything: each of these projects loses this program and
+  // keeps the rest, and only the ones with no other are left unplaced. The
+  // old wording said "unlinked but kept", which is false for a shared
+  // project. The count is `projectCount` from `getProgram`, not the
+  // `affectedProjectCount` the delete returns; nothing renders that one.
   const deleteDescription =
     projectCount > 0
-      ? `${projectCount} project(s) will be unlinked but kept.`
+      ? `${projectCount} project(s) will lose this program and keep any others. A project with no other program is left unplaced.`
       : "This cannot be undone.";
 
   return (

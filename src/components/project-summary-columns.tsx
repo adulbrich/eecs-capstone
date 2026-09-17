@@ -1,13 +1,13 @@
 import type { AdminColumn } from "#/components/admin-data-table";
+import type { ProjectProgram } from "#/lib/project-visibility";
 import { ProjectBadges } from "./project-badges";
-import { programLabel } from "./project-card";
+import { programCourseIds } from "./project-card";
 import { TeamFullBadge } from "./team-full-badge";
 
 /** The fields of `projectSummarySelect` these columns read. */
 export interface ProjectSummaryRow {
   acceptingApplicants: boolean;
-  programCourseId: string | null;
-  programCourseName: string | null;
+  programs: ProjectProgram[];
   requiresNdaIp: boolean;
   studentProposed: boolean;
   teamsSupported: number;
@@ -25,9 +25,14 @@ export interface ProjectSummaryRow {
  * options in.
  */
 export function projectSummaryColumns<Row extends ProjectSummaryRow>() {
+  // Plain text, not chips: the course ids `'; '` separated, the same string
+  // the card meta line and the CSV carry. Chips would stop AdminDataTable
+  // rows staying single height in an already wide table, and they are
+  // reserved for categories, where an unbounded set needs the separation.
+  // Sorting stays on that string (#462).
   const program = {
-    accessorFn: (row) => programLabel(row) ?? undefined,
-    cell: ({ row }) => programLabel(row.original) ?? "-",
+    accessorFn: (row) => programCourseIds(row) ?? undefined,
+    cell: ({ row }) => programCourseIds(row.original) ?? "-",
     header: "Program",
     id: "program" as const,
     sortUndefined: "last",

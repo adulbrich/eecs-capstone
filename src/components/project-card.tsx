@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { projectImageSrc } from "#/lib/project-image";
+import type { ProjectProgram } from "#/lib/project-visibility";
 import { stripMarkdown } from "#/lib/strip-markdown";
 import { BookmarkToggle } from "./bookmark-set";
 import { ImageOrFallback } from "./image-or-fallback";
@@ -15,8 +16,7 @@ interface ProjectSummary {
   description: string | null;
   id: string;
   imageUrl?: string | null;
-  programCourseId?: string | null;
-  programCourseName?: string | null;
+  programs: ProjectProgram[];
   requiresNdaIp: boolean;
   status: string;
   studentProposed: boolean;
@@ -24,18 +24,28 @@ interface ProjectSummary {
   updatedAt?: Date | string | null;
 }
 
-function programLabel(project: {
-  programCourseId?: string | null;
-  programCourseName?: string | null;
+/**
+ * The course ids alone, `'; '` separated, which is the same string the
+ * shared table column carries. The card and the table are two render modes
+ * of one listing, so a visitor toggling between them should not see the
+ * punctuation change.
+ *
+ * This breaks the continuity #449 established, where the detail badge read
+ * as the string the listing showed on the way in. Deliberate: two full
+ * labels plus the contact name runs to roughly sixty characters and wraps
+ * to a third line at phone width in the quietest text on the card. The card
+ * is a scanning surface and the full name is one click away.
+ */
+function programCourseIds(project: {
+  programs: ProjectProgram[];
 }): string | null {
-  const parts = [project.programCourseId, project.programCourseName].filter(
-    Boolean
-  ) as string[];
-  return parts.length > 0 ? parts.join(" ") : null;
+  return project.programs.length > 0
+    ? project.programs.map((p) => p.courseId).join("; ")
+    : null;
 }
 
 function ProjectMeta({ project }: { project: ProjectSummary }) {
-  const meta = [programLabel(project), project.contactName].filter(
+  const meta = [programCourseIds(project), project.contactName].filter(
     Boolean
   ) as string[];
   return (
@@ -116,4 +126,4 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
 }
 
 export type { ProjectSummary };
-export { programLabel };
+export { programCourseIds };

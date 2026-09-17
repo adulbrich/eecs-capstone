@@ -67,16 +67,17 @@ export const proposerSchema = z.object({
 
 export type ProposerInput = Omit<z.infer<typeof proposerSchema>, "sendEmail">;
 
-export const programSchema = z.object({
+export const programsSchema = z.object({
   id: z.string().uuid(),
-  // A string in transit, null only in the column: the empty string is the
-  // picker's no-program choice and the impl folds it, the same shape
-  // `mentorshipSchema` uses. Never on ProjectInput since #450: the form
-  // cannot carry it and only this endpoint writes it.
-  programId: z.string().uuid().nullable().or(z.literal("")),
+  // The whole set, every time. An empty array is the cleared set, which is
+  // what retired the empty-string-for-null convention the single picker
+  // needed: unchecking every box says the same thing without a sentinel.
+  // Never on ProjectInput since #450: the form cannot carry it and only
+  // this endpoint writes it.
+  programIds: z.array(z.string().uuid()),
 });
 
-export type ProgramInput = z.infer<typeof programSchema>;
+export type ProgramsInput = z.infer<typeof programsSchema>;
 
 const transitionInputSchema = z.object({
   id: z.string().uuid(),
@@ -127,13 +128,13 @@ export const updateProjectProposer = createServerFn({ method: "POST" })
     return updateProjectProposerForCurrentUser(data);
   });
 
-export const updateProjectProgram = createServerFn({ method: "POST" })
-  .validator((data: unknown) => programSchema.parse(data))
+export const updateProjectPrograms = createServerFn({ method: "POST" })
+  .validator((data: unknown) => programsSchema.parse(data))
   .handler(async ({ data }) => {
-    const { updateProjectProgramForCurrentUser } = await import(
+    const { updateProjectProgramsForCurrentUser } = await import(
       "./_internal/projects"
     );
-    return updateProjectProgramForCurrentUser(data);
+    return updateProjectProgramsForCurrentUser(data);
   });
 
 export const submitProject = createServerFn({ method: "POST" })

@@ -340,9 +340,9 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "staff",
     note: "The only writer of mentorEmail, which is the whole of mentorship (#402). The key does not exist on ProjectInput, so updateProject cannot reach it; this endpoint is what keeps it staff-only.",
   },
-  "server/projects.ts:updateProjectProgram": {
+  "server/projects.ts:updateProjectPrograms": {
     level: "staff",
-    note: "The only writer of programId after create (#450, ADR-0026). The key left ProjectInput, so updateProject cannot reach it and a proposer has no endpoint that moves their own project between programs; createProject writes a null, so every project arrives unplaced.",
+    note: "The only writer of project_programs (#450, #462, ADR-0026, ADR-0028). The key never entered ProjectInput, so updateProject cannot reach it and a proposer has no endpoint that moves their own project between programs; createProject writes no join rows, so every project arrives unplaced.",
   },
   "server/projects.ts:updateProjectProposer": {
     level: "staff",

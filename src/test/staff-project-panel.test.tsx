@@ -167,9 +167,9 @@ const PROJECT_ID = "00000000-0000-0000-0000-0000000000p1";
 function project(
   status: string,
   id = PROJECT_ID,
-  programId: string | null = null
+  programs: { courseId: string; courseName: string; id: string }[] = []
 ) {
-  return { id, status, deletedAt: null, programId };
+  return { id, status, deletedAt: null, programs, teamsSupported: 1 };
 }
 
 // Keyed on the id, as the route renders it: a rerender with a new id is the
@@ -178,13 +178,13 @@ function panel(
   status: string,
   id = PROJECT_ID,
   viewerIsOwner = false,
-  programId: string | null = null
+  programs: { courseId: string; courseName: string; id: string }[] = []
 ) {
   return (
     <StaffProjectPanel
       key={id}
       onChanged={() => Promise.resolve()}
-      project={project(status, id, programId)}
+      project={project(status, id, programs)}
       viewerIsOwner={viewerIsOwner}
     />
   );
@@ -210,7 +210,7 @@ describe("StaffProjectPanel section order", () => {
       "Status",
       // Placing a project is the decision staff make right after deciding
       // whether to take it, and before deciding whose it is (#450).
-      "Program",
+      "Programs",
       "Proposer",
       "Mentor",
       "Scope assessment",
@@ -952,27 +952,64 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
     ).toBe(true);
   });
 
-  // The Program section seeds its draft from the payload once and never
+  // The Programs section seeds its draft from the payload once and never
   // loads, so the panel's key is the only thing that stops it showing the
-  // previous project's program. That key is on the route for the transition
+  // previous project's programs. That key is on the route for the transition
   // dialog's sake, which is why this asserts the consequence rather than
   // trusting the comment beside it (#450).
-  it("shows the next project's program rather than the previous one's", async () => {
-    const view = render(panel("submitted", PROJECT_ID, false, PROGRAM_A));
-    await screen.findByLabelText("Proposer email");
-    expect(screen.getByRole("combobox", { name: "Program" }).textContent).toBe(
-      "Program A"
+  it("shows the next project's programs rather than the previous one's", async () => {
+    const view = render(
+      panel("submitted", PROJECT_ID, false, [
+        { id: PROGRAM_A, courseId: "Program", courseName: "A" },
+      ])
     );
+    await screen.findByLabelText("Proposer email");
+    expect(
+      screen
+        .getByRole("checkbox", { name: "Program A" })
+        .getAttribute("aria-checked")
+    ).toBe("true");
 
     view.rerender(
-      panel("submitted", "00000000-0000-0000-0000-0000000000p2", false, null)
+      panel("submitted", "00000000-0000-0000-0000-0000000000p2", false, [])
     );
 
     await waitFor(() =>
       expect(
-        screen.getByRole("combobox", { name: "Program" }).textContent
-      ).toBe("(no program)")
+        screen
+          .getByRole("checkbox", { name: "Program A" })
+          .getAttribute("aria-checked")
+      ).toBe("false")
     );
+  });
+
+  // Advisory, computed from the saved set rather than the draft, so it is
+  // there on every visit to the panel and not only after an edit (#462).
+  it("warns when the saved programs outnumber the teams supported", async () => {
+    render(
+      panel("submitted", PROJECT_ID, false, [
+        { id: PROGRAM_A, courseId: "Program", courseName: "A" },
+        {
+          id: "00000000-0000-0000-0000-00000000pg02",
+          courseId: "Program",
+          courseName: "B",
+        },
+      ])
+    );
+    await screen.findByLabelText("Proposer email");
+    expect(
+      screen.getByText(/supports 1 team but runs in 2 programs/)
+    ).toBeTruthy();
+  });
+
+  it("stays quiet when the programs fit the teams supported", async () => {
+    render(
+      panel("submitted", PROJECT_ID, false, [
+        { id: PROGRAM_A, courseId: "Program", courseName: "A" },
+      ])
+    );
+    await screen.findByLabelText("Proposer email");
+    expect(screen.queryByText(/but runs in/)).toBeNull();
   });
 });
 

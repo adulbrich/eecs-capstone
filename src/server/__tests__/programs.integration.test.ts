@@ -1,7 +1,12 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
-import { programInstructors, projects, user } from "#/db/schema";
+import {
+  programInstructors,
+  projectPrograms,
+  projects,
+  user,
+} from "#/db/schema";
 import { auth } from "#/lib/auth";
 import type { UserRole } from "#/lib/vocabularies";
 import {
@@ -17,7 +22,7 @@ import {
 } from "#/server/_internal/programs";
 import {
   createProjectAs,
-  updateProjectProgramAs,
+  updateProjectProgramsAs,
 } from "#/server/_internal/projects";
 
 async function makeUser(email: string, role: UserRole) {
@@ -193,7 +198,7 @@ describe("term_count and expected_teams are staff-editable and never public", ()
 });
 
 describe("programs", () => {
-  it("create + update + delete; deleteProgram returns unlinkedProjectCount", async () => {
+  it("create + update + delete; deleteProgram returns affectedProjectCount", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const { id: programId } = await createProgramAs(admin, {
       courseId: "CS-462",
@@ -224,16 +229,79 @@ describe("programs", () => {
     });
     // Placed by the staff writer, the only one that sets the column after
     // create since #450.
-    await updateProjectProgramAs(admin, { id: projId, programId });
+    await updateProjectProgramsAs(admin, {
+      id: projId,
+      programIds: [programId],
+    });
 
     const result = await deleteProgramAs(admin, programId);
-    expect(result.unlinkedProjectCount).toBe(1);
+    expect(result.affectedProjectCount).toBe(1);
 
+    // The join row cascades away and the project survives unplaced, which
+    // is the same outcome the old `on delete set null` produced for a
+    // project that ran in one program (#462).
     const [project] = await db
       .select()
       .from(projects)
       .where(eq(projects.id, projId));
-    expect(project.programId).toBeNull();
+    expect(project.id).toBe(projId);
+    const links = await db
+      .select()
+      .from(projectPrograms)
+      .where(eq(projectPrograms.projectId, projId));
+    expect(links).toEqual([]);
+  });
+
+  // The count is every project that loses this program, not every project
+  // left unplaced: a shared one keeps its others and is still affected.
+  it("deleteProgram leaves a shared project with its other programs", async () => {
+    const admin = await makeUser(`dp2-${Date.now()}@x.com`, "admin");
+    const { id: doomed } = await createProgramAs(admin, {
+      courseId: `DEL-${Date.now()}`,
+      courseName: "Doomed",
+      description: null,
+      termCount: null,
+      expectedTeams: null,
+    });
+    const { id: kept } = await createProgramAs(admin, {
+      courseId: `KEEP-${Date.now()}`,
+      courseName: "Kept",
+      description: null,
+      termCount: null,
+      expectedTeams: null,
+    });
+    const { id: projId } = await createProjectAs(admin, {
+      title: `Shared ${Date.now()}`,
+      description: null,
+      problemStatement: null,
+      objectives: null,
+      minQualifications: null,
+      prefQualifications: null,
+      url: null,
+      contactEmail: null,
+      contactName: null,
+      imageUrl: "",
+      licenseRestrictions: null,
+      notes: null,
+    });
+    await updateProjectProgramsAs(admin, {
+      id: projId,
+      programIds: [doomed, kept],
+    });
+
+    // The program detail page's counter reads join rows, so a project that
+    // runs here and elsewhere is counted here too.
+    const before = await getProgramAs(admin, { id: doomed });
+    expect(before.projectCount).toBe(1);
+
+    const result = await deleteProgramAs(admin, doomed);
+    expect(result.affectedProjectCount).toBe(1);
+
+    const links = await db
+      .select({ programId: projectPrograms.programId })
+      .from(projectPrograms)
+      .where(eq(projectPrograms.projectId, projId));
+    expect(links.map((l) => l.programId)).toEqual([kept]);
   });
 
   it("addProgramInstructor refuses for plain user role", async () => {

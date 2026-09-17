@@ -17,7 +17,7 @@ import { createProgramAs } from "#/server/_internal/programs";
 import {
   createProjectAs,
   forceTransitionAs,
-  updateProjectProgramAs,
+  updateProjectProgramsAs,
 } from "#/server/_internal/projects";
 
 async function makeUser(email: string, role: UserRole) {
@@ -80,9 +80,9 @@ describe("the program selector", () => {
     // Placed after create: `createProjectAs` stopped carrying a program in
     // #450, so the staff writer is the only one that sets the column.
     const inA = await createProjectAs(admin, baseProject());
-    await updateProjectProgramAs(admin, { id: inA.id, programId: a.id });
+    await updateProjectProgramsAs(admin, { id: inA.id, programIds: [a.id] });
     const inB = await createProjectAs(admin, baseProject());
-    await updateProjectProgramAs(admin, { id: inB.id, programId: b.id });
+    await updateProjectProgramsAs(admin, { id: inB.id, programIds: [b.id] });
     await forceTransitionAs(admin, inA.id, "published", undefined, {
       sendEmail: false,
     });
@@ -124,6 +124,54 @@ describe("the program selector", () => {
     expect(onlyA.breakdowns.projectsByStatus).not.toEqual(
       expect.arrayContaining([{ key: "submitted", count: 1 }])
     );
+  });
+
+  // The documented semantic of #462, not a bug: `teams_supported` is one
+  // number on the project, shared across its programs, so a shared project
+  // contributes all of it to each and the per program figures stop summing
+  // to the global one. `slotsHint` says so under the tile.
+  it("counts a shared project in full under each of its programs", async () => {
+    const admin = await makeUser(`an-sh-${Date.now()}@x.com`, "admin");
+    const a = await createProgramAs(admin, {
+      courseId: `AN-S1-${Date.now()}`,
+      courseName: "Corvallis",
+      description: null,
+      expectedTeams: null,
+    });
+    const b = await createProgramAs(admin, {
+      courseId: `AN-S2-${Date.now()}`,
+      courseName: "Ecampus",
+      description: null,
+      expectedTeams: null,
+    });
+    // teamsSupported is 2 on baseProject().
+    const shared = await createProjectAs(admin, baseProject());
+    await updateProjectProgramsAs(admin, {
+      id: shared.id,
+      programIds: [a.id, b.id],
+    });
+    await forceTransitionAs(admin, shared.id, "published", undefined, {
+      sendEmail: false,
+    });
+
+    const all = await getAnalyticsAs(admin, { ...RANGE, programId: null });
+    const onlyA = await getAnalyticsAs(admin, { ...RANGE, programId: a.id });
+    const onlyB = await getAnalyticsAs(admin, { ...RANGE, programId: b.id });
+
+    // Two under each, two globally: the per program figures deliberately
+    // over-count against the whole.
+    expect(onlyA.headline.publishedTeamSlots).toBe(2);
+    expect(onlyB.headline.publishedTeamSlots).toBe(2);
+    expect(all.headline.publishedTeamSlots).toBe(2);
+    // And the tile names the reason rather than leaving staff to find it.
+    expect(all.headline.sharedProjects).toBe(1);
+    expect(onlyA.headline.sharedProjects).toBe(1);
+
+    // The program breakdown groups through the join table, so the project
+    // appears in a row for each program rather than once under one.
+    const byProgram = all.breakdowns.projectsByProgram ?? [];
+    expect(byProgram.find((r) => r.key === a.id)?.count).toBe(1);
+    expect(byProgram.find((r) => r.key === b.id)?.count).toBe(1);
   });
 
   it("compares published slots against expected teams, and says when that is not set", async () => {

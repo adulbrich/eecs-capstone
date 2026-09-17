@@ -219,13 +219,14 @@ test.describe("project staff override", () => {
  * the picker is not on the form they actually use.
  */
 test.describe("project program placement", () => {
-  test("staff place a project from the panel, and the proposer has no picker", async ({
+  test("staff place a project in two programs, and the proposer has no picker", async ({
     browser,
   }) => {
     const title = fixtureName("Project");
     const { db, close } = openDb();
     let projectId: string;
-    let courseName: string;
+    let first: { courseId: string; courseName: string; id: string };
+    let second: { courseId: string; courseName: string; id: string };
     try {
       const proposerId = await userIdByEmail(db, "user@example.com");
       ({ id: projectId } = await createFixtureProject(db, {
@@ -233,7 +234,8 @@ test.describe("project program placement", () => {
         proposerId,
         status: "draft",
       }));
-      ({ courseName } = await createFixtureProgram(db));
+      first = await createFixtureProgram(db);
+      second = await createFixtureProgram(db);
     } finally {
       await close();
     }
@@ -244,26 +246,70 @@ test.describe("project program placement", () => {
       await staff.goto(`/projects/${projectId}`);
       await waitForHydration(staff);
 
-      // Created unplaced: `ProjectInput` carries no program any more, so the
-      // picker opens on its no-program choice however the project was made.
-      const picker = staff.getByRole("combobox", { name: "Program" });
-      await expect(picker).toContainText("(no program)");
+      // Created unplaced: nothing writes a join row on create, so every box
+      // starts unchecked however the project was made.
+      const firstBox = staff.getByRole("checkbox", {
+        name: `${first.courseId} ${first.courseName}`,
+      });
+      const secondBox = staff.getByRole("checkbox", {
+        name: `${second.courseId} ${second.courseName}`,
+      });
+      await expect(firstBox).toBeVisible();
+      await expect(firstBox).not.toBeChecked();
 
-      await picker.click();
-      await staff.getByRole("option", { name: courseName }).click();
-      await staff.getByRole("button", { name: "Save program" }).click();
+      // Both, which is the whole point of #462: one proposal offered under
+      // two courses is one project, not two.
+      await firstBox.click();
+      await expect(firstBox).toBeChecked();
+      await secondBox.click();
+      await expect(secondBox).toBeChecked();
+      await staff.getByRole("button", { name: "Save programs" }).click();
 
-      // Reload rather than trust the control: this asserts the stored column,
+      // Wait for the save to land before reloading, or the reload aborts
+      // the request in flight. The warning is the signal because it is
+      // computed from the SAVED set, not the draft, so it can only appear
+      // once the write returned and the route refetched. Advisory: the save
+      // was not refused, and teams_supported is still 1 (#462).
+      await expect(
+        staff.getByText(/supports 1 team but runs in 2 programs/)
+      ).toBeVisible();
+
+      // Reload rather than trust the control: this asserts the stored rows,
       // not optimistic client state.
       await staff.reload();
       await waitForHydration(staff);
       await expect(
-        staff.getByRole("combobox", { name: "Program" })
-      ).toContainText(courseName);
+        staff.getByRole("checkbox", {
+          name: `${first.courseId} ${first.courseName}`,
+        })
+      ).toBeChecked();
+      await expect(
+        staff.getByRole("checkbox", {
+          name: `${second.courseId} ${second.courseName}`,
+        })
+      ).toBeChecked();
+
+      // One badge per program on the public half of the page, full labels.
+      // Scoped to the badges rather than `getByText`, because the checkbox
+      // labels in the panel below carry the same strings and a page-wide
+      // text match would pass without a badge rendering at all.
+      const badges = staff.locator('[data-slot="badge"]');
+      await expect(
+        badges.filter({ hasText: `${first.courseId} ${first.courseName}` })
+      ).toHaveCount(1);
+      await expect(
+        badges.filter({ hasText: `${second.courseId} ${second.courseName}` })
+      ).toHaveCount(1);
+
+      // Still there after a reload, which is the point of reading it off
+      // the saved set rather than the draft.
+      await expect(
+        staff.getByText(/supports 1 team but runs in 2 programs/)
+      ).toBeVisible();
 
       // The save is in the edit log, which is what makes a placement
       // traceable to who made it.
-      await expect(staff.getByText("Changed: programId")).toBeVisible();
+      await expect(staff.getByText("Changed: programs")).toBeVisible();
     } finally {
       await staffContext.close();
     }
@@ -281,6 +327,9 @@ test.describe("project program placement", () => {
       await expect(
         owner.getByRole("combobox", { name: "Program" })
       ).toHaveCount(0);
+      await expect(owner.getByRole("checkbox", { name: /Course/ })).toHaveCount(
+        0
+      );
       // The panel is staff-only, so the section is not reachable that way
       // either.
       await owner.goto(`/projects/${projectId}`);

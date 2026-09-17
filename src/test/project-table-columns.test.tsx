@@ -58,8 +58,11 @@ const ROWS: ProjectListRow[] = [
     objectives: null,
     prefQualifications: null,
     problemStatement: null,
-    programCourseId: "CS 461",
-    programCourseName: "Capstone",
+    // Two, so the Program cell has a join to get wrong.
+    programs: [
+      { id: "pr1", courseId: "CS 461", courseName: "Capstone" },
+      { id: "pr2", courseId: "CS 46X", courseName: "Capstone Ecampus" },
+    ],
     requiresNdaIp: true,
     // Not accepting, so this row carries all three badges at once and the
     // Badges column has something to get wrong.
@@ -83,8 +86,7 @@ const ROWS: ProjectListRow[] = [
     objectives: null,
     prefQualifications: null,
     problemStatement: null,
-    programCourseId: null,
-    programCourseName: null,
+    programs: [],
     requiresNdaIp: false,
     // The bare row: no badge of any kind, so the cell shows a dash.
     acceptingApplicants: true,

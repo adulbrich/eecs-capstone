@@ -99,10 +99,14 @@ Each project carries:
   a `proposerEmail` link key for proposers without an account yet. The creator
   is the proposer on create; staff link, reassign or unlink from the Proposer
   section of the staff panel on the project page, never from the form (#322).
-- [x] Program association: which program a project runs in, set by staff from
-  the Program section of the staff panel and never from the form (#450,
+- [x] Program association: which programs a project runs in, set by staff from
+  the Programs section of the staff panel and never from the form (#450,
   [ADR-0026](./docs/adr/0026-the-program-is-staff-placed-not-proposed.md)). A
-  project is created unplaced and staff place it during review.
+  project is created unplaced and staff place it during review. A project can
+  run in several programs at once (#462,
+  [ADR-0028](./docs/adr/0028-a-project-runs-in-many-programs.md)): one
+  proposal offered both in Corvallis and on Ecampus is one record filed under
+  two courses.
 - [x] Teams supported: how many student teams the project can take on (1-5,
   default 1), on the project form, where anyone who may edit the project sets
   it. This line used to say staff set it on the form, which matched neither

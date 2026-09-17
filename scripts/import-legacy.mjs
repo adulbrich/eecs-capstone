@@ -365,17 +365,30 @@ async function resolveProposers(client, rows) {
   return new Map(found.rows.map((u) => [u.email.toLowerCase(), u.id]));
 }
 
+/**
+ * The project's program, written to the join table since #462. Additive on
+ * purpose: `ON CONFLICT DO NOTHING` rather than a delete-then-insert, so a
+ * re-run contributes the legacy placement without discarding a second
+ * program staff added in this app. A legacy row names exactly one course,
+ * so this never writes more than one row per project.
+ */
+const UPSERT_PROGRAM = `
+INSERT INTO project_programs (project_id, program_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING
+`;
+
 const UPSERT = `
 INSERT INTO projects (
   id, title, description, problem_statement, objectives,
   min_qualifications, pref_qualifications, url,
   contact_name, contact_email, license_restrictions,
   requires_nda_ip, is_sponsored, accepting_applicants, teams_supported,
-  notes, proposer_id, proposer_email, program_id, status,
+  notes, proposer_id, proposer_email, status,
   published_at, archived_at, created_at, updated_at, image_url
 ) VALUES (
   $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-  $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+  $16, $17, $18, $19, $20, $21, $22, $23, $24
 )
 ON CONFLICT (id) DO UPDATE SET
   title = excluded.title,
@@ -395,7 +408,6 @@ ON CONFLICT (id) DO UPDATE SET
   notes = excluded.notes,
   proposer_id = excluded.proposer_id,
   proposer_email = excluded.proposer_email,
-  program_id = excluded.program_id,
   status = excluded.status,
   published_at = excluded.published_at,
   archived_at = excluded.archived_at,
@@ -526,9 +538,6 @@ async function main() {
         buildNotes(row),
         proposerIds.get(proposerEmailOf(row)) ?? null,
         proposerEmailOf(row),
-        row.program_course
-          ? (programIds.get(row.program_course) ?? null)
-          : null,
         statusOf(row),
         // Null where the legacy event log has nothing, which is every project
         // whose lifecycle finished before its first row (2022-08-03). Not
@@ -551,6 +560,12 @@ async function main() {
         row.updated_at ?? row.created_at,
         imageKeys[row.legacy_id] ?? null,
       ]);
+      const programId = row.program_course
+        ? (programIds.get(row.program_course) ?? null)
+        : null;
+      if (programId) {
+        await client.query(UPSERT_PROGRAM, [uuidv5(row.legacy_id), programId]);
+      }
     }
     await client.query("COMMIT");
 

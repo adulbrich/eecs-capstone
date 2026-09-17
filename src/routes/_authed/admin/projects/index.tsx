@@ -18,7 +18,7 @@ import { FilterSwitch } from "#/components/filter-switch";
 import { ImageOrFallback } from "#/components/image-or-fallback";
 import { ListingLayout } from "#/components/listing-layout";
 import { LocalTime } from "#/components/local-time";
-import { programLabel } from "#/components/project-card";
+import { programCourseIds } from "#/components/project-card";
 import {
   type FilterProgram,
   PROJECT_SWITCH_HINT,
@@ -288,8 +288,10 @@ const COLUMNS = defineAdminColumns<Row>()([
     sortUndefined: "last",
   },
   {
-    accessorFn: (row) => programLabel(row) ?? undefined,
-    cell: ({ row }) => programLabel(row.original) ?? "-",
+    // The same course ids the public table and the card meta line show, so
+    // the two listings read alike (#462).
+    accessorFn: (row) => programCourseIds(row) ?? undefined,
+    cell: ({ row }) => programCourseIds(row.original) ?? "-",
     header: "Program",
     id: "program",
     sortUndefined: "last",
@@ -438,17 +440,11 @@ const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
     key: "proposerEmail",
     value: (row) => row.proposerEmail,
   },
-  { header: "Program ID", key: "programId", value: (row) => row.programId },
-  {
-    header: "Program course ID",
-    key: "programCourseId",
-    value: (row) => row.programCourseId,
-  },
-  {
-    header: "Program course name",
-    key: "programCourseName",
-    value: (row) => row.programCourseName,
-  },
+  // One cell, the course ids `'; '` separated, in place of the id and the
+  // two label columns a single program had. A break for anyone keyed on the
+  // old headers, taken with #462: a spreadsheet loses the course names, and
+  // the course id is what staff sort and pivot on.
+  { header: "Programs", key: "programs", value: (row) => row.programs },
   {
     header: "Teams supported",
     key: "teamsSupported",
@@ -552,9 +548,7 @@ function AdminProjectsFilters({
             <SelectItem value="_all_">All programs</SelectItem>
             {/*
               No sentinel, unlike "_all_" above: "none" is the value the URL
-              actually carries, where "all" is the absent param. `program-select.tsx`
-              needs one for the same choice because there the empty string is
-              the stored value and Radix reserves it (#458).
+              actually carries, where "all" is the absent param (#458).
             */}
             <SelectItem value={PROGRAM_FILTER_NONE}>No program</SelectItem>
             {programs.map((p) => (

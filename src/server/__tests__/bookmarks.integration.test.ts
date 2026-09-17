@@ -41,7 +41,6 @@ function baseProject() {
     contactName: null,
     imageUrl: "",
     licenseRestrictions: null,
-    programId: null,
     notes: null,
   };
 }
@@ -259,8 +258,7 @@ describe("bookmarks", () => {
       "objectives",
       "prefQualifications",
       "problemStatement",
-      "programCourseId",
-      "programCourseName",
+      "programs",
       "requiresNdaIp",
       "status",
       "studentProposed",

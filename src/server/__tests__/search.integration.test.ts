@@ -1,11 +1,12 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
-import { projects, user } from "#/db/schema";
+import { programs, projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import {
   createProjectAs,
   performTransitionAs,
+  updateProjectProgramsAs,
   updateProjectProposerAs,
 } from "#/server/_internal/projects";
 import { searchProjectsImpl } from "#/server/_internal/search";
@@ -35,7 +36,6 @@ function baseProject(title: string, description: string | null = null) {
     contactName: null,
     imageUrl: "",
     licenseRestrictions: null,
-    programId: null,
     notes: null,
   };
 }
@@ -143,8 +143,8 @@ describe("searchProjects", () => {
   it("returns exactly the public field set", async () => {
     // Pinned so a private column cannot ride into the anonymous listing with
     // nothing failing. The list is projectDetailView's public fields minus the
-    // four the listing has no use for (notes, isSponsored, programId,
-    // deletedAt) plus the correlated categories string. proposerEmail and
+    // three the listing has no use for (notes, isSponsored, deletedAt)
+    // plus `updatedAt` and the correlated categories string. proposerEmail and
     // notes must never appear here.
     const admin = await makeAdmin(`k-${Date.now()}@x.com`);
     await publish(admin, "Key set");
@@ -165,8 +165,7 @@ describe("searchProjects", () => {
       "objectives",
       "prefQualifications",
       "problemStatement",
-      "programCourseId",
-      "programCourseName",
+      "programs",
       "requiresNdaIp",
       "status",
       "studentProposed",
@@ -177,6 +176,71 @@ describe("searchProjects", () => {
     ]);
     // An array, never null: the chips map over it without a guard.
     expect(rows[0].categories).toEqual([]);
+  });
+});
+
+// The public listing runs the same `runsInProgram` predicate the admin one
+// does, so the filter stays single-valued and a project shared between two
+// programs answers to both of them (#462).
+describe("the program filter on the public listing", () => {
+  it("returns a project that runs in the chosen program among others", async () => {
+    const admin = await makeAdmin(`sp-${Date.now()}@x.com`);
+    const [corvallis] = await db
+      .insert(programs)
+      .values({ courseId: `SP-A-${Date.now()}`, courseName: "Corvallis" })
+      .returning();
+    const [ecampus] = await db
+      .insert(programs)
+      .values({ courseId: `SP-B-${Date.now()}`, courseName: "Ecampus" })
+      .returning();
+    const shared = await publish(admin, "Shared across campuses");
+    const onlyHere = await publish(admin, "Corvallis only");
+    await updateProjectProgramsAs(admin, {
+      id: shared,
+      programIds: [corvallis.id, ecampus.id],
+    });
+    await updateProjectProgramsAs(admin, {
+      id: onlyHere,
+      programIds: [corvallis.id],
+    });
+
+    const inEcampus = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      programId: ecampus.id,
+    });
+    const inCorvallis = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      programId: corvallis.id,
+    });
+
+    expect(inEcampus.rows.map((r) => r.id)).toEqual([shared]);
+    expect(inCorvallis.rows.map((r) => r.id).sort()).toEqual(
+      [shared, onlyHere].sort()
+    );
+  });
+
+  // The aggregate must not fan the row out, or a shared project would
+  // appear twice in one page of results.
+  it("lists a shared project once, carrying both programs", async () => {
+    const admin = await makeAdmin(`sp2-${Date.now()}@x.com`);
+    const [a] = await db
+      .insert(programs)
+      .values({ courseId: `SP-C-${Date.now()}`, courseName: "One" })
+      .returning();
+    const [b] = await db
+      .insert(programs)
+      .values({ courseId: `SP-D-${Date.now()}`, courseName: "Two" })
+      .returning();
+    const id = await publish(admin, "Listed once");
+    await updateProjectProgramsAs(admin, { id, programIds: [a.id, b.id] });
+
+    const { rows } = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      programId: a.id,
+    });
+
+    expect(rows.filter((r) => r.id === id)).toHaveLength(1);
+    expect(rows[0].programs).toHaveLength(2);
   });
 });
 

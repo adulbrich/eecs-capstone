@@ -1,7 +1,9 @@
-import { eq, sql } from "drizzle-orm";
+import { asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
+  programs,
   projectEditLog,
+  projectPrograms,
   projectStatusHistory,
   projects,
   user,
@@ -11,7 +13,11 @@ import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
 import { diffRowFields } from "#/lib/edit-diff";
 import { normalizeEmailAddress } from "#/lib/email-address";
 import { assertNoImageKeyOnCreate } from "#/lib/image-upload-policy";
-import { canEditProject, canWritePrivateNotes } from "#/lib/project-visibility";
+import {
+  canEditProject,
+  canWritePrivateNotes,
+  programLabel,
+} from "#/lib/project-visibility";
 import {
   type ActorRole,
   assertTransitionAllowed,
@@ -20,7 +26,7 @@ import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import type {
   MentorshipInput,
-  ProgramInput,
+  ProgramsInput,
   ProjectInput,
   ProposerInput,
   UpdateProjectInput,
@@ -145,10 +151,6 @@ export async function createProjectAs(
       imageUrl: null,
       ...ndaFields(data),
       isSponsored: data.isSponsored ?? false,
-      // Always null on create, and staff place it afterwards from the panel
-      // (#450). A staff-created project is in the same position as any other:
-      // proposed first, placed second.
-      programId: null,
       notes: allowedNotes,
       proposerId,
       proposerEmail: null,
@@ -429,65 +431,122 @@ export async function updateProjectMentorshipForCurrentUser(
 }
 
 /**
- * The only writer of `projects.program_id` after create (#450), and staff
- * only. Placing a project in a program is a staff judgement about how the
- * course runs, not a fact the proposer reports, which is the same line #322
- * drew for the proposer and the categories; ADR-0026 records the trade.
+ * The programs a project runs in, in `course_id` order, as the edit log
+ * stores them and the panel reads them back. Labels rather than ids, so a
+ * row still reads as course names after a program is deleted.
+ */
+async function programLabelsFor(
+  tx: Pick<typeof db, "select">,
+  programIds: string[]
+): Promise<string[]> {
+  if (programIds.length === 0) {
+    return [];
+  }
+  const rows = await tx
+    .select({ courseId: programs.courseId, courseName: programs.courseName })
+    .from(programs)
+    .where(inArray(programs.id, programIds))
+    .orderBy(asc(programs.courseId));
+  return rows.map(programLabel);
+}
+
+/**
+ * The only writer of `project_programs` (#450, #462), and staff only.
+ * Placing a project in a program is a staff judgement about how the course
+ * runs, not a fact the proposer reports, which is the same line #322 drew
+ * for the proposer and the categories; ADR-0026 records the trade and
+ * ADR-0028 records the move to a set.
  *
- * Not part of `updateProjectAs`: the key left `ProjectInput`, so the shared
- * form cannot carry it and a proposer has no endpoint that moves their own
- * project between programs. `createProjectAs` still writes a null, so a new
- * project arrives unplaced and the panel is where it gets placed.
+ * Not part of `updateProjectAs`: the key never entered `ProjectInput`, so
+ * the shared form cannot carry it and a proposer has no endpoint that moves
+ * their own project. A new project arrives with no rows here at all, and the
+ * panel is where it gets placed.
  *
- * An empty string clears the program, the same "string in transit, null only
- * in the column" rule mentorship follows, because `ProgramSelect` emits one
- * for its no-program choice. One edit-log row per change, and a save that
- * changes nothing writes none.
+ * Delete then insert inside the transaction, the shape
+ * `setProjectCategoriesAs` uses. Unlike that one this keeps its edit-log
+ * row, which has to be hand rolled: `diffRowFields` reads columns off a row
+ * and there is no column left to read.
+ *
+ * Compared as a set, not as two arrays. Checkbox order is whatever order
+ * staff clicked in, and an array comparison would write a row claiming a
+ * change every time somebody reordered nothing. The incoming ids are
+ * deduped for the same reason the composite primary key exists.
  *
  * No embedding refresh, for the reason the proposer and mentor writers skip
- * one: the column is not part of the embedded text. The program left
+ * one: the program is not part of the embedded text. It left
  * `buildProjectEmbeddingSource` in #463 (ADR-0025), which embeds a project's
- * prose and not its categories or program.
+ * prose and not its categories or programs.
  *
  * The scope assessment needs no call either, for a different reason: its
- * source hash covers the program's `term_count` and `getScopeAssessmentAs`
+ * source hash covers each program's `term_count` and `getScopeAssessmentAs`
  * recomputes that hash on read, so a move already reports the stored verdict
  * as stale.
  */
-export async function updateProjectProgramAs(
+export async function updateProjectProgramsAs(
   viewer: Viewer,
-  data: ProgramInput
+  data: ProgramsInput
 ): Promise<{ id: string; updated: boolean }> {
   assertStaff(viewer);
   const existing = await loadProjectOr404(data.id);
-  const newValues: Partial<typeof projects.$inferSelect> = {
-    programId: data.programId || null,
-  };
-  const { changedFields, newDiff, oldDiff } = diffRowFields(
-    existing,
-    newValues
-  );
-  if (changedFields.length === 0) {
+  const wanted = [...new Set(data.programIds)];
+  const saved = await db
+    .select({ programId: projectPrograms.programId })
+    .from(projectPrograms)
+    .where(eq(projectPrograms.projectId, existing.id));
+  const savedIds = saved.map((r) => r.programId);
+  // Both sides are already free of repeats, the saved one by the composite
+  // primary key and the wanted one by the dedupe above, so equal sizes plus
+  // containment is set equality.
+  const savedSet = new Set(savedIds);
+  if (
+    savedSet.size === wanted.length &&
+    wanted.every((id) => savedSet.has(id))
+  ) {
     return { id: existing.id, updated: false };
   }
   await db.transaction(async (tx) => {
+    // Inside the transaction, so a program deleted between the read and the
+    // insert cannot leave the logged labels one short of the rows written.
+    const [oldLabels, newLabels] = await Promise.all([
+      programLabelsFor(tx, savedIds),
+      programLabelsFor(tx, wanted),
+    ]);
+    await tx
+      .delete(projectPrograms)
+      .where(eq(projectPrograms.projectId, existing.id));
+    if (wanted.length > 0) {
+      await tx.insert(projectPrograms).values(
+        wanted.map((programId) => ({
+          projectId: existing.id,
+          programId,
+        }))
+      );
+    }
+    // The project row itself is untouched by the placement now, but the
+    // listing orders on `updated_at` and staff expect a move to surface the
+    // project, which is what the single-column writer did.
     await tx
       .update(projects)
-      .set({ ...newValues, updatedAt: new Date() })
+      .set({ updatedAt: new Date() })
       .where(eq(projects.id, existing.id));
+    // Nothing renders these two columns: `EditLogEntry` carries four fields
+    // and #467 kept the values out of both payloads. They are for whoever
+    // reads `project_edit_log` in the database, which is why they are
+    // labels and why they are ordered: an unordered array would differ on
+    // nothing and make two identical sets look like a change.
     await tx.insert(projectEditLog).values({
       projectId: existing.id,
       editorId: viewer.id,
-      changedFields,
-      oldValues: oldDiff,
-      newValues: newDiff,
+      changedFields: ["programs"],
+      oldValues: { programs: oldLabels },
+      newValues: { programs: newLabels },
     });
   });
   return { id: existing.id, updated: true };
 }
 
-export async function updateProjectProgramForCurrentUser(data: ProgramInput) {
-  return updateProjectProgramAs(await requireUser(), data);
+export async function updateProjectProgramsForCurrentUser(data: ProgramsInput) {
+  return updateProjectProgramsAs(await requireUser(), data);
 }
 
 function assertChangesRequestedHasComment(

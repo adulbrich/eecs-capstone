@@ -17,7 +17,7 @@ export interface ScopeSourceProject {
 }
 
 export interface ScopeSourceProgram {
-  label: string | null;
+  label: string;
   termCount: number | null;
 }
 
@@ -36,15 +36,40 @@ const SCOPE_FIELDS = [
   ["prefQualifications", "Preferred qualifications"],
 ] as const;
 
-function programLine(program: ScopeSourceProgram): string {
-  if (!program.label) {
-    return "This proposal names no program.";
-  }
+function programPhrase(program: ScopeSourceProgram): string {
   const terms =
     program.termCount === null
       ? "term count not set"
       : `runs ${program.termCount} ${program.termCount === 1 ? "term" : "terms"}`;
-  return `${program.label} (${terms}).`;
+  return `${program.label} (${terms})`;
+}
+
+/**
+ * A project runs in zero, one or many programs (#462). The empty and single
+ * cases must render exactly the strings they always have, or every stored
+ * verdict reads as stale and staff re-run them at Bedrock cost each; the
+ * many case is the only new output. Sorted by label so the caller's order
+ * cannot move the hash.
+ */
+function programLine(programs: ScopeSourceProgram[]): string {
+  if (programs.length === 0) {
+    return "This proposal names no program.";
+  }
+  // Codepoint order, not `localeCompare`: this feeds the hash that decides
+  // whether a stored verdict is stale, and a locale or runtime change must
+  // not silently move it.
+  const sorted = [...programs].sort((a, b) => {
+    if (a.label === b.label) {
+      return 0;
+    }
+    return a.label < b.label ? -1 : 1;
+  });
+  if (sorted.length === 1) {
+    return `${programPhrase(sorted[0])}.`;
+  }
+  return `This proposal runs in ${sorted.length} programs: ${sorted
+    .map(programPhrase)
+    .join("; ")}.`;
 }
 
 /**
@@ -54,9 +79,9 @@ function programLine(program: ScopeSourceProgram): string {
  */
 export function buildScopeSource(
   project: ScopeSourceProject,
-  program: ScopeSourceProgram
+  programs: ScopeSourceProgram[]
 ): string {
-  const parts = [`<program>\n${programLine(program)}\n</program>`];
+  const parts = [`<program>\n${programLine(programs)}\n</program>`];
   parts.push(`Teams supported: ${project.teamsSupported}`);
   for (const [field, label] of SCOPE_FIELDS) {
     const value = project[field]?.trim();

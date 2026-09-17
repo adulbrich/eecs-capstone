@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db";
-import { programs, projects } from "#/db/schema";
+import { programs, projectPrograms, projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import {
   mantleResponses,
@@ -39,24 +39,30 @@ async function loadScopeInput(projectId: string) {
   if (!project) {
     throw new Error("Project not found");
   }
-  let program: ScopeSourceProgram = { label: null, termCount: null };
-  if (project.programId) {
-    const [row] = await db
-      .select({
-        courseId: programs.courseId,
-        courseName: programs.courseName,
-        termCount: programs.termCount,
-      })
-      .from(programs)
-      .where(eq(programs.id, project.programId));
-    if (row) {
-      program = {
-        label: `${row.courseId} ${row.courseName}`,
-        termCount: row.termCount,
-      };
-    }
-  }
-  const source = buildScopeSource(project, program);
+  // Every program the project runs in, each with its own term count, in
+  // `course_id` order (#462). A project in none yields an empty array, which
+  // is the case `buildScopeSource` renders exactly as it always did.
+  const rows = await db
+    .select({
+      courseId: programs.courseId,
+      courseName: programs.courseName,
+      termCount: programs.termCount,
+    })
+    .from(projectPrograms)
+    .innerJoin(programs, eq(programs.id, projectPrograms.programId))
+    .where(eq(projectPrograms.projectId, project.id))
+    .orderBy(asc(programs.courseId));
+  // Built here rather than through `programLabel`, on purpose. This string
+  // is part of the text `scopeSourceHash` covers, so binding it to the
+  // formatter the badges use would let a change made for the UI silently
+  // stale every stored verdict and charge staff a Bedrock call each. Same
+  // reason `SCOPE_FIELDS` in `scope-assessment-source.ts` does not follow
+  // `FIELD_LABELS` (#375).
+  const programList: ScopeSourceProgram[] = rows.map((row) => ({
+    label: `${row.courseId} ${row.courseName}`,
+    termCount: row.termCount,
+  }));
+  const source = buildScopeSource(project, programList);
   return { project, source, hash: scopeSourceHash(source, MODEL_ID) };
 }
 

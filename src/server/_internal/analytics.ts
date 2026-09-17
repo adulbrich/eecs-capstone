@@ -9,6 +9,7 @@ import {
   programs,
   projectBookmarks,
   projectCategories,
+  projectPrograms,
   projectStatusHistory,
   projects,
   user,
@@ -24,6 +25,7 @@ import {
 } from "#/lib/vocabularies";
 import type { AnalyticsInput } from "../analytics";
 import { countPendingRequests, countRows, countSubmitted } from "./admin";
+import { projectProgramCount, runsInProgram } from "./project-summary";
 
 export interface Flow {
   current: number;
@@ -89,6 +91,12 @@ export interface AnalyticsView {
     pendingLines: number;
     publishedTeamSlots: number;
     publishedWithMentor: number;
+    /**
+     * Published projects in scope running in more than one program. Their
+     * whole `teams_supported` counts under each, so the per program figures
+     * do not sum to the global one and `slotsHint` names the reason (#462).
+     */
+    sharedProjects: number;
     publishedWithoutBookmarks: number;
     publishedWithoutMentor: number;
     requestsWithPending: number;
@@ -145,12 +153,13 @@ function fill(
 async function headline(programId: string | null) {
   const live = and(
     isNull(projects.deletedAt),
-    programId ? eq(projects.programId, programId) : undefined
+    programId ? runsInProgram(programId) : undefined
   );
   const published = and(live, sql`${projects.status} = 'published'`);
 
   const [
     [slots],
+    [shared],
     expected,
     submittedAwaiting,
     oldestSubmitted,
@@ -169,6 +178,13 @@ async function headline(programId: string | null) {
       })
       .from(projects)
       .where(published),
+    // How many of those projects run in more than one program. Their whole
+    // `teams_supported` lands under each, so the per program figures stop
+    // summing to the global one and `slotsHint` says so (#462).
+    db
+      .select({ shared: countRows() })
+      .from(projects)
+      .where(and(published, sql`${projectProgramCount} > 1`)),
     db
       .select({
         total: sql<number>`coalesce(sum(${programs.expectedTeams}), 0)::int`,
@@ -192,7 +208,13 @@ async function headline(programId: string | null) {
         order by created_at desc limit 1
       ) h on true
       where p.status = 'submitted' and p.deleted_at is null
-        ${programId ? sql`and p.program_id = ${programId}` : sql``}
+        ${
+          // The same predicate the Drizzle queries use, told which name the
+          // outer row goes by here: this query aliases `projects` as `p`.
+          programId
+            ? sql`and ${runsInProgram(programId, sql.raw("p.id"))}`
+            : sql``
+        }
     `),
     db
       // The staff to-do, over the live scope the tile always had: every
@@ -262,6 +284,7 @@ async function headline(programId: string | null) {
   const expectedRow = expected[0];
   return {
     publishedTeamSlots: slots?.slots ?? 0,
+    sharedProjects: shared?.shared ?? 0,
     expectedTeams:
       expectedRow && expectedRow.set > 0 ? expectedRow.total : null,
     expectedTeamsPrograms: {
@@ -361,7 +384,7 @@ async function transitionsIn(
         // Same population as the stocks: a soft-deleted project's history
         // does not count as a submission that happened.
         isNull(projects.deletedAt),
-        programId ? eq(projects.programId, programId) : undefined
+        programId ? runsInProgram(programId) : undefined
       )
     );
   return row?.n ?? 0;
@@ -409,7 +432,7 @@ async function flow(
 async function breakdowns(programId: string | null, viewerIsAdmin: boolean) {
   const live = and(
     isNull(projects.deletedAt),
-    programId ? eq(projects.programId, programId) : undefined
+    programId ? runsInProgram(programId) : undefined
   );
   const [
     byStatus,
@@ -435,7 +458,12 @@ async function breakdowns(programId: string | null, viewerIsAdmin: boolean) {
             count: countRows(),
           })
           .from(projects)
-          .leftJoin(programs, eq(projects.programId, programs.id))
+          // Both joins left: a project in no program keeps its row under the
+          // null key, which is the unfiled bucket the page renders, and a
+          // project in two programs produces a row under each and counts in
+          // both (#462).
+          .leftJoin(projectPrograms, eq(projectPrograms.projectId, projects.id))
+          .leftJoin(programs, eq(projectPrograms.programId, programs.id))
           .where(isNull(projects.deletedAt))
           .groupBy(programs.id, programs.courseId, programs.courseName),
     db

@@ -27,6 +27,36 @@ export type VisibleComment = {
   isInternal: boolean | null;
 } & Record<string, unknown>;
 
+/**
+ * One of the programs a project runs in (#462). The three parts stay
+ * separate rather than being pre-joined into a label, because the listings
+ * render the course id alone and the detail badge renders both, so both
+ * halves have to survive the trip out of SQL.
+ *
+ * Defined here rather than beside the aggregate that builds it: this module
+ * is the authority for what leaves the server, and it is client-safe, so the
+ * components can name the type without importing the database.
+ */
+export interface ProjectProgram {
+  courseId: string;
+  courseName: string;
+  id: string;
+}
+
+/**
+ * How a program reads wherever it is named in full: the detail page badges,
+ * the staff checkbox list, and the label arrays the edit log stores. One
+ * function because those three have to agree, and the edit log's rows are
+ * read back long after the fact. Takes the two halves rather than a whole
+ * `ProjectProgram` so the server can call it on a bare query row.
+ */
+export function programLabel(program: {
+  courseId: string;
+  courseName: string;
+}): string {
+  return `${program.courseId} ${program.courseName}`;
+}
+
 function isOwner(project: VisibleProject, viewer: Viewer): boolean {
   return !!viewer && project.proposerId === viewer.id;
 }
@@ -122,13 +152,13 @@ export interface ProjectRow extends VisibleProject {
   prefQualifications: string | null;
   problemStatement: string | null;
   /**
-   * Joined from `programs`, not columns of `projects`: the caller left-joins
-   * them, so both are null for a project with no program and for one whose
-   * program was deleted (`program_id` is `on delete set null`).
+   * Aggregated from `project_programs`, not columns of `projects`: the
+   * caller runs a correlated subquery, so this is empty for a project in no
+   * program and loses one entry when a program is deleted out from under it
+   * (the join row is `on delete cascade`). Ordered by `course_id` inside the
+   * aggregate, so no renderer sorts.
    */
-  programCourseId: string | null;
-  programCourseName: string | null;
-  programId: string | null;
+  programs: ProjectProgram[];
   requiresNdaIp: boolean;
   studentProposed: boolean;
   teamsSupported: number;
@@ -154,12 +184,12 @@ export interface ProjectDetailView {
   prefQualifications: string | null;
   problemStatement: string | null;
   /**
-   * Public, and the same two columns every card and the public table already
-   * carry. `programId` beside them stays the bare UUID nothing renders.
+   * Public, the same programs every card and the public table already
+   * carry, and now a set rather than one value (#462). Each entry keeps its
+   * id, which is what the staff checkbox list reads back, alongside the two
+   * label halves the badges render.
    */
-  programCourseId: string | null;
-  programCourseName: string | null;
-  programId: string | null;
+  programs: ProjectProgram[];
   requiresNdaIp: boolean;
   status: ProjectStatus;
   studentProposed: boolean;
@@ -205,14 +235,14 @@ export function projectDetailView(
     requiresNdaIp: project.requiresNdaIp,
     teamsSupported: project.teamsSupported,
     acceptingApplicants: project.acceptingApplicants,
-    programId: project.programId,
-    // Public by design, and not a new decision: the listing has shown this
-    // pair on every card and in the Program column since before the detail
-    // page existed, so a student who clicked through from a card was the
-    // only viewer the program was hidden from (#449). `programs.description`
-    // and the two staff-only numbers that size a program stay out.
-    programCourseId: project.programCourseId,
-    programCourseName: project.programCourseName,
+    // Public by design, and not a new decision: the listing has shown the
+    // program on every card and in the Program column since before the
+    // detail page existed, so a student who clicked through from a card was
+    // the only viewer it was hidden from (#449). `programs.description` and
+    // the two staff-only numbers that size a program stay out. Passed
+    // through rather than copied field by field, and never reordered: the
+    // aggregate already sorted by `course_id`.
+    programs: project.programs,
     status: project.status as ProjectStatus,
     deletedAt: project.deletedAt,
     // The one viewer-dependent field, and the reason this cannot be a SQL
