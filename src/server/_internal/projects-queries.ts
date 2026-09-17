@@ -3,6 +3,7 @@ import {
   asc,
   desc,
   eq,
+  getTableColumns,
   gte,
   ilike,
   inArray,
@@ -351,9 +352,22 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
   // by the view, because the view is pure and this is the only place a
   // project row is read for the detail page. The mentor's name is not read:
   // nothing about the mentor is public (#336).
+  //
+  // The program is joined for its two label columns, the same pair and the
+  // same join `projectSummarySelect` carries for the card and the table, so
+  // the detail page names the program with the string the listing showed
+  // (#449). `getTableColumns` keeps the selection flat, which is what stops
+  // the join folding the row under table names, the shape `getProgram` was
+  // caught by (docs/QUIRKS.md). `projectDetailView` still names every field
+  // it passes on, so the join widens this projection's input, not its output.
   const [project] = await db
-    .select()
+    .select({
+      ...getTableColumns(projects),
+      programCourseId: programs.courseId,
+      programCourseName: programs.courseName,
+    })
     .from(projects)
+    .leftJoin(programs, eq(projects.programId, programs.id))
     .where(eq(projects.id, data.id));
   if (!project) {
     return {

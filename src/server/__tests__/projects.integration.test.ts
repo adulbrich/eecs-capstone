@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "#/db";
 import {
   notifications,
+  programs,
   projectEditLog,
   projectStatusHistory,
   projects,
@@ -348,6 +349,89 @@ describe("transitions on an unlinked (null proposer) project", () => {
 // Staff-only data and actions must be enforced server-side, not merely hidden
 // in the UI: a non-staff (or anonymous) caller hitting the server functions
 // directly must never receive staff-only fields or succeed at staff-only writes.
+describe("the program on the public project payload", () => {
+  async function makeProgram(courseId: string, courseName: string) {
+    const [prog] = await db
+      .insert(programs)
+      .values({ courseId, courseName })
+      .returning();
+    return prog.id;
+  }
+
+  // The pair the card and the Program column have always shown. An anonymous
+  // reader is the whole point: a student who clicked through from a card was
+  // the only viewer the program was hidden from (#449).
+  it("names the program to an anonymous reader", async () => {
+    const owner = await makeUser(`pg-o-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`pg-a-${Date.now()}@x.com`, "admin");
+    const programId = await makeProgram(
+      "CS 461",
+      "Software Engineering Project"
+    );
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      programId,
+    });
+    await forceTransitionAs(admin, id, "published", undefined, {
+      sendEmail: false,
+    });
+
+    const { project } = await getProjectAs(null, { id });
+
+    expect(project?.programCourseId).toBe("CS 461");
+    expect(project?.programCourseName).toBe("Software Engineering Project");
+  });
+
+  // Null, not an empty string and not a missing key: the page renders no
+  // badge at all for these, and the key set is one shape for every project.
+  it("reports null for a project filed under no program", async () => {
+    const owner = await makeUser(`pg-n-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, baseProject());
+
+    const { project } = await getProjectAs(owner, { id });
+
+    expect(project?.programCourseId).toBeNull();
+    expect(project?.programCourseName).toBeNull();
+    expect(project?.programId).toBeNull();
+  });
+
+  // `projects.program_id` is `on delete set null`, so a program deleted out
+  // from under a project reads as no program rather than as a dangling id.
+  it("reports null once the program is deleted", async () => {
+    const owner = await makeUser(`pg-d-${Date.now()}@x.com`, "user");
+    const programId = await makeProgram("ECE 441", "Capstone");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      programId,
+    });
+    await db.delete(programs).where(eq(programs.id, programId));
+
+    const { project } = await getProjectAs(owner, { id });
+
+    expect(project?.programCourseId).toBeNull();
+    expect(project?.programCourseName).toBeNull();
+    expect(project?.programId).toBeNull();
+  });
+
+  // The join must not fan a project out into two rows, and must not change
+  // what the detail read returns beside the program.
+  it("returns one project, with the rest of the payload intact", async () => {
+    const owner = await makeUser(`pg-1-${Date.now()}@x.com`, "user");
+    const programId = await makeProgram("CS 462", "Capstone II");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      programId,
+      title: "Joined once",
+    });
+
+    const { project } = await getProjectAs(owner, { id });
+
+    expect(project?.id).toBe(id);
+    expect(project?.title).toBe("Joined once");
+    expect(project?.programId).toBe(programId);
+  });
+});
+
 describe("staff-only data and actions are inaccessible to non-staff", () => {
   it("names every field it returns, for an anonymous reader and for staff", async () => {
     // /projects/$id is public, so this payload reaches anonymous viewers. The
@@ -368,6 +452,8 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
       "objectives",
       "prefQualifications",
       "problemStatement",
+      "programCourseId",
+      "programCourseName",
       "programId",
       "requiresNdaIp",
       "status",
