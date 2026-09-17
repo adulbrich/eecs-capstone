@@ -421,7 +421,7 @@ Repeat with the second admin's email. Check the task's CloudWatch log for
 
 ## 7a. Importing the legacy portal archive
 
-A one-time job: 547 archived projects and 330 images from the old PHP capstone
+A one-time job: 557 archived projects and 338 images from the old PHP capstone
 portal. Run it after the first deploy and after the admins exist, since the
 importer links a project to an account only where one already exists.
 
@@ -435,7 +435,7 @@ The whole thing is idempotent: every project's primary key is a UUIDv5 derived
 from its legacy `cp_id`, so a second run refreshes the same rows and `--undo`
 deletes exactly them. The `NAMESPACE` constant is shared by
 `scripts/import-legacy-images.ts` and `scripts/import-legacy.mjs` and **must
-never change**: a different value re-keys all 547 rows and orphans every image
+never change**: a different value re-keys all 557 rows and orphans every image
 object already in the bucket.
 
 ### 7a.0 The values the rest of this section uses
@@ -518,7 +518,7 @@ npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
 ```
 
 That writes `./legacy-out/projects/<uuid>/<uuid>.webp` (paths that *are* the
-object-storage keys), plus `image-keys.json`. Expect `wrote 330 webp files`
+object-storage keys), plus `image-keys.json`. Expect `wrote 338 webp files`
 and one skip: `41z9KqPQXXbHwZtb` is a PDF somebody uploaded as a project
 image.
 
@@ -643,7 +643,7 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
 The CloudWatch log should end with:
 
 ```
-Imported 547 projects (302 with no publish date, 330 with an image)
+Imported 557 projects (303 with no publish date, 338 with an image)
 ```
 
 Everything runs in one transaction, so a failure leaves nothing behind. To
@@ -671,11 +671,11 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
 It checks every `published` or `archived` project and embeds the ones whose
 stored hash does not match the text they carry now, and the ones with no vector
 at all whatever their hash says. On a first run that is all of them. Budget
-about five minutes for 547 rows at one Bedrock call each plus a 200ms
+about five minutes for 557 rows at one Bedrock call each plus a 200ms
 politeness delay. The CloudWatch log should end with:
 
 ```
-547 project(s) checked: 547 updated, 0 already current, 0 failed.
+557 project(s) checked: 557 updated, 0 already current, 0 failed.
 ```
 
 Safe and cheap to re-run: an unchanged row costs one small query, two if it
@@ -699,7 +699,7 @@ sweepers has the rest.
   `/admin/projects` says how many rows a date range is hiding.
 - **The archive is public.** `searchProjects` has no auth guard and
   `archivedOnly` resolves to `status = 'archived'`, so a signed-out visitor
-  can browse all 547. That is the intent; it is also why the 141 projects the
+  can browse all 557. That is the intent; it is also why the 146 projects the
   old portal kept hidden are held back in `archived-hidden-projects.jsonl` and
   are not part of this import.
 - **No `contact_email` is set.** The old portal published proposer names and
@@ -713,30 +713,63 @@ sweepers has the rest.
 
 Both are supported, with one thing to know about each.
 
-**A re-run replaces every column on a row it already imported**, including
-anything staff edited in this app since. That is what you want when correcting
-a bad mapping and not what you want for a routine top-up, so the importer
-counts both groups before it writes:
+**Every import after a cohort's first one passes `--skip-existing`** (ADR-0027).
+The bare form is a full upsert: on a row it already imported it rewrites the 24
+columns its `ON CONFLICT` names, including anything staff edited in this app
+since. The importer counts both groups before it writes, so you can see which
+you are about to do:
 
 ```
-  12 new, 547 already imported (will be overwritten)
+  12 new, 557 already imported (will be overwritten)
 ```
 
-Three things are exempt from that replacement. `image_url` is written with
-`COALESCE(excluded.image_url, projects.image_url)`, so a re-run without
-`image-keys.json` keeps the images a row already has rather than nulling them
-while the objects sit in the bucket. And a program is never created: a missing
-`course_id` is an error, because in production all four exist and a miss means
-an identifier drifted, where inserting would attach projects to a brand new
-program that merely looks right. `--create-missing-programs` opts in, for a
-fresh local database with nothing to match.
+`projects` has 32 columns and the upsert names 24, so what a bare re-run
+cannot touch is worth naming rather than counting. It never writes
+`student_proposed`, `mentor_email`, `deleted_at`, the three embedding columns
+or the two `scope_assessment` ones, so a mentor, a student-proposed flag, a
+soft delete, a vector and a scope assessment all survive it. `image_url` is
+named but written with `COALESCE(excluded.image_url, projects.image_url)`, so a
+re-run without `image-keys.json` keeps the images a row already has rather than
+nulling them while the objects sit in the bucket. A program is never created:
+a missing `course_id` is an error, because in production all four exist and a
+miss means an identifier drifted, where inserting would attach projects to a
+brand new program that merely looks right. `--create-missing-programs` opts in,
+for a fresh local database with nothing to match.
 
-The third is the three embedding columns, which the upsert never names, so a
-re-run leaves whatever vector a row is already carrying. That is not an
-oversight and it is not free: the re-run reverts the text, the vector stays
-built from the text before it, and nothing in the app re-embeds a row nobody
-edits. Running 7a.5 afterwards is what closes that, and it is why 7a.5 says to
-run it after every import rather than only the first.
+Surviving the upsert is not the same as being correct after it. The vector is
+the case that matters: a re-run reverts the text, the vector stays built from
+the text before it, and nothing in the app re-embeds a row nobody edits.
+Running 7a.5 afterwards is what closes that, and it is why 7a.5 says to run it
+after every import rather than only the first.
+
+The 24 it does write are the project's own text, its flags, its dates, its
+proposer and its program, which is most of what anyone would correct here and
+why the rule above exists. It stopped being hypothetical when four rows
+carrying the literal string `0` in a proposer name or email were left to be
+fixed in this app rather than in the old portal: a later full upsert would put
+the `0` back and report nothing unusual.
+
+The rule has no standing exception, and the case that would want one is worth
+naming so nobody reinvents it quietly. If the pipeline is ever found to have
+mapped something wrong for every row, the way `export.sql` read a dead column
+and left half the catalog with no program, a full upsert is the only way to
+push the corrected mapping onto a whole cohort at once. That is a deliberate
+call to make at the time, against the staff edits it will discard and with a
+`pg_dump` taken first, not a permission this runbook grants in advance.
+
+Read its tally with care: the closing `Imported N projects` counts every row in
+the file, not the rows this run wrote, because the check queries
+`WHERE id = ANY($1)` over all of them. A top-up that adds 12 rows to a
+203-row file still prints `Imported 203`. The line above it is the one that
+says what happened: `12 new, 191 already imported (skipped)`.
+
+Know what that costs. `--skip-existing` skips the whole row, not the columns
+staff touched, so an existing project picks up nothing from a later export: not
+a retitled project, not a description the proposer rewrote in the old portal,
+not an image uploaded there after the first run. New rows arrive, existing ones
+freeze. If a specific project does need its legacy text again, the honest move
+is to edit it here from the export rather than to reach for the full upsert and
+take every other row with it.
 
 Pass `--skip-existing` to add only the rows that are not there yet and leave
 the rest untouched:
@@ -752,9 +785,31 @@ shell has neither `DATABASE_URL` nor a data location and exits immediately)
 Re-running is otherwise safe: the primary key is derived from the legacy
 `cp_id`, so no run can duplicate a row, and the derived image keys mean a
 second image upload overwrites the same object rather than orphaning it. Note
-that a re-run also re-links proposers, so someone whose account was deleted
-since (which nulls `proposer_id`) gets linked again if a matching account
-exists.
+that a FULL re-run also re-links proposers, so someone whose account was
+deleted since (which nulls `proposer_id`) gets linked again if a matching
+account exists. A `--skip-existing` run does not: it never writes the row at
+all, so `proposer_id` stays as it is.
+
+Two things about re-exporting the ARCHIVED set now that the live set exists.
+`export.sql`'s WHERE is currently `cp.cp_archived = 0 AND cp.cp_cps_id = 4`, so
+put it back to `cp.cp_archived = 1 AND cp.cp_cps_id = 4` first, keeping the
+status clause, and write the result to `archived-projects.jsonl` so
+`clean-export.py` derives the archived filenames rather than the live ones.
+And expect a diff: `resolve_program` now recovers a course the app has no
+`programs` row for into staff notes instead of dropping it, which adds an
+ENGR41X note to exactly two of the 557 archived rows (`xWf4xJi2vUwh8oDh` and
+`5FaLvacaTmSA2hLQ`). Everything else in that file is byte-identical to what the
+2026-09-16 import received, which is worth re-checking against the 557-row
+copy in Box's `backup-20260917/` rather than assuming. That directory is dated
+the day it was taken, not the day of the import it holds.
+
+The two side files come back with the same rows but not the same bytes: the
+held file's `held_reason` string changed, and three of its 146 rows resolve
+their program differently now, two of them losing one outright. None of the
+146 is imported, so none of that reaches the database. The run also prints a
+contradiction report on 5 archived rows, all pre-2022-08-03 and therefore
+explained rather than fatal; that report is new and does not mean the export
+went wrong.
 
 `--undo` hard-deletes the rows rather than soft-deleting them, which is right
 for backing out an import nobody has used yet and wrong once anyone has. It
@@ -770,11 +825,28 @@ source, which needs curation rather than a mapping), and the `studentProposed`
 flag (four candidates are identifiable only from prose in the legacy comments,
 so they want a staff eye rather than a hardcoded id list).
 
-**To import the projects that are still live in the old portal**, drop the
-`cp_archived = 1` condition from `export.sql` and write the result to a
-different filename, then name that file with `LEGACY_DATA_PROJECTS_FILE`. Each
-row carries `target_status`, computed as `archived` or `published` from
-`cp_archived`, and the importer reads it; nothing is hardcoded to `archived`.
+**To import the projects that are still live in the old portal**, set
+`export.sql`'s WHERE to `cp.cp_archived = 0 AND cp.cp_cps_id = 4` and write the
+result to `live-projects.jsonl`. Do not drop `cp_cps_id = 4` as well: 85 of the
+111 live drafts have a NULL `cp_date_updated`, and `clean-export.py` treats a
+null timestamp as the silent CONVERT_TZ failure it was written to catch.
+
+`clean-export.py` takes the export as its first argument and derives the three
+outputs from it, so the two sets can never overwrite each other:
+
+```bash
+python3 clean-export.py live-projects.jsonl   # -> live-projects-clean.jsonl
+```
+
+Name the CLEANED file with `LEGACY_DATA_PROJECTS_FILE`. The importer never
+reads the raw export: the raw file carries `created_at_pacific` rather than
+`created_at`, and its text is still HTML.
+
+Each row carries `target_status`. `export.sql` sets it to `archived` or
+`published` from `cp_archived`, and `clean-export.py` then rewrites a live
+hidden row to `approved`. The importer accepts all three, and nothing is
+hardcoded to `archived` except the default it falls back to when the field is
+absent, which only an export made before the field existed can be.
 `export.sql` and `clean-export.py` live beside the data in Box, not in this
 repo.
 
@@ -788,13 +860,13 @@ overwrite the archived cohort's manifest in Box and its key map in
 
 ```bash
 # Must hold `legacy-images-manifest.jsonl`, a `legacy-images/` directory of
-# the image files, and `live-projects.jsonl`. `prepare` hardcodes the first
-# two names, so a differently named directory reports every row as
-# "file missing" rather than failing outright.
+# the image files. `prepare` hardcodes the first two names, so a differently
+# named directory reports every row as "file missing" rather than failing
+# outright.
 LIVE="$BOX/Capstone Portal Migration/live"
 npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
   prepare "$LIVE" ./live-out
-cp "$LIVE/live-projects.jsonl" ./live-out/
+cp "$LIVE/live-projects-clean.jsonl" ./live-out/
 ```
 
 That leaves `./live-out` holding both files the import needs. Give the set its
@@ -806,7 +878,7 @@ costs nothing.
 aws --profile aws-capstone1 s3 sync ./live-out/projects \
   "s3://$ASSETS_BUCKET/projects/" --region us-west-2 \
   --exclude "*" --include "*.webp"
-aws --profile aws-capstone1 s3 cp ./live-out/live-projects.jsonl \
+aws --profile aws-capstone1 s3 cp ./live-out/live-projects-clean.jsonl \
   "s3://$OPS_BUCKET/legacy-live/" --region us-west-2
 aws --profile aws-capstone1 s3 cp ./live-out/image-keys.json \
   "s3://$OPS_BUCKET/legacy-live/" --region us-west-2
@@ -819,21 +891,85 @@ need the 7a.0b grant to still exist, which it does not if you ran the takedown
 after the archived import.
 
 Then run 7a.4 with both variables set, rather than composing the override by
-hand. `CLUSTER`, `TASKDEF` and `NETCFG` come from 7a.4 unchanged:
+hand. `CLUSTER`, `TASKDEF` and `NETCFG` come from 7a.4 unchanged. The command
+below is the bare full upsert, which is right for this cohort's FIRST run and
+wrong for every run after it: add `"--skip-existing"` to the command array next
+time, for the reasons in 7a.7.
 
 ```bash
 aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARGATE \
   --task-definition "$TASKDEF" \
   --network-configuration "$NETCFG" \
-  --overrides '{"containerOverrides":[{"name":"app","command":["node","scripts/import-legacy.mjs"],"environment":[{"name":"LEGACY_DATA_S3_URI","value":"s3://'"$OPS_BUCKET"'/legacy-live/"},{"name":"LEGACY_DATA_PROJECTS_FILE","value":"live-projects.jsonl"}]}]}' \
+  --overrides '{"containerOverrides":[{"name":"app","command":["node","scripts/import-legacy.mjs"],"environment":[{"name":"LEGACY_DATA_S3_URI","value":"s3://'"$OPS_BUCKET"'/legacy-live/"},{"name":"LEGACY_DATA_PROJECTS_FILE","value":"live-projects-clean.jsonl"}]}]}' \
   --region us-west-2
 ```
 
-`clean-export.py` still routes hidden rows to their own file, which matters
-more here: a hidden live project has never been public, and importing it as
-`published` would list it immediately.
+**What this import deliberately leaves in the old portal**, as of 2026-09-17.
+Each of these needs a decision that the import itself does not settle, and none
+is lost: the portal still holds them, and the two sets the cleaner writes out
+are in Box beside the data.
 
-Three things to decide before doing that, none of which this import settles:
+| set | rows | where it is |
+| --- | ---: | --- |
+| Hidden archived projects | 146 | `archived-hidden-projects.jsonl` |
+| Rejected, live and archived | 49 | the portal only |
+| Drafts, live and archived | 138 | the portal only |
+| Pending approval, archived only | 30 | the portal only |
+| DigiClips working notes | 11 | `excluded-projects.jsonl` |
+
+374 rows in total, against 557 archived and 203 live already accounted for,
+which is the portal's 1134. Those two filenames are what the cleaner wrote
+before it derived its outputs from its input; a re-export writes
+`archived-projects-hidden.jsonl` and `archived-projects-excluded.jsonl`
+instead, with the same contents. Re-derive these counts before the production
+run rather than trusting them, and the same goes for every count in this
+section: the portal is written daily, and the live figure moved from 201 to 203
+between the assessment and this paragraph because two pending proposals were
+approved.
+
+Nothing in this app's status vocabulary fits a rejected or a draft legacy
+project: `softDeleteProjectAs` refuses a `draft` outright, and
+`changes_requested` means "resubmit", where the portal's Rejected is terminal.
+
+Hidden rows are handled differently in the two sets, and `clean-export.py` is
+where that lives because `export.sql` serves both. `cp_is_hidden` means "not on
+the portal's Browse page". On a LIVE row that is this app's `approved`: the old
+portal's Approve button writes only the status and its Publish button only
+clears the flag, so a project sits approved and unlisted between the two
+clicks, and `search.ts` filters on `published` (or `archived` when
+`archivedOnly` is set) so nothing is exposed. On an ARCHIVED row there is no
+such status, since `archived` is public here, so those stay in the hidden file
+pending a decision.
+
+An `approved` row is not in `EMBEDDABLE_STATUSES`, so 7a.5's backfill skips it
+and publishing it later embeds it through `commitTransition`. Size the backfill
+against the `published` count, not the row count.
+
+Two things carry over from the archived set without needing a decision. A
+project the old portal published and later unpublished imports as `approved`
+carrying its original `published_at`, which is true and which
+`commitTransition` preserves rather than resetting, since it only stamps that
+column when it is still null. A project it archived and later unarchived
+imports carrying its `archived_at` for the same reason: `commitTransition` sets
+that column on every archive and nothing ever clears it, so this app holds one
+on a republished project too. Both columns mean "was X on", not "is X", and the
+admin date filters read them that way for imported and app-created rows alike.
+
+52 of the 203 land with no program: 26 because more than one course applies,
+21 because the course is ENGR41X, which gets no `programs` row because that
+group has left the portal, and 5 with nothing in the portal to recover. The
+first 47 keep their courses in staff-only notes rather than losing them. Four
+further rows are not in the 52 at all: they get a program AND a note, because
+they carry one course this app can represent and one it cannot.
+
+For the `published` ones this matters more than it did for the archived set:
+the project page renders no program badge, and the listing's `program` filter
+will not return them, so a student filtering for CS467 does not see the rows
+that are in fact open to CS467. The `approved` ones are not listed at all, so
+the filter cannot miss them until somebody publishes one, which is the moment
+to file it. Filing them by hand from the notes is the fix either way.
+
+Five things this import does not settle:
 
 - Those projects are still being edited in the old portal, so the two systems
   diverge from the moment you copy. Either the old portal becomes read-only or
@@ -842,8 +978,22 @@ Three things to decide before doing that, none of which this import settles:
   filter, so they are visible to every visitor immediately rather than as
   history.
 - `accepting_applicants` is imported as `true` for the same reason as the
-  archived set (the legacy schema has no closed flag), and for a live project
-  that claim is load-bearing rather than inert.
+  archived set (the legacy schema has no closed flag), and for a `published`
+  row that claim is load-bearing rather than inert, because `search.ts`'s
+  `acceptingOnly` filter reads it. It is inert on an `approved` row: the
+  project page reads it as well, but `TeamFullBadge` renders the full case and
+  returns null for the open one, so `true` puts no badge on anything.
+- Retiring one of the 64 `approved` rows is not a single step. `TRANSITIONS` in
+  `src/lib/project-workflow.ts` gives `approved` the targets `published` and
+  `changes_requested`, with no `approved -> archived`, so an imported project
+  nobody wants to offer has to be published publicly first and then archived,
+  or soft-deleted, which notifies the proposer if their account is linked.
+- 68 of the 203 were created by an admin account, 43 of them by one person, so
+  they import with that admin as the proposer rather than the partner who
+  wanted the project. The export carries `proposer_is_admin` and the importer
+  does not read it, deliberately: reassigning a proposer is a staff judgement
+  about who the real contact is, and 47 rows carry additional contact emails in
+  their notes to make that judgement from.
 
 ---
 

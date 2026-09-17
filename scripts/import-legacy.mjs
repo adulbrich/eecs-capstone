@@ -1,11 +1,20 @@
 /**
- * Production importer for the legacy PHP capstone portal's archived projects.
+ * Production importer for the legacy PHP capstone portal's projects.
  *
  * Run as a one-off ECS task, the way `promote-admin.mjs` is:
  *
- *   node scripts/import-legacy.mjs                 # import, or refresh a prior run
+ *   node scripts/import-legacy.mjs                 # a cohort's FIRST import only
  *   node scripts/import-legacy.mjs --undo          # delete exactly the imported rows
  *   node scripts/import-legacy.mjs --skip-existing # add only rows not already imported
+ *
+ * The bare form is a full upsert: on a row that already exists it rewrites the
+ * 24 of the table's 32 columns its `ON CONFLICT` names, staff edits to the
+ * project's own text included. `student_proposed`, `mentor_email`,
+ * `deleted_at`, the three embedding columns and the two `scope_assessment`
+ * ones are not among them, and `image_url` is COALESCEd, so all of those
+ * survive. It is for a cohort's FIRST import. Every run after that passes
+ * `--skip-existing`, with no standing exception. ADR-0027 is the decision and
+ * DEPLOYMENT.md's 7a.7 is the operational detail.
  *
  * The only thing that writes the imported rows to the database, and plain
  * `.mjs` so it runs from the production image: that installs with
@@ -27,7 +36,10 @@
  * DEPLOYMENT.md); this reads the small `image-keys.json` that step emits and
  * sets `image_url` from it.
  *
- * Inputs: `archived-projects-clean.jsonl` and, optionally, `image-keys.json`.
+ * Inputs: the cleaned JSONL named by `LEGACY_DATA_PROJECTS_FILE`, defaulting
+ * to `archived-projects-clean.jsonl`, and optionally `image-keys.json`. The
+ * live set exports to its own filename (`live-projects-clean.jsonl`) so a run
+ * over one set can never overwrite the other.
  *
  * They are read at runtime from a PRIVATE S3 prefix named by
  * `LEGACY_DATA_S3_URI` (for example `s3://eecs-capstone-ops/legacy/`), using
@@ -47,9 +59,9 @@ import pg from "pg";
 
 /**
  * MUST match `NAMESPACE` in `scripts/import-legacy-images.ts` exactly. Every row's
- * primary key is derived from it, so a different value here re-keys all 547
- * rows and orphans everything a previous run wrote, including the image
- * objects already in the bucket.
+ * primary key is derived from it, so a different value here re-keys every
+ * imported row and orphans everything a previous run wrote, including the
+ * image objects already in the bucket.
  */
 const NAMESPACE = "6f2a1c84-0d3e-4b57-9a6f-1e8c5d40b213";
 
@@ -183,8 +195,18 @@ const PROGRAMS = {
  * The statuses this importer will write. A guard rather than a pass-through:
  * the value arrives from a SQL file, and an unrecognised one would otherwise
  * fail against the enum halfway through the transaction.
+ *
+ * `approved` is here for the legacy portal's hidden-but-accepting projects,
+ * which that portal keeps on a flag separate from its status the same way this
+ * app keeps approval separate from publication. DEPLOYMENT.md's live-import
+ * section has that mapping in full, and why it exposes nothing.
+ *
+ * What an `approved` row does NOT get:
+ * `EMBEDDABLE_STATUSES` is `published` and `archived` only, so neither
+ * `refreshProjectEmbedding` nor `scripts/backfill-embeddings.mjs` will ever
+ * embed it. Publishing it later goes through `commitTransition`, which does.
  */
-const IMPORTABLE_STATUSES = ["archived", "published"];
+const IMPORTABLE_STATUSES = ["approved", "archived", "published"];
 
 function statusOf(row) {
   // Absent means an export made before `target_status` existed, and every one
@@ -381,8 +403,8 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at = excluded.updated_at,
   -- COALESCE, not a plain overwrite: the image-keys file is optional, so a
   -- re-run without it binds null here and would otherwise wipe image_url on
-  -- all 547 rows while the objects stayed in the bucket. A row keeps the image
-  -- it has unless this run actually carries a key for it.
+  -- every row it touches while the objects stayed in the bucket. A row keeps
+  -- the image it has unless this run actually carries a key for it.
   image_url = COALESCE(excluded.image_url, projects.image_url)
 `;
 
@@ -489,10 +511,16 @@ async function main() {
         row.requires_nda_ip,
         row.is_sponsored,
         // True, because that is what the source says: the legacy schema has
-        // no closed-to-applicants column, every one of the 547 carries status
-        // 4 ("Accepting Applicants") which is what this import selects on,
-        // and `capstone_application` is empty. The flag means "published but
-        // not closed", not "students can apply"; archived settles the latter.
+        // no closed-to-applicants column, every row any export selects carries
+        // status 4 ("Accepting Applicants"), and `capstone_application` is
+        // empty. The flag means "published but not closed", not "students can
+        // apply"; `archived` settles the latter and so does `approved`, which
+        // is not publicly listed at all.
+        //
+        // Where it bites is `search.ts`'s `acceptingOnly` filter, so only on a
+        // `published` row. The project page reads it too, but `TeamFullBadge`
+        // renders the FULL case and returns null for the open one, so writing
+        // `true` puts no badge on any imported project either way.
         true,
         row.teams_supported,
         buildNotes(row),
@@ -507,6 +535,16 @@ async function main() {
         // backfilled: that would erase the difference between a date we know
         // and one we guessed. `search.ts` orders on
         // coalesce(published_at, created_at) so the nulls still sort sanely.
+        //
+        // An `approved` row can carry one, and most do. They were published in
+        // the old portal and unpublished again later, which is what its
+        // Unpublish button does, so the date is true and worth keeping.
+        // `commitTransition` only stamps `publishedAt` when it is still null,
+        // so publishing one here preserves the original rather than resetting
+        // it to today. An admin "published between" filter does return these,
+        // which is the same thing it does for a project this app published and
+        // moved back out of `published`: the column means "was published on",
+        // not "is published", and nothing ever clears it.
         row.published_at,
         row.archived_at,
         row.created_at,
