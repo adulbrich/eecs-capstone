@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   ADMIN_DATE_FIELDS,
   DEFAULT_ADMIN_STATUSES,
+  PROGRAM_FILTER_NONE,
 } from "#/lib/admin-project-filters";
 import { PROJECT_STATUSES } from "#/lib/vocabularies";
 
@@ -39,7 +40,15 @@ const adminListSchema = z
     from: z.string().regex(DAY).nullable().default(null),
     to: z.string().regex(DAY).nullable().default(null),
     includeSoftDeleted: z.boolean().default(false),
-    program: z.string().uuid().nullable().default(null),
+    // Three states in one field, because they are mutually exclusive: null is
+    // every program, "none" is `program_id IS NULL`, a UUID is that program.
+    // A separate boolean beside `withoutMentorOnly` could have been set at the
+    // same time as a UUID, which describes the empty set and leaves a reader
+    // guessing which control wins (#458).
+    program: z
+      .union([z.literal(PROGRAM_FILTER_NONE), z.string().uuid()])
+      .nullable()
+      .default(null),
     // Better Auth user ids are text, not UUIDs, so this cannot be `.uuid()`.
     proposer: z.string().max(255).nullable().default(null),
     q: z.string().max(200).default(""),

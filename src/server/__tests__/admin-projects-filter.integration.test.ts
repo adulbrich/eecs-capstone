@@ -144,6 +144,110 @@ describe("admin projects program filter", () => {
     ]);
   });
 
+  it("returns only the projects with no program when none is the choice", async () => {
+    const admin = await makeAdmin(`np-${Date.now()}@x.com`);
+    const cs461 = await makeProgram("CS 461");
+
+    const placed = await createProjectAs(
+      admin,
+      baseProject("In CS 461", cs461)
+    );
+    await createProjectAs(admin, baseProject("Unplaced", null));
+
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ program: "none" })
+    );
+
+    expect(rows.map((r) => r.title)).toEqual(["Unplaced"]);
+    expect(rows.map((r) => r.id)).not.toContain(placed.id);
+  });
+
+  // The other half of the pair above, and the half nothing pinned before
+  // #458: a chosen program must keep excluding the unplaced rows, or the two
+  // choices would overlap and "No program" would be a view of the same set.
+  it("keeps the projects with no program out of a chosen program", async () => {
+    const admin = await makeAdmin(`np2-${Date.now()}@x.com`);
+    const cs461 = await makeProgram("CS 461");
+
+    await createProjectAs(admin, baseProject("In CS 461", cs461));
+    const unplaced = await createProjectAs(
+      admin,
+      baseProject("Unplaced", null)
+    );
+
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ program: cs461 })
+    );
+
+    expect(rows.map((r) => r.id)).not.toContain(unplaced.id);
+  });
+
+  // A program deleted out from under a project leaves `program_id` null,
+  // because the column is `on delete set null` in `src/db/schema.ts`. Those
+  // rows are exactly what staff need this choice to surface.
+  it("surfaces a project whose program was deleted", async () => {
+    const admin = await makeAdmin(`np3-${Date.now()}@x.com`);
+    const doomed = await makeProgram("CS 461");
+
+    const orphan = await createProjectAs(
+      admin,
+      baseProject("Program deleted", doomed)
+    );
+    await db.delete(programs).where(eq(programs.id, doomed));
+
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ program: "none" })
+    );
+
+    expect(rows.map((r) => r.id)).toContain(orphan.id);
+  });
+
+  // The export and the table share `buildAdminProjectListConditions`, so the
+  // file can never disagree with the page about which rows match.
+  it("exports the same rows the table shows for the none choice", async () => {
+    const admin = await makeAdmin(`np4-${Date.now()}@x.com`);
+    const cs461 = await makeProgram("CS 461");
+
+    await createProjectAs(admin, baseProject("In CS 461", cs461));
+    await createProjectAs(admin, baseProject("Unplaced", null));
+
+    const chosen = filter({ program: "none" });
+    const listed = await listAdminProjectsAs(admin, chosen);
+    const exported = await exportAdminProjectsAs(admin, chosen);
+
+    expect(exported.rows.map((r) => r.title)).toEqual(["Unplaced"]);
+    expect(exported.rows.map((r) => r.id)).toEqual(
+      listed.rows.map((r) => r.id)
+    );
+  });
+
+  it("composes the none choice with the status filter", async () => {
+    const admin = await makeAdmin(`np5-${Date.now()}@x.com`);
+
+    const draft = await createProjectAs(
+      admin,
+      baseProject("Unplaced draft", null)
+    );
+    const live = await createProjectAs(
+      admin,
+      baseProject("Unplaced live", null)
+    );
+    await performTransitionAs(admin, live.id, "submitted");
+    await performTransitionAs(admin, live.id, "approved");
+    await performTransitionAs(admin, live.id, "published");
+
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ program: "none", statuses: ["published"] })
+    );
+
+    expect(rows.map((r) => r.title)).toEqual(["Unplaced live"]);
+    expect(rows.map((r) => r.id)).not.toContain(draft.id);
+  });
+
   it("composes the program filter with the status filter", async () => {
     const admin = await makeAdmin(`c-${Date.now()}@x.com`);
     const cs461 = await makeProgram("CS 461");

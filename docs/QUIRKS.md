@@ -148,6 +148,10 @@ export const Route = createFileRoute("/_authed/admin/projects/")({
 
 An `.optional()` param without a default (`from`, `to`, `status`) is the exception: `undefined` removes it, which is what the date inputs and the default status set rely on.
 
+### `program` means three things on `/admin/projects` and two on `/projects`
+
+The two listings share the param name so a narrowed link can move between them (#340), but they do not share the schema. On `/admin/projects` it is `z.union([z.literal(PROGRAM_FILTER_NONE), z.string().uuid()]).nullable()`: absent is every program, `none` is `program_id IS NULL`, a UUID is that program (#458). The literal is `PROGRAM_FILTER_NONE` in `src/lib/admin-project-filters.ts`, not three inline copies, because the route schema, the server schema and the query branch all have to agree on it; that is what separates it from the `_all_` and `_none_` sentinels, which each live inside one component. The three states are in one field rather than a dropdown plus a switch because they are mutually exclusive, and a switch could have been on at the same time as a UUID. `buildAdminProjectScope` branches on `"none"` before the equality, so a new caller that forgets the literal silently filters by a program id that cannot exist rather than erroring. On `/projects` the param is still a UUID or null, and its schema carries no `.catch`, so an admin link with `program=none` pasted there errors the route the same way any bad value does; adding "No program" to the public listing was out of scope, since a student is not looking for unplaced projects.
+
 ### Single canonical URL per resource
 
 One detail URL per project and per item, staff sections rendered conditionally on it. [ADR-0010](./adr/0010-single-canonical-url-per-resource.md).
