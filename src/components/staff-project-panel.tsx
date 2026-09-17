@@ -131,7 +131,7 @@ export function StaffProjectPanel({
       const { rows } = await listProjectEditLog({
         data: { id: project.id },
       });
-      setEditLog(rows as EditLogEntry[]);
+      setEditLog(rows);
     } catch {
       // ignored
     }

@@ -863,6 +863,47 @@ describe("private notes", () => {
     expect(rows).toHaveLength(1);
   });
 
+  it("names the editor and ships no before-and-after values", async () => {
+    // The projection is pinned by name, not just spot-checked: oldValues and
+    // newValues hold every changed field including notes, nothing renders
+    // them, and a later widening of this select would ship them to a browser
+    // unnoticed (#467).
+    const admin = await makeUser(`pcol-a-${Date.now()}@x.com`, "admin");
+    const owner = await makeUser(`pcol-o-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, baseProject());
+    await updateProjectAs(owner, { id, ...baseProject(), notes: "later" });
+
+    const { rows } = await listProjectEditLogAs(admin, { id });
+    expect(Object.keys(rows[0]).sort()).toEqual([
+      "changedFields",
+      "createdAt",
+      "editorId",
+      "editorName",
+      "id",
+    ]);
+    // makeUser names each account after its address.
+    expect(rows[0].editorName).toBe(owner.email);
+    expect(rows[0].editorId).toBe(owner.id);
+  });
+
+  it("reads a deleted editor as Deleted user, keeping the row", async () => {
+    // The join is inner, so this is the case that would silently drop an
+    // audit row if ADR 0008 ever deleted the account instead of scrubbing it.
+    const admin = await makeUser(`pdel-a-${Date.now()}@x.com`, "admin");
+    const owner = await makeUser(`pdel-o-${Date.now()}@x.com`, "user");
+    const { id } = await createProjectAs(owner, baseProject());
+    await updateProjectAs(owner, { id, ...baseProject(), notes: "later" });
+
+    await deleteAccountAs(owner, { confirmEmail: owner.email });
+
+    const { rows } = await listProjectEditLogAs(admin, { id });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].editorName).toBe("Deleted user");
+    // The scrubbed address is deleted-<id>@invalid, and this surface cannot
+    // print it: the projection does not carry it.
+    expect(JSON.stringify(rows)).not.toContain("@invalid");
+  });
+
   it("logs an image change like any other field", async () => {
     // The defect this closes: the upload path wrote projects.image_url on its
     // own request, so staff reading a project's edit history saw every text

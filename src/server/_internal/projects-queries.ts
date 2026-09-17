@@ -46,14 +46,6 @@ import {
   projectSummarySelect,
 } from "./project-summary";
 
-type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
-
 /** The vocabulary plus the sentinel this filter adds for "no filter". */
 type StatusFilter = "all" | ProjectStatus;
 
@@ -552,6 +544,17 @@ export async function getProposerForEditImpl(data: {
  * Test seam, the same *As / *Impl split the rest of this file uses: the gate
  * lived inside the Impl, where nothing but a request could reach it, and so
  * had no refusal test.
+ *
+ * The editor is joined for a name, the way `getProjectAs` joins the status
+ * history's actor: an id prefix answered nothing about who made an edit
+ * (#467). The join is inner and total, because `editor_id` is `notNull` with
+ * `onDelete: restrict` and ADR-0008 scrubs a deleted account's name to
+ * "Deleted user" rather than removing the row, so no audit row can drop out.
+ *
+ * `oldValues` and `newValues` are deliberately not selected, matching
+ * `listInventoryItemEditLogAs`. They hold the before and after of every
+ * changed field, notes included, and nothing renders them, so selecting them
+ * would ship staff-private strings to a browser with no reader for them.
  */
 export async function listProjectEditLogAs(
   viewer: Viewer,
@@ -559,17 +562,18 @@ export async function listProjectEditLogAs(
 ) {
   assertStaff(viewer);
   const rows = await db
-    .select()
+    .select({
+      id: projectEditLog.id,
+      editorId: projectEditLog.editorId,
+      editorName: user.name,
+      changedFields: projectEditLog.changedFields,
+      createdAt: projectEditLog.createdAt,
+    })
     .from(projectEditLog)
+    .innerJoin(user, eq(projectEditLog.editorId, user.id))
     .where(eq(projectEditLog.projectId, data.id))
     .orderBy(desc(projectEditLog.createdAt));
-  return {
-    rows: rows.map((r) => ({
-      ...r,
-      oldValues: r.oldValues as JsonValue,
-      newValues: r.newValues as JsonValue,
-    })),
-  };
+  return { rows };
 }
 
 export async function listProjectEditLogImpl(data: { id: string }) {
