@@ -629,9 +629,15 @@ export async function getItemHistoryAs(
  * The rows have been written since #126 and read by nothing, so an image
  * change reached the log and no staff member could see it.
  *
- * No join to `user`, unlike `getItemHistoryAs` next door. The project panel
- * renders `editorId.slice(0, 8)` and this matches it rather than quietly
- * offering more; a name join belongs on both logs at once or neither.
+ * The editor is joined for a name, the way `getItemHistoryAs` next door joins
+ * the status history's actor. Both edit logs gained it at once (#467), which
+ * is the condition the id-prefix version of this comment set. The join is
+ * inner and total: `editor_id` is `notNull` with `onDelete: restrict` and
+ * ADR-0008 scrubs a deleted account's name to "Deleted user" rather than
+ * removing the row, so no audit row can drop out.
+ *
+ * Name only, no address, matching the status history the panel renders above
+ * it. An address on the edit log is a separate decision with its own reason.
  *
  * `oldValues` and `newValues` are deliberately not selected. They hold the
  * before and after of every changed field, notes, serial and location
@@ -647,10 +653,12 @@ export async function listInventoryItemEditLogAs(
     .select({
       id: inventoryItemEditLog.id,
       editorId: inventoryItemEditLog.editorId,
+      editorName: user.name,
       changedFields: inventoryItemEditLog.changedFields,
       createdAt: inventoryItemEditLog.createdAt,
     })
     .from(inventoryItemEditLog)
+    .innerJoin(user, eq(inventoryItemEditLog.editorId, user.id))
     .where(eq(inventoryItemEditLog.itemId, data.itemId))
     .orderBy(desc(inventoryItemEditLog.createdAt));
   return { rows };

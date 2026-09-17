@@ -3,14 +3,14 @@ import { LocalTime } from "./local-time";
 /**
  * The rows either edit log renders.
  *
- * `listProjectEditLog` returns more than this and neither panel shows the
- * rest; `listInventoryItemEditLog` selects exactly these four, deliberately,
- * because its `oldValues` carry notes, serial and location.
+ * Both server functions select exactly these four and no more: their
+ * `oldValues` and `newValues` carry notes, serial and location, and nothing
+ * renders them, so neither payload carries them (#467).
  */
 export interface EditLogEntry {
   changedFields: string[];
   createdAt: Date | string;
-  editorId: string;
+  editorName: string;
   id: string;
 }
 
@@ -18,8 +18,14 @@ export interface EditLogEntry {
  * Who changed which fields, and when. Shared by the project staff panel and
  * the inventory one, which rendered the same nineteen lines of markup twice.
  *
- * The editor is an id prefix rather than a name, on both. Neither server
- * function joins `user`, and adding a name belongs on both logs at once.
+ * The editor is named, on both, the way the status history beside either log
+ * already names the person who moved the status. Both server functions join
+ * `user`, and an account deleted since reads "Deleted user" rather than
+ * dropping the row: ADR-0008 scrubs the name and leaves the account.
+ *
+ * `editorId` is still in both payloads for a staff member debugging a row,
+ * and deliberately not rendered: the name is the answer to "who changed
+ * this", and an id prefix beside it was never the readable half.
  *
  * `error` separates "this item has no edits" from "the log could not be
  * loaded", which an empty list alone cannot say.
@@ -46,7 +52,7 @@ export function EditLogList({
       {rows.map((row) => (
         <li className="border-border border-l-2 pl-3" key={row.id}>
           <div className="text-muted-foreground text-xs">
-            {row.editorId.slice(0, 8)} at <LocalTime value={row.createdAt} />
+            {row.editorName} at <LocalTime value={row.createdAt} />
           </div>
           <div className="text-xs">Changed: {row.changedFields.join(", ")}</div>
         </li>

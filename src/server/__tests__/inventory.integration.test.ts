@@ -3670,7 +3670,8 @@ describe("hasRequestHistory on the staff detail", () => {
 
 describe("listInventoryItemEditLogAs", () => {
   it("returns the item's edits, newest first", async () => {
-    const admin = await makeUser(`iel-a1-${Date.now()}@x.com`, "admin");
+    const email = `iel-a1-${Date.now()}@x.com`;
+    const admin = await makeUser(email, "admin");
     const item = await makeItem({ name: "Old", location: "Shelf A" });
 
     await updateInventoryItemAs(admin, {
@@ -3697,6 +3698,9 @@ describe("listInventoryItemEditLogAs", () => {
       new Set(["name", "location"])
     );
     expect(rows[0].editorId).toBe(admin.id);
+    // The name the panel renders, joined since #467; makeUser names each
+    // account after its address.
+    expect(rows[0].editorName).toBe(email);
   });
 
   it("returns nothing for an item nobody has edited", async () => {
