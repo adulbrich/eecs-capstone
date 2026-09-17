@@ -920,6 +920,7 @@ run rather than trusting them, and the same goes for every count in this
 section: the portal is written daily, and the live figure moved from 201 to 203
 between the assessment and this paragraph because two pending proposals were
 approved.
+
 Nothing in this app's status vocabulary fits a rejected or a draft legacy
 project: `softDeleteProjectAs` refuses a `draft` outright, and
 `changes_requested` means "resubmit", where the portal's Rejected is terminal.
@@ -953,11 +954,14 @@ admin date filters read them that way for imported and app-created rows alike.
 group has left the portal, and 5 with nothing in the portal to recover. The
 first 47 keep their courses in staff-only notes rather than losing them. Four
 further rows are not in the 52 at all: they get a program AND a note, because
-they carry one course this app can represent and one it cannot. This matters more than it did for the
-archived set, because these are published: the project page renders no program
-badge for them, and the listing's `program` filter will not return them, so a
-student filtering for CS467 does not see the rows that are in fact open to
-CS467. Filing them by hand from the notes is the fix.
+they carry one course this app can represent and one it cannot.
+
+For the `published` ones this matters more than it did for the archived set:
+the project page renders no program badge, and the listing's `program` filter
+will not return them, so a student filtering for CS467 does not see the rows
+that are in fact open to CS467. The `approved` ones are not listed at all, so
+the filter cannot miss them until somebody publishes one, which is the moment
+to file it. Filing them by hand from the notes is the fix either way.
 
 Three things to decide before doing that, none of which this import settles:
 
