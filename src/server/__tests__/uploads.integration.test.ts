@@ -81,7 +81,6 @@ function baseProject() {
     contactName: null,
     imageUrl: "",
     licenseRestrictions: null,
-    programId: null,
     notes: null,
   };
 }

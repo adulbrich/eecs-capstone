@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 import { db } from "#/db";
-import { programs, projects, user } from "#/db/schema";
+import { programs, projectPrograms, projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { refreshProjectEmbedding } from "#/server/_internal/project-embeddings";
 import {
@@ -9,7 +9,7 @@ import {
   forceTransitionAs,
   performTransitionAs,
   updateProjectAs,
-  updateProjectProgramAs,
+  updateProjectProgramsAs,
 } from "#/server/_internal/projects";
 
 const VECTOR = Array.from({ length: 1024 }, (_, i) => (i === 0 ? 1 : 0));
@@ -39,7 +39,6 @@ function baseProject(title: string) {
     contactName: null,
     imageUrl: "",
     licenseRestrictions: null,
-    programId: null,
     notes: null,
   };
 }
@@ -365,7 +364,7 @@ describe("embedding triggers", () => {
    *
    * Asserted on the stored hash rather than on a spy. It was a spy when the
    * attach went through `updateProjectAs`, which takes an `embed` and gates a
-   * call on the diff; #450 moved the attach to `updateProjectProgramAs`,
+   * call on the diff; #450 moved the attach to `updateProjectProgramsAs`,
    * which takes no `embed` at all, so "no call" became true by construction.
    * The hash is what still knows whether the text moved, and the paid
    * re-embed a moved hash would cause is the cost this decision was weighed
@@ -390,7 +389,7 @@ describe("embedding triggers", () => {
       .returning();
     // Through the staff writer, because #450 took `programId` off
     // `ProjectInput`, so `updateProjectAs` cannot attach a program any more.
-    await updateProjectProgramAs(admin, { id, programId: program.id });
+    await updateProjectProgramsAs(admin, { id, programIds: [program.id] });
 
     // Then recompute. Asserting that the writer did not call `embed` would
     // prove nothing: it takes no embed parameter, so that holds whatever the
@@ -398,7 +397,11 @@ describe("embedding triggers", () => {
     // unmoved is what actually pins the program outside the embedded text.
     await refreshProjectEmbedding(id, embed);
     const after = await readRow(id);
-    expect(after.programId).toBe(program.id);
+    const links = await db
+      .select({ programId: projectPrograms.programId })
+      .from(projectPrograms)
+      .where(eq(projectPrograms.projectId, id));
+    expect(links.map((l) => l.programId)).toEqual([program.id]);
     expect(after.embeddingSourceHash).toBe(before.embeddingSourceHash);
     expect(embed).not.toHaveBeenCalled();
   });

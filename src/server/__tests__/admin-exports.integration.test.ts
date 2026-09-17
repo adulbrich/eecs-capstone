@@ -48,7 +48,6 @@ function baseProject(title: string) {
     contactName: null,
     imageUrl: "",
     licenseRestrictions: null,
-    programId: null,
     notes: "Staff only",
   };
 }

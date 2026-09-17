@@ -49,8 +49,7 @@ const base: ProjectSummary = {
   imageUrl: null,
   contactName: "Jane Doe",
   updatedAt: "2026-05-28T00:00:00.000Z",
-  programCourseId: "CS-462",
-  programCourseName: "Capstone",
+  programs: [{ id: "p-1", courseId: "CS-462", courseName: "Capstone" }],
 };
 
 describe("ProjectCard", () => {
@@ -82,14 +81,39 @@ describe("ProjectCard", () => {
     expect(src).toContain("projects/a/b.webp");
   });
 
-  it("renders program, contact, and updated meta", () => {
+  // Course ids only, `'; '` separated: the card is a scanning surface and
+  // shows the same string the table column carries, not the full labels the
+  // detail page badges (#462).
+  it("renders the course ids, contact, and updated meta", () => {
     const { container, getByText } = render(<ProjectCard project={base} />);
-    expect(getByText("CS-462 Capstone · Jane Doe")).toBeTruthy();
+    expect(getByText("CS-462 · Jane Doe")).toBeTruthy();
     // The timestamp renders inside a nested <time> (see LocalTime), so the
     // paragraph's text spans elements and a whole-string matcher would miss it.
     const updated = container.querySelector("time");
     expect(updated?.getAttribute("dateTime")).toBe(base.updatedAt);
     expect(updated?.closest("p")?.textContent).toMatch(/^Updated /);
+  });
+
+  it("joins two programs with a semicolon, in course id order", () => {
+    const { getByText } = render(
+      <ProjectCard
+        project={{
+          ...base,
+          programs: [
+            { id: "p-1", courseId: "CS 461", courseName: "Capstone I" },
+            { id: "p-2", courseId: "CS 46X", courseName: "Capstone Ecampus" },
+          ],
+        }}
+      />
+    );
+    expect(getByText("CS 461; CS 46X · Jane Doe")).toBeTruthy();
+  });
+
+  it("shows no program line for a project in none", () => {
+    const { getByText } = render(
+      <ProjectCard project={{ ...base, programs: [] }} />
+    );
+    expect(getByText("Jane Doe")).toBeTruthy();
   });
 
   it("stacks the image above the text below md and beside it from md up", () => {

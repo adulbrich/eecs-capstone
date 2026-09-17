@@ -5,6 +5,7 @@ import {
   notifications,
   programs,
   projectEditLog,
+  projectPrograms,
   projectStatusHistory,
   projects,
   user,
@@ -19,7 +20,7 @@ import {
   restoreProjectAs,
   softDeleteProjectAs,
   updateProjectAs,
-  updateProjectProgramAs,
+  updateProjectProgramsAs,
   updateProjectProposerAs,
 } from "#/server/_internal/projects";
 import {
@@ -56,7 +57,6 @@ function baseProject() {
     contactName: null,
     imageUrl: "",
     licenseRestrictions: null,
-    programId: null,
     notes: null,
     teamsSupported: 1,
   };
@@ -375,13 +375,13 @@ describe("the program on the public project payload", () => {
       ...baseProject(),
       ...overrides,
     });
-    await updateProjectProgramAs(admin, { id, programId });
+    await updateProjectProgramsAs(admin, { id, programIds: [programId] });
     return id;
   }
 
-  // The pair the card and the Program column have always shown. An anonymous
-  // reader is the whole point: a student who clicked through from a card was
-  // the only viewer the program was hidden from (#449).
+  // The labels the card and the Program column have always shown. An
+  // anonymous reader is the whole point: a student who clicked through from
+  // a card was the only viewer the program was hidden from (#449).
   it("names the program to an anonymous reader", async () => {
     const owner = await makeUser(`pg-o-${Date.now()}@x.com`, "user");
     const admin = await makeUser(`pg-a-${Date.now()}@x.com`, "admin");
@@ -396,58 +396,89 @@ describe("the program on the public project payload", () => {
 
     const { project } = await getProjectAs(null, { id });
 
-    expect(project?.programCourseId).toBe("CS 461");
-    expect(project?.programCourseName).toBe("Software Engineering Project");
+    expect(project?.programs).toEqual([
+      {
+        id: programId,
+        courseId: "CS 461",
+        courseName: "Software Engineering Project",
+      },
+    ]);
   });
 
-  // Null, not an empty string and not a missing key: the page renders no
+  // In `course_id` order, sorted inside the aggregate, so no renderer has to
+  // sort and the badge row cannot drift from the table column (#462).
+  it("names every program a project runs in, in course id order", async () => {
+    const owner = await makeUser(`pg-m-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`pg-ma-${Date.now()}@x.com`, "admin");
+    const ecampus = await makeProgram("CS 46X", "Capstone Ecampus");
+    const corvallis = await makeProgram("CS 461", "Capstone Corvallis");
+    const { id } = await createProjectAs(owner, baseProject());
+    // Reversed on the way in, so the order is the aggregate's and not the
+    // caller's.
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [ecampus, corvallis],
+    });
+
+    // The owner, not an anonymous reader: this project is still a draft.
+    const { project } = await getProjectAs(owner, { id });
+
+    expect(project?.programs.map((pr) => pr.courseId)).toEqual([
+      "CS 461",
+      "CS 46X",
+    ]);
+  });
+
+  // An empty array, not a null and not a missing key: the page renders no
   // badge at all for these, and the key set is one shape for every project.
-  it("reports null for a project filed under no program", async () => {
+  it("reports an empty list for a project filed under no program", async () => {
     const owner = await makeUser(`pg-n-${Date.now()}@x.com`, "user");
     const { id } = await createProjectAs(owner, baseProject());
 
     const { project } = await getProjectAs(owner, { id });
 
-    expect(project?.programCourseId).toBeNull();
-    expect(project?.programCourseName).toBeNull();
-    expect(project?.programId).toBeNull();
+    expect(project?.programs).toEqual([]);
   });
 
-  // `projects.program_id` is `on delete set null`, so a program deleted out
-  // from under a project reads as no program rather than as a dangling id.
-  it("reports null once the program is deleted", async () => {
+  // The join row is `on delete cascade`, so a deleted program drops out of
+  // the set and leaves the rest of it alone. For a project that ran only
+  // there the result is the same unplaced project `set null` produced.
+  it("drops only the deleted program and keeps the others", async () => {
     const owner = await makeUser(`pg-d-${Date.now()}@x.com`, "user");
     const admin = await makeUser(`pg-da-${Date.now()}@x.com`, "admin");
-    const programId = await makeProgram("ECE 441", "Capstone");
-    const id = await placedProject(owner, admin, programId);
-    await db.delete(programs).where(eq(programs.id, programId));
+    const doomed = await makeProgram("ECE 441", "Capstone");
+    const kept = await makeProgram("ECE 442", "Capstone II");
+    const { id } = await createProjectAs(owner, baseProject());
+    await updateProjectProgramsAs(admin, { id, programIds: [doomed, kept] });
+
+    await db.delete(programs).where(eq(programs.id, doomed));
 
     const { project } = await getProjectAs(owner, { id });
-
-    expect(project?.programCourseId).toBeNull();
-    expect(project?.programCourseName).toBeNull();
-    expect(project?.programId).toBeNull();
+    expect(project?.programs.map((pr) => pr.courseId)).toEqual(["ECE 442"]);
   });
 
-  // The join must not fan a project out into two rows, and must not change
-  // what the detail read returns beside the program.
+  // The aggregate must not fan a project out into two rows, which is the
+  // whole reason it is a correlated subquery and not a join.
   it("returns one project, with the rest of the payload intact", async () => {
     const owner = await makeUser(`pg-1-${Date.now()}@x.com`, "user");
     const admin = await makeUser(`pg-1a-${Date.now()}@x.com`, "admin");
-    const programId = await makeProgram("CS 462", "Capstone II");
-    const id = await placedProject(owner, admin, programId, {
-      title: "Joined once",
+    const a = await makeProgram("CS 462", "Capstone II");
+    const b = await makeProgram("CS 463", "Capstone III");
+    const { id } = await createProjectAs(owner, {
+      ...baseProject(),
+      title: "Aggregated once",
     });
+    await updateProjectProgramsAs(admin, { id, programIds: [a, b] });
 
     const { project } = await getProjectAs(owner, { id });
 
     expect(project?.id).toBe(id);
-    expect(project?.title).toBe("Joined once");
-    expect(project?.programId).toBe(programId);
+    expect(project?.title).toBe("Aggregated once");
+    expect(project?.programs).toHaveLength(2);
   });
 });
 
-describe("updateProjectProgramAs", () => {
+describe("updateProjectProgramsAs", () => {
   async function makeProgram(courseId: string) {
     const [prog] = await db
       .insert(programs)
@@ -456,12 +487,19 @@ describe("updateProjectProgramAs", () => {
     return prog.id;
   }
 
-  async function programOf(id: string) {
-    const [row] = await db
-      .select({ programId: projects.programId })
-      .from(projects)
-      .where(eq(projects.id, id));
-    return row.programId;
+  async function programsOf(id: string) {
+    const rows = await db
+      .select({ programId: projectPrograms.programId })
+      .from(projectPrograms)
+      .where(eq(projectPrograms.projectId, id));
+    return rows.map((r) => r.programId).sort();
+  }
+
+  async function logOf(id: string) {
+    return await db
+      .select()
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
   }
 
   // The whole point of #450: the proposer proposes, staff place. A proposer
@@ -472,16 +510,16 @@ describe("updateProjectProgramAs", () => {
     const { id } = await createProjectAs(owner, baseProject());
 
     await expect(
-      updateProjectProgramAs(owner, { id, programId })
+      updateProjectProgramsAs(owner, { id, programIds: [programId] })
     ).rejects.toThrow("Forbidden");
-    expect(await programOf(id)).toBeNull();
+    expect(await programsOf(id)).toEqual([]);
   });
 
-  it("creates unplaced, because ProjectInput no longer carries a program", async () => {
+  it("creates unplaced, because ProjectInput never carried a program", async () => {
     const admin = await makeUser(`pr-c-${Date.now()}@x.com`, "admin");
     const { id } = await createProjectAs(admin, baseProject());
 
-    expect(await programOf(id)).toBeNull();
+    expect(await programsOf(id)).toEqual([]);
   });
 
   it("places, logs one row naming the field, and writes none for an unchanged save", async () => {
@@ -489,34 +527,114 @@ describe("updateProjectProgramAs", () => {
     const programId = await makeProgram(`PP-${Date.now()}`);
     const { id } = await createProjectAs(admin, baseProject());
 
-    const first = await updateProjectProgramAs(admin, { id, programId });
+    const first = await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [programId],
+    });
     expect(first.updated).toBe(true);
-    expect(await programOf(id)).toBe(programId);
+    expect(await programsOf(id)).toEqual([programId]);
 
-    const again = await updateProjectProgramAs(admin, { id, programId });
+    const again = await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [programId],
+    });
     expect(again.updated).toBe(false);
 
-    const log = await db
-      .select()
-      .from(projectEditLog)
-      .where(eq(projectEditLog.projectId, id));
+    const log = await logOf(id);
     expect(log).toHaveLength(1);
     expect(log[0].editorId).toBe(admin.id);
-    expect(log[0].changedFields).toEqual(["programId"]);
+    expect(log[0].changedFields).toEqual(["programs"]);
   });
 
-  // The empty string is what `ProgramSelect` emits for its no-program
-  // choice, and it has to reach the column as a null rather than as a value.
-  it("clears the program on an empty string", async () => {
+  it("places a project in two programs at once", async () => {
+    const admin = await makeUser(`pr-2-${Date.now()}@x.com`, "admin");
+    const a = await makeProgram(`P2A-${Date.now()}`);
+    const b = await makeProgram(`P2B-${Date.now()}`);
+    const { id } = await createProjectAs(admin, baseProject());
+
+    const result = await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [a, b],
+    });
+
+    expect(result.updated).toBe(true);
+    expect(await programsOf(id)).toEqual([a, b].sort());
+  });
+
+  // Checkbox order is whatever order staff clicked in. Comparing arrays
+  // would write a row and claim a change every time somebody reordered
+  // nothing, which is what the set comparison in the writer prevents.
+  it("counts the same ids in a different order as no change", async () => {
+    const admin = await makeUser(`pr-r-${Date.now()}@x.com`, "admin");
+    const a = await makeProgram(`PRA-${Date.now()}`);
+    const b = await makeProgram(`PRB-${Date.now()}`);
+    const { id } = await createProjectAs(admin, baseProject());
+    await updateProjectProgramsAs(admin, { id, programIds: [a, b] });
+
+    const again = await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [b, a],
+    });
+
+    expect(again.updated).toBe(false);
+    expect(await logOf(id)).toHaveLength(1);
+  });
+
+  // The composite primary key rejects a repeat, so the writer dedupes
+  // before it inserts rather than letting the constraint surface as a raw
+  // Postgres error in the panel.
+  it("survives a duplicate id in the input", async () => {
+    const admin = await makeUser(`pr-d-${Date.now()}@x.com`, "admin");
+    const a = await makeProgram(`PDA-${Date.now()}`);
+    const { id } = await createProjectAs(admin, baseProject());
+
+    const result = await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [a, a],
+    });
+
+    expect(result.updated).toBe(true);
+    expect(await programsOf(id)).toEqual([a]);
+  });
+
+  // Nothing renders these two columns (`EditLogEntry` carries four fields,
+  // and #467 kept the values out of both payloads), so they are for whoever
+  // reads the table. Labels, and ordered, or two saves of the same set
+  // would differ on nothing.
+  it("logs the old and new sets as ordered label arrays", async () => {
+    const admin = await makeUser(`pr-l-${Date.now()}@x.com`, "admin");
+    const stamp = Date.now();
+    const a = await makeProgram(`PLA-${stamp}`);
+    const b = await makeProgram(`PLB-${stamp}`);
+    const { id } = await createProjectAs(admin, baseProject());
+    await updateProjectProgramsAs(admin, { id, programIds: [a] });
+
+    await updateProjectProgramsAs(admin, { id, programIds: [b, a] });
+
+    const log = await logOf(id);
+    expect(log).toHaveLength(2);
+    const latest = log.at(-1);
+    expect(latest?.oldValues).toEqual({ programs: [`PLA-${stamp} Capstone`] });
+    expect(latest?.newValues).toEqual({
+      programs: [`PLA-${stamp} Capstone`, `PLB-${stamp} Capstone`],
+    });
+  });
+
+  // An empty array is the cleared set, which is what retired the
+  // empty-string-for-null sentinel the single picker needed.
+  it("clears every program on an empty array", async () => {
     const admin = await makeUser(`pr-x-${Date.now()}@x.com`, "admin");
     const programId = await makeProgram(`PX-${Date.now()}`);
     const { id } = await createProjectAs(admin, baseProject());
-    await updateProjectProgramAs(admin, { id, programId });
+    await updateProjectProgramsAs(admin, { id, programIds: [programId] });
 
-    const cleared = await updateProjectProgramAs(admin, { id, programId: "" });
+    const cleared = await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [],
+    });
 
     expect(cleared.updated).toBe(true);
-    expect(await programOf(id)).toBeNull();
+    expect(await programsOf(id)).toEqual([]);
   });
 });
 
@@ -540,9 +658,7 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
       "objectives",
       "prefQualifications",
       "problemStatement",
-      "programCourseId",
-      "programCourseName",
-      "programId",
+      "programs",
       "requiresNdaIp",
       "status",
       "studentProposed",

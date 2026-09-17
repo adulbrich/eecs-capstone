@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "#/db";
-import { programs, projectEditLog, projects, user } from "#/db/schema";
+import { projectEditLog, projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import {
   adminProjectSummarySelect,
@@ -48,7 +48,6 @@ function baseProject() {
     contactName: null,
     imageUrl: "",
     licenseRestrictions: null,
-    programId: null,
     notes: null,
     teamsSupported: 1,
   };
@@ -239,7 +238,6 @@ describe("the public payload", () => {
     const [staffRow] = await db
       .select(adminProjectSummarySelect)
       .from(projects)
-      .leftJoin(programs, eq(projects.programId, programs.id))
       .leftJoin(user, eq(projects.proposerId, user.id))
       .where(eq(projects.id, id));
     expect(staffRow.mentorName).toBe(mentor.name);
@@ -252,7 +250,6 @@ describe("the public payload", () => {
     const [row] = await db
       .select(projectSummarySelect)
       .from(projects)
-      .leftJoin(programs, eq(projects.programId, programs.id))
       .where(eq(projects.id, id));
     expect(row.studentProposed).toBe(false);
     expectNothingAboutTheMentor(row);

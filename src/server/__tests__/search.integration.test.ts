@@ -35,7 +35,6 @@ function baseProject(title: string, description: string | null = null) {
     contactName: null,
     imageUrl: "",
     licenseRestrictions: null,
-    programId: null,
     notes: null,
   };
 }
@@ -143,8 +142,8 @@ describe("searchProjects", () => {
   it("returns exactly the public field set", async () => {
     // Pinned so a private column cannot ride into the anonymous listing with
     // nothing failing. The list is projectDetailView's public fields minus the
-    // four the listing has no use for (notes, isSponsored, programId,
-    // deletedAt) plus the correlated categories string. proposerEmail and
+    // three the listing has no use for (notes, isSponsored, deletedAt)
+    // plus the correlated categories string. proposerEmail and
     // notes must never appear here.
     const admin = await makeAdmin(`k-${Date.now()}@x.com`);
     await publish(admin, "Key set");
@@ -165,8 +164,7 @@ describe("searchProjects", () => {
       "objectives",
       "prefQualifications",
       "problemStatement",
-      "programCourseId",
-      "programCourseName",
+      "programs",
       "requiresNdaIp",
       "status",
       "studentProposed",

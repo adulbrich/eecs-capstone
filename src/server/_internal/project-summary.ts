@@ -2,6 +2,27 @@ import { type SQL, sql } from "drizzle-orm";
 import { projects, user } from "#/db/schema";
 import type { ProjectProgram } from "#/lib/project-visibility";
 
+/**
+ * `"projects"."id"`, written out rather than interpolated as a column.
+ *
+ * Drizzle qualifies a column with its table only when the query has a
+ * join, so interpolating `projects.id` renders a bare `"id"` on a
+ * single-table select. Inside the correlated subqueries below that bare
+ * name resolves against the subquery's own tables first: `categories c`
+ * and `programs pr` both have an `id`, so the predicate silently compares
+ * the wrong two columns and the aggregate comes back empty with no error
+ * anywhere. It stayed hidden until #462 only because every consumer
+ * happened to join `programs`, which qualified everything.
+ *
+ * Every consumer selects from `projects` unaliased, so the qualified name
+ * is right whether or not the outer query joins anything. Use it for any
+ * reference to the outer row from inside one of these subqueries.
+ */
+const OUTER_PROJECT_ID = sql.raw('"projects"."id"');
+
+/** Same trap, same fix: `user` could grow a column of this name. */
+const OUTER_MENTOR_EMAIL = sql.raw('"projects"."mentor_email"');
+
 export interface ProjectCategory {
   id: string;
   name: string;
@@ -18,7 +39,7 @@ export const projectCategoriesList = sql<ProjectCategory[]>`coalesce((
   SELECT json_agg(json_build_object('id', c.id, 'name', c.name, 'type', c.type) ORDER BY c.type, c.name)
   FROM project_categories pc
   JOIN categories c ON c.id = pc.category_id
-  WHERE pc.project_id = ${projects.id}
+  WHERE pc.project_id = ${OUTER_PROJECT_ID}
 ), '[]'::json)`;
 
 /**
@@ -30,7 +51,7 @@ export const projectCategoriesText = sql<string | null>`(
   SELECT string_agg(c.name, '; ' ORDER BY c.type, c.name)
   FROM project_categories pc
   JOIN categories c ON c.id = pc.category_id
-  WHERE pc.project_id = ${projects.id}
+  WHERE pc.project_id = ${OUTER_PROJECT_ID}
 )`;
 
 /**
@@ -47,7 +68,7 @@ export const projectProgramsList = sql<ProjectProgram[]>`coalesce((
   SELECT json_agg(json_build_object('id', pr.id, 'courseId', pr.course_id, 'courseName', pr.course_name) ORDER BY pr.course_id)
   FROM project_programs pp
   JOIN programs pr ON pr.id = pp.program_id
-  WHERE pp.project_id = ${projects.id}
+  WHERE pp.project_id = ${OUTER_PROJECT_ID}
 ), '[]'::json)`;
 
 /**
@@ -61,7 +82,7 @@ export const projectProgramsText = sql<string | null>`(
   SELECT string_agg(pr.course_id, '; ' ORDER BY pr.course_id)
   FROM project_programs pp
   JOIN programs pr ON pr.id = pp.program_id
-  WHERE pp.project_id = ${projects.id}
+  WHERE pp.project_id = ${OUTER_PROJECT_ID}
 )`;
 
 /**
@@ -76,7 +97,7 @@ export const projectProgramsText = sql<string | null>`(
 export function runsInProgram(programId: string): SQL {
   return sql`EXISTS (
     SELECT 1 FROM project_programs pp
-    WHERE pp.project_id = ${projects.id} AND pp.program_id = ${programId}
+    WHERE pp.project_id = ${OUTER_PROJECT_ID} AND pp.program_id = ${programId}
   )`;
 }
 
@@ -86,7 +107,7 @@ export function runsInProgram(programId: string): SQL {
  * here too, since the join row is `on delete cascade`.
  */
 export const inNoProgram: SQL = sql`NOT EXISTS (
-  SELECT 1 FROM project_programs pp WHERE pp.project_id = ${projects.id}
+  SELECT 1 FROM project_programs pp WHERE pp.project_id = ${OUTER_PROJECT_ID}
 )`;
 
 /**
@@ -95,7 +116,7 @@ export const inNoProgram: SQL = sql`NOT EXISTS (
  */
 export const projectProgramCount = sql<number>`(
   SELECT count(*)::int FROM project_programs pp
-  WHERE pp.project_id = ${projects.id}
+  WHERE pp.project_id = ${OUTER_PROJECT_ID}
 )`;
 
 /**
@@ -109,7 +130,7 @@ export const projectProgramCount = sql<number>`(
  */
 export const mentorNameSql = sql<string | null>`(
   SELECT ${user.name} FROM ${user}
-  WHERE lower(${user.email}) = lower(${projects.mentorEmail})
+  WHERE lower(${user.email}) = lower(${OUTER_MENTOR_EMAIL})
   LIMIT 1
 )`;
 

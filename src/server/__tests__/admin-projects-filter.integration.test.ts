@@ -9,7 +9,7 @@ import {
   createProjectAs,
   performTransitionAs,
   softDeleteProjectAs,
-  updateProjectProgramAs,
+  updateProjectProgramsAs,
   updateProjectProposerAs,
 } from "#/server/_internal/projects";
 import {
@@ -76,7 +76,10 @@ async function makeProject(
 ) {
   const project = await createProjectAs(creator, baseProject(title));
   if (programId) {
-    await updateProjectProgramAs(placedBy, { id: project.id, programId });
+    await updateProjectProgramsAs(placedBy, {
+      id: project.id,
+      programIds: [programId],
+    });
   }
   return project;
 }
@@ -202,9 +205,10 @@ describe("admin projects program filter", () => {
     expect(rows.map((r) => r.id)).not.toContain(unplaced.id);
   });
 
-  // A program deleted out from under a project leaves `program_id` null,
-  // because the column is `on delete set null` in `src/db/schema.ts`. Those
-  // rows are exactly what staff need this choice to surface.
+  // A program deleted out from under a project takes its join row with it,
+  // because `project_programs` is `on delete cascade` on both sides. A
+  // project that ran only there is left with none, which is exactly what
+  // staff need this choice to surface.
   it("surfaces a project whose program was deleted", async () => {
     const admin = await makeAdmin(`np3-${Date.now()}@x.com`);
     const doomed = await makeProgram("CS 461");
@@ -218,6 +222,52 @@ describe("admin projects program filter", () => {
     );
 
     expect(rows.map((r) => r.id)).toContain(orphan.id);
+  });
+
+  // Any-match, which is the whole of #462 on this filter: the control is
+  // still single-valued and a project shared between two programs answers
+  // to both of them.
+  it("returns a project that runs in the chosen program among others", async () => {
+    const admin = await makeAdmin(`sh-${Date.now()}@x.com`);
+    const cs461 = await makeProgram("CS 461");
+    const ecampus = await makeProgram("CS 46X");
+    const shared = await createProjectAs(admin, baseProject("Both campuses"));
+    await updateProjectProgramsAs(admin, {
+      id: shared.id,
+      programIds: [cs461, ecampus],
+    });
+
+    const inCorvallis = await listAdminProjectsAs(
+      admin,
+      filter({ program: cs461 })
+    );
+    const inEcampus = await listAdminProjectsAs(
+      admin,
+      filter({ program: ecampus })
+    );
+
+    expect(inCorvallis.rows.map((r) => r.id)).toContain(shared.id);
+    expect(inEcampus.rows.map((r) => r.id)).toContain(shared.id);
+  });
+
+  // The other half: a shared project has join rows, so it is not unplaced
+  // and must stay out of the "none" bucket.
+  it("keeps a shared project out of the none choice", async () => {
+    const admin = await makeAdmin(`sh2-${Date.now()}@x.com`);
+    const cs461 = await makeProgram("CS 461");
+    const ecampus = await makeProgram("CS 46X");
+    const shared = await createProjectAs(admin, baseProject("Still placed"));
+    await updateProjectProgramsAs(admin, {
+      id: shared.id,
+      programIds: [cs461, ecampus],
+    });
+
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ program: "none" })
+    );
+
+    expect(rows.map((r) => r.id)).not.toContain(shared.id);
   });
 
   // The export and the table share `buildAdminProjectListConditions`, so the
