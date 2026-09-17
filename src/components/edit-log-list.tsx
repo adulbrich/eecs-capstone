@@ -3,9 +3,10 @@ import { LocalTime } from "./local-time";
 /**
  * The rows either edit log renders.
  *
- * Both server functions select exactly these four and no more: their
- * `oldValues` and `newValues` carry notes, serial and location, and nothing
- * renders them, so neither payload carries them (#467).
+ * Both server functions select these four and `editorId`, and nothing else:
+ * their `oldValues` and `newValues` hold the before and after of every
+ * changed field, notes included, and nothing renders them, so neither
+ * payload carries them (#467).
  */
 export interface EditLogEntry {
   changedFields: string[];
@@ -23,9 +24,10 @@ export interface EditLogEntry {
  * `user`, and an account deleted since reads "Deleted user" rather than
  * dropping the row: ADR-0008 scrubs the name and leaves the account.
  *
- * `editorId` is still in both payloads for a staff member debugging a row,
- * and deliberately not rendered: the name is the answer to "who changed
- * this", and an id prefix beside it was never the readable half.
+ * `editorId` stays in both payloads and is deliberately not rendered: the
+ * name is the answer to "who changed this", and an id prefix beside it was
+ * never the readable half. Nothing forces its removal and
+ * `inventory.integration.test.ts` reads it, so #467 left it alone.
  *
  * `error` separates "this item has no edits" from "the log could not be
  * loaded", which an empty list alone cannot say.

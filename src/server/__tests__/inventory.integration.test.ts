@@ -17,6 +17,7 @@ import {
 import { auth } from "#/lib/auth";
 import { isOpenRow } from "#/lib/my-items-filter";
 import type { UserRole } from "#/lib/vocabularies";
+import { deleteAccountAs } from "#/server/_internal/account";
 import {
   createCategoryAs,
   deleteCategoryAs,
@@ -3701,6 +3702,32 @@ describe("listInventoryItemEditLogAs", () => {
     // The name the panel renders, joined since #467; makeUser names each
     // account after its address.
     expect(rows[0].editorName).toBe(email);
+  });
+
+  it("reads a deleted editor as Deleted user, keeping the row", async () => {
+    // The mirror of the project log's case. The join is inner, so this is
+    // what would silently drop an audit row if ADR 0008 ever deleted the
+    // account instead of scrubbing it. A second admin exists because the
+    // last admin cannot delete their own account.
+    const email = `iel-a5-${Date.now()}@x.com`;
+    const editor = await makeUser(email, "admin");
+    await makeUser(`iel-a6-${Date.now()}@x.com`, "admin");
+    const item = await makeItem({ name: "Old" });
+    await updateInventoryItemAs(editor, {
+      ...baseItemInput("New"),
+      id: item.id,
+      categoryIds: [],
+    });
+
+    await deleteAccountAs(editor, { confirmEmail: email });
+
+    const { rows } = await listInventoryItemEditLogAs(
+      await makeUser(`iel-a7-${Date.now()}@x.com`, "admin"),
+      { itemId: item.id }
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].editorName).toBe("Deleted user");
+    expect(JSON.stringify(rows)).not.toContain("@invalid");
   });
 
   it("returns nothing for an item nobody has edited", async () => {
