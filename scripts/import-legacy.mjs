@@ -50,9 +50,9 @@ import pg from "pg";
 
 /**
  * MUST match `NAMESPACE` in `scripts/import-legacy-images.ts` exactly. Every row's
- * primary key is derived from it, so a different value here re-keys all 547
- * rows and orphans everything a previous run wrote, including the image
- * objects already in the bucket.
+ * primary key is derived from it, so a different value here re-keys every
+ * imported row and orphans everything a previous run wrote, including the
+ * image objects already in the bucket.
  */
 const NAMESPACE = "6f2a1c84-0d3e-4b57-9a6f-1e8c5d40b213";
 
@@ -190,7 +190,7 @@ const PROGRAMS = {
  * `approved` is here for the legacy portal's hidden-but-accepting projects,
  * which that portal keeps on a flag separate from its status the same way this
  * app keeps approval separate from publication. DEPLOYMENT.md's live-import
- * section is the source of truth for that mapping and why it exposes nothing.
+ * section has that mapping in full, and why it exposes nothing.
  *
  * What an `approved` row does NOT get:
  * `EMBEDDABLE_STATUSES` is `published` and `archived` only, so neither
@@ -394,8 +394,8 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at = excluded.updated_at,
   -- COALESCE, not a plain overwrite: the image-keys file is optional, so a
   -- re-run without it binds null here and would otherwise wipe image_url on
-  -- all 547 rows while the objects stayed in the bucket. A row keeps the image
-  -- it has unless this run actually carries a key for it.
+  -- every row it touches while the objects stayed in the bucket. A row keeps
+  -- the image it has unless this run actually carries a key for it.
   image_url = COALESCE(excluded.image_url, projects.image_url)
 `;
 

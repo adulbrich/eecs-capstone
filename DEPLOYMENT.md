@@ -518,7 +518,7 @@ npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
 ```
 
 That writes `./legacy-out/projects/<uuid>/<uuid>.webp` (paths that *are* the
-object-storage keys), plus `image-keys.json`. Expect `wrote 330 webp files`
+object-storage keys), plus `image-keys.json`. Expect `wrote 338 webp files`
 and one skip: `41z9KqPQXXbHwZtb` is a PDF somebody uploaded as a project
 image.
 
@@ -643,7 +643,7 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
 The CloudWatch log should end with:
 
 ```
-Imported 547 projects (302 with no publish date, 330 with an image)
+Imported 557 projects (303 with no publish date, 338 with an image)
 ```
 
 Everything runs in one transaction, so a failure leaves nothing behind. To
@@ -671,11 +671,11 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
 It checks every `published` or `archived` project and embeds the ones whose
 stored hash does not match the text they carry now, and the ones with no vector
 at all whatever their hash says. On a first run that is all of them. Budget
-about five minutes for 547 rows at one Bedrock call each plus a 200ms
+about five minutes for 557 rows at one Bedrock call each plus a 200ms
 politeness delay. The CloudWatch log should end with:
 
 ```
-547 project(s) checked: 547 updated, 0 already current, 0 failed.
+557 project(s) checked: 557 updated, 0 already current, 0 failed.
 ```
 
 Safe and cheap to re-run: an unchanged row costs one small query, two if it
@@ -719,7 +719,7 @@ a bad mapping and not what you want for a routine top-up, so the importer
 counts both groups before it writes:
 
 ```
-  12 new, 547 already imported (will be overwritten)
+  12 new, 557 already imported (will be overwritten)
 ```
 
 Three things are exempt from that replacement. `image_url` is written with
@@ -757,9 +757,9 @@ since (which nulls `proposer_id`) gets linked again if a matching account
 exists.
 
 Two things about re-exporting the ARCHIVED set now that the live set exists.
-`export.sql`'s WHERE is currently `cp_archived = 0 AND cp_cps_id = 4`, so put
-it back to `cp_archived = 1 AND cp_cps_id = 4` first, keeping the status
-clause, and write the result to `archived-projects.jsonl` so
+`export.sql`'s WHERE is currently `cp.cp_archived = 0 AND cp.cp_cps_id = 4`, so
+put it back to `cp.cp_archived = 1 AND cp.cp_cps_id = 4` first, keeping the
+status clause, and write the result to `archived-projects.jsonl` so
 `clean-export.py` derives the archived filenames rather than the live ones.
 And expect a diff: `resolve_program` now recovers a course the app has no
 `programs` row for into staff notes instead of dropping it, which adds an
@@ -768,6 +768,14 @@ ENGR41X note to exactly two of the 557 archived rows (`xWf4xJi2vUwh8oDh` and
 2026-09-16 import received, which is worth re-checking against the 557-row
 copy in Box's `backup-20260917/` rather than assuming. That directory is dated
 the day it was taken, not the day of the import it holds.
+
+The two side files come back with the same rows but not the same bytes: the
+held file's `held_reason` string changed, and three of its 146 rows resolve
+their program differently now, two of them losing one outright. None of the
+146 is imported, so none of that reaches the database. The run also prints a
+contradiction report on 5 archived rows, all pre-2022-08-03 and therefore
+explained rather than fatal; that report is new and does not mean the export
+went wrong.
 
 `--undo` hard-deletes the rows rather than soft-deleting them, which is right
 for backing out an import nobody has used yet and wrong once anyone has. It
@@ -877,9 +885,10 @@ which is the portal's 1134. Those two filenames are what the cleaner wrote
 before it derived its outputs from its input; a re-export writes
 `archived-projects-hidden.jsonl` and `archived-projects-excluded.jsonl`
 instead, with the same contents. Re-derive these counts before the production
-run rather than trusting them: the portal is written daily, and the live figure
-moved from 201 to 203 between the assessment and this paragraph because two
-pending proposals were approved.
+run rather than trusting them, and the same goes for every count in this
+section: the portal is written daily, and the live figure moved from 201 to 203
+between the assessment and this paragraph because two pending proposals were
+approved.
 Nothing in this app's status vocabulary fits a rejected or a draft legacy
 project: `softDeleteProjectAs` refuses a `draft` outright, and
 `changes_requested` means "resubmit", where the portal's Rejected is terminal.
@@ -910,9 +919,10 @@ admin date filters read them that way for imported and app-created rows alike.
 
 52 of the 203 land with no program: 26 because more than one course applies,
 21 because the course is ENGR41X, which gets no `programs` row because that
-group has left the portal, 4 with a program plus an extra course, and 1 with
-nothing in the portal to recover. Every one of those keeps its course in
-staff-only notes rather than losing it. This matters more than it did for the
+group has left the portal, and 5 with nothing in the portal to recover. The
+first 47 keep their courses in staff-only notes rather than losing them. Four
+further rows are not in the 52 at all: they get a program AND a note, because
+they carry one course this app can represent and one it cannot. This matters more than it did for the
 archived set, because these are published: the project page renders no program
 badge for them, and the listing's `program` filter will not return them, so a
 student filtering for CS467 does not see the rows that are in fact open to
@@ -932,6 +942,11 @@ Three things to decide before doing that, none of which this import settles:
   `acceptingOnly` filter reads it. It is inert on an `approved` row: the
   project page reads it as well, but `TeamFullBadge` renders the full case and
   returns null for the open one, so `true` puts no badge on anything.
+- Retiring one of the 64 `approved` rows is not a single step. `TRANSITIONS` in
+  `src/lib/project-workflow.ts` gives `approved` the targets `published` and
+  `changes_requested`, with no `approved -> archived`, so an imported project
+  nobody wants to offer has to be published publicly first and then archived,
+  or soft-deleted, which notifies the proposer if their account is linked.
 - 68 of the 203 were created by an admin account, 43 of them by one person, so
   they import with that admin as the proposer rather than the partner who
   wanted the project. The export carries `proposer_is_admin` and the importer
