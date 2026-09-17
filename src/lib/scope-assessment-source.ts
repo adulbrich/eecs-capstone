@@ -55,7 +55,15 @@ function programLine(programs: ScopeSourceProgram[]): string {
   if (programs.length === 0) {
     return "This proposal names no program.";
   }
-  const sorted = [...programs].sort((a, b) => a.label.localeCompare(b.label));
+  // Codepoint order, not `localeCompare`: this feeds the hash that decides
+  // whether a stored verdict is stale, and a locale or runtime change must
+  // not silently move it.
+  const sorted = [...programs].sort((a, b) => {
+    if (a.label === b.label) {
+      return 0;
+    }
+    return a.label < b.label ? -1 : 1;
+  });
   if (sorted.length === 1) {
     return `${programPhrase(sorted[0])}.`;
   }

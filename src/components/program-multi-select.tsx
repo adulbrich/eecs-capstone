@@ -59,13 +59,18 @@ export function ProgramMultiSelect({ describedBy, value, onChange }: Props) {
   }
 
   return (
-    <div aria-describedby={describedBy} className="space-y-2">
+    <div className="space-y-2">
       <FieldError message={loadError} />
       {!loadError && programs.length === 0 && (
         <p className="text-muted-foreground text-sm">No programs yet.</p>
       )}
       {programs.length > 0 && (
-        <fieldset className="border border-border p-2">
+        // `aria-describedby` goes on the fieldset, not the wrapper: a bare
+        // div has no role, so the description would never be announced.
+        <fieldset
+          aria-describedby={describedBy}
+          className="border border-border p-2"
+        >
           <legend className="px-1 font-medium text-muted-foreground text-xs">
             Programs
           </legend>

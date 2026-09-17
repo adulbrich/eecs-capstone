@@ -15,6 +15,7 @@ const TABLES = [
   "project_comments",
   "project_collaborators",
   "project_categories",
+  "project_programs",
   "projects",
   "categories",
   "program_instructors",

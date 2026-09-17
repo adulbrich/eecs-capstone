@@ -57,7 +57,7 @@ _Avoid_: advisor, supervisor, sponsor
 **Program**:
 A capstone course: its course id, name, description, instructors, and the two
 staff-only numbers that size it (how many terms it runs, how many teams are
-expected). A project belongs to at most one program.
+expected). A project runs in a set of programs: zero, one or many.
 _Avoid_: course (the column names and some copy still say it; use program in
 anything new), section, class, cohort
 
@@ -65,8 +65,9 @@ anything new), section, class, cohort
 
 **Project**:
 The one record a proposal, a review, a listing entry and an archived project all are.
-A project has exactly one status at a time, at most one proposer, and at most one
-program.
+A project has exactly one status at a time, at most one proposer, and runs in a
+set of programs: zero, one or many, since one proposal can be offered under two
+courses at once.
 _Avoid_: idea, listing, posting, capstone (on its own)
 
 **Proposal**:

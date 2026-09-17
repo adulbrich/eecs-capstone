@@ -14,6 +14,7 @@ import {
   programInstructors,
   programs,
   projectCategories,
+  projectPrograms,
   projects,
   user,
   userInterests,
@@ -337,7 +338,7 @@ async function main() {
     licenseRestrictions: string;
     notes: string;
     proposerId: string;
-    programId: string;
+    programIds: string[];
     status:
       | "draft"
       | "submitted"
@@ -377,7 +378,10 @@ async function main() {
       notes:
         "Sponsor can provide two AMR dev units on loan for spring term if the team reaches hardware integration.",
       proposerId: u.sponsorAcme.id,
-      programId: p461.id,
+      // The one project in two programs, so a fresh database shows the
+      // badge row, the analytics double count and, since teams_supported
+      // defaults to 1, the staff panel's warning (#462).
+      programIds: [p461.id, p462.id],
       status: "published",
       publishedAt: daysAgo(40),
       categories: [
@@ -408,7 +412,7 @@ async function main() {
       notes:
         "NorthStar will grant a sandbox AWS account with a monthly credit cap of $200.",
       proposerId: u.sponsorNorthstar.id,
-      programId: p461.id,
+      programIds: [p461.id],
       status: "published",
       publishedAt: daysAgo(38),
       categories: [
@@ -440,7 +444,7 @@ async function main() {
       notes:
         "Dr. Kim can provide a labeled starter set (~5k images) and access to a lab GPU workstation.",
       proposerId: u.facultyKim.id,
-      programId: p461.id,
+      programIds: [p461.id],
       status: "published",
       publishedAt: daysAgo(35),
       categories: [
@@ -471,7 +475,7 @@ async function main() {
       notes:
         "Two Meta Quest 3 headsets are reserved in inventory for this team during winter/spring.",
       proposerId: u.facultyAlvarez.id,
-      programId: p461.id,
+      programIds: [p461.id],
       status: "approved",
       publishedAt: null,
       categories: ["AR / VR", "Unity / VR"],
@@ -498,7 +502,7 @@ async function main() {
       notes:
         "Student-led; the team is seeking a faculty advisor. Scope may need trimming to fit one year.",
       proposerId: u.studentJordan.id,
-      programId: p461.id,
+      programIds: [p461.id],
       status: "submitted",
       publishedAt: null,
       categories: ["Web Development", "React", "Mobile", "React Native"],
@@ -525,7 +529,7 @@ async function main() {
       notes:
         "Hardware (Pi 5, Jetson Orin Nano, Coral accelerator) is available in inventory for checkout.",
       proposerId: u.sponsorVitalink.id,
-      programId: p461.id,
+      programIds: [p461.id],
       status: "published",
       publishedAt: daysAgo(20),
       categories: [
@@ -557,7 +561,7 @@ async function main() {
       notes:
         "Strong fit for students interested in accessibility. Could integrate with the existing handbook site.",
       proposerId: u.facultyAlvarez.id,
-      programId: p461.id,
+      programIds: [p461.id],
       status: "published",
       publishedAt: daysAgo(12),
       categories: ["Web Development", "React"],
@@ -584,7 +588,7 @@ async function main() {
       notes:
         "Draft proposal; the team still needs to confirm a faculty sponsor and a test drone (Tello EDU available in inventory).",
       proposerId: u.studentSam.id,
-      programId: p461.id,
+      programIds: [p461.id],
       status: "draft",
       publishedAt: null,
       categories: ["Robotics", "Python", "IoT / Embedded"],
@@ -610,7 +614,7 @@ async function main() {
       licenseRestrictions: "Apache-2.0.",
       notes: "Seeded only so a 200-character title shows up in the tables.",
       proposerId: u.facultyKim.id,
-      programId: p461.id,
+      programIds: [p461.id],
       status: "published",
       publishedAt: daysAgo(3),
       categories: ["Machine Learning", "Python", "Data Science"],
@@ -627,10 +631,15 @@ async function main() {
       console.log(`project: "${proj.title}" (exists)`);
       continue;
     }
-    const { categories: catNames, ...values } = proj;
+    const { categories: catNames, programIds, ...values } = proj;
     const [row] = await db.insert(projects).values(values).returning({
       id: projects.id,
     });
+    if (programIds.length > 0) {
+      await db
+        .insert(projectPrograms)
+        .values(programIds.map((programId) => ({ projectId: row.id, programId })));
+    }
     const categoryIds = catNames
       .map((name) => cat.get(name))
       .filter((id): id is string => Boolean(id));
@@ -644,7 +653,7 @@ async function main() {
     }
     created += 1;
     console.log(
-      `project: "${proj.title}" (created, ${categoryIds.length} categories, status=${proj.status})`,
+      `project: "${proj.title}" (created, ${categoryIds.length} categories, ${programIds.length} programs, status=${proj.status})`,
     );
   }
   console.log(`projects: ${created} created, ${PROJECTS.length} total defined`);

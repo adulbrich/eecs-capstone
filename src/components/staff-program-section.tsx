@@ -104,7 +104,9 @@ function TeamsWarning({
   }
   const teams = teamsSupported === 1 ? "1 team" : `${teamsSupported} teams`;
   return (
-    <p className="text-destructive text-xs">
+    // `warning`, not `destructive`: UI-CONVENTIONS reserves the destructive
+    // palette for a hard stop, and this is something staff may still act on.
+    <p className="text-xs" style={{ color: "var(--status-warning)" }}>
       This project supports {teams} but runs in {programCount} programs. Ask the
       proposer to raise it, or remove a program.
     </p>
