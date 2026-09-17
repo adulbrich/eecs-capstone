@@ -20,9 +20,12 @@ import { FieldError } from "./ui/field";
  * there is no window where a blank draft could be posted over a real value,
  * which is what those two sections disable Save to avoid.
  *
- * The draft is keyed on the saved set by the panel, which remounts on a
- * project change (`<StaffProjectPanel key={project.id}>`), so a navigation
- * between two projects cannot leave A's programs in B's picker.
+ * The draft seeds from the saved set once and is never resynced, so the
+ * remount is what keeps it honest: the panel is keyed on the project
+ * (`<StaffProjectPanel key={project.id}>`), so a navigation between two
+ * projects cannot leave A's programs in B's picker. A set another staff
+ * member saved while this panel sat open is not picked up, the same as the
+ * single picker before it.
  */
 export function StaffProgramSection({
   onChanged,

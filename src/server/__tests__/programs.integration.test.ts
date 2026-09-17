@@ -198,7 +198,7 @@ describe("term_count and expected_teams are staff-editable and never public", ()
 });
 
 describe("programs", () => {
-  it("create + update + delete; deleteProgram returns unlinkedProjectCount", async () => {
+  it("create + update + delete; deleteProgram returns affectedProjectCount", async () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const { id: programId } = await createProgramAs(admin, {
       courseId: "CS-462",
