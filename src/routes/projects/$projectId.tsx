@@ -10,11 +10,13 @@ import { CategoryChip } from "#/components/category-chip";
 import { Markdown } from "#/components/markdown";
 import { OwnerProjectActions } from "#/components/owner-project-actions";
 import { ProjectBadges } from "#/components/project-badges";
+import { programLabel } from "#/components/project-card";
 import { ProjectPrivatePanel } from "#/components/project-private-panel";
 import { SectionHeading } from "#/components/section-heading";
 import { StaffProjectPanel } from "#/components/staff-project-panel";
 import { StatusBadge } from "#/components/status-badge";
 import { TeamFullBadge } from "#/components/team-full-badge";
+import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
@@ -143,6 +145,18 @@ function ProjectDetail() {
         studentProposed={project.studentProposed}
       >
         <StatusBadge status={project.status} />
+        {/*
+          After the status, and only when there is one to name: a project
+          with no program renders nothing here rather than a placeholder,
+          and so does one whose program was deleted, since the column is
+          `on delete set null`. `programLabel` is the card's formatter, so
+          the badge reads as the string the listing showed on the way in
+          (#449). No link: the listing does take `?program=<uuid>`, but a
+          way off the page does not belong three lines under the title.
+        */}
+        {programLabel(project) && (
+          <Badge variant="outline">{programLabel(project)}</Badge>
+        )}
         <TeamFullBadge acceptingApplicants={project.acceptingApplicants} />
       </ProjectBadges>
 

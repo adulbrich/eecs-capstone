@@ -121,6 +121,13 @@ export interface ProjectRow extends VisibleProject {
   objectives: string | null;
   prefQualifications: string | null;
   problemStatement: string | null;
+  /**
+   * Joined from `programs`, not columns of `projects`: the caller left-joins
+   * them, so both are null for a project with no program and for one whose
+   * program was deleted (`program_id` is `on delete set null`).
+   */
+  programCourseId: string | null;
+  programCourseName: string | null;
   programId: string | null;
   requiresNdaIp: boolean;
   studentProposed: boolean;
@@ -146,6 +153,12 @@ export interface ProjectDetailView {
   objectives: string | null;
   prefQualifications: string | null;
   problemStatement: string | null;
+  /**
+   * Public, and the same two columns every card and the public table already
+   * carry. `programId` beside them stays the bare UUID nothing renders.
+   */
+  programCourseId: string | null;
+  programCourseName: string | null;
   programId: string | null;
   requiresNdaIp: boolean;
   status: ProjectStatus;
@@ -193,6 +206,13 @@ export function projectDetailView(
     teamsSupported: project.teamsSupported,
     acceptingApplicants: project.acceptingApplicants,
     programId: project.programId,
+    // Public by design, and not a new decision: the listing has shown this
+    // pair on every card and in the Program column since before the detail
+    // page existed, so a student who clicked through from a card was the
+    // only viewer the program was hidden from (#449). `programs.description`
+    // and the two staff-only numbers that size a program stay out.
+    programCourseId: project.programCourseId,
+    programCourseName: project.programCourseName,
     status: project.status as ProjectStatus,
     deletedAt: project.deletedAt,
     // The one viewer-dependent field, and the reason this cannot be a SQL

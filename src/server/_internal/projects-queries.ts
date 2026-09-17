@@ -342,10 +342,30 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
   // by the view, because the view is pure and this is the only place a
   // project row is read for the detail page. The mentor's name is not read:
   // nothing about the mentor is public (#336).
-  const [project] = await db
-    .select()
+  //
+  // The program is joined for its two label columns, the same pair and the
+  // same join `projectSummarySelect` carries for the card and the table, so
+  // the detail page names the program with the string the listing showed
+  // (#449). The nested `project` key keeps the join from folding the row
+  // under table names, which is the shape `getProgram` was caught by
+  // (docs/QUIRKS.md); `projectDetailView` still names every field it passes
+  // on, so the join widens the input to the projection and not its output.
+  const [row] = await db
+    .select({
+      project: projects,
+      programCourseId: programs.courseId,
+      programCourseName: programs.courseName,
+    })
     .from(projects)
+    .leftJoin(programs, eq(projects.programId, programs.id))
     .where(eq(projects.id, data.id));
+  const project = row
+    ? {
+        ...row.project,
+        programCourseId: row.programCourseId,
+        programCourseName: row.programCourseName,
+      }
+    : undefined;
   if (!project) {
     return {
       project: null,
