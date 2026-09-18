@@ -1,5 +1,10 @@
 import { useState } from "react";
 import type { ProjectProgram } from "#/lib/project-visibility";
+import {
+  clampTeamsSupported,
+  TEAMS_SUPPORTED_MAX,
+  TEAMS_SUPPORTED_MIN,
+} from "#/lib/teams-supported";
 import { useAction } from "#/lib/use-action";
 import { updateProjectPrograms } from "#/server/projects";
 import { PanelSection } from "./panel";
@@ -116,18 +121,13 @@ export function StaffProgramSection({
             aria-describedby="staff-teams-supported-description"
             className="w-24"
             id="staff-teams-supported"
-            max={5}
-            min={1}
-            onBlur={(e) => {
-              // The same clamp the proposer's form applies, so the two
-              // writers cannot disagree about what the bounds are.
-              const n = Number(e.target.value);
-              if (!Number.isFinite(n) || n < 1) {
-                setTeams(1);
-              } else if (n > 5) {
-                setTeams(5);
-              }
-            }}
+            max={TEAMS_SUPPORTED_MAX}
+            min={TEAMS_SUPPORTED_MIN}
+            // The same clamp the proposer's form applies, from the same
+            // module, so the two writers cannot disagree about the bounds.
+            onBlur={(e) =>
+              setTeams(clampTeamsSupported(Number(e.target.value)))
+            }
             onChange={(e) => setTeams(Number(e.target.value))}
             type="number"
             value={teams}

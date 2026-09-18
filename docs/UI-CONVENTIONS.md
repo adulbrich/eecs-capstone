@@ -1011,6 +1011,22 @@ this rule existed, and two had already drifted apart on details like
 `variant="status"`: it wants the blank canvas, and paints it with the
 `bg-primary text-primary-foreground` tokens rather than a status pair.
 
+A badge that reports a number is silent at the value nearly every row holds.
+`TeamFullBadge` renders nothing for a team with room, and the teams badge in
+`ProjectBadges` renders nothing at one team, which is the default and the
+common case; #434 deleted two columns that spelled facts out on every row, and
+a badge that is always there is the same filler in a smaller box. The
+consequence is that a row of badges can be empty, so the component returns
+null rather than an empty flex row, and a caller passing `children` has to
+handle that case itself, because an element is truthy even when it renders
+nothing.
+
+A badge does not repeat a value the same surface already prints. Both project
+tables carry a Teams supported column, so their Badges cell passes
+`ProjectBadges` no count; the card and the detail page have no such column,
+which is what the badge is for. `src/test/project-table-columns.test.tsx`
+pins that, because the rule otherwise lives only in a comment.
+
 ### Listing layout
 
 A page that lists and filters renders through `ListingLayout` from
