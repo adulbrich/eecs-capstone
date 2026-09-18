@@ -31,14 +31,11 @@ export function getRouter() {
     defaultPreloadStaleTime: 0,
     /**
      * A revisit waits for its loader instead of painting the previous
-     * visit's rows behind a refetch. `defaultStaleTime` is 0, so every
-     * revisit is stale, and the default `"background"` meant every
-     * navigation away from a save landed on a frame built from pre-edit
-     * data (#474). Two costs, both accepted: a revisit now feels like a
-     * first visit, and nothing paints until the loader resolves.
-     * ADR-0029 is the decision; the rule it leaves behind, about seeding
-     * `useState` from loader data, is in docs/QUIRKS.md under TanStack
-     * Router.
+     * visit's rows behind a refetch (#474). ADR-0029 is the decision, what
+     * it rules out and what it costs; the rule it leaves behind, about
+     * seeding `useState` from loader data, is in docs/QUIRKS.md under
+     * TanStack Router. Both belong there rather than here, so that
+     * revisiting the trade-off is one edit.
      */
     defaultStaleReloadMode: "blocking",
     defaultNotFoundComponent: NotFound,

@@ -62,17 +62,14 @@ type CategoryTypes = Awaited<ReturnType<typeof listCategoryTypes>>["types"];
  * The editable half of the page, keyed by the parent on the values it was
  * seeded from.
  *
- * `useState` seeded from loader data runs its initializer once per mount, so
- * a component that outlives an edit keeps the pre-edit values in its inputs
- * and saves them back over whatever was written (#474). The router blocks on
- * a stale reload now, so the seed is fresh; the `key` is what keeps this
- * form correct if that is ever reverted.
+ * Every input below is a `useState` seeded from loader data, which freezes
+ * on the frame it mounted on. See "The router blocks on a stale reload" in
+ * docs/QUIRKS.md for why that is a write risk and not just a display one
+ * (#474).
  *
- * The key is the seeded values themselves rather than a timestamp: the
- * `categories` table has no `updatedAt` column, and adding one to feed a
- * React key would be a schema change in service of a render detail. The
- * cost is that a save which changes nothing produces no new key, which
- * changes nothing either.
+ * The key is the seeded values themselves rather than a timestamp, because
+ * `categories` has no `updatedAt` column. The cost of that: a save which
+ * changes nothing produces no new key, which changes nothing either.
  */
 function CategoryForm({
   category,

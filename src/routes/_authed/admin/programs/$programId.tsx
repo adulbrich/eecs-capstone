@@ -49,14 +49,10 @@ type ProgramLoaderData = Awaited<ReturnType<typeof getProgram>>;
  * The editable half of the page, keyed by the parent on the record it was
  * seeded from.
  *
- * Every field below is a `useState` seeded from loader data, and a
- * `useState` initializer runs once per mount: a later loader result updates
- * `program` but never these inputs, so a component that outlives an edit
- * shows the values from before it and saves them back (#474). The router now
- * blocks on a stale reload, so the seed is taken from fresh data; the `key`
- * is the second line of defence, and what keeps this form correct if that
- * router option is ever reverted or this route opts back into
- * `staleReloadMode: "background"`.
+ * Every field below is a `useState` seeded from loader data, which freezes
+ * on the frame it mounted on. See "The router blocks on a stale reload" in
+ * docs/QUIRKS.md for why that is a write risk and not just a display one
+ * (#474).
  *
  * `InstructorManager` stays outside, in the parent: it fires
  * `router.invalidate()` on every change, and a remount there would throw
