@@ -176,6 +176,18 @@ test.describe("admin catalog creates and saves", () => {
           .where(eq(schema.programs.id, created.id))
       );
       expect(saved.courseName).toBe(renamed);
+
+      // Reopen from the list without reloading. The form used to seed its
+      // inputs from the stale loader frame the router painted on the way
+      // back, so this field held the pre-save name and a second Save wrote
+      // it back over the rename (#474). Clicked rather than `goto`, because
+      // a fresh document load is exactly what used to hide it.
+      await rowFor(staff, renamed)
+        .getByRole("link", { name: "Manage" })
+        .click();
+      await staff.waitForURL(`**/admin/programs/${created.id}`);
+      await waitForHydration(staff);
+      await expect(staff.getByLabel("Course name")).toHaveValue(renamed);
     } finally {
       await staffContext.close();
       if (createdId) {

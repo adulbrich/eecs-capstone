@@ -160,6 +160,12 @@ One detail URL per project and per item, staff sections rendered conditionally o
 
 Navigating from `/projects/A` to `/projects/B` re-runs the loader and re-renders the same component instance with new props. Nothing remounts unless the route sets `remountDeps`, and nothing in `src/` does. So a child that keeps draft state in `useState` and loads its record in an effect keeps A's drafts on screen while B's record is in flight, and a Save clicked in that window posts A's values onto B. `StaffMentorshipSection` had exactly this until it was keyed, and `StaffProjectPanel` had the same shape one level up: its open transition dialog kept A's target status and comment, and Confirm posted them with B's id. The key now sits on the panel where `$projectId.tsx` renders it, `<StaffProjectPanel key={project.id} ... />`, which remounts the panel and every section under it on a param change; the sections carry no key of their own. Two tests in `staff-project-panel.test.tsx` rerender the panel with a second id to prove it. Key the outermost child that holds a draft, not the route: `remountDeps` would also discard state the page should keep, such as an open dialog's scroll position.
 
+### The router blocks on a stale reload, and a `useState` seeded from loader data depends on it
+
+`src/router.tsx` sets `defaultStaleReloadMode: "blocking"`, so a revisit waits for its loader rather than painting the last visit's rows behind a refetch. [ADR-0029](./adr/0029-a-revisit-waits-for-its-loader.md) is the decision and what it costs.
+
+The gotcha it leaves behind outlives that decision: a `useState` initializer does not re-run when props change, so an input seeded from loader data keeps whatever frame it mounted on while everything rendering that data directly re-renders around it. The breadcrumb and the input on the same page can therefore disagree, reading the same field from the same source. Key the child holding the seeds on the record; ADR-0029's Consequences say which two routes are keyed and on what. Staying on the page after `await router.invalidate()` needs none of this, because the component stays mounted and no seed is involved.
+
 ---
 
 ## TanStack Form

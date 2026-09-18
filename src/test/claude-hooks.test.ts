@@ -434,10 +434,15 @@ describe("after-edit", () => {
       tool_input: { file_path: join(cwd, file) },
     });
 
+  // Its own ceiling, for the reason the session-context test below has one:
+  // this is the only test here that runs Biome, twice, and the full suite
+  // spawns a worker per file, so two Biome starts on a loaded machine spend
+  // the default 5000ms before either prints. Reproduced on `main` at load
+  // average 14, where it failed three runs in a row and passed alone.
   it("is quiet on a clean file, and on a file Biome excludes", () => {
     expect(edited("scripts/check-prose.mjs").status).toBe(0);
     expect(edited("src/routeTree.gen.ts").status).toBe(0);
-  });
+  }, 30_000);
 
   it("reports an emdash in a file it just saw written", () => {
     const dir = mkdtempSync(join(cwd, ".hooks-test-"));
