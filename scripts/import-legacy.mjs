@@ -154,13 +154,15 @@ function uuidv5(name) {
  * Matched on `courseId` alone, never on the display name: three of the four
  * share one, so a name match would be ambiguous from the start. That makes
  * `courseId` the better key here rather than a good one. It carries the
- * campus, but it has no unique constraint in the database and staff can edit
- * it in the UI, so neither uniqueness nor stability is guaranteed.
+ * campus and is unique on `lower()` since #472, but staff can still edit it
+ * in the UI, so uniqueness is guaranteed and stability is not.
  *
- * Not unique, so `resolvePrograms` refuses an ambiguous match rather than
- * picking a row: an earlier production layout had two rows both called
- * `CS46x`, and taking the first would have silently attached 181 projects to
- * the wrong campus.
+ * `resolvePrograms` keeps refusing an ambiguous match rather than picking a
+ * row, although the constraint now makes one impossible in a current
+ * database: an earlier production layout had two rows both called `CS46x`,
+ * and taking the first would have silently attached 181 projects to the wrong
+ * campus. This script can be pointed at a snapshot predating that migration,
+ * which is what the check is still for.
  *
  * Not stable, so this map is coupled to live data with nothing testing the two
  * against each other. It has drifted once: on 2026-09-17 staff renamed all

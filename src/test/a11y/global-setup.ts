@@ -175,7 +175,8 @@ async function createFixtures(
       .returning();
   }
 
-  // Program (no unique constraint on courseId, hence the select-first pattern)
+  // Program (unique on lower(courseId) since #472, so select-first is now
+  // belt and braces rather than the thing keeping reruns from duplicating it)
   let [program] = await db
     .select()
     .from(schema.programs)

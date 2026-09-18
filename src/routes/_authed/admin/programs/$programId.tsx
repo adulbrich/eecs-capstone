@@ -24,6 +24,7 @@ import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { PROGRAM_COURSE_ID_HINT } from "#/lib/program-fields";
 import { useAction } from "#/lib/use-action";
 import { isStaff } from "#/lib/viewer";
 import { deleteProgram, getProgram, updateProgram } from "#/server/programs";
@@ -121,11 +122,15 @@ function ProgramForm({
       <div className="space-y-1.5">
         <Label htmlFor="course-id">Course ID</Label>
         <Input
+          aria-describedby="course-id-description"
           id="course-id"
           onChange={(e) => setCourseId(e.target.value)}
           required
           value={courseId}
         />
+        <p className="text-muted-foreground text-xs" id="course-id-description">
+          {PROGRAM_COURSE_ID_HINT}
+        </p>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="course-name">Course name</Label>

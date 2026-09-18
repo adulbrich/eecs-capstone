@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "programs_course_id_unique_idx" ON "programs" USING btree (lower("course_id"));
