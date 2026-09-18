@@ -52,32 +52,60 @@ export const categoryDomainEnum = pgEnum("category_domain", [
   "inventory",
 ]);
 
-export const programs = pgTable("programs", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  courseId: text("course_id").notNull(),
-  courseName: text("course_name").notNull(),
-  description: text("description"),
-  /**
-   * How many academic terms the course runs, so a proposal can be judged
-   * against the right bar. Staff-editable, never public: `listProgramsImpl`
-   * projects the public columns by name and leaves this out. Nullable so an
-   * unset value is visibly unset rather than judged against a wrong bar (#61).
-   */
-  termCount: integer("term_count"),
-  /**
-   * How many student teams the office expects to place in this course, the
-   * denominator the analytics dashboard compares published team slots
-   * against (#34). Staff-editable, never public, and nullable so an unset
-   * value renders as "not set" rather than as a comparison against zero.
-   */
-  expectedTeams: integer("expected_teams"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+/** Named so the writers can recognise a violation of exactly this index. */
+export const PROGRAM_COURSE_ID_INDEX = "programs_course_id_unique_idx";
+
+export const programs = pgTable(
+  "programs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    /**
+     * The identity of a program, and not merely a label: the card's meta
+     * line, the Program column on both listings, the admin breadcrumb and
+     * the staff CSV all render this alone, with no course name beside it to
+     * tell two programs apart. Unique on `lower()` since #472, because
+     * `cs467` and `CS467` are one course, the same reason
+     * `CATEGORY_NAME_INDEX` keys on `lower(name)`.
+     */
+    courseId: text("course_id").notNull(),
+    /**
+     * Deliberately not unique. The three 30-week programs share the display
+     * name "Capstone (30 weeks)" on purpose, which is why
+     * `import-legacy.mjs` matches on the course id alone.
+     */
+    courseName: text("course_name").notNull(),
+    description: text("description"),
+    /**
+     * How many academic terms the course runs, so a proposal can be judged
+     * against the right bar. Staff-editable, never public: `listProgramsImpl`
+     * projects the public columns by name and leaves this out. Nullable so an
+     * unset value is visibly unset rather than judged against a wrong bar
+     * (#61).
+     */
+    termCount: integer("term_count"),
+    /**
+     * How many student teams the office expects to place in this course, the
+     * denominator the analytics dashboard compares published team slots
+     * against (#34). Staff-editable, never public, and nullable so an unset
+     * value renders as "not set" rather than as a comparison against zero.
+     */
+    expectedTeams: integer("expected_teams"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    /**
+     * On `lower()` rather than on the column, so the stored spelling stays
+     * whatever staff typed and ADR-0015 does not come into it: nothing is
+     * normalized on write here, only compared.
+     */
+    uniqueIndex(PROGRAM_COURSE_ID_INDEX).on(sql`lower(${t.courseId})`),
+  ]
+);
 
 export const programInstructors = pgTable(
   "program_instructors",

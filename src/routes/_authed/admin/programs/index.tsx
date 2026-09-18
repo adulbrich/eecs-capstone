@@ -39,6 +39,7 @@ import { ListCount } from "#/components/ui/pagination";
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
+import { PROGRAM_COURSE_ID_HINT } from "#/lib/project-visibility";
 import type { SortState } from "#/lib/table-state";
 import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";
@@ -252,12 +253,19 @@ function ProgramsAdmin() {
               <div className="flex flex-col gap-2">
                 <Label htmlFor="prog-course-id">Course ID</Label>
                 <Input
+                  aria-describedby="prog-course-id-description"
                   id="prog-course-id"
                   onChange={(e) => setCourseId(e.target.value)}
                   placeholder="e.g., CS 461"
                   required
                   value={courseId}
                 />
+                <p
+                  className="text-muted-foreground text-xs"
+                  id="prog-course-id-description"
+                >
+                  {PROGRAM_COURSE_ID_HINT}
+                </p>
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="prog-course-name">Course name</Label>

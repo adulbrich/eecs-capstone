@@ -1,6 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
+  PROGRAM_COURSE_ID_INDEX,
   programInstructors,
   programs,
   projectPrograms,
@@ -9,6 +10,7 @@ import {
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { assertStaff, isStaff, STAFF_ROLES } from "#/lib/viewer";
 import type { ProgramInput, ProgramUpdateInput } from "../programs";
+import { findUniqueViolation } from "./pg-errors";
 
 interface AuthUser {
   id: string;
@@ -125,19 +127,46 @@ export async function getProgramForCurrentUser(data: { id: string }) {
   return getProgramAs(viewer, data);
 }
 
+/**
+ * Turns a unique violation on the `lower(course_id)` index into the sentence
+ * the staff form should show, naming the stored spelling so a staff member
+ * who typed "cs46x-corvallis" sees that "CS46X-CORVALLIS" is the row they
+ * collided with. Anything else is rethrown untouched. Modelled on
+ * `rethrowNameCollision` in `categories.ts`.
+ */
+async function rethrowCourseIdCollision(
+  error: unknown,
+  courseId: string
+): Promise<never> {
+  if (!findUniqueViolation(error, PROGRAM_COURSE_ID_INDEX)) {
+    throw error;
+  }
+  const [existing] = await db
+    .select({ courseId: programs.courseId })
+    .from(programs)
+    .where(sql`lower(${programs.courseId}) = lower(${courseId})`);
+  throw new Error(
+    `A program with course ID "${existing?.courseId ?? courseId}" already exists.`
+  );
+}
+
 export async function createProgramAs(viewer: AuthUser, data: ProgramInput) {
   assertStaff(viewer);
-  const [row] = await db
-    .insert(programs)
-    .values({
-      courseId: data.courseId,
-      courseName: data.courseName,
-      description: data.description ?? null,
-      termCount: data.termCount ?? null,
-      expectedTeams: data.expectedTeams ?? null,
-    })
-    .returning();
-  return { id: row.id };
+  try {
+    const [row] = await db
+      .insert(programs)
+      .values({
+        courseId: data.courseId,
+        courseName: data.courseName,
+        description: data.description ?? null,
+        termCount: data.termCount ?? null,
+        expectedTeams: data.expectedTeams ?? null,
+      })
+      .returning();
+    return { id: row.id };
+  } catch (error) {
+    return rethrowCourseIdCollision(error, data.courseId);
+  }
 }
 
 export async function createProgramForCurrentUser(data: ProgramInput) {
@@ -150,18 +179,24 @@ export async function updateProgramAs(
   data: ProgramUpdateInput
 ) {
   assertStaff(viewer);
-  await db
-    .update(programs)
-    .set({
-      courseId: data.courseId,
-      courseName: data.courseName,
-      description: data.description ?? null,
-      termCount: data.termCount ?? null,
-      expectedTeams: data.expectedTeams ?? null,
-      updatedAt: new Date(),
-    })
-    .where(eq(programs.id, data.id));
-  return { id: data.id };
+  try {
+    await db
+      .update(programs)
+      .set({
+        courseId: data.courseId,
+        courseName: data.courseName,
+        description: data.description ?? null,
+        termCount: data.termCount ?? null,
+        expectedTeams: data.expectedTeams ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(programs.id, data.id));
+    return { id: data.id };
+  } catch (error) {
+    // An edit that leaves the course id alone does not reach here: the row
+    // collides only with itself, and Postgres does not count that.
+    return rethrowCourseIdCollision(error, data.courseId);
+  }
 }
 
 export async function updateProgramForCurrentUser(data: ProgramUpdateInput) {

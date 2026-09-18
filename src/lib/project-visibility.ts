@@ -57,6 +57,19 @@ export function programLabel(program: {
   return `${program.courseId} ${program.courseName}`;
 }
 
+/**
+ * What the Course ID field is for, told to staff at the point of entry.
+ *
+ * One constant because the create dialog on `/admin/programs` and the edit
+ * page both need it and neither is the other's parent, which is the same
+ * reason `programLabel` above is a function rather than two template
+ * literals. The rule it states is enforced by `PROGRAM_COURSE_ID_INDEX`
+ * (#472); before that it was convention, and every production program
+ * already follows it.
+ */
+export const PROGRAM_COURSE_ID_HINT =
+  "Identifies the program everywhere it is listed, so two sections of one course need distinct ids, as in CS46X-CORVALLIS and CS46X-ECAMPUS.";
+
 function isOwner(project: VisibleProject, viewer: Viewer): boolean {
   return !!viewer && project.proposerId === viewer.id;
 }
