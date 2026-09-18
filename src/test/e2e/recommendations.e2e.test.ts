@@ -168,10 +168,16 @@ test.describe("recommended order", () => {
     // left to the docblock above: with nothing typed the option is absent, not
     // disabled (#475). The unit test owns both directions of this; here it is
     // what makes the pick below Newest rather than Most relevant.
+    const newest = page.getByRole("option", { name: "Newest", exact: true });
+    // Anchored on an option that is there, because the absence below is
+    // trivially true of a listbox that has not rendered yet and `toHaveCount`
+    // retries only until its condition holds. Same shape as
+    // `expectRecommendedRefused` above, which reads a present option first.
+    await expect(newest).toBeVisible();
     await expect(
       page.getByRole("option", { name: "Most relevant", exact: true })
     ).toHaveCount(0);
-    await page.getByRole("option", { name: "Newest", exact: true }).click();
+    await newest.click();
     await page.waitForURL(/order=newest/);
 
     await expect(page.getByText("Ranked by your interests.")).toHaveCount(0);
