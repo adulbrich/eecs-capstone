@@ -164,7 +164,7 @@ Navigating from `/projects/A` to `/projects/B` re-runs the loader and re-renders
 
 `src/router.tsx` sets `defaultStaleReloadMode: "blocking"`, so a revisit waits for its loader rather than painting the last visit's rows behind a refetch. [ADR-0029](./adr/0029-a-revisit-waits-for-its-loader.md) is the decision and what it costs.
 
-The gotcha it leaves behind: seeding `useState` from loader data is only correct while the router blocks, because a `useState` initializer does not re-run when props change, so an input seeded from a stale frame never recovers while everything rendering loader data directly does. Where a route seeds that way, key the child holding the seeds on the record. `/admin/programs/$programId` keys on `String(program.updatedAt)`; `/admin/categories/$categoryId` keys on `` `${category.name}|${category.type ?? ""}` ``, because `categories` has no `updatedAt` column. `remountDeps` cannot serve here: it sees `search`, `params` and `loaderDeps`, never loader data. Staying on the page after `await router.invalidate()` needs none of this, because the component stays mounted and no seed is involved.
+The gotcha it leaves behind outlives that decision: a `useState` initializer does not re-run when props change, so an input seeded from loader data keeps whatever frame it mounted on while everything rendering that data directly re-renders around it. The breadcrumb and the input on the same page can therefore disagree, reading the same field from the same source. Key the child holding the seeds on the record; ADR-0029's Consequences say which two routes are keyed and on what. Staying on the page after `await router.invalidate()` needs none of this, because the component stays mounted and no seed is involved.
 
 ---
 
