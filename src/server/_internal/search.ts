@@ -19,11 +19,17 @@ export async function searchProjectsForRequest(data: SearchProjectsInput) {
  * A user's query as a literal `LIKE` operand: `%` and `_` stop being
  * wildcards, and a backslash stops being the escape character.
  *
- * Postgres reads `\` as `LIKE`'s escape by default, so it has to go first or
- * it would escape the escapes added after it. Unescaped, a bare `%` matches
- * every row with a non-null value in any of the three columns, and a query
- * like `100%` quietly means something other than what was typed. This
- * listing is anonymous, which is why it is escaped here.
+ * Unescaped, a bare `%` matches every row with a non-null value in any of the
+ * three columns, and a query like `100%` quietly means something other than
+ * what was typed. This listing is anonymous, which is why it is escaped here.
+ *
+ * `\` is escaped as well as the two the issue names, because Postgres reads
+ * it as `LIKE`'s own escape by default: a query ending in one would otherwise
+ * neutralize the closing `%` this is wrapped in and silently become a suffix
+ * match. One character class in one pass, rather than three sequential
+ * `replace` calls: a sequential version has to do the backslash first or it
+ * escapes the escapes the later passes add, and this has no order to get
+ * wrong. Do not "simplify" it into the sequential form.
  *
  * `buildAdminProjectListConditions` in `projects-queries.ts` builds its
  * pattern raw and has the same gap. It is staff-only, so it is left alone
