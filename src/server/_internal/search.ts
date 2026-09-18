@@ -70,6 +70,15 @@ async function interestsVectorFor(
   return row?.embedding ?? null;
 }
 
+/**
+ * The unreachable branch of an exhaustive switch. The parameter types as
+ * `never` only while every case is handled, so a new member of the union
+ * turns into a compile error at the call rather than a silent default.
+ */
+function assertNever(value: never): never {
+  throw new Error(`Unhandled ordering: ${String(value)}`);
+}
+
 /** The resolved ordering, as the `ORDER BY` fragment that delivers it. */
 function orderBySql(
   order: ResolvedOrder,
@@ -113,8 +122,15 @@ function orderBySql(
       // an embedding call fails.
       return sql`${projects.embedding} IS NULL, ${projects.embedding} <=> ${probe}::vector, ${listingDate} DESC`;
     }
-    default:
+    case "relevance":
+      // Only ever reached with a query: an empty box resolves this to
+      // `newest` before the call. See `relevanceOrder` for why.
       return relevanceOrder;
+    default:
+      // Exhaustive rather than a fallthrough. Every ordering has a case
+      // above, so adding a seventh to the enum fails to compile here instead
+      // of silently rendering in relevance order (#475).
+      return assertNever(order);
   }
 }
 
