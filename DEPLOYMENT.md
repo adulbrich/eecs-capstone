@@ -946,18 +946,28 @@ diff <(jq -r '[.legacy_id,.target_status] | @tsv' \
         live-projects-clean.jsonl | sort)
 ```
 
-Both fields, not the id alone: a project that was published and is now approved
-keeps its id and changes nothing an id-only diff can see.
+Both fields, not the id alone: a project that was published and is now
+approved keeps its id and changes nothing an id-only diff can see.
+
+What the pair cannot see is a text edit. A retitled project, or a description
+the proposer rewrote in the old portal, keeps both its id and its status, so
+this check reports nothing and `--skip-existing` would not carry the change
+anyway. It answers "which projects are in the set", not "is every imported row
+still faithful".
 
 Do not shortcut that with a watermark column, because the portal has no honest
 one. `MAX(cp_date_updated)` looks like the obvious candidate and is the worst
 of them: `CapstoneProjectsDao::updateCapstoneProject` writes that column back
-from the value it loaded, and the only caller of the setter is the row loader,
-so every save copies the value onto itself and archiving, unarchiving,
-publishing and hiding all leave it where it was. 619 projects carry a log entry
-later than their own `cp_date_updated`, measured against the live database on
-2026-09-17. `MAX(lg_date_created)` is better and
-still blind in one direction: `capstone_project_log` has messages for
+from the value it loaded, and the only caller of the setter is the row
+loader, so every save copies the value onto itself and archiving, unarchiving,
+publishing and hiding all leave it where it was. That was read off
+`CapstoneProjectsDao.php` and `CapstoneProject.php` on the portal host on
+2026-09-17, not inferred; the legacy PHP is not in this repo, so anyone
+re-checking it has to read it there, and `capstone-legacy-portal.md` in Box
+gives the location. The measurable consequence is that 619 projects carry a
+log entry later than their own `cp_date_updated`, counted against the live
+database the same day.
+`MAX(lg_date_created)` is better and still blind in one direction: `capstone_project_log` has messages for
 Published, Archived and Unarchived but none for hiding, so a project going from
 listed to unlisted writes no row anywhere. A row count on its own misses a
 departure and an arrival on the same day.
