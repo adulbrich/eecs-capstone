@@ -447,6 +447,9 @@ and an unset bucket name hands `aws` an empty string rather than failing:
 
 ```bash
 BOX="$HOME/Library/CloudStorage/Box-Box/Projects"
+# Every import writes its output here, in Box beside the source data, never
+# into the working tree. See 7a.1 for why.
+OUT="$BOX/Capstone Portal Migration/import-output"
 # `infra/s3.tf` names it "${var.project}-assets-<account id>"; there is no
 # terraform output for it, so read it from the state. The backend is remote,
 # so `terraform init` has to have run in this checkout first.
@@ -512,21 +515,24 @@ aws --profile aws-capstone1 s3 rb "s3://$OPS_BUCKET" --force
 ### 7a.1 Prepare the data on a workstation
 
 From the repo, with the Box folder holding `archived-projects-clean.jsonl`,
-`legacy-images/` and `legacy-images-manifest.jsonl`:
+`legacy-images/` and `legacy-images-manifest.jsonl`. `$OUT` comes from 7a.0:
 
 ```bash
 npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
-  prepare "$BOX/Capstone Portal Migration" ./legacy-out
+  prepare "$BOX/Capstone Portal Migration" "$OUT/legacy-out"
 ```
 
-**Name that output directory with an `-out` suffix.** `.gitignore` matches
-`*-out/`, and the directory holds real proposer addresses and project images
-in a repo that is public and mirrors to GitLab. A directory named anything
-else is untracked but not ignored, which is one `git add` from publishing it.
-The 2026-09-18 top-up used `./new-out` and was caught only because the rule
-was a list of two names at the time.
+**The output directory goes in Box, never in the repo.** It holds real
+proposer addresses and converted project images, and this repo is public and
+mirrors to GitLab. It used to be written to `./legacy-out` in the working
+tree, kept out of git by name; on 2026-09-18 a top-up wrote to `./new-out`,
+which that list did not cover, and 1.6 MB of project images sat untracked and
+unignored until someone noticed. Nothing was committed, and the three
+directories moved to `$OUT` the same day. `.gitignore` still matches
+`*-out/` as a backstop for anyone who ignores this paragraph, not as the way
+the rule is enforced.
 
-That writes `./legacy-out/projects/<uuid>/<uuid>.webp` (paths that *are* the
+That writes `$OUT/legacy-out/projects/<uuid>/<uuid>.webp` (paths that *are* the
 object-storage keys), plus `image-keys.json`. `prepare` counts every manifest
 row that converts, so what it prints depends on the manifest you hand it: the
 339-row file from 2026-09-16 gives `wrote 338 webp files`, and a manifest of
@@ -554,7 +560,7 @@ bucket itself is private (section 1); nothing here makes an object public:
 # --exclude, because this path does not go through the scripts' key-space
 # guard: a .DS_Store Finder leaves in the tree would upload as an object no
 # row points at. The `upload` mode in 7a.2b refuses those itself.
-aws --profile aws-capstone1 s3 sync ./legacy-out/projects \
+aws --profile aws-capstone1 s3 sync "$OUT/legacy-out/projects" \
   "s3://$ASSETS_BUCKET/projects/" --region us-west-2 \
   --exclude "*" --include "*.webp"
 ```
@@ -566,7 +572,7 @@ bucket:
 aws --profile aws-capstone1 s3 cp \
   "$BOX/Capstone Portal Migration/archived-projects-clean.jsonl" \
   "s3://$OPS_BUCKET/legacy/" --region us-west-2
-aws --profile aws-capstone1 s3 cp ./legacy-out/image-keys.json \
+aws --profile aws-capstone1 s3 cp "$OUT/legacy-out/image-keys.json" \
   "s3://$OPS_BUCKET/legacy/" --region us-west-2
 ```
 
@@ -583,7 +589,7 @@ holding those same two files, and upload the images to the local stack with
 the image script's own `upload` mode rather than `aws s3 sync`:
 
 ```bash
-npx tsx --env-file=.env.local scripts/import-legacy-images.ts upload ./legacy-out
+npx tsx --env-file=.env.local scripts/import-legacy-images.ts upload "$OUT/legacy-out"
 ```
 
 ### 7a.2b Running it against a local database
@@ -593,10 +599,10 @@ cover a local one end to end, which is also how to rehearse the import:
 
 ```bash
 npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
-  prepare "$BOX/Capstone Portal Migration" ./legacy-out
-npx tsx --env-file=.env.local scripts/import-legacy-images.ts upload ./legacy-out
-cp "$BOX/Capstone Portal Migration/archived-projects-clean.jsonl" ./legacy-out/
-LEGACY_DATA_DIR=./legacy-out node --env-file=.env.local \
+  prepare "$BOX/Capstone Portal Migration" "$OUT/legacy-out"
+npx tsx --env-file=.env.local scripts/import-legacy-images.ts upload "$OUT/legacy-out"
+cp "$BOX/Capstone Portal Migration/archived-projects-clean.jsonl" "$OUT/legacy-out/"
+LEGACY_DATA_DIR="$OUT/legacy-out" node --env-file=.env.local \
   scripts/import-legacy.mjs --create-missing-programs
 ```
 
@@ -901,7 +907,7 @@ writes `image-keys.json` into the output one. The manifest is generated per
 cohort, so the archived one names only archived projects. Give the live set
 its own directory at BOTH ends rather than regenerating in place, which would
 overwrite the archived cohort's manifest in Box and its key map in
-`./legacy-out`, and those are the record of what the first import did:
+`$OUT/legacy-out`, and those are the record of what the first import did:
 
 ```bash
 # Must hold `legacy-images-manifest.jsonl`, a `legacy-images/` directory of
@@ -910,22 +916,22 @@ overwrite the archived cohort's manifest in Box and its key map in
 # outright.
 LIVE="$BOX/Capstone Portal Migration/live"
 npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
-  prepare "$LIVE" ./live-out
-cp "$LIVE/live-projects-clean.jsonl" ./live-out/
+  prepare "$LIVE" "$OUT/live-out"
+cp "$LIVE/live-projects-clean.jsonl" "$OUT/live-out/"
 ```
 
-That leaves `./live-out` holding both files the import needs. Give the set its
+That leaves `$OUT/live-out` holding both files the import needs. Give the set its
 own S3 prefix as well as its own filename, for the same reason `prepare` got
 its own directory: `LEGACY_DATA_S3_URI` is per invocation, so a second prefix
 costs nothing.
 
 ```bash
-aws --profile aws-capstone1 s3 sync ./live-out/projects \
+aws --profile aws-capstone1 s3 sync "$OUT/live-out/projects" \
   "s3://$ASSETS_BUCKET/projects/" --region us-west-2 \
   --exclude "*" --include "*.webp"
-aws --profile aws-capstone1 s3 cp ./live-out/live-projects-clean.jsonl \
+aws --profile aws-capstone1 s3 cp "$OUT/live-out/live-projects-clean.jsonl" \
   "s3://$OPS_BUCKET/legacy-live/" --region us-west-2
-aws --profile aws-capstone1 s3 cp ./live-out/image-keys.json \
+aws --profile aws-capstone1 s3 cp "$OUT/live-out/image-keys.json" \
   "s3://$OPS_BUCKET/legacy-live/" --region us-west-2
 ```
 

@@ -33,9 +33,11 @@ test-results/
 # and the converted images. This repo is public and mirrors to GitLab, so a
 # stray `git add` here would publish student and sponsor PII.
 #
-# Matched by pattern, not by name. This was a list of two directories until
-# 2026-09-18, when a top-up import wrote its output to `new-out/` and landed
-# outside it: every cohort gets its own directory, so naming them one by one
-# means the list is wrong whenever someone adds a cohort. Anything ending
-# `-out/` is treated as import output. `.output` is covered separately above.
+# This is a BACKSTOP, not the rule. Since 2026-09-18 that output belongs in
+# Box beside the source data (`$OUT` in DEPLOYMENT.md 7a.0) and no import
+# should write into the working tree at all. The pattern stays because the
+# directories used to live here, and because a rule that lists members by
+# name fails the first time someone adds one: this was `legacy-out/` plus
+# `live-out/` until a top-up wrote to `new-out/` and fell straight through.
+# `.output` is covered separately above.
 *-out/
