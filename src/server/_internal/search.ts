@@ -157,16 +157,17 @@ export async function searchProjectsImpl(
    * interests and this is what those interests are for, and making them pick
    * the sort on every visit was the whole of #424.
    *
-   * The gate is the vector, never the text. A member whose interests saved but
-   * failed to embed resolves to `relevance`, so the default never promises an
-   * order it cannot deliver. For the same reason a hand-typed
-   * `?order=recommended` from such a viewer reports `relevance`: the page still
-   * renders, ordered by relevance, and says which ordering it used.
+   * The gate is the vector, never the text, so the default never promises an
+   * order it cannot deliver. A member whose interests saved but failed to
+   * embed therefore lands on `defaultWithoutVector` below, as does a
+   * hand-typed `?order=recommended` from such a viewer: the page renders and
+   * reports the ordering it actually used rather than the one asked for.
    */
   // Where a viewer with no interest vector lands, which is the whole of the
   // resolution table in #475 once `recommended` is off the table: a typed
   // query means `relevance`, an empty box means `newest`. Named once because
-  // both the absent-sort default and the `recommended` fallback need it.
+  // both the absent-sort default and the `recommended` fallback need it, and
+  // named rather than written twice so the two cannot drift apart.
   const defaultWithoutVector = trimmed ? "relevance" : "newest";
   const canRecommend = interestsVector !== null;
   const requested =
