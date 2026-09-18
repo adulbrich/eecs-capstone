@@ -520,9 +520,11 @@ npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
 ```
 
 That writes `./legacy-out/projects/<uuid>/<uuid>.webp` (paths that *are* the
-object-storage keys), plus `image-keys.json`. Expect `wrote 338 webp files`
-and one skip: `41z9KqPQXXbHwZtb` is a PDF somebody uploaded as a project
-image.
+object-storage keys), plus `image-keys.json`. On the whole archived cohort
+expect `wrote 427 webp files` and one skip: `41z9KqPQXXbHwZtb` is a PDF
+somebody uploaded as a project image. The figure was 338 when the cohort was
+557 rows; the 2026-09-18 top-up ran the 89 images the hidden rows brought with
+them, and its key map was merged with the first run's to give the 427.
 
 Converting here rather than in the cluster is deliberate. The keys are fully
 derived from the manifest, so a workstation run produces exactly what an
@@ -662,7 +664,8 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
   --region us-west-2
 ```
 
-The CloudWatch log should end with:
+The CloudWatch log should end with a line of this shape. The figures below are
+the 2026-09-16 first run, not what a later one prints:
 
 ```
 Imported 557 projects (303 with no publish date, 338 with an image)
@@ -698,7 +701,8 @@ against the rows actually missing a vector rather than the file's row count:
 the first cohort's 557 took about five minutes, and the 146-row top-up on
 2026-09-18 took 72 seconds of task wall time including container start.
 
-The CloudWatch log should end with:
+The CloudWatch log should end with a line of this shape, again from the
+2026-09-16 first run:
 
 ```
 557 project(s) checked: 557 updated, 0 already current, 0 failed.
@@ -718,8 +722,9 @@ sweepers has the rest.
 
 ### 7a.6 What to expect afterwards
 
-- **302 projects have no `published_at` and 264 no `archived_at`.** The legacy
-  event log only starts 2022-08-03, so those dates do not exist to import.
+- **368 archived projects have no `published_at` and 296 no `archived_at`,
+  and 10 of the live ones have no publish date.** The legacy event log only
+  starts 2022-08-03, so those dates do not exist to import.
   They are left null rather than backfilled. `searchProjects` orders on
   `coalesce(published_at, created_at)` so the nulls still sort by age, and
   `/admin/projects` says how many rows a date range is hiding.
