@@ -927,6 +927,40 @@ section: the portal is written daily, and the live figure moved from 201 to 203
 between the assessment and this paragraph because two pending proposals were
 approved.
 
+**How to tell whether the portal moved since the last import.** Re-export,
+re-clean, and diff the `legacy_id` set against the copy of the file the last
+run actually received, which is in Box under `backup-<date>/`:
+
+```bash
+python3 clean-export.py live-projects.jsonl
+diff <(jq -r .legacy_id backup-20260917/live-projects-clean-20260917.jsonl | sort) \
+     <(jq -r .legacy_id live-projects-clean.jsonl | sort)
+```
+
+Do not shortcut that with a watermark column, because the portal has no honest
+one. `MAX(cp_date_updated)` looks like the obvious candidate and is the worst
+of them: `CapstoneProjectsDao::updateCapstoneProject` writes that column back
+from the value it loaded, the same self-perpetuating pattern as `cp_cpc_id`, so
+archiving, unarchiving, publishing and hiding all leave it where it was. 619
+projects carry a log entry later than their own `cp_date_updated`, measured
+against the live database on 2026-09-17. `MAX(lg_date_created)` is better and
+still blind in one direction: `capstone_project_log` has messages for
+Published, Archived and Unarchived but none for hiding, so a project going from
+listed to unlisted writes no row anywhere. A row count on its own misses a
+departure and an arrival on the same day.
+
+This is not hypothetical. `iqKA4bMVopiBzrRq` was unarchived and published on
+2026-09-17, hours after the live export was taken, and `MAX(cp_date_updated)`
+across the table still read `2026-09-16 21:29:58` afterwards. The watermark
+said the set had not moved; the diff found the row.
+
+Read the diff with `--skip-existing` in mind. An id only on the right is a row
+the next run adds. An id only on the left has left the target set, which the
+importer cannot act on at all: it never deletes. A `target_status` that changed
+on an id already imported is exactly what the flag freezes, so it is
+information about the portal rather than a defect, and applying it is a staff
+edit in this app.
+
 Nothing in this app's status vocabulary fits a rejected or a draft legacy
 project: `softDeleteProjectAs` refuses a `draft` outright, and
 `changes_requested` means "resubmit", where the portal's Rejected is terminal.
