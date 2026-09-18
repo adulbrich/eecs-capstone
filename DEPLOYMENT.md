@@ -520,11 +520,17 @@ npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
 ```
 
 That writes `./legacy-out/projects/<uuid>/<uuid>.webp` (paths that *are* the
-object-storage keys), plus `image-keys.json`. On the whole archived cohort
-expect `wrote 427 webp files` and one skip: `41z9KqPQXXbHwZtb` is a PDF
-somebody uploaded as a project image. The figure was 338 when the cohort was
-557 rows; the 2026-09-18 top-up ran the 89 images the hidden rows brought with
-them, and its key map was merged with the first run's to give the 427.
+object-storage keys), plus `image-keys.json`. `prepare` counts every manifest
+row that converts, so what it prints depends on the manifest you hand it: the
+339-row file from 2026-09-16 gives `wrote 338 webp files`, and a manifest of
+the whole archived cohort, 429 rows today, would give 428. Either way there is
+one skip, `41z9KqPQXXbHwZtb`, a PDF somebody uploaded as a project image.
+
+The key map the archived cohort actually uses holds 427, one fewer than 428,
+because the DigiClips logo converts but its project is excluded from the
+import. That map is the first run's 338 merged with the 89 the 2026-09-18
+top-up produced. Handing the importer the extra key would be harmless and not
+silent: it reports any image key naming a project the run did not import.
 
 Converting here rather than in the cluster is deliberate. The keys are fully
 derived from the manifest, so a workstation run produces exactly what an
@@ -722,9 +728,11 @@ sweepers has the rest.
 
 ### 7a.6 What to expect afterwards
 
-- **368 archived projects have no `published_at` and 296 no `archived_at`,
-  and 10 of the live ones have no publish date.** The legacy event log only
-  starts 2022-08-03, so those dates do not exist to import.
+- **Many rows carry no `published_at` or `archived_at`.** The legacy event log
+  only starts 2022-08-03, so those dates do not exist to import. The
+  2026-09-18 archived run reported 368 of its 702 rows with no publish date
+  and 296 with no archive date. Do not treat those as current totals: staff
+  archive projects in the app daily, so the table moves.
   They are left null rather than backfilled. `searchProjects` orders on
   `coalesce(published_at, created_at)` so the nulls still sort by age, and
   `/admin/projects` says how many rows a date range is hiding.
@@ -1001,6 +1009,13 @@ This is not hypothetical. `iqKA4bMVopiBzrRq` was unarchived and published on
 2026-09-17, hours after the live export was taken, and `MAX(cp_date_updated)`
 across the table still read `2026-09-16 21:29:58` afterwards. The watermark
 said the set had not moved; the diff found the row.
+
+The export can also fall behind the database on a row neither side counts as
+changed. The 2026-09-18 live export held 11 rows with no `published_at` while
+the importer's own summary, which queries Postgres rather than the file, said
+10: staff had published one here, `commitTransition` stamped the column, and
+`--skip-existing` never carries that back. The database is ahead of the
+portal on that row, which is the intended direction now.
 
 Read the diff with `--skip-existing` in mind. An id on the right only is a row
 the next run adds. An id on the left only has left the target set, which a
