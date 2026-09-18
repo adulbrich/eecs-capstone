@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "#/lib/auth-client";
 import { errorMessage } from "#/lib/error-message";
@@ -13,17 +13,30 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
   const writeBookmark = useWriteBookmark();
   const [bookmarked, setBookmarked] = useState(false);
   const [loading, setLoading] = useState(false);
+  // The first render shows a guess, and the read below replaces it. A click in
+  // that window writes a row the read cannot see, because the read was computed
+  // before the insert, so its answer would put the button back to the state the
+  // viewer just left and the page would contradict the database (#444). Each
+  // write takes the next number; the read writes back only if the number it
+  // started with is still current. Same shape as `comment-thread.tsx`'s
+  // `attempt`, one counter for the whole component because there is one field.
+  const writes = useRef(0);
 
   useEffect(() => {
     if (!session?.user) {
       return;
     }
+    const startedAt = writes.current;
     void (async () => {
+      let answer = false;
       try {
         const { bookmarked: b } = await isBookmarked({ data: { projectId } });
-        setBookmarked(b);
+        answer = b;
       } catch {
-        setBookmarked(false);
+        answer = false;
+      }
+      if (writes.current === startedAt) {
+        setBookmarked(answer);
       }
     })();
   }, [session?.user, projectId]);
@@ -36,6 +49,7 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
   }
 
   async function toggle() {
+    writes.current += 1;
     setLoading(true);
     const next = !bookmarked;
     setBookmarked(next);
