@@ -719,9 +719,9 @@ sweepers has the rest.
   `/admin/projects` says how many rows a date range is hiding.
 - **The archive is public.** `searchProjects` has no auth guard and
   `archivedOnly` resolves to `status = 'archived'`, so a signed-out visitor
-  can browse all 557. That is the intent; it is also why the 146 projects the
-  old portal kept hidden are held back in `archived-hidden-projects.jsonl` and
-  are not part of this import.
+  can browse every archived row. The 146 the old portal kept hidden were held
+  back on that ground at first and imported on 2026-09-18 once the trade-off
+  was accepted; ADR-0031 records why.
 - **No `contact_email` is set.** The old portal published proposer names and
   never published an address. The addresses live in `proposer_email`, which is
   staff-only on both read paths.
@@ -823,12 +823,10 @@ ENGR41X note to exactly two of the 557 archived rows (`xWf4xJi2vUwh8oDh` and
 copy in Box's `backup-20260917/` rather than assuming. That directory is dated
 the day it was taken, not the day of the import it holds.
 
-The two side files come back with the same rows but not the same bytes: the
-held file's `held_reason` string changed, and three of its 146 rows resolve
-their program differently now, two of them losing one outright. None of the
-146 is imported, so none of that reaches the database. The run also prints a
-contradiction report on 5 archived rows, all pre-2022-08-03 and therefore
-explained rather than fatal; that report is new and does not mean the export
+`clean-export.py` no longer writes a hidden file at all, since 2026-09-18:
+every archived row is imported, so the only side file is the excluded one. The
+run prints a contradiction report on 5 archived rows, all pre-2022-08-03 and
+therefore explained rather than fatal; that report does not mean the export
 went wrong.
 
 `--undo` hard-deletes the rows rather than soft-deleting them, which is right
@@ -924,28 +922,26 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
   --region us-west-2
 ```
 
-**What this import deliberately leaves in the old portal**, as of 2026-09-17.
+**What this import deliberately leaves in the old portal**, as of 2026-09-18.
 Each of these needs a decision that the import itself does not settle, and none
-is lost: the portal still holds them, and the two sets the cleaner writes out
-are in Box beside the data.
+is lost: the portal still holds them.
 
 | set | rows | where it is |
 | --- | ---: | --- |
-| Hidden archived projects | 146 | `archived-hidden-projects.jsonl` |
+| Drafts, live and archived | 139 | the portal only |
 | Rejected, live and archived | 49 | the portal only |
-| Drafts, live and archived | 138 | the portal only |
 | Pending approval, archived only | 30 | the portal only |
-| DigiClips working notes | 11 | `excluded-projects.jsonl` |
+| DigiClips working notes | 11 | `archived-projects-excluded.jsonl` |
 
-374 rows in total, against 557 archived and 203 live already accounted for,
-which is the portal's 1134. Those two filenames are what the cleaner wrote
-before it derived its outputs from its input; a re-export writes
-`archived-projects-hidden.jsonl` and `archived-projects-excluded.jsonl`
-instead, with the same contents. Re-derive these counts before the production
-run rather than trusting them, and the same goes for every count in this
-section: the portal is written daily, and the live figure moved from 201 to 203
-between the assessment and this paragraph because two pending proposals were
-approved.
+229 rows, against the 906 imported (702 archived and 204 live), which is the
+portal's 1135. The hidden archived projects used to be the first line of this
+table and are no longer deferred: all 146 were imported on 2026-09-18, 145 as
+`archived` and one as `published` after staff unarchived it.
+
+Re-derive these counts before any run rather than trusting them, and the same
+goes for every count in this section. The portal is written daily: the live
+Accepting Applicants figure went 201, 203, 204 across three days of this work,
+and the archived figure fell 714 to 713 when one project was unarchived.
 
 **How to tell whether the portal moved since the last import.** Set
 `export.sql`'s WHERE to the cohort you are checking, run it into
@@ -1012,9 +1008,10 @@ the portal's Browse page". On a LIVE row that is this app's `approved`: the old
 portal's Approve button writes only the status and its Publish button only
 clears the flag, so a project sits approved and unlisted between the two
 clicks, and `search.ts` filters on `published` (or `archived` when
-`archivedOnly` is set) so nothing is exposed. On an ARCHIVED row there is no
-such status, since `archived` is public here, so those stay in the hidden file
-pending a decision.
+`archivedOnly` is set) so nothing is exposed. On an ARCHIVED row the flag is
+inert in the old portal, because its Browse page requires `cp_archived = 0`
+either way, so those import as plain `archived`. That does make them public
+here, which is the trade-off ADR-0031 weighs.
 
 An `approved` row is not in `EMBEDDABLE_STATUSES`, so 7a.5's backfill skips it
 and publishing it later embeds it through `commitTransition`. Size the backfill
