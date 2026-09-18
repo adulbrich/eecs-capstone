@@ -16,17 +16,22 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
   // The first render shows a guess, and the read below replaces it. A click in
   // that window writes a row the read cannot see, because the read was computed
   // before the insert, so its answer would put the button back to the state the
-  // viewer just left and the page would contradict the database (#444). Each
-  // write takes the next number; the read writes back only if the number it
-  // started with is still current. Same shape as `comment-thread.tsx`'s
-  // `attempt`, one counter for the whole component because there is one field.
-  const writes = useRef(0);
+  // viewer just left and the page would contradict the database (#444).
+  //
+  // So every attempt at knowing the answer takes the next number, and an
+  // answer writes back only if its number is still current. A click is such an
+  // attempt because it decides the value outright, and so is a re-run of the
+  // effect, which is what keeps a read fired for the previous project or
+  // session from landing on the current one. Same shape as
+  // `comment-thread.tsx`'s `attempt`: one counter, because there is one field.
+  const attempt = useRef(0);
 
   useEffect(() => {
     if (!session?.user) {
       return;
     }
-    const startedAt = writes.current;
+    attempt.current += 1;
+    const mine = attempt.current;
     void (async () => {
       let answer = false;
       try {
@@ -35,7 +40,7 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
       } catch {
         answer = false;
       }
-      if (writes.current === startedAt) {
+      if (attempt.current === mine) {
         setBookmarked(answer);
       }
     })();
@@ -49,7 +54,7 @@ export function BookmarkButton({ projectId }: { projectId: string }) {
   }
 
   async function toggle() {
-    writes.current += 1;
+    attempt.current += 1;
     setLoading(true);
     const next = !bookmarked;
     setBookmarked(next);

@@ -42,11 +42,11 @@ afterEach(() => {
   answerRead = null;
 });
 
-function renderButton() {
+function renderButton(projectId = "p1") {
   const qc = new QueryClient();
   return render(
     <QueryClientProvider client={qc}>
-      <BookmarkButton projectId="p1" />
+      <BookmarkButton projectId={projectId} />
     </QueryClientProvider>
   );
 }
@@ -89,6 +89,32 @@ describe("BookmarkButton", () => {
     await answer(true);
 
     expect(getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+  });
+
+  it("drops the previous project's read after the id changes", async () => {
+    // The same staleness, reached through the effect rather than a click: the
+    // button is reused for a second project while the first project's read is
+    // still out, and that read knows nothing about the second one.
+    session = { user: { id: "u1" } };
+    const view = renderButton("p1");
+    await view.findByRole("button", { name: "Bookmark" });
+    const answerForP1 = answerRead;
+
+    rows.add("p2");
+    view.rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <BookmarkButton projectId="p2" />
+      </QueryClientProvider>
+    );
+    await answer(true);
+    expect(view.getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
+
+    await act(async () => {
+      answerForP1?.(false);
+      await Promise.resolve();
+    });
+
+    expect(view.getByRole("button", { name: "Remove bookmark" })).toBeTruthy();
   });
 
   it("still toggles on a settled page", async () => {
