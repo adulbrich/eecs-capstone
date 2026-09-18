@@ -185,7 +185,11 @@ _Avoid_: assignment, sponsorship, seeking mentor, no mentor needed, unmentored,
 needs mentor, mentor state
 
 **Teams supported**:
-How many student teams a project can take on, one to five. Set by staff.
+How many student teams a project can take on, one to five. The proposer states it on
+their own form and staff set it from the panel's Programs and teams section, which
+makes it the one field with two writers ([ADR-0032](./docs/adr/0032-teams-supported-has-two-writers.md)).
+Public above one, as a badge on the card and the detail page, and as a column in both
+table views at any value.
 _Avoid_: capacity, slots, team count (that is the mentor's number)
 
 **Bookmark**:

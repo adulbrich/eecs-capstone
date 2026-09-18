@@ -67,4 +67,38 @@ describe("ProjectBadges", () => {
     expect(getByText("NDA/IP required")).toBeTruthy();
     expect(container.querySelectorAll("div").length).toBe(1);
   });
+
+  // The count is the number of teams the project can host (#468). A badge on
+  // nearly every project is the filler #434 removed two columns to be rid of,
+  // so one team says nothing at all.
+  it("says nothing about teams at one, or when no count is given", () => {
+    const one = render(<ProjectBadges {...OFF} teamsSupported={1} />);
+    expect(one.container.innerHTML).toBe("");
+    const none = render(<ProjectBadges {...OFF} />);
+    expect(none.container.innerHTML).toBe("");
+  });
+
+  it("renders the count above one, on its own", () => {
+    // On its own: the count alone is enough to make the row exist, which is
+    // the empty case the guard has to know about.
+    const { getByText } = render(<ProjectBadges {...OFF} teamsSupported={3} />);
+    expect(getByText("3 teams").getAttribute("data-variant")).toBe("outline");
+  });
+
+  it("puts the count after the two marks", () => {
+    const { container } = render(
+      <ProjectBadges
+        {...OFF}
+        requiresNdaIp
+        studentProposed
+        teamsSupported={2}
+      />
+    );
+    const row = container.firstElementChild;
+    expect(Array.from(row?.children ?? []).map((c) => c.textContent)).toEqual([
+      "Student proposed",
+      "NDA/IP required",
+      "2 teams",
+    ]);
+  });
 });

@@ -133,6 +133,7 @@ describe("the stored assessment and its staleness", () => {
       id,
       programIds: [program.id],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
     expect(await getScopeAssessmentAs(admin, { projectId: id })).toBeNull();
 
@@ -175,6 +176,7 @@ describe("the stored assessment and its staleness", () => {
       id,
       programIds: [program.id],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
     await assessProjectScopeAs(admin, { projectId: id }, invoke);
     // The term count is part of what was judged against, so moving it is a

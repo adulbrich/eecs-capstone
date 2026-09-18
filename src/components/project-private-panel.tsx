@@ -27,7 +27,6 @@ export function ProjectPrivatePanel({
   notes,
   onCommentsChanged,
   projectId,
-  teamsSupported,
   viewerIsOwner,
   viewerIsStaff,
 }: {
@@ -37,7 +36,6 @@ export function ProjectPrivatePanel({
   notes: string | null;
   onCommentsChanged: () => Promise<void>;
   projectId: string;
-  teamsSupported: number;
   viewerIsOwner: boolean;
   viewerIsStaff: boolean;
 }) {
@@ -45,23 +43,17 @@ export function ProjectPrivatePanel({
     <Panel tone="private">
       <PanelHeader
         actions={
-          <>
-            {/* Team capacity is proposer-and-staff information, not staff-only,
-                so it belongs here rather than in the staff panel. */}
-            <span className="text-muted-foreground text-xs">
-              Teams supported:{" "}
-              <span className="font-medium text-foreground">
-                {teamsSupported}
-              </span>
-            </span>
-            {canEdit && (
-              <Button asChild size="sm" variant="outline">
-                <Link params={{ projectId }} to="/projects/$projectId/edit">
-                  Edit
-                </Link>
-              </Button>
-            )}
-          </>
+          /* Teams supported left this header in #468: staff can set it from
+             their own panel now, so it stopped being a number only these two
+             roles could see, and it reads as a public badge beside the title
+             instead. The Edit button is unmoved. */
+          canEdit && (
+            <Button asChild size="sm" variant="outline">
+              <Link params={{ projectId }} to="/projects/$projectId/edit">
+                Edit
+              </Link>
+            </Button>
+          )
         }
         title="Private"
       />

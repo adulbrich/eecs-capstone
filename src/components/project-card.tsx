@@ -20,6 +20,8 @@ interface ProjectSummary {
   requiresNdaIp: boolean;
   status: string;
   studentProposed: boolean;
+  /** Drives the teams supported badge, silent at one (#468). */
+  teamsSupported: number;
   title: string;
   updatedAt?: Date | string | null;
 }
@@ -100,6 +102,7 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
             className="mt-2"
             requiresNdaIp={project.requiresNdaIp}
             studentProposed={project.studentProposed}
+            teamsSupported={project.teamsSupported}
           />
           {/* `self-start` because this column stretches its items: the badge
               is `inline-flex`, but as a flex item in a `flex-col` it is

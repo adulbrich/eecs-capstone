@@ -247,6 +247,20 @@ describe("the public project table", () => {
     expect(badgesCellFor("Bare Minimum").textContent?.trim()).toBe("-");
   });
 
+  // `ProjectBadges` grew a teams badge in #468 for the card and the detail
+  // page, which have no column carrying the number. This table does, so it
+  // passes the component no count and the badge stays out of the row. Without
+  // this the claim lives only in a comment on an optional prop, and the row
+  // would print 3 twice.
+  it("leaves the team count to its own column rather than badging it", () => {
+    renderTable(DEFAULT_HIDDEN);
+    const badged = within(badgesCellFor("Rover Telemetry"));
+    expect(badged.queryByText(/teams?$/i)).toBeNull();
+    expect(cellFor("Rover Telemetry", "Teams supported").textContent).toContain(
+      "3"
+    );
+  });
+
   /**
    * The criterion the issue names, in the only half of it this file can
    * prove: a stale `?sort=accepting` degrades to the default order. That

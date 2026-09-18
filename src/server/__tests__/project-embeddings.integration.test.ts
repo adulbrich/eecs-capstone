@@ -393,6 +393,7 @@ describe("embedding triggers", () => {
       id,
       programIds: [program.id],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     // Then recompute. Asserting that the writer did not call `embed` would

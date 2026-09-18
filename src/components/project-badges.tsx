@@ -27,13 +27,26 @@ export function ProjectBadges({
   className,
   requiresNdaIp,
   studentProposed,
+  teamsSupported,
 }: {
   children?: React.ReactNode;
   className?: string;
   requiresNdaIp: boolean;
   studentProposed: boolean;
+  /**
+   * How many teams the project can host (#468). Silent at one, which the
+   * empty case below has to know about too: a badge on nearly every project
+   * is the filler #434 deleted two columns to remove.
+   *
+   * Optional, and omitted on purpose by the two tables: they carry a Teams
+   * supported column of their own, so passing it there would print the same
+   * number twice in one row. The card and the detail page have no such
+   * column, which is what this badge is for.
+   */
+  teamsSupported?: number;
 }) {
-  if (!(children || studentProposed || requiresNdaIp)) {
+  const manyTeams = (teamsSupported ?? 1) > 1;
+  if (!(children || studentProposed || requiresNdaIp || manyTeams)) {
     return null;
   }
   return (
@@ -41,6 +54,11 @@ export function ProjectBadges({
       {children}
       {studentProposed && <Badge variant="outline">Student proposed</Badge>}
       {requiresNdaIp && <Badge variant="outline">NDA/IP required</Badge>}
+      {/* A count, in the glossary's word for them. Last in the row because it
+          is the weakest of the three marks: it says how much room there is,
+          not what a reader would have to agree to. Always plural, because
+          `manyTeams` is false at one and the badge is not rendered. */}
+      {manyTeams && <Badge variant="outline">{teamsSupported} teams</Badge>}
     </div>
   );
 }

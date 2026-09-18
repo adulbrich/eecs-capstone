@@ -379,6 +379,7 @@ describe("the program on the public project payload", () => {
       id,
       programIds: [programId],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
     return id;
   }
@@ -423,6 +424,7 @@ describe("the program on the public project payload", () => {
       id,
       programIds: [ecampus, corvallis],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     // The owner, not an anonymous reader: this project is still a draft.
@@ -458,6 +460,7 @@ describe("the program on the public project payload", () => {
       id,
       programIds: [doomed, kept],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     await db.delete(programs).where(eq(programs.id, doomed));
@@ -481,6 +484,7 @@ describe("the program on the public project payload", () => {
       id,
       programIds: [a, b],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     const { project } = await getProjectAs(owner, { id });
@@ -527,6 +531,7 @@ describe("updateProjectProgramsAs", () => {
         id,
         programIds: [programId],
         acceptingApplicants: true,
+        teamsSupported: 1,
       })
     ).rejects.toThrow("Forbidden");
     expect(await programsOf(id)).toEqual([]);
@@ -548,6 +553,7 @@ describe("updateProjectProgramsAs", () => {
       id,
       programIds: [programId],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
     expect(first.updated).toBe(true);
     expect(await programsOf(id)).toEqual([programId]);
@@ -556,6 +562,7 @@ describe("updateProjectProgramsAs", () => {
       id,
       programIds: [programId],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
     expect(again.updated).toBe(false);
 
@@ -575,6 +582,7 @@ describe("updateProjectProgramsAs", () => {
       id,
       programIds: [a, b],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     expect(result.updated).toBe(true);
@@ -593,12 +601,14 @@ describe("updateProjectProgramsAs", () => {
       id,
       programIds: [a, b],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     const again = await updateProjectProgramsAs(admin, {
       id,
       programIds: [b, a],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     expect(again.updated).toBe(false);
@@ -617,6 +627,7 @@ describe("updateProjectProgramsAs", () => {
       id,
       programIds: [a, a],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     expect(result.updated).toBe(true);
@@ -637,12 +648,14 @@ describe("updateProjectProgramsAs", () => {
       id,
       programIds: [a],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     await updateProjectProgramsAs(admin, {
       id,
       programIds: [b, a],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     const log = await logOf(id);
@@ -664,12 +677,14 @@ describe("updateProjectProgramsAs", () => {
       id,
       programIds: [programId],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     const cleared = await updateProjectProgramsAs(admin, {
       id,
       programIds: [],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     expect(cleared.updated).toBe(true);
@@ -1711,6 +1726,87 @@ describe("sponsorship flag", () => {
   });
 });
 
+// Staff gained this from the panel in #468 and the proposer kept it on their
+// form, which makes it the one dual-written field. ADR-0032 records why.
+describe("teamsSupported from the programs writer", () => {
+  it("is written by the programs writer, and the write is logged", async () => {
+    const owner = await makeUser(`ts-o-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`ts-s-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [],
+      acceptingApplicants: true,
+      teamsSupported: 3,
+    });
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.teamsSupported).toBe(3);
+    const log = await db
+      .select()
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
+    expect(log).toHaveLength(1);
+    expect(log[0].changedFields).toEqual(["teamsSupported"]);
+  });
+
+  // The no-op check compares all three fields, so a count-only change had to
+  // be taught to count as a change or this save would write nothing.
+  it("saves a teams-supported-only change against an unchanged program set", async () => {
+    const owner = await makeUser(`ts-f-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`ts-g-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+
+    const result = await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [],
+      acceptingApplicants: true,
+      teamsSupported: 2,
+    });
+
+    expect(result.updated).toBe(true);
+  });
+
+  it("stays put when none of the three fields moves", async () => {
+    const owner = await makeUser(`ts-n-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`ts-m-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+
+    const result = await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [],
+      acceptingApplicants: true,
+      teamsSupported: 1,
+    });
+
+    expect(result.updated).toBe(false);
+  });
+
+  // The proposer keeps the field on their form, which is the dual write
+  // ADR-0032 accepts, so a form save after a staff edit still lands.
+  it("lets the proposer write it back from the project form", async () => {
+    const owner = await makeUser(`ts-p-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`ts-q-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [],
+      acceptingApplicants: true,
+      teamsSupported: 4,
+    });
+
+    await updateProjectAs(owner, {
+      id,
+      ...baseProject(),
+      teamsSupported: 2,
+    });
+
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    expect(row.teamsSupported).toBe(2);
+  });
+});
+
 // Staff only since #491, written through the Programs and teams section
 // rather than the proposer's form. `ProjectInput` no longer carries it, so a
 // created project takes the column default and only this writer moves it.
@@ -1738,6 +1834,7 @@ describe("acceptingApplicants", () => {
       id,
       programIds: [],
       acceptingApplicants: false,
+      teamsSupported: 1,
     });
 
     expect(await flagOf(id)).toBe(false);
@@ -1760,12 +1857,14 @@ describe("acceptingApplicants", () => {
       id,
       programIds: [programId],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     const result = await updateProjectProgramsAs(admin, {
       id,
       programIds: [programId],
       acceptingApplicants: false,
+      teamsSupported: 1,
     });
 
     expect(result.updated).toBe(true);
@@ -1782,6 +1881,7 @@ describe("acceptingApplicants", () => {
       id,
       programIds: [programId],
       acceptingApplicants: false,
+      teamsSupported: 1,
     });
 
     const log = await db
@@ -1804,6 +1904,7 @@ describe("acceptingApplicants", () => {
       id,
       programIds: [],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     expect(result.updated).toBe(false);
@@ -1822,6 +1923,7 @@ describe("acceptingApplicants", () => {
       id,
       programIds: [],
       acceptingApplicants: false,
+      teamsSupported: 1,
     });
     await performTransitionAs(owner, id, "submitted");
     await forceTransitionAs(admin, id, "published", undefined, {

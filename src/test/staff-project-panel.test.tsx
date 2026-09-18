@@ -1054,6 +1054,43 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
     );
   });
 
+  // Staff write this and so does the proposer, which is the dual write
+  // ADR-0032 accepts. It rides the same Save as the other two (#468).
+  it("saves teams supported through the same endpoint", async () => {
+    updateProjectPrograms.mockResolvedValue({ id: PROJECT_ID, updated: true });
+    render(panel("submitted", PROJECT_ID, false, []));
+    await screen.findByLabelText("Proposer email");
+
+    fireEvent.change(screen.getByLabelText("Teams supported"), {
+      target: { value: "3" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save programs and teams" })
+    );
+
+    await waitFor(() =>
+      expect(updateProjectPrograms).toHaveBeenCalledWith({
+        data: {
+          id: PROJECT_ID,
+          programIds: [],
+          acceptingApplicants: true,
+          teamsSupported: 3,
+        },
+      })
+    );
+  });
+
+  // The panel says the proposer owns the field, which is the whole mitigation
+  // ADR-0032 rests on: nothing tells either writer the other moved it.
+  it("says the proposer can set teams supported back", async () => {
+    render(panel("submitted", PROJECT_ID, false, []));
+    await screen.findByLabelText("Proposer email");
+
+    expect(
+      screen.getByText(/the proposer sets this on their own form/i)
+    ).toBeTruthy();
+  });
+
   // One Save for the section, so the flag rides the programs endpoint. A
   // second writer here would mean a second button (#491).
   it("saves the flag and the program set through one endpoint", async () => {
@@ -1076,6 +1113,7 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
           id: PROJECT_ID,
           programIds: [PROGRAM_A],
           acceptingApplicants: false,
+          teamsSupported: 1,
         },
       })
     );

@@ -1,5 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import {
+  TEAMS_SUPPORTED_MAX,
+  TEAMS_SUPPORTED_MIN,
+} from "#/lib/teams-supported";
 import { PROJECT_STATUSES, type ProjectStatus } from "#/lib/vocabularies";
 import { SEND_EMAIL_FIELD } from "./send-email-field";
 
@@ -24,7 +28,12 @@ const projectInputSchema = z.object({
   requiresNdaIp: z.boolean().optional(),
   isSponsored: z.boolean().optional(),
   notes: z.string().max(5000).nullable().optional(),
-  teamsSupported: z.number().int().min(1).max(5).optional(),
+  teamsSupported: z
+    .number()
+    .int()
+    .min(TEAMS_SUPPORTED_MIN)
+    .max(TEAMS_SUPPORTED_MAX)
+    .optional(),
 });
 
 export type ProjectInput = z.infer<typeof projectInputSchema>;
@@ -80,6 +89,16 @@ export const programsSchema = z.object({
   // section keeps one Save. Required, never defaulted: an optional flag would
   // let a stale client silently reopen a full team.
   acceptingApplicants: z.boolean(),
+  // The one field the proposer and staff both write (#468, ADR-0032): staff
+  // need to raise it in the same motion as placing a project in a second
+  // program, and the proposer is the only party who knows the capacity in the
+  // first place. Same bounds as `projectInputSchema`, and required for the
+  // same reason as the flag above.
+  teamsSupported: z
+    .number()
+    .int()
+    .min(TEAMS_SUPPORTED_MIN)
+    .max(TEAMS_SUPPORTED_MAX),
 });
 
 export type ProgramsInput = z.infer<typeof programsSchema>;

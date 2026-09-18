@@ -506,23 +506,42 @@ export async function updateProjectProgramsAs(
   const programsMoved = !(
     savedSet.size === wanted.length && wanted.every((id) => savedSet.has(id))
   );
-  const flagMoved = existing.acceptingApplicants !== data.acceptingApplicants;
-  // Both halves, or a flag-only save would report `updated: false` and write
-  // nothing while the section's one Save said it had saved (#491).
-  if (!(programsMoved || flagMoved)) {
+  // The plain columns this section owns, as data rather than as one branch
+  // each: #491 added the first and #468 the second, and a third would have
+  // meant a third copy of the same diff, write and log. Each entry is one
+  // field's name, its stored value and the incoming one.
+  const columns = [
+    {
+      name: "acceptingApplicants" as const,
+      old: existing.acceptingApplicants,
+      next: data.acceptingApplicants,
+    },
+    {
+      name: "teamsSupported" as const,
+      old: existing.teamsSupported,
+      next: data.teamsSupported,
+    },
+  ];
+  const columnsMoved = columns.filter((c) => c.old !== c.next);
+  // Every field, or a save touching only one of them would report
+  // `updated: false` and write nothing while the section's one Save said it
+  // had saved (#491).
+  if (!(programsMoved || columnsMoved.length > 0)) {
     return { id: existing.id, updated: false };
   }
   await db.transaction(async (tx) => {
     // The row first and its log rows after, the order every writer in this
     // file uses. The placement itself leaves the project row alone, but the
     // listing orders on `updated_at` and staff expect a move to surface the
-    // project, which is what the single-column writer did; the flag lands in
-    // the same statement. The old value the log rows below record comes from
-    // `existing`, read before the transaction, so this cannot overwrite it.
+    // project, which is what the single-column writer did; the columns above
+    // land in the same statement. The old values the log rows below record
+    // come from `existing`, read before the transaction, so this cannot
+    // overwrite them.
     await tx
       .update(projects)
       .set({
         acceptingApplicants: data.acceptingApplicants,
+        teamsSupported: data.teamsSupported,
         updatedAt: new Date(),
       })
       .where(eq(projects.id, existing.id));
@@ -557,18 +576,17 @@ export async function updateProjectProgramsAs(
         newValues: { programs: newLabels },
       });
     }
-    if (flagMoved) {
-      // Its own row rather than a second entry in the programs row's
-      // `changedFields`, which is where a form save would have put it:
-      // `diffRowFields` writes one row naming every column that moved, and
-      // these two moved for different reasons and read better apart. The
-      // field name is the one the tests and the diff renderer already know.
+    // A row each, rather than one row naming every column that moved, which
+    // is where a form save through `diffRowFields` would have put them. These
+    // move for unrelated reasons and read better apart, and the names are the
+    // ones the tests and the diff renderer already know.
+    for (const column of columnsMoved) {
       await tx.insert(projectEditLog).values({
         projectId: existing.id,
         editorId: viewer.id,
-        changedFields: ["acceptingApplicants"],
-        oldValues: { acceptingApplicants: existing.acceptingApplicants },
-        newValues: { acceptingApplicants: data.acceptingApplicants },
+        changedFields: [column.name],
+        oldValues: { [column.name]: column.old },
+        newValues: { [column.name]: column.next },
       });
     }
   });

@@ -70,16 +70,22 @@ describe("ProjectForm layout", () => {
     ).not.toContain("text-base");
   });
 
-  // The second grid holds one field since #450 took the Program picker out of
-  // this form. It stays a grid so Teams keeps the half-width column its number
-  // input is sized for, rather than stretching to the form's full width.
-  it("puts the contact pair in a two-column grid, and leaves Teams in its own", () => {
+  // The contact pair is the only thing on this form that wants two columns.
+  // Teams had a grid of its own, left behind when #450 took the Program picker
+  // out, and from `sm` that wrapped its help text inside the left half with
+  // the right half empty while every other field ran full width. The number
+  // input carries `w-24`, which is what actually keeps it narrow.
+  it("gives the contact pair the only two-column grid, and Teams the full width", () => {
     render(<ProjectForm showNotes={false} submitLabel="Save" />);
     const grids = document.querySelectorAll("form .sm\\:grid-cols-2");
-    expect(grids.length).toBe(2);
+    expect(grids.length).toBe(1);
     expect(grids[0].textContent).toContain("Contact Name");
     expect(grids[0].textContent).toContain("Contact Email");
-    expect(grids[1].textContent).toContain("Teams");
-    expect(grids[1].textContent).not.toContain("Program");
+    expect(grids[0].textContent).not.toContain("Teams");
+
+    // The input stays narrow on its own, which is why the column was not
+    // buying anything.
+    const teams = screen.getByLabelText("Teams") as HTMLInputElement;
+    expect(teams.className).toContain("w-24");
   });
 });

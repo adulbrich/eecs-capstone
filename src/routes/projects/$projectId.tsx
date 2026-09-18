@@ -143,6 +143,7 @@ function ProjectDetail() {
         className="mt-3"
         requiresNdaIp={project.requiresNdaIp}
         studentProposed={project.studentProposed}
+        teamsSupported={project.teamsSupported}
       >
         <StatusBadge status={project.status} />
         {/*
@@ -235,7 +236,6 @@ function ProjectDetail() {
           // so invalidating the route after a post re-ran it for nothing.
           onCommentsChanged={() => refreshComments()}
           projectId={project.id}
-          teamsSupported={project.teamsSupported}
           viewerIsOwner={viewerIsOwner}
           viewerIsStaff={viewerIsStaff}
         />

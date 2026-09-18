@@ -109,8 +109,10 @@ Each project carries:
   two courses.
 - [x] Teams supported: how many student teams the project can take on (1-5,
   default 1), on the project form, where anyone who may edit the project sets
-  it. This line used to say staff set it on the form, which matched neither
-  the form's gating nor the field's intent.
+  it, and from the Programs and teams section of the staff panel, so staff can
+  raise it in the same motion as placing a project in a second program. The one
+  field with two writers, which ADR-0032 records. Shown as a badge above one
+  team. (#468)
 - [x] Student-proposed marker and mentor: staff mark a project as student-proposed
   from the Proposer section of the staff panel, saved with the link, and record a
   mentor's email from the Mentor section. Mentorship is that address and nothing
