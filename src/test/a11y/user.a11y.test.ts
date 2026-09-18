@@ -29,11 +29,11 @@ const { projectId, bookmarkProjectIds, draftProjectId } = JSON.parse(
  * export.
  *
  * `BookmarkButton` renders from `useState(false)` and corrects itself when
- * that read lands, which is a window a person never hits and a test lands in
- * every time. Clicking inside it loses the click: the optimistic set is
- * overwritten by the older answer, the label goes back to "Bookmark" and the
- * write it already sent is invisible. That is a component bug (#444) and this
- * scan is not the place to prove it, so wait the window out.
+ * that read lands. A click inside that window now survives it (#444), so this
+ * wait is no longer there to dodge a bug. It is there because the label is
+ * the only thing telling this scan whether the slot is already bookmarked
+ * from a failed earlier attempt, and before the read lands the label is the
+ * guess rather than the answer.
  *
  * The encoding is TanStack Start's, so a framework upgrade could change it.
  * That failure is loud and lands here: the wait times out naming this
