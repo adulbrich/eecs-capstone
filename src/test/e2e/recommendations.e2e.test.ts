@@ -164,7 +164,14 @@ test.describe("recommended order", () => {
     expect(recommended).toEqual([...SEED_RECOMMENDED_TITLES]);
 
     await sortTrigger(page).click();
-    await page.getByRole("option", { name: "Newest" }).click();
+    // The gate itself, asserted where the listbox is already open rather than
+    // left to the docblock above: with nothing typed the option is absent, not
+    // disabled (#475). The unit test owns both directions of this; here it is
+    // what makes the pick below Newest rather than Most relevant.
+    await expect(
+      page.getByRole("option", { name: "Most relevant", exact: true })
+    ).toHaveCount(0);
+    await page.getByRole("option", { name: "Newest", exact: true }).click();
     await page.waitForURL(/order=newest/);
 
     await expect(page.getByText("Ranked by your interests.")).toHaveCount(0);
