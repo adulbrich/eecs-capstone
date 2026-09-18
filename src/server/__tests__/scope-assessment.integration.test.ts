@@ -129,7 +129,11 @@ describe("the stored assessment and its staleness", () => {
       termCount: 3,
     });
     const { id } = await createProjectAs(admin, baseProject());
-    await updateProjectProgramsAs(admin, { id, programIds: [program.id] });
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [program.id],
+      acceptingApplicants: true,
+    });
     expect(await getScopeAssessmentAs(admin, { projectId: id })).toBeNull();
 
     const fresh = await assessProjectScopeAs(admin, { projectId: id }, invoke);
@@ -167,7 +171,11 @@ describe("the stored assessment and its staleness", () => {
       termCount: 1,
     });
     const { id } = await createProjectAs(admin, baseProject());
-    await updateProjectProgramsAs(admin, { id, programIds: [program.id] });
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [program.id],
+      acceptingApplicants: true,
+    });
     await assessProjectScopeAs(admin, { projectId: id }, invoke);
     // The term count is part of what was judged against, so moving it is a
     // reason the verdict may no longer hold.

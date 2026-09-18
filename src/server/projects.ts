@@ -25,7 +25,6 @@ const projectInputSchema = z.object({
   isSponsored: z.boolean().optional(),
   notes: z.string().max(5000).nullable().optional(),
   teamsSupported: z.number().int().min(1).max(5).optional(),
-  acceptingApplicants: z.boolean().optional(),
 });
 
 export type ProjectInput = z.infer<typeof projectInputSchema>;
@@ -75,6 +74,12 @@ export const programsSchema = z.object({
   // Never on ProjectInput since #450: the form cannot carry it and only
   // this endpoint writes it.
   programIds: z.array(z.string().uuid()),
+  // Whether a team still has room, which staff learn from running bidding and
+  // assignment and the proposer usually hears from them (#491). It rides this
+  // endpoint rather than getting a writer of its own so the Programs and teams
+  // section keeps one Save. Required, never defaulted: an optional flag would
+  // let a stale client silently reopen a full team.
+  acceptingApplicants: z.boolean(),
 });
 
 export type ProgramsInput = z.infer<typeof programsSchema>;

@@ -66,24 +66,21 @@ describe("ProjectForm NDA/IP agreement", () => {
 });
 
 describe("ProjectForm team is full", () => {
-  it("says the box is about applying, not about being listed", () => {
-    // The flag is orthogonal to status: an unchecked box keeps the project
-    // listed. The label names the act (apply, never bid: CONTEXT.md
-    // **Team is full**) and the helper says what a student sees when it is
-    // off (#309).
+  it("carries no control for it, at any role", () => {
+    // Staff only since #491, set from the panel's Programs and teams section.
+    // The form is one component for both roles, so a control rendered here at
+    // all is one a proposer reaches.
     renderForm();
 
     expect(
-      screen.getByLabelText(/students can apply to join this project/i)
-    ).toBeTruthy();
+      screen.queryByLabelText(/students can apply to join this project/i)
+    ).toBeNull();
+    expect(screen.queryByLabelText(/team is full/i)).toBeNull();
     expect(
-      screen.getByText(/uncheck once you have the team you need/i)
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        /stays\s+listed, but students see that its team is full/i
-      )
-    ).toBeTruthy();
+      screen.queryByText(/uncheck once you have the team you need/i)
+    ).toBeNull();
+    // The NDA helper stays, and so does the rule it is here for: the form
+    // names the act students take, never bidding (CONTEXT.md **Team is full**).
     expect(
       screen.getByText(/students see this before they apply/i)
     ).toBeTruthy();

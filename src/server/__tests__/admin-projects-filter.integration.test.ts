@@ -79,6 +79,7 @@ async function makeProject(
     await updateProjectProgramsAs(placedBy, {
       id: project.id,
       programIds: [programId],
+      acceptingApplicants: true,
     });
   }
   return project;
@@ -235,6 +236,7 @@ describe("admin projects program filter", () => {
     await updateProjectProgramsAs(admin, {
       id: shared.id,
       programIds: [cs461, ecampus],
+      acceptingApplicants: true,
     });
 
     const inCorvallis = await listAdminProjectsAs(
@@ -260,6 +262,7 @@ describe("admin projects program filter", () => {
     await updateProjectProgramsAs(admin, {
       id: shared.id,
       programIds: [cs461, ecampus],
+      acceptingApplicants: true,
     });
 
     const { rows } = await listAdminProjectsAs(
@@ -915,10 +918,10 @@ describe("admin projects date range", () => {
 });
 
 /**
- * Writes the flags the five switches narrow on, past the form writers: the
- * project form carries `acceptingApplicants` and `requiresNdaIp`, and the
- * Proposer and Mentor sections carry the rest, but the rule under test is the
- * query's.
+ * Writes the flags the five switches narrow on, past the real writers: the
+ * project form carries `requiresNdaIp`, the Programs and teams section carries
+ * `acceptingApplicants` (#491), and the Proposer and Mentor sections carry the
+ * rest, but the rule under test is the query's.
  */
 async function flag(
   id: string,
