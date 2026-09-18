@@ -614,8 +614,9 @@ duplicate. Staff can edit `course_id` too, though, so the map in the script is
 coupled to live data with nothing testing the two against each other. On
 2026-09-17 `CS467` was renamed to `CS467-ECAMPUS`, and the next run refused.
 Below is that refusal in the script's current wording. The id in it is the
-stale one the map still carried that day, so nothing on `main` prints this
-again; a later rename prints the same shape with whichever id has gone stale:
+stale one the map carried that day, and the map now carries the new one, so
+this exact message cannot recur; a later rename prints the same shape with
+whichever id has gone stale:
 
 ```
 Error: No program with course_id "CS467" (for legacy course "CS467 (3 Month)").
