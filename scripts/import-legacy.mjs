@@ -152,11 +152,19 @@ function uuidv5(name) {
  * onto.
  *
  * Matched on `courseId` alone, which is the stable identifier: it is unique
- * and carries the campus, while all three 3-term rows share the display name
- * "Capstone (3-term)". Matching on the name, or on the pair, would break the
- * moment staff rename a course in the UI, and a failed match creates a
- * duplicate program rather than erroring. `courseName` is used only when
- * creating a row that is absent.
+ * and carries the campus, while the 3-term rows share a display name.
+ * Matching on the name, or on the pair, would break the moment staff rename a
+ * course in the UI, and a failed match creates a duplicate program rather than
+ * erroring. `courseName` is used only when creating a row that is absent.
+ *
+ * `course_id` is staff-editable too, though, so this map is coupled to live
+ * data and nothing tests the two against each other. It has drifted once: on
+ * 2026-09-17 staff renamed all four programs, `CS467` became `CS467-ECAMPUS`
+ * and the display names became "Capstone (30 weeks)" and "Capstone (10
+ * weeks)", and the next import refused with `No program with course_id
+ * "CS467"`. That refusal is the design working, so read it as "the ids moved,
+ * update this map", not as a broken importer. Check `programs` before a run
+ * that follows any program admin work.
  *
  * `course_id` is not unique at the database level, so `resolvePrograms`
  * refuses an ambiguous match rather than picking a row: an earlier production
@@ -171,22 +179,22 @@ function uuidv5(name) {
 const PROGRAMS = {
   "CS46X On Campus (9 Month)": {
     courseId: "CS46X-CORVALLIS",
-    courseName: "Capstone (3-term)",
+    courseName: "Capstone (30 weeks)",
     termCount: 3,
   },
   "CS46X Online (9-month)": {
     courseId: "CS46X-ECAMPUS",
-    courseName: "Capstone (3-term)",
+    courseName: "Capstone (30 weeks)",
     termCount: 3,
   },
   "ECE44X (9 Month)": {
     courseId: "ECE44X-CORVALLIS",
-    courseName: "Capstone (3-term)",
+    courseName: "Capstone (30 weeks)",
     termCount: 3,
   },
   "CS467 (3 Month)": {
-    courseId: "CS467",
-    courseName: "Capstone (1-term) (Ecampus)",
+    courseId: "CS467-ECAMPUS",
+    courseName: "Capstone (10 weeks)",
     termCount: 1,
   },
 };
