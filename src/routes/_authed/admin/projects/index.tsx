@@ -119,7 +119,13 @@ export const searchSchema = z.object({
     .catch(null),
   // Better Auth user ids are text, not UUIDs.
   proposer: z.string().max(255).nullable().default(null),
-  q: z.string().max(200).default(""),
+  // Uncapped on purpose. The server clamps a long query to
+  // SEARCH_QUERY_MAX and the hint line under the box says so, which it
+  // can only do while the URL still carries what the reader typed. A
+  // `.max()` here would have been a router error on a long link, which is
+  // the shape #478 was about; a `.catch("")` would drop the search
+  // silently instead.
+  q: z.string().default(""),
   sort: z.string().optional(),
   // Absent is the default set, every status but archived; any explicit
   // choice is spelled out in full. `.catch` on the four so a stale or
@@ -871,6 +877,7 @@ function AdminProjects() {
           <SearchHint
             fields="titles, descriptions, problem statements, objectives, qualifications, contacts and proposers"
             id={SEARCH_HINT_ID}
+            query={q}
           />
         </>
       }

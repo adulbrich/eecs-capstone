@@ -1,9 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX } from "#/lib/pagination";
+import { searchQuerySchema } from "#/lib/search-query";
 
-const searchInputSchema = z.object({
-  query: z.string().trim().max(200).default(""),
+/**
+ * Exported so the over-length case can be tested where it actually lives.
+ * The `createServerFn` wrapper below is the only caller; a test cannot
+ * reach the validator through it, and `searchProjectsImpl` sees data this
+ * has already clamped, so testing the impl would prove nothing about #478.
+ */
+export const searchInputSchema = z.object({
+  query: searchQuerySchema,
   categoryIds: z.array(z.string().uuid()).max(20).default([]),
   programId: z.string().uuid().nullable().default(null),
   archivedOnly: z.boolean().default(false),

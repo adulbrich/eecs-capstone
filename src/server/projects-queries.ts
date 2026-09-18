@@ -5,6 +5,7 @@ import {
   DEFAULT_ADMIN_STATUSES,
   PROGRAM_FILTER_NONE,
 } from "#/lib/admin-project-filters";
+import { searchQuerySchema } from "#/lib/search-query";
 import { PROJECT_STATUSES } from "#/lib/vocabularies";
 
 // Re-exported so components can type the shape `getProposerForEdit` returns
@@ -52,7 +53,7 @@ const adminListSchema = z
       .default(null),
     // Better Auth user ids are text, not UUIDs, so this cannot be `.uuid()`.
     proposer: z.string().max(255).nullable().default(null),
-    q: z.string().max(200).default(""),
+    q: searchQuerySchema,
     // Three of the public listing's four switches, under the same names
     // (#340); archived is a status here.
     acceptingOnly: z.boolean().default(false),

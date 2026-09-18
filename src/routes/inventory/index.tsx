@@ -34,6 +34,12 @@ import type { ViewMode } from "#/lib/view-preference";
 import { listInventory, listInventoryCategories } from "#/server/inventory";
 
 const searchSchema = z.object({
+  // Uncapped on purpose. The server clamps a long query to
+  // SEARCH_QUERY_MAX and the hint line under the box says so, which it
+  // can only do while the URL still carries what the reader typed. A
+  // `.max()` here would have been a router error on a long link, which is
+  // the shape #478 was about; a `.catch("")` would drop the search
+  // silently instead.
   q: z.string().default(""),
   status: z.enum(ACTIVE_STATUSES).nullable().default(null),
   // A stale `?category=Electronics` link (pre-UUID, singular) fails

@@ -2,6 +2,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { SearchHint } from "#/components/search-hint";
+import { SEARCH_QUERY_MAX } from "#/lib/search-query";
 
 afterEach(cleanup);
 
@@ -32,5 +33,43 @@ describe("SearchHint", () => {
       box.getAttribute("aria-describedby") ?? ""
     );
     expect(described?.textContent).toMatch(/Searches titles\./);
+  });
+
+  // The note the server's clamp owes the reader (#478). In the described
+  // paragraph rather than a live region, so a screen reader hears it when it
+  // reaches the box that produced it.
+  it("says nothing about length for a query inside the cap", () => {
+    render(
+      <SearchHint
+        fields="titles"
+        id="hint"
+        query={"a".repeat(SEARCH_QUERY_MAX)}
+      />
+    );
+    expect(screen.getByText(/Searches titles\./).textContent).not.toMatch(
+      /characters were used/
+    );
+  });
+
+  it("says the query was cut when it was", () => {
+    render(
+      <SearchHint
+        fields="titles"
+        id="hint"
+        query={"a".repeat(SEARCH_QUERY_MAX + 1)}
+      />
+    );
+    expect(screen.getByText(/Searches titles\./).textContent).toMatch(
+      new RegExp(`only its first ${SEARCH_QUERY_MAX} characters were used`)
+    );
+  });
+
+  it("stays silent when the caller passes no query", () => {
+    // Every caller passes one today; the prop is optional so a listing that
+    // does not can still render the hint.
+    render(<SearchHint fields="titles" id="hint" />);
+    expect(screen.getByText(/Searches titles\./).textContent).not.toMatch(
+      /characters were used/
+    );
   });
 });

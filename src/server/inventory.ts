@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { ACTIVE_STATUSES } from "#/lib/inventory-visibility";
 import { PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX } from "#/lib/pagination";
+import { searchQuerySchema } from "#/lib/search-query";
 import {
   INVENTORY_CUSTOM_LINE_STATUSES,
   INVENTORY_ITEM_STATUSES,
@@ -30,7 +31,7 @@ export const uploadInventoryImage = createServerFn({ method: "POST" })
 const itemStatusEnum = z.enum(ACTIVE_STATUSES);
 
 const listInventorySchema = z.object({
-  q: z.string().default(""),
+  q: searchQuerySchema,
   status: itemStatusEnum.nullable().default(null),
   categories: z.array(z.string().uuid()).max(20).default([]),
   page: z.number().int().positive().default(1),
@@ -55,7 +56,7 @@ export const listInventory = createServerFn({ method: "GET" })
 
 const listAdminInventorySchema = z.object({
   categories: z.array(z.string().uuid()).max(20).default([]),
-  q: z.string().default(""),
+  q: searchQuerySchema,
   // Staff only, and deliberately absent from listInventorySchema. Retired
   // items are the archive; this is the only way to list them. `visibleStatuses`
   // also ignores the flag for a viewer who may not see retired, so a request
@@ -291,7 +292,7 @@ const requestQueueSchema = z.object({
   // "all" is a view, never combinable with a specific status, so it is one of
   // the exclusive options rather than a separate flag.
   status: z.enum([...INVENTORY_QUEUE_STATUSES, "all"]).default("pending"),
-  q: z.string().default(""),
+  q: searchQuerySchema,
 });
 
 export type InventoryRequestQueueFilter = z.infer<typeof requestQueueSchema>;

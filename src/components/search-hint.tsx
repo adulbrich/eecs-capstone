@@ -1,3 +1,5 @@
+import { clampSearchQuery, SEARCH_QUERY_MAX } from "#/lib/search-query";
+
 /**
  * The line under a listing's search input: what the box searches and the
  * syntax it takes. The input names it through `aria-describedby`, so a
@@ -22,14 +24,48 @@
  *
  * Text only, no link and no control: the row ends with the Filters button,
  * and the tab order from the search to it is asserted.
+ *
+ * `query` is optional and is the listing's committed query, never the input's
+ * draft: a query past `SEARCH_QUERY_MAX` is cut on the server, and this line
+ * is where the reader is told so (#478). In this paragraph rather than in one
+ * of its own because the input already points at it through
+ * `aria-describedby`, so the cut is announced on focus without a live region,
+ * and because a second paragraph would need its own margin in four call
+ * sites.
  */
-export function SearchHint({ fields, id }: { fields: string; id: string }) {
+export function SearchHint({
+  fields,
+  id,
+  query,
+}: {
+  fields: string;
+  id: string;
+  query?: string;
+}) {
+  const note = query === undefined ? null : searchQueryNote(query);
   return (
     <p
       className="-mt-1 basis-full pl-3 text-muted-foreground text-xs md:order-last"
       id={id}
     >
       Searches {fields}. Quote a "phrase", or put - before a word to exclude it.
+      {note && <span className="text-foreground"> {note}</span>}
     </p>
   );
+}
+
+/**
+ * What the reader is told when their query was longer than the server runs,
+ * and `null` when it was not. One sentence, in one place: `SearchHint` puts
+ * it in the line it already owns, and `/admin/users`, which has a bare input
+ * and no hint, renders it in a paragraph of its own.
+ *
+ * It reads the same function the schemas clamp with, so the note cannot claim
+ * a cut the query did not get, or stay silent about one it did.
+ */
+export function searchQueryNote(query: string): string | null {
+  if (!clampSearchQuery(query).truncated) {
+    return null;
+  }
+  return `Your search was too long, so only its first ${SEARCH_QUERY_MAX} characters were used.`;
 }

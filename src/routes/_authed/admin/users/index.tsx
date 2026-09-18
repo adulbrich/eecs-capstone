@@ -13,6 +13,7 @@ import {
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
 import { LocalTime } from "#/components/local-time";
+import { searchQueryNote } from "#/components/search-hint";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -96,6 +97,10 @@ export const Route = createFileRoute("/_authed/admin/users/")({
 });
 
 type Row = Awaited<ReturnType<typeof listUsers>>["rows"][number];
+
+/** The truncation note, named the way the other admin routes name their
+ * hint: one id for the paragraph and the `aria-describedby` on the box. */
+const USER_SEARCH_NOTE_ID = "user-search-note";
 
 const DEFAULT_SORT: SortState = { desc: true, id: "createdAt" };
 
@@ -224,6 +229,9 @@ function UsersAdmin() {
     [navigate]
   );
   const [qDraft, setQDraft] = useDebouncedDraft(q, commitQuery);
+  // The committed query, never `qDraft`: the note describes the search
+  // that ran, and must not appear and vanish between keystrokes (#478).
+  const queryNote = searchQueryNote(q);
 
   const { tableProps } = useAdminTable({
     columns: COLUMNS,
@@ -289,6 +297,10 @@ function UsersAdmin() {
             <div>
               <Label htmlFor="user-search">Search</Label>
               <Input
+                // Described only while there is a note: this page has no
+                // `SearchHint`, so there is nothing under the box the rest of
+                // the time, and a dangling reference is a broken one.
+                aria-describedby={queryNote ? USER_SEARCH_NOTE_ID : undefined}
                 className="mt-1 w-48"
                 id="user-search"
                 onChange={(e) => setQDraft(e.target.value)}
@@ -296,6 +308,11 @@ function UsersAdmin() {
                 type="search"
                 value={qDraft}
               />
+              {queryNote && (
+                <p className="mt-1 max-w-48 text-xs" id={USER_SEARCH_NOTE_ID}>
+                  {queryNote}
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="user-role">Role</Label>
