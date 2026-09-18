@@ -80,6 +80,12 @@ export const programsSchema = z.object({
   // section keeps one Save. Required, never defaulted: an optional flag would
   // let a stale client silently reopen a full team.
   acceptingApplicants: z.boolean(),
+  // The one field the proposer and staff both write (#468, ADR-0032): staff
+  // need to raise it in the same motion as placing a project in a second
+  // program, and the proposer is the only party who knows the capacity in the
+  // first place. Same bounds as `projectInputSchema`, and required for the
+  // same reason as the flag above.
+  teamsSupported: z.number().int().min(1).max(5),
 });
 
 export type ProgramsInput = z.infer<typeof programsSchema>;

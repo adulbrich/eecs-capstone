@@ -46,6 +46,7 @@ const base: ProjectSummary = {
   acceptingApplicants: true,
   requiresNdaIp: false,
   studentProposed: false,
+  teamsSupported: 1,
   imageUrl: null,
   contactName: "Jane Doe",
   updatedAt: "2026-05-28T00:00:00.000Z",

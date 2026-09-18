@@ -84,12 +84,14 @@ describe("the program selector", () => {
       id: inA.id,
       programIds: [a.id],
       acceptingApplicants: true,
+      teamsSupported: 2,
     });
     const inB = await createProjectAs(admin, baseProject());
     await updateProjectProgramsAs(admin, {
       id: inB.id,
       programIds: [b.id],
       acceptingApplicants: true,
+      teamsSupported: 2,
     });
     await forceTransitionAs(admin, inA.id, "published", undefined, {
       sendEmail: false,
@@ -158,6 +160,7 @@ describe("the program selector", () => {
       id: shared.id,
       programIds: [a.id, b.id],
       acceptingApplicants: true,
+      teamsSupported: 2,
     });
     await forceTransitionAs(admin, shared.id, "published", undefined, {
       sendEmail: false,

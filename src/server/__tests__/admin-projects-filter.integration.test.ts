@@ -80,6 +80,7 @@ async function makeProject(
       id: project.id,
       programIds: [programId],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
   }
   return project;
@@ -237,6 +238,7 @@ describe("admin projects program filter", () => {
       id: shared.id,
       programIds: [cs461, ecampus],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     const inCorvallis = await listAdminProjectsAs(
@@ -263,6 +265,7 @@ describe("admin projects program filter", () => {
       id: shared.id,
       programIds: [cs461, ecampus],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     const { rows } = await listAdminProjectsAs(

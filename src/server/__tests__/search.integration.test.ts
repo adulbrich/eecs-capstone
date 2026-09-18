@@ -97,6 +97,7 @@ describe("searchProjects", () => {
       id: closedId,
       programIds: [],
       acceptingApplicants: false,
+      teamsSupported: 1,
     });
     const input = { ...SEARCH_DEFAULTS, pageSize: 50 };
 
@@ -486,11 +487,13 @@ describe("the program filter on the public listing", () => {
       id: shared,
       programIds: [corvallis.id, ecampus.id],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
     await updateProjectProgramsAs(admin, {
       id: onlyHere,
       programIds: [corvallis.id],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     const inEcampus = await searchProjectsImpl({
@@ -525,6 +528,7 @@ describe("the program filter on the public listing", () => {
       id,
       programIds: [a.id, b.id],
       acceptingApplicants: true,
+      teamsSupported: 1,
     });
 
     const { rows } = await searchProjectsImpl({

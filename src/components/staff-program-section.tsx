@@ -7,6 +7,7 @@ import { ProgramMultiSelect } from "./program-multi-select";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { FieldError } from "./ui/field";
+import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 
 /**
@@ -49,6 +50,7 @@ export function StaffProgramSection({
   teamsSupported: number;
 }) {
   const [draft, setDraft] = useState(() => programs.map((p) => p.id));
+  const [teams, setTeams] = useState(teamsSupported);
   // Held in the glossary's direction rather than the column's. The column is
   // `accepting_applicants` and CONTEXT.md keeps that name on purpose, but the
   // word staff and students both read is "Team is full", so the checkbox says
@@ -63,6 +65,7 @@ export function StaffProgramSection({
           id: projectId,
           programIds: draft,
           acceptingApplicants: !full,
+          teamsSupported: teams,
         },
       });
       await onChanged();
@@ -107,6 +110,38 @@ export function StaffProgramSection({
             unless a student asks for full teams too.
           </p>
         </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="staff-teams-supported">Teams supported</Label>
+          <Input
+            aria-describedby="staff-teams-supported-description"
+            className="w-24"
+            id="staff-teams-supported"
+            max={5}
+            min={1}
+            onBlur={(e) => {
+              // The same clamp the proposer's form applies, so the two
+              // writers cannot disagree about what the bounds are.
+              const n = Number(e.target.value);
+              if (!Number.isFinite(n) || n < 1) {
+                setTeams(1);
+              } else if (n > 5) {
+                setTeams(5);
+              }
+            }}
+            onChange={(e) => setTeams(Number(e.target.value))}
+            type="number"
+            value={teams}
+          />
+          <p
+            className="text-muted-foreground text-xs"
+            id="staff-teams-supported-description"
+          >
+            How many separate teams could work on this project at the same time.
+            The proposer sets this on their own form and can set it back, so
+            raise it here when you place a project in another program rather
+            than to overrule them.
+          </p>
+        </div>
         <TeamsWarning
           programCount={programs.length}
           teamsSupported={teamsSupported}
@@ -126,11 +161,11 @@ export function StaffProgramSection({
 }
 
 /**
- * Advisory only, and read off the saved set rather than the draft, so it is
- * there on every visit to the panel and not just in the seconds after an
- * edit. The save is never refused: `teams_supported` is a proposer field and
- * staff cannot edit it from here, so refusing would leave them with no way
- * forward (#462, #468 is the follow-up if that proves annoying).
+ * Advisory only, and read off the saved values rather than the draft, so it
+ * is there on every visit to the panel and not just in the seconds after an
+ * edit. The save is never refused: staff may have a reason, and the number is
+ * in the same section now, so the warning points at a control the reader is
+ * already looking at rather than at somebody to email (#462, #468).
  *
  * The predicate is general rather than "two programs, one team": three
  * programs against two teams is the same problem and reads the same way.
@@ -150,8 +185,8 @@ function TeamsWarning({
     // `warning`, not `destructive`: UI-CONVENTIONS reserves the destructive
     // palette for a hard stop, and this is something staff may still act on.
     <p className="text-xs" style={{ color: "var(--status-warning)" }}>
-      This project supports {teams} but runs in {programCount} programs. Ask the
-      proposer to raise it, or remove a program.
+      This project supports {teams} but runs in {programCount} programs. Raise
+      the number above, or remove a program.
     </p>
   );
 }

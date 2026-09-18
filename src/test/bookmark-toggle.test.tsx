@@ -132,6 +132,7 @@ describe("BookmarkToggle", () => {
       requiresNdaIp: false,
       status: "published",
       studentProposed: false,
+      teamsSupported: 1,
       programs: [],
     };
     render(
