@@ -212,8 +212,15 @@ function buildAdminProjectListConditions(data: AdminProjectsFilter): SQL[] {
   if (trimmed) {
     // Same tsvector-plus-title-ILIKE shape as the public listing, so a
     // partial word still matches what staff hunting for a half-remembered
-    // title actually type. Extended with contact and proposer fields, since
-    // staff also search by who is involved, not just the text.
+    // title actually type. True since #476, which gave the public listing
+    // the ILIKEs this comment had been claiming for it. Extended with
+    // proposer fields, which stay staff-only: matching a public search
+    // against one would leak it by inference.
+    //
+    // The pattern is raw, so `%` and `_` in a staff query behave as
+    // wildcards. The public path escapes them in `escapeLikePattern`
+    // (`_internal/search.ts`); this one is staff-only and is left as it is
+    // rather than fixed in passing.
     const like = `%${trimmed}%`;
     const match = or(
       sql`${projects.searchVector} @@ websearch_to_tsquery('english', ${trimmed})`,

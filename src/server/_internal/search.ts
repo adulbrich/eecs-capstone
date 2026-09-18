@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { projectCategories, projects, userInterests } from "#/db/schema";
 import { readSession } from "#/lib/_internal/auth-guards";
@@ -13,6 +13,24 @@ import { projectSummarySelect, runsInProgram } from "./project-summary";
 export async function searchProjectsForRequest(data: SearchProjectsInput) {
   const session = await readSession();
   return searchProjectsImpl(data, session?.user?.id ?? null);
+}
+
+/**
+ * A user's query as a literal `LIKE` operand: `%` and `_` stop being
+ * wildcards, and a backslash stops being the escape character.
+ *
+ * Postgres reads `\` as `LIKE`'s escape by default, so it has to go first or
+ * it would escape the escapes added after it. Unescaped, a bare `%` matches
+ * every row with a non-null value in any of the three columns, and a query
+ * like `100%` quietly means something other than what was typed. This
+ * listing is anonymous, which is why it is escaped here.
+ *
+ * `buildAdminProjectListConditions` in `projects-queries.ts` builds its
+ * pattern raw and has the same gap. It is staff-only, so it is left alone
+ * rather than fixed in passing (#476).
+ */
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 
 /** The viewer's interest vector, or null for a visitor or a member without one. One indexed row. */
@@ -39,9 +57,29 @@ export async function searchProjectsImpl(
     isNull(projects.deletedAt),
   ];
   if (trimmed) {
-    conditions.push(
-      sql`${projects.searchVector} @@ websearch_to_tsquery('english', ${trimmed})`
+    // The tsvector answers stemming, field weighting and the quoted-phrase
+    // and -exclude syntax SearchHint advertises; the ILIKEs answer what it
+    // structurally cannot see, which is partial words and identifier-shaped
+    // data. Postgres classifies an address as one `email` token and emits it
+    // whole, so `alice.smith@oregonstate.edu` in the vector matches neither
+    // `alice` nor `oregonstate.edu`, and putting contacts in the generated
+    // column would have bought exact-full-address search and nothing else
+    // (#476). Title is here too: the admin listing has always or'd an ILIKE
+    // beside its tsvector, and without one here a partial contact name would
+    // match while a partial title did not.
+    //
+    // The same array feeds the count query below, so the total cannot
+    // disagree with the rows.
+    const like = `%${escapeLikePattern(trimmed)}%`;
+    const match = or(
+      sql`${projects.searchVector} @@ websearch_to_tsquery('english', ${trimmed})`,
+      ilike(projects.title, like),
+      ilike(projects.contactName, like),
+      ilike(projects.contactEmail, like)
     );
+    if (match) {
+      conditions.push(match);
+    }
   }
   // Any-match: a project shared between two programs answers to both, and
   // the filter itself stays single-valued (#462).
