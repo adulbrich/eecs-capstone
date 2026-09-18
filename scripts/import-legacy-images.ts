@@ -16,7 +16,7 @@
 // whole database import into a `.ts` and a `.mjs`, and every constant they
 // shared was a chance to diverge silently.
 //
-// `<src-dir>` is the Box copy of `submission/images/` plus
+// `<src-dir>` is the private-store copy of `submission/images/` plus
 // `legacy-images-manifest.jsonl`, not the NFS export: that tree is a live
 // production site whose permissions IT has already broken once.
 //
