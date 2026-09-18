@@ -310,6 +310,10 @@ test.describe("admin catalog deletes", () => {
       await dialog.getByRole("button", { name: "Delete" }).click();
       await staff.waitForURL(/\/admin\/programs$/, { timeout: 15_000 });
 
+      // The wait above is anchored and does navigate, but the absence below
+      // still needs the table to exist before it means anything. Same reason
+      // as the category case.
+      await expect(staff.getByRole("table")).toBeVisible();
       await expect(rowFor(staff, courseName)).toHaveCount(0);
       expect(
         await countWhere((db) =>
