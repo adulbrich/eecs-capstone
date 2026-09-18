@@ -22,6 +22,15 @@ export type ProjectListRow = Awaited<
   ReturnType<typeof searchProjects>
 >["rows"][number];
 
+/**
+ * Required by `useAdminTable` and inert: every column below is
+ * `enableSorting: false` since #475, so `parseSort` returns this whatever the
+ * URL says and the table renders the order `searchProjects` returned. It used
+ * to be a real `updatedAt desc`, which is how a reader who picked
+ * "Recommended for you" and switched to table view got recommendation
+ * selected rows in Updated order. `/my/items` passes an inert one for the
+ * same reason. [ADR-0030](../../docs/adr/0030-one-ordering-control-on-the-public-listing.md).
+ */
 export const PROJECT_TABLE_DEFAULT_SORT: SortState = {
   desc: true,
   id: "updatedAt",
@@ -106,10 +115,13 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     ),
     cardHeader: true,
     enableHiding: false,
+    enableSorting: false,
     header: "Title",
     id: "title",
   },
-  shared.program,
+  // Spread rather than changed at the source: `projectSummaryColumns` is
+  // shared with `bookmark-table-columns.tsx`, whose table still sorts.
+  { ...shared.program, enableSorting: false },
   {
     cell: ({ row }) =>
       row.original.categories.length === 0 ? (
@@ -125,14 +137,14 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     header: "Categories",
     id: "categories",
   },
-  shared.teams,
+  { ...shared.teams, enableSorting: false },
   shared.badges,
   {
     accessorFn: (row) => row.contactName ?? undefined,
     cell: ({ row }) => row.original.contactName ?? "-",
+    enableSorting: false,
     header: "Contact name",
     id: "contactName",
-    sortUndefined: "last",
   },
   {
     accessorFn: (row) => row.contactEmail ?? undefined,
@@ -150,16 +162,16 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
     // Hidden by default since 2026-09-02: eight visible columns overflowed
     // 1280px, and the address is the one a reader wants least while scanning.
     defaultHidden: true,
+    enableSorting: false,
     header: "Contact email",
     id: "contactEmail",
-    sortUndefined: "last",
   },
   {
     accessorFn: (row) => row.updatedAt,
     cell: ({ row }) => <LocalTime dateOnly value={row.original.updatedAt} />,
+    enableSorting: false,
     header: "Updated",
     id: "updatedAt",
-    sortFn: "datetime",
   },
   proseColumn("description", "Description"),
   proseColumn("problemStatement", "Problem statement"),
@@ -183,8 +195,8 @@ export const PROJECT_TABLE_COLUMNS = defineAdminColumns<ProjectListRow>()([
         "-"
       ),
     defaultHidden: true,
+    enableSorting: false,
     header: "URL",
     id: "url",
-    sortUndefined: "last",
   },
 ]);

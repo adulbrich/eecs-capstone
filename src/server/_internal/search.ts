@@ -132,14 +132,14 @@ export async function searchProjectsImpl(
    */
   const listingDate = sql`coalesce(${projects.publishedAt}, ${projects.createdAt})`;
 
-  // "relevance" is where an unresolved sort lands for everyone without an
-  // interest vector, because ordering used to be implicit: a query ranked by
-  // ts_rank, everything else by date. Defaulting to "newest" instead would
-  // have silently reordered every existing keyword search. Since #424 a viewer
-  // who has a vector resolves to `recommended` before reaching this.
-  const relevanceOrder = trimmed
-    ? sql`ts_rank(${projects.searchVector}, websearch_to_tsquery('english', ${trimmed})) DESC, ${listingDate} DESC`
-    : sql`${listingDate} DESC`;
+  // Only ever reached with a query, because `relevance` without one resolves
+  // to `newest` below: with an empty box `ts_rank` is 0 for every row and
+  // this compiled to exactly what `newest` compiles to, so the select said
+  // "Most relevant" over date-ordered rows, relevant to nothing (#475). The
+  // argument recorded here before, that defaulting to `newest` would silently
+  // reorder every existing keyword search, only ever covered URLs carrying a
+  // query, and those still resolve to `relevance`.
+  const relevanceOrder = sql`ts_rank(${projects.searchVector}, websearch_to_tsquery('english', ${trimmed})) DESC, ${listingDate} DESC`;
 
   // Read for every signed-in viewer, not only under `recommended`: the
   // listing tells the reader whether the recommended sort is open to them,
@@ -163,14 +163,42 @@ export async function searchProjectsImpl(
    * `?order=recommended` from such a viewer reports `relevance`: the page still
    * renders, ordered by relevance, and says which ordering it used.
    */
+  // Where a viewer with no interest vector lands, which is the whole of the
+  // resolution table in #475 once `recommended` is off the table: a typed
+  // query means `relevance`, an empty box means `newest`. Named once because
+  // both the absent-sort default and the `recommended` fallback need it.
+  const defaultWithoutVector = trimmed ? "relevance" : "newest";
   const canRecommend = interestsVector !== null;
-  const requested = data.sort ?? (canRecommend ? "recommended" : "relevance");
-  const order =
-    requested === "recommended" && !canRecommend ? "relevance" : requested;
+  const requested =
+    data.sort ?? (canRecommend ? "recommended" : defaultWithoutVector);
+  // Two orderings cannot always be delivered, and both degrade here rather
+  // than at the call site, so the select and the rows can never disagree:
+  // `recommended` needs a vector, `relevance` needs a query. A URL carrying
+  // `?order=relevance` with an empty box therefore renders in date order and
+  // reports `newest`, which is what the reader sees in the select (#475).
+  let order = requested;
+  if (order === "recommended" && !canRecommend) {
+    order = defaultWithoutVector;
+  }
+  if (order === "relevance" && !trimmed) {
+    order = "newest";
+  }
 
   let orderBy = relevanceOrder;
   if (order === "newest") {
     orderBy = sql`${listingDate} DESC`;
+  } else if (order === "oldest") {
+    orderBy = sql`${listingDate} ASC`;
+  } else if (order === "title") {
+    // Case-insensitive, or "Zebra" would sort above "apple" under the C
+    // collation. `title` is NOT NULL, so there is no null case to place.
+    orderBy = sql`lower(${projects.title}) ASC`;
+  } else if (order === "updated") {
+    // The objection recorded above against `updatedAt` as the listing date,
+    // that one staff typo fix jumps a 2019 project to the top, is an
+    // objection to it being implicit. A reader who picks "Recently updated"
+    // by name has asked for exactly that (#475).
+    orderBy = sql`${projects.updatedAt} DESC`;
   } else if (order === "recommended" && interestsVector) {
     const probe = toSqlVector(interestsVector);
     // Null embeddings sort last rather than being filtered out: a project

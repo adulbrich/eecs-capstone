@@ -290,19 +290,44 @@ test("projects table interactions", async ({ page }) => {
   await checkA11y(page);
   await closeMenu(page);
 
-  // Not "Updated": that is the page's default sort column, so its header
-  // already carries aria-sort before any click. "Title" starts unsorted, so
-  // a passing assertion here can only mean the click actually did something.
-  const header = page.getByRole("columnheader", { name: "Title", exact: true });
-  const before = await header.getAttribute("aria-sort");
-  await page.getByRole("button", { name: "Title", exact: true }).click();
-  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/);
-  expect(await header.getAttribute("aria-sort")).not.toBe(before);
-  // The same click writes the URL: this is the sort-to-URL path the admin
-  // suite covers on /admin/inventory, on the public table.
-  await expect(page).toHaveURL(/[?&]sort=title(&|$)/);
-  await expect(page).toHaveURL(/[?&]dir=(asc|desc)(&|$)/);
+  // The headers stopped sorting in #475, so what used to be asserted here
+  // (a click writing ?sort= and ?dir=) is now asserted not to exist. Every
+  // header, not just Title: one column left sortable would put a second
+  // ordering back on the page beside the Sort select.
+  const headers = page.getByRole("columnheader");
+  const count = await headers.count();
+  expect(count).toBeGreaterThan(0);
+  for (let i = 0; i < count; i++) {
+    const header = headers.nth(i);
+    await expect(header).not.toHaveAttribute("aria-sort", /.*/);
+    await expect(header.getByRole("button")).toHaveCount(0);
+  }
   await checkA11y(page);
+});
+
+test("projects listing keeps one ordering in both views", async ({ page }) => {
+  // The criterion #475 exists for: the same URL renders the same rows in the
+  // same order whichever view it is in, which was false while the table
+  // applied its own `updatedAt desc` on top of the server's order.
+  const url = "/projects?order=title&acceptingOnly=false";
+  await page.goto(`${url}&view=table`);
+  await waitForHydration(page);
+  const tableTitles = await page
+    .locator("tbody tr td:first-child a")
+    .allInnerTexts();
+
+  await page.goto(`${url}&view=card`);
+  await waitForHydration(page);
+  // `h3` because that is what ProjectCard puts the title in, and it is the
+  // only heading level inside a card.
+  const cardTitles = await page
+    .getByRole("heading", { level: 3 })
+    .allInnerTexts();
+
+  expect(tableTitles.length).toBeGreaterThan(0);
+  expect(cardTitles.map((t) => t.trim())).toEqual(
+    tableTitles.map((t) => t.trim())
+  );
 });
 
 test("projects table shows its default-hidden columns when toggled on", async ({

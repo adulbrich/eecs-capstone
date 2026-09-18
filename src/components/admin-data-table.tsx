@@ -214,7 +214,13 @@ type ColumnId<C> = C extends { id: infer TId } ? TId : never;
  * failure there would send the reader after the wrong fix.
  *
  * A column with no `accessorFn` at all (an actions column, say) has no value
- * to sort and passes through untouched.
+ * to sort and passes through untouched, as does one that declares
+ * `enableSorting: false`: rule 1 is about what happens when a reader clicks
+ * the header, so a column with no such header has no comparator to get
+ * wrong. That exemption is what lets a whole table turn sorting off while
+ * keeping accessors its cards and its CSV still read (#475). Rule 2 still
+ * applies to both, because `undefined` against `null` is about the value,
+ * not about sorting.
  */
 type CheckedAdminColumn<C> = C extends {
   accessorFn: (...args: never[]) => infer TValue;
@@ -223,9 +229,11 @@ type CheckedAdminColumn<C> = C extends {
     ? { ACCESSOR_RETURNS_NULL_USE_UNDEFINED: ColumnId<C> }
     : [TValue] extends [string | undefined]
       ? C
-      : C extends { sortFn: NonNullable<unknown> }
+      : C extends { enableSorting: false }
         ? C
-        : { COLUMN_NEEDS_ITS_OWN_SORT_FN: ColumnId<C> }
+        : C extends { sortFn: NonNullable<unknown> }
+          ? C
+          : { COLUMN_NEEDS_ITS_OWN_SORT_FN: ColumnId<C> }
   : C;
 
 type CheckedAdminColumns<C extends readonly unknown[]> = {

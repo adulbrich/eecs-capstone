@@ -80,8 +80,10 @@ const SEARCH_DEFAULTS = {
 };
 
 /** Every id the listing hands back, page by page, in page order. */
+type Ordering = NonNullable<Parameters<typeof searchProjectsImpl>[0]["sort"]>;
+
 async function pageThrough(
-  sort: "relevance" | "newest" | "recommended",
+  sort: Ordering,
   query: string,
   viewerId: string | null
 ) {
@@ -113,6 +115,27 @@ describe("paging a listing whose rows tie on every sort key", () => {
     expectVisitsEachExactlyOnce(await pageThrough("newest", "", null), ids);
   });
 
+  /**
+   * The three orderings #475 added, over the same wholly tied cohort. Each
+   * one ties on its own key for all 400 rows: they share a title, they share
+   * `published_at`, and they were inserted in one statement so they share
+   * `updated_at` too. Only the `projects.id` tie break separates them, which
+   * is the property these tests exist to hold.
+   *
+   * Title is the one a reader would notice breaking: it is the ordering the
+   * column header used to offer, and page-local sorting is exactly what made
+   * page two restart the alphabet.
+   */
+  for (const sort of ["oldest", "title", "updated"] as const) {
+    it(`visits each project exactly once under ${sort}`, async () => {
+      const ids = await insertTiedProjects(null);
+      expectVisitsEachExactlyOnce(await pageThrough(sort, "", null), ids);
+    });
+  }
+
+  // Resolves to `newest` on the server since #475, so this is the same
+  // ordering as the case above reached by the other route. Kept because the
+  // route it comes in by is a URL a reader can still paste.
   it("visits each project exactly once under relevance with no query", async () => {
     const ids = await insertTiedProjects(null);
     expectVisitsEachExactlyOnce(await pageThrough("relevance", "", null), ids);

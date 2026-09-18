@@ -23,12 +23,19 @@ const searchInputSchema = z.object({
     .max(PAGE_SIZE_MAX)
     .default(PAGE_SIZE_DEFAULT),
   /**
+   * The listing's one ordering control, and the only thing that decides row
+   * order in either view: the table's column headers stopped sorting in #475,
+   * so there is no second ordering to disagree with this one.
+   *
    * Optional rather than defaulted, so the server can tell "no choice yet"
-   * from "chose relevance". An absent sort resolves in `searchProjectsImpl`:
-   * a viewer with an interest vector gets `recommended`, everyone else
-   * `relevance` (#424). The resolved value comes back as `order`.
+   * from "chose relevance". An absent sort resolves in `searchProjectsImpl`,
+   * which also resolves the two values that cannot always be delivered:
+   * `recommended` needs an interest vector and `relevance` needs a query.
+   * The resolved value comes back as `order` (#424).
    */
-  sort: z.enum(["relevance", "newest", "recommended"]).optional(),
+  sort: z
+    .enum(["relevance", "newest", "oldest", "title", "updated", "recommended"])
+    .optional(),
 });
 
 export type SearchProjectsInput = z.infer<typeof searchInputSchema>;

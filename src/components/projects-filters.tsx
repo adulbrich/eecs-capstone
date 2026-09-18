@@ -29,7 +29,35 @@ export interface FilterProgram {
   id: string;
 }
 
-export type ProjectsOrder = "relevance" | "newest" | "recommended";
+export type ProjectsOrder =
+  | "relevance"
+  | "newest"
+  | "oldest"
+  | "title"
+  | "updated"
+  | "recommended";
+
+/**
+ * The listing's one ordering control, in the order the select offers them.
+ *
+ * Since #475 this is the only thing that orders the public listing: the
+ * table's column headers no longer sort, so a reader in either view sees the
+ * same rows in the same order for the same URL. The options that replaced the
+ * headers are here rather than on the columns, which is why Title and
+ * Recently updated read as sentences rather than as column names.
+ *
+ * Contact name and Contact email stay table columns and are deliberately not
+ * here: ordering a public catalog by a contact's surname is a staff shaped
+ * job, and #476 made them searchable instead.
+ */
+export const PROJECT_ORDER_LABEL: Record<ProjectsOrder, string> = {
+  recommended: "Recommended for you",
+  relevance: "Most relevant",
+  newest: "Newest",
+  oldest: "Oldest",
+  title: "Title A-Z",
+  updated: "Recently updated",
+};
 
 /**
  * The legend over the narrowing switches. Each label below completes it as
@@ -251,11 +279,30 @@ export function ProjectsSearchBar({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="relevance">Most relevant</SelectItem>
-          <SelectItem value="newest">Newest</SelectItem>
+          {/*
+            "Most relevant" is absent rather than disabled while the box is
+            empty, because with no query it is not a different ordering: it
+            resolves to Newest on the server, and an option that silently
+            means another one is worse than no option (#475). Gated on the
+            committed `q` rather than on the draft, so it does not appear and
+            vanish between keystrokes.
+
+            "Recommended for you" is disabled rather than absent, because it
+            is a thing the reader could have: the prompt under this row tells
+            them how, and an option that is simply gone tells them nothing.
+          */}
           <SelectItem disabled={!canRecommend} value="recommended">
-            Recommended for you
+            {PROJECT_ORDER_LABEL.recommended}
           </SelectItem>
+          {q.trim() !== "" && (
+            <SelectItem value="relevance">
+              {PROJECT_ORDER_LABEL.relevance}
+            </SelectItem>
+          )}
+          <SelectItem value="newest">{PROJECT_ORDER_LABEL.newest}</SelectItem>
+          <SelectItem value="oldest">{PROJECT_ORDER_LABEL.oldest}</SelectItem>
+          <SelectItem value="title">{PROJECT_ORDER_LABEL.title}</SelectItem>
+          <SelectItem value="updated">{PROJECT_ORDER_LABEL.updated}</SelectItem>
         </SelectContent>
       </Select>
       <ViewToggle current={view} onChange={setView} />
