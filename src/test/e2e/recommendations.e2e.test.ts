@@ -164,15 +164,16 @@ test.describe("recommended order", () => {
     expect(recommended).toEqual([...SEED_RECOMMENDED_TITLES]);
 
     await sortTrigger(page).click();
-    // The gate itself, asserted where the listbox is already open rather than
-    // left to the docblock above: with nothing typed the option is absent, not
-    // disabled (#475). The unit test owns both directions of this; here it is
-    // what makes the pick below Newest rather than Most relevant.
+    // The gate the docblock describes, proved here rather than only asserted
+    // there. The unit test owns both directions; this is the empty-box one,
+    // free because the listbox is open anyway for the pick below.
+    //
+    // Read a present option first: the absence below is trivially true of a
+    // listbox that has not rendered yet, and `toHaveCount` retries only until
+    // its condition holds, so on its own it can pass without ever seeing the
+    // options. `expectRecommendedRefused` above is safe for the same reason,
+    // by reading an attribute off an option that is there.
     const newest = page.getByRole("option", { name: "Newest", exact: true });
-    // Anchored on an option that is there, because the absence below is
-    // trivially true of a listbox that has not rendered yet and `toHaveCount`
-    // retries only until its condition holds. Same shape as
-    // `expectRecommendedRefused` above, which reads a present option first.
     await expect(newest).toBeVisible();
     await expect(
       page.getByRole("option", { name: "Most relevant", exact: true })
