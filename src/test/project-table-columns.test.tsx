@@ -259,13 +259,20 @@ describe("the public project table", () => {
    * below assert are unsortable, so the assertion read `expect(F)
    * .toEqual(F)` whatever `F` was.
    */
-  it("keeps badges and the two removed ids out of the sortable set", () => {
+  /**
+   * Inverted in #475: the set is empty rather than merely missing three ids.
+   * With nothing sortable, `parseSort` returns the inert default whatever
+   * the URL says, which is what makes the Sort select the listing's only
+   * ordering and what makes a stale `?sort=title` harmless. Asserted over
+   * every column rather than over a list of names, so a column added later
+   * with sorting left on fails here instead of quietly reintroducing a
+   * second ordering.
+   */
+  it("makes no column sortable", () => {
     const sortableIds = PROJECT_TABLE_COLUMNS.filter(
       (column) => column.enableSorting !== false
     ).map((column) => column.id);
-    expect(sortableIds).not.toContain("badges");
-    expect(sortableIds).not.toContain("accepting");
-    expect(sortableIds).not.toContain("nda");
+    expect(sortableIds).toEqual([]);
   });
 
   /**
@@ -283,14 +290,27 @@ describe("the public project table", () => {
     expect(hideableIds).toContain("badges");
   });
 
-  it("does not sort on the badge cluster", () => {
-    renderTable(DEFAULT_HIDDEN);
-    const header = screen
-      .getAllByRole("columnheader")
-      .find((h) => h.textContent?.trim() === "Badges");
-    expect(header).toBeDefined();
-    // Every sortable header in this table renders its label inside a button.
-    expect(within(header as HTMLElement).queryByRole("button")).toBeNull();
+  /**
+   * Was "does not sort on the badge cluster" until #475, which took sorting
+   * off every column. Rendered rather than read off the definitions, because
+   * the flag and the markup are two different claims: the assertion above
+   * says the column list declares nothing sortable, and this one says the
+   * table drew no header a reader can click.
+   */
+  it("renders no clickable header and no aria-sort", () => {
+    renderTable([]);
+    const headers = screen.getAllByRole("columnheader");
+    expect(headers.length).toBeGreaterThan(0);
+    for (const header of headers) {
+      // Every sortable header in this table renders its label inside a button.
+      expect(
+        within(header).queryByRole("button"),
+        header.textContent ?? ""
+      ).toBeNull();
+      expect(header.getAttribute("aria-sort"), header.textContent ?? "").toBe(
+        null
+      );
+    }
   });
 
   it("renders the contact email as a mailto link and the URL as an external link", () => {

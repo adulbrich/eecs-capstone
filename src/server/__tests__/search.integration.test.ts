@@ -345,6 +345,122 @@ describe("searching the public listing by contact and by partial word", () => {
   });
 });
 
+/**
+ * The listing's one ordering control, after #475 made the Sort select the
+ * only thing that orders these rows in either view.
+ *
+ * The resolution table is the part worth pinning: two of the six orderings
+ * cannot always be delivered, and each degrades on the server rather than at
+ * the call site, so `order` on the result is what the select shows and it can
+ * never describe an order the rows are not in.
+ */
+describe("the public listing's ordering", () => {
+  it("orders by title, oldest and recently updated on request", async () => {
+    const admin = await makeAdmin(`o1-${Date.now()}@x.com`);
+    const banana = await publish(admin, "banana project");
+    const apple = await publish(admin, "Apple project");
+    const cherry = await publish(admin, "Cherry project");
+    const input = { ...SEARCH_DEFAULTS, pageSize: 50 };
+
+    // Case-insensitive, or "Apple" and "Cherry" would both precede "banana".
+    const byTitle = await searchProjectsImpl({ ...input, sort: "title" });
+    expect(byTitle.rows.map((r) => r.title)).toEqual([
+      "Apple project",
+      "banana project",
+      "Cherry project",
+    ]);
+    expect(byTitle.order).toBe("title");
+
+    // Published in the order banana, apple, cherry.
+    const oldest = await searchProjectsImpl({ ...input, sort: "oldest" });
+    expect(oldest.rows.map((r) => r.id)).toEqual([banana, apple, cherry]);
+    expect(oldest.order).toBe("oldest");
+
+    const newest = await searchProjectsImpl({ ...input, sort: "newest" });
+    expect(newest.rows.map((r) => r.id)).toEqual([cherry, apple, banana]);
+
+    // `updated` is its own column, not the listing date: touching the oldest
+    // row must float it to the top, which is exactly what the argument in
+    // search.ts objects to for an IMPLICIT ordering and what a reader asking
+    // for it by name has asked for.
+    await db
+      .update(projects)
+      .set({ updatedAt: new Date() })
+      .where(eq(projects.id, banana));
+    const updated = await searchProjectsImpl({ ...input, sort: "updated" });
+    expect(updated.rows[0].id).toBe(banana);
+    expect(updated.order).toBe("updated");
+  });
+
+  it("resolves relevance to newest when the box is empty", async () => {
+    const admin = await makeAdmin(`o2-${Date.now()}@x.com`);
+    const first = await publish(admin, "Earlier");
+    const second = await publish(admin, "Later");
+
+    // The duplication #475 removed: with no query `ts_rank` is 0 for every
+    // row, so this compiled to exactly what `newest` compiles to while the
+    // select said "Most relevant".
+    const empty = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      sort: "relevance",
+      query: "",
+    });
+    expect(empty.order).toBe("newest");
+    expect(empty.rows.map((r) => r.id)).toEqual([second, first]);
+
+    // With a query it is a real ordering and stays itself.
+    const typed = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      sort: "relevance",
+      query: "Earlier",
+    });
+    expect(typed.order).toBe("relevance");
+  });
+
+  it("resolves an absent sort by the viewer's vector and the query", async () => {
+    const admin = await makeAdmin(`o3-${Date.now()}@x.com`);
+    await publish(admin, "Anything at all");
+
+    // No vector, empty box: Newest, not Most relevant. This is the line a
+    // signed-out visitor lands on.
+    const bare = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      sort: undefined,
+    });
+    expect(bare.order).toBe("newest");
+    expect(bare.viewer.canRecommend).toBe(false);
+
+    // No vector, query typed: relevance, which is a real ordering here.
+    const typed = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      sort: undefined,
+      query: "anything",
+    });
+    expect(typed.order).toBe("relevance");
+  });
+
+  it("falls back from recommended to the no-vector default", async () => {
+    const admin = await makeAdmin(`o4-${Date.now()}@x.com`);
+    await publish(admin, "Fallback subject");
+
+    // A hand-typed ?order=recommended from a viewer with no vector: the page
+    // renders and says which ordering it actually used, rather than promising
+    // one it cannot deliver.
+    const empty = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      sort: "recommended",
+    });
+    expect(empty.order).toBe("newest");
+
+    const typed = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      sort: "recommended",
+      query: "fallback",
+    });
+    expect(typed.order).toBe("relevance");
+  });
+});
+
 // The public listing runs the same `runsInProgram` predicate the admin one
 // does, so the filter stays single-valued and a project shared between two
 // programs answers to both of them (#462).

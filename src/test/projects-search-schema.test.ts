@@ -73,10 +73,18 @@ describe("/projects order search param", () => {
   });
 
   it("keeps an explicit choice", () => {
-    expect(searchSchema.parse({ order: "relevance" }).order).toBe("relevance");
-    expect(searchSchema.parse({ order: "recommended" }).order).toBe(
-      "recommended"
-    );
+    // All six the select offers since #475. The three added there are the
+    // orderings that used to be column headers.
+    for (const order of [
+      "relevance",
+      "newest",
+      "oldest",
+      "title",
+      "updated",
+      "recommended",
+    ] as const) {
+      expect(searchSchema.parse({ order }).order, order).toBe(order);
+    }
   });
 
   /**
@@ -86,6 +94,28 @@ describe("/projects order search param", () => {
    * `.catch` do so because a stale link from a real feature could carry them.
    */
   it("refuses a value the enum does not know", () => {
-    expect(() => searchSchema.parse({ order: "oldest" })).toThrow();
+    expect(() => searchSchema.parse({ order: "alphabetical" })).toThrow();
+  });
+});
+
+/**
+ * The column sort left the schema in #475, when the table's headers stopped
+ * sorting. A link from before that carries both params, and Zod strips a key
+ * the schema does not know, so the listing renders rather than the reader
+ * landing in the error boundary. This is the half of that criterion a unit
+ * test can hold; the a11y suite asserts no header is clickable.
+ */
+describe("/projects sort and dir, after the headers stopped sorting", () => {
+  it("drops a stale ?sort=title&dir=asc rather than raising", () => {
+    const parsed = searchSchema.parse({ sort: "title", dir: "asc" });
+    expect("sort" in parsed).toBe(false);
+    expect("dir" in parsed).toBe(false);
+  });
+
+  it("still keeps the column visibility param beside them", () => {
+    // `cols` stayed: table view keeps its Columns menu, only sorting went.
+    expect(searchSchema.parse({ cols: "url,description" }).cols).toBe(
+      "url,description"
+    );
   });
 });

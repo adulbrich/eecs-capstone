@@ -44,14 +44,20 @@ class ResizeObserverStub {
 globalThis.ResizeObserver ??=
   ResizeObserverStub as unknown as typeof ResizeObserver;
 
+// Radix's Select scrolls its highlighted item into view on open, and jsdom
+// implements no such method. The same stub a dozen suites here install.
+Element.prototype.scrollIntoView = vi.fn();
+
 import {
   ARCHIVE_MODE_HINT,
   countActiveFilters,
+  PROJECT_ORDER_LABEL,
   PROJECT_SWITCH_HINT,
   PROJECT_SWITCH_LABEL,
   PROJECT_SWITCH_LEGEND,
   PROJECTS_FILTER_DEFAULTS,
   ProjectsFilters,
+  ProjectsSearchBar,
   RecommendationPrompt,
 } from "#/components/projects-filters";
 
@@ -269,5 +275,71 @@ describe("the effective order the loader resolved", () => {
   it("shows no line when it resolved to relevance", () => {
     renderPrompt({ canRecommend: true, signedIn: true }, "relevance");
     expect(screen.queryByText(/Ranked by your interests/)).toBeNull();
+  });
+});
+
+/**
+ * The option list, after #475 made this select the listing's only ordering.
+ *
+ * Radix renders the options into a portal only once the trigger is opened,
+ * and jsdom cannot do its pointer dance, so these read the items through the
+ * open menu after a click on the trigger. The two conditional options are
+ * what the assertions are for: everything else is a fixed list.
+ */
+describe("the Sort select's options", () => {
+  function renderBar(q: string, canRecommend = false) {
+    render(
+      <ProjectsSearchBar
+        canRecommend={canRecommend}
+        order={q === "" ? "newest" : "relevance"}
+        q={q}
+        view="card"
+      />
+    );
+    fireEvent.click(screen.getByRole("combobox", { name: "Sort" }));
+  }
+
+  it("offers Most relevant only while a query is typed", () => {
+    renderBar("robotics");
+    expect(
+      screen.getByRole("option", { name: PROJECT_ORDER_LABEL.relevance })
+    ).toBeTruthy();
+
+    cleanup();
+    renderBar("");
+    // Absent rather than disabled: with an empty box it resolves to Newest on
+    // the server, so it is not a different ordering to offer.
+    expect(
+      screen.queryByRole("option", { name: PROJECT_ORDER_LABEL.relevance })
+    ).toBeNull();
+  });
+
+  it("offers the four unconditional orderings whatever the box holds", () => {
+    renderBar("");
+    for (const key of ["newest", "oldest", "title", "updated"] as const) {
+      expect(
+        screen.getByRole("option", { name: PROJECT_ORDER_LABEL[key] }),
+        key
+      ).toBeTruthy();
+    }
+  });
+
+  it("keeps Recommended for you present but disabled without a vector", () => {
+    // Disabled rather than absent, unlike Most relevant: it is a thing the
+    // reader could have, and the prompt under the row says how.
+    renderBar("", false);
+    expect(
+      screen
+        .getByRole("option", { name: PROJECT_ORDER_LABEL.recommended })
+        .getAttribute("aria-disabled")
+    ).toBe("true");
+
+    cleanup();
+    renderBar("", true);
+    expect(
+      screen
+        .getByRole("option", { name: PROJECT_ORDER_LABEL.recommended })
+        .getAttribute("aria-disabled")
+    ).not.toBe("true");
   });
 });

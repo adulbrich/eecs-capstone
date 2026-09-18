@@ -66,16 +66,21 @@ export const searchSchema = z.object({
   // server resolves an absent one from the viewer's interest vector and hands
   // back what it picked as `order` on the result, which is what the Sort
   // select and the prompt line below read (#424).
-  order: z.enum(["relevance", "newest", "recommended"]).optional(),
+  order: z
+    .enum(["relevance", "newest", "oldest", "title", "updated", "recommended"])
+    .optional(),
   // Optional so a param-less visit is detectable; the stored preference then
   // seeds it. Absent from the URL defaults to "card" at render. A value the
   // enum no longer knows (`row`, until 2026-09-02) reads as absent rather than
   // as a router error, so a stale link renders the default.
   view: z.enum(["card", "table"]).optional().catch(undefined),
-  // Table mode's column sort and visibility, owned by useAdminTable.
+  // Table mode's column visibility, owned by useAdminTable. `sort` and `dir`
+  // left in #475: no column here accepts a sort, so a URL naming one could
+  // only disagree with the rows. Zod strips a key the schema does not know,
+  // so a stale link carrying `?sort=title&dir=asc` renders the listing
+  // normally rather than raising a router error. This is the shape
+  // `/my/items` already uses.
   cols: z.string().optional(),
-  dir: z.enum(["asc", "desc"]).optional(),
-  sort: z.string().optional(),
 });
 
 export const Route = createFileRoute("/projects/")({
@@ -182,10 +187,15 @@ function ProjectsList() {
   // Columns menu sits in the search row above the table (#367) and needs
   // the same `controlsProps` the table gets. `seedColumns` keeps the column
   // seed effect waiting for table view, so card view's URL stays free of a
-  // stored layout it has nothing to show. Sorting is local to the page: the
-  // server's `order` decides which rows are here, the column sort decides
-  // their order on it, and clicking a header does not send the reader back
-  // to page one because the page's rows do not change.
+  // stored layout it has nothing to show.
+  //
+  // Nothing here sorts. The server's `order` is the listing's only ordering
+  // in both views, and every column is `enableSorting: false`, so
+  // `parseSort` returns this inert `defaultSort` whatever the URL says and
+  // the table renders the order `searchProjects` returned. That reverses
+  // what this comment argued until #475, when page-local sorting turned out
+  // to mean page two restarting the alphabet. `defaultSort` is still
+  // required by the hook and still passed, the way `/my/items` passes one.
   const { controlsProps, tableProps } = useAdminTable({
     columns: PROJECT_TABLE_COLUMNS,
     defaultSort: PROJECT_TABLE_DEFAULT_SORT,

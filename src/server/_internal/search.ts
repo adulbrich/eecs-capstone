@@ -1,4 +1,13 @@
-import { and, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import {
+  and,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { db } from "#/db";
 import { projectCategories, projects, userInterests } from "#/db/schema";
 import { readSession } from "#/lib/_internal/auth-guards";
@@ -39,6 +48,14 @@ function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 
+/**
+ * An ordering this listing can actually deliver: the request enum minus
+ * nothing, but named separately because `searchProjectsImpl` resolves the two
+ * that depend on state (`recommended` on a vector, `relevance` on a query)
+ * before anything reads it.
+ */
+type ResolvedOrder = NonNullable<SearchProjectsInput["sort"]>;
+
 /** The viewer's interest vector, or null for a visitor or a member without one. One indexed row. */
 async function interestsVectorFor(
   viewerId: string | null
@@ -51,6 +68,70 @@ async function interestsVectorFor(
     .from(userInterests)
     .where(eq(userInterests.userId, viewerId));
   return row?.embedding ?? null;
+}
+
+/**
+ * The unreachable branch of an exhaustive switch. The parameter types as
+ * `never` only while every case is handled, so a new member of the union
+ * turns into a compile error at the call rather than a silent default.
+ */
+function assertNever(value: never): never {
+  throw new Error(`Unhandled ordering: ${String(value)}`);
+}
+
+/** The resolved ordering, as the `ORDER BY` fragment that delivers it. */
+function orderBySql(
+  order: ResolvedOrder,
+  parts: {
+    interestsVector: number[] | null;
+    listingDate: SQL;
+    relevanceOrder: SQL;
+  }
+): SQL {
+  const { interestsVector, listingDate, relevanceOrder } = parts;
+  switch (order) {
+    case "newest":
+      return sql`${listingDate} DESC`;
+    case "oldest":
+      return sql`${listingDate} ASC`;
+    case "title":
+      // Case-insensitive, or "Zebra" would sort above "apple" under the C
+      // collation. `title` is NOT NULL, so there is no null case to place.
+      return sql`lower(${projects.title}) ASC`;
+    case "updated":
+      // The objection recorded against `updatedAt` as the listing date, that
+      // one staff typo fix jumps a 2019 project to the top, is an objection
+      // to it being implicit. A reader who picks "Recently updated" by name
+      // has asked for exactly that (#475).
+      return sql`${projects.updatedAt} DESC`;
+    case "recommended": {
+      if (!interestsVector) {
+        // Unreachable through `searchProjectsImpl`, which degrades
+        // `recommended` before it gets here, and cheaper than a non-null
+        // assertion.
+        return relevanceOrder;
+      }
+      const probe = toSqlVector(interestsVector);
+      // Null embeddings sort last rather than being filtered out: a project
+      // that failed to embed must stay reachable.
+      //
+      // The date, so that the projects sharing the null case are ordered by
+      // something a reader would recognise before the id breaks the rest of
+      // the tie. #427 gave every published and archived project a vector, so
+      // that group should be empty now; it refills one row at a time whenever
+      // an embedding call fails.
+      return sql`${projects.embedding} IS NULL, ${projects.embedding} <=> ${probe}::vector, ${listingDate} DESC`;
+    }
+    case "relevance":
+      // Only ever reached with a query: an empty box resolves this to
+      // `newest` before the call. See `relevanceOrder` for why.
+      return relevanceOrder;
+    default:
+      // Exhaustive rather than a fallthrough. Every ordering has a case
+      // above, so adding a seventh to the enum fails to compile here instead
+      // of silently rendering in relevance order (#475).
+      return assertNever(order);
+  }
 }
 
 export async function searchProjectsImpl(
@@ -132,14 +213,14 @@ export async function searchProjectsImpl(
    */
   const listingDate = sql`coalesce(${projects.publishedAt}, ${projects.createdAt})`;
 
-  // "relevance" is where an unresolved sort lands for everyone without an
-  // interest vector, because ordering used to be implicit: a query ranked by
-  // ts_rank, everything else by date. Defaulting to "newest" instead would
-  // have silently reordered every existing keyword search. Since #424 a viewer
-  // who has a vector resolves to `recommended` before reaching this.
-  const relevanceOrder = trimmed
-    ? sql`ts_rank(${projects.searchVector}, websearch_to_tsquery('english', ${trimmed})) DESC, ${listingDate} DESC`
-    : sql`${listingDate} DESC`;
+  // Only ever reached with a query, because `relevance` without one resolves
+  // to `newest` below: with an empty box `ts_rank` is 0 for every row and
+  // this compiled to exactly what `newest` compiles to, so the select said
+  // "Most relevant" over date-ordered rows, relevant to nothing (#475). The
+  // argument recorded here before, that defaulting to `newest` would silently
+  // reorder every existing keyword search, only ever covered URLs carrying a
+  // query, and those still resolve to `relevance`.
+  const relevanceOrder = sql`ts_rank(${projects.searchVector}, websearch_to_tsquery('english', ${trimmed})) DESC, ${listingDate} DESC`;
 
   // Read for every signed-in viewer, not only under `recommended`: the
   // listing tells the reader whether the recommended sort is open to them,
@@ -157,32 +238,39 @@ export async function searchProjectsImpl(
    * interests and this is what those interests are for, and making them pick
    * the sort on every visit was the whole of #424.
    *
-   * The gate is the vector, never the text. A member whose interests saved but
-   * failed to embed resolves to `relevance`, so the default never promises an
-   * order it cannot deliver. For the same reason a hand-typed
-   * `?order=recommended` from such a viewer reports `relevance`: the page still
-   * renders, ordered by relevance, and says which ordering it used.
+   * The gate is the vector, never the text, so the default never promises an
+   * order it cannot deliver. A member whose interests saved but failed to
+   * embed therefore lands on `defaultWithoutVector` below, as does a
+   * hand-typed `?order=recommended` from such a viewer: the page renders and
+   * reports the ordering it actually used rather than the one asked for.
    */
+  // Where a viewer with no interest vector lands, which is the whole of the
+  // resolution table in #475 once `recommended` is off the table: a typed
+  // query means `relevance`, an empty box means `newest`. Named once because
+  // both the absent-sort default and the `recommended` fallback need it, and
+  // named rather than written twice so the two cannot drift apart.
+  const defaultWithoutVector = trimmed ? "relevance" : "newest";
   const canRecommend = interestsVector !== null;
-  const requested = data.sort ?? (canRecommend ? "recommended" : "relevance");
-  const order =
-    requested === "recommended" && !canRecommend ? "relevance" : requested;
-
-  let orderBy = relevanceOrder;
-  if (order === "newest") {
-    orderBy = sql`${listingDate} DESC`;
-  } else if (order === "recommended" && interestsVector) {
-    const probe = toSqlVector(interestsVector);
-    // Null embeddings sort last rather than being filtered out: a project
-    // that failed to embed must stay reachable.
-    //
-    // The date, so that the projects sharing the null case are ordered by
-    // something a reader would recognise before the id breaks the rest of the
-    // tie. #427 gave every published and archived project a vector, so that
-    // group should be empty now; it refills one row at a time whenever an
-    // embedding call fails.
-    orderBy = sql`${projects.embedding} IS NULL, ${projects.embedding} <=> ${probe}::vector, ${listingDate} DESC`;
+  const requested =
+    data.sort ?? (canRecommend ? "recommended" : defaultWithoutVector);
+  // Two orderings cannot always be delivered, and both degrade here rather
+  // than at the call site, so the select and the rows can never disagree:
+  // `recommended` needs a vector, `relevance` needs a query. A URL carrying
+  // `?order=relevance` with an empty box therefore renders in date order and
+  // reports `newest`, which is what the reader sees in the select (#475).
+  let order = requested;
+  if (order === "recommended" && !canRecommend) {
+    order = defaultWithoutVector;
   }
+  if (order === "relevance" && !trimmed) {
+    order = "newest";
+  }
+
+  const orderBy = orderBySql(order, {
+    interestsVector,
+    listingDate,
+    relevanceOrder,
+  });
 
   const offset = (data.page - 1) * data.pageSize;
   const rows = await db

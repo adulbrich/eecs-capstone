@@ -129,7 +129,10 @@ describe("sort=recommended", () => {
     expect(rows.length).toBe(0);
   });
 
-  it("falls back to relevance ordering when the viewer has no vector", async () => {
+  // "date ordering", not "relevance": with an empty box relevance itself
+  // resolves to newest since #475, so the fallback lands there. The rows are
+  // what this asserts and they are unchanged.
+  it("falls back to date ordering when the viewer has no vector", async () => {
     const admin = await makeAdmin(`d-${Date.now()}@x.com`);
     await publishWithVector(admin, "First", unitVector(0));
     await publishWithVector(admin, "Second", unitVector(1));
@@ -148,7 +151,7 @@ describe("sort=recommended", () => {
     expect(viewer).toEqual({ signedIn: true, canRecommend: false });
   });
 
-  it("falls back to relevance ordering for a signed-out viewer", async () => {
+  it("falls back to date ordering for a signed-out viewer", async () => {
     const admin = await makeAdmin(`e-${Date.now()}@x.com`);
     await publishWithVector(admin, "First", unitVector(0));
     await publishWithVector(admin, "Second", unitVector(1));
@@ -211,16 +214,29 @@ describe("an absent sort resolves by the viewer's vector", () => {
     expect(rows.map((r) => r.title)).toEqual(["Near", "Far"]);
   });
 
-  it("falls back to relevance for a visitor", async () => {
+  /**
+   * Both halves of the no-vector row of #475's resolution table. It used to
+   * be `relevance` whatever the box held, which was the duplication that
+   * issue removed: with nothing typed, relevance ranked by a `ts_rank` that
+   * is 0 for every row and fell through to the same date ordering `newest`
+   * uses, while the select said "Most relevant".
+   */
+  it("resolves a visitor by whether a query is typed", async () => {
     const admin = await makeAdmin(`d2-${Date.now()}@x.com`);
     await publishWithVector(admin, "Near", unitVector(0));
     await publishWithVector(admin, "Far", unitVector(1));
 
-    const { order } = await searchProjectsImpl(
+    const empty = await searchProjectsImpl(
       { ...SEARCH_DEFAULTS, sort: undefined },
       null
     );
-    expect(order).toBe("relevance");
+    expect(empty.order).toBe("newest");
+
+    const typed = await searchProjectsImpl(
+      { ...SEARCH_DEFAULTS, sort: undefined, query: "near" },
+      null
+    );
+    expect(typed.order).toBe("relevance");
   });
 
   /**
@@ -241,10 +257,12 @@ describe("an absent sort resolves by the viewer's vector", () => {
       { ...SEARCH_DEFAULTS, sort: undefined },
       admin.id
     );
-    expect(order).toBe("relevance");
+    // The same no-vector row of the table as the visitor above: the gate is
+    // the vector, and with an empty box that row is `newest`.
+    expect(order).toBe("newest");
   });
 
-  it("lets an explicit relevance win over the vector", async () => {
+  it("lets an explicit sort win over the vector", async () => {
     const admin = await viewerWithVector(`d4-${Date.now()}@x.com`);
     await publishWithVector(admin, "Near", unitVector(0));
     await publishWithVector(admin, "Far", unitVector(1));
@@ -253,7 +271,10 @@ describe("an absent sort resolves by the viewer's vector", () => {
       { ...SEARCH_DEFAULTS, sort: "relevance" },
       admin.id
     );
-    expect(order).toBe("relevance");
+    // Reported as `newest`, because an empty box resolves relevance onward
+    // (#475). What this case is really about is the rows below: an explicit
+    // sort that is not `recommended` beat the vector.
+    expect(order).toBe("newest");
     // The rows, not just the label. Three things have to line up for a case
     // to catch a widened SQL branch: a vector, an explicit sort that is not
     // recommended, and rows whose cosine and relevance orders disagree. The
@@ -273,15 +294,23 @@ describe("an absent sort resolves by the viewer's vector", () => {
    * renders rather than erroring, and reports the ordering it actually used
    * so the Select cannot claim one the rows are not in.
    */
-  it("reports relevance when recommended is asked for without a vector", async () => {
+  it("reports what it used when recommended is asked for without a vector", async () => {
     const admin = await makeAdmin(`d5-${Date.now()}@x.com`);
     await publishWithVector(admin, "Near", unitVector(0));
 
-    const { order } = await searchProjectsImpl(
+    const empty = await searchProjectsImpl(
       { ...SEARCH_DEFAULTS, sort: "recommended" },
       admin.id
     );
-    expect(order).toBe("relevance");
+    expect(empty.order).toBe("newest");
+
+    // With a query the same fallback lands on relevance, which is a real
+    // ordering there rather than another name for the date.
+    const typed = await searchProjectsImpl(
+      { ...SEARCH_DEFAULTS, sort: "recommended", query: "near" },
+      admin.id
+    );
+    expect(typed.order).toBe("relevance");
   });
 
   it("filters by the query and still ranks by cosine", async () => {
