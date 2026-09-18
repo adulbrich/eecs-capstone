@@ -421,9 +421,11 @@ Repeat with the second admin's email. Check the task's CloudWatch log for
 
 ## 7a. Importing the legacy portal archive
 
-A one-time job: 557 archived projects and 338 images from the old PHP capstone
-portal. Run it after the first deploy and after the admins exist, since the
-importer links a project to an account only where one already exists.
+A one-time job per cohort. As of 2026-09-18 it has imported 906 projects from
+the old PHP capstone portal, 702 archived and 204 live, and their images: the
+archived cohort's key map holds 427 and the live one's 131. Run it after the
+first deploy and after the admins exist, since the importer links a project to
+an account only where one already exists.
 
 **The source data never enters this repo or a container image.** The JSONL
 names 299 real proposers and their email addresses, this repo is public and
@@ -435,8 +437,8 @@ The whole thing is idempotent: every project's primary key is a UUIDv5 derived
 from its legacy `cp_id`, so a second run refreshes the same rows and `--undo`
 deletes exactly them. The `NAMESPACE` constant is shared by
 `scripts/import-legacy-images.ts` and `scripts/import-legacy.mjs` and **must
-never change**: a different value re-keys all 557 rows and orphans every image
-object already in the bucket.
+never change**: a different value re-keys every imported row and orphans every
+image object already in the bucket.
 
 ### 7a.0 The values the rest of this section uses
 
@@ -690,9 +692,10 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
 
 It checks every `published` or `archived` project and embeds the ones whose
 stored hash does not match the text they carry now, and the ones with no vector
-at all whatever their hash says. On a first run that is all of them. Budget
-about five minutes for 557 rows at one Bedrock call each plus a 200ms
-politeness delay. The CloudWatch log should end with:
+at all whatever their hash says. On a first run that is all of them. Budget one
+Bedrock call per row needing one, plus a 200ms politeness delay: about five
+minutes for the first cohort's 557, and well under one for a top-up. Size it
+against the `published` plus `archived` count, not the file's row count. The CloudWatch log should end with:
 
 ```
 557 project(s) checked: 557 updated, 0 already current, 0 failed.
@@ -845,11 +848,12 @@ so they want a staff eye rather than a hardcoded id list).
 
 **To import the projects that are still live in the old portal**, set
 `export.sql`'s WHERE to `cp.cp_archived = 0 AND cp.cp_cps_id = 4` and write the
-result to `live-projects.jsonl`. Do not drop `cp_cps_id = 4` as well: 85 of the
-111 live drafts have a NULL `cp_date_updated`, and `clean-export.py` treats a
-null timestamp as the silent CONVERT_TZ failure it was written to catch.
+result to `live-projects.jsonl`. Do not drop `cp_cps_id = 4` as well: most of
+the live drafts (85 of the 111 there were on 2026-09-16, 112 today) have a NULL
+`cp_date_updated`, and `clean-export.py` treats a null timestamp as the silent
+CONVERT_TZ failure it was written to catch.
 
-`clean-export.py` takes the export as its first argument and derives the three
+`clean-export.py` takes the export as its first argument and derives its
 outputs from it, so the two sets can never overwrite each other:
 
 ```bash
