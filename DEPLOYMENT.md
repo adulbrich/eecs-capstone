@@ -428,7 +428,7 @@ first deploy and after the admins exist, since the importer links a project to
 an account only where one already exists.
 
 **The source data never enters this repo or a container image.** The JSONL
-names 299 real proposers and their email addresses, this repo is public and
+names 444 real proposers and their email addresses, this repo is public and
 mirrors to GitLab, and everything in the app's asset bucket is served to
 the world through its CloudFront distribution.
 It lives in Box and reaches production through a private S3 prefix.
@@ -693,9 +693,12 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
 It checks every `published` or `archived` project and embeds the ones whose
 stored hash does not match the text they carry now, and the ones with no vector
 at all whatever their hash says. On a first run that is all of them. Budget one
-Bedrock call per row needing one, plus a 200ms politeness delay: about five
-minutes for the first cohort's 557, and well under one for a top-up. Size it
-against the `published` plus `archived` count, not the file's row count. The CloudWatch log should end with:
+Bedrock call per row needing one, plus a 200ms politeness delay, and size that
+against the rows actually missing a vector rather than the file's row count:
+the first cohort's 557 took about five minutes, and the 146-row top-up on
+2026-09-18 took 72 seconds of task wall time including container start.
+
+The CloudWatch log should end with:
 
 ```
 557 project(s) checked: 557 updated, 0 already current, 0 failed.
