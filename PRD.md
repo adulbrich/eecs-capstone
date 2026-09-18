@@ -135,9 +135,10 @@ Each project carries:
   marked "Team is full" on its page, its card and its table row. The public
   listing hides such projects by default; the "are looking for team members"
   switch is what shows them, and `/admin/projects` starts with it off so staff
-  see everything. Staff and the proposer edit the flag as an ordinary form
-  field, so the edit log records it. A boolean, not a status, so it stays
-  orthogonal to the review workflow. (#72, #419)
+  see everything. Staff edit the flag from the Programs and teams section of
+  the staff panel, riding that section's one Save, and the edit log records it.
+  A boolean, not a status, so it stays orthogonal to the review workflow.
+  (#72, #419, #491)
 - [x] Collaborators table (schema present for multi-user project membership).
 - [x] Full-text search vector (Postgres generated `tsvector`, weighted across
   title, description, problem statement, objectives, and qualifications).

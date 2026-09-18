@@ -232,6 +232,7 @@ describe("programs", () => {
     await updateProjectProgramsAs(admin, {
       id: projId,
       programIds: [programId],
+      acceptingApplicants: true,
     });
 
     const result = await deleteProgramAs(admin, programId);
@@ -287,6 +288,7 @@ describe("programs", () => {
     await updateProjectProgramsAs(admin, {
       id: projId,
       programIds: [doomed, kept],
+      acceptingApplicants: true,
     });
 
     // The program detail page's counter reads join rows, so a project that

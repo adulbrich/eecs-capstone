@@ -90,7 +90,12 @@ describe("searchProjects", () => {
   it("acceptingOnly hides projects whose team is full", async () => {
     const admin = await makeAdmin(`a-acc-${Date.now()}@x.com`);
     const openId = await publish(admin, "Open roster");
-    const closedId = await publish(admin, "Closed roster", {
+    const closedId = await publish(admin, "Closed roster");
+    // Staff only since #491, so it is set through the panel's writer rather
+    // than through the project payload.
+    await updateProjectProgramsAs(admin, {
+      id: closedId,
+      programIds: [],
       acceptingApplicants: false,
     });
     const input = { ...SEARCH_DEFAULTS, pageSize: 50 };
@@ -480,10 +485,12 @@ describe("the program filter on the public listing", () => {
     await updateProjectProgramsAs(admin, {
       id: shared,
       programIds: [corvallis.id, ecampus.id],
+      acceptingApplicants: true,
     });
     await updateProjectProgramsAs(admin, {
       id: onlyHere,
       programIds: [corvallis.id],
+      acceptingApplicants: true,
     });
 
     const inEcampus = await searchProjectsImpl({
@@ -514,7 +521,11 @@ describe("the program filter on the public listing", () => {
       .values({ courseId: `SP-D-${Date.now()}`, courseName: "Two" })
       .returning();
     const id = await publish(admin, "Listed once");
-    await updateProjectProgramsAs(admin, { id, programIds: [a.id, b.id] });
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [a.id, b.id],
+      acceptingApplicants: true,
+    });
 
     const { rows } = await searchProjectsImpl({
       ...SEARCH_DEFAULTS,

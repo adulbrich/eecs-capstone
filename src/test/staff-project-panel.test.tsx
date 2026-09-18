@@ -26,6 +26,7 @@ const {
   restoreProject,
   softDeleteProject,
   updateProjectMentorship,
+  updateProjectPrograms,
   updateProjectProposer,
 } = vi.hoisted(() => ({
   performTransition: vi.fn(),
@@ -34,6 +35,7 @@ const {
   restoreProject: vi.fn(),
   softDeleteProject: vi.fn(),
   updateProjectMentorship: vi.fn(),
+  updateProjectPrograms: vi.fn(),
   updateProjectProposer: vi.fn(),
 }));
 vi.mock("#/server/projects", () => ({
@@ -43,6 +45,7 @@ vi.mock("#/server/projects", () => ({
   restoreProject,
   softDeleteProject,
   updateProjectMentorship,
+  updateProjectPrograms,
   updateProjectProposer,
 }));
 
@@ -167,9 +170,17 @@ const PROJECT_ID = "00000000-0000-0000-0000-0000000000p1";
 function project(
   status: string,
   id = PROJECT_ID,
-  programs: { courseId: string; courseName: string; id: string }[] = []
+  programs: { courseId: string; courseName: string; id: string }[] = [],
+  acceptingApplicants = true
 ) {
-  return { id, status, deletedAt: null, programs, teamsSupported: 1 };
+  return {
+    id,
+    status,
+    deletedAt: null,
+    programs,
+    teamsSupported: 1,
+    acceptingApplicants,
+  };
 }
 
 // Keyed on the id, as the route renders it: a rerender with a new id is the
@@ -178,13 +189,14 @@ function panel(
   status: string,
   id = PROJECT_ID,
   viewerIsOwner = false,
-  programs: { courseId: string; courseName: string; id: string }[] = []
+  programs: { courseId: string; courseName: string; id: string }[] = [],
+  acceptingApplicants = true
 ) {
   return (
     <StaffProjectPanel
       key={id}
       onChanged={() => Promise.resolve()}
-      project={project(status, id, programs)}
+      project={project(status, id, programs, acceptingApplicants)}
       viewerIsOwner={viewerIsOwner}
     />
   );
@@ -210,7 +222,7 @@ describe("StaffProjectPanel section order", () => {
       "Status",
       // Placing a project is the decision staff make right after deciding
       // whether to take it, and before deciding whose it is (#450).
-      "Programs",
+      "Programs and teams",
       "Proposer",
       "Mentor",
       "Scope assessment",
@@ -1010,6 +1022,63 @@ describe("StaffProjectPanel proposer and categories across a project change", ()
     );
     await screen.findByLabelText("Proposer email");
     expect(screen.queryByText(/but runs in/)).toBeNull();
+  });
+
+  // The checkbox reads in the glossary's direction and the column stores the
+  // inverse, so a project still taking students shows an unchecked box (#491).
+  it("shows the team as full only when the project stopped accepting", async () => {
+    const view = render(panel("submitted", PROJECT_ID, false, []));
+    await screen.findByLabelText("Proposer email");
+    expect(
+      screen
+        .getByRole("checkbox", { name: "Team is full" })
+        .getAttribute("data-state")
+    ).toBe("unchecked");
+
+    view.rerender(
+      panel(
+        "submitted",
+        "00000000-0000-0000-0000-0000000000p3",
+        false,
+        [],
+        false
+      )
+    );
+
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("checkbox", { name: "Team is full" })
+          .getAttribute("data-state")
+      ).toBe("checked")
+    );
+  });
+
+  // One Save for the section, so the flag rides the programs endpoint. A
+  // second writer here would mean a second button (#491).
+  it("saves the flag and the program set through one endpoint", async () => {
+    updateProjectPrograms.mockResolvedValue({ id: PROJECT_ID, updated: true });
+    render(
+      panel("submitted", PROJECT_ID, false, [
+        { id: PROGRAM_A, courseId: "Program", courseName: "A" },
+      ])
+    );
+    await screen.findByLabelText("Proposer email");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Team is full" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save programs and teams" })
+    );
+
+    await waitFor(() =>
+      expect(updateProjectPrograms).toHaveBeenCalledWith({
+        data: {
+          id: PROJECT_ID,
+          programIds: [PROGRAM_A],
+          acceptingApplicants: false,
+        },
+      })
+    );
   });
 });
 

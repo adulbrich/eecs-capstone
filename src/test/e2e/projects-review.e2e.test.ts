@@ -263,7 +263,9 @@ test.describe("project program placement", () => {
       await expect(firstBox).toBeChecked();
       await secondBox.click();
       await expect(secondBox).toBeChecked();
-      await staff.getByRole("button", { name: "Save programs" }).click();
+      await staff
+        .getByRole("button", { name: "Save programs and teams" })
+        .click();
 
       // Wait for the save to land before reloading, or the reload aborts
       // the request in flight. The warning is the signal because it is

@@ -110,8 +110,8 @@ _Avoid_: audit log, timeline (as a term; the UI may call it that)
 A published project with no room left on its team. It stays in the catalog, marked
 "Team is full" on its card, page and the Badges column of table view, and the
 public listing hides it by default; the "are looking for team members" switch is
-what shows it. A flag on the project, edited by staff and the proposer alike,
-orthogonal to status.
+what shows it. A flag on the project, edited by staff alone from the staff
+panel's Programs and teams section, orthogonal to status.
 
 The app never records who would join, only whether there is room: bidding and
 assignment happen outside it, which is why there is no word here for the student on

@@ -156,7 +156,6 @@ export async function createProjectAs(
       proposerEmail: null,
       status: "draft",
       teamsSupported: data.teamsSupported ?? 1,
-      acceptingApplicants: data.acceptingApplicants ?? true,
     })
     .returning();
   return { id: created.id };
@@ -194,7 +193,6 @@ function buildProjectValues(
     ...ndaFields(data),
     isSponsored: data.isSponsored ?? false,
     teamsSupported: data.teamsSupported ?? 1,
-    acceptingApplicants: data.acceptingApplicants ?? true,
   };
   if (canWritePrivateNotes(existing, viewer)) {
     newValues.notes = data.notes ?? null;
@@ -472,6 +470,13 @@ async function programLabelsFor(
  * change every time somebody reordered nothing. The incoming ids are
  * deduped for the same reason the composite primary key exists.
  *
+ * Carries `accepting_applicants` too since #491, because the Programs and
+ * teams section saves both with one button and three Save buttons in one
+ * section would be worse than the navigation that change removed. The two
+ * halves are checked and logged separately: either one moving is a save, and
+ * the log gets a row per changed field so `acceptingApplicants` reads there
+ * the way it did when the proposer's form wrote it.
+ *
  * No embedding refresh, for the reason the proposer and mentor writers skip
  * one: the program is not part of the embedded text. It left
  * `buildProjectEmbeddingSource` in #463 (ADR-0025), which embeds a project's
@@ -498,49 +503,69 @@ export async function updateProjectProgramsAs(
   // primary key and the wanted one by the dedupe above, so equal sizes plus
   // containment is set equality.
   const savedSet = new Set(savedIds);
-  if (
-    savedSet.size === wanted.length &&
-    wanted.every((id) => savedSet.has(id))
-  ) {
+  const programsMoved = !(
+    savedSet.size === wanted.length && wanted.every((id) => savedSet.has(id))
+  );
+  const flagMoved = existing.acceptingApplicants !== data.acceptingApplicants;
+  // Both halves, or a flag-only save would report `updated: false` and write
+  // nothing while the section's one Save said it had saved (#491).
+  if (!(programsMoved || flagMoved)) {
     return { id: existing.id, updated: false };
   }
   await db.transaction(async (tx) => {
-    // Inside the transaction, so a program deleted between the read and the
-    // insert cannot leave the logged labels one short of the rows written.
-    const [oldLabels, newLabels] = await Promise.all([
-      programLabelsFor(tx, savedIds),
-      programLabelsFor(tx, wanted),
-    ]);
-    await tx
-      .delete(projectPrograms)
-      .where(eq(projectPrograms.projectId, existing.id));
-    if (wanted.length > 0) {
-      await tx.insert(projectPrograms).values(
-        wanted.map((programId) => ({
-          projectId: existing.id,
-          programId,
-        }))
-      );
+    if (programsMoved) {
+      // Inside the transaction, so a program deleted between the read and the
+      // insert cannot leave the logged labels one short of the rows written.
+      const [oldLabels, newLabels] = await Promise.all([
+        programLabelsFor(tx, savedIds),
+        programLabelsFor(tx, wanted),
+      ]);
+      await tx
+        .delete(projectPrograms)
+        .where(eq(projectPrograms.projectId, existing.id));
+      if (wanted.length > 0) {
+        await tx.insert(projectPrograms).values(
+          wanted.map((programId) => ({
+            projectId: existing.id,
+            programId,
+          }))
+        );
+      }
+      // Nothing renders these two columns: `EditLogEntry` carries four fields
+      // and #467 kept the values out of both payloads. They are for whoever
+      // reads `project_edit_log` in the database, which is why they are
+      // labels and why they are ordered: an unordered array would differ on
+      // nothing and make two identical sets look like a change.
+      await tx.insert(projectEditLog).values({
+        projectId: existing.id,
+        editorId: viewer.id,
+        changedFields: ["programs"],
+        oldValues: { programs: oldLabels },
+        newValues: { programs: newLabels },
+      });
     }
-    // The project row itself is untouched by the placement now, but the
-    // listing orders on `updated_at` and staff expect a move to surface the
-    // project, which is what the single-column writer did.
+    if (flagMoved) {
+      // One row per changed field, so the Edit log reads the way it does for
+      // a form save and `acceptingApplicants` keeps the name the tests and
+      // the diff renderer already know (#491).
+      await tx.insert(projectEditLog).values({
+        projectId: existing.id,
+        editorId: viewer.id,
+        changedFields: ["acceptingApplicants"],
+        oldValues: { acceptingApplicants: existing.acceptingApplicants },
+        newValues: { acceptingApplicants: data.acceptingApplicants },
+      });
+    }
+    // The placement leaves the project row alone, but the listing orders on
+    // `updated_at` and staff expect a move to surface the project, which is
+    // what the single-column writer did. The flag lands in the same statement.
     await tx
       .update(projects)
-      .set({ updatedAt: new Date() })
+      .set({
+        acceptingApplicants: data.acceptingApplicants,
+        updatedAt: new Date(),
+      })
       .where(eq(projects.id, existing.id));
-    // Nothing renders these two columns: `EditLogEntry` carries four fields
-    // and #467 kept the values out of both payloads. They are for whoever
-    // reads `project_edit_log` in the database, which is why they are
-    // labels and why they are ordered: an unordered array would differ on
-    // nothing and make two identical sets look like a change.
-    await tx.insert(projectEditLog).values({
-      projectId: existing.id,
-      editorId: viewer.id,
-      changedFields: ["programs"],
-      oldValues: { programs: oldLabels },
-      newValues: { programs: newLabels },
-    });
   });
   return { id: existing.id, updated: true };
 }

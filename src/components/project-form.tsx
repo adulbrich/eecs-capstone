@@ -60,7 +60,6 @@ export const projectFormSchema = z.object({
   // to the model, so they do not belong in a map the review reads.
   notes: z.string().max(5000),
   teamsSupported: z.number().int().min(1).max(5),
-  acceptingApplicants: z.boolean(),
 });
 
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
@@ -121,7 +120,6 @@ export function ProjectForm({
       isSponsored: initial?.isSponsored ?? false,
       notes: initial?.notes ?? "",
       teamsSupported: initial?.teamsSupported ?? 1,
-      acceptingApplicants: initial?.acceptingApplicants ?? true,
     } satisfies ProjectFormValues,
     validators: {
       // The schema itself. react-form takes a Standard Schema and Zod 4
@@ -570,27 +568,6 @@ export function ProjectForm({
           )}
         </form.Field>
       </div>
-      <form.Field name="acceptingApplicants">
-        {(field: AnyForm) => (
-          <div>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                checked={field.state.value as boolean}
-                id="acceptingApplicants"
-                onCheckedChange={(next) => field.handleChange(next === true)}
-              />
-              <Label className="font-normal" htmlFor="acceptingApplicants">
-                Students can apply to join this project
-              </Label>
-            </div>
-            <p className="mt-1 text-muted-foreground text-xs">
-              Uncheck once you have the team you need. The project stays listed,
-              but students see that its team is full, and the listing hides it
-              unless they ask for full teams too.
-            </p>
-          </div>
-        )}
-      </form.Field>
       {showNotes && <Divider />}
       {/* Private notes are not staff-only content: the proposer writes and
           reads them too. */}

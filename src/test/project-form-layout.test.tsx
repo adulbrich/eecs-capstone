@@ -47,7 +47,6 @@ describe("ProjectForm layout", () => {
       "This project requires an NDA or IP agreement",
       "This is a sponsored project",
       "Teams",
-      "Students can apply to join this project",
       "Private Notes",
     ]);
   });

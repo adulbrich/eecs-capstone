@@ -80,9 +80,17 @@ describe("the program selector", () => {
     // Placed after create: `createProjectAs` stopped carrying a program in
     // #450, so the staff writer is the only one that sets the column.
     const inA = await createProjectAs(admin, baseProject());
-    await updateProjectProgramsAs(admin, { id: inA.id, programIds: [a.id] });
+    await updateProjectProgramsAs(admin, {
+      id: inA.id,
+      programIds: [a.id],
+      acceptingApplicants: true,
+    });
     const inB = await createProjectAs(admin, baseProject());
-    await updateProjectProgramsAs(admin, { id: inB.id, programIds: [b.id] });
+    await updateProjectProgramsAs(admin, {
+      id: inB.id,
+      programIds: [b.id],
+      acceptingApplicants: true,
+    });
     await forceTransitionAs(admin, inA.id, "published", undefined, {
       sendEmail: false,
     });
@@ -149,6 +157,7 @@ describe("the program selector", () => {
     await updateProjectProgramsAs(admin, {
       id: shared.id,
       programIds: [a.id, b.id],
+      acceptingApplicants: true,
     });
     await forceTransitionAs(admin, shared.id, "published", undefined, {
       sendEmail: false,

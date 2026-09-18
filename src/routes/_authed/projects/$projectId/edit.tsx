@@ -64,7 +64,6 @@ function EditProject() {
             isSponsored: project.isSponsored ?? false,
             notes: project.notes ?? "",
             teamsSupported: project.teamsSupported ?? 1,
-            acceptingApplicants: project.acceptingApplicants,
           }}
           onSaved={() => {
             toast.success("Project saved.");

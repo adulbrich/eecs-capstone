@@ -258,6 +258,7 @@ function ProjectDetail() {
             deletedAt: project.deletedAt,
             programs: project.programs,
             teamsSupported: project.teamsSupported,
+            acceptingApplicants: project.acceptingApplicants,
           }}
           viewerIsOwner={viewerIsOwner}
         />

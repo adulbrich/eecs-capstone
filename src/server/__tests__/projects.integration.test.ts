@@ -375,7 +375,11 @@ describe("the program on the public project payload", () => {
       ...baseProject(),
       ...overrides,
     });
-    await updateProjectProgramsAs(admin, { id, programIds: [programId] });
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [programId],
+      acceptingApplicants: true,
+    });
     return id;
   }
 
@@ -418,6 +422,7 @@ describe("the program on the public project payload", () => {
     await updateProjectProgramsAs(admin, {
       id,
       programIds: [ecampus, corvallis],
+      acceptingApplicants: true,
     });
 
     // The owner, not an anonymous reader: this project is still a draft.
@@ -449,7 +454,11 @@ describe("the program on the public project payload", () => {
     const doomed = await makeProgram("ECE 441", "Capstone");
     const kept = await makeProgram("ECE 442", "Capstone II");
     const { id } = await createProjectAs(owner, baseProject());
-    await updateProjectProgramsAs(admin, { id, programIds: [doomed, kept] });
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [doomed, kept],
+      acceptingApplicants: true,
+    });
 
     await db.delete(programs).where(eq(programs.id, doomed));
 
@@ -468,7 +477,11 @@ describe("the program on the public project payload", () => {
       ...baseProject(),
       title: "Aggregated once",
     });
-    await updateProjectProgramsAs(admin, { id, programIds: [a, b] });
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [a, b],
+      acceptingApplicants: true,
+    });
 
     const { project } = await getProjectAs(owner, { id });
 
@@ -510,7 +523,11 @@ describe("updateProjectProgramsAs", () => {
     const { id } = await createProjectAs(owner, baseProject());
 
     await expect(
-      updateProjectProgramsAs(owner, { id, programIds: [programId] })
+      updateProjectProgramsAs(owner, {
+        id,
+        programIds: [programId],
+        acceptingApplicants: true,
+      })
     ).rejects.toThrow("Forbidden");
     expect(await programsOf(id)).toEqual([]);
   });
@@ -530,6 +547,7 @@ describe("updateProjectProgramsAs", () => {
     const first = await updateProjectProgramsAs(admin, {
       id,
       programIds: [programId],
+      acceptingApplicants: true,
     });
     expect(first.updated).toBe(true);
     expect(await programsOf(id)).toEqual([programId]);
@@ -537,6 +555,7 @@ describe("updateProjectProgramsAs", () => {
     const again = await updateProjectProgramsAs(admin, {
       id,
       programIds: [programId],
+      acceptingApplicants: true,
     });
     expect(again.updated).toBe(false);
 
@@ -555,6 +574,7 @@ describe("updateProjectProgramsAs", () => {
     const result = await updateProjectProgramsAs(admin, {
       id,
       programIds: [a, b],
+      acceptingApplicants: true,
     });
 
     expect(result.updated).toBe(true);
@@ -569,11 +589,16 @@ describe("updateProjectProgramsAs", () => {
     const a = await makeProgram(`PRA-${Date.now()}`);
     const b = await makeProgram(`PRB-${Date.now()}`);
     const { id } = await createProjectAs(admin, baseProject());
-    await updateProjectProgramsAs(admin, { id, programIds: [a, b] });
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [a, b],
+      acceptingApplicants: true,
+    });
 
     const again = await updateProjectProgramsAs(admin, {
       id,
       programIds: [b, a],
+      acceptingApplicants: true,
     });
 
     expect(again.updated).toBe(false);
@@ -591,6 +616,7 @@ describe("updateProjectProgramsAs", () => {
     const result = await updateProjectProgramsAs(admin, {
       id,
       programIds: [a, a],
+      acceptingApplicants: true,
     });
 
     expect(result.updated).toBe(true);
@@ -607,9 +633,17 @@ describe("updateProjectProgramsAs", () => {
     const a = await makeProgram(`PLA-${stamp}`);
     const b = await makeProgram(`PLB-${stamp}`);
     const { id } = await createProjectAs(admin, baseProject());
-    await updateProjectProgramsAs(admin, { id, programIds: [a] });
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [a],
+      acceptingApplicants: true,
+    });
 
-    await updateProjectProgramsAs(admin, { id, programIds: [b, a] });
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [b, a],
+      acceptingApplicants: true,
+    });
 
     const log = await logOf(id);
     expect(log).toHaveLength(2);
@@ -626,11 +660,16 @@ describe("updateProjectProgramsAs", () => {
     const admin = await makeUser(`pr-x-${Date.now()}@x.com`, "admin");
     const programId = await makeProgram(`PX-${Date.now()}`);
     const { id } = await createProjectAs(admin, baseProject());
-    await updateProjectProgramsAs(admin, { id, programIds: [programId] });
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [programId],
+      acceptingApplicants: true,
+    });
 
     const cleared = await updateProjectProgramsAs(admin, {
       id,
       programIds: [],
+      acceptingApplicants: true,
     });
 
     expect(cleared.updated).toBe(true);
@@ -1672,31 +1711,36 @@ describe("sponsorship flag", () => {
   });
 });
 
+// Staff only since #491, written through the Programs and teams section
+// rather than the proposer's form. `ProjectInput` no longer carries it, so a
+// created project takes the column default and only this writer moves it.
 describe("acceptingApplicants", () => {
-  it("round-trips through create and update, and the update is logged", async () => {
+  async function makeAcceptingProgram(courseId: string) {
+    const [prog] = await db
+      .insert(programs)
+      .values({ courseId, courseName: "Capstone" })
+      .returning();
+    return prog.id;
+  }
+
+  async function flagOf(id: string) {
+    const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    return row.acceptingApplicants;
+  }
+
+  it("is written by the programs writer, and the write is logged", async () => {
     const owner = await makeUser(`acc-o-${Date.now()}@x.com`, "user");
-    const { id } = await createProjectAs(owner, {
-      ...baseProject(),
+    const admin = await makeUser(`acc-s-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+    expect(await flagOf(id)).toBe(true);
+
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [],
       acceptingApplicants: false,
     });
-    const [created] = await db
-      .select()
-      .from(projects)
-      .where(eq(projects.id, id));
-    expect(created.acceptingApplicants).toBe(false);
 
-    await updateProjectAs(owner, {
-      id,
-      ...baseProject(),
-      acceptingApplicants: true,
-    });
-    const [updated] = await db
-      .select()
-      .from(projects)
-      .where(eq(projects.id, id));
-    expect(updated.acceptingApplicants).toBe(true);
-
-    // An ordinary form field, so the edit log picks it up with no extra work.
+    expect(await flagOf(id)).toBe(false);
     const log = await db
       .select()
       .from(projectEditLog)
@@ -1705,21 +1749,78 @@ describe("acceptingApplicants", () => {
     expect(log[0].changedFields).toEqual(["acceptingApplicants"]);
   });
 
-  it("defaults to accepting when the caller says nothing", async () => {
-    const owner = await makeUser(`acc-d-${Date.now()}@x.com`, "user");
+  // The no-op check compares the program set, so a flag-only change had to be
+  // taught to count as a change or this save would write nothing.
+  it("saves a flag-only change against an unchanged program set", async () => {
+    const owner = await makeUser(`acc-f-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`acc-g-${Date.now()}@x.com`, "admin");
+    const programId = await makeAcceptingProgram(`ACC${Date.now()}`);
     const { id } = await createProjectAs(owner, baseProject());
-    const [created] = await db
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [programId],
+      acceptingApplicants: true,
+    });
+
+    const result = await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [programId],
+      acceptingApplicants: false,
+    });
+
+    expect(result.updated).toBe(true);
+    expect(await flagOf(id)).toBe(false);
+  });
+
+  it("writes one log row per changed field when both move together", async () => {
+    const owner = await makeUser(`acc-b-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`acc-c-${Date.now()}@x.com`, "admin");
+    const programId = await makeAcceptingProgram(`ACB${Date.now()}`);
+    const { id } = await createProjectAs(owner, baseProject());
+
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [programId],
+      acceptingApplicants: false,
+    });
+
+    const log = await db
       .select()
-      .from(projects)
-      .where(eq(projects.id, id));
-    expect(created.acceptingApplicants).toBe(true);
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
+    expect(log).toHaveLength(2);
+    expect(log.flatMap((r) => r.changedFields).sort()).toEqual([
+      "acceptingApplicants",
+      "programs",
+    ]);
+  });
+
+  it("stays put when neither the set nor the flag moves", async () => {
+    const owner = await makeUser(`acc-n-${Date.now()}@x.com`, "user");
+    const admin = await makeUser(`acc-m-${Date.now()}@x.com`, "admin");
+    const { id } = await createProjectAs(owner, baseProject());
+
+    const result = await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [],
+      acceptingApplicants: true,
+    });
+
+    expect(result.updated).toBe(false);
+    const log = await db
+      .select()
+      .from(projectEditLog)
+      .where(eq(projectEditLog.projectId, id));
+    expect(log).toHaveLength(0);
   });
 
   it("reaches anonymous viewers in the public payload", async () => {
     const owner = await makeUser(`acc-p-${Date.now()}@x.com`, "user");
     const admin = await makeUser(`acc-q-${Date.now()}@x.com`, "admin");
-    const { id } = await createProjectAs(owner, {
-      ...baseProject(),
+    const { id } = await createProjectAs(owner, baseProject());
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [],
       acceptingApplicants: false,
     });
     await performTransitionAs(owner, id, "submitted");

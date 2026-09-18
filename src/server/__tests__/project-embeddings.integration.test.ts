@@ -389,7 +389,11 @@ describe("embedding triggers", () => {
       .returning();
     // Through the staff writer, because #450 took `programId` off
     // `ProjectInput`, so `updateProjectAs` cannot attach a program any more.
-    await updateProjectProgramsAs(admin, { id, programIds: [program.id] });
+    await updateProjectProgramsAs(admin, {
+      id,
+      programIds: [program.id],
+      acceptingApplicants: true,
+    });
 
     // Then recompute. Asserting that the writer did not call `embed` would
     // prove nothing: it takes no embed parameter, so that holds whatever the
