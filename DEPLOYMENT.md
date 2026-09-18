@@ -611,19 +611,32 @@ the data; it is resolved anyway so the choice exists for new proposals.
 Matching is on `course_id` alone, not on the name, because three of the four
 share a display name and a rename in the UI would otherwise turn a match into a
 duplicate. Staff can edit `course_id` too, though, so the map in the script is
-coupled to live data with nothing testing the two against each other: on
-2026-09-17 `CS467` was renamed to `CS467-ECAMPUS` and the next run refused,
-which is the guard working. Read that refusal as "the ids moved, update
-`PROGRAMS`", not as a reason to pass `--create-missing-programs`, which would
-split the course in two. `course_id` has no unique constraint, so the importer
-refuses an ambiguous match rather than guessing:
+coupled to live data with nothing testing the two against each other. On
+2026-09-17 `CS467` was renamed to `CS467-ECAMPUS`, and the next run refused.
+The message has since been reworded to name the fix; this is what it prints
+now:
+
+```
+Error: No program with course_id "CS467" (for legacy course "CS467 (3 Month)").
+If staff renamed it, update PROGRAMS to the new id. Only pass
+--create-missing-programs on an empty database; on a populated one it
+duplicates the course.
+```
+
+That is the guard working: read it as "the ids moved, update `PROGRAMS`".
+Creating the missing program instead would have made a second CS467 and hung
+11 projects off it.
+
+A separate guard catches the opposite shape, and prints a different message.
+`course_id` has no unique constraint, so two rows can share one, and the
+importer refuses rather than picking:
 
 ```
 Error: 2 programs share course_id "CS467-ECAMPUS". Refusing to guess which
 one these projects belong to; give them distinct course ids first.
 ```
 
-The whole import is one transaction, so that failure leaves nothing behind.
+The whole import is one transaction, so either failure leaves nothing behind.
 
 ### 7a.4 Run the import
 
@@ -958,8 +971,8 @@ still faithful".
 Do not shortcut that with a watermark column, because the portal has no honest
 one. `MAX(cp_date_updated)` looks like the obvious candidate and is the worst
 of them: `CapstoneProjectsDao::updateCapstoneProject` writes that column back
-from the value it loaded, and the only caller of the setter is the row
-loader, so every save copies the value onto itself and archiving, unarchiving,
+from the value it loaded, and the only caller of the setter is the row loader,
+so every save copies the value onto itself and archiving, unarchiving,
 publishing and hiding all leave it where it was. That was read off
 `CapstoneProjectsDao.php` and `CapstoneProject.php` on the portal host on
 2026-09-17, not inferred; the legacy PHP is not in this repo, so anyone
@@ -967,9 +980,11 @@ re-checking it has to read it there, and `capstone-legacy-portal.md` in Box
 gives the location. The measurable consequence is that 619 projects carry a
 log entry later than their own `cp_date_updated`, counted against the live
 database the same day.
-`MAX(lg_date_created)` is better and still blind in one direction: `capstone_project_log` has messages for
-Published, Archived and Unarchived but none for hiding, so a project going from
-listed to unlisted writes no row anywhere. A row count on its own misses a
+
+`MAX(lg_date_created)` is better and still blind in one direction:
+`capstone_project_log` has messages for Published, Archived and Unarchived but
+none for hiding, so a project going from listed to unlisted writes no row
+anywhere. A row count on its own misses a
 departure and an arrival on the same day.
 
 This is not hypothetical. `iqKA4bMVopiBzrRq` was unarchived and published on
