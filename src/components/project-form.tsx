@@ -525,49 +525,50 @@ export function ProjectForm({
         )}
       </form.Field>
       {/*
-        One column since #450 took the Program picker out of this form. The
-        grid stays because Teams keeps its half-width column from `sm`, which
-        is what its number input is sized for.
+        No grid. #450 took the Program picker out of this form and left Teams
+        alone in a two-column grid, so from `sm` its label and its help text
+        wrapped inside the left half with the right half empty, while the rest
+        of the form ran full width. The number input carries its own `w-24`,
+        which is what actually keeps it from stretching, so the column bought
+        nothing and cost the sentence half its line.
       */}
-      <div className="grid gap-6 sm:grid-cols-2">
-        <form.Field name="teamsSupported">
-          {(field: AnyForm) => (
-            <div>
-              <Label className="text-base" htmlFor="teamsSupported">
-                Teams
-              </Label>
-              <p
-                className="mt-0.5 text-muted-foreground text-xs"
-                id="teamsSupported-description"
-              >
-                How many separate teams could work on this project at the same
-                time. They might take different parts, try different solutions,
-                or compete for the best one. More teams means a larger time
-                commitment.
-              </p>
-              <Input
-                aria-describedby="teamsSupported-description"
-                className="mt-1 w-24"
-                id="teamsSupported"
-                max={5}
-                min={1}
-                onBlur={(e) => {
-                  const n = Number(e.target.value);
-                  if (!Number.isFinite(n) || n < 1) {
-                    field.handleChange(1);
-                  } else if (n > 5) {
-                    field.handleChange(5);
-                  }
-                }}
-                onChange={(e) => field.handleChange(Number(e.target.value))}
-                type="number"
-                value={field.state.value as number}
-              />
-              <FieldError errors={field.state.meta.errors} />
-            </div>
-          )}
-        </form.Field>
-      </div>
+      <form.Field name="teamsSupported">
+        {(field: AnyForm) => (
+          <div>
+            <Label className="text-base" htmlFor="teamsSupported">
+              Teams
+            </Label>
+            <p
+              className="mt-0.5 text-muted-foreground text-xs"
+              id="teamsSupported-description"
+            >
+              How many separate teams could work on this project at the same
+              time. They might take different parts, try different solutions, or
+              compete for the best one. More teams means a larger time
+              commitment.
+            </p>
+            <Input
+              aria-describedby="teamsSupported-description"
+              className="mt-1 w-24"
+              id="teamsSupported"
+              max={5}
+              min={1}
+              onBlur={(e) => {
+                const n = Number(e.target.value);
+                if (!Number.isFinite(n) || n < 1) {
+                  field.handleChange(1);
+                } else if (n > 5) {
+                  field.handleChange(5);
+                }
+              }}
+              onChange={(e) => field.handleChange(Number(e.target.value))}
+              type="number"
+              value={field.state.value as number}
+            />
+            <FieldError errors={field.state.meta.errors} />
+          </div>
+        )}
+      </form.Field>
       {showNotes && <Divider />}
       {/* Private notes are not staff-only content: the proposer writes and
           reads them too. */}
