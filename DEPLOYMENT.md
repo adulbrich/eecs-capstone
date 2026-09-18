@@ -431,7 +431,8 @@ an account only where one already exists.
 names 444 real proposers and their email addresses, this repo is public and
 mirrors to GitLab, and everything in the app's asset bucket is served to
 the world through its CloudFront distribution.
-It lives in Box and reaches production through a private S3 prefix.
+It lives in the team's private file store and reaches production through a
+private S3 prefix.
 
 The whole thing is idempotent: every project's primary key is a UUIDv5 derived
 from its legacy `cp_id`, so a second run refreshes the same rows and `--undo`
@@ -445,11 +446,20 @@ image object already in the bucket.
 Set these once, in the shell you will run 7a from. Nothing below assigns them,
 and an unset bucket name hands `aws` an empty string rather than failing:
 
+`SRC` and `OUT` are deliberately left blank here. They point into the team's
+private file store, and this repo is public and mirrors to GitLab, so the
+paths are not written down in it. `capstone-legacy-portal.md`, which lives in
+that store rather than in this repo for the same reason, records both. Ask an
+instructor if you do not have access to it.
+
 ```bash
-BOX="$HOME/Library/CloudStorage/Box-Box/Projects"
-# Every import writes its output here, in Box beside the source data, never
-# into the working tree. See 7a.1 for why.
-OUT="$BOX/Capstone Portal Migration/import-output"
+# The folder holding the exports, `legacy-images/` and the image manifest.
+SRC=
+# Where every import writes its output: beside the source data, never into
+# the working tree. See 7a.1 for why.
+OUT=
+: "${SRC:?set SRC to the legacy data folder; capstone-legacy-portal.md has it}"
+: "${OUT:?set OUT to the import output folder; it must not be in this repo}"
 # `infra/s3.tf` names it "${var.project}-assets-<account id>"; there is no
 # terraform output for it, so read it from the state. The backend is remote,
 # so `terraform init` has to have run in this checkout first.
@@ -514,21 +524,21 @@ aws --profile aws-capstone1 s3 rb "s3://$OPS_BUCKET" --force
 
 ### 7a.1 Prepare the data on a workstation
 
-From the repo, with the Box folder holding `archived-projects-clean.jsonl`,
+From the repo, with `$SRC` holding `archived-projects-clean.jsonl`,
 `legacy-images/` and `legacy-images-manifest.jsonl`. `$OUT` comes from 7a.0:
 
 ```bash
 npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
-  prepare "$BOX/Capstone Portal Migration" "$OUT/legacy-out"
+  prepare "$SRC" "$OUT/legacy-out"
 ```
 
-**The output directory goes in Box, never in the repo.** It holds real
-proposer addresses and converted project images, and this repo is public and
-mirrors to GitLab. It used to be written to `./legacy-out` in the working
-tree, kept out of git by name; on 2026-09-18 a top-up wrote to `./new-out`,
-which that list did not cover, and 1.6 MB of project images sat untracked and
-unignored until someone noticed. Nothing was committed, and the three
-directories moved to `$OUT` the same day. `.gitignore` still matches
+**The output directory goes in the private store, never in the repo.** It
+holds real proposer addresses and converted project images, and this repo is
+public and mirrors to GitLab. It used to be written to `./legacy-out` in the
+working tree, kept out of git by name; on 2026-09-18 a top-up wrote to
+`./new-out`, which that list did not cover, and 1.6 MB of project images sat
+untracked and unignored until someone noticed. Nothing was committed, and the
+three directories moved to `$OUT` the same day. `.gitignore` still matches
 `*-out/` as a backstop for anyone who ignores this paragraph, not as the way
 the rule is enforced.
 
@@ -570,7 +580,7 @@ bucket:
 
 ```bash
 aws --profile aws-capstone1 s3 cp \
-  "$BOX/Capstone Portal Migration/archived-projects-clean.jsonl" \
+  "$SRC/archived-projects-clean.jsonl" \
   "s3://$OPS_BUCKET/legacy/" --region us-west-2
 aws --profile aws-capstone1 s3 cp "$OUT/legacy-out/image-keys.json" \
   "s3://$OPS_BUCKET/legacy/" --region us-west-2
@@ -599,9 +609,9 @@ cover a local one end to end, which is also how to rehearse the import:
 
 ```bash
 npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
-  prepare "$BOX/Capstone Portal Migration" "$OUT/legacy-out"
+  prepare "$SRC" "$OUT/legacy-out"
 npx tsx --env-file=.env.local scripts/import-legacy-images.ts upload "$OUT/legacy-out"
-cp "$BOX/Capstone Portal Migration/archived-projects-clean.jsonl" "$OUT/legacy-out/"
+cp "$SRC/archived-projects-clean.jsonl" "$OUT/legacy-out/"
 LEGACY_DATA_DIR="$OUT/legacy-out" node --env-file=.env.local \
   scripts/import-legacy.mjs --create-missing-programs
 ```
@@ -852,7 +862,7 @@ And expect a diff: `resolve_program` now recovers a course the app has no
 ENGR41X note to exactly two of the 557 archived rows (`xWf4xJi2vUwh8oDh` and
 `5FaLvacaTmSA2hLQ`). Everything else in that file is byte-identical to what the
 2026-09-16 import received, which is worth re-checking against the 557-row
-copy in Box's `backup-20260917/` rather than assuming. That directory is dated
+copy in `$SRC/backup-20260917/` rather than assuming. That directory is dated
 the day it was taken, not the day of the import it holds.
 
 `clean-export.py` no longer writes a hidden file at all, since 2026-09-18:
@@ -898,7 +908,7 @@ Each row carries `target_status`. `export.sql` sets it to `archived` or
 hidden row to `approved`. The importer accepts all three, and nothing is
 hardcoded to `archived` except the default it falls back to when the field is
 absent, which only an export made before the field existed can be.
-`export.sql` and `clean-export.py` live beside the data in Box, not in this
+`export.sql` and `clean-export.py` live beside the data in `$SRC`, not in this
 repo.
 
 That cohort needs its own images too, and `prepare` reads a fixed filename at
@@ -906,7 +916,7 @@ each end: `legacy-images-manifest.jsonl` in the source directory, and it
 writes `image-keys.json` into the output one. The manifest is generated per
 cohort, so the archived one names only archived projects. Give the live set
 its own directory at BOTH ends rather than regenerating in place, which would
-overwrite the archived cohort's manifest in Box and its key map in
+overwrite the archived cohort's manifest in `$SRC` and its key map in
 `$OUT/legacy-out`, and those are the record of what the first import did:
 
 ```bash
@@ -914,7 +924,7 @@ overwrite the archived cohort's manifest in Box and its key map in
 # the image files. `prepare` hardcodes the first two names, so a differently
 # named directory reports every row as "file missing" rather than failing
 # outright.
-LIVE="$BOX/Capstone Portal Migration/live"
+LIVE="$SRC/live"
 npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
   prepare "$LIVE" "$OUT/live-out"
 cp "$LIVE/live-projects-clean.jsonl" "$OUT/live-out/"
@@ -979,7 +989,7 @@ and the archived figure fell 714 to 713 when one project was unarchived.
 **How to tell whether the portal moved since the last import.** Set
 `export.sql`'s WHERE to the cohort you are checking, run it into
 `live-projects.jsonl` as above, clean it, and diff the result against the copy
-of the file the last run actually received, which is in Box under
+of the file the last run actually received, which is under
 `backup-<date>/`:
 
 ```bash
@@ -1007,7 +1017,7 @@ so every save copies the value onto itself and archiving, unarchiving,
 publishing and hiding all leave it where it was. That was read off
 `CapstoneProjectsDao.php` and `CapstoneProject.php` on the portal host on
 2026-09-17, not inferred; the legacy PHP is not in this repo, so anyone
-re-checking it has to read it there, and `capstone-legacy-portal.md` in Box
+re-checking it has to read it there, and `capstone-legacy-portal.md` in `$SRC`
 gives the location. The measurable consequence is that 619 projects carry a
 log entry later than their own `cp_date_updated`, counted against the live
 database the same day.
