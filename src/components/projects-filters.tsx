@@ -230,7 +230,10 @@ export function ProjectsSearchBar({
         value={queryDraft}
       />
       <SearchHint
-        fields="titles, descriptions, problem statements, objectives and qualifications"
+        // Contacts are last because they are the narrowest of the six and the
+        // most recent (#476); the rest keep the order the tsvector weights
+        // them in.
+        fields="titles, descriptions, problem statements, objectives, qualifications and contacts"
         id={hintId}
       />
       <Select onValueChange={(v) => setOrder(v as ProjectsOrder)} value={order}>

@@ -179,6 +179,172 @@ describe("searchProjects", () => {
   });
 });
 
+/**
+ * The search box matches a contact's name or address, and a partial title,
+ * beside the full-text match it already did (#476).
+ *
+ * The tsvector cannot answer any of these: Postgres classifies an address as
+ * a single `email` token and emits it whole, so nothing inside it is
+ * reachable, and a tsvector matches lexemes rather than substrings, so a
+ * truncated word matches nothing either. The ILIKEs answer exactly that and
+ * nothing the tsvector already covers.
+ */
+describe("searching the public listing by contact and by partial word", () => {
+  it("matches a contact's full name, and their surname alone", async () => {
+    const admin = await makeAdmin(`c1-${Date.now()}@x.com`);
+    const id = await publish(admin, "Telemetry rig", {
+      contactName: "Alice Smith",
+      contactEmail: "alice.smith@oregonstate.edu",
+    });
+
+    for (const query of ["Alice Smith", "Smith"]) {
+      const { rows } = await searchProjectsImpl({ ...SEARCH_DEFAULTS, query });
+      expect(
+        rows.map((r) => r.id),
+        query
+      ).toContain(id);
+    }
+  });
+
+  it("matches the local part of a contact address, and the domain", async () => {
+    const admin = await makeAdmin(`c2-${Date.now()}@x.com`);
+    const id = await publish(admin, "Weather balloon", {
+      contactName: "Alice Smith",
+      contactEmail: "alice.smith@oregonstate.edu",
+    });
+    const elsewhere = await publish(admin, "Off campus", {
+      contactName: "Bob Jones",
+      contactEmail: "bob@example.com",
+    });
+
+    const local = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      query: "alice.smith",
+    });
+    expect(local.rows.map((r) => r.id)).toContain(id);
+
+    const domain = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      query: "oregonstate.edu",
+    });
+    expect(domain.rows.map((r) => r.id)).toContain(id);
+    expect(domain.rows.map((r) => r.id)).not.toContain(elsewhere);
+  });
+
+  it("matches a partial title", async () => {
+    const admin = await makeAdmin(`c3-${Date.now()}@x.com`);
+    const id = await publish(admin, "Robotics arm calibration");
+
+    const { rows } = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      query: "roboti",
+    });
+    expect(rows.map((r) => r.id)).toContain(id);
+  });
+
+  it("treats % and _ as characters rather than as wildcards", async () => {
+    const admin = await makeAdmin(`c4-${Date.now()}@x.com`);
+    const literal = await publish(admin, "Runs at 100% duty cycle");
+    const other = await publish(admin, "Something else entirely");
+
+    // Unescaped, `%` alone matches every row with a non-null title and
+    // `100%` means "starts with 100"; both would put `other` here.
+    for (const query of ["%", "100%"]) {
+      const { rows, total } = await searchProjectsImpl({
+        ...SEARCH_DEFAULTS,
+        query,
+      });
+      expect(
+        rows.map((r) => r.id),
+        query
+      ).not.toContain(other);
+      // The count query runs the same conditions, so it cannot disagree.
+      expect(total, query).toBe(rows.length);
+    }
+
+    // Both queries still find the project that really does carry a `%`,
+    // which is what separates "escaped" from "stripped".
+    for (const query of ["%", "100%"]) {
+      const { rows } = await searchProjectsImpl({ ...SEARCH_DEFAULTS, query });
+      expect(
+        rows.map((r) => r.id),
+        query
+      ).toContain(literal);
+    }
+
+    // `_` is LIKE's single-character wildcard, so unescaped `d_ty` would
+    // reach "duty".
+    const underscore = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      query: "d_ty",
+    });
+    expect(underscore.rows.map((r) => r.id)).not.toContain(literal);
+  });
+
+  it("agrees between the rows and the total for a contact-only match", async () => {
+    const admin = await makeAdmin(`c5-${Date.now()}@x.com`);
+    await publish(admin, "Nothing in the text", {
+      contactName: "Zenobia Quartermain",
+      contactEmail: "zq@oregonstate.edu",
+    });
+
+    const { rows, total } = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      query: "Quartermain",
+      pageSize: 50,
+    });
+    expect(rows.length).toBe(1);
+    expect(total).toBe(1);
+  });
+
+  it("does not match on the proposer's name or address", async () => {
+    // The exposure #336 and #402 removed: a hit against an otherwise empty
+    // result would tell an anonymous visitor who proposed a project.
+    //
+    // `makeAdmin` stores the address as the account's name too, so both
+    // queries below reach `user.name` and `user.email`, which the admin
+    // listing matches and this one must not. Neither shares a word with the
+    // title, or the tsvector would match on that instead and the test would
+    // pass for the wrong reason.
+    const admin = await makeAdmin(`quillfeather-${Date.now()}@x.com`);
+    const id = await publish(admin, "Sensor mesh");
+
+    for (const query of ["quillfeather", "@x.com"]) {
+      const { rows } = await searchProjectsImpl({ ...SEARCH_DEFAULTS, query });
+      expect(
+        rows.map((r) => r.id),
+        query
+      ).not.toContain(id);
+    }
+  });
+
+  it("still answers the quoted phrase and -exclude syntax", async () => {
+    const admin = await makeAdmin(`c6-${Date.now()}@x.com`);
+    const both = await publish(admin, "Machine learning pipeline", {
+      description: "machine learning for sensor data",
+    });
+    const excluded = await publish(admin, "Machine shop scheduling", {
+      description: "machine tooling and shop floor",
+    });
+
+    const phrase = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      query: '"machine learning"',
+      pageSize: 50,
+    });
+    expect(phrase.rows.map((r) => r.id)).toContain(both);
+    expect(phrase.rows.map((r) => r.id)).not.toContain(excluded);
+
+    const minus = await searchProjectsImpl({
+      ...SEARCH_DEFAULTS,
+      query: "machine -shop",
+      pageSize: 50,
+    });
+    expect(minus.rows.map((r) => r.id)).toContain(both);
+    expect(minus.rows.map((r) => r.id)).not.toContain(excluded);
+  });
+});
+
 // The public listing runs the same `runsInProgram` predicate the admin one
 // does, so the filter stays single-valued and a project shared between two
 // programs answers to both of them (#462).
