@@ -519,6 +519,13 @@ npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
   prepare "$BOX/Capstone Portal Migration" ./legacy-out
 ```
 
+**Name that output directory with an `-out` suffix.** `.gitignore` matches
+`*-out/`, and the directory holds real proposer addresses and project images
+in a repo that is public and mirrors to GitLab. A directory named anything
+else is untracked but not ignored, which is one `git add` from publishing it.
+The 2026-09-18 top-up used `./new-out` and was caught only because the rule
+was a list of two names at the time.
+
 That writes `./legacy-out/projects/<uuid>/<uuid>.webp` (paths that *are* the
 object-storage keys), plus `image-keys.json`. `prepare` counts every manifest
 row that converts, so what it prints depends on the manifest you hand it: the
