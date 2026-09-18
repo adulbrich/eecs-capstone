@@ -613,8 +613,9 @@ share a display name and a rename in the UI would otherwise turn a match into a
 duplicate. Staff can edit `course_id` too, though, so the map in the script is
 coupled to live data with nothing testing the two against each other. On
 2026-09-17 `CS467` was renamed to `CS467-ECAMPUS`, and the next run refused.
-The message has since been reworded to name the fix; this is what it prints
-now:
+Below is that refusal in the script's current wording. The id in it is the
+stale one the map still carried that day, so nothing on `main` prints this
+again; a later rename prints the same shape with whichever id has gone stale:
 
 ```
 Error: No program with course_id "CS467" (for legacy course "CS467 (3 Month)").
@@ -984,8 +985,8 @@ database the same day.
 `MAX(lg_date_created)` is better and still blind in one direction:
 `capstone_project_log` has messages for Published, Archived and Unarchived but
 none for hiding, so a project going from listed to unlisted writes no row
-anywhere. A row count on its own misses a
-departure and an arrival on the same day.
+anywhere. A row count on its own misses a departure and an arrival on the same
+day.
 
 This is not hypothetical. `iqKA4bMVopiBzrRq` was unarchived and published on
 2026-09-17, hours after the live export was taken, and `MAX(cp_date_updated)`
