@@ -421,12 +421,14 @@ Repeat with the second admin's email. Check the task's CloudWatch log for
 
 ## 7a. Importing the legacy portal archive
 
-A one-time job: 557 archived projects and 338 images from the old PHP capstone
-portal. Run it after the first deploy and after the admins exist, since the
-importer links a project to an account only where one already exists.
+A one-time job per cohort. As of 2026-09-18 it has imported 906 projects from
+the old PHP capstone portal, 702 archived and 204 live, and their images: the
+archived cohort's key map holds 427 and the live one's 131. Run it after the
+first deploy and after the admins exist, since the importer links a project to
+an account only where one already exists.
 
 **The source data never enters this repo or a container image.** The JSONL
-names 299 real proposers and their email addresses, this repo is public and
+names 444 real proposers and their email addresses, this repo is public and
 mirrors to GitLab, and everything in the app's asset bucket is served to
 the world through its CloudFront distribution.
 It lives in Box and reaches production through a private S3 prefix.
@@ -435,8 +437,8 @@ The whole thing is idempotent: every project's primary key is a UUIDv5 derived
 from its legacy `cp_id`, so a second run refreshes the same rows and `--undo`
 deletes exactly them. The `NAMESPACE` constant is shared by
 `scripts/import-legacy-images.ts` and `scripts/import-legacy.mjs` and **must
-never change**: a different value re-keys all 557 rows and orphans every image
-object already in the bucket.
+never change**: a different value re-keys every imported row and orphans every
+image object already in the bucket.
 
 ### 7a.0 The values the rest of this section uses
 
@@ -517,10 +519,25 @@ npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
   prepare "$BOX/Capstone Portal Migration" ./legacy-out
 ```
 
+**Name that output directory with an `-out` suffix.** `.gitignore` matches
+`*-out/`, and the directory holds real proposer addresses and project images
+in a repo that is public and mirrors to GitLab. A directory named anything
+else is untracked but not ignored, which is one `git add` from publishing it.
+The 2026-09-18 top-up used `./new-out` and was caught only because the rule
+was a list of two names at the time.
+
 That writes `./legacy-out/projects/<uuid>/<uuid>.webp` (paths that *are* the
-object-storage keys), plus `image-keys.json`. Expect `wrote 338 webp files`
-and one skip: `41z9KqPQXXbHwZtb` is a PDF somebody uploaded as a project
-image.
+object-storage keys), plus `image-keys.json`. `prepare` counts every manifest
+row that converts, so what it prints depends on the manifest you hand it: the
+339-row file from 2026-09-16 gives `wrote 338 webp files`, and a manifest of
+the whole archived cohort, 429 rows today, would give 428. Either way there is
+one skip, `41z9KqPQXXbHwZtb`, a PDF somebody uploaded as a project image.
+
+The key map the archived cohort actually uses holds 427, one fewer than 428,
+because the DigiClips logo converts but its project is excluded from the
+import. That map is the first run's 338 merged with the 89 the 2026-09-18
+top-up produced. Handing the importer the extra key would be harmless and not
+silent: it reports any image key naming a project the run did not import.
 
 Converting here rather than in the cluster is deliberate. The keys are fully
 derived from the manifest, so a workstation run produces exactly what an
@@ -660,7 +677,8 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
   --region us-west-2
 ```
 
-The CloudWatch log should end with:
+The CloudWatch log should end with a line of this shape. The figures below are
+the 2026-09-16 first run, not what a later one prints:
 
 ```
 Imported 557 projects (303 with no publish date, 338 with an image)
@@ -690,9 +708,14 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
 
 It checks every `published` or `archived` project and embeds the ones whose
 stored hash does not match the text they carry now, and the ones with no vector
-at all whatever their hash says. On a first run that is all of them. Budget
-about five minutes for 557 rows at one Bedrock call each plus a 200ms
-politeness delay. The CloudWatch log should end with:
+at all whatever their hash says. On a first run that is all of them. Budget one
+Bedrock call per row needing one, plus a 200ms politeness delay, and size that
+against the rows actually missing a vector rather than the file's row count:
+the first cohort's 557 took about five minutes, and the 146-row top-up on
+2026-09-18 took 72 seconds of task wall time including container start.
+
+The CloudWatch log should end with a line of this shape, again from the
+2026-09-16 first run:
 
 ```
 557 project(s) checked: 557 updated, 0 already current, 0 failed.
@@ -712,16 +735,19 @@ sweepers has the rest.
 
 ### 7a.6 What to expect afterwards
 
-- **302 projects have no `published_at` and 264 no `archived_at`.** The legacy
-  event log only starts 2022-08-03, so those dates do not exist to import.
+- **Many rows carry no `published_at` or `archived_at`.** The legacy event log
+  only starts 2022-08-03, so those dates do not exist to import. The
+  2026-09-18 archived run reported 368 of its 702 rows with no publish date
+  and 296 with no archive date. Do not treat those as current totals: staff
+  archive projects in the app daily, so the table moves.
   They are left null rather than backfilled. `searchProjects` orders on
   `coalesce(published_at, created_at)` so the nulls still sort by age, and
   `/admin/projects` says how many rows a date range is hiding.
 - **The archive is public.** `searchProjects` has no auth guard and
   `archivedOnly` resolves to `status = 'archived'`, so a signed-out visitor
-  can browse all 557. That is the intent; it is also why the 146 projects the
-  old portal kept hidden are held back in `archived-hidden-projects.jsonl` and
-  are not part of this import.
+  can browse every archived row. The 146 the old portal kept hidden were held
+  back on that ground at first and imported on 2026-09-18 once the trade-off
+  was accepted; ADR-0031 records why.
 - **No `contact_email` is set.** The old portal published proposer names and
   never published an address. The addresses live in `proposer_email`, which is
   staff-only on both read paths.
@@ -823,12 +849,10 @@ ENGR41X note to exactly two of the 557 archived rows (`xWf4xJi2vUwh8oDh` and
 copy in Box's `backup-20260917/` rather than assuming. That directory is dated
 the day it was taken, not the day of the import it holds.
 
-The two side files come back with the same rows but not the same bytes: the
-held file's `held_reason` string changed, and three of its 146 rows resolve
-their program differently now, two of them losing one outright. None of the
-146 is imported, so none of that reaches the database. The run also prints a
-contradiction report on 5 archived rows, all pre-2022-08-03 and therefore
-explained rather than fatal; that report is new and does not mean the export
+`clean-export.py` no longer writes a hidden file at all, since 2026-09-18:
+every archived row is imported, so the only side file is the excluded one. The
+run prints a contradiction report on 5 archived rows, all pre-2022-08-03 and
+therefore explained rather than fatal; that report does not mean the export
 went wrong.
 
 `--undo` hard-deletes the rows rather than soft-deleting them, which is right
@@ -847,11 +871,12 @@ so they want a staff eye rather than a hardcoded id list).
 
 **To import the projects that are still live in the old portal**, set
 `export.sql`'s WHERE to `cp.cp_archived = 0 AND cp.cp_cps_id = 4` and write the
-result to `live-projects.jsonl`. Do not drop `cp_cps_id = 4` as well: 85 of the
-111 live drafts have a NULL `cp_date_updated`, and `clean-export.py` treats a
-null timestamp as the silent CONVERT_TZ failure it was written to catch.
+result to `live-projects.jsonl`. Do not drop `cp_cps_id = 4` as well: most of
+the live drafts (85 of the 111 there were on 2026-09-16, 112 today) have a NULL
+`cp_date_updated`, and `clean-export.py` treats a null timestamp as the silent
+CONVERT_TZ failure it was written to catch.
 
-`clean-export.py` takes the export as its first argument and derives the three
+`clean-export.py` takes the export as its first argument and derives its
 outputs from it, so the two sets can never overwrite each other:
 
 ```bash
@@ -924,28 +949,26 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
   --region us-west-2
 ```
 
-**What this import deliberately leaves in the old portal**, as of 2026-09-17.
+**What this import deliberately leaves in the old portal**, as of 2026-09-18.
 Each of these needs a decision that the import itself does not settle, and none
-is lost: the portal still holds them, and the two sets the cleaner writes out
-are in Box beside the data.
+is lost: the portal still holds them.
 
 | set | rows | where it is |
 | --- | ---: | --- |
-| Hidden archived projects | 146 | `archived-hidden-projects.jsonl` |
+| Drafts, live and archived | 139 | the portal only |
 | Rejected, live and archived | 49 | the portal only |
-| Drafts, live and archived | 138 | the portal only |
 | Pending approval, archived only | 30 | the portal only |
-| DigiClips working notes | 11 | `excluded-projects.jsonl` |
+| DigiClips working notes | 11 | `archived-projects-excluded.jsonl` |
 
-374 rows in total, against 557 archived and 203 live already accounted for,
-which is the portal's 1134. Those two filenames are what the cleaner wrote
-before it derived its outputs from its input; a re-export writes
-`archived-projects-hidden.jsonl` and `archived-projects-excluded.jsonl`
-instead, with the same contents. Re-derive these counts before the production
-run rather than trusting them, and the same goes for every count in this
-section: the portal is written daily, and the live figure moved from 201 to 203
-between the assessment and this paragraph because two pending proposals were
-approved.
+229 rows, against the 906 imported (702 archived and 204 live), which is the
+portal's 1135. The hidden archived projects used to be the first line of this
+table and are no longer deferred: all 146 were imported on 2026-09-18, 145 as
+`archived` and one as `published` after staff unarchived it.
+
+Re-derive these counts before any run rather than trusting them, and the same
+goes for every count in this section. The portal is written daily: the live
+Accepting Applicants figure went 201, 203, 204 across three days of this work,
+and the archived figure fell 714 to 713 when one project was unarchived.
 
 **How to tell whether the portal moved since the last import.** Set
 `export.sql`'s WHERE to the cohort you are checking, run it into
@@ -994,6 +1017,13 @@ This is not hypothetical. `iqKA4bMVopiBzrRq` was unarchived and published on
 across the table still read `2026-09-16 21:29:58` afterwards. The watermark
 said the set had not moved; the diff found the row.
 
+The export can also fall behind the database on a row neither side counts as
+changed. The 2026-09-18 live export held 11 rows with no `published_at` while
+the importer's own summary, which queries Postgres rather than the file, said
+10: staff had published one here, `commitTransition` stamped the column, and
+`--skip-existing` never carries that back. The database is ahead of the
+portal on that row, which is the intended direction now.
+
 Read the diff with `--skip-existing` in mind. An id on the right only is a row
 the next run adds. An id on the left only has left the target set, which a
 skipping run cannot act on: it writes nothing to a row it did not insert, and
@@ -1012,9 +1042,10 @@ the portal's Browse page". On a LIVE row that is this app's `approved`: the old
 portal's Approve button writes only the status and its Publish button only
 clears the flag, so a project sits approved and unlisted between the two
 clicks, and `search.ts` filters on `published` (or `archived` when
-`archivedOnly` is set) so nothing is exposed. On an ARCHIVED row there is no
-such status, since `archived` is public here, so those stay in the hidden file
-pending a decision.
+`archivedOnly` is set) so nothing is exposed. On an ARCHIVED row the flag is
+inert in the old portal, because its Browse page requires `cp_archived = 0`
+either way, so those import as plain `archived`. That does make them public
+here, which is the trade-off ADR-0031 weighs.
 
 An `approved` row is not in `EMBEDDABLE_STATUSES`, so 7a.5's backfill skips it
 and publishing it later embeds it through `commitTransition`. Size the backfill
