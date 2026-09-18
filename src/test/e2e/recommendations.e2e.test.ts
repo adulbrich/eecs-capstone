@@ -142,12 +142,17 @@ test.describe("recommended order", () => {
 
   /**
    * The other direction, which is what keeps the default from being a trap:
-   * an explicit "Most relevant" is written to the URL and changes the order,
-   * so the member who prefers relevance can still get it.
+   * an explicit choice is written to the URL and changes the order, so a
+   * member who would rather read the listing some other way still can.
+   *
+   * Newest rather than "Most relevant", which the select no longer offers
+   * over an empty box: with no query every row ranks 0 and relevance
+   * compiled to what newest compiles to, so #475 dropped the option instead
+   * of letting it name an ordering it did not deliver. Newest is the
+   * ordering that pick used to resolve to anyway, so this still measures the
+   * same distance from the recommended head of the list.
    */
-  test("picking Most relevant writes the param and reorders", async ({
-    page,
-  }) => {
+  test("picking Newest writes the param and reorders", async ({ page }) => {
     await page.goto("/projects");
     await waitForHydration(page);
     const titles = page.getByRole("heading", { level: 3 });
@@ -159,15 +164,29 @@ test.describe("recommended order", () => {
     expect(recommended).toEqual([...SEED_RECOMMENDED_TITLES]);
 
     await sortTrigger(page).click();
-    await page.getByRole("option", { name: "Most relevant" }).click();
-    await page.waitForURL(/order=relevance/);
+    // The gate the docblock describes, proved here rather than only asserted
+    // there. The unit test owns both directions; this is the empty-box one,
+    // free because the listbox is open anyway for the pick below.
+    //
+    // Read a present option first: the absence below is trivially true of a
+    // listbox that has not rendered yet, and `toHaveCount` retries only until
+    // its condition holds, so on its own it can pass without ever seeing the
+    // options. `expectRecommendedRefused` above is safe for the same reason,
+    // by reading an attribute off an option that is there.
+    const newest = page.getByRole("option", { name: "Newest", exact: true });
+    await expect(newest).toBeVisible();
+    await expect(
+      page.getByRole("option", { name: "Most relevant", exact: true })
+    ).toHaveCount(0);
+    await newest.click();
+    await page.waitForURL(/order=newest/);
 
     await expect(page.getByText("Ranked by your interests.")).toHaveCount(0);
     await expect(titles.first()).toBeVisible();
-    const byRelevance = (await titles.allTextContents()).slice(
+    const byDate = (await titles.allTextContents()).slice(
       0,
       SEED_RECOMMENDED_TITLES.length
     );
-    expect(byRelevance).not.toEqual(recommended);
+    expect(byDate).not.toEqual(recommended);
   });
 });
