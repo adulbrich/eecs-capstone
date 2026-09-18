@@ -513,6 +513,19 @@ export async function updateProjectProgramsAs(
     return { id: existing.id, updated: false };
   }
   await db.transaction(async (tx) => {
+    // The row first and its log rows after, the order every writer in this
+    // file uses. The placement itself leaves the project row alone, but the
+    // listing orders on `updated_at` and staff expect a move to surface the
+    // project, which is what the single-column writer did; the flag lands in
+    // the same statement. The old value the log rows below record comes from
+    // `existing`, read before the transaction, so this cannot overwrite it.
+    await tx
+      .update(projects)
+      .set({
+        acceptingApplicants: data.acceptingApplicants,
+        updatedAt: new Date(),
+      })
+      .where(eq(projects.id, existing.id));
     if (programsMoved) {
       // Inside the transaction, so a program deleted between the read and the
       // insert cannot leave the logged labels one short of the rows written.
@@ -556,16 +569,6 @@ export async function updateProjectProgramsAs(
         newValues: { acceptingApplicants: data.acceptingApplicants },
       });
     }
-    // The placement leaves the project row alone, but the listing orders on
-    // `updated_at` and staff expect a move to surface the project, which is
-    // what the single-column writer did. The flag lands in the same statement.
-    await tx
-      .update(projects)
-      .set({
-        acceptingApplicants: data.acceptingApplicants,
-        updatedAt: new Date(),
-      })
-      .where(eq(projects.id, existing.id));
   });
   return { id: existing.id, updated: true };
 }
