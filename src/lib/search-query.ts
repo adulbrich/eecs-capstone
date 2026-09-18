@@ -31,10 +31,31 @@ export function clampSearchQuery(raw: string): {
   truncated: boolean;
 } {
   const trimmed = raw.trim();
+  if (trimmed.length <= SEARCH_QUERY_MAX) {
+    return { query: trimmed, truncated: false };
+  }
+  // A cut that lands between the two halves of a surrogate pair, which is
+  // what an emoji is, would send a lone half to Postgres; the driver turns
+  // that into a replacement character, so the query the reader is told about
+  // would end in a glyph they never typed. Drop the orphaned half instead.
+  const splitsPair =
+    isHighSurrogate(trimmed.charCodeAt(SEARCH_QUERY_MAX - 1)) &&
+    isLowSurrogate(trimmed.charCodeAt(SEARCH_QUERY_MAX));
   return {
-    query: trimmed.slice(0, SEARCH_QUERY_MAX),
-    truncated: trimmed.length > SEARCH_QUERY_MAX,
+    query: trimmed.slice(
+      0,
+      splitsPair ? SEARCH_QUERY_MAX - 1 : SEARCH_QUERY_MAX
+    ),
+    truncated: true,
   };
+}
+
+function isHighSurrogate(code: number): boolean {
+  return code >= 0xd8_00 && code <= 0xdb_ff;
+}
+
+function isLowSurrogate(code: number): boolean {
+  return code >= 0xdc_00 && code <= 0xdf_ff;
 }
 
 /**

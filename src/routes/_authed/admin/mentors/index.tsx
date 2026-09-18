@@ -12,6 +12,7 @@ import {
   defineAdminColumns,
 } from "#/components/admin-data-table";
 import { ExportCsvButton } from "#/components/export-csv-button";
+import { SearchQueryNote, searchQueryNote } from "#/components/search-hint";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -38,6 +39,9 @@ import {
   listMentors,
   setUserMentorStatus,
 } from "#/server/users";
+
+/** The truncation note, and the `aria-describedby` that points at it. */
+const MENTOR_SEARCH_NOTE_ID = "mentor-search-note";
 
 const searchSchema = z.object({
   cols: z.string().optional(),
@@ -207,6 +211,9 @@ function MentorsAdmin() {
     [navigate]
   );
   const [qDraft, setQDraft] = useDebouncedDraft(q, commitQuery);
+  // The committed query, never `qDraft`: the note describes the search
+  // that ran, and must not appear and vanish between keystrokes (#478).
+  const queryNote = searchQueryNote(q);
 
   const { orderRows, tableProps } = useAdminTable({
     columns: COLUMNS,
@@ -268,6 +275,7 @@ function MentorsAdmin() {
           <div>
             <Label htmlFor="mentor-search">Search</Label>
             <Input
+              aria-describedby={queryNote ? MENTOR_SEARCH_NOTE_ID : undefined}
               className="mt-1 w-64"
               id="mentor-search"
               onChange={(e) => setQDraft(e.target.value)}
@@ -275,6 +283,7 @@ function MentorsAdmin() {
               type="search"
               value={qDraft}
             />
+            <SearchQueryNote id={MENTOR_SEARCH_NOTE_ID} query={q} />
           </div>
         }
       />

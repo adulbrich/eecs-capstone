@@ -27,6 +27,7 @@ import {
 import { InventoryStatusBadge } from "#/components/inventory-status-badge";
 import { LineSheet, type LineSheetField } from "#/components/line-sheet";
 import { LocalTime } from "#/components/local-time";
+import { SearchQueryNote, searchQueryNote } from "#/components/search-hint";
 import { Badge } from "#/components/ui/badge";
 import {
   Breadcrumb,
@@ -67,6 +68,9 @@ import {
 
 /** Both vocabularies plus the sentinel this filter adds for "no filter". */
 const STATUSES = [...INVENTORY_QUEUE_STATUSES, "all"] as const;
+
+/** The truncation note, and the `aria-describedby` that points at it. */
+const REQUEST_SEARCH_NOTE_ID = "request-search-note";
 
 const searchSchema = z.object({
   cols: z.string().optional(),
@@ -390,6 +394,9 @@ function AdminRequestQueue() {
     [navigate]
   );
   const [qDraft, setQDraft] = useDebouncedDraft(q, commitQuery);
+  // The committed query, never `qDraft`: the note describes the search
+  // that ran, and must not appear and vanish between keystrokes (#478).
+  const queryNote = searchQueryNote(q);
 
   const { tableProps } = useAdminTable({
     columns,
@@ -447,6 +454,9 @@ function AdminRequestQueue() {
             <div>
               <Label htmlFor="request-search">Search</Label>
               <Input
+                aria-describedby={
+                  queryNote ? REQUEST_SEARCH_NOTE_ID : undefined
+                }
                 className="mt-1 w-64"
                 id="request-search"
                 onChange={(e) => setQDraft(e.target.value)}
@@ -454,6 +464,7 @@ function AdminRequestQueue() {
                 type="search"
                 value={qDraft}
               />
+              <SearchQueryNote id={REQUEST_SEARCH_NOTE_ID} query={q} />
             </div>
             <div>
               <Label htmlFor="request-filter-status">Status</Label>

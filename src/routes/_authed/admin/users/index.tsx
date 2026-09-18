@@ -13,7 +13,7 @@ import {
 import { ExportCsvButton } from "#/components/export-csv-button";
 import { FilterSwitch } from "#/components/filter-switch";
 import { LocalTime } from "#/components/local-time";
-import { searchQueryNote } from "#/components/search-hint";
+import { SearchQueryNote, searchQueryNote } from "#/components/search-hint";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -308,11 +308,7 @@ function UsersAdmin() {
                 type="search"
                 value={qDraft}
               />
-              {queryNote && (
-                <p className="mt-1 max-w-48 text-xs" id={USER_SEARCH_NOTE_ID}>
-                  {queryNote}
-                </p>
-              )}
+              <SearchQueryNote id={USER_SEARCH_NOTE_ID} query={q} />
             </div>
             <div>
               <Label htmlFor="user-role">Role</Label>

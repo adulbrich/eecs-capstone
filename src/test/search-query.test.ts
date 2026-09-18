@@ -35,6 +35,26 @@ describe("clampSearchQuery", () => {
     });
   });
 
+  it("does not cut a surrogate pair in half", () => {
+    // An emoji is two UTF-16 code units, and the cap counts code units, so a
+    // query can end exactly between them. Half a pair reaches Postgres as a
+    // replacement character, a glyph the reader never typed.
+    const emoji = "\u{1F600}";
+    const padded = `${"e".repeat(SEARCH_QUERY_MAX - 1)}${emoji}tail`;
+    const { query, truncated } = clampSearchQuery(padded);
+    expect(truncated).toBe(true);
+    expect(query).toBe("e".repeat(SEARCH_QUERY_MAX - 1));
+    expect(query).not.toMatch(/[\uD800-\uDBFF]/);
+  });
+
+  it("keeps a pair that fits whole", () => {
+    const emoji = "\u{1F600}";
+    const padded = `${"e".repeat(SEARCH_QUERY_MAX - 2)}${emoji}tail`;
+    expect(clampSearchQuery(padded).query).toBe(
+      `${"e".repeat(SEARCH_QUERY_MAX - 2)}${emoji}`
+    );
+  });
+
   it("reads an empty box as an empty query", () => {
     expect(clampSearchQuery("   ")).toEqual({ query: "", truncated: false });
   });

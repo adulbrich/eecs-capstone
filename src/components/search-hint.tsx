@@ -55,10 +55,36 @@ export function SearchHint({
 }
 
 /**
+ * The same note under a bare search box: the three staff tables that have an
+ * input and no `SearchHint` (`/admin/users`, `/admin/mentors` and the
+ * inventory request queue) render this instead.
+ *
+ * It renders nothing when there is nothing to say, the way `FieldError` does
+ * and for the reason UI-CONVENTIONS gives there: three hand-written
+ * paragraphs are three margins to drift. `max-w-64` keeps the sentence from
+ * widening the toolbar cell past the widest of the three boxes.
+ *
+ * The caller still calls `searchQueryNote` itself, for the conditional
+ * `aria-describedby` on its input: a reference to a paragraph that is not
+ * rendered is a broken one.
+ */
+export function SearchQueryNote({ id, query }: { id: string; query: string }) {
+  const note = searchQueryNote(query);
+  if (note === null) {
+    return null;
+  }
+  return (
+    <p className="mt-1 max-w-64 text-xs" id={id}>
+      {note}
+    </p>
+  );
+}
+
+/**
  * What the reader is told when their query was longer than the server runs,
  * and `null` when it was not. One sentence, in one place: `SearchHint` puts
- * it in the line it already owns, and `/admin/users`, which has a bare input
- * and no hint, renders it in a paragraph of its own.
+ * it in the line it already owns, and `SearchQueryNote` above renders it for
+ * a box with no hint under it.
  *
  * It reads the same function the schemas clamp with, so the note cannot claim
  * a cut the query did not get, or stay silent about one it did.
