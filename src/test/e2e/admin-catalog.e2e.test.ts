@@ -247,8 +247,20 @@ test.describe("admin catalog deletes", () => {
       const dialog = staff.getByRole("alertdialog");
       await expect(dialog).toBeVisible();
       await dialog.getByRole("button", { name: "Delete" }).click();
-      await staff.waitForURL(/\/admin\/categories/, { timeout: 15_000 });
+      // `\?` rather than a bare path, because the path alone also matches
+      // `/admin/categories/<id>`, the detail page this click started on. An
+      // unanchored pattern there is a no-op: `waitForURL` resolves on the
+      // current URL without waiting for the redirect, and everything below
+      // inherits the race. `onDelete` awaits the server call before it
+      // navigates, so arriving at the list is itself proof the row is gone.
+      // The rename case above waits on the same shape, for the same reason.
+      await staff.waitForURL(/\/admin\/categories\?/, { timeout: 15_000 });
 
+      // The table first: an absence read off a page that has not rendered one
+      // is true of any page, and `toHaveCount` retries only until its
+      // condition holds, so on its own it can pass without ever seeing the
+      // list. The rename case reads a present row for the same reason.
+      await expect(staff.getByRole("table")).toBeVisible();
       await expect(rowFor(staff, name)).toHaveCount(0);
       expect(
         await countWhere((db) =>
@@ -298,6 +310,10 @@ test.describe("admin catalog deletes", () => {
       await dialog.getByRole("button", { name: "Delete" }).click();
       await staff.waitForURL(/\/admin\/programs$/, { timeout: 15_000 });
 
+      // The wait above is anchored and does navigate, but the absence below
+      // still needs the table to exist before it means anything. Same reason
+      // as the category case.
+      await expect(staff.getByRole("table")).toBeVisible();
       await expect(rowFor(staff, courseName)).toHaveCount(0);
       expect(
         await countWhere((db) =>
