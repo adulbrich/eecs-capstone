@@ -39,7 +39,7 @@ import { ListCount } from "#/components/ui/pagination";
 import { getSession } from "#/lib/auth-guards";
 import { defineCsvColumns, toCsv } from "#/lib/csv";
 import { pageTitle } from "#/lib/page-title";
-import { PROGRAM_COURSE_ID_HINT } from "#/lib/project-visibility";
+import { PROGRAM_COURSE_ID_HINT } from "#/lib/program-fields";
 import type { SortState } from "#/lib/table-state";
 import { useAction } from "#/lib/use-action";
 import { useAdminTable } from "#/lib/use-admin-table";

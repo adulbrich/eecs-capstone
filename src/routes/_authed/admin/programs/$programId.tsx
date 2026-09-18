@@ -24,7 +24,7 @@ import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
-import { PROGRAM_COURSE_ID_HINT } from "#/lib/project-visibility";
+import { PROGRAM_COURSE_ID_HINT } from "#/lib/program-fields";
 import { useAction } from "#/lib/use-action";
 import { isStaff } from "#/lib/viewer";
 import { deleteProgram, getProgram, updateProgram } from "#/server/programs";
