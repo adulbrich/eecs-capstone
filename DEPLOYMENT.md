@@ -597,7 +597,7 @@ them:
 | --- | --- | ---: |
 | `CS46X-CORVALLIS` | CS46X On Campus (9 Month) | 181 |
 | `ECE44X-CORVALLIS` | ECE44X (9 Month) | 81 |
-| `CS467` | CS467 (3 Month) | 11 |
+| `CS467-ECAMPUS` | CS467 (3 Month) | 11 |
 | `CS46X-ECAMPUS` | CS46X Online (9-month) | 0 |
 
 All four already exist in production, so a correct run prints four `matched`
@@ -608,14 +608,19 @@ row it just made is a duplicate: stop, fix the id, and re-run.
 section, across all 1111 of them, so the distinction cannot be recovered from
 the data; it is resolved anyway so the choice exists for new proposals.
 
-Matching is on `course_id` alone, not on the name, because all three 3-term
-rows share the display name "Capstone (3-term)" and a rename in the UI would
-otherwise turn a match into a duplicate. `course_id` has no unique constraint,
-so the importer refuses an ambiguous match rather than guessing:
+Matching is on `course_id` alone, not on the name, because three of the four
+share a display name and a rename in the UI would otherwise turn a match into a
+duplicate. Staff can edit `course_id` too, though, so the map in the script is
+coupled to live data with nothing testing the two against each other: on
+2026-09-17 `CS467` was renamed to `CS467-ECAMPUS` and the next run refused,
+which is the guard working. Read that refusal as "the ids moved, update
+`PROGRAMS`", not as a reason to pass `--create-missing-programs`, which would
+split the course in two. `course_id` has no unique constraint, so the importer
+refuses an ambiguous match rather than guessing:
 
 ```
-Error: 2 programs share course_id "CS467". Refusing to guess which one these
-projects belong to; give them distinct course ids first.
+Error: 2 programs share course_id "CS467-ECAMPUS". Refusing to guess which
+one these projects belong to; give them distinct course ids first.
 ```
 
 The whole import is one transaction, so that failure leaves nothing behind.
@@ -927,23 +932,31 @@ section: the portal is written daily, and the live figure moved from 201 to 203
 between the assessment and this paragraph because two pending proposals were
 approved.
 
-**How to tell whether the portal moved since the last import.** Re-export,
-re-clean, and diff the `legacy_id` set against the copy of the file the last
-run actually received, which is in Box under `backup-<date>/`:
+**How to tell whether the portal moved since the last import.** Set
+`export.sql`'s WHERE to the cohort you are checking, run it into
+`live-projects.jsonl` as above, clean it, and diff the result against the copy
+of the file the last run actually received, which is in Box under
+`backup-<date>/`:
 
 ```bash
 python3 clean-export.py live-projects.jsonl
-diff <(jq -r .legacy_id backup-20260917/live-projects-clean-20260917.jsonl | sort) \
-     <(jq -r .legacy_id live-projects-clean.jsonl | sort)
+diff <(jq -r '[.legacy_id,.target_status] | @tsv' \
+        backup-20260917/live-projects-clean-20260917.jsonl | sort) \
+     <(jq -r '[.legacy_id,.target_status] | @tsv' \
+        live-projects-clean.jsonl | sort)
 ```
+
+Both fields, not the id alone: a project that was published and is now approved
+keeps its id and changes nothing an id-only diff can see.
 
 Do not shortcut that with a watermark column, because the portal has no honest
 one. `MAX(cp_date_updated)` looks like the obvious candidate and is the worst
 of them: `CapstoneProjectsDao::updateCapstoneProject` writes that column back
-from the value it loaded, the same self-perpetuating pattern as `cp_cpc_id`, so
-archiving, unarchiving, publishing and hiding all leave it where it was. 619
-projects carry a log entry later than their own `cp_date_updated`, measured
-against the live database on 2026-09-17. `MAX(lg_date_created)` is better and
+from the value it loaded, and the only caller of the setter is the row loader,
+so every save copies the value onto itself and archiving, unarchiving,
+publishing and hiding all leave it where it was. 619 projects carry a log entry
+later than their own `cp_date_updated`, measured against the live database on
+2026-09-17. `MAX(lg_date_created)` is better and
 still blind in one direction: `capstone_project_log` has messages for
 Published, Archived and Unarchived but none for hiding, so a project going from
 listed to unlisted writes no row anywhere. A row count on its own misses a
@@ -954,12 +967,13 @@ This is not hypothetical. `iqKA4bMVopiBzrRq` was unarchived and published on
 across the table still read `2026-09-16 21:29:58` afterwards. The watermark
 said the set had not moved; the diff found the row.
 
-Read the diff with `--skip-existing` in mind. An id only on the right is a row
-the next run adds. An id only on the left has left the target set, which the
-importer cannot act on at all: it never deletes. A `target_status` that changed
-on an id already imported is exactly what the flag freezes, so it is
-information about the portal rather than a defect, and applying it is a staff
-edit in this app.
+Read the diff with `--skip-existing` in mind. An id on the right only is a row
+the next run adds. An id on the left only has left the target set, which a
+skipping run cannot act on: it writes nothing to a row it did not insert, and
+it never deletes one. (`--undo` does delete, which is why it is a separate
+flag.) An id on both sides with a different `target_status` is exactly what
+`--skip-existing` freezes, so no run will move it: that is information about
+the portal, and applying it means a staff edit in this app.
 
 Nothing in this app's status vocabulary fits a rejected or a draft legacy
 project: `softDeleteProjectAs` refuses a `draft` outright, and

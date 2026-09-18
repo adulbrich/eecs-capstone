@@ -152,7 +152,7 @@ function uuidv5(name) {
  * onto.
  *
  * Matched on `courseId` alone, which is the stable identifier: it is unique
- * and carries the campus, while the 3-term rows share a display name.
+ * and carries the campus, while three of the four share a display name.
  * Matching on the name, or on the pair, would break the moment staff rename a
  * course in the UI, and a failed match creates a duplicate program rather than
  * erroring. `courseName` is used only when creating a row that is absent.
@@ -171,7 +171,9 @@ function uuidv5(name) {
  * layout had two rows both called `CS46x`, and taking the first would have
  * silently attached 181 projects to the wrong campus.
  *
- * `term_count` is stated by the course name and only written on create.
+ * `term_count` is spelled out here and only written on create. It used to be
+ * readable off the course name, back when those names counted terms; they
+ * count weeks now, so the two no longer agree by inspection.
  * `expected_teams` is never written: it is the denominator the analytics
  * dashboard compares published team slots against (#34), and a made-up value
  * there corrupts a real metric.
