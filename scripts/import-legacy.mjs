@@ -151,19 +151,30 @@ function uuidv5(name) {
  * The four programs production carries, and which legacy course each maps
  * onto.
  *
- * Matched on `courseId` alone, which is the stable identifier: it is unique
- * and carries the campus, while all three 3-term rows share the display name
- * "Capstone (3-term)". Matching on the name, or on the pair, would break the
- * moment staff rename a course in the UI, and a failed match creates a
- * duplicate program rather than erroring. `courseName` is used only when
- * creating a row that is absent.
+ * Matched on `courseId` alone, never on the display name: three of the four
+ * share one, so a name match would be ambiguous from the start. That makes
+ * `courseId` the better key here rather than a good one. It carries the
+ * campus, but it has no unique constraint in the database and staff can edit
+ * it in the UI, so neither uniqueness nor stability is guaranteed.
  *
- * `course_id` is not unique at the database level, so `resolvePrograms`
- * refuses an ambiguous match rather than picking a row: an earlier production
- * layout had two rows both called `CS46x`, and taking the first would have
- * silently attached 181 projects to the wrong campus.
+ * Not unique, so `resolvePrograms` refuses an ambiguous match rather than
+ * picking a row: an earlier production layout had two rows both called
+ * `CS46x`, and taking the first would have silently attached 181 projects to
+ * the wrong campus.
  *
- * `term_count` is stated by the course name and only written on create.
+ * Not stable, so this map is coupled to live data with nothing testing the two
+ * against each other. It has drifted once: on 2026-09-17 staff renamed all
+ * four programs, `CS467` became `CS467-ECAMPUS`, and the next import refused
+ * with `No program with course_id "CS467"`. That refusal is the design
+ * working, so read it as "the ids moved, update this map". Check `programs`
+ * before a run that follows any program admin work.
+ *
+ * `courseName` and `termCount` are read only when a row is absent and has to
+ * be created. On a match nothing compares them, so a display-name change in
+ * the UI leaves this map quietly wrong while only an id change errors. They
+ * are spelled out rather than derived from each other: the names used to count
+ * terms and now count weeks.
+ *
  * `expected_teams` is never written: it is the denominator the analytics
  * dashboard compares published team slots against (#34), and a made-up value
  * there corrupts a real metric.
@@ -171,22 +182,22 @@ function uuidv5(name) {
 const PROGRAMS = {
   "CS46X On Campus (9 Month)": {
     courseId: "CS46X-CORVALLIS",
-    courseName: "Capstone (3-term)",
+    courseName: "Capstone (30 weeks)",
     termCount: 3,
   },
   "CS46X Online (9-month)": {
     courseId: "CS46X-ECAMPUS",
-    courseName: "Capstone (3-term)",
+    courseName: "Capstone (30 weeks)",
     termCount: 3,
   },
   "ECE44X (9 Month)": {
     courseId: "ECE44X-CORVALLIS",
-    courseName: "Capstone (3-term)",
+    courseName: "Capstone (30 weeks)",
     termCount: 3,
   },
   "CS467 (3 Month)": {
-    courseId: "CS467",
-    courseName: "Capstone (1-term) (Ecampus)",
+    courseId: "CS467-ECAMPUS",
+    courseName: "Capstone (10 weeks)",
     termCount: 1,
   },
 };
@@ -316,7 +327,9 @@ async function resolvePrograms(client, createMissingPrograms) {
     if (!createMissingPrograms) {
       throw new Error(
         `No program with course_id "${spec.courseId}" (for legacy course "${course}"). ` +
-          "Create it first, or pass --create-missing-programs on an empty database."
+          "If staff renamed it, update PROGRAMS to the new id. " +
+          "Only pass --create-missing-programs on an empty database; " +
+          "on a populated one it duplicates the course."
       );
     }
     const created = await client.query(
