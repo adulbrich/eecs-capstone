@@ -451,13 +451,13 @@ function AdminRequestQueue() {
         {...tableProps}
         toolbar={
           <>
-            <div>
+            <div className="w-64">
               <Label htmlFor="request-search">Search</Label>
               <Input
                 aria-describedby={
                   queryNote ? REQUEST_SEARCH_NOTE_ID : undefined
                 }
-                className="mt-1 w-64"
+                className="mt-1 w-full"
                 id="request-search"
                 onChange={(e) => setQDraft(e.target.value)}
                 placeholder="Item, requester name, or email"

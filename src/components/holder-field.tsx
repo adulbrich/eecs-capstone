@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   Command,
   CommandEmpty,
@@ -13,6 +13,7 @@ import {
   PopoverTrigger,
 } from "#/components/ui/popover";
 import { lookupUserByEmail, searchUsers } from "#/server/users";
+import { SearchQueryNote, searchQueryNote } from "./search-hint";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -50,6 +51,7 @@ function AccountSearch({ onPick }: { onPick: (email: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<Account[]>([]);
+  const noteId = useId();
 
   useEffect(() => {
     if (!query.trim()) {
@@ -91,10 +93,15 @@ function AccountSearch({ onPick }: { onPick: (email: string) => void }) {
       <PopoverContent align="end" className="w-80 p-0">
         <Command shouldFilter={false}>
           <CommandInput
+            aria-describedby={searchQueryNote(query) ? noteId : undefined}
             onValueChange={setQuery}
             placeholder="Search by name or email..."
             value={query}
           />
+          {/* The same note the listings carry; see proposer-picker.tsx. */}
+          <div className="px-3">
+            <SearchQueryNote id={noteId} query={query} />
+          </div>
           <CommandList>
             <CommandEmpty>No accounts found.</CommandEmpty>
             <CommandGroup>

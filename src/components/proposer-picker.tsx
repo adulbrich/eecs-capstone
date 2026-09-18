@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   Command,
   CommandEmpty,
@@ -15,6 +15,7 @@ import {
   PopoverTrigger,
 } from "#/components/ui/popover";
 import { searchUsers } from "#/server/users";
+import { SearchQueryNote, searchQueryNote } from "./search-hint";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -36,6 +37,7 @@ interface Match {
 function AccountSearch({ onPick }: { onPick: (email: string) => void }) {
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<Match[]>([]);
+  const noteId = useId();
 
   useEffect(() => {
     if (!query.trim()) {
@@ -71,10 +73,18 @@ function AccountSearch({ onPick }: { onPick: (email: string) => void }) {
   return (
     <Command shouldFilter={false}>
       <CommandInput
+        aria-describedby={searchQueryNote(query) ? noteId : undefined}
         onValueChange={setQuery}
         placeholder="Search accounts..."
         value={query}
       />
+      {/* The box clamps at SEARCH_QUERY_MAX like every other search, and says
+          so here. The live query, not a committed one: the popover has no URL
+          to commit to, and the note is a function of the string alone, so it
+          cannot disagree with the matches under it (#478). */}
+      <div className="px-3">
+        <SearchQueryNote id={noteId} query={query} />
+      </div>
       <CommandList>
         <CommandEmpty>No accounts found.</CommandEmpty>
         <CommandGroup>

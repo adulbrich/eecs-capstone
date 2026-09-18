@@ -61,8 +61,10 @@ export function SearchHint({
  *
  * It renders nothing when there is nothing to say, the way `FieldError` does
  * and for the reason UI-CONVENTIONS gives there: three hand-written
- * paragraphs are three margins to drift. `max-w-64` keeps the sentence from
- * widening the toolbar cell past the widest of the three boxes.
+ * paragraphs are three margins to drift. It carries no width of its own,
+ * because the three boxes are not the same width: each caller's toolbar cell
+ * carries the width and the input fills it, so the sentence wraps to the box
+ * it belongs to rather than widening the cell past it.
  *
  * The caller still calls `searchQueryNote` itself, for the conditional
  * `aria-describedby` on its input: a reference to a paragraph that is not
@@ -74,7 +76,7 @@ export function SearchQueryNote({ id, query }: { id: string; query: string }) {
     return null;
   }
   return (
-    <p className="mt-1 max-w-64 text-xs" id={id}>
+    <p className="mt-1 text-xs" id={id}>
       {note}
     </p>
   );

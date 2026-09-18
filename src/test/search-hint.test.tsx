@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { SearchHint } from "#/components/search-hint";
+import { SearchHint, SearchQueryNote } from "#/components/search-hint";
 import { SEARCH_QUERY_MAX } from "#/lib/search-query";
 
 afterEach(cleanup);
@@ -71,5 +71,25 @@ describe("SearchHint", () => {
     expect(screen.getByText(/Searches titles\./).textContent).not.toMatch(
       /characters were used/
     );
+  });
+});
+
+describe("SearchQueryNote", () => {
+  // The three staff tables with a bare input and no hint render this one
+  // instead, so the sentence and the margin have one home (#478).
+  it("renders nothing for a query inside the cap", () => {
+    const { container } = render(
+      <SearchQueryNote id="note" query={"a".repeat(SEARCH_QUERY_MAX)} />
+    );
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("renders the note under the id the input describes itself by", () => {
+    render(
+      <SearchQueryNote id="note" query={"a".repeat(SEARCH_QUERY_MAX + 1)} />
+    );
+    const note = screen.getByText(/characters were used/);
+    expect(note.id).toBe("note");
+    expect(note.tagName).toBe("P");
   });
 });

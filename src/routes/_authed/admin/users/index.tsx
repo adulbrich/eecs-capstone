@@ -294,14 +294,16 @@ function UsersAdmin() {
         {...tableProps}
         toolbar={
           <>
-            <div>
+            {/* The cell carries the box's width so the truncation note under
+                it wraps to the box rather than widening the toolbar (#478). */}
+            <div className="w-48">
               <Label htmlFor="user-search">Search</Label>
               <Input
                 // Described only while there is a note: this page has no
                 // `SearchHint`, so there is nothing under the box the rest of
                 // the time, and a dangling reference is a broken one.
                 aria-describedby={queryNote ? USER_SEARCH_NOTE_ID : undefined}
-                className="mt-1 w-48"
+                className="mt-1 w-full"
                 id="user-search"
                 onChange={(e) => setQDraft(e.target.value)}
                 placeholder="Email or name"

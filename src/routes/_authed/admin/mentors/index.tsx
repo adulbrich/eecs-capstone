@@ -272,11 +272,11 @@ function MentorsAdmin() {
         noMatchMessage="No mentors in this view."
         {...tableProps}
         toolbar={
-          <div>
+          <div className="w-64">
             <Label htmlFor="mentor-search">Search</Label>
             <Input
               aria-describedby={queryNote ? MENTOR_SEARCH_NOTE_ID : undefined}
-              className="mt-1 w-64"
+              className="mt-1 w-full"
               id="mentor-search"
               onChange={(e) => setQDraft(e.target.value)}
               placeholder="Name, email, or affiliation"
