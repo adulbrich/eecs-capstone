@@ -180,7 +180,6 @@ describe("searchProjects", () => {
 });
 
 /**
-/**
  * The search box matches a contact's name or address, and a partial title,
  * beside the full-text match it already did (#476).
  *

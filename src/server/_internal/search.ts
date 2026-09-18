@@ -1,4 +1,13 @@
-import { and, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import {
+  and,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { db } from "#/db";
 import { projectCategories, projects, userInterests } from "#/db/schema";
 import { readSession } from "#/lib/_internal/auth-guards";
@@ -39,6 +48,14 @@ function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 
+/**
+ * An ordering this listing can actually deliver: the request enum minus
+ * nothing, but named separately because `searchProjectsImpl` resolves the two
+ * that depend on state (`recommended` on a vector, `relevance` on a query)
+ * before anything reads it.
+ */
+type ResolvedOrder = NonNullable<SearchProjectsInput["sort"]>;
+
 /** The viewer's interest vector, or null for a visitor or a member without one. One indexed row. */
 async function interestsVectorFor(
   viewerId: string | null
@@ -51,6 +68,54 @@ async function interestsVectorFor(
     .from(userInterests)
     .where(eq(userInterests.userId, viewerId));
   return row?.embedding ?? null;
+}
+
+/** The resolved ordering, as the `ORDER BY` fragment that delivers it. */
+function orderBySql(
+  order: ResolvedOrder,
+  parts: {
+    interestsVector: number[] | null;
+    listingDate: SQL;
+    relevanceOrder: SQL;
+  }
+): SQL {
+  const { interestsVector, listingDate, relevanceOrder } = parts;
+  switch (order) {
+    case "newest":
+      return sql`${listingDate} DESC`;
+    case "oldest":
+      return sql`${listingDate} ASC`;
+    case "title":
+      // Case-insensitive, or "Zebra" would sort above "apple" under the C
+      // collation. `title` is NOT NULL, so there is no null case to place.
+      return sql`lower(${projects.title}) ASC`;
+    case "updated":
+      // The objection recorded against `updatedAt` as the listing date, that
+      // one staff typo fix jumps a 2019 project to the top, is an objection
+      // to it being implicit. A reader who picks "Recently updated" by name
+      // has asked for exactly that (#475).
+      return sql`${projects.updatedAt} DESC`;
+    case "recommended": {
+      if (!interestsVector) {
+        // Unreachable through `searchProjectsImpl`, which degrades
+        // `recommended` before it gets here, and cheaper than a non-null
+        // assertion.
+        return relevanceOrder;
+      }
+      const probe = toSqlVector(interestsVector);
+      // Null embeddings sort last rather than being filtered out: a project
+      // that failed to embed must stay reachable.
+      //
+      // The date, so that the projects sharing the null case are ordered by
+      // something a reader would recognise before the id breaks the rest of
+      // the tie. #427 gave every published and archived project a vector, so
+      // that group should be empty now; it refills one row at a time whenever
+      // an embedding call fails.
+      return sql`${projects.embedding} IS NULL, ${projects.embedding} <=> ${probe}::vector, ${listingDate} DESC`;
+    }
+    default:
+      return relevanceOrder;
+  }
 }
 
 export async function searchProjectsImpl(
@@ -185,33 +250,11 @@ export async function searchProjectsImpl(
     order = "newest";
   }
 
-  let orderBy = relevanceOrder;
-  if (order === "newest") {
-    orderBy = sql`${listingDate} DESC`;
-  } else if (order === "oldest") {
-    orderBy = sql`${listingDate} ASC`;
-  } else if (order === "title") {
-    // Case-insensitive, or "Zebra" would sort above "apple" under the C
-    // collation. `title` is NOT NULL, so there is no null case to place.
-    orderBy = sql`lower(${projects.title}) ASC`;
-  } else if (order === "updated") {
-    // The objection recorded above against `updatedAt` as the listing date,
-    // that one staff typo fix jumps a 2019 project to the top, is an
-    // objection to it being implicit. A reader who picks "Recently updated"
-    // by name has asked for exactly that (#475).
-    orderBy = sql`${projects.updatedAt} DESC`;
-  } else if (order === "recommended" && interestsVector) {
-    const probe = toSqlVector(interestsVector);
-    // Null embeddings sort last rather than being filtered out: a project
-    // that failed to embed must stay reachable.
-    //
-    // The date, so that the projects sharing the null case are ordered by
-    // something a reader would recognise before the id breaks the rest of the
-    // tie. #427 gave every published and archived project a vector, so that
-    // group should be empty now; it refills one row at a time whenever an
-    // embedding call fails.
-    orderBy = sql`${projects.embedding} IS NULL, ${projects.embedding} <=> ${probe}::vector, ${listingDate} DESC`;
-  }
+  const orderBy = orderBySql(order, {
+    interestsVector,
+    listingDate,
+    relevanceOrder,
+  });
 
   const offset = (data.page - 1) * data.pageSize;
   const rows = await db
