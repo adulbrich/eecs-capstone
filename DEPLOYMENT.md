@@ -532,15 +532,12 @@ npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
   prepare "$SRC" "$OUT/legacy-out"
 ```
 
-**The output directory goes in the private store, never in the repo.** It
-holds real proposer addresses and converted project images, and this repo is
-public and mirrors to GitLab. It used to be written to `./legacy-out` in the
-working tree, kept out of git by name; on 2026-09-18 a top-up wrote to
-`./new-out`, which that list did not cover, and 1.6 MB of project images sat
-untracked and unignored until someone noticed. Nothing was committed, and the
-three directories moved to `$OUT` the same day. `.gitignore` still matches
-`*-out/` as a backstop for anyone who ignores this paragraph, not as the way
-the rule is enforced.
+**The output directory goes outside this repo.** It holds real proposer
+addresses and converted project images, and this repo is public and mirrors to
+GitLab. `$OUT` from 7a.0 puts it in the private store beside the source data;
+point it anywhere you like except the working tree. Nothing in the repo guards
+this for you, so read the assertion in 7a.0 as the check: an unset `$OUT`
+stops the run rather than defaulting to somewhere convenient.
 
 That writes `$OUT/legacy-out/projects/<uuid>/<uuid>.webp` (paths that *are* the
 object-storage keys), plus `image-keys.json`. `prepare` counts every manifest

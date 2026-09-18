@@ -27,17 +27,3 @@ test-results/
 # Personal Claude Code overrides. `.claude/settings.json` is tracked and shared;
 # this one is not, and the directory being tracked makes it committable by accident.
 .claude/settings.local.json
-
-# Legacy import working directories (DEPLOYMENT.md section 7a). They hold the
-# exported JSONL, which names 444 real proposers and their email addresses,
-# and the converted images. This repo is public and mirrors to GitLab, so a
-# stray `git add` here would publish student and sponsor PII.
-#
-# This is a BACKSTOP, not the rule. Since 2026-09-18 that output belongs in
-# Box beside the source data (`$OUT` in DEPLOYMENT.md 7a.0) and no import
-# should write into the working tree at all. The pattern stays because the
-# directories used to live here, and because a rule that lists members by
-# name fails the first time someone adds one: this was `legacy-out/` plus
-# `live-out/` until a top-up wrote to `new-out/` and fell straight through.
-# `.output` is covered separately above.
-*-out/
