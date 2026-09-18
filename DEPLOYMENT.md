@@ -920,10 +920,10 @@ npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
 cp "$LIVE/live-projects-clean.jsonl" "$OUT/live-out/"
 ```
 
-That leaves `$OUT/live-out` holding both files the import needs. Give the set its
-own S3 prefix as well as its own filename, for the same reason `prepare` got
-its own directory: `LEGACY_DATA_S3_URI` is per invocation, so a second prefix
-costs nothing.
+That leaves `$OUT/live-out` holding both files the import needs. Give the set
+its own S3 prefix as well as its own filename, for the same reason `prepare`
+got its own directory: `LEGACY_DATA_S3_URI` is per invocation, so a second
+prefix costs nothing.
 
 ```bash
 aws --profile aws-capstone1 s3 sync "$OUT/live-out/projects" \
