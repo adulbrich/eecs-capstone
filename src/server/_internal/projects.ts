@@ -558,9 +558,11 @@ export async function updateProjectProgramsAs(
       });
     }
     if (flagMoved) {
-      // One row per changed field, so the Edit log reads the way it does for
-      // a form save and `acceptingApplicants` keeps the name the tests and
-      // the diff renderer already know (#491).
+      // Its own row rather than a second entry in the programs row's
+      // `changedFields`, which is where a form save would have put it:
+      // `diffRowFields` writes one row naming every column that moved, and
+      // these two moved for different reasons and read better apart. The
+      // field name is the one the tests and the diff renderer already know.
       await tx.insert(projectEditLog).values({
         projectId: existing.id,
         editorId: viewer.id,
