@@ -454,10 +454,11 @@ instructor if you do not have access to it.
 
 ```bash
 # The folder holding the exports, `legacy-images/` and the image manifest.
-SRC=
+# Quote both: the real paths contain spaces.
+SRC=""
 # Where every import writes its output: beside the source data, never into
 # the working tree. See 7a.1 for why.
-OUT=
+OUT=""
 : "${SRC:?set SRC to the legacy data folder; capstone-legacy-portal.md has it}"
 : "${OUT:?set OUT to the import output folder; it must not be in this repo}"
 # `infra/s3.tf` names it "${var.project}-assets-<account id>"; there is no
@@ -536,8 +537,10 @@ npx tsx --env-file=.env.local scripts/import-legacy-images.ts \
 addresses and converted project images, and this repo is public and mirrors to
 GitLab. `$OUT` from 7a.0 puts it in the private store beside the source data;
 point it anywhere you like except the working tree. Nothing in the repo guards
-this for you, so read the assertion in 7a.0 as the check: an unset `$OUT`
-stops the run rather than defaulting to somewhere convenient.
+this for you. The assertions in 7a.0 abort a non-interactive run on an unset
+value, but 7a is written to be run by hand, and an interactive shell only
+prints the message and carries on, so check both values before the first
+command that writes.
 
 That writes `$OUT/legacy-out/projects/<uuid>/<uuid>.webp` (paths that *are* the
 object-storage keys), plus `image-keys.json`. `prepare` counts every manifest
@@ -987,7 +990,7 @@ and the archived figure fell 714 to 713 when one project was unarchived.
 `export.sql`'s WHERE to the cohort you are checking, run it into
 `live-projects.jsonl` as above, clean it, and diff the result against the copy
 of the file the last run actually received, which is under
-`backup-<date>/`:
+`$SRC/backup-<date>/`:
 
 ```bash
 python3 clean-export.py live-projects.jsonl
