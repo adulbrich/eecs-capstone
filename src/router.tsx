@@ -35,10 +35,10 @@ export function getRouter() {
      * revisit is stale, and the default `"background"` meant every
      * navigation away from a save landed on a frame built from pre-edit
      * data (#474). Two costs, both accepted: a revisit now feels like a
-     * first visit, and nothing paints until the loader resolves. See
-     * "Why the router blocks on a stale reload" in docs/QUIRKS.md, which
-     * is also where the rule about seeding `useState` from loader data
-     * lives.
+     * first visit, and nothing paints until the loader resolves.
+     * ADR-0029 is the decision; the rule it leaves behind, about seeding
+     * `useState` from loader data, is in docs/QUIRKS.md under TanStack
+     * Router.
      */
     defaultStaleReloadMode: "blocking",
     defaultNotFoundComponent: NotFound,
