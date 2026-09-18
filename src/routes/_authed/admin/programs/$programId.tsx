@@ -43,10 +43,36 @@ export const Route = createFileRoute("/_authed/admin/programs/$programId")({
   component: ProgramEdit,
 });
 
-function ProgramEdit() {
+type ProgramLoaderData = Awaited<ReturnType<typeof getProgram>>;
+
+/**
+ * The editable half of the page, keyed by the parent on the record it was
+ * seeded from.
+ *
+ * Every field below is a `useState` seeded from loader data, and a
+ * `useState` initializer runs once per mount: a later loader result updates
+ * `program` but never these inputs, so a component that outlives an edit
+ * shows the values from before it and saves them back (#474). The router now
+ * blocks on a stale reload, so the seed is taken from fresh data; the `key`
+ * is the second line of defence, and what keeps this form correct if that
+ * router option is ever reverted or this route opts back into
+ * `staleReloadMode: "background"`.
+ *
+ * `InstructorManager` stays outside, in the parent: it fires
+ * `router.invalidate()` on every change, and a remount there would throw
+ * away whatever the staff member had typed into the fields above it.
+ * Adding or removing an instructor does not touch `programs.updatedAt`
+ * anyway, so today the key would not change; keeping it outside means that
+ * staying true is not a condition of this form working.
+ */
+function ProgramForm({
+  program,
+  projectCount,
+}: {
+  program: ProgramLoaderData["program"];
+  projectCount: number;
+}) {
   const navigate = useNavigate();
-  const router = useRouter();
-  const { program, instructors, projectCount } = Route.useLoaderData();
   const [courseId, setCourseId] = useState(program.courseId);
   const [courseName, setCourseName] = useState(program.courseName);
   const [description, setDescription] = useState(program.description ?? "");
@@ -95,6 +121,91 @@ function ProgramEdit() {
       : "This cannot be undone.";
 
   return (
+    <form className="mt-6 space-y-3" onSubmit={onSave}>
+      <div className="space-y-1.5">
+        <Label htmlFor="course-id">Course ID</Label>
+        <Input
+          id="course-id"
+          onChange={(e) => setCourseId(e.target.value)}
+          required
+          value={courseId}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="course-name">Course name</Label>
+        <Input
+          id="course-name"
+          onChange={(e) => setCourseName(e.target.value)}
+          required
+          value={courseName}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="course-desc">Description</Label>
+        <Textarea
+          id="course-desc"
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          value={description}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="course-terms">Terms</Label>
+        <Input
+          id="course-terms"
+          inputMode="numeric"
+          max={12}
+          min={1}
+          onChange={(e) => setTermCount(e.target.value)}
+          type="number"
+          value={termCount}
+        />
+        <p className="text-muted-foreground text-xs">
+          How many academic terms the course runs. The scope assessment judges
+          proposals against it; leave it blank if unsure, and the assessment
+          says so rather than guessing.
+        </p>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="course-expected-teams">Expected teams</Label>
+        <Input
+          id="course-expected-teams"
+          inputMode="numeric"
+          min={0}
+          onChange={(e) => setExpectedTeams(e.target.value)}
+          type="number"
+          value={expectedTeams}
+        />
+        <p className="text-muted-foreground text-xs">
+          How many student teams the office expects to place this cycle. The
+          analytics dashboard compares published team slots against it; leave it
+          blank and the dashboard says "not set".
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <Button disabled={busy} type="submit">
+          {busy ? "Saving..." : "Save"}
+        </Button>
+        <ConfirmDialog
+          description={deleteDescription}
+          onConfirm={onDelete}
+          title={`Delete program "${program.courseName}"?`}
+        >
+          <Button type="button" variant="destructive">
+            Delete
+          </Button>
+        </ConfirmDialog>
+      </div>
+      <FieldError message={error} />
+    </form>
+  );
+}
+
+function ProgramEdit() {
+  const router = useRouter();
+  const { program, instructors, projectCount } = Route.useLoaderData();
+
+  return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:p-8">
       <Breadcrumb>
         <BreadcrumbList>
@@ -120,83 +231,17 @@ function ProgramEdit() {
         {projectCount} linked project{projectCount === 1 ? "" : "s"}
       </p>
 
-      <form className="mt-6 space-y-3" onSubmit={onSave}>
-        <div className="space-y-1.5">
-          <Label htmlFor="course-id">Course ID</Label>
-          <Input
-            id="course-id"
-            onChange={(e) => setCourseId(e.target.value)}
-            required
-            value={courseId}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="course-name">Course name</Label>
-          <Input
-            id="course-name"
-            onChange={(e) => setCourseName(e.target.value)}
-            required
-            value={courseName}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="course-desc">Description</Label>
-          <Textarea
-            id="course-desc"
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            value={description}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="course-terms">Terms</Label>
-          <Input
-            id="course-terms"
-            inputMode="numeric"
-            max={12}
-            min={1}
-            onChange={(e) => setTermCount(e.target.value)}
-            type="number"
-            value={termCount}
-          />
-          <p className="text-muted-foreground text-xs">
-            How many academic terms the course runs. The scope assessment judges
-            proposals against it; leave it blank if unsure, and the assessment
-            says so rather than guessing.
-          </p>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="course-expected-teams">Expected teams</Label>
-          <Input
-            id="course-expected-teams"
-            inputMode="numeric"
-            min={0}
-            onChange={(e) => setExpectedTeams(e.target.value)}
-            type="number"
-            value={expectedTeams}
-          />
-          <p className="text-muted-foreground text-xs">
-            How many student teams the office expects to place this cycle. The
-            analytics dashboard compares published team slots against it; leave
-            it blank and the dashboard says "not set".
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button disabled={busy} type="submit">
-            {busy ? "Saving..." : "Save"}
-          </Button>
-          <ConfirmDialog
-            description={deleteDescription}
-            onConfirm={onDelete}
-            title={`Delete program "${program.courseName}"?`}
-          >
-            <Button type="button" variant="destructive">
-              Delete
-            </Button>
-          </ConfirmDialog>
-        </div>
-        <FieldError message={error} />
-      </form>
+      {/*
+        Keyed on the record, so a loader result carrying a newer program
+        remounts the form and re-seeds its inputs. `updateProgramAs` bumps
+        `updatedAt` on every save, which makes it the cheapest thing to
+        watch here.
+      */}
+      <ProgramForm
+        key={String(program.updatedAt)}
+        program={program}
+        projectCount={projectCount}
+      />
 
       <InstructorManager
         initial={instructors}

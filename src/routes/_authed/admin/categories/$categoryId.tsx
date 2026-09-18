@@ -55,9 +55,33 @@ export const Route = createFileRoute("/_authed/admin/categories/$categoryId")({
   component: CategoryEdit,
 });
 
-function CategoryEdit() {
+type CategoryRecord = Awaited<ReturnType<typeof getCategory>>["category"];
+type CategoryTypes = Awaited<ReturnType<typeof listCategoryTypes>>["types"];
+
+/**
+ * The editable half of the page, keyed by the parent on the values it was
+ * seeded from.
+ *
+ * `useState` seeded from loader data runs its initializer once per mount, so
+ * a component that outlives an edit keeps the pre-edit values in its inputs
+ * and saves them back over whatever was written (#474). The router blocks on
+ * a stale reload now, so the seed is fresh; the `key` is what keeps this
+ * form correct if that is ever reverted.
+ *
+ * The key is the seeded values themselves rather than a timestamp: the
+ * `categories` table has no `updatedAt` column, and adding one to feed a
+ * React key would be a schema change in service of a render detail. The
+ * cost is that a save which changes nothing produces no new key, which
+ * changes nothing either.
+ */
+function CategoryForm({
+  category,
+  types,
+}: {
+  category: CategoryRecord;
+  types: CategoryTypes;
+}) {
   const navigate = useNavigate();
-  const { category, types } = Route.useLoaderData();
   const isProject = category.domain === "project";
   const [name, setName] = useState(category.name);
   const [type, setType] = useState(category.type ?? "");
@@ -87,6 +111,67 @@ function CategoryEdit() {
   }
 
   return (
+    <form className="mt-6 space-y-3" onSubmit={onSave}>
+      {/* Same order and descriptions as the New category dialog (#374). */}
+      {isProject && (
+        <div className="space-y-1.5">
+          <Label htmlFor="cat-type">Type</Label>
+          <p
+            className="text-muted-foreground text-xs"
+            id="cat-type-description"
+          >
+            {CATEGORY_FIELD_DESCRIPTION.type}
+          </p>
+          <CategoryTypeCombobox
+            describedBy="cat-type-description"
+            id="cat-type"
+            onChange={setType}
+            types={types}
+            value={type}
+          />
+        </div>
+      )}
+      <div className="space-y-1.5">
+        <Label htmlFor="cat-name">Name</Label>
+        {isProject && (
+          <p
+            className="text-muted-foreground text-xs"
+            id="cat-name-description"
+          >
+            {CATEGORY_FIELD_DESCRIPTION.name}
+          </p>
+        )}
+        <Input
+          aria-describedby={isProject ? "cat-name-description" : undefined}
+          id="cat-name"
+          onChange={(e) => setName(e.target.value)}
+          required
+          value={name}
+        />
+      </div>
+      <div className="flex gap-2">
+        <Button disabled={busy} type="submit">
+          {busy ? "Saving..." : "Save"}
+        </Button>
+        <ConfirmDialog
+          description="It will be removed from any projects and inventory items that use it. Those projects and items are unaffected otherwise."
+          onConfirm={onDelete}
+          title={`Delete category "${category.name}"?`}
+        >
+          <Button type="button" variant="destructive">
+            Delete
+          </Button>
+        </ConfirmDialog>
+      </div>
+      <FieldError message={error} />
+    </form>
+  );
+}
+
+function CategoryEdit() {
+  const { category, types } = Route.useLoaderData();
+
+  return (
     <div className="mx-auto max-w-md px-4 py-6 md:p-8">
       <Breadcrumb>
         <BreadcrumbList>
@@ -108,60 +193,11 @@ function CategoryEdit() {
         </BreadcrumbList>
       </Breadcrumb>
       <h1 className="mt-2 font-semibold text-2xl">Edit category</h1>
-      <form className="mt-6 space-y-3" onSubmit={onSave}>
-        {/* Same order and descriptions as the New category dialog (#374). */}
-        {isProject && (
-          <div className="space-y-1.5">
-            <Label htmlFor="cat-type">Type</Label>
-            <p
-              className="text-muted-foreground text-xs"
-              id="cat-type-description"
-            >
-              {CATEGORY_FIELD_DESCRIPTION.type}
-            </p>
-            <CategoryTypeCombobox
-              describedBy="cat-type-description"
-              id="cat-type"
-              onChange={setType}
-              types={types}
-              value={type}
-            />
-          </div>
-        )}
-        <div className="space-y-1.5">
-          <Label htmlFor="cat-name">Name</Label>
-          {isProject && (
-            <p
-              className="text-muted-foreground text-xs"
-              id="cat-name-description"
-            >
-              {CATEGORY_FIELD_DESCRIPTION.name}
-            </p>
-          )}
-          <Input
-            aria-describedby={isProject ? "cat-name-description" : undefined}
-            id="cat-name"
-            onChange={(e) => setName(e.target.value)}
-            required
-            value={name}
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button disabled={busy} type="submit">
-            {busy ? "Saving..." : "Save"}
-          </Button>
-          <ConfirmDialog
-            description="It will be removed from any projects and inventory items that use it. Those projects and items are unaffected otherwise."
-            onConfirm={onDelete}
-            title={`Delete category "${category.name}"?`}
-          >
-            <Button type="button" variant="destructive">
-              Delete
-            </Button>
-          </ConfirmDialog>
-        </div>
-        <FieldError message={error} />
-      </form>
+      <CategoryForm
+        category={category}
+        key={`${category.name}|${category.type ?? ""}`}
+        types={types}
+      />
     </div>
   );
 }

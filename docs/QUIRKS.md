@@ -160,6 +160,16 @@ One detail URL per project and per item, staff sections rendered conditionally o
 
 Navigating from `/projects/A` to `/projects/B` re-runs the loader and re-renders the same component instance with new props. Nothing remounts unless the route sets `remountDeps`, and nothing in `src/` does. So a child that keeps draft state in `useState` and loads its record in an effect keeps A's drafts on screen while B's record is in flight, and a Save clicked in that window posts A's values onto B. `StaffMentorshipSection` had exactly this until it was keyed, and `StaffProjectPanel` had the same shape one level up: its open transition dialog kept A's target status and comment, and Confirm posted them with B's id. The key now sits on the panel where `$projectId.tsx` renders it, `<StaffProjectPanel key={project.id} ... />`, which remounts the panel and every section under it on a param change; the sections carry no key of their own. Two tests in `staff-project-panel.test.tsx` rerender the panel with a second id to prove it. Key the outermost child that holds a draft, not the route: `remountDeps` would also discard state the page should keep, such as an open dialog's scroll position.
 
+### The router blocks on a stale reload, and a `useState` seeded from loader data depends on it
+
+`src/router.tsx` sets `defaultStaleReloadMode: "blocking"`. `defaultStaleTime` is 0, so every revisit is stale, and the default `"background"` paints the cached `loaderData` and revalidates behind it. Nothing invalidates before navigating away from a save, so every navigation that followed one landed on a frame built from pre-edit data (#474). The visible half of that was a list flashing the old row; the serious half was an edit form whose inputs are `useState(record.field)`, which seeds from the stale frame and never recovers, because a `useState` initializer does not re-run when props change. A staff member reopening such a form saw values from before the edit and saved them back over a colleague's work.
+
+`await router.invalidate()` before a `navigate()` does not fix it: it revalidates in the background and its promise resolves before any reload lands. `invalidate({ sync: true })` does, per call site, which is why the router option was preferred over eight of them. Staying on the page after `await router.invalidate()` is fine and unchanged: the component stays mounted, so rendered output self-heals.
+
+What `blocking` costs: a revisit behaves like a first visit. The previous page stays on screen until the loader resolves, and the router's pending state appears after its default 1s, since the app sets no `defaultPendingMs` or `defaultPendingComponent`. Add `staleReloadMode: "background"` to a single route only if that route measurably needs the instant paint; none does today.
+
+Seeding `useState` from loader data is only safe while the router blocks. Where a route does it, key the child on the record so the seed cannot freeze either way: `/admin/programs/$programId` keys on `String(program.updatedAt)`, and `/admin/categories/$categoryId` keys on `` `${category.name}|${category.type ?? ""}` `` because the `categories` table has no `updatedAt` column. `remountDeps` cannot serve here: it sees `search`, `params` and `loaderDeps`, never loader data.
+
 ---
 
 ## TanStack Form

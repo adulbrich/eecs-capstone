@@ -29,6 +29,18 @@ export function getRouter() {
     scrollRestoration: true,
     defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
+    /**
+     * A revisit waits for its loader instead of painting the previous
+     * visit's rows behind a refetch. `defaultStaleTime` is 0, so every
+     * revisit is stale, and the default `"background"` meant every
+     * navigation away from a save landed on a frame built from pre-edit
+     * data (#474). Two costs, both accepted: a revisit now feels like a
+     * first visit, and nothing paints until the loader resolves. See
+     * "Why the router blocks on a stale reload" in docs/QUIRKS.md, which
+     * is also where the rule about seeding `useState` from loader data
+     * lives.
+     */
+    defaultStaleReloadMode: "blocking",
     defaultNotFoundComponent: NotFound,
   });
 
