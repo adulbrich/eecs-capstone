@@ -119,7 +119,10 @@ export const searchSchema = z.object({
     .catch(null),
   // Better Auth user ids are text, not UUIDs.
   proposer: z.string().max(255).nullable().default(null),
-  q: z.string().max(200).default(""),
+  // Uncapped on purpose, for the reason `/projects` gives at length: the
+  // server clamps, and the note under the box needs the URL to still
+  // carry what the reader typed (#478).
+  q: z.string().default(""),
   sort: z.string().optional(),
   // Absent is the default set, every status but archived; any explicit
   // choice is spelled out in full. `.catch` on the four so a stale or
@@ -871,6 +874,7 @@ function AdminProjects() {
           <SearchHint
             fields="titles, descriptions, problem statements, objectives, qualifications, contacts and proposers"
             id={SEARCH_HINT_ID}
+            query={q}
           />
         </>
       }

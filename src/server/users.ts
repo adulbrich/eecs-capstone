@@ -1,13 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX } from "#/lib/pagination";
+import { searchQuerySchema } from "#/lib/search-query";
 import { USER_ROLES } from "#/lib/vocabularies";
 import { SEND_EMAIL_FIELD } from "./send-email-field";
 
 const roleEnum = z.enum(USER_ROLES);
 
 const listUsersSchema = z.object({
-  q: z.string().trim().max(200).optional().default(""),
+  q: searchQuerySchema,
   role: roleEnum.nullable().optional().default(null),
   includeBanned: z.boolean().default(true),
   page: z.number().int().min(1).default(1),
@@ -26,7 +27,7 @@ export type ListUsersInput = z.infer<typeof listUsersSchema>;
 const idSchema = z.object({ id: z.string() });
 
 const searchUsersSchema = z.object({
-  q: z.string().trim().max(200).default(""),
+  q: searchQuerySchema,
 });
 
 export const searchUsers = createServerFn({ method: "GET" })
@@ -119,7 +120,7 @@ export const unbanUser = createServerFn({ method: "POST" })
     return unbanUserForCurrentUser(data);
   });
 
-const listMentorsSchema = z.object({ q: z.string().default("") });
+const listMentorsSchema = z.object({ q: searchQuerySchema });
 
 export const listMentors = createServerFn({ method: "GET" })
   .validator((data: unknown) => listMentorsSchema.parse(data))

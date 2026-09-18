@@ -632,6 +632,7 @@ function AdminInventory() {
           <SearchHint
             fields="names, descriptions, serials, labels, locations, holders and programs"
             id={SEARCH_HINT_ID}
+            query={q}
           />
         </>
       }

@@ -83,7 +83,7 @@ export function InventorySearchBar({
         type="search"
         value={localQ}
       />
-      <SearchHint fields="names and descriptions" id={hintId} />
+      <SearchHint fields="names and descriptions" id={hintId} query={q} />
       <ViewToggle current={view} onChange={onViewChange} />
     </>
   );

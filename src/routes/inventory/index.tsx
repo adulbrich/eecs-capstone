@@ -34,6 +34,9 @@ import type { ViewMode } from "#/lib/view-preference";
 import { listInventory, listInventoryCategories } from "#/server/inventory";
 
 const searchSchema = z.object({
+  // Uncapped on purpose, for the reason `/projects` gives at length: the
+  // server clamps, and the note under the box needs the URL to still
+  // carry what the reader typed (#478).
   q: z.string().default(""),
   status: z.enum(ACTIVE_STATUSES).nullable().default(null),
   // A stale `?category=Electronics` link (pre-UUID, singular) fails

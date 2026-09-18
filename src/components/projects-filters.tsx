@@ -263,6 +263,10 @@ export function ProjectsSearchBar({
         // them in.
         fields="titles, descriptions, problem statements, objectives, qualifications and contacts"
         id={hintId}
+        // The committed query, not `queryDraft`: the note describes the
+        // search that ran, so it must not appear and vanish between
+        // keystrokes, the same reason "Most relevant" is gated on `q` below.
+        query={q}
       />
       <Select onValueChange={(v) => setOrder(v as ProjectsOrder)} value={order}>
         {/*
