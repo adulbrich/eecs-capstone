@@ -3,7 +3,7 @@ import { db } from "#/db";
 import { projectComments, projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import { isStaff } from "#/lib/viewer";
-import type { AddCommentInput } from "../comments";
+import type { AddCommentInput, UpdateCommentInput } from "../comments";
 import type { EmailOptions } from "./email-dispatch";
 import { recordCommentNotifications } from "./notify";
 import { notifyCommentByEmail } from "./project-emails";
@@ -119,4 +119,67 @@ export async function addCommentForCurrentUser(
   const viewer = await requireUser();
   const { sendEmail, ...fields } = data;
   return addCommentAs(viewer, fields, { sendEmail });
+}
+
+/**
+ * The refusal a locked comment gives, in one place because two callers show it
+ * to a reader: the thread renders it under the editor, and the server throws it
+ * at anyone who posts past a hidden Edit button.
+ *
+ * Deliberately generic. A proposer can be locked by a staff reply they are not
+ * allowed to see, so a message naming the reply would say more than
+ * `filterCommentsForViewer` lets through (#503).
+ */
+export const COMMENT_LOCKED_MESSAGE = "This comment can no longer be edited";
+
+/**
+ * Content only, by the author only, until the first reply.
+ *
+ * Nothing here notifies: `addCommentAs` mails the text and stores a 200
+ * character snapshot on a `notifications` row, and an edit leaves both as
+ * posted. The recipient already holds the original in their inbox, so a bell
+ * entry matching what they were told is consistent rather than stale, and
+ * rewriting it would quietly change a record whose link already anchors here
+ * (#503).
+ */
+export async function updateCommentAs(
+  viewer: AuthUser,
+  data: UpdateCommentInput
+): Promise<{ id: string }> {
+  const [comment] = await db
+    .select()
+    .from(projectComments)
+    .where(eq(projectComments.id, data.commentId));
+  if (!comment) {
+    throw new Error("Comment not found");
+  }
+  // Authorship is the whole gate. Staff are not privileged here: the thread is
+  // what a review decision was made on, so nobody rewrites anybody else's
+  // words. A stranger fails this too, which is why there is no separate
+  // project-visibility check: a viewer who cannot see the project cannot have
+  // authored a comment on it.
+  if (comment.authorId !== viewer.id) {
+    throw new Error("Forbidden");
+  }
+  // Any reply, by anyone, internal or not. A reply's meaning depends on the
+  // text it answers.
+  const [reply] = await db
+    .select({ id: projectComments.id })
+    .from(projectComments)
+    .where(eq(projectComments.parentId, data.commentId))
+    .limit(1);
+  if (reply) {
+    throw new Error(COMMENT_LOCKED_MESSAGE);
+  }
+
+  await db
+    .update(projectComments)
+    .set({ content: data.content, editedAt: new Date() })
+    .where(eq(projectComments.id, data.commentId));
+  return { id: data.commentId };
+}
+
+export async function updateCommentForCurrentUser(data: UpdateCommentInput) {
+  const viewer = await requireUser();
+  return updateCommentAs(viewer, data);
 }

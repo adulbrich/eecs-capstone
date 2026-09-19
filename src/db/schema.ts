@@ -387,6 +387,10 @@ export const projectComments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    // Null until the author first edits. The original text is not kept: the
+    // marker exists so a reader knows the words moved, not so anyone can diff
+    // them (#503).
+    editedAt: timestamp("edited_at", { withTimezone: true }),
   },
   (t) => [index("project_comments_project_idx").on(t.projectId, t.createdAt)]
 );

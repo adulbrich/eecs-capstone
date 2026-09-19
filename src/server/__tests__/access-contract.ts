@@ -126,6 +126,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "owner-or-staff",
     note: "An internal comment additionally requires staff: a proposer cannot post one.",
   },
+  "server/comments.ts:updateComment": {
+    level: "authenticated",
+    note: "Scoped to the viewer by authorship, which is stricter than owner-or-staff in both directions: a staff member may not edit a proposer's comment, and a proposer may not edit staff's. The live guard is that authorship plus the reply lock. Do not read the level as 'any signed-in user may edit any comment'.",
+  },
 
   "server/interests.ts:getMyInterests": { level: "authenticated" },
   "server/interests.ts:saveMyInterests": { level: "authenticated" },

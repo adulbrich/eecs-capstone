@@ -617,12 +617,29 @@ export async function listProjectCommentsAs(
       content: projectComments.content,
       isInternal: projectComments.isInternal,
       createdAt: projectComments.createdAt,
+      editedAt: projectComments.editedAt,
     })
     .from(projectComments)
     .leftJoin(user, eq(user.id, projectComments.authorId))
     .where(eq(projectComments.projectId, data.id))
     .orderBy(asc(projectComments.createdAt));
-  return { rows: filterCommentsForViewer(rows, viewer, project) };
+  // Derived from every child on the project, before the filter below removes
+  // the ones this viewer may not see. A proposer whose comment drew an
+  // internal staff reply receives no child for it, so a thread that counted
+  // its own children would offer them an Edit the server then refuses (#503).
+  // `hasReply` states the fact; authorship is the client's half of the
+  // decision, and it already has that from `authorId`.
+  const parentsWithReplies = new Set(
+    rows.flatMap((r) => (r.parentId ? [r.parentId] : []))
+  );
+  // `isMine` rather than the viewer's own id on the wire: the thread needs to
+  // know which rows are the reader's, not who the reader is.
+  const withLock = rows.map((r) => ({
+    ...r,
+    hasReply: parentsWithReplies.has(r.id),
+    isMine: !!viewer && r.authorId === viewer.id,
+  }));
+  return { rows: filterCommentsForViewer(withLock, viewer, project) };
 }
 
 export async function listProjectCommentsImpl(data: { id: string }) {
