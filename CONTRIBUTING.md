@@ -9,11 +9,11 @@ one: accounts, the setup wizard, and what Claude Code does in your terminal.
 ## The process
 
 ```
-pick up         branch            commit               push              pull request        merge
---------        ------            ------               ----              ------------        -----
-GitHub issue    fetch, then       lefthook:            lefthook:         verify, smoke,      squash, merge
-ready-for-*     branch from       biome, prose,        typecheck,        a11y-smoke,         or rebase
-p0/p1/p2        origin/main       branch, message      unit suite        pr-text (CI)        no human
+pick up         branch            commit               push              pull request        merge           clean up
+--------        ------            ------               ----              ------------        -----           --------
+GitHub issue    fetch, then       lefthook:            lefthook:         verify, smoke,      squash, merge   worktree,
+ready-for-*     branch from       biome, prose,        typecheck,        a11y-smoke,         or rebase       branch,
+p0/p1/p2        origin/main       branch, message      unit suite        pr-text (CI)        no human        dev server
 claim it        fix/ feat/ ...                                           review loop         approval
 ```
 
@@ -36,6 +36,25 @@ claim it        fix/ feat/ ...                                           review 
 5. **Run the review loop.** `mattpocock-skills:code-review` until a pass raises
    nothing unanswered, then merge. No approving review is required by GitHub, so
    this loop is the review. Record the pass count in the PR.
+6. **Clean up after the merge.** Three things outlive the branch, and each one
+   has since cost somebody a debugging session:
+   - **The worktree**, if the work had one: `git worktree remove <path>`. A
+     worktree under `.claude/worktrees/` is a second copy of this repo inside
+     the root, which is why `vite.config.ts` scopes the unit run to `src/**`.
+   - **Any dev server started inside it.** Both Playwright configs set
+     `reuseExistingServer` outside CI, so a server left holding port 3000 from
+     another checkout makes the accessibility and smoke suites scan that code
+     and pass. `lsof -ti :3000` gives the pid; the owning directory is
+     `lsof -a -p <pid> -d cwd -Fn`.
+   - **The local branch**, once its remote is gone. A squash merge leaves it
+     "not fully merged", so `git branch -d` refuses it and only `-D` removes
+     it. `.claude/hooks/guard-git.mjs` reserves `-D` for you rather than an
+     agent, so an agent's part is to name the branches and the command.
+
+   `node scripts/check-workspace.mjs --ports` reports all three, and the
+   SessionStart hook runs the same checks, so a session is told at its first
+   message instead of finding out. The script only ever reports: removing a
+   branch means force-removing it, and that stays yours.
 
 ## The gates
 

@@ -108,6 +108,27 @@ if (wanted && !node.startsWith(wanted.replace(/^v/, ""))) {
 
 lines.push(composeLine(cwd));
 
+/*
+ * What the last session left behind, from the repo's own script so the rule
+ * has one implementation. A checkout that predates the script gets the rest of
+ * the context rather than a crash, the way `loadRuleScripts` treats the
+ * screenshots rule.
+ */
+try {
+  const workspace = await import(
+    `${repoRoot(cwd)}/scripts/check-workspace.mjs`
+  );
+  lines.push(
+    ...workspace.workspaceLines({
+      gone: workspace.goneBranches(repoRoot(cwd)),
+      servers: workspace.foreignServers(repoRoot(cwd)),
+      worktrees: workspace.otherWorktrees(repoRoot(cwd)),
+    })
+  );
+} catch {
+  // No script in this checkout, or git could not answer.
+}
+
 lines.push(
   "Gates: lefthook.yml at commit and push, the hooks under .claude/hooks in this session. CONTRIBUTING.md has the table."
 );
