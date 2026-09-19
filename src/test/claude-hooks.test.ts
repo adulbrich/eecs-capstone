@@ -473,6 +473,15 @@ describe("session-context", () => {
     expect(result.stdout).toContain("Compose:");
   }, 30_000);
 
+  it("reports what the last session left behind, in one form or the other", () => {
+    // Either shape satisfies this: a checkout with leftovers names them, a
+    // tidy one says so. What must not happen is silence, which is how a
+    // worktree and the dev server inside it survived long enough to make a
+    // browser suite scan the wrong branch and pass (#515).
+    const result = hook("session-context", {});
+    expect(result.stdout).toMatch(/Leftover/);
+  }, 30_000);
+
   it("says the compose check did not finish rather than that nothing runs", () => {
     // The cap is short enough to be reachable on a cold daemon, and an answer
     // that never came must not read as "nothing running": that would tell a

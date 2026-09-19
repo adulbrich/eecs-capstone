@@ -9,11 +9,11 @@ one: accounts, the setup wizard, and what Claude Code does in your terminal.
 ## The process
 
 ```
-pick up         branch            commit               push              pull request        merge
---------        ------            ------               ----              ------------        -----
-GitHub issue    fetch, then       lefthook:            lefthook:         verify, smoke,      squash, merge
-ready-for-*     branch from       biome, prose,        typecheck,        a11y-smoke,         or rebase
-p0/p1/p2        origin/main       branch, message      unit suite        pr-text (CI)        no human
+pick up         branch            commit               push              pull request        merge           clean up
+--------        ------            ------               ----              ------------        -----           --------
+GitHub issue    fetch, then       lefthook:            lefthook:         verify, smoke,      squash, merge   worktree,
+ready-for-*     branch from       biome, prose,        typecheck,        a11y-smoke,         or rebase       branch,
+p0/p1/p2        origin/main       branch, message      unit suite        pr-text (CI)        no human        dev server
 claim it        fix/ feat/ ...                                           review loop         approval
 ```
 
@@ -36,6 +36,31 @@ claim it        fix/ feat/ ...                                           review 
 5. **Run the review loop.** `mattpocock-skills:code-review` until a pass raises
    nothing unanswered, then merge. No approving review is required by GitHub, so
    this loop is the review. Record the pass count in the PR.
+6. **Clean up after the merge.** Three things outlive the branch, and each one
+   has since cost somebody a debugging session:
+   - **The worktree**, if the work had one: `git worktree remove <path>`. A
+     worktree under `.claude/worktrees/` is a second copy of this repo inside
+     the root, which is why `vite.config.ts` scopes the unit run to `src/**`.
+   - **Any dev server started inside it.** The accessibility suite reuses a
+     server it did not start (`reuseExistingServer: !CI`), so one left holding
+     port 3000 from another checkout makes that suite scan the other code and
+     report green. The smoke suite already defends itself, never reusing and
+     running on 3001, so a stray server there fails the run loudly instead.
+     `lsof -ti :3000` gives the pid; the owning directory is
+     `lsof -a -p <pid> -d cwd -Fn`.
+   - **The local branch**, once its remote is gone. A squash merge leaves it
+     "not fully merged", so `git branch -d` refuses it and only `-D` removes
+     it. `.claude/hooks/guard-git.mjs` reserves `-D` for you rather than an
+     agent, so an agent's part is to name the branches and the command.
+
+   `node scripts/check-workspace.mjs --ports` reports all three, and the
+   SessionStart hook runs the same checks, so a session is told at its first
+   message instead of finding out. Two limits worth knowing: the script only
+   ever reports, because a worktree or a server may belong to another session
+   that is still running and because removing a merged branch here means force
+   removing it; and the hook runs once, at the first message, so it names what
+   the last session left rather than what this one is about to. This step is
+   the in-session half of that.
 
 ## The gates
 
