@@ -35,6 +35,11 @@
  *   node scripts/check-workspace.mjs --root <dir>   report on another checkout
  *   node scripts/check-workspace.mjs --ports        also probe 3000 and 3001
  *   node scripts/check-workspace.mjs --ports 3000   probe the ports named
+ *
+ * The list form of `--ports` is there so the probe can be tested against a
+ * port the kernel just handed out, rather than against whatever happens to be
+ * on 3000 on the machine running the suite. Nothing in this repo passes it;
+ * say so rather than let it read as a workflow somebody uses.
  */
 import { execFileSync } from "node:child_process";
 
@@ -60,9 +65,10 @@ const PROBE_TIMEOUT = 1500;
  * `composeLine` in the session hook caps a single subprocess and says why: a
  * convenience must fail visibly rather than stall a session. This runs up to
  * one `lsof` per port plus two per listening pid, so a per-call cap alone
- * bounds nothing. When the budget runs out the report says the probe was cut
- * short, because silence would read as "no foreign server", which is the
- * answer this exists to avoid getting wrong.
+ * bounds nothing. When the budget runs out the report names the ports it did
+ * not reach, because silence would read as "no foreign server", which is the
+ * answer this exists to avoid getting wrong, and naming 3000 when 3001 was
+ * the one skipped is the same mistake with extra confidence.
  */
 const PROBE_BUDGET = 2500;
 
@@ -139,14 +145,18 @@ export function foreignServers(root, ports) {
   }));
   const found = [];
   const deadline = Date.now() + PROBE_BUDGET;
-  for (const { port, why } of wanted) {
+  /** Ports still to check, so a cut-short probe can name what it skipped. */
+  const left = (from) => wanted.slice(from).map((p) => p.port);
+  for (const [index, { port, why }] of wanted.entries()) {
     if (Date.now() > deadline) {
-      return { cutShort: true, servers: found };
+      return { servers: found, unchecked: left(index) };
     }
     const pids = run("lsof", ["-ti", `:${port}`]).split("\n").filter(Boolean);
     for (const pid of pids) {
       if (Date.now() > deadline) {
-        return { cutShort: true, servers: found };
+        // This port counts as unchecked: a pid whose directory was never read
+        // is a server this run cannot speak for.
+        return { servers: found, unchecked: left(index) };
       }
       // -Fn prints the field-prefixed form: an `n` line carries the path.
       const cwdLine = run("lsof", ["-a", "-p", pid, "-d", "cwd", "-Fn"])
@@ -158,11 +168,11 @@ export function foreignServers(root, ports) {
       }
     }
   }
-  return { cutShort: false, servers: found };
+  return { servers: found, unchecked: [] };
 }
 
 /** The report, as lines. Pure, so the shapes above are what the tests drive. */
-export function workspaceLines({ worktrees, gone, servers, cutShort }) {
+export function workspaceLines({ worktrees, gone, servers, unchecked }) {
   const lines = [];
   for (const w of worktrees) {
     lines.push(
@@ -182,9 +192,9 @@ export function workspaceLines({ worktrees, gone, servers, cutShort }) {
       `Leftover dev server: pid ${s.pid} holds port ${s.port} from ${s.dir}, not this checkout. Stop it before a browser suite, because ${s.why}.`
     );
   }
-  if (cutShort) {
+  if (unchecked && unchecked.length > 0) {
     lines.push(
-      `Port probe: no answer in ${PROBE_BUDGET}ms, so this says nothing about a dev server. Check with \`lsof -ti :3000\` before a browser suite.`
+      `Port probe: out of budget after ${PROBE_BUDGET}ms, so this says nothing about ${unchecked.join(" or ")}. Check with \`lsof -ti :${unchecked[0]}\` before a browser suite.`
     );
   }
   return lines.length > 0 ? lines : ["Leftovers: none."];
@@ -211,11 +221,11 @@ function main(argv) {
   const ports = portsFrom(argv);
   const probe = ports
     ? foreignServers(top, ports)
-    : { cutShort: false, servers: [] };
+    : { servers: [], unchecked: [] };
   const lines = workspaceLines({
-    cutShort: probe.cutShort,
     gone: goneBranches(top),
     servers: probe.servers,
+    unchecked: probe.unchecked,
     worktrees: otherWorktrees(top),
   });
   process.stdout.write(`${lines.join("\n")}\n`);

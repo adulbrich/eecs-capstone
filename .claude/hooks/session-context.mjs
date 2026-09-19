@@ -131,9 +131,9 @@ if (existsSync(`${root}/scripts/check-workspace.mjs`)) {
   const probe = workspace.foreignServers(root);
   lines.push(
     ...workspace.workspaceLines({
-      cutShort: probe.cutShort,
       gone: workspace.goneBranches(root),
       servers: probe.servers,
+      unchecked: probe.unchecked,
       worktrees: workspace.otherWorktrees(root),
     })
   );
