@@ -65,10 +65,15 @@ const PROBE_TIMEOUT = 1500;
  * `composeLine` in the session hook caps a single subprocess and says why: a
  * convenience must fail visibly rather than stall a session. This runs up to
  * one `lsof` per port plus two per listening pid, so a per-call cap alone
- * bounds nothing. When the budget runs out the report names the ports it did
- * not reach, because silence would read as "no foreign server", which is the
- * answer this exists to avoid getting wrong, and naming 3000 when 3001 was
- * the one skipped is the same mistake with extra confidence.
+ * bounds nothing. Each call is capped at whatever is left of the budget as
+ * well as at `PROBE_TIMEOUT`, because a deadline checked only before a call
+ * still lets the last one run its own full cap past it: the ceiling would be
+ * the sum of the two, and the report would claim a number it does not keep.
+ *
+ * When the budget runs out the report names the ports it did not reach, since
+ * silence would read as "no foreign server", which is the answer this exists
+ * to avoid getting wrong, and naming 3000 when 3001 was the one skipped is
+ * the same mistake with extra confidence.
  */
 const PROBE_BUDGET = 2500;
 
@@ -147,19 +152,23 @@ export function foreignServers(root, ports) {
   const deadline = Date.now() + PROBE_BUDGET;
   /** Ports still to check, so a cut-short probe can name what it skipped. */
   const left = (from) => wanted.slice(from).map((p) => p.port);
+  /** What one call may take: the smaller of its own cap and what is left. */
+  const slice = () => Math.min(PROBE_TIMEOUT, deadline - Date.now());
   for (const [index, { port, why }] of wanted.entries()) {
-    if (Date.now() > deadline) {
+    if (slice() <= 0) {
       return { servers: found, unchecked: left(index) };
     }
-    const pids = run("lsof", ["-ti", `:${port}`]).split("\n").filter(Boolean);
+    const pids = run("lsof", ["-ti", `:${port}`], slice())
+      .split("\n")
+      .filter(Boolean);
     for (const pid of pids) {
-      if (Date.now() > deadline) {
+      if (slice() <= 0) {
         // This port counts as unchecked: a pid whose directory was never read
         // is a server this run cannot speak for.
         return { servers: found, unchecked: left(index) };
       }
       // -Fn prints the field-prefixed form: an `n` line carries the path.
-      const cwdLine = run("lsof", ["-a", "-p", pid, "-d", "cwd", "-Fn"])
+      const cwdLine = run("lsof", ["-a", "-p", pid, "-d", "cwd", "-Fn"], slice())
         .split("\n")
         .find((l) => l.startsWith("n"));
       const dir = cwdLine ? cwdLine.slice(1) : "";
