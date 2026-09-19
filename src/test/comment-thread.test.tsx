@@ -697,12 +697,56 @@ describe("CommentThread editing", () => {
     expect(updateComment).not.toHaveBeenCalled();
   });
 
-  it("marks an edited comment, and leaves an unedited one unmarked", () => {
-    renderThread([
+  it("marks an edited comment with when it was edited, and leaves an unedited one unmarked", () => {
+    const { container } = renderThread([
       comment({ id: "c1", editedAt: "2026-05-28T11:00:00.000Z" }),
       comment({ id: "c2", content: "As posted." }),
     ]);
-    expect(screen.getAllByText("(edited)")).toHaveLength(1);
+    expect(screen.getAllByText(/\(edited/)).toHaveLength(1);
+    // The time itself, not just the word: a reader who cares that the words
+    // moved cares when (#503).
+    expect(
+      container.querySelectorAll('time[datetime="2026-05-28T11:00:00.000Z"]')
+    ).toHaveLength(1);
+  });
+
+  it("keeps an open editor and its text when the thread refetches", () => {
+    // #188 and #190 are the two precedents: a refetch that lands while
+    // somebody is typing must not take what they typed. `CommentNode` is keyed
+    // by comment id, so this holds by construction, and the test is here to
+    // keep it that way.
+    const mine = comment({ isMine: true });
+    const { rerender } = render(
+      <CommentThread
+        comments={[mine]}
+        onChanged={() => Promise.resolve()}
+        projectId={PROJECT_ID}
+        viewerIsOwner={false}
+        viewerIsStaff
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByPlaceholderText("Edit comment"), {
+      target: { value: "Half a rewrite" },
+    });
+
+    rerender(
+      <CommentThread
+        comments={[
+          mine,
+          comment({ id: "c2", authorId: "someone-else", content: "Landed." }),
+        ]}
+        onChanged={() => Promise.resolve()}
+        projectId={PROJECT_ID}
+        viewerIsOwner={false}
+        viewerIsStaff
+      />
+    );
+
+    expect(screen.getByText("Landed.")).toBeTruthy();
+    expect(
+      (screen.getByPlaceholderText("Edit comment") as HTMLTextAreaElement).value
+    ).toBe("Half a rewrite");
   });
 
   it("offers no Edit to a viewer who is not the author, staff or not", () => {

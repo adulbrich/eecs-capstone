@@ -103,7 +103,11 @@ function CommentHeader({ comment }: { comment: Comment }) {
       <span>
         <LocalTime value={comment.createdAt} />
       </span>
-      {comment.editedAt && <span>(edited)</span>}
+      {comment.editedAt && (
+        <span>
+          (edited <LocalTime value={comment.editedAt} />)
+        </span>
+      )}
       {comment.isInternal && (
         <span
           className="rounded px-1.5 py-0.5 font-medium text-xs"

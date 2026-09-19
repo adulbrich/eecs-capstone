@@ -1,12 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { commentContent } from "#/lib/comment-content";
 import { SEND_EMAIL_FIELD } from "./send-email-field";
-
-/**
- * One spelling of the content rule, so an edit cannot accept text a post would
- * have refused (#503).
- */
-const commentContent = z.string().trim().min(1).max(5000);
 
 const addCommentSchema = z.object({
   projectId: z.string().uuid(),

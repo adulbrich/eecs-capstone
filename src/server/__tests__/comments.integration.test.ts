@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "#/db";
-import { notifications, projectComments, user } from "#/db/schema";
+import { notifications, projectComments, projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { addCommentAs, updateCommentAs } from "#/server/_internal/comments";
 import {
@@ -573,6 +573,58 @@ describe("updateCommentAs", () => {
     // The recipient holds the original in their inbox, so the bell matching
     // what they were told is consistent rather than stale (#503).
     expect(bell[0].message).toBe("as posted");
+  });
+
+  it("refuses an author who is no longer part of the thread", async () => {
+    // Authorship alone is not enough. Staff reassign a project's proposer from
+    // their panel, and the previous proposer keeps every comment they wrote
+    // while losing the dialogue those comments belong to. The same membership
+    // rule `addCommentAs` applies to a post applies to an edit (#503).
+    const owner = await makeUser(`u-re-${Date.now()}@x.com`, "user");
+    const successor = await makeUser(`u-rs-${Date.now()}@x.com`, "user");
+    const { id: pid } = await createProjectAs(owner, baseProject());
+    const { id } = await addCommentAs(owner, {
+      projectId: pid,
+      content: "written while it was mine",
+      isInternal: false,
+    });
+
+    await db
+      .update(projects)
+      .set({ proposerId: successor.id })
+      .where(eq(projects.id, pid));
+
+    await expect(
+      updateCommentAs(owner, { commentId: id, content: "second thoughts" })
+    ).rejects.toThrow(/Forbidden/);
+
+    const [row] = await db
+      .select()
+      .from(projectComments)
+      .where(eq(projectComments.id, id));
+    expect(row.content).toBe("written while it was mine");
+  });
+
+  it("ignores an isInternal smuggled past the type", async () => {
+    const owner = await makeUser(`u-si-${Date.now()}@x.com`, "user");
+    const { id: pid } = await createProjectAs(owner, baseProject());
+    const { id } = await addCommentAs(owner, {
+      projectId: pid,
+      content: "public",
+      isInternal: false,
+    });
+
+    await updateCommentAs(owner, {
+      commentId: id,
+      content: "still public",
+      isInternal: true,
+    } as Parameters<typeof updateCommentAs>[1]);
+
+    const [row] = await db
+      .select()
+      .from(projectComments)
+      .where(eq(projectComments.id, id));
+    expect(row.isInternal).toBe(false);
   });
 
   it("refuses a comment id that does not exist", async () => {

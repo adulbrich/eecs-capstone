@@ -1,4 +1,5 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, notExists, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "#/db";
 import { projectComments, projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
@@ -146,36 +147,53 @@ export async function updateCommentAs(
   viewer: AuthUser,
   data: UpdateCommentInput
 ): Promise<{ id: string }> {
-  const [comment] = await db
-    .select()
+  const [row] = await db
+    .select({ authorId: projectComments.authorId, project: projects })
     .from(projectComments)
+    .innerJoin(projects, eq(projects.id, projectComments.projectId))
     .where(eq(projectComments.id, data.commentId));
-  if (!comment) {
+  if (!row) {
     throw new Error("Comment not found");
   }
-  // Authorship is the whole gate. Staff are not privileged here: the thread is
-  // what a review decision was made on, so nobody rewrites anybody else's
-  // words. A stranger fails this too, which is why there is no separate
-  // project-visibility check: a viewer who cannot see the project cannot have
-  // authored a comment on it.
-  if (comment.authorId !== viewer.id) {
+  // Two gates, and both are needed. Membership is the same rule `addCommentAs`
+  // applies to a post: the thread is a private submitter to staff dialogue, so
+  // only the current proposer and staff are in it. Authorship narrows that to
+  // the one person who wrote these words, because the thread is what a review
+  // decision was made on and nobody rewrites anybody else's part of it, staff
+  // included. Authorship alone would not do: staff reassign a project's
+  // proposer from their panel, and the previous proposer still authored the
+  // comments while no longer being in the conversation they belong to.
+  const isOwner = row.project.proposerId === viewer.id;
+  if (!(isStaff(viewer) || isOwner)) {
     throw new Error("Forbidden");
   }
-  // Any reply, by anyone, internal or not. A reply's meaning depends on the
-  // text it answers.
-  const [reply] = await db
-    .select({ id: projectComments.id })
-    .from(projectComments)
-    .where(eq(projectComments.parentId, data.commentId))
-    .limit(1);
-  if (reply) {
-    throw new Error(COMMENT_LOCKED_MESSAGE);
+  if (row.authorId !== viewer.id) {
+    throw new Error("Forbidden");
   }
 
-  await db
+  // The reply lock rides on the write rather than a read before it. Any reply,
+  // by anyone, internal or not: a reply's meaning depends on the text it
+  // answers. Asking first and writing second leaves a window in which a reply
+  // lands between the two, and the edit it should have stopped goes through.
+  const child = alias(projectComments, "child");
+  const updated = await db
     .update(projectComments)
     .set({ content: data.content, editedAt: new Date() })
-    .where(eq(projectComments.id, data.commentId));
+    .where(
+      and(
+        eq(projectComments.id, data.commentId),
+        notExists(
+          db
+            .select({ one: sql`1` })
+            .from(child)
+            .where(eq(child.parentId, data.commentId))
+        )
+      )
+    )
+    .returning({ id: projectComments.id });
+  if (updated.length === 0) {
+    throw new Error(COMMENT_LOCKED_MESSAGE);
+  }
   return { id: data.commentId };
 }
 
