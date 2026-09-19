@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -48,14 +48,37 @@ function repoWithRemote() {
   return { base, dir, remote };
 }
 
-/** The report for `dir`, with the port probe off: no test binds a port. */
-function report(dir: string) {
+/** The report for `dir`. The port probe is off unless a case asks for it. */
+function report(dir: string, ...extra: string[]) {
   const result = spawnSync(
     process.execPath,
-    [join(cwd, "scripts/check-workspace.mjs"), "--root", dir],
+    [join(cwd, "scripts/check-workspace.mjs"), "--root", dir, ...extra],
     { encoding: "utf8", env }
   );
   return { status: result.status, stdout: result.stdout };
+}
+
+/**
+ * A process listening on a free port from `dir`, which is what the probe is
+ * looking for: a server whose working directory is not this checkout. Its own
+ * port is picked by the kernel, so the test never fights whatever is on 3000.
+ */
+function listenerIn(dir: string) {
+  const child = spawn(
+    process.execPath,
+    [
+      "-e",
+      "const s=require('net').createServer();s.listen(0,'127.0.0.1',()=>console.log(s.address().port));setInterval(()=>{},1e6)",
+    ],
+    { cwd: dir, env, stdio: ["ignore", "pipe", "ignore"] }
+  );
+  const port = new Promise<number>((resolve, reject) => {
+    child.stdout.on("data", (chunk: Buffer) =>
+      resolve(Number(chunk.toString().trim()))
+    );
+    child.on("error", reject);
+  });
+  return { child, port };
 }
 
 describe("check-workspace", () => {
@@ -103,6 +126,38 @@ describe("check-workspace", () => {
     // to find out.
     expect(result.stdout).toContain("git branch -D");
   });
+
+  it("names a server on a probed port whose directory is not this checkout", async () => {
+    const { dir } = repoWithRemote();
+    const outside = mkdtempSync(join(tmpdir(), "elsewhere-"));
+    temp.push(outside);
+    const { child, port } = listenerIn(outside);
+    try {
+      const result = report(dir, "--ports", String(await port));
+      expect(result.stdout).toContain(`port ${await port}`);
+      expect(result.stdout).toContain(String(child.pid));
+      expect(result.stdout).toContain("Stop it before a browser suite");
+    } finally {
+      child.kill();
+    }
+  }, 20_000);
+
+  it("says nothing about a port nobody is listening on", async () => {
+    const { dir } = repoWithRemote();
+    // Bind a port, learn its number, then give it back: the odds of anything
+    // else taking it inside this test are what make this a free port rather
+    // than a guess at one.
+    const outside = mkdtempSync(join(tmpdir(), "elsewhere-"));
+    temp.push(outside);
+    const { child, port } = listenerIn(outside);
+    const free = await port;
+    child.kill();
+    await new Promise((r) => setTimeout(r, 200));
+
+    expect(report(dir, "--ports", String(free)).stdout).toContain(
+      "Leftovers: none"
+    );
+  }, 20_000);
 
   it("leaves a branch that was never pushed alone", () => {
     const { dir } = repoWithRemote();

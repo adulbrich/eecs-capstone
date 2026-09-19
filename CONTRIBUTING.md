@@ -41,10 +41,12 @@ claim it        fix/ feat/ ...                                           review 
    - **The worktree**, if the work had one: `git worktree remove <path>`. A
      worktree under `.claude/worktrees/` is a second copy of this repo inside
      the root, which is why `vite.config.ts` scopes the unit run to `src/**`.
-   - **Any dev server started inside it.** Both Playwright configs set
-     `reuseExistingServer` outside CI, so a server left holding port 3000 from
-     another checkout makes the accessibility and smoke suites scan that code
-     and pass. `lsof -ti :3000` gives the pid; the owning directory is
+   - **Any dev server started inside it.** The accessibility suite reuses a
+     server it did not start (`reuseExistingServer: !CI`), so one left holding
+     port 3000 from another checkout makes that suite scan the other code and
+     report green. The smoke suite already defends itself, never reusing and
+     running on 3001, so a stray server there fails the run loudly instead.
+     `lsof -ti :3000` gives the pid; the owning directory is
      `lsof -a -p <pid> -d cwd -Fn`.
    - **The local branch**, once its remote is gone. A squash merge leaves it
      "not fully merged", so `git branch -d` refuses it and only `-D` removes
@@ -53,8 +55,12 @@ claim it        fix/ feat/ ...                                           review 
 
    `node scripts/check-workspace.mjs --ports` reports all three, and the
    SessionStart hook runs the same checks, so a session is told at its first
-   message instead of finding out. The script only ever reports: removing a
-   branch means force-removing it, and that stays yours.
+   message instead of finding out. Two limits worth knowing: the script only
+   ever reports, because a worktree or a server may belong to another session
+   that is still running and because removing a merged branch here means force
+   removing it; and the hook runs once, at the first message, so it names what
+   the last session left rather than what this one is about to. This step is
+   the in-session half of that.
 
 ## The gates
 

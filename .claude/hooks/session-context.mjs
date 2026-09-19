@@ -4,7 +4,7 @@
  * use against `.nvmrc`, and which compose services are up. No network.
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { cleanEnv, currentBranch, readInput, repoRoot } from "./lib.mjs";
 
 /**
@@ -110,23 +110,33 @@ lines.push(composeLine(cwd));
 
 /*
  * What the last session left behind, from the repo's own script so the rule
- * has one implementation. A checkout that predates the script gets the rest of
- * the context rather than a crash, the way `loadRuleScripts` treats the
- * screenshots rule.
+ * has one implementation.
+ *
+ * Gated on the file rather than wrapped in a catch, which is how
+ * `loadRuleScripts` treats a checkout without the screenshots rule. The
+ * difference is not style. A catch around the import also swallows a bug
+ * inside the script, and the section then vanishes from a session's context
+ * with nothing said: that is not a thought experiment, it happened once here
+ * when the script's return shape changed under a catch that hid it. Missing
+ * is a fact about the checkout; throwing is a bug, and a bug should be loud.
+ *
+ * The ports are probed here although the CLI makes that opt-in, because this
+ * is the caller the probe exists for: a server another checkout left on 3000
+ * is invisible until a browser suite has already reported green against it.
+ * The script bounds the probe itself and says so when the budget runs out.
  */
-try {
-  const workspace = await import(
-    `${repoRoot(cwd)}/scripts/check-workspace.mjs`
-  );
+const root = repoRoot(cwd);
+if (existsSync(`${root}/scripts/check-workspace.mjs`)) {
+  const workspace = await import(`${root}/scripts/check-workspace.mjs`);
+  const probe = workspace.foreignServers(root);
   lines.push(
     ...workspace.workspaceLines({
-      gone: workspace.goneBranches(repoRoot(cwd)),
-      servers: workspace.foreignServers(repoRoot(cwd)),
-      worktrees: workspace.otherWorktrees(repoRoot(cwd)),
+      cutShort: probe.cutShort,
+      gone: workspace.goneBranches(root),
+      servers: probe.servers,
+      worktrees: workspace.otherWorktrees(root),
     })
   );
-} catch {
-  // No script in this checkout, or git could not answer.
 }
 
 lines.push(
