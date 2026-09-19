@@ -81,18 +81,35 @@ const cleanEnv = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_"))
 );
 
-function run(file, args, timeout = PROBE_TIMEOUT) {
+/**
+ * A call's output, and whether it answered at all.
+ *
+ * The two must not collapse into one empty string, which is the mistake
+ * `composeLine` in the session hook has a paragraph about. `lsof -ti` exits
+ * non-zero when nothing is listening, so an empty answer is a real answer
+ * here; a call that ran out of time is not one, and reporting "no foreign
+ * server" on the strength of it is the failure this file exists to prevent
+ * with the confidence turned up.
+ */
+function probe(file, args, timeout = PROBE_TIMEOUT) {
   try {
-    return execFileSync(file, args, {
-      encoding: "utf8",
-      env: cleanEnv,
-      stdio: ["ignore", "pipe", "ignore"],
-      timeout,
-    }).trim();
-  } catch {
-    return "";
+    return {
+      answered: true,
+      out: execFileSync(file, args, {
+        encoding: "utf8",
+        env: cleanEnv,
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout,
+      }).trim(),
+    };
+  } catch (error) {
+    return { answered: error.code !== "ETIMEDOUT", out: "" };
   }
 }
+
+/** For the callers whose silence and whose failure mean the same thing. */
+const run = (file, args, timeout = PROBE_TIMEOUT) =>
+  probe(file, args, timeout).out;
 
 const git = (root, args) => run("git", ["-C", root, ...args], 5000);
 
@@ -155,22 +172,29 @@ export function foreignServers(root, ports) {
   /** What one call may take: the smaller of its own cap and what is left. */
   const slice = () => Math.min(PROBE_TIMEOUT, deadline - Date.now());
   for (const [index, { port, why }] of wanted.entries()) {
-    if (slice() <= 0) {
+    // Read once, then both checked and passed, so the value the guard
+    // approved is the value the call gets.
+    const budget = slice();
+    if (budget <= 0) {
       return { servers: found, unchecked: left(index) };
     }
-    const pids = run("lsof", ["-ti", `:${port}`], slice())
-      .split("\n")
-      .filter(Boolean);
-    for (const pid of pids) {
-      if (slice() <= 0) {
-        // This port counts as unchecked: a pid whose directory was never read
-        // is a server this run cannot speak for.
+    const listing = probe("lsof", ["-ti", `:${port}`], budget);
+    if (!listing.answered) {
+      return { servers: found, unchecked: left(index) };
+    }
+    for (const pid of listing.out.split("\n").filter(Boolean)) {
+      // Unchecked either way: a pid whose directory was never read is a
+      // server this run cannot speak for.
+      const own = slice();
+      if (own <= 0) {
+        return { servers: found, unchecked: left(index) };
+      }
+      const cwdRead = probe("lsof", ["-a", "-p", pid, "-d", "cwd", "-Fn"], own);
+      if (!cwdRead.answered) {
         return { servers: found, unchecked: left(index) };
       }
       // -Fn prints the field-prefixed form: an `n` line carries the path.
-      const cwdLine = run("lsof", ["-a", "-p", pid, "-d", "cwd", "-Fn"], slice())
-        .split("\n")
-        .find((l) => l.startsWith("n"));
+      const cwdLine = cwdRead.out.split("\n").find((l) => l.startsWith("n"));
       const dir = cwdLine ? cwdLine.slice(1) : "";
       if (dir && dir !== root) {
         found.push({ dir, pid, port, why });
@@ -203,7 +227,7 @@ export function workspaceLines({ worktrees, gone, servers, unchecked }) {
   }
   if (unchecked && unchecked.length > 0) {
     lines.push(
-      `Port probe: out of budget after ${PROBE_BUDGET}ms, so this says nothing about ${unchecked.join(" or ")}. Check with \`lsof -ti :${unchecked[0]}\` before a browser suite.`
+      `Port probe: no answer inside its ${PROBE_BUDGET}ms, so this says nothing about ${unchecked.join(" or ")}. Check with \`lsof -ti :${unchecked[0]}\` before a browser suite.`
     );
   }
   return lines.length > 0 ? lines : ["Leftovers: none."];

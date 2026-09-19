@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -158,6 +158,34 @@ describe("check-workspace", () => {
       "Leftovers: none"
     );
   }, 20_000);
+
+  it("says which ports it could not check when the probe runs out of budget", async () => {
+    // A fake `lsof` that never answers, the way the session-context test fakes
+    // a slow `docker`. An answer that never came and an answer of "nobody is
+    // listening" are the same empty string to the caller, and they mean
+    // opposite things: reporting none of the second when it was the first is
+    // how a stray dev server stays invisible.
+    const bin = mkdtempSync(join(tmpdir(), "slow-lsof-"));
+    temp.push(bin);
+    writeFileSync(join(bin, "lsof"), "#!/bin/sh\nsleep 30\n");
+    chmodSync(join(bin, "lsof"), 0o755);
+    const { dir } = repoWithRemote();
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(cwd, "scripts/check-workspace.mjs"),
+        "--root",
+        dir,
+        "--ports",
+        "3000,3001",
+      ],
+      { encoding: "utf8", env: { ...env, PATH: `${bin}:${process.env.PATH}` } }
+    );
+
+    expect(result.stdout).toContain("3000");
+    expect(result.stdout).not.toContain("Leftovers: none");
+  }, 30_000);
 
   it("leaves a branch that was never pushed alone", () => {
     const { dir } = repoWithRemote();
