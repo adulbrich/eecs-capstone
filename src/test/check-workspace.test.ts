@@ -187,6 +187,57 @@ describe("check-workspace", () => {
     expect(result.stdout).not.toContain("Leftovers: none");
   }, 30_000);
 
+  it("says it could not read the checkout when git does not answer", () => {
+    // The same rule as the port probe, one layer up: a git that never answered
+    // and a checkout with nothing in it are not the same finding, and only one
+    // of them is safe to report as "none".
+    const bin = mkdtempSync(join(tmpdir(), "slow-git-"));
+    temp.push(bin);
+    writeFileSync(join(bin, "git"), "#!/bin/sh\nsleep 30\n");
+    chmodSync(join(bin, "git"), 0o755);
+    const { dir } = repoWithRemote();
+
+    const result = spawnSync(
+      process.execPath,
+      [join(cwd, "scripts/check-workspace.mjs"), "--root", dir],
+      { encoding: "utf8", env: { ...env, PATH: `${bin}:${process.env.PATH}` } }
+    );
+
+    expect(result.stdout).not.toContain("Leftovers: none");
+    expect(result.stdout).toContain("did not answer");
+  }, 60_000);
+
+  it("says nothing was checked when lsof is not installed", () => {
+    // A missing binary is not an empty answer either. `run` used to turn every
+    // failure into "", so a machine without lsof reported no dev server with
+    // the same confidence as one that had looked.
+    const bin = mkdtempSync(join(tmpdir(), "no-lsof-"));
+    temp.push(bin);
+    const { dir } = repoWithRemote();
+    const gitPath = spawnSync("which", ["git"], {
+      encoding: "utf8",
+      env,
+    }).stdout.trim();
+    writeFileSync(join(bin, "git"), `#!/bin/sh\nexec ${gitPath} "$@"\n`);
+    chmodSync(join(bin, "git"), 0o755);
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(cwd, "scripts/check-workspace.mjs"),
+        "--root",
+        dir,
+        "--ports",
+        "3000",
+      ],
+      // PATH holding git and nothing else, so lsof cannot be found.
+      { encoding: "utf8", env: { ...env, PATH: bin } }
+    );
+
+    expect(result.stdout).not.toContain("Leftovers: none");
+    expect(result.stdout).toContain("3000");
+  }, 30_000);
+
   it("leaves a branch that was never pushed alone", () => {
     const { dir } = repoWithRemote();
     run(dir, "branch", "wip/never-pushed");

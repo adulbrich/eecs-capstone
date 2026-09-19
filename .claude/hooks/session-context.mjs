@@ -128,13 +128,19 @@ lines.push(composeLine(cwd));
 const root = repoRoot(cwd);
 if (existsSync(`${root}/scripts/check-workspace.mjs`)) {
   const workspace = await import(`${root}/scripts/check-workspace.mjs`);
-  const probe = workspace.foreignServers(root);
+  const ports = workspace.foreignServers(root);
+  const trees = workspace.otherWorktrees(root);
+  const branches = workspace.goneBranches(root);
   lines.push(
     ...workspace.workspaceLines({
-      gone: workspace.goneBranches(root),
-      servers: probe.servers,
-      unchecked: probe.unchecked,
-      worktrees: workspace.otherWorktrees(root),
+      gone: branches.branches,
+      servers: ports.servers,
+      unchecked: ports.unchecked,
+      unreadable: [
+        ...(trees.answered ? [] : ["worktrees"]),
+        ...(branches.answered ? [] : ["branches"]),
+      ],
+      worktrees: trees.worktrees,
     })
   );
 }

@@ -103,15 +103,18 @@ function probe(file, args, timeout = PROBE_TIMEOUT) {
       }).trim(),
     };
   } catch (error) {
-    return { answered: error.code !== "ETIMEDOUT", out: "" };
+    // `status` is a number exactly when the process ran to the end, whatever
+    // it exited with. It is null when the binary was missing, when a signal
+    // killed it, and when the timeout did. `code` cannot do this job: it is
+    // ETIMEDOUT for a timeout and ENOENT for a missing binary, but null for
+    // both a plain non-zero exit and a SIGKILL, which puts the two halves of
+    // the question on one value.
+    return { answered: error.status !== null, out: "" };
   }
 }
 
-/** For the callers whose silence and whose failure mean the same thing. */
-const run = (file, args, timeout = PROBE_TIMEOUT) =>
-  probe(file, args, timeout).out;
-
-const git = (root, args) => run("git", ["-C", root, ...args], 5000);
+const GIT_TIMEOUT = 5000;
+const git = (root, args) => probe("git", ["-C", root, ...args], GIT_TIMEOUT);
 
 /**
  * Every worktree but the checkout itself, with the branch each holds.
@@ -120,9 +123,14 @@ const git = (root, args) => run("git", ["-C", root, ...args], 5000);
  * line is a full ref, and a detached one has none.
  */
 export function otherWorktrees(root) {
+  const listing = git(root, ["worktree", "list", "--porcelain"]);
+  const top = git(root, ["rev-parse", "--show-toplevel"]);
+  if (!(listing.answered && top.answered)) {
+    return { answered: false, worktrees: [] };
+  }
   const out = [];
   let current = null;
-  for (const line of git(root, ["worktree", "list", "--porcelain"]).split("\n")) {
+  for (const line of listing.out.split("\n")) {
     if (line.startsWith("worktree ")) {
       current = { path: line.slice("worktree ".length), branch: "detached" };
       out.push(current);
@@ -130,8 +138,8 @@ export function otherWorktrees(root) {
       current.branch = line.slice("branch refs/heads/".length);
     }
   }
-  const top = git(root, ["rev-parse", "--show-toplevel"]) || root;
-  return out.filter((w) => w.path !== top);
+  const here = top.out || root;
+  return { answered: true, worktrees: out.filter((w) => w.path !== here) };
 }
 
 /**
@@ -141,16 +149,23 @@ export function otherWorktrees(root) {
  * how someone loses it.
  */
 export function goneBranches(root) {
-  return git(root, [
+  const refs = git(root, [
     "for-each-ref",
     "--format=%(refname:short)|%(upstream)|%(upstream:track)",
     "refs/heads/",
-  ])
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => line.split("|"))
-    .filter(([, upstream, track]) => upstream && track === "[gone]")
-    .map(([name]) => name);
+  ]);
+  if (!refs.answered) {
+    return { answered: false, branches: [] };
+  }
+  return {
+    answered: true,
+    branches: refs.out
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => line.split("|"))
+      .filter(([, upstream, track]) => upstream && track === "[gone]")
+      .map(([name]) => name),
+  };
 }
 
 /**
@@ -205,7 +220,7 @@ export function foreignServers(root, ports) {
 }
 
 /** The report, as lines. Pure, so the shapes above are what the tests drive. */
-export function workspaceLines({ worktrees, gone, servers, unchecked }) {
+export function workspaceLines({ worktrees, gone, servers, unchecked, unreadable }) {
   const lines = [];
   for (const w of worktrees) {
     lines.push(
@@ -223,6 +238,11 @@ export function workspaceLines({ worktrees, gone, servers, unchecked }) {
   for (const s of servers) {
     lines.push(
       `Leftover dev server: pid ${s.pid} holds port ${s.port} from ${s.dir}, not this checkout. Stop it before a browser suite, because ${s.why}.`
+    );
+  }
+  if (unreadable && unreadable.length > 0) {
+    lines.push(
+      `Git did not answer about ${unreadable.join(" or ")} within ${GIT_TIMEOUT}ms, so this says nothing about them.`
     );
   }
   if (unchecked && unchecked.length > 0) {
@@ -250,16 +270,22 @@ function main(argv) {
   const rootFlag = argv.indexOf("--root");
   const root =
     rootFlag === -1 ? process.cwd() : (argv[rootFlag + 1] ?? process.cwd());
-  const top = git(root, ["rev-parse", "--show-toplevel"]) || root;
+  const top = git(root, ["rev-parse", "--show-toplevel"]).out || root;
   const ports = portsFrom(argv);
-  const probe = ports
+  const portProbe = ports
     ? foreignServers(top, ports)
     : { servers: [], unchecked: [] };
+  const trees = otherWorktrees(top);
+  const branches = goneBranches(top);
   const lines = workspaceLines({
-    gone: goneBranches(top),
-    servers: probe.servers,
-    unchecked: probe.unchecked,
-    worktrees: otherWorktrees(top),
+    gone: branches.branches,
+    servers: portProbe.servers,
+    unchecked: portProbe.unchecked,
+    unreadable: [
+      ...(trees.answered ? [] : ["worktrees"]),
+      ...(branches.answered ? [] : ["branches"]),
+    ],
+    worktrees: trees.worktrees,
   });
   process.stdout.write(`${lines.join("\n")}\n`);
 }
