@@ -126,6 +126,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "owner-or-staff",
     note: "An internal comment additionally requires staff: a proposer cannot post one.",
   },
+  "server/comments.ts:updateComment": {
+    level: "owner-or-staff",
+    note: "The same membership as addComment, and then narrower: authorship. A staff member may not edit a proposer's comment and a proposer may not edit staff's, so the level is the outer bound rather than the whole guard. Membership is not redundant with authorship, because a reassigned proposer still authored their old comments. The reply lock is the third gate, and it rides on the UPDATE.",
+  },
 
   "server/interests.ts:getMyInterests": { level: "authenticated" },
   "server/interests.ts:saveMyInterests": { level: "authenticated" },

@@ -181,6 +181,10 @@ Each project carries:
 - [x] Private notes, status history, and comments render inside one bordered
   "Private" panel on the project page, visible to the proposer and staff, with
   a single audience statement instead of per-section explanations.
+- [x] A comment's author can edit its text until someone replies, and the
+  comment then reads "(edited)" with the time of the edit. Only the text: the
+  internal flag is fixed once posted. An edit sends no email and writes no notification, so the bell entry
+  and the inbox keep the words the recipient was actually told.
 
 ## 6. Logging & Audit
 

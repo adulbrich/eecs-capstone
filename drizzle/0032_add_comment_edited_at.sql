@@ -1,0 +1,1 @@
+ALTER TABLE "project_comments" ADD COLUMN "edited_at" timestamp with time zone;

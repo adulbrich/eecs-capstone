@@ -23,6 +23,17 @@ const config = defineConfig({
     tanstackStart(),
     viteReact(),
   ],
+  test: {
+    // Scoped the way `vitest.integration.config.ts` scopes its own include,
+    // and for a sharper reason than tidiness: an agent worktree checked out
+    // under `.claude/worktrees/` is a second copy of this repo inside the
+    // root, and vitest's default include walks straight into it. Every test
+    // there runs against that worktree's own `node_modules`, so a stale or
+    // half-installed one turns the pre-push unit gate red over code that is
+    // not on the branch being pushed. Every test this project owns is under
+    // `src/`.
+    include: ["src/**/*.{test,spec}.?(c|m)[jt]s?(x)"],
+  },
 });
 
 export default config;

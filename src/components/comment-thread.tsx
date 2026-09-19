@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { errorMessage } from "#/lib/error-message";
 import { useAction } from "#/lib/use-action";
-import { addComment } from "#/server/comments";
+import { addComment, updateComment } from "#/server/comments";
 import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
@@ -14,8 +14,20 @@ interface Comment {
   authorName: string | null;
   content: string;
   createdAt: Date | string;
+  /** Null until the author first edits it. The original text is not kept. */
+  editedAt: Date | string | null;
+  /**
+   * Whether anything replied to this comment, decided by the server over every
+   * reply on the project rather than over the ones this viewer received. A
+   * proposer is handed no children at all for a comment staff replied to
+   * internally, so counting the rendered replies would offer them an Edit the
+   * server then refuses (#503).
+   */
+  hasReply: boolean;
   id: string;
   isInternal: boolean | null;
+  /** Whether the viewer wrote it. The viewer's own id never crosses the wire. */
+  isMine: boolean;
   parentId: string | null;
   projectId: string;
 }
@@ -91,6 +103,11 @@ function CommentHeader({ comment }: { comment: Comment }) {
       <span>
         <LocalTime value={comment.createdAt} />
       </span>
+      {comment.editedAt && (
+        <span>
+          (edited <LocalTime value={comment.editedAt} />)
+        </span>
+      )}
       {comment.isInternal && (
         <span
           className="rounded px-1.5 py-0.5 font-medium text-xs"
@@ -104,6 +121,100 @@ function CommentHeader({ comment }: { comment: Comment }) {
         </span>
       )}
     </div>
+  );
+}
+
+/**
+ * A comment's text, and the author's own way back into it.
+ *
+ * Content only, and only until somebody replies: `hasReply` carries that lock
+ * from the server, because the reply that set it may be one this viewer is not
+ * allowed to see. Everything else about the row is fixed once posted, the
+ * internal flag above all (#503).
+ */
+function CommentBody({
+  comment,
+  onChanged,
+}: {
+  comment: Comment;
+  onChanged: () => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(comment.content);
+  const { busy, error, run, setError } = useAction({ fallback: "Edit failed" });
+
+  function open() {
+    // The saved text, not whatever a cancelled edit left behind, and without
+    // that edit's failure still on screen.
+    setDraft(comment.content);
+    setError(null);
+    setEditing(true);
+  }
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const content = draft.trim();
+    // A Save that changes nothing is a Cancel with a different button. Asking
+    // the server would mark the comment edited for no edit.
+    if (content === comment.content) {
+      setEditing(false);
+      return;
+    }
+    return run(async () => {
+      await updateComment({ data: { commentId: comment.id, content } });
+      await onChanged();
+      // Only on success. A refusal leaves the editor open with the text still
+      // in it, since the author may be able to do something about it and has
+      // nowhere else to recover their words from (#503).
+      setEditing(false);
+    });
+  }
+
+  if (!editing) {
+    return (
+      <>
+        <p className="mt-1 whitespace-pre-wrap text-sm">{comment.content}</p>
+        {comment.isMine && !comment.hasReply && (
+          <Button
+            className="mt-1"
+            onClick={open}
+            size="xs"
+            type="button"
+            variant="ghost"
+          >
+            Edit
+          </Button>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <form className="mt-1 space-y-2" onSubmit={(e) => void onSubmit(e)}>
+      <Textarea
+        aria-label="Edit comment"
+        disabled={busy}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder="Edit comment"
+        required
+        rows={3}
+        value={draft}
+      />
+      <div className="flex gap-2">
+        <Button disabled={busy} size="xs" type="submit">
+          Save
+        </Button>
+        <Button
+          onClick={() => setEditing(false)}
+          size="xs"
+          type="button"
+          variant="outline"
+        >
+          Cancel
+        </Button>
+      </div>
+      <FieldError message={error} />
+    </form>
   );
 }
 
@@ -134,7 +245,7 @@ function CommentNode({
       style={isInternal ? INTERNAL_SURFACE : undefined}
     >
       <CommentHeader comment={comment} />
-      <p className="mt-1 whitespace-pre-wrap text-sm">{comment.content}</p>
+      <CommentBody comment={comment} onChanged={onChanged} />
 
       {replies.length > 0 && (
         <div className="mt-3 space-y-2 pl-4">
@@ -150,7 +261,7 @@ function CommentNode({
               }
             >
               <CommentHeader comment={r} />
-              <p className="mt-1 whitespace-pre-wrap text-sm">{r.content}</p>
+              <CommentBody comment={r} onChanged={onChanged} />
             </div>
           ))}
         </div>

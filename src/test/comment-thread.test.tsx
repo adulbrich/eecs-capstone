@@ -10,8 +10,11 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { addComment } = vi.hoisted(() => ({ addComment: vi.fn() }));
-vi.mock("#/server/comments", () => ({ addComment }));
+const { addComment, updateComment } = vi.hoisted(() => ({
+  addComment: vi.fn(),
+  updateComment: vi.fn(),
+}));
+vi.mock("#/server/comments", () => ({ addComment, updateComment }));
 
 // Radix's Checkbox measures itself on mount; jsdom ships no ResizeObserver.
 class ResizeObserverStub {
@@ -34,6 +37,8 @@ afterEach(cleanup);
 beforeEach(() => {
   addComment.mockReset();
   addComment.mockResolvedValue({ id: "new-comment" });
+  updateComment.mockReset();
+  updateComment.mockResolvedValue({ id: "c1" });
 });
 
 const PROJECT_ID = "00000000-0000-0000-0000-0000000000p1";
@@ -50,6 +55,9 @@ function comment(overrides: Partial<ThreadComment>): ThreadComment {
     content: "Looks good to me.",
     isInternal: false,
     createdAt: "2026-05-28T10:00:00.000Z",
+    editedAt: null,
+    hasReply: false,
+    isMine: false,
     ...overrides,
   };
 }
@@ -583,5 +591,166 @@ describe("CommentThread forms while a post is in flight", () => {
       expect(screen.getByText("Still forbidden")).toBeTruthy()
     );
     expect(box.disabled).toBe(false);
+  });
+});
+
+describe("CommentThread editing", () => {
+  /** Opens the editor on the only editable comment and replaces its text. */
+  function openEditorAndType(text: string) {
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByPlaceholderText("Edit comment"), {
+      target: { value: text },
+    });
+  }
+
+  it("offers Edit on the viewer's own comment", () => {
+    renderThread([comment({ isMine: true })]);
+    expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
+  });
+
+  it("offers no Edit on somebody else's comment", () => {
+    renderThread([comment({ isMine: false })]);
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+  });
+
+  it("offers no Edit once the comment has a reply", () => {
+    // The reply itself may be invisible to this viewer, which is why the lock
+    // arrives as `hasReply` rather than being counted from the rendered
+    // children (#503).
+    renderThread([comment({ isMine: true, hasReply: true })]);
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+  });
+
+  it("offers Edit on the viewer's own reply", () => {
+    renderThread([
+      comment({}),
+      comment({ id: "c2", parentId: "c1", isMine: true, content: "Mine." }),
+    ]);
+    expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
+  });
+
+  it("posts the new text and refetches the thread", async () => {
+    const onChanged = vi.fn().mockResolvedValue(undefined);
+    renderThread([comment({ isMine: true })], true, false, onChanged);
+    openEditorAndType("Reworded.");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(updateComment).toHaveBeenCalledTimes(1));
+    expect(updateComment.mock.calls[0]?.[0]).toEqual({
+      data: { commentId: "c1", content: "Reworded." },
+    });
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+  });
+
+  it("closes the editor after a successful save", async () => {
+    renderThread([comment({ isMine: true })]);
+    openEditorAndType("Reworded.");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(screen.queryByPlaceholderText("Edit comment")).toBeNull()
+    );
+  });
+
+  it("keeps the typed text and shows the reason when the save is refused", async () => {
+    updateComment.mockRejectedValue(
+      new Error("This comment can no longer be edited")
+    );
+    renderThread([comment({ isMine: true })]);
+    openEditorAndType("Too late.");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("This comment can no longer be edited")
+      ).toBeTruthy()
+    );
+    // Nothing the author typed is thrown away by a failure (#503).
+    const box = screen.getByPlaceholderText(
+      "Edit comment"
+    ) as HTMLTextAreaElement;
+    expect(box.value).toBe("Too late.");
+  });
+
+  it("restores the saved text on cancel and writes nothing", () => {
+    renderThread([comment({ isMine: true })]);
+    openEditorAndType("Half a thought");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(updateComment).not.toHaveBeenCalled();
+    expect(screen.getByText("Looks good to me.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(
+      (screen.getByPlaceholderText("Edit comment") as HTMLTextAreaElement).value
+    ).toBe("Looks good to me.");
+  });
+
+  it("sends nothing when the text is unchanged", async () => {
+    renderThread([comment({ isMine: true })]);
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(screen.queryByPlaceholderText("Edit comment")).toBeNull()
+    );
+    expect(updateComment).not.toHaveBeenCalled();
+  });
+
+  it("marks an edited comment with when it was edited, and leaves an unedited one unmarked", () => {
+    const { container } = renderThread([
+      comment({ id: "c1", editedAt: "2026-05-28T11:00:00.000Z" }),
+      comment({ id: "c2", content: "As posted." }),
+    ]);
+    expect(screen.getAllByText(/\(edited/)).toHaveLength(1);
+    // The time itself, not just the word: a reader who cares that the words
+    // moved cares when (#503).
+    expect(
+      container.querySelectorAll('time[datetime="2026-05-28T11:00:00.000Z"]')
+    ).toHaveLength(1);
+  });
+
+  it("keeps an open editor and its text when the thread refetches", () => {
+    // #188 and #190 are the two precedents: a refetch that lands while
+    // somebody is typing must not take what they typed. `CommentNode` is keyed
+    // by comment id, so this holds by construction, and the test is here to
+    // keep it that way.
+    const mine = comment({ isMine: true });
+    const { rerender } = render(
+      <CommentThread
+        comments={[mine]}
+        onChanged={() => Promise.resolve()}
+        projectId={PROJECT_ID}
+        viewerIsOwner={false}
+        viewerIsStaff
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByPlaceholderText("Edit comment"), {
+      target: { value: "Half a rewrite" },
+    });
+
+    rerender(
+      <CommentThread
+        comments={[
+          mine,
+          comment({ id: "c2", authorId: "someone-else", content: "Landed." }),
+        ]}
+        onChanged={() => Promise.resolve()}
+        projectId={PROJECT_ID}
+        viewerIsOwner={false}
+        viewerIsStaff
+      />
+    );
+
+    expect(screen.getByText("Landed.")).toBeTruthy();
+    expect(
+      (screen.getByPlaceholderText("Edit comment") as HTMLTextAreaElement).value
+    ).toBe("Half a rewrite");
+  });
+
+  it("offers no Edit to a viewer who is not the author, staff or not", () => {
+    renderThread([comment({ isMine: false })], false, true);
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
   });
 });
