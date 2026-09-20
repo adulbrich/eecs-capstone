@@ -1426,10 +1426,15 @@ Rough monthly cost at capstone scale in us-west-2:
 | Item | ~$/mo |
 |------|------|
 | Internal ALB | 17 |
-| Fargate (0.25 vCPU / 0.5 GB, 1 task) | 9 |
-| RDS db.t4g.micro + 20 GB | 14 |
+| Fargate (0.25 vCPU / 1 GB, 2 tasks) | 17 |
+| RDS db.t4g.small + 20 GB | 26 |
 | CloudFront + S3 + ECR + Secrets Manager | 1 to 5 |
-| **Total** | **~40 to 50** |
+| **Total** | **~61 to 65** |
+
+The Fargate line is the floor, not the ceiling: the service autoscales to four
+tasks on CPU, and each extra task is about $8.51 a month for the hours it
+actually runs. See [ADR-0035](./docs/adr/0035-scale-the-service-and-let-it-pick-the-instance.md)
+for why the instance class is sized by connections rather than by load.
 
 There is deliberately no NAT Gateway (~$32/mo avoided). The ALB is the largest
 line and is required for stable, secure HTTPS on Fargate.

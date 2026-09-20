@@ -53,9 +53,9 @@ variable "db_username" {
 }
 
 variable "db_instance_class" {
-  description = "RDS instance class (Graviton/arm64)."
+  description = "RDS instance class (Graviton/arm64). Sized by connections rather than by CPU: t4g.micro peaked at 6.6% CPU, but its 107 usable connections cannot hold four app tasks at their pool maximum during a deploy. t4g.small has 2 GiB and 220. See ADR-0035."
   type        = string
-  default     = "db.t4g.micro"
+  default     = "db.t4g.small"
 }
 
 variable "db_allocated_storage" {
@@ -71,9 +71,27 @@ variable "container_cpu" {
 }
 
 variable "container_memory" {
-  description = "Fargate task memory in MB."
+  description = "Fargate task memory in MB. At 256 CPU units Fargate accepts 512, 1024 or 2048. Raised to 1024 because memory, not CPU, is the binding resource: it peaked at 44.7% of 512 MB with almost no concurrent users, and SSR concurrency is what 500 students add. See ADR-0035."
   type        = number
-  default     = 512
+  default     = 1024
+}
+
+variable "app_min_tasks" {
+  description = "Floor for the app service. Two rather than one so a task crash is not an outage; ECS takes 60 to 90 seconds to replace a task, and with a floor of one nothing serves in the meantime."
+  type        = number
+  default     = 2
+}
+
+variable "app_max_tasks" {
+  description = "Ceiling for the app service. Four is what the database connection budget allows: a deploy runs old and new side by side, so this doubles to eight tasks holding 210 of the instance's 220 usable connections. Raising it means a bigger instance, not just a bigger number. See ADR-0034."
+  type        = number
+  default     = 4
+}
+
+variable "app_scale_target_cpu" {
+  description = "Average CPU percentage the app service scales to hold. One task absorbs roughly 50 requests per second at 100%, so 50 starts adding a task at about 25."
+  type        = number
+  default     = 50
 }
 
 variable "app_port" {

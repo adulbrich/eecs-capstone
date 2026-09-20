@@ -4,16 +4,15 @@ import type { PoolConfig } from "pg";
  * How many connections the fleet may hold open at once, and where the number
  * comes from. Pure, so the unit test can hold the sum to the ceiling.
  *
- * The binding constraint is the RDS instance, not the task. `db.t4g.micro`
- * has 1 GiB, which the RDS formula turns into 112 `max_connections`; Postgres
- * keeps 3 for superusers and RDS 2 more for its own, so 107 are usable. Its
- * freeable memory sat between 131 and 176 MB with ten backends open, and each
- * backend costs a few MB more, which is what caps the per-task pool well
- * below the raw arithmetic. Task memory is not the limit: an idle client
- * measured at 0.11 MB of RSS, so twenty are about 2 MB of the 512 MB task.
+ * The binding constraint is the RDS instance, not the task. `db.t4g.small`
+ * has 2 GiB, which the RDS formula turns into 225 `max_connections`; Postgres
+ * keeps 3 for superusers and RDS 2 more for its own, so 220 are usable. Task
+ * memory is not the limit: an idle client measured at 0.11 MB of RSS, so
+ * twenty are about 2 MB of the 1024 MB task.
  *
- * `taskCeiling` is the most app tasks the budget allows at once. A deploy
- * already makes two, old and new, and #522 may raise it with autoscaling.
+ * `taskCeiling` is the most app tasks the budget allows at once: the
+ * autoscaling ceiling of four in `infra/variables.tf`, doubled because a
+ * deploy runs old and new side by side at `maximumPercent` 200.
  * `oneOffScript` is pg's default pool that `scripts/migrate.mjs` and the
  * other one-off scripts open beside the fleet; `migrate()` uses one session
  * of it, so this is a reservation, not a measurement. `trafficPerTask` is
@@ -22,8 +21,8 @@ import type { PoolConfig } from "pg";
  * the ADR before changing any of these.
  */
 export const CONNECTION_BUDGET = {
-  rdsUsable: 107,
-  taskCeiling: 3,
+  rdsUsable: 220,
+  taskCeiling: 8,
   oneOffScript: 10,
   trafficPerTask: 5,
 } as const;
@@ -32,7 +31,7 @@ export const CONNECTION_BUDGET = {
  * Connections one app task holds at most. pg-pool defaulted to 10, and RDS
  * `DatabaseConnections` sat at exactly 10 for a week under a handful of
  * staff (#521): no headroom before requests queue. 20 doubles it and, with
- * the traffic writer's 5, fits three tasks plus a one-off script inside
+ * the traffic writer's 5, fits eight tasks plus a one-off script inside
  * `rdsUsable`. A cap, not a floor: pg-pool opens lazily and closes clients
  * idle for 10 s, so a quiet task holds far fewer.
  */
