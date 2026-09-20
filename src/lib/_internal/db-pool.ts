@@ -67,8 +67,10 @@ export function poolConfig(connectionString: string): PoolConfig {
  * nothing to clean up and the next acquisition opens a fresh connection.
  *
  * Logs `error.message` and nothing else on purpose: pg-pool attaches the
- * client to the error, and a client carries its own connection parameters,
- * password included.
+ * client to the error (`err.client = client`), and inspecting a client prints
+ * its connection parameters. The password is not among them, since `pg`
+ * defines that one non-enumerable, but the host, the user and the database
+ * name are, and none of them belongs in a log line about a dropped socket.
  */
 export function logPoolErrors(
   pool: Pool,

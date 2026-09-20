@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { Pool } from "pg";
+import { Client, Pool } from "pg";
 import { describe, expect, it } from "vitest";
 import {
   CONNECTION_BUDGET,
@@ -92,13 +92,24 @@ describe("surviving a connection the server drops", () => {
     expect(String(logged[0])).toContain("terminating connection");
   });
 
-  it("says nothing about the connection string, which carries the password", () => {
+  it("says nothing the attached client would expose", () => {
+    // pg-pool sets `err.client = client` before it emits, and inspecting a
+    // client prints its connection parameters. The error therefore has to
+    // carry one for this to be able to fail: with a bare Error there is
+    // nothing to leak and logging the whole object would pass.
     const pool = new Pool({ connectionString: URL_WITH_ENCODED_PASSWORD });
     const logged: unknown[] = [];
     logPoolErrors(pool, (message) => logged.push(message));
 
-    pool.emit("error", new Error("terminating connection"));
-    expect(String(logged[0])).not.toContain("p%40ss");
-    expect(String(logged[0])).not.toContain("db.internal");
+    const error = new Error("terminating connection") as Error & {
+      client: Client;
+    };
+    error.client = new Client({ connectionString: URL_WITH_ENCODED_PASSWORD });
+    pool.emit("error", error);
+
+    const line = String(logged[0]);
+    expect(line).toContain("terminating connection");
+    expect(line).not.toContain("db.internal");
+    expect(line).not.toContain("eecs_capstone");
   });
 });
