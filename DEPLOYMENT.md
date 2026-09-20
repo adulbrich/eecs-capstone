@@ -1539,21 +1539,22 @@ Eight of these are fatal. A task with `NODE_ENV=production` refuses to start,
 exit code 1 and one message naming every missing one, without `DATABASE_URL`,
 `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `TRUSTED_PROXY_CIDR`,
 `ONID_DISCOVERY_URL`, `ONID_CLIENT_ID`, `ONID_CLIENT_SECRET` or `S3_BUCKET`;
-a blank value counts as missing.
+a blank value counts as missing. `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`
+only warn, because GitHub sign-in is optional (`var.github_client_id` defaults
+to empty). The check is `src/nitro/config-check.ts`, a Nitro plugin, and the
+list is in `src/lib/_internal/startup-config.ts`; nothing is fatal outside
+production.
 
 `TRUSTED_PROXY_CIDR` is `var.vpc_cidr`: the hops Better Auth skips in
 `X-Forwarded-For` to find the viewer, without which the rate limiter puts
 every viewer in one bucket (#519). It was added on 2026-09-20 and reaches the
 task only through `terraform apply`, so the first deploy of code that requires
 it must follow the apply, the same rule as `EMAIL_TRANSPORT`; a deploy before
-it fails to stabilise while the old task keeps serving. Confirm the fix on the
+it fails to stabilize while the old task keeps serving. Confirm the fix on the
 next task start: the `Rate limiting could not determine a client IP` warning
 no longer appears in `/ecs/eecs-capstone`, and new `session.ipAddress` rows
 hold distinct public addresses. One `10.x` value for everyone means the
-CloudFront VPC origin ENI sits outside `var.vpc_cidr`. `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` only warn, because
-GitHub sign-in is optional (`var.github_client_id` defaults to empty). The check
-is `src/nitro/config-check.ts`, a Nitro plugin, and the list is in
-`src/lib/_internal/startup-config.ts`; nothing is fatal outside production.
+CloudFront VPC origin ENI sits outside `var.vpc_cidr`.
 
 This list is written by hand and `infra/ecs.tf` is the source of truth. The
 test in `src/lib/__tests__/env-contract.test.ts` checks the task definition
