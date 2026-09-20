@@ -14,9 +14,8 @@ describe("poolConfig", () => {
   });
 
   it("raises the pool above pg-pool's default of ten, which production was pinned at", () => {
-    // node_modules/pg-pool/index.js: `max || poolSize || 10`. RDS
-    // DatabaseConnections sat at exactly 10 for a week with a handful of
-    // staff signed in (#521).
+    // node_modules/pg-pool/index.js: `max || poolSize || 10`, the number
+    // production sat at (#521).
     const max = poolConfig(URL_WITH_ENCODED_PASSWORD).max;
     expect(max).toBeGreaterThan(10);
   });
@@ -33,13 +32,13 @@ describe("poolConfig", () => {
 
   it("keeps the whole fleet inside what the RDS instance can hold", () => {
     // The ceiling this rests on: every app task at its pool maximum plus the
-    // collector reservation, with the migration one-off open beside them
-    // during a deploy, stays under the instance's usable connections. Raising
-    // `max`, the task ceiling or the collector share has to keep this true.
+    // traffic writer's reservation, with a one-off script's pool open beside
+    // them, stays under the instance's usable connections. Raising `max`,
+    // the task ceiling or the traffic share has to keep this true.
     const { max } = poolConfig(URL_WITH_ENCODED_PASSWORD);
-    const perTask = (max ?? 0) + CONNECTION_BUDGET.collectorPerTask;
+    const perTask = (max ?? 0) + CONNECTION_BUDGET.trafficPerTask;
     const fleet =
-      perTask * CONNECTION_BUDGET.taskCeiling + CONNECTION_BUDGET.migration;
+      perTask * CONNECTION_BUDGET.taskCeiling + CONNECTION_BUDGET.oneOffScript;
     expect(fleet).toBeLessThanOrEqual(CONNECTION_BUDGET.rdsUsable);
   });
 });
