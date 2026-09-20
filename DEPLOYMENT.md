@@ -1523,26 +1523,39 @@ this config; delete it manually if you are done with the project.
 
 **Runtime environment (set in the task definition, `infra/ecs.tf`):**
 
-`NODE_ENV`, `PORT`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `ONID_CLIENT_ID`,
-`ONID_DISCOVERY_URL`, `S3_BUCKET`, `S3_REGION`, `BEDROCK_REGION`,
-`BEDROCK_MODEL_ID`, `BEDROCK_REASONING_EFFORT`, `BEDROCK_EMBEDDING_MODEL_ID`,
-`BEDROCK_EMBEDDING_DIMENSIONS`, `AI_REVIEW_LIMIT_PER_HOUR`,
-`AI_REVIEW_LIMIT_PER_DAY`, `BEDROCK_SCOPE_REASONING_EFFORT`,
-`AI_SCOPE_LIMIT_PER_HOUR`, `AI_SCOPE_LIMIT_PER_DAY`, `EMAIL_TRANSPORT=ses`, `EMAIL_FROM`,
+`NODE_ENV`, `PORT`, `BETTER_AUTH_URL`, `TRUSTED_PROXY_CIDR`,
+`GITHUB_CLIENT_ID`, `ONID_CLIENT_ID`, `ONID_DISCOVERY_URL`, `S3_BUCKET`,
+`S3_REGION`, `BEDROCK_REGION`, `BEDROCK_MODEL_ID`, `BEDROCK_REASONING_EFFORT`,
+`BEDROCK_EMBEDDING_MODEL_ID`, `BEDROCK_EMBEDDING_DIMENSIONS`,
+`AI_REVIEW_LIMIT_PER_HOUR`, `AI_REVIEW_LIMIT_PER_DAY`,
+`BEDROCK_SCOPE_REASONING_EFFORT`, `AI_SCOPE_LIMIT_PER_HOUR`,
+`AI_SCOPE_LIMIT_PER_DAY`, `EMAIL_TRANSPORT=ses`, `EMAIL_FROM`,
 `EMAIL_REPLY_TO`, `EMAIL_STAFF_INBOX`, `SES_REGION`, plus secrets
 `DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`,
 `ONID_CLIENT_SECRET`. In production, S3 and Bedrock use the task role, so no
 access keys and no `S3_ENDPOINT` are set; `BEDROCK_EMBEDDINGS_ENABLED` is
 deliberately not plumbed either.
 
-Seven of these are fatal. A task with `NODE_ENV=production` refuses to start,
+Eight of these are fatal. A task with `NODE_ENV=production` refuses to start,
 exit code 1 and one message naming every missing one, without `DATABASE_URL`,
-`BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `ONID_DISCOVERY_URL`,
-`ONID_CLIENT_ID`, `ONID_CLIENT_SECRET` or `S3_BUCKET`; a blank value counts as
-missing. `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` only warn, because
-GitHub sign-in is optional (`var.github_client_id` defaults to empty). The check
-is `src/nitro/config-check.ts`, a Nitro plugin, and the list is in
-`src/lib/_internal/startup-config.ts`; nothing is fatal outside production.
+`BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `TRUSTED_PROXY_CIDR`,
+`ONID_DISCOVERY_URL`, `ONID_CLIENT_ID`, `ONID_CLIENT_SECRET` or `S3_BUCKET`;
+a blank value counts as missing. `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`
+only warn, because GitHub sign-in is optional (`var.github_client_id` defaults
+to empty). The check is `src/nitro/config-check.ts`, a Nitro plugin, and the
+list is in `src/lib/_internal/startup-config.ts`; nothing is fatal outside
+production.
+
+`TRUSTED_PROXY_CIDR` is `var.vpc_cidr`: the hops Better Auth skips in
+`X-Forwarded-For` to find the viewer, without which the rate limiter puts
+every viewer in one bucket (#519). It was added on 2026-09-20 and reaches the
+task only through `terraform apply`, so the first deploy of code that requires
+it must follow the apply, the same rule as `EMAIL_TRANSPORT`; a deploy before
+it fails to stabilize while the old task keeps serving. Confirm the fix on the
+next task start: the `Rate limiting could not determine a client IP` warning
+no longer appears in `/ecs/eecs-capstone`, and new `session.ipAddress` rows
+hold distinct public addresses. One `10.x` value for everyone means the
+CloudFront VPC origin ENI sits outside `var.vpc_cidr`.
 
 This list is written by hand and `infra/ecs.tf` is the source of truth. The
 test in `src/lib/__tests__/env-contract.test.ts` checks the task definition

@@ -120,3 +120,32 @@ describe("warnUnconfiguredProviders", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 });
+
+describe("buildAuthConfig trusted proxies", () => {
+  it("parses TRUSTED_PROXY_CIDR into the trusted proxy list", () => {
+    expect(
+      buildAuthConfig({
+        TRUSTED_PROXY_CIDR: "10.0.0.0/16",
+      } as NodeJS.ProcessEnv).trustedProxies
+    ).toEqual(["10.0.0.0/16"]);
+  });
+
+  it("yields an empty list, not a blank entry, when the variable is unset or blank", () => {
+    // Better Auth validates every entry at construction and warns about each
+    // invalid one, so [""] would print a warning on every dev boot and every
+    // integration test that imports auth.ts.
+    expect(buildAuthConfig({} as NodeJS.ProcessEnv).trustedProxies).toEqual([]);
+    expect(
+      buildAuthConfig({ TRUSTED_PROXY_CIDR: "  " } as NodeJS.ProcessEnv)
+        .trustedProxies
+    ).toEqual([]);
+  });
+
+  it("accepts a comma-separated list and trims each entry", () => {
+    expect(
+      buildAuthConfig({
+        TRUSTED_PROXY_CIDR: " 10.0.0.0/16, 172.16.0.0/12 ,",
+      } as NodeJS.ProcessEnv).trustedProxies
+    ).toEqual(["10.0.0.0/16", "172.16.0.0/12"]);
+  });
+});

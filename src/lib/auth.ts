@@ -70,10 +70,18 @@ function withVerificationLanding(url: string): string {
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
   trustHost: authConfig.trustHost,
-  // CloudFront terminates TLS at the edge and forwards to the origin over
-  // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in
-  // production so a misread request protocol can't silently disable them.
-  advanced: { useSecureCookies: authConfig.isProduction },
+  advanced: {
+    // CloudFront terminates TLS at the edge and forwards to the origin over
+    // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in
+    // production so a misread request protocol can't silently disable them.
+    useSecureCookies: authConfig.isProduction,
+    // The same proxy chain, seen from the rate limiter: without this, every
+    // production request resolved to no address and shared one bucket per
+    // path (#519). Rate limiting is off outside production, so nothing local
+    // exercises it; src/lib/__tests__/trusted-proxies.test.ts pins the walk.
+    // See the Better Auth section of docs/QUIRKS.md.
+    ipAddress: { trustedProxies: [...authConfig.trustedProxies] },
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,

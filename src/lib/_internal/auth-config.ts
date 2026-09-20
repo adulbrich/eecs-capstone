@@ -35,6 +35,15 @@ export interface AuthConfig {
      */
     issuer: string;
   };
+  /**
+   * The hops Better Auth skips in `X-Forwarded-For` to reach the viewer, as IP
+   * or CIDR entries from `TRUSTED_PROXY_CIDR`. Empty when unset or blank,
+   * never `[""]`: Better Auth warns per invalid entry at construction, and
+   * that would print on every dev boot and integration test. Production
+   * refuses to boot without it (`startup-config.ts`). See the Better Auth
+   * section of docs/QUIRKS.md for why (#519).
+   */
+  trustedProxies: readonly string[];
   trustHost: boolean;
   /** Names of unset provider credentials, in `.env.example` order. */
   unconfigured: readonly string[];
@@ -78,8 +87,17 @@ export function buildAuthConfig(
     // arriving in separate commits, not a decision. See the Better Auth
     // section of docs/QUIRKS.md.
     trustHost: env.NODE_ENV !== "development",
+    trustedProxies: splitList(env.TRUSTED_PROXY_CIDR),
     unconfigured: PROVIDER_VARS.filter((name) => !env[name]?.trim()),
   };
+}
+
+/** Comma-separated, each entry trimmed, blanks dropped. */
+function splitList(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 /**
