@@ -90,7 +90,7 @@ resource "aws_ecs_task_definition" "app" {
         { name = "BETTER_AUTH_URL", value = "https://${var.domain_name}" },
         # The hops Better Auth skips when reading X-Forwarded-For: CloudFront's
         # VPC origin ENI, which the ALB appends, sits in this range. Without
-        # it the rate limiter cannot resolve a viewer and every visitor shares
+        # it the rate limiter cannot resolve a viewer and every viewer shares
         # one bucket per path (#519). The app refuses to boot without it, so
         # it reaches the task by apply *then* deploy, like EMAIL_TRANSPORT.
         { name = "TRUSTED_PROXY_CIDR", value = var.vpc_cidr },

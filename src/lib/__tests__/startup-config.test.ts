@@ -11,11 +11,11 @@ const complete = {
   DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake",
   BETTER_AUTH_URL: "https://example.test",
   BETTER_AUTH_SECRET: "not-a-real-secret",
+  TRUSTED_PROXY_CIDR: "10.0.0.0/16",
   ONID_DISCOVERY_URL: "https://example.test/.well-known/openid-configuration",
   ONID_CLIENT_ID: "not-a-real-client-id",
   ONID_CLIENT_SECRET: "not-a-real-client-secret",
   S3_BUCKET: "not-a-real-bucket",
-  TRUSTED_PROXY_CIDR: "10.0.0.0/16",
 } as NodeJS.ProcessEnv;
 
 describe("missingProductionConfig", () => {

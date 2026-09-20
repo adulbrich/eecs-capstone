@@ -11,7 +11,7 @@
  */
 
 /**
- * The variables the app cannot serve a single request without, in
+ * The variables the app cannot serve a single request correctly without, in
  * `.env.example` order. `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are not
  * here on purpose: `infra/variables.tf` defaults the id to empty, so GitHub
  * sign-in is optional and `warnUnconfiguredProviders` names it instead.
@@ -52,15 +52,15 @@ function missingInProduction(env: NodeJS.ProcessEnv): string[] {
     DATABASE_URL: env.DATABASE_URL,
     BETTER_AUTH_URL: env.BETTER_AUTH_URL,
     BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET,
+    // Not a secret, and the app would serve requests without it, but wrongly:
+    // Better Auth could not resolve a viewer behind CloudFront and the ALB and
+    // rate limited every viewer as one (#519). The alternative to fatal is
+    // one warning per task start, which is how it went unnoticed for a month.
+    TRUSTED_PROXY_CIDR: env.TRUSTED_PROXY_CIDR,
     ONID_DISCOVERY_URL: env.ONID_DISCOVERY_URL,
     ONID_CLIENT_ID: env.ONID_CLIENT_ID,
     ONID_CLIENT_SECRET: env.ONID_CLIENT_SECRET,
     S3_BUCKET: env.S3_BUCKET,
-    // Not a secret, but fatal: without it Better Auth cannot resolve a client
-    // behind CloudFront and the ALB and rate limits every visitor as one
-    // (#519). The failure would otherwise be one warning per task start and
-    // "Too many requests" for whoever signs in fourth.
-    TRUSTED_PROXY_CIDR: env.TRUSTED_PROXY_CIDR,
   };
   return unsetNames(values);
 }
