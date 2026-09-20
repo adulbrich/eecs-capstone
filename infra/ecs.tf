@@ -216,6 +216,8 @@ resource "aws_appautoscaling_target" "app" {
   scalable_dimension = "ecs:service:DesiredCount"
   min_capacity       = var.app_min_tasks
   max_capacity       = var.app_max_tasks
+
+  tags = { Name = "${var.project}-scaling" }
 }
 
 # CPU rather than memory. A Node process grows its heap to fill what it is

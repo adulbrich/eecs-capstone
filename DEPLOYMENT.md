@@ -154,8 +154,13 @@ Notes:
 
 - The `aws_cloudfront_vpc_origin` resource takes **15 to 30+ minutes** to
   create. This is expected, not a hang. The same applies on destroy.
-- The ECS service is created at `desired_count = 0` on purpose; no image exists
-  yet. The first deploy (step 5) pushes an image and scales it to 1.
+- The ECS service is created at `desired_count = 0`, but Application Auto
+  Scaling raises it to `var.app_min_tasks` as soon as the apply registers the
+  scalable target, and no image exists yet. On a greenfield stack the tasks
+  therefore crash-loop between the apply and the first deploy, and the service
+  reports a failed deployment. That is expected and self-heals: the first
+  deploy (step 5) pushes a real image as a fresh deployment. The deploy no
+  longer passes `--desired-count`, because scaling owns it from here on.
 
 Record the outputs (also available later via `terraform output`):
 

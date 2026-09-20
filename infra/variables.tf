@@ -83,13 +83,13 @@ variable "app_min_tasks" {
 }
 
 variable "app_max_tasks" {
-  description = "Ceiling for the app service. Four is what the database connection budget allows: a deploy runs old and new side by side, so this doubles to eight tasks holding 210 of the instance's 220 usable connections. Raising it means a bigger instance, not just a bigger number. See ADR-0034."
+  description = "Ceiling for the app service. Four is what the database connection budget allows: a deploy runs old and new side by side, so this doubles to eight tasks holding 200 connections, which with the one-off script reservation is 210 of the instance's 220. Raising it means a bigger instance, not just a bigger number, and `src/lib/__tests__/db-pool.test.ts` reads this default and fails if the two disagree. See ADR-0034."
   type        = number
   default     = 4
 }
 
 variable "app_scale_target_cpu" {
-  description = "Average CPU percentage the app service scales to hold. One task absorbs roughly 50 requests per second at 100%, so 50 starts adding a task at about 25."
+  description = "Average CPU percentage the app service scales to hold. One task absorbs roughly 50 requests per second at 100%, so 50 starts adding a task at about 25 requests per second."
   type        = number
   default     = 50
 }
