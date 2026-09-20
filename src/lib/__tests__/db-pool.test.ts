@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
+import { Pool } from "pg";
 import { describe, expect, it } from "vitest";
-import { CONNECTION_BUDGET, poolConfig } from "../_internal/db-pool";
+import {
+  CONNECTION_BUDGET,
+  logPoolErrors,
+  poolConfig,
+} from "../_internal/db-pool";
 
 /** A `default = <number>` inside one named block of `infra/variables.tf`. */
 function terraformDefault(name: string): number {
@@ -60,5 +65,40 @@ describe("poolConfig", () => {
     const fleet =
       perTask * CONNECTION_BUDGET.taskCeiling + CONNECTION_BUDGET.oneOffScript;
     expect(fleet).toBeLessThanOrEqual(CONNECTION_BUDGET.rdsUsable);
+  });
+});
+
+describe("surviving a connection the server drops", () => {
+  it("would crash the process without a listener, which is the hazard", () => {
+    // pg-pool's idle listener removes the client and then emits on the pool
+    // (node_modules/pg-pool/index.js, makeIdleListener). An EventEmitter with
+    // no `error` listener throws on that emit, and a throw from a socket
+    // callback is an uncaught exception, so the task exits (#525).
+    const bare = new Pool({ connectionString: URL_WITH_ENCODED_PASSWORD });
+    expect(() =>
+      bare.emit("error", new Error("terminating connection"))
+    ).toThrow("terminating connection");
+  });
+
+  it("logs the error and stays up once the listener is attached", () => {
+    const pool = new Pool({ connectionString: URL_WITH_ENCODED_PASSWORD });
+    const logged: unknown[] = [];
+    logPoolErrors(pool, (message) => logged.push(message));
+
+    expect(() =>
+      pool.emit("error", new Error("terminating connection"))
+    ).not.toThrow();
+    expect(logged).toHaveLength(1);
+    expect(String(logged[0])).toContain("terminating connection");
+  });
+
+  it("says nothing about the connection string, which carries the password", () => {
+    const pool = new Pool({ connectionString: URL_WITH_ENCODED_PASSWORD });
+    const logged: unknown[] = [];
+    logPoolErrors(pool, (message) => logged.push(message));
+
+    pool.emit("error", new Error("terminating connection"));
+    expect(String(logged[0])).not.toContain("p%40ss");
+    expect(String(logged[0])).not.toContain("db.internal");
   });
 });

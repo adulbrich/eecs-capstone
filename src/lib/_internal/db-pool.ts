@@ -1,4 +1,4 @@
-import type { PoolConfig } from "pg";
+import type { Pool, PoolConfig } from "pg";
 
 /**
  * How many connections the fleet may hold open at once, and where the number
@@ -53,4 +53,28 @@ export function poolConfig(connectionString: string): PoolConfig {
     max: POOL_MAX,
     connectionTimeoutMillis: ACQUIRE_TIMEOUT_MS,
   };
+}
+
+/**
+ * Keeps a dropped connection from taking the task down with it.
+ *
+ * When the server closes an idle connection, pg-pool's idle listener removes
+ * the client and then calls `pool.emit("error", ...)`. An `EventEmitter` with
+ * no `error` listener throws on that emit, and the throw arrives on a socket
+ * callback rather than inside a request, so nothing catches it and the
+ * process exits. One RDS restart or failover was therefore one outage (#525).
+ * pg-pool has already discarded the client by the time this runs, so there is
+ * nothing to clean up and the next acquisition opens a fresh connection.
+ *
+ * Logs `error.message` and nothing else on purpose: pg-pool attaches the
+ * client to the error, and a client carries its own connection parameters,
+ * password included.
+ */
+export function logPoolErrors(
+  pool: Pool,
+  log: (message: string) => void = console.error
+): void {
+  pool.on("error", (error: Error) => {
+    log(`Database pool dropped a connection: ${error.message}`);
+  });
 }
