@@ -5,6 +5,15 @@ resource "aws_lb" "app" {
   security_groups    = [aws_security_group.alb.id]
   subnets            = aws_subnet.private[*].id
 
+  # Every request that reached the origin, which CloudWatch metrics can only
+  # count in aggregate. The bucket, its retention and the delivery grant are
+  # in infra/logging.tf; the prefix is what the bucket policy scopes to.
+  access_logs {
+    bucket  = aws_s3_bucket.access_logs.id
+    prefix  = "alb"
+    enabled = true
+  }
+
   tags = { Name = "${var.project}-alb" }
 }
 

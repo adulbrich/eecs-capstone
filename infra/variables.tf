@@ -64,6 +64,12 @@ variable "db_allocated_storage" {
   default     = 20
 }
 
+variable "access_log_retention_days" {
+  description = "How long ALB and CloudFront access logs are kept. These hold the full client IP of every visitor, so this is a privacy control and the lifecycle rule deletes rather than archives. Thirty matches the CloudWatch log group."
+  type        = number
+  default     = 30
+}
+
 variable "container_cpu" {
   description = "Fargate task CPU units (256 = 0.25 vCPU)."
   type        = number

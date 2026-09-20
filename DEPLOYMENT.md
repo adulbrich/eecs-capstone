@@ -1523,6 +1523,13 @@ this config; delete it manually if you are done with the project.
 
 **Key names (defaults):**
 
+- Access logs: ALB and the app distribution both write to
+  `eecs-capstone-access-logs-<account-id>`, deleted after
+  `var.access_log_retention_days` (30). They hold full client IP addresses;
+  [ADR-0036](./docs/adr/0036-access-logs-keep-raw-addresses-for-thirty-days.md)
+  says why that is the decision and why retention is the control. The
+  CloudFront half is standard logging v2, so its delivery resources live in
+  `us-east-1` while the bucket stays in `us-west-2`.
 - Region: `us-west-2`, project prefix: `eecs-capstone`
 - ECS cluster/service: `eecs-capstone` / `eecs-capstone`
 - ECR repo: `eecs-capstone`
@@ -1575,7 +1582,7 @@ cannot be, so read it as a summary and not as the contract.
 **File map:**
 
 - `infra/` Terraform (one file per concern: `vpc`, `security-groups`, `rds`,
-  `s3`, `ecr`, `ecs`, `cloudfront`, `iam`, `secrets`, `outputs`).
+  `s3`, `ecr`, `ecs`, `cloudfront`, `iam`, `logging`, `secrets`, `outputs`).
 - `Dockerfile`, `.dockerignore` multi-stage arm64 image build.
 - `.github/workflows/deploy.yml` manual deploy workflow.
 - `scripts/migrate.mjs` production migration runner.
