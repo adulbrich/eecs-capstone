@@ -15,6 +15,17 @@ resource "aws_s3_bucket" "access_logs" {
   tags = { Name = "${var.project}-access-logs" }
 }
 
+# Explicit rather than relying on the post-2023 account default, because the
+# choice of log delivery below depends on it: ACLs disabled is the reason
+# CloudFront standard logging v1 is not an option here.
+resource "aws_s3_bucket_ownership_controls" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
 resource "aws_s3_bucket_public_access_block" "access_logs" {
   bucket = aws_s3_bucket.access_logs.id
 
@@ -75,21 +86,28 @@ data "aws_iam_policy_document" "access_logs" {
     }
   }
 
-  # Scoped by principal and source rather than by key prefix, deliberately.
-  # Vended log delivery picks its own path (`AWSLogs/<account>/CloudFront/`
-  # when the destination ARN carries no prefix), and a policy naming a prefix
-  # that disagrees does not fail loudly: the delivery is refused and the
-  # bucket simply stays empty. The two conditions are the real control, since
-  # they allow only this account's own delivery sources to write anything.
+  # Vended log delivery picks its own key prefix rather than taking one:
+  # `AWSLogs/<account-id>/CloudFront/` when the destination ARN carries no
+  # prefix of its own. This grants one segment above that rather than the
+  # exact path, which is deliberate in both directions. Naming the exact path
+  # risks the failure this already hit once in review, where a prefix that
+  # disagrees with the delivery is refused silently and the bucket just stays
+  # empty. Granting the whole bucket would let a delivery write over the
+  # ALB's `alb/` prefix, which starts with a different segment and so is not
+  # reachable under this one. The two conditions are the real control:
+  # together they allow only this account's own delivery sources to write.
   #
-  # No `s3:x-amz-acl` condition, although the AWS example carries one. This
-  # bucket leaves ACLs disabled (BucketOwnerEnforced), so a delivery cannot
-  # send that header and requiring it would refuse every object.
+  # No `s3:x-amz-acl` condition, although the AWS example policy carries one.
+  # BucketOwnerEnforced does accept a PUT that sends
+  # `bucket-owner-full-control`, so requiring it would not break delivery;
+  # it is left off because the source conditions already say who may write,
+  # and a condition on a header nothing here controls is one more thing that
+  # can refuse an object without saying why.
   statement {
     sid       = "AllowCloudFrontLogDelivery"
     effect    = "Allow"
     actions   = ["s3:PutObject"]
-    resources = ["${aws_s3_bucket.access_logs.arn}/*"]
+    resources = ["${aws_s3_bucket.access_logs.arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
 
     principals {
       type        = "Service"
