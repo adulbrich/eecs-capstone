@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { inspect } from "node:util";
 import { Client, Pool } from "pg";
 import { describe, expect, it } from "vitest";
 import {
@@ -107,7 +108,11 @@ describe("surviving a connection the server drops", () => {
     error.client = new Client({ connectionString: URL_WITH_ENCODED_PASSWORD });
     pool.emit("error", error);
 
-    const line = String(logged[0]);
+    // `inspect` rather than `String`. An Error's own toString prints only
+    // name and message, so a `String()` assertion would pass on an
+    // implementation that handed the whole error object to the logger and
+    // left the attached client to be rendered downstream.
+    const line = inspect(logged[0]);
     expect(line).toContain("terminating connection");
     expect(line).not.toContain("db.internal");
     expect(line).not.toContain("eecs_capstone");
