@@ -1523,8 +1523,8 @@ this config; delete it manually if you are done with the project.
 
 **Runtime environment (set in the task definition, `infra/ecs.tf`):**
 
-`NODE_ENV`, `PORT`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `ONID_CLIENT_ID`,
-`ONID_DISCOVERY_URL`, `S3_BUCKET`, `S3_REGION`, `BEDROCK_REGION`,
+`NODE_ENV`, `PORT`, `BETTER_AUTH_URL`, `TRUSTED_PROXY_CIDR`, `GITHUB_CLIENT_ID`,
+`ONID_CLIENT_ID`, `ONID_DISCOVERY_URL`, `S3_BUCKET`, `S3_REGION`, `BEDROCK_REGION`,
 `BEDROCK_MODEL_ID`, `BEDROCK_REASONING_EFFORT`, `BEDROCK_EMBEDDING_MODEL_ID`,
 `BEDROCK_EMBEDDING_DIMENSIONS`, `AI_REVIEW_LIMIT_PER_HOUR`,
 `AI_REVIEW_LIMIT_PER_DAY`, `BEDROCK_SCOPE_REASONING_EFFORT`,
@@ -1535,11 +1535,13 @@ this config; delete it manually if you are done with the project.
 access keys and no `S3_ENDPOINT` are set; `BEDROCK_EMBEDDINGS_ENABLED` is
 deliberately not plumbed either.
 
-Seven of these are fatal. A task with `NODE_ENV=production` refuses to start,
+Eight of these are fatal. A task with `NODE_ENV=production` refuses to start,
 exit code 1 and one message naming every missing one, without `DATABASE_URL`,
 `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `ONID_DISCOVERY_URL`,
-`ONID_CLIENT_ID`, `ONID_CLIENT_SECRET` or `S3_BUCKET`; a blank value counts as
-missing. `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` only warn, because
+`ONID_CLIENT_ID`, `ONID_CLIENT_SECRET`, `S3_BUCKET` or `TRUSTED_PROXY_CIDR`; a
+blank value counts as missing. `TRUSTED_PROXY_CIDR` is `var.vpc_cidr`, the
+hops Better Auth skips in `X-Forwarded-For` to find the viewer; without it the
+rate limiter puts every visitor in one bucket (#519). `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` only warn, because
 GitHub sign-in is optional (`var.github_client_id` defaults to empty). The check
 is `src/nitro/config-check.ts`, a Nitro plugin, and the list is in
 `src/lib/_internal/startup-config.ts`; nothing is fatal outside production.

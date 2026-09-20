@@ -15,6 +15,7 @@ const complete = {
   ONID_CLIENT_ID: "not-a-real-client-id",
   ONID_CLIENT_SECRET: "not-a-real-client-secret",
   S3_BUCKET: "not-a-real-bucket",
+  TRUSTED_PROXY_CIDR: "10.0.0.0/16",
 } as NodeJS.ProcessEnv;
 
 describe("missingProductionConfig", () => {
@@ -53,6 +54,26 @@ describe("missingProductionConfig", () => {
         BETTER_AUTH_SECRET: "   ",
       } as NodeJS.ProcessEnv)
     ).toEqual(["BETTER_AUTH_SECRET"]);
+  });
+
+  it("refuses to boot without a trusted proxy range", () => {
+    // Without it the rate limiter cannot resolve a client behind CloudFront
+    // and the ALB, and quietly puts every visitor in one bucket per path
+    // (#519). A blank value is the shape terraform passes for an unset
+    // variable, so blank counts as missing like every other entry here.
+    expect(
+      missingProductionConfig({
+        ...complete,
+        TRUSTED_PROXY_CIDR: "",
+      } as NodeJS.ProcessEnv)
+    ).toEqual(["TRUSTED_PROXY_CIDR"]);
+    expect(
+      missingProductionConfig({
+        ...complete,
+        NODE_ENV: "development",
+        TRUSTED_PROXY_CIDR: "",
+      } as NodeJS.ProcessEnv)
+    ).toEqual([]);
   });
 
   it("leaves the GitHub credentials to the warning", () => {

@@ -56,6 +56,11 @@ function missingInProduction(env: NodeJS.ProcessEnv): string[] {
     ONID_CLIENT_ID: env.ONID_CLIENT_ID,
     ONID_CLIENT_SECRET: env.ONID_CLIENT_SECRET,
     S3_BUCKET: env.S3_BUCKET,
+    // Not a secret, but fatal: without it Better Auth cannot resolve a client
+    // behind CloudFront and the ALB and rate limits every visitor as one
+    // (#519). The failure would otherwise be one warning per task start and
+    // "Too many requests" for whoever signs in fourth.
+    TRUSTED_PROXY_CIDR: env.TRUSTED_PROXY_CIDR,
   };
   return unsetNames(values);
 }

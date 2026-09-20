@@ -70,10 +70,22 @@ function withVerificationLanding(url: string): string {
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
   trustHost: authConfig.trustHost,
-  // CloudFront terminates TLS at the edge and forwards to the origin over
-  // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in
-  // production so a misread request protocol can't silently disable them.
-  advanced: { useSecureCookies: authConfig.isProduction },
+  advanced: {
+    // CloudFront terminates TLS at the edge and forwards to the origin over
+    // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in
+    // production so a misread request protocol can't silently disable them.
+    useSecureCookies: authConfig.isProduction,
+    // The same proxy chain, seen from the rate limiter. Behind CloudFront and
+    // the ALB `X-Forwarded-For` always carries at least two entries, and with
+    // no trusted hop Better Auth trusts only a single-entry header, so every
+    // production request resolved to no address and shared one rate limit
+    // bucket per path: three sign-ins per ten seconds for the whole user base
+    // (#519). With the VPC range trusted it walks the chain from the right and
+    // takes the first entry outside it, which is the viewer. Rate limiting is
+    // off outside production, so nothing local exercises this; the resolver
+    // itself is pinned by src/lib/__tests__/trusted-proxies.test.ts.
+    ipAddress: { trustedProxies: [...authConfig.trustedProxies] },
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,

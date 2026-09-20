@@ -35,6 +35,20 @@ export interface AuthConfig {
      */
     issuer: string;
   };
+  /**
+   * The proxy hops between the viewer and this process, as IP or CIDR
+   * entries, from `TRUSTED_PROXY_CIDR`. Better Auth walks `X-Forwarded-For`
+   * from the right, skips every entry inside one of these, and takes the first
+   * it cannot skip as the client, for rate limiting and `session.ipAddress`
+   * both. Empty when the variable is unset or blank, never `[""]`: Better Auth
+   * validates each entry at construction and warns per invalid one, so a blank
+   * entry would print on every dev boot and every integration test that
+   * imports `auth.ts`. Production refuses to boot without it
+   * (`startup-config.ts`), because with no trusted hop the header, which
+   * always carries at least two entries behind CloudFront and the ALB, resolves
+   * to no address and every visitor shares one rate limit bucket (#519).
+   */
+  trustedProxies: readonly string[];
   trustHost: boolean;
   /** Names of unset provider credentials, in `.env.example` order. */
   unconfigured: readonly string[];
@@ -78,8 +92,17 @@ export function buildAuthConfig(
     // arriving in separate commits, not a decision. See the Better Auth
     // section of docs/QUIRKS.md.
     trustHost: env.NODE_ENV !== "development",
+    trustedProxies: splitList(env.TRUSTED_PROXY_CIDR),
     unconfigured: PROVIDER_VARS.filter((name) => !env[name]?.trim()),
   };
+}
+
+/** Comma-separated, each entry trimmed, blanks dropped. */
+function splitList(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 /**
