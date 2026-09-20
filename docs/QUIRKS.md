@@ -352,7 +352,7 @@ The cast is the documented Drizzle idiom to avoid a circular initialization erro
 
 ### Pool reuse
 
-`src/db/index.ts` exports a single `db` instance (`drizzle(DATABASE_URL)`). Pass this to Better Auth's `drizzleAdapter`. Do not let any code path open a second pool via raw `pg.Pool`; the Drizzle shortcut already manages one.
+`src/db/index.ts` exports a single `db` instance, built as `drizzle({ connection: poolConfig(DATABASE_URL), schema })` so the pool is sized on purpose: `src/lib/_internal/db-pool.ts` holds the maximum, the acquisition timeout and the connection budget they come from, and its unit test holds the fleet to the RDS ceiling (#521, [ADR-0034](./adr/0034-the-pool-is-sized-against-the-instance.md)). Pass `db` to Better Auth's `drizzleAdapter`. Do not let app code open a second pool via raw `pg.Pool`; the one exception is the traffic collector's own capped pool that the ADR reserves for #18. Scripts under `scripts/` open their own, which is fine because they run once and outside the task.
 
 ### FK rules in this project
 
