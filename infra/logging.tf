@@ -5,10 +5,9 @@
 # unknowable (#523).
 #
 # These logs hold the full client IP of every visitor, which is a different
-# decision from the one the traffic collector made for itself in #508, where
-# the address is hashed and never stored. Operational logs keeping raw
-# addresses is ordinary, and the control is the retention rule below rather
-# than the collection. See ADR-0036.
+# decision from the one the traffic writer made for itself in #508, where the
+# address is hashed and never stored. See ADR-0036 for why both are right and
+# why retention, not collection, is the control here.
 
 resource "aws_s3_bucket" "access_logs" {
   bucket = "${var.project}-access-logs-${data.aws_caller_identity.current.account_id}"
@@ -37,9 +36,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "access_logs" {
   }
 }
 
-# The retention rule is the privacy control, so it deletes rather than
-# transitions to cheaper storage: a visitor address moved to Glacier is still
-# a visitor address. Thirty days matches the CloudWatch log group.
+# The retention rule is the privacy control, which is why it deletes rather
+# than transitioning to cheaper storage. See ADR-0036.
 resource "aws_s3_bucket_lifecycle_configuration" "access_logs" {
   bucket = aws_s3_bucket.access_logs.id
 
@@ -77,14 +75,21 @@ data "aws_iam_policy_document" "access_logs" {
     }
   }
 
-  # CloudFront standard logging v2 delivers as the vended-logs service rather
-  # than as an account, and the source conditions are what stop another
-  # account naming this bucket as its own log destination.
+  # Scoped by principal and source rather than by key prefix, deliberately.
+  # Vended log delivery picks its own path (`AWSLogs/<account>/CloudFront/`
+  # when the destination ARN carries no prefix), and a policy naming a prefix
+  # that disagrees does not fail loudly: the delivery is refused and the
+  # bucket simply stays empty. The two conditions are the real control, since
+  # they allow only this account's own delivery sources to write anything.
+  #
+  # No `s3:x-amz-acl` condition, although the AWS example carries one. This
+  # bucket leaves ACLs disabled (BucketOwnerEnforced), so a delivery cannot
+  # send that header and requiring it would refuse every object.
   statement {
     sid       = "AllowCloudFrontLogDelivery"
     effect    = "Allow"
     actions   = ["s3:PutObject"]
-    resources = ["${aws_s3_bucket.access_logs.arn}/cloudfront/*"]
+    resources = ["${aws_s3_bucket.access_logs.arn}/*"]
 
     principals {
       type        = "Service"
@@ -143,16 +148,17 @@ resource "aws_cloudwatch_log_delivery_destination" "access_logs_s3" {
   tags = { Name = "${var.project}-access-logs-s3" }
 }
 
+# No `s3_delivery_configuration`. A suffix path appends to the prefix
+# CloudFront already chooses rather than replacing it, so asking for
+# "cloudfront" would land objects under `AWSLogs/<account>/CloudFront/
+# cloudfront/` and any policy or runbook naming the shorter path would be
+# quietly wrong. The default path is distinct from the ALB's `alb/` prefix
+# already, so the option buys nothing here.
 resource "aws_cloudwatch_log_delivery" "cloudfront_app" {
   provider = aws.us_east_1
 
   delivery_source_name     = aws_cloudwatch_log_delivery_source.cloudfront_app.name
   delivery_destination_arn = aws_cloudwatch_log_delivery_destination.access_logs_s3.arn
 
-  s3_delivery_configuration {
-    suffix_path                 = "/cloudfront"
-    enable_hive_compatible_path = false
-  }
-
-  tags = { Name = "${var.project}-app-access-logs" }
+  tags = { Name = "${var.project}-app-log-delivery" }
 }

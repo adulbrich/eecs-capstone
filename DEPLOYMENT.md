@@ -1523,13 +1523,6 @@ this config; delete it manually if you are done with the project.
 
 **Key names (defaults):**
 
-- Access logs: ALB and the app distribution both write to
-  `eecs-capstone-access-logs-<account-id>`, deleted after
-  `var.access_log_retention_days` (30). They hold full client IP addresses;
-  [ADR-0036](./docs/adr/0036-access-logs-keep-raw-addresses-for-thirty-days.md)
-  says why that is the decision and why retention is the control. The
-  CloudFront half is standard logging v2, so its delivery resources live in
-  `us-east-1` while the bucket stays in `us-west-2`.
 - Region: `us-west-2`, project prefix: `eecs-capstone`
 - ECS cluster/service: `eecs-capstone` / `eecs-capstone`
 - ECR repo: `eecs-capstone`
@@ -1537,6 +1530,10 @@ this config; delete it manually if you are done with the project.
   `eecs-capstone/github-client-secret`, `eecs-capstone/onid-client-secret`
 - SSM: `/eecs-capstone/ASSETS_PUBLIC_BASE`
 - Log group: `/ecs/eecs-capstone`
+- Access logs bucket: `eecs-capstone-access-logs-<account-id>`, ALB under
+  `alb/`, CloudFront under `AWSLogs/<account-id>/CloudFront/`, both deleted
+  after `var.access_log_retention_days`. They hold client IP addresses; see
+  [ADR-0036](./docs/adr/0036-access-logs-keep-raw-addresses-for-thirty-days.md).
 
 **Runtime environment (set in the task definition, `infra/ecs.tf`):**
 

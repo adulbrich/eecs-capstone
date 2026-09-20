@@ -14,6 +14,11 @@ resource "aws_lb" "app" {
     enabled = true
   }
 
+  # ELB writes a test object the moment logging is enabled and fails the
+  # update if it cannot, so the grant has to exist first. Terraform does not
+  # infer this from the bucket reference above.
+  depends_on = [aws_s3_bucket_policy.access_logs]
+
   tags = { Name = "${var.project}-alb" }
 }
 

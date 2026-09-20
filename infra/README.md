@@ -4,12 +4,12 @@ Provisions the AWS deployment for the EECS Capstone app in **us-west-2**:
 a VPC (public app subnets + private ALB/RDS subnets, no NAT Gateway),
 an internal ALB fronted by **CloudFront VPC origins**, an arm64 **Fargate**
 service, **RDS** Postgres, a private **S3** assets bucket served via a second
-CloudFront distribution (OAC), ECR, IAM (task/execution roles + a GitHub OIDC
-deploy role), and Secrets Manager / SSM config.
+CloudFront distribution (OAC), a private **S3** access-logs bucket written by
+the ALB and the app distribution, ECR, IAM (task/execution roles + a GitHub
+OIDC deploy role), SES, and Secrets Manager / SSM config.
 
-Email is not provisioned yet: the app runs with `EMAIL_TRANSPORT=console`
-(verification/reset links go to CloudWatch logs, not real inboxes). Add SES
-(or another provider) later and flip `EMAIL_TRANSPORT` back in `infra/ecs.tf`.
+Email is live: `infra/ses.tf` provisions the domain identity and the app runs
+with `EMAIL_TRANSPORT=ses`. See DEPLOYMENT.md section 9.
 
 See the full design in `../.claude/plans/` (the approved deployment plan).
 
