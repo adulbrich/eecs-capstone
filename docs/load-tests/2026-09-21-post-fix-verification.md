@@ -13,6 +13,10 @@ the one question that document left open, which is whether the 502 is gone.
 the whole session, including a 42 requests per second burst that took the hottest
 task to 98% CPU. The comparable run on 2026-09-21 morning produced seven.
 
+That does not mean #524 is satisfied. Two of its five phase 2 criteria still fail,
+and the connection pool rather than CPU is now what fails them. See "Against #524's
+own success criteria" below before reading this run as a green light for term.
+
 ## Configuration under test
 
 | | At the time of this run |
@@ -52,9 +56,32 @@ because it is the only part of that ADR that was a projection.
 
 The burst is closer to serviceable than ADR-0040 expected. It predicted a fleet at
 its absorption limit would be serving slowly, on the morning's evidence that 26.3
-came with a p50 of 4.12 s. At 39.6 the p50 was 151 ms and the p95 1.01 s. So three
-tasks do not merely absorb 42 requests per second, they absorb it while staying
-inside #524's p99 criterion of 1500 ms, though not its p95 criterion of 500 ms.
+came with a p50 of 4.12 s. At 39.6 the p50 was 151 ms.
+
+## Against #524's own success criteria, the answer is no
+
+#524 asks five things of phase 2 and says "if those hold, the app is ready for
+term". Three hold and two do not, so on its own terms the answer is not yet.
+
+| #524 criterion at 42 requests per second | Measured | |
+| --- | --- | --- |
+| p95 under 500 ms | 1.01 s | **miss** |
+| p99 under 1500 ms | 1.99 s | **miss** |
+| Zero 5XX | 0 | pass |
+| `DatabaseConnections` stays below the pool maximum rather than pinning to it | 59 of 60 | **miss** |
+| ECS `MemoryUtilization` under 75% | 23.8% | pass |
+| `runningCount` never drops | held at 3 | pass |
+
+The latency misses and the connection miss are probably the same fact rather than
+two. A request that waits on the pool is a slow request, and the pool ran out at
+exactly the rate the tail went long. That is a hypothesis this run cannot separate,
+because nothing here measures acquire wait directly, and it is the first thing to
+measure next rather than the first thing to fix.
+
+What has changed since the morning is still worth stating plainly: the same phase
+on two tasks absorbed 26.3 requests per second at a p50 of 4.12 s with 502s in it,
+and none of #524's criteria were close. Three tasks absorb 39.6 at a p50 of 151 ms
+with no 5XX at all. The fleet moved from far outside the bar to just outside it.
 
 ## The first attempt aborted, and it was warm-up
 
