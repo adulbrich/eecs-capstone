@@ -42,7 +42,7 @@ COPY --from=build /app/.output ./.output
 # `node scripts/image-url-legacy.mjs`, `node scripts/import-legacy.mjs`,
 # `node scripts/backfill-embeddings.mjs`).
 COPY drizzle ./drizzle
-COPY scripts/migrate.mjs scripts/promote-admin.mjs scripts/image-url-legacy.mjs scripts/import-legacy.mjs scripts/backfill-embeddings.mjs ./scripts/
+COPY scripts/migrate.mjs scripts/promote-admin.mjs scripts/image-url-legacy.mjs scripts/import-legacy.mjs scripts/backfill-embeddings.mjs scripts/backfill-social-summaries.mjs ./scripts/
 # `import-legacy.mjs` reads its data (the projects JSONL and image-keys.json)
 # at runtime from a PRIVATE S3 prefix, not from here. That data names 299 real
 # proposers and their addresses, and this repo is public and mirrors to
