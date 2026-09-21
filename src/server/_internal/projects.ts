@@ -10,6 +10,7 @@ import {
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
 import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
+import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
 import { diffRowFields } from "#/lib/edit-diff";
 import { normalizeEmailAddress } from "#/lib/email-address";
 import { assertNoImageKeyOnCreate } from "#/lib/image-upload-policy";
@@ -47,6 +48,7 @@ import {
   isEmbeddableStatus,
   refreshProjectEmbedding,
 } from "./project-embeddings";
+import { refreshSocialSummary } from "./project-social-summary";
 
 export interface AuthUser {
   id: string;
@@ -55,6 +57,12 @@ export interface AuthUser {
 
 export interface TransitionOptions extends EmailOptions {
   embed?: EmbedFn;
+  /**
+   * The social summary's model seam, threaded exactly as `embed` is so a test
+   * can publish a project without reaching Bedrock. Two seams rather than one
+   * because they are two models behind two kill switches.
+   */
+  summarize?: ResponsesFn;
 }
 
 async function loadProjectOr404(id: string) {
@@ -203,7 +211,8 @@ function buildProjectValues(
 export async function updateProjectAs(
   viewer: AuthUser,
   data: UpdateProjectInput,
-  embed?: EmbedFn
+  embed?: EmbedFn,
+  summarize?: ResponsesFn
 ): Promise<{ id: string; updated: boolean }> {
   const existing = await loadProjectOr404(data.id);
   if (!canEditProject(existing, viewer)) {
@@ -260,6 +269,11 @@ export async function updateProjectAs(
   // see any more. `isEmbeddableStatus` is the single spelling of that rule.
   if (isEmbeddableStatus(existing.status)) {
     await refreshProjectEmbedding(existing.id, embed);
+    // Same gate, same placement, same swallowed failure. Separate call
+    // because the two are separate models with separate kill switches: an
+    // embeddings outage must not cost the project its preview text, and the
+    // reverse.
+    await refreshSocialSummary(existing.id, summarize);
   }
 
   return { id: existing.id, updated: true };
@@ -694,6 +708,7 @@ async function commitTransition(
   // failed to embed at publish time, which archiving now retries.
   if (isEmbeddableStatus(target)) {
     await refreshProjectEmbedding(project.id, opts?.embed);
+    await refreshSocialSummary(project.id, opts?.summarize);
   }
 
   // Same reasoning, and it matters more here: a failed email must not undo an

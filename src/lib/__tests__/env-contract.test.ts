@@ -61,6 +61,10 @@ const NOT_READ_HERE = new Map([
     "VITE_STORAGE_PUBLIC_BASE",
     "client-side, reached through import.meta.env at build time (src/lib/storage.ts)",
   ],
+  [
+    "VITE_SITE_URL",
+    "client-side, reached through import.meta.env at build time (src/lib/site-url.ts)",
+  ],
 ]);
 
 /**

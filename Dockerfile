@@ -18,6 +18,8 @@ COPY . .
 # assets CloudFront URL as this build arg.
 ARG VITE_STORAGE_PUBLIC_BASE
 ENV VITE_STORAGE_PUBLIC_BASE=${VITE_STORAGE_PUBLIC_BASE}
+ARG VITE_SITE_URL
+ENV VITE_SITE_URL=${VITE_SITE_URL}
 RUN npm run build
 # The only place this can go red: CI builds a checkout that still has
 # `.gitignore`, this stage builds one shaped by `.dockerignore`. See #397.
