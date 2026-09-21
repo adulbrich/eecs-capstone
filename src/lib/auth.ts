@@ -84,11 +84,12 @@ export const auth = betterAuth({
     // path (#519). Rate limiting is off outside production, so nothing local
     // exercises it; src/lib/__tests__/trusted-proxies.test.ts pins the walk.
     //
-    // The value must stay non-empty whatever it holds, and it does NOT name a
-    // hop inside the VPC: the ALB appends a CloudFront edge address, so the
-    // limiter keys on an edge server today. Correcting that at the load
-    // balancer is the second half of #535 and has not shipped. Both are
-    // explained once in the Better Auth section of docs/QUIRKS.md.
+    // The value must stay non-empty whatever it holds, because the walk only
+    // happens at all when the trusted list is non-empty. It does NOT name a
+    // hop that gets skipped: `infra/ecs.tf` sets the load balancer to
+    // `preserve`, so the chain reaching the task is CloudFront's own, whose
+    // last entry is the viewer (#535). Explained once in the Better Auth
+    // section of docs/QUIRKS.md.
     ipAddress: { trustedProxies: [...authConfig.trustedProxies] },
   },
   emailAndPassword: {
