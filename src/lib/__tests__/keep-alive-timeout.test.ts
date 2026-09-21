@@ -2,11 +2,10 @@ import { readFileSync } from "node:fs";
 import http from "node:http";
 import { describe, expect, it } from "vitest";
 import {
-  HEADERS_TIMEOUT_MS,
-  installKeepAliveTimeouts,
+  installKeepAliveTimeout,
   KEEP_ALIVE_TIMEOUT_MS,
-  withKeepAliveTimeouts,
-} from "../_internal/keep-alive-timeouts";
+  withKeepAliveTimeout,
+} from "../_internal/keep-alive-timeout";
 
 /** The `idle_timeout` on the `aws_lb` block in `infra/ecs.tf`, in seconds. */
 function albIdleTimeoutMs(): number {
@@ -25,14 +24,14 @@ function serverThroughWrapper(
 ): http.Server {
   const original = http.createServer;
   try {
-    installKeepAliveTimeouts(http);
+    installKeepAliveTimeout(http);
     return create(http);
   } finally {
     http.createServer = original;
   }
 }
 
-describe("the keep-alive timeouts", () => {
+describe("the keep-alive timeout", () => {
   it("outlasts the load balancer's idle timeout", () => {
     // The whole defect in one inequality (#545). The ALB reuses a pooled
     // connection for `idle_timeout`; whichever side closes first decides, and
@@ -44,40 +43,40 @@ describe("the keep-alive timeouts", () => {
     expect(KEEP_ALIVE_TIMEOUT_MS).toBeGreaterThan(albIdle);
   });
 
-  it("keeps the headers timeout above the keep-alive timeout", () => {
-    // Node applies the shorter of the two to an idle keep-alive connection, so
-    // an inverted pair closes it early and reintroduces the same 502 under a
-    // different timer. Node's default headers timeout is 60 s, which the
-    // keep-alive above now exceeds, which is why this has to be set too.
-    expect(HEADERS_TIMEOUT_MS).toBeGreaterThan(KEEP_ALIVE_TIMEOUT_MS);
-  });
-
-  it("beats Node's own defaults, which are what production ran", () => {
-    // Node 24 defaults keepAliveTimeout to 5000 and headersTimeout to 60000,
-    // read off a bare server rather than written down, so a future Node that
-    // fixes this upstream makes the assertion trivially true instead of wrong.
+  it("beats Node's own default, which is what production ran", () => {
+    // Node 24 defaults this to 5000, read off a bare server rather than
+    // written down, so a future Node that fixes it upstream makes the
+    // assertion trivially true instead of wrong.
     const bare = http.createServer();
     expect(KEEP_ALIVE_TIMEOUT_MS).toBeGreaterThan(bare.keepAliveTimeout);
     bare.close();
   });
 });
 
-describe("withKeepAliveTimeouts", () => {
+describe("withKeepAliveTimeout", () => {
   it("leaves the caller's other options alone", () => {
-    const merged = withKeepAliveTimeouts({ maxHeaderSize: 4096 });
+    const merged = withKeepAliveTimeout({ maxHeaderSize: 4096 });
     expect(merged.maxHeaderSize).toBe(4096);
+  });
+
+  it("leaves headersTimeout to Node", () => {
+    // Measured, not assumed: `headersTimeout` bounds a request whose headers
+    // have begun arriving, not an idle connection, so it plays no part in this
+    // fix. A server at keepAliveTimeout 8000 and headersTimeout 3000 sent its
+    // FIN at 9006 ms. Setting it here would only weaken a slow-headers bound.
+    expect(withKeepAliveTimeout({})).not.toHaveProperty("headersTimeout");
   });
 
   it("is authoritative over a value already in the options", () => {
     // A fix for a defect, not a default: the point is that nothing quietly
     // puts production back on a timeout below the load balancer's.
-    const merged = withKeepAliveTimeouts({ keepAliveTimeout: 5000 });
+    const merged = withKeepAliveTimeout({ keepAliveTimeout: 5000 });
     expect(merged.keepAliveTimeout).toBe(KEEP_ALIVE_TIMEOUT_MS);
   });
 });
 
-describe("installKeepAliveTimeouts", () => {
-  it("applies the timeouts to a server created with options and a handler", () => {
+describe("installKeepAliveTimeout", () => {
+  it("applies the timeout to a server created with options and a handler", () => {
     // The overload srvx uses: `createServer(options, handler)`, from
     // node_modules/srvx/dist/adapters/node.mjs.
     const handler = () => {
@@ -88,7 +87,6 @@ describe("installKeepAliveTimeouts", () => {
     );
 
     expect(server.keepAliveTimeout).toBe(KEEP_ALIVE_TIMEOUT_MS);
-    expect(server.headersTimeout).toBe(HEADERS_TIMEOUT_MS);
     expect(server.listenerCount("request")).toBe(1);
     server.close();
   });
@@ -113,9 +111,9 @@ describe("installKeepAliveTimeouts", () => {
     // call per boot path and be invisible until it was not.
     const original = http.createServer;
     try {
-      installKeepAliveTimeouts(http);
+      installKeepAliveTimeout(http);
       const once = http.createServer;
-      installKeepAliveTimeouts(http);
+      installKeepAliveTimeout(http);
       expect(http.createServer).toBe(once);
     } finally {
       http.createServer = original;

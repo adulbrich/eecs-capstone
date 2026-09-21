@@ -9,8 +9,8 @@ resource "aws_lb" "app" {
   # balancer holds an idle connection to a task for this long and reuses it;
   # the task has to outlast it, or the balancer dispatches onto a connection
   # Node has already closed and the student gets a 502 (#545). The other half
-  # is KEEP_ALIVE_TIMEOUT_MS in src/lib/_internal/keep-alive-timeouts.ts, and
-  # `src/lib/__tests__/keep-alive-timeouts.test.ts` reads this line to hold the
+  # is KEEP_ALIVE_TIMEOUT_MS in src/lib/_internal/keep-alive-timeout.ts, and
+  # `src/lib/__tests__/keep-alive-timeout.test.ts` reads this line to hold the
   # two in the right order. Lowering it is not the way to fix that pair: this
   # also bounds the wait for a target's first byte, and the load test measured
   # a p50 of 4.12 s under saturation, so a short one trades 502s for 504s.

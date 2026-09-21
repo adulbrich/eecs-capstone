@@ -1,13 +1,14 @@
 # The task outlasts the load balancer's idle timeout, and a wrapper is how
 
-`src/lib/_internal/keep-alive-timeouts.ts` sets the Node HTTP server's
-`keepAliveTimeout` to 65 seconds and `headersTimeout` to 66, above the ALB's
-`idle_timeout`, which `infra/ecs.tf` now writes down as 60 rather than leaving
-at the AWS default. Node defaults the first to 5 seconds, so production shipped
-with the task closing pooled connections twelve times sooner than the load
-balancer stopped reusing them, and every request the ALB dispatched into that
-gap reached a connection that was already gone: no response, no target status
-code, and a 502 for the student (#545). The four access log lines the load test
+`src/lib/_internal/keep-alive-timeout.ts` sets the Node HTTP server's
+`keepAliveTimeout` to 65 seconds, above the ALB's `idle_timeout`, which
+`infra/ecs.tf` now writes down as 60 rather than leaving at the AWS default.
+Node defaults it to 5 seconds, and the FIN measures a consistent second later
+than the setting, so production shipped with the task dropping pooled
+connections after about 6 seconds while the load balancer went on reusing them
+for 60. Every request the ALB dispatched into that gap reached a connection
+that was already gone: no response, no target status code, and a 502 for the
+student (#545). The four access log lines the load test
 retrieved say exactly that and nothing else, once the fields are read against
 AWS's definitions rather than inferred: `target_status_code` is recorded "only
 if a connection was established to the target and the target sent a response",
@@ -24,12 +25,12 @@ side instead would work on paper, but `idle_timeout` also bounds the wait for a
 target's first byte, and the load test measured a p50 of 4.12 s under
 saturation, so a short one trades 502s for 504s. Decided 2026-09-21.
 
-The delivery mechanism is the part worth recording. Neither timeout is
+The delivery mechanism is the part worth recording. The timeout is not
 reachable through configuration: Nitro's `node-server` entry calls srvx's
 `serve()` with a fixed set of options and never passes the `node` key that
 would reach `http.createServer`, srvx's plugin list belongs to Nitro, and the
 four Nitro runtime hooks (`close`, `error`, `request`, `response`) never see
-the server. Nitro v3 has no setting for either, which was checked against its
+the server. Nitro v3 has no setting for it, which was checked against its
 documentation rather than recalled. So a Nitro plugin wraps `http.createServer`
 at boot, before the entry calls `serve()`, the same "runs once before the
 listener binds" slot `config-check.ts` already uses. The alternative was a
@@ -42,13 +43,20 @@ right end state is Nitro exposing the option upstream.
 
 ## Consequences
 
-`src/lib/__tests__/keep-alive-timeouts.test.ts` reads `idle_timeout` out of
+`src/lib/__tests__/keep-alive-timeout.test.ts` reads `idle_timeout` out of
 `infra/ecs.tf` and holds `keepAliveTimeout` above it, so raising one side alone
 fails rather than silently reopening the defect, the same way
 `db-pool.test.ts` holds `CONNECTION_BUDGET` to `app_max_tasks`. `headersTimeout`
-has to stay above `keepAliveTimeout` because Node applies the shorter of the two
-to an idle connection, and Node's 60 second default is below the new keep-alive,
-so it could not be left alone. `scripts/loadtest/pooled-connection-reuse.mjs`
+is left at Node's default, which is the one thing here that was nearly got
+wrong: the obvious worry is that its 60 seconds, now below the keep-alive,
+would close an idle connection first and reintroduce the same 502. Measurement
+says no. A server at `keepAliveTimeout` 8000 against `headersTimeout` 3000 sent
+its FIN at 9006 ms rather than 4000, and one at 65000 against 60000 was still
+open at 14 s; since Node 18.14 `headersTimeout` bounds a request whose headers
+have begun arriving rather than an idle connection, and Node 24's documentation
+states no ordering requirement between the two. An earlier draft of this ADR
+raised it to 66 seconds on the shorter-wins reasoning, which the probe
+falsified. `scripts/loadtest/pooled-connection-reuse.mjs`
 reproduces the defect against a local build in about thirty seconds, which
 answers the question #545 left open about whether a local reproduction was
 possible: it is, and it needs neither load nor a constrained pool. It cannot be
