@@ -104,14 +104,18 @@ describe("embeddingHash", () => {
  * a test that reached it would be an integration test with a bill. So pin the
  * arithmetic the limit was chosen by instead (ADR-0037).
  *
- * This is a floor on the reasoning, not on the limit. Values up to about 21,560
+ * This is a floor on the reasoning, not on the limit. Values up to about 21,240
  * would also clear the ceiling, so a small raise passes here; what fails on any
  * change to the number itself is the literal pinned in
  * `src/test/backfill-embeddings-parity.test.ts`. What this catches is a raise
  * that stops being defensible against the densest text the corpus holds.
  *
- * `WORST_CHARS_PER_TOKEN` is measured, not assumed: 34,487 characters of a
- * link-heavy legacy row tokenised to 13,103 tokens on 2026-09-20.
+ * `WORST_CHARS_PER_TOKEN` is measured on the string that is actually embedded,
+ * which is the truncated one: a link-heavy legacy row's first 20,000
+ * characters tokenised to 7,712 on 2026-09-20. Measuring the untruncated row
+ * instead gives 2.63 and is wrong in the unsafe direction, because density is
+ * not uniform along a paste of links and nothing ever embeds the whole thing.
+ * The margin this leaves is 480 tokens, about 6 percent.
  *
  * The ceiling belongs to one model, so the default model id is pinned beside
  * it rather than leaving 8,192 floating free of the thing that enforces it.
@@ -125,7 +129,7 @@ describe("embeddingHash", () => {
 describe("EMBEDDING_SOURCE_LIMIT", () => {
   const TITAN_V2 = "amazon.titan-embed-text-v2:0";
   const TITAN_V2_MAX_INPUT_TOKENS = 8192;
-  const WORST_CHARS_PER_TOKEN = 34_487 / 13_103;
+  const WORST_CHARS_PER_TOKEN = 20_000 / 7712;
 
   it("is measured against the model the app defaults to", () => {
     expect(buildEmbedConfig({}).modelId).toBe(TITAN_V2);
