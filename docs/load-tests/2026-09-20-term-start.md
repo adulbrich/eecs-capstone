@@ -131,17 +131,21 @@ only became visible afterwards. Metrics publish a minute or two late and the acc
 written every five minutes, so "check for 5XX between phases" cannot give a clean answer
 between back-to-back phases.
 
-So the run stopped when a human read the numbers, one phase later than #524 intends. What would
-have honoured the rule:
+So the run stopped when a human read the numbers, one phase later than #524 intends.
 
-- Set the error threshold to `rate<0.0001` or use `abortOnFail` on a check of the status code,
-  so the first failed request stops the run rather than the hundredth.
-- Failing that, treat any non-zero `http_req_failed` in a k6 summary as the stop signal. k6
-  reports it the moment the run ends, which is the only fast signal available. Both Monday
-  phases carried it in their own summaries.
-- Leave three minutes between phases if CloudWatch is the source of truth.
+**The script now does what the issue asked.** It counts responses with a status of 500 or above
+into a `server_errors` metric and holds that metric to `count<1` with `abortOnFail`. A rate
+cannot express "the first one stops it" and a counter can, and k6 re-evaluates thresholds every
+few seconds, so a run now stops seconds after the first 5XX instead of never. Verified against
+production at 2 requests per second: the threshold registers and reports `count=0`.
 
-The first of those is the real fix and belongs in the script before it is run again.
+That is the fix, not a workaround. The two fallbacks are still worth knowing, because
+CloudWatch is the only place an `ELB_5XX` with no client-visible failure would show up:
+
+- Treat any non-zero `http_req_failed` in a k6 summary as a stop signal. k6 reports it the
+  moment the run ends. Both Monday phases carried it, and that was the fast signal available.
+- Leave three minutes between phases if CloudWatch is the source of truth, because metrics and
+  access logs both publish too late to clear a phase that just ended.
 
 Not to be confused with the 57 `460`s in the same logs. Those are the ALB recording that the
 client went away, and the client was k6 interrupting its own in-flight iterations when the
@@ -237,9 +241,9 @@ IDS=/path/to/ids.txt RPS=25 DURATION=3m k6 run scripts/loadtest/projects-browse.
 ```
 
 `P99_ABORT_MS` raises the latency abort from #524's 3000 for a deliberately short run when the
-failure shape is the point. The error threshold has no override, but read "What the thresholds
-actually do" before relying on it: it is a 1% rate across the run, so it does not stop on the
-first 5XX and did not stop either Monday phase.
+failure shape is the point. It cannot loosen the error thresholds, which have no override and
+now stop the run on the first 5XX. "What the thresholds actually do" explains why that took a
+counter rather than a rate.
 
 **Do not run 1d or 1e until the 502 has an explanation.** They exist to push further into the
 regime that already produces it, on a live site, and a louder version of a failure that is
