@@ -25,20 +25,22 @@ the issue's "what is already known" table describe a fleet that no longer exists
 ## Results
 
 Latency is client side from k6, across all four steps of the session. The CloudWatch columns are
-the highest one minute datapoint inside each phase, on non-overlapping windows. CPU is given
-twice on purpose: the fleet average is what `ECSServiceAverageCPUUtilization` scales on, and the
-maximum is the hottest single task. No phase dropped an iteration, so each ran at the rate it
-claims.
+the highest one minute datapoint inside each phase, on non-overlapping windows. CPU and memory
+are each given twice on purpose: the average is the fleet number, and
+`ECSServiceAverageCPUUtilization` is what the autoscaling policy tracks, while the peak is the
+hottest single task and runs several points higher. Comparing a peak against the 50% target
+would be comparing the wrong statistic. No phase dropped an iteration, so each ran at the rate
+it claims.
 
-| Phase | Rate | p50 | p95 | p99 | max | Errors | CPU avg | CPU max | Mem avg | DB conns | Tasks |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0. Baseline | 1/s | 70 ms | 179 ms | 266 ms | 370 ms | 0% | 6.5% | 8.8% | 9.8% | 6 | 2 |
-| 1a | 5/s | 62 ms | 154 ms | 243 ms | 605 ms | 0% | 21.9% | 24.9% | 15.2% | 6 | 2 |
-| 1b | 10/s | 61 ms | 173 ms | 389 ms | 771 ms | 0% | 39.8% | 47.6% | 17.8% | 10 | 2 |
-| 1c | 25/s | not run | | | | | | | | | |
-| 1d | 50/s | not run | | | | | | | | | |
-| 1e | 75/s | not run | | | | | | | | | |
-| 2. Term start | 42/s then 8/s | not run | | | | | | | | | |
+| Phase | Rate | p50 | p95 | p99 | slowest | Errors | CPU avg | CPU peak | Mem avg | Mem peak | DB conns | Tasks |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0. Baseline | 1/s | 70 ms | 179 ms | 266 ms | 370 ms | 0% | 6.5% | 8.8% | 9.8% | 11.1% | 6 | 2 |
+| 1a | 5/s | 62 ms | 154 ms | 243 ms | 605 ms | 0% | 21.9% | 24.9% | 15.2% | 16.1% | 6 | 2 |
+| 1b | 10/s | 61 ms | 173 ms | 389 ms | 771 ms | 0% | 39.8% | 47.6% | 17.8% | 18.0% | 10 | 2 |
+| 1c | 25/s | not run | | | | | | | | | | |
+| 1d | 50/s | not run | | | | | | | | | | |
+| 1e | 75/s | not run | | | | | | | | | | |
+| 2. Term start | 42/s then 8/s | not run | | | | | | | | | | |
 
 Zero 5XX at the target and zero at the load balancer across all three phases. `runningCount`
 never moved off 2, and no scaling activity fired: the fleet average peaked at 39.8%, under the
@@ -72,6 +74,7 @@ What that implies, and it is an extrapolation rather than a measurement:
 Confirming or killing that prediction is what phases 1c through 2 are for. Do not act on it
 before they run.
 
+Memory never became interesting: 18.0% of 1024 MB at the worst, against #524's 75% criterion.
 The database is nowhere near a constraint. It held 7.5% CPU and 10 connections at 10 requests
 per second, against a pool ceiling of 20 per task and 220 usable on the instance.
 
