@@ -8,30 +8,32 @@ absorbing 26.3 requests per second while a 500 student term start needs about
 42, at a measured cost of roughly 19 ms of vCPU per listing render, so two
 tasks cannot serve the arrival however well the scaler behaves, and three at
 about 39 are the cheapest floor that comes within reach of it while leaving the
-scaler a fourth task to add. The reason the floor rather than the policy is
+scaler a fourth task to add. Read 39 as what three tasks absorb at saturation
+rather than as comfortable capacity, since the 26.3 it scales from was measured
+at a p50 of 4.12 seconds. The reason the floor rather than the policy is
 that scaling out is measurably slower than the burst it would have to answer,
-and this is now measured rather than predicted: on 2026-09-21 the CPU average
-breached 50% at 06:36 and 06:37, dipped to 13.6% at 06:38 in the gap between
-two test phases, and breached again at 06:39, 06:40 and 06:41 at 72.8, 85.9 and
-82.0 percent, which is the first run of three consecutive minutes the alarm's
-three evaluation periods can fire on; `AlarmHigh` went to ALARM at 06:44:43 and
-set the desired count to 4, and the two new tasks logged themselves listening
-at 06:45:13 and 06:45:22. The third breaching datapoint is stamped 06:41 and
-covers the minute ending 06:42, so that is 2 minutes 43 seconds from its close
-to the alarm firing and 3 minutes 22 seconds to capacity actually serving,
-against a term start burst that lasts about two; the load had stopped at 06:42,
-so the tasks arrived three and a half minutes after the last request and the scaler wound them back down at
-06:59 and 07:10. #546 and the load test write-up both record that autoscaling
-"never fired" and that the last scaling activity predated the run; that was an
-artifact of reading `runningCount` and the activity list before 06:44:43, and
-it is corrected in both places. The alarm is healthy, the policy sized the
-jump correctly when it finally saw the data, and neither fact helps: a
-mechanism that needs three consecutive breaching minutes on a metric ECS
-publishes late cannot answer a two minute arrival, so the tasks have to be
-running beforehand. Scheduled scaling that lifts the floor for the first week
-of term and drops it after was priced against this and not taken, because it
-buys about $8.51 a month against a term that lasts weeks and adds a moving part
-that fails silently by not firing. Decided 2026-09-21, with the floor and the
+and this is now measured rather than predicted: the alarm went to ALARM 2
+minutes 43 seconds after the third consecutive breaching minute closed, and the
+new tasks were serving 3 minutes 22 seconds after it, against a term start
+burst that lasts about two, by which time the load had been over for three
+minutes and the scaler wound them straight back down. The minute by minute
+timeline is in `docs/load-tests/2026-09-20-term-start.md` and is not repeated
+here. #546 records that autoscaling "never fired" and that the alarm never
+transitioned, and the write-up said the same; both were artifacts of reading
+`runningCount` and the scaling activity list before the scaler acted, the
+write-up is corrected in place, and this ADR with the pull request carrying it
+is the correction to the issue. The alarm is healthy, the policy sized the jump
+correctly when it finally saw the data, and neither fact helps: a mechanism
+needing three consecutive breaching minutes on a metric ECS published about two
+and a half minutes late cannot answer a two minute arrival, so the tasks have
+to be running beforehand. One non-breaching minute resets that run of three,
+which is what the gap between two test phases did, so the measured lag is a
+floor rather than a typical case. Scheduled scaling that lifts the floor to four for the first
+week of term and drops it back after was priced against this and not taken: a
+week of a fourth task is about $2 against the $8.51 a month a permanent fourth
+costs, so the saving is real but small, and it is bought by adding a moving
+part whose failure mode is silently not firing on the one morning it exists
+for. Decided 2026-09-21, with the floor and the
 cost confirmed by the maintainer, the same way ADR-0035's were.
 
 ## Consequences
@@ -47,8 +49,9 @@ still holds, and three tasks at the pool maximum of 20 are 60 of the instance's
 220 rather than the 40 the load test watched pin. The scaling signal stays CPU, which settles
 the question ADR-0035 left open: it asked whether memory would turn out to lead
 CPU under real concurrency, in which case the CPU policy would not fire when it
-mattered. It does not. Under the burst that pinned one task at 99.9% CPU,
-memory reached 23.2% of 1024 MB, so CPU leads by a wide margin and the memory
+mattered. It does not. Across the loaded phases the fleet average CPU
+peaked at 99.7% while memory peaked at 23.2% of 1024 MB, so CPU leads by a wide
+margin and the memory
 raise to 1024 was the right answer to memory rather than a scaling signal. The
 burst is still not fully covered: three tasks are about 39 requests per second against about 42, so a
 term start arrival will still saturate briefly and the fourth task will still
