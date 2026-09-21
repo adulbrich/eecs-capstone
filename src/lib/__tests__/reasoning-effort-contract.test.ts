@@ -43,6 +43,29 @@ function matches(file: string, pattern: RegExp): [string, string][] {
   return [...text.matchAll(pattern)].map(([, name, value]) => [name, value]);
 }
 
+/**
+ * Asserts every effort a file declares is one the model takes.
+ *
+ * The count guard is the important half. It reports on the scan rather than
+ * on the values, because a regex that quietly stops matching, after a rename
+ * or a reformat, would otherwise sail through an empty loop. Three features
+ * send an effort today: the review, the scope assessment and the social
+ * summary.
+ *
+ * The comparison is written as a string on both sides so a failure prints the
+ * variable's name and the value it carries, rather than `expected false to be
+ * true`.
+ */
+function expectSupportedDefaults(file: string, pattern: RegExp): void {
+  const found = matches(file, pattern);
+  expect(found.length).toBeGreaterThanOrEqual(3);
+  for (const [name, value] of found) {
+    expect(`${name}=${value}`).toBe(
+      `${name}=${SUPPORTED.has(value) ? value : `<one of ${[...SUPPORTED].join(", ")}>`}`
+    );
+  }
+}
+
 const SUPPORTED = new Set<string>(MANTLE_REASONING_EFFORTS);
 
 describe("reasoning effort contract", () => {
@@ -65,27 +88,11 @@ describe("reasoning effort contract", () => {
    * into the task definition, where they beat every default in `src`.
    */
   it("ships Terraform defaults the model accepts", () => {
-    const found = matches(VARIABLES_TF, TF_EFFORT_VARIABLE);
-    // Guards the regex rather than the values: a rename that stopped matching
-    // would otherwise pass this test by finding nothing at all. Three features
-    // send an effort today, the review, the scope assessment and the social
-    // summary, so a count below that means the scan broke.
-    expect(found.length).toBeGreaterThanOrEqual(3);
-    for (const [name, value] of found) {
-      expect(`${name}=${value}`).toBe(
-        `${name}=${SUPPORTED.has(value) ? value : `<one of ${[...SUPPORTED].join(", ")}>`}`
-      );
-    }
+    expectSupportedDefaults(VARIABLES_TF, TF_EFFORT_VARIABLE);
   });
 
   it("documents defaults the model accepts", () => {
-    const found = matches(ENV_EXAMPLE, ENV_EFFORT_KEY);
-    expect(found.length).toBeGreaterThanOrEqual(3);
-    for (const [name, value] of found) {
-      expect(`${name}=${value}`).toBe(
-        `${name}=${SUPPORTED.has(value) ? value : `<one of ${[...SUPPORTED].join(", ")}>`}`
-      );
-    }
+    expectSupportedDefaults(ENV_EXAMPLE, ENV_EFFORT_KEY);
   });
 
   it("falls back to values the model accepts", () => {
