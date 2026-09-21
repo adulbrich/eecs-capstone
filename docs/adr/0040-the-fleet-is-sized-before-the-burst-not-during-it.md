@@ -58,5 +58,5 @@ term start arrival will still saturate briefly and the fourth task will still
 arrive minutes late, which is accepted for now rather than fixed, and the thing
 that would fix it is a floor of 4 for the arrival window. What would change
 this decision is a measurement rather than an argument: a phase 1c and phase 2
-re-run against a three task fleet, after [ADR-0039](./0039-the-task-outlasts-the-load-balancer-idle-timeout.md)
+re-run against a three task fleet, after [ADR-0041](./0041-the-task-outlasts-the-load-balancer-idle-timeout.md)
 deploys, since those phases must not run until the 502 fix is live.

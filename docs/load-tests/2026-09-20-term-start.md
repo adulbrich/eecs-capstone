@@ -134,7 +134,7 @@ listing and detail GETs. Seven failures across roughly 7200 requests is 0.1%, an
 them is a student seeing an error page.
 
 This is the one result here that is a defect rather than a capacity number. It is
-[#545](https://github.com/adulbrich/eecs-capstone/issues/545). ADR-0039 carries the fix, which is not the same as the issue being closed: that waits on a phase 1c re-run after the deploy showing no ELB 5XX. And
+[#545](https://github.com/adulbrich/eecs-capstone/issues/545). ADR-0041 carries the fix, which is not the same as the issue being closed: that waits on a phase 1c re-run after the deploy showing no ELB 5XX. And
 `scripts/loadtest/pooled-connection-reuse.mjs` reproduces it against a local build in about
 thirty seconds without any load at all. 1d and 1e should still wait for a deploy that carries
 the fix, because they exist to push further into exactly the regime that produced it.
@@ -274,7 +274,7 @@ now stop the run on the first 5XX. "What the thresholds actually do" explains wh
 counter rather than a rate.
 
 **Do not run 1d or 1e until the 502 fix is deployed.** It has an explanation now (#545,
-ADR-0039), but until the deploy carrying it is live these phases push further into the regime
+ADR-0041), but until the deploy carrying it is live these phases push further into the regime
 that produces it, on a live site, and a louder version of a known failure is not worth a
 student seeing an error page for. The first thing to check after that deploy is
 `HTTPCode_ELB_5XX_Count` across a re-run of 1c, which is what actually closes #545.
