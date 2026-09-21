@@ -75,6 +75,7 @@ async function reusePooledConnection() {
   await sleep(REPRO_IDLE_MS);
 
   let outcome = "no response";
+  let giveUp;
   socket.resume();
   await new Promise((resolve) => {
     let settled = false;
@@ -83,6 +84,7 @@ async function reusePooledConnection() {
         return;
       }
       settled = true;
+      clearTimeout(giveUp);
       outcome = value;
       resolve();
     };
@@ -93,7 +95,9 @@ async function reusePooledConnection() {
     socket.on("error", (error) => settle(error.code));
     socket.on("close", () => settle(outcome));
     socket.write(request(REPRO_PATH), (error) => error && settle(error.code));
-    setTimeout(() => settle("timed out"), 5000);
+    // Cleared on settle, or the last round's timer holds the process open for
+    // five seconds after the script has said what it found.
+    giveUp = setTimeout(() => settle("timed out"), 5000);
   });
   socket.destroy();
   return outcome;
@@ -115,19 +119,29 @@ try {
   for (let round = 0; round < REPRO_ROUNDS; round++) {
     outcomes.push(await reusePooledConnection());
   }
-  const broken = outcomes.filter((o) => !o.startsWith("HTTP 2")).length;
+  // The defect is a connection that carried no response at all, which is what
+  // the ALB turns into a 502. The status is beside the point: a 500 from the
+  // app is a complete response that the balancer would have passed through,
+  // and counting it here would report the defect on a task that is merely
+  // misconfigured. Anything that did not start with a status line, an EPIPE,
+  // a reset, a close or a timeout, is the failure.
+  const broken = outcomes.filter((o) => !o.startsWith("HTTP ")).length;
 
-  console.log(`idle ${REPRO_IDLE_MS} ms, ${REPRO_ROUNDS} connections: ${outcomes.join(", ")}`);
+  console.log(
+    `idle ${REPRO_IDLE_MS} ms, ${REPRO_ROUNDS} connections: ${outcomes.join(", ")}`
+  );
   if (broken > 0) {
     console.log(
-      `\nReproduced: ${broken} of ${REPRO_ROUNDS} reused connections carried no response.\n` +
+      `\nReproduced: ${broken} of ${REPRO_ROUNDS} reused connections carried no response at all.\n` +
         "Each one is an ALB 502 with target_status_code - and\n" +
         "response_processing_time -1, which is what #545 recorded in production.\n" +
         "See src/lib/_internal/keep-alive-timeout.ts and ADR-0039."
     );
   } else {
     console.log(
-      `\nNot reproduced: every reused connection answered after ${REPRO_IDLE_MS} ms idle.`
+      `\nNot reproduced: every reused connection carried a response after ${REPRO_IDLE_MS} ms idle.\n` +
+        "A non-2xx status above is the app's business, not this defect's: the\n" +
+        "load balancer passes a complete response through whatever it says."
     );
   }
   process.exitCode = broken > 0 ? 1 : 0;

@@ -58,11 +58,24 @@ type ServerOptions = Parameters<typeof nodeHttp.createServer>[0];
 /**
  * The timeout merged into whatever options the server is being created with.
  * Ours wins on purpose: this is a fix for a defect, not a default to be
- * overridden, and nothing in the build passes the key today.
+ * overridden, and nothing in the build passes the key today. The return type
+ * says the key is there rather than echoing the argument's, so a caller that
+ * reads it back is not relying on the implementation.
  */
-export function withKeepAliveTimeout<T extends ServerOptions>(options: T): T {
+export function withKeepAliveTimeout<T extends ServerOptions>(
+  options: T
+): T & { keepAliveTimeout: number } {
   return { ...options, keepAliveTimeout: KEEP_ALIVE_TIMEOUT_MS };
 }
+
+/**
+ * Marks the wrapper as ours, so installing twice is a no-op. A symbol rather
+ * than a check on `createServer.name`: the bundler is free to rename a
+ * function it has to deconflict, and a name comparison would then fail open
+ * silently, leaving a wrapper around a wrapper and a test that no longer
+ * tests what it says.
+ */
+const INSTALLED = Symbol.for("eecs-capstone.keepAliveTimeout.installed");
 
 /**
  * Applies the timeout to the HTTP server Nitro is about to create.
@@ -86,7 +99,7 @@ export function withKeepAliveTimeout<T extends ServerOptions>(options: T): T {
  */
 export function installKeepAliveTimeout(http: typeof nodeHttp): void {
   const createServer = http.createServer;
-  if (createServer.name === "createServerWithKeepAlive") {
+  if (INSTALLED in createServer) {
     return;
   }
   function createServerWithKeepAlive(
@@ -101,5 +114,6 @@ export function installKeepAliveTimeout(http: typeof nodeHttp): void {
       ? createServer.call(this, withKeepAliveTimeout({}), first)
       : createServer.call(this, withKeepAliveTimeout(first ?? {}), second);
   }
+  Object.defineProperty(createServerWithKeepAlive, INSTALLED, { value: true });
   http.createServer = createServerWithKeepAlive as typeof http.createServer;
 }
