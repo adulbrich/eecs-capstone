@@ -86,7 +86,9 @@ react to three minutes of sustained overload.
 
 Term start is a burst. Autoscaling that needs three minutes to notice, a minute of cooldown and
 a Fargate task start cannot be the plan for it. The fleet has to be big enough before the
-students arrive, which means `app_min_tasks`, not `app_max_tasks`.
+students arrive, which means `app_min_tasks`, not `app_max_tasks`. That is
+[#546](https://github.com/adulbrich/eecs-capstone/issues/546), which also carries why the alarm
+did not fire as a thing to diagnose rather than a thing assumed.
 
 ### 2. Under saturation the app breaks connections mid-response, as 502
 
@@ -104,9 +106,20 @@ unhealthy target, which would be 503. Both tasks did it, on ordinary listing and
 Seven failures across roughly 7200 requests is 0.1%, and every one of them is a student seeing
 an error page.
 
-This is the one result here that is a defect rather than a capacity number. It wants its own
-issue before 1d and 1e are ever run, because 1d and 1e exist to push further into exactly the
-regime that produces it.
+This is the one result here that is a defect rather than a capacity number. It is
+[#545](https://github.com/adulbrich/eecs-capstone/issues/545), and 1d and 1e should wait for
+it, because they exist to push further into exactly the regime that produces it.
+
+**On the abort criterion, honestly.** #524 says to stop the moment a 5XX appears, and 1c ran
+after the first two had already happened. The sequence was: the held burst ended at 06:38:00,
+ALB 5XX was queried immediately and returned no datapoints, 1c started at 06:38:56, and the
+06:37 datapoint only became visible later. CloudWatch publishes on a lag of a minute or two,
+so "check for 5XX between phases" does not actually give a clean answer between
+back-to-back phases. Anyone repeating this should either leave three minutes between phases or
+watch the ALB access logs, which are written every five minutes and are equally lagged. The
+practical version: treat any k6 `http_req_failed` above zero as the stop signal, because k6
+sees it immediately and CloudWatch does not. Both Monday phases reported it in their own
+summaries, and that was the signal available in real time.
 
 Not to be confused with the 57 `460`s in the same logs. Those are the ALB recording that the
 client went away, and the client was k6 interrupting its own in-flight iterations when the
