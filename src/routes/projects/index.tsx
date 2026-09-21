@@ -33,6 +33,7 @@ import {
 } from "#/components/ui/pagination";
 import { pageTitle } from "#/lib/page-title";
 import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
+import { NOINDEX } from "#/lib/social-meta";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
 import { useSignedIn } from "#/lib/use-signed-in";
@@ -91,7 +92,9 @@ export const searchSchema = z.object({
 
 export const Route = createFileRoute("/projects/")({
   validateSearch: searchSchema,
-  head: () => ({ meta: [{ title: pageTitle("Projects") }] }),
+  head: () => ({
+    meta: [{ title: pageTitle("Projects") }, NOINDEX],
+  }),
   // Only the filter fields: the view mode, the column sort and the column
   // visibility are client state and must not re-run the loader.
   loaderDeps: ({ search }) => ({

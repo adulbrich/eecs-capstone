@@ -22,6 +22,8 @@ import { pageTitle } from "#/lib/page-title";
 import { projectImageSrc } from "#/lib/project-image";
 import { FIELD_HEADINGS } from "#/lib/project-review-fields";
 import { programLabel } from "#/lib/project-visibility";
+import { absoluteUrl } from "#/lib/site-url";
+import { NOINDEX, socialDescription } from "#/lib/social-meta";
 import { listProjectCategories } from "#/server/categories";
 import { getProject, listProjectComments } from "#/server/projects-queries";
 
@@ -43,16 +45,44 @@ interface ProjectDetailData {
 }
 
 export const Route = createFileRoute("/projects/$projectId")({
-  head: ({ loaderData }) => ({
-    meta: [
-      {
-        title: pageTitle(
-          (loaderData as ProjectDetailData | undefined)?.project?.title ??
-            "Project"
-        ),
-      },
-    ],
-  }),
+  head: ({ loaderData, params }) => {
+    const project = (loaderData as ProjectDetailData | undefined)?.project;
+    const title = project?.title ?? "Project";
+    const description = socialDescription({
+      description: project?.description,
+      problemStatement: project?.problemStatement,
+      socialSummary: project?.socialSummary,
+    });
+    return {
+      links: [
+        // The clean URL, so a link shared carrying filter or tracking params
+        // unfurls as one page rather than as several.
+        {
+          rel: "canonical",
+          href: absoluteUrl(`/projects/${params.projectId}`),
+        },
+      ],
+      meta: [
+        { title: pageTitle(title) },
+        // Out of search results, in chat previews. The two are separate
+        // levers: robots.txt bans the fetch, which would take the unfurl with
+        // it, while this only tells an indexer not to list the page. Every
+        // status, not just archived: a published project is no more wanted in
+        // a search result than an old one (#498).
+        NOINDEX,
+        { name: "description", content: description },
+        { property: "og:type", content: "article" },
+        { property: "og:title", content: title },
+        { property: "og:description", content: description },
+        {
+          property: "og:url",
+          content: absoluteUrl(`/projects/${params.projectId}`),
+        },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
+      ],
+    };
+  },
   loader: async ({ params }): Promise<ProjectDetailData> => {
     // A param that cannot name a project is a 404. Without this the server
     // function's Zod `.uuid()` throws and the page 500s instead.

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
 import { pageTitle } from "#/lib/page-title";
+import { NOINDEX } from "#/lib/social-meta";
 
 // Better Auth lands here after checking the token. On failure it appends
 // `?error=<code>` to the same URL, where the code is one of TOKEN_EXPIRED,
@@ -10,7 +11,7 @@ const searchSchema = z.object({ error: z.string().optional() });
 
 export const Route = createFileRoute("/(auth)/verify-email")({
   validateSearch: searchSchema,
-  head: () => ({ meta: [{ title: pageTitle("Verify Email") }] }),
+  head: () => ({ meta: [{ title: pageTitle("Verify Email") }, NOINDEX] }),
   component: VerifyEmail,
 });
 

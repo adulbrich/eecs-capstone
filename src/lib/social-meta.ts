@@ -29,8 +29,36 @@ export const SOCIAL_DESCRIPTION_MAX_LENGTH = 160;
  */
 export const SITE_DESCRIPTION = `Propose a capstone project, follow it through staff review into the public catalog, and borrow the equipment your team needs at ${brand.institutionName}.`;
 
-/** Alt text for the static card, which carries its meaning as pixels. */
-export const SOCIAL_CARD_ALT = `${brand.institutionName} ${brand.programName}`;
+/**
+ * The preview card every page shares, shipped in `public/` rather than imported
+ * and hashed into `/assets/` the way `brand.ts` handles the logo. Scrapers
+ * cache per URL, so a content hash in the filename would orphan every preview
+ * already scraped on each redesign. `scripts/generate-social-card.mjs` rebuilds
+ * the file; `docs/QUIRKS.md` says why it is committed rather than generated at
+ * build time.
+ */
+export const SOCIAL_CARD_PATH = "/social-card.png";
+
+/**
+ * The tag that keeps a page out of search results, spelled once so the nine
+ * routes carrying it cannot drift.
+ *
+ * Not `robots.txt`, which stays permissive on purpose. A `Disallow` bans the
+ * fetch, and the preview scrapers honour it, so it would take the unfurls this
+ * whole feature exists for with it. This tag is read only by indexers and
+ * leaves scrapers alone, which is what lets the catalog be unlisted and
+ * shareable at the same time (#498).
+ *
+ * `follow` rather than `nofollow`: a crawler should still walk from the catalog
+ * to whatever it links, it just should not list these pages.
+ */
+export const NOINDEX = { content: "noindex, follow", name: "robots" } as const;
+
+/**
+ * Alt text for that card, which carries its meaning as pixels. Without it a
+ * screen reader on a platform that surfaces `og:image:alt` gets nothing.
+ */
+export const SOCIAL_CARD_ALT = `${brand.institutionName} ${brand.programName}, School of Electrical Engineering and Computer Science`;
 
 // Biome wants regex literals at the top level, and these are hot enough to
 // deserve it anyway: `socialDescription` can run three of them per request.

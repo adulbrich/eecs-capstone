@@ -26,7 +26,9 @@ import {
   PaginationStatus,
 } from "#/components/ui/pagination";
 import { ACTIVE_STATUSES, type ActiveStatus } from "#/lib/inventory-visibility";
+import { pageTitle } from "#/lib/page-title";
 import { PAGE_SIZE_DEFAULT } from "#/lib/pagination";
+import { NOINDEX } from "#/lib/social-meta";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
 import { useSignedIn } from "#/lib/use-signed-in";
@@ -57,6 +59,9 @@ const searchSchema = z.object({
 });
 
 export const Route = createFileRoute("/inventory/")({
+  head: () => ({
+    meta: [{ title: pageTitle("Inventory") }, NOINDEX],
+  }),
   validateSearch: searchSchema,
   // Only the filter fields: the view mode, the column sort and the column
   // visibility are client state and must not re-run the loader.
