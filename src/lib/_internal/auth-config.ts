@@ -36,17 +36,18 @@ export interface AuthConfig {
     issuer: string;
   };
   /**
-   * The hops Better Auth skips in `X-Forwarded-For` to reach the viewer, as IP
+   * The trusted-proxy list Better Auth walks `X-Forwarded-For` against, as IP
    * or CIDR entries from `TRUSTED_PROXY_CIDR`. Empty when unset or blank,
    * never `[""]`: Better Auth warns per invalid entry at construction, and
    * that would print on every dev boot and integration test. Production
    * refuses to boot without it (`startup-config.ts`). See the Better Auth
    * section of docs/QUIRKS.md for why (#519).
    *
-   * "The hops Better Auth skips" describes what the variable is for, not what
-   * it currently matches: the ALB appends a CloudFront edge address rather than
-   * a VPC hop, so today it skips nothing. Rewriting this properly waits for the
-   * second half of #535, which is what changes the chain.
+   * Deliberately not called "the hops we skip". It skips nothing: the load
+   * balancer is set to `preserve`, so the chain is CloudFront's own and its
+   * last entry is the viewer. What a non-empty value buys is that Better Auth
+   * walks the chain from the right at all, instead of believing only a
+   * single-entry header (#535).
    */
   trustedProxies: readonly string[];
   trustHost: boolean;

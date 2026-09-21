@@ -16,6 +16,28 @@ resource "aws_lb" "app" {
   # a p50 of 4.12 s under saturation, so a short one trades 502s for 504s.
   idle_timeout = 60
 
+  # Hand X-Forwarded-For to the task exactly as CloudFront sent it. The default
+  # is "append", and what the ALB appends is the CloudFront EDGE server's public
+  # address, not the VPC origin ENI (AWS documents this under "Client IP
+  # addresses" for custom origins). So the last entry was an edge server, Better
+  # Auth read it as the viewer, and the rate limiter keyed on CloudFront rather
+  # than on a person: diluted across many edges for one viewer, and firing on
+  # strangers when it fired (#535).
+  #
+  # Under "preserve" the last entry is CloudFront's own append, which is
+  # documented and unconditional: the viewer address taken from the TCP
+  # connection. Anything a viewer prepends sits to its left and is never
+  # reached. TRUSTED_PROXY_CIDR below must still be non-empty for that walk to
+  # happen at all; see the comment there.
+  #
+  # Not a change in forgery risk, despite how it reads. Under `append` an
+  # in-VPC caller sending `XFF: 1.2.3.4` produced `1.2.3.4, <its own 10.x>`, and
+  # the walk skipped the trusted 10.x and believed 1.2.3.4 anyway. Anything
+  # inside the VPC could forge a viewer before this and can after it. What
+  # bounds that is the ALB being internal and the only things in the VPC being
+  # this app's own tasks, not the header mode.
+  xff_header_processing_mode = "preserve"
+
   # Every request that reached the origin, which CloudWatch metrics can only
   # count in aggregate. The bucket, its retention and the delivery grant are
   # in infra/logging.tf; the prefix is what the bucket policy scopes to.
@@ -113,11 +135,20 @@ resource "aws_ecs_task_definition" "app" {
         # cover a hostname that disagrees with it: requests from any other
         # origin fail the origin check with INVALID_ORIGIN.
         { name = "BETTER_AUTH_URL", value = "https://${var.domain_name}" },
-        # The hops Better Auth skips when reading X-Forwarded-For: CloudFront's
-        # VPC origin ENI, which the ALB appends, sits in this range. Without
-        # it the rate limiter cannot resolve a viewer and every viewer shares
-        # one bucket per path (#519). The app refuses to boot without it, so
-        # it reaches the task by apply *then* deploy, like EMAIL_TRANSPORT.
+        # Required, and required to be NON-EMPTY, which is the whole of what it
+        # now does. With an empty trusted list Better Auth believes only a
+        # single-entry header and every viewer collapses into one bucket (#519);
+        # with a non-empty one it walks X-Forwarded-For from the right and takes
+        # the first entry outside the range, which under `preserve` on the load
+        # balancer above is CloudFront's append, the viewer.
+        #
+        # It no longer names a hop that is skipped. It used to claim to be the
+        # CloudFront VPC origin ENI; that ENI is not in the chain, so this value
+        # matches nothing and skips nothing (#535). Keep it set to the VPC range
+        # anyway: it is a real CIDR, it can never match a viewer, and a
+        # value that could match one would make a viewer invisible. The app
+        # refuses to boot without it, so it reaches the task by apply *then*
+        # deploy, like EMAIL_TRANSPORT.
         { name = "TRUSTED_PROXY_CIDR", value = var.vpc_cidr },
         { name = "GITHUB_CLIENT_ID", value = var.github_client_id },
         { name = "ONID_CLIENT_ID", value = var.onid_client_id },

@@ -1676,16 +1676,30 @@ to empty). The check is `src/nitro/config-check.ts`, a Nitro plugin, and the
 list is in `src/lib/_internal/startup-config.ts`; nothing is fatal outside
 production.
 
-`TRUSTED_PROXY_CIDR` is `var.vpc_cidr`: the hops Better Auth skips in
-`X-Forwarded-For` to find the viewer, without which the rate limiter puts
-every viewer in one bucket (#519). It was added on 2026-09-20 and reaches the
-task only through `terraform apply`, so the first deploy of code that requires
-it must follow the apply, the same rule as `EMAIL_TRANSPORT`; a deploy before
-it fails to stabilize while the old task keeps serving. Confirm the fix on the
-next task start: the `Rate limiting could not determine a client IP` warning
-no longer appears in `/ecs/eecs-capstone`, and new `session.ipAddress` rows
-hold distinct public addresses. One `10.x` value for everyone means the
-CloudFront VPC origin ENI sits outside `var.vpc_cidr`.
+`TRUSTED_PROXY_CIDR` is `var.vpc_cidr`, and what it buys is that it is
+non-empty rather than what it matches. An empty trusted list sends Better Auth
+down a path that believes only a single-entry header, which put every viewer in
+one bucket (#519); a non-empty one makes it walk `X-Forwarded-For` from the
+right and take the first entry outside the range. It does not name a hop that
+gets skipped: the CloudFront VPC origin ENI is not in the chain, so this value
+matches nothing, and the claim that it did was wrong (#535). It reaches the task
+only through `terraform apply`, so the first deploy of code that requires it
+must follow the apply, the same rule as `EMAIL_TRANSPORT`; a deploy before it
+fails to stabilize while the old task keeps serving.
+
+The ALB carries `xff_header_processing_mode = "preserve"` (#535), so the task
+sees the header exactly as CloudFront sent it and the last entry is the viewer.
+Without it the ALB appends the CloudFront **edge server's** public address and
+Better Auth reads that as the viewer, which is what #535 fixed.
+
+Confirm after the apply and the deploy: sign in, then read `session.ipAddress`
+from `/api/auth/get-session`. It should be a campus or home address. A
+`130.176.x.x` value, or anything else inside AWS's `CLOUDFRONT_ORIGIN_FACING`
+ranges, means the attribute did not take. Also confirm the `Rate limiting could
+not determine a client IP` warning does not appear in `/ecs/eecs-capstone`, and
+that target health did not change: health checks send no `X-Forwarded-For` at
+all and resolve to no address, which is expected and harmless because they never
+reach a rate-limited route.
 
 The three reasoning efforts are not free strings. Mantle accepts `none`,
 `low`, `medium`, `high`, `xhigh` and `max`, and rejects anything else with a
