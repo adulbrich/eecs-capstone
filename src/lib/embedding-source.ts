@@ -17,6 +17,7 @@ import { createHash } from "node:crypto";
  *   way. The test looks for it to prove the strip kept the code it removed the
  *   comments from, so a rename has to move in both places at once.
  */
+
 /**
  * The character ceiling on the embedded text.
  * `docs/adr/0037-the-embedding-source-limit-stands-in-for-a-token-ceiling.md`
@@ -31,9 +32,9 @@ import { createHash } from "node:crypto";
  * Shared with `buildInterestsEmbeddingSource` below, where it never bites:
  * `INTERESTS_MAX_LENGTH` caps that text at 2,000 characters.
  *
- * Changing the number re-embeds every row whose text is longer than it, at one
- * paid Bedrock call each, because the truncated string is what `embeddingHash`
- * covers.
+ * Changing the number re-embeds every row longer than the smaller of the old
+ * value and the new one, at one paid Bedrock call each, because the truncated
+ * string is what `embeddingHash` covers.
  */
 export const EMBEDDING_SOURCE_LIMIT = 20_000;
 

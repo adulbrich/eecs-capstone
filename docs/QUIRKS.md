@@ -1091,7 +1091,7 @@ This app talks to two different Bedrock endpoints, and almost nothing is shared 
 
 ### The embedded text is capped in characters against a model limit in tokens
 
-`EMBEDDING_SOURCE_LIMIT` (`src/lib/embedding-source.ts`) truncates the source at 20,000 characters, but Titan Text Embeddings V2 refuses an input over 8,192 tokens, and no character count can guarantee a token count. A row that overflows fails quietly: `refreshProjectEmbedding` catches the throw and returns `"failed"`, so the row keeps a null vector, sorts last under `recommended` (#427), and every later sweep retries it at one wasted Bedrock call. The limit was 45,000 until 2026-09-20 and had never bound anything, because no project in the corpus came near it. `docs/adr/0037-the-embedding-source-limit-stands-in-for-a-token-ceiling.md` carries the trade-off and the arithmetic 20,000 was chosen by.
+`EMBEDDING_SOURCE_LIMIT` (`src/lib/embedding-source.ts`) truncates the source at 20,000 characters, but Titan Text Embeddings V2 refuses an input over 8,192 tokens, and no character count can guarantee a token count. A row that overflows fails quietly: `refreshProjectEmbedding` catches the throw and returns `"failed"`, so the row keeps a null vector, sorts last under `recommended` (#427), and every later sweep retries it at one wasted Bedrock call. The limit was 45,000 until 2026-09-20 and had never bound anything, because no project in the corpus came near it. [ADR-0037](./adr/0037-the-embedding-source-limit-stands-in-for-a-token-ceiling.md) carries the trade-off and the arithmetic 20,000 was chosen by.
 
 ### The SigV4 service name is `bedrock-mantle`, not `bedrock`
 

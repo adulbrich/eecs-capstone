@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMBEDDING_MODEL_ID } from "#/lib/_internal/bedrock-embed";
+import { buildEmbedConfig } from "#/lib/_internal/bedrock-embed";
 import {
   buildInterestsEmbeddingSource,
   buildProjectEmbeddingSource,
@@ -111,17 +111,24 @@ describe("embeddingHash", () => {
  * that stops being defensible against the densest text the corpus holds.
  *
  * `WORST_CHARS_PER_TOKEN` is measured, not assumed: 34,487 characters of a
- * link-heavy legacy row tokenised to 13,103 tokens on 2026-09-20. The ceiling
- * belongs to one model, so the model id is asserted too rather than leaving
- * 8,192 floating free of the thing that enforces it.
+ * link-heavy legacy row tokenised to 13,103 tokens on 2026-09-20.
+ *
+ * The ceiling belongs to one model, so the default model id is pinned beside
+ * it rather than leaving 8,192 floating free of the thing that enforces it.
+ * Through `buildEmbedConfig` with an explicit empty environment, not through
+ * the ambient `EMBEDDING_MODEL_ID`: `bedrock-embed.test.ts` already removed
+ * that exact assertion because it reddened for any developer who had set
+ * `BEDROCK_EMBEDDING_MODEL_ID`. What this reaches is the default, not the
+ * value `infra/ecs.tf` supplies in production, so it catches a default swapped
+ * out from under the arithmetic and nothing about the deployed model.
  */
 describe("EMBEDDING_SOURCE_LIMIT", () => {
   const TITAN_V2 = "amazon.titan-embed-text-v2:0";
   const TITAN_V2_MAX_INPUT_TOKENS = 8192;
   const WORST_CHARS_PER_TOKEN = 34_487 / 13_103;
 
-  it("is measured against the model actually configured", () => {
-    expect(EMBEDDING_MODEL_ID).toBe(TITAN_V2);
+  it("is measured against the model the app defaults to", () => {
+    expect(buildEmbedConfig({}).modelId).toBe(TITAN_V2);
   });
 
   it("clears that model's token ceiling at the worst measured density", () => {
