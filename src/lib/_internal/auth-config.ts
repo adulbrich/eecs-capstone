@@ -42,6 +42,11 @@ export interface AuthConfig {
    * that would print on every dev boot and integration test. Production
    * refuses to boot without it (`startup-config.ts`). See the Better Auth
    * section of docs/QUIRKS.md for why (#519).
+   *
+   * "The hops Better Auth skips" describes what the variable is for, not what
+   * it currently matches: the ALB appends a CloudFront edge address rather than
+   * a VPC hop, so today it skips nothing. Rewriting this properly waits for the
+   * second half of #535, which is what changes the chain.
    */
   trustedProxies: readonly string[];
   trustHost: boolean;

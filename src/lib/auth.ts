@@ -7,6 +7,7 @@ import {
   buildAuthConfig,
   warnUnconfiguredProviders,
 } from "#/lib/_internal/auth-config";
+import { authRateLimit } from "#/lib/_internal/auth-rate-limits";
 import { onidProfileFromIdToken } from "#/lib/_internal/onid-profile";
 import { requireUserName } from "#/lib/_internal/user-name";
 import { getEmailSender } from "#/lib/email/sender";
@@ -70,6 +71,9 @@ function withVerificationLanding(url: string): string {
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
   trustHost: authConfig.trustHost,
+  // Numbers and reasons in lib/_internal/auth-rate-limits.ts. Still only
+  // active under NODE_ENV=production, which is Better Auth's own default.
+  rateLimit: authRateLimit,
   advanced: {
     // CloudFront terminates TLS at the edge and forwards to the origin over
     // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in
@@ -79,7 +83,12 @@ export const auth = betterAuth({
     // production request resolved to no address and shared one bucket per
     // path (#519). Rate limiting is off outside production, so nothing local
     // exercises it; src/lib/__tests__/trusted-proxies.test.ts pins the walk.
-    // See the Better Auth section of docs/QUIRKS.md.
+    //
+    // The value must stay non-empty whatever it holds, and it does NOT name a
+    // hop inside the VPC: the ALB appends a CloudFront edge address, so the
+    // limiter keys on an edge server today. Correcting that at the load
+    // balancer is the second half of #535 and has not shipped. Both are
+    // explained once in the Better Auth section of docs/QUIRKS.md.
     ipAddress: { trustedProxies: [...authConfig.trustedProxies] },
   },
   emailAndPassword: {
@@ -94,8 +103,16 @@ export const auth = betterAuth({
     // A refused sign-in on an unverified account mails a fresh link, which is
     // the only way out for a person whose first link expired or went missing:
     // sign-in refuses them and nothing else in the app sends one. Better Auth
-    // runs this after the password check, so a wrong password costs no mail,
-    // and its rate limiter covers the route.
+    // runs this after the password check, so a wrong password costs no mail.
+    //
+    // A wrong password is the only thing that costs no mail, though. Sign-up is
+    // open, so anyone can register an address they do NOT own with a password
+    // they choose, and then every sign-in mails the real owner a fresh link.
+    // The rate limit on /sign-in/email is therefore also the ceiling on
+    // verification mail aimed at a stranger, which is why #535 left that one
+    // path on Better Auth's 3-per-10-seconds default while raising every other
+    // path around it. #554 is the fix, and it is to meter the send rather than
+    // the route; until it lands, do not raise /sign-in/email.
     sendOnSignIn: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
