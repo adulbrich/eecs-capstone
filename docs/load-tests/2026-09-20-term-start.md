@@ -81,25 +81,27 @@ per second, against a pool ceiling of 20 per task and 220 usable on the instance
 ## Why the ramp stopped at 1b
 
 #529 resized the database from `db.t4g.micro` to `db.t4g.small` at 19:23 PDT, 35 minutes before
-this run. A class change restarts the instance, and the restart zeroes the accrued burst credit
-balance: `CPUCreditBalance` had been flat at its 288 cap all day and read about 2 when this run
-started, with `CPUSurplusCreditBalance` already accruing, which is the instance spending past a
-balance it does not have.
+this run. A class change restarts the instance, and the restart throws away the accrued burst
+credit balance. The five minute series says it plainly: `CPUCreditBalance` had been flat at its
+288 cap all day, read 288.0 at 19:20, and read 0.0 at 19:25. `CPUSurplusCreditBalance` began
+accruing at the same time, which is the instance spending past a balance it does not have.
 
-#524's own abort criteria say to stop when the credit balance falls. It had already fallen
-before the first request. Phases 0, 1a and 1b stay under the instance's 20% baseline (7.5% at
-the worst), so credits kept accruing throughout, from 6.7 to 11.2 over the run. The heavy phases
-would not. Spending past zero costs a surplus charge rather than an immediate throttle, and the
-throttle to baseline arrives only if surplus outruns what 24 hours of accrual repays, but the
-result either way is a live database degraded past the end of the test.
+#524's own abort criteria say to stop when the credit balance falls. It had already fallen to
+zero before the first request. From there it refills at a steady 1.5 credits per five minutes:
+2.1 at 19:35, 5.2 at 19:45, 9.7 at 20:00, 14.2 at 20:15. That is **18 credits per hour**, not
+the nominal 24, and the loaded phases did not slow it: phases 0, 1a and 1b stay under the
+instance's 20% baseline, 7.5% at the worst, so the instance kept earning throughout the run.
 
-Observed net accrual is about 18 credits per hour at this idle load, not the nominal 24. The
-heavy phases are cheap to run: at the measured database load they spend a handful of credits
-in total, because only 1d and 1e cross the 20% baseline at all and only for minutes.
+The heavy phases would not stay under it. Spending past zero costs a surplus charge rather than
+an immediate throttle, and the throttle to baseline arrives only if surplus outruns what 24
+hours of accrual repays, but the result either way is a live database degraded past the end of
+the test. The phases themselves are cheap: at the measured database load they spend a handful
+of credits in total, because only 1d and 1e cross the 20% baseline at all and only for minutes.
+The point is having a balance to spend them from.
 
-**Wait for `CPUCreditBalance` at 100 or more, and read it rather than trusting the clock.**
-At 18 per hour from about 2 at 19:26 PDT, it crosses 100 around 01:00 PDT and reads roughly 175
-by 05:00. Monday 05:00 to 07:00 PDT is the window to use: quiet, and before term traffic.
+**Wait for `CPUCreditBalance` at 100 or more, and read it rather than trusting the clock.** At
+18 per hour from 14.2 at 20:15 PDT, it crosses 100 around 01:00 PDT and reads about 170 by
+05:00. Monday 05:00 to 07:00 PDT is the window to use: quiet, and before term traffic.
 
 ## Running the rest
 
