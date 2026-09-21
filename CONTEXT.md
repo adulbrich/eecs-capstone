@@ -229,6 +229,20 @@ A project linking itself to a newly verified account at its proposer email. Only
 verified address claims; registering alone never does.
 _Avoid_: link (the resulting state, not the act), transfer, adopt
 
+**Social summary**:
+The one-line sentence shown when a link to a project is shared in a chat app or on
+social media, written by a model from the title, description and problem statement.
+Public, because it is the page's `og:description`. Staff may overwrite it, which
+stops it regenerating until they hand it back.
+_Avoid_: summary (the listing card's projection already owns that word in this
+codebase), blurb, excerpt, description (a field the proposer writes)
+
+**Social preview**:
+What a link to a page looks like when a chat app or a social platform expands it:
+the title, the social summary, and a brand card shared by every page. Not a search
+result; the catalog is deliberately kept out of those.
+_Avoid_: unfurl (the act, not the thing), card, embed, rich preview
+
 ## Both domains
 
 **Visibility**:
