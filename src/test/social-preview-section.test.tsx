@@ -6,6 +6,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const server = vi.hoisted(() => ({
@@ -129,10 +130,23 @@ describe("SocialPreviewSection actions", () => {
         resolve = r;
       })
     );
+    const typed = "A correction typed before pressing the button.";
+    type(typed);
     fireEvent.click(regenerateButton());
     await waitFor(() => expect(textarea().disabled).toBe(true));
+
+    // `userEvent`, not `fireEvent`, and the difference is the whole point.
+    // `fireEvent.change` dispatches the event straight at the element, and a
+    // disabled textarea takes it, so it cannot tell a guarded field from an
+    // unguarded one: it reports the bug as fixed either way. `userEvent.type`
+    // goes through the checks a browser makes and refuses a disabled control,
+    // which is the behaviour staff actually get.
+    await userEvent.type(textarea(), " typed while waiting");
+    expect(textarea().value).toBe(typed);
+
     resolve(AUTOMATIC);
     await waitFor(() => expect(textarea().disabled).toBe(false));
+    expect(textarea().value).toBe(AUTOMATIC.summary);
   });
 
   it("saves the trimmed text and takes the manual mark back from the server", async () => {
