@@ -30,9 +30,12 @@ resource "aws_lb" "app" {
   # reached. TRUSTED_PROXY_CIDR below must still be non-empty for that walk to
   # happen at all; see the comment there.
   #
-  # The residual risk is that anything already inside the VPC could call this
-  # internal ALB with a forged header and be believed. The only things in the
-  # VPC are this app's own tasks, and the public internet cannot reach the ALB.
+  # Not a change in forgery risk, despite how it reads. Under `append` an
+  # in-VPC caller sending `XFF: 1.2.3.4` produced `1.2.3.4, <its own 10.x>`, and
+  # the walk skipped the trusted 10.x and believed 1.2.3.4 anyway. Anything
+  # inside the VPC could forge a viewer before this and can after it. What
+  # bounds that is the ALB being internal and the only things in the VPC being
+  # this app's own tasks, not the header mode.
   xff_header_processing_mode = "preserve"
 
   # Every request that reached the origin, which CloudWatch metrics can only
@@ -142,9 +145,8 @@ resource "aws_ecs_task_definition" "app" {
         # It no longer names a hop that is skipped. It used to claim to be the
         # CloudFront VPC origin ENI; that ENI is not in the chain, so this value
         # matches nothing and skips nothing (#535). Keep it set to the VPC range
-        # anyway: it is a real CIDR, it can never match a viewer, and a value
-        # that
-        # could match one would be a way to make a viewer invisible. The app
+        # anyway: it is a real CIDR, it can never match a viewer, and a
+        # value that could match one would make a viewer invisible. The app
         # refuses to boot without it, so it reaches the task by apply *then*
         # deploy, like EMAIL_TRANSPORT.
         { name = "TRUSTED_PROXY_CIDR", value = var.vpc_cidr },

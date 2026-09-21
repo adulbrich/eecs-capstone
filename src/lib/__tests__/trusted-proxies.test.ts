@@ -68,15 +68,18 @@ describe("resolving the viewer behind CloudFront under preserve", () => {
     ).toBeNull();
   });
 
-  it("takes the viewer even when the trusted range is one it could never match", () => {
-    // `TRUSTED_PROXY_CIDR` is `var.vpc_cidr` and matches nothing in the chain.
-    // That is deliberate after #535: its job is to be non-empty so the walk
-    // happens, not to name a hop. A value that COULD match a viewer would be a
-    // way to make that viewer invisible.
+  it("skips an entry that IS inside the trusted range, which is the forgery bound", () => {
+    // Nothing in the real chain sits in `var.vpc_cidr`, so this case is not
+    // production traffic. It pins the property that makes the residual risk in
+    // `infra/ecs.tf` what it is: a caller already inside the VPC can prepend
+    // whatever it likes and be believed, because its own address is trusted and
+    // gets skipped. That was equally true before `preserve` and is bounded by
+    // the ALB being internal, not by this walk.
+    const insideTheVpc = "10.0.5.5";
     expect(
-      getIPFromHeader(`${SPOOFED}, ${VIEWER}`, {
-        trustedProxies: ["10.0.0.0/16"],
+      getIPFromHeader(`${SPOOFED}, ${insideTheVpc}`, {
+        trustedProxies: [TRUSTED],
       })
-    ).toBe(VIEWER);
+    ).toBe(SPOOFED);
   });
 });
