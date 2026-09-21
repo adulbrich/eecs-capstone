@@ -215,25 +215,17 @@ const PROGRAMS = {
  * section has that mapping in full, and why it exposes nothing.
  *
  * `changes_requested` is here for the legacy portal's rejected proposals,
- * which have no counterpart in this vocabulary: there is no `rejected`
- * status, and a rejection the proposer may still fix is what
- * `changes_requested` already means. Added 2026-09-20 for a sponsor's rows
- * that staff want rewritten here rather than in the old portal.
+ * which have no counterpart in this vocabulary. ADR-0038 is the decision and
+ * what follows from it, including why an imported row of that status carries
+ * no change-request comment and what to do instead.
  *
  * What an `approved` or `changes_requested` row does NOT get:
  * `EMBEDDABLE_STATUSES` is `published` and `archived` only, so neither
  * `refreshProjectEmbedding` nor `scripts/backfill-embeddings.mjs` will ever
  * embed it. Publishing it later goes through `commitTransition`, which does.
- * `search.ts` serves neither, so both are staff and proposer only.
  *
- * One asymmetry worth knowing about `changes_requested`. Staff reaching it
- * through the UI must leave a comment saying what to change
- * (`assertChangesRequestedHasComment` in `src/server/_internal/projects.ts`),
- * and this importer writes no status history for any status, so an imported
- * row arrives with no such comment. That is handled rather than broken:
- * `owner-project-actions.tsx` renders "No note was left" in its place. Put
- * the reason in the row's `notes`, which staff and the proposer can both
- * read, and which `buildNotes` below carries through.
+ * `src/test/import-legacy-parity.test.ts` pins this list against
+ * `PROJECT_STATUSES`, which this file cannot import (ADR-0024).
  */
 const IMPORTABLE_STATUSES = [
   "approved",

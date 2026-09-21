@@ -14,8 +14,8 @@ import { PROJECT_STATUSES } from "#/lib/vocabularies";
  * - `scripts/import-legacy.mjs` is the only thing that writes to the
  *   database, and runs anywhere.
  *
- * Three things cross that boundary and cannot be imported across it, so each
- * is written out twice and each fails silently if the copies drift:
+ * Four things cross that boundary and cannot be imported across it, and each
+ * fails silently if it drifts:
  *
  * - `NAMESPACE`. A project's row id and the prefix of its image key both
  *   derive from it, so a differing value writes every object under a key no
@@ -24,6 +24,10 @@ import { PROJECT_STATUSES } from "#/lib/vocabularies";
  * - The `image-keys.json` filename. The importer treats an unreadable key map
  *   as "the image step has not run yet", which is legal, so a drifted name
  *   lands all 547 rows with no image and no error.
+ * - `IMPORTABLE_STATUSES`, which crosses the same boundary for the same
+ *   reason and is pinned at the bottom of this file rather than here, because
+ *   what it is checked against is the app's vocabulary rather than a second
+ *   copy of itself.
  *
  * Nothing else would catch any of them: the two run months apart, by
  * different people.
@@ -169,15 +173,31 @@ describe("the legacy import's two scripts", () => {
 describe("the importer's status guard", () => {
   const IMPORTABLE_PATTERN = /const IMPORTABLE_STATUSES = \[([^\]]*)\]/;
 
-  it("names only statuses the project vocabulary defines", () => {
+  function importableStatuses(): string[] {
     const body = IMPORTABLE_PATTERN.exec(IMPORT_SOURCE)?.[1];
     expect(body).toBeDefined();
-    const statuses = [...(body as string).matchAll(/"([^"]+)"/g)].map(
+    return [...(body as string).matchAll(/"([^"]+)"/g)].map(
       (match) => match[1]
     );
+  }
+
+  it("names only statuses the project vocabulary defines", () => {
+    const statuses = importableStatuses();
     expect(statuses.length).toBeGreaterThan(0);
     for (const status of statuses) {
       expect(PROJECT_STATUSES).toContain(status);
     }
+  });
+
+  // A literal pin as well as the subset check above, because the subset
+  // passes if a status is silently DROPPED, and a drop is the change that
+  // refuses a whole cohort mid-import rather than mistyping one row.
+  it("is exactly the four the runbook imports", () => {
+    expect(importableStatuses()).toEqual([
+      "approved",
+      "archived",
+      "changes_requested",
+      "published",
+    ]);
   });
 });

@@ -1053,9 +1053,14 @@ flag.) An id on both sides with a different `target_status` is exactly what
 `--skip-existing` freezes, so no run will move it: that is information about
 the portal, and applying it means a staff edit in this app.
 
-Nothing in this app's status vocabulary fits a rejected or a draft legacy
-project: `softDeleteProjectAs` refuses a `draft` outright, and
-`changes_requested` means "resubmit", where the portal's Rejected is terminal.
+Nothing in this app's status vocabulary fits a draft legacy project:
+`softDeleteProjectAs` refuses a `draft` outright. Rejected proposals were
+listed here too, on the reading that `changes_requested` means "resubmit"
+where the portal's Rejected is terminal. That reading was overturned on
+2026-09-20 and ADR-0038 records why: a rejection is only terminal while nobody
+intends to work on it, and staff asked for a cohort they do intend to rewrite
+here. 7a.8 covers importing those; the rest stay in the portal, where Rejected
+still is terminal.
 
 Hidden rows are handled differently in the two sets, and `clean-export.py` is
 where that lives because `export.sql` serves both. `cp_is_hidden` means "not on
@@ -1127,9 +1132,12 @@ Five things this import does not settle:
 The legacy portal's `Rejected` status (`cp_cps_id = 3`) has no counterpart in
 this app's vocabulary, which is why 49 rows sit in the deferred table above.
 `changes_requested` is the closest honest mapping: a proposal staff turned
-down that the proposer may still fix. The owner can edit it and resubmit, staff
-can edit it and approve it, and `search.ts` serves neither it nor `approved`,
-so nothing about it is public while it is being worked on. It is not in
+down that the proposer may still fix. Staff can edit it and approve it, and
+`search.ts` serves neither it nor `approved`, so nothing about it is public
+while it is being worked on. The proposer can edit and resubmit only once that
+address holds a verified account: the importer binds `proposer_id` from a
+lookup that resolves nothing until then (ADR-0007), so expect staff to be doing
+the editing. It is not in
 `EMBEDDABLE_STATUSES`, so these rows cost no Bedrock call and 7a.5 has nothing
 to do for them.
 
@@ -1138,22 +1146,37 @@ proposal nobody will touch belongs in the old portal, where it already is.
 
 **Three things differ from every other import in this section.**
 
-**The export needs its own WHERE and its own `target_status`.** `export.sql`
-derives `target_status` from `cp_archived` alone and knows nothing about
-rejections, so it writes `published` for these and `clean-export.py` then reads
-their `cp_is_hidden` and makes it `approved`. Both are wrong. Set
-`target_status` to `changes_requested` on every row after cleaning, and check
-it before uploading: a wrong value here is the difference between a staff-only
-draft and a published project.
+**The export needs its own WHERE and its own `target_status`.** Set
+`export.sql`'s WHERE to `cp.cp_archived = 0 AND cp.cp_cps_id = 3`, narrowed by
+`AND LOWER(u.u_email) = '<proposer>'` if you are taking one proposer's rows
+rather than all of them, and write the result to its own filename so
+`clean-export.py` derives its outputs from that rather than overwriting the
+live or archived ones. The draft hazard 7a.7 warns about does not apply here:
+rejected rows have been saved at least once, so `cp_date_updated` is populated
+and the null-timestamp check does not fire. Verify that before trusting it.
+
+Then fix the status. `export.sql` derives `target_status` from `cp_archived`
+alone and knows nothing about rejections, so it writes `published` for these,
+and `clean-export.py` reads their `cp_is_hidden` and turns that into
+`approved`. Both are wrong. Set `target_status` to `changes_requested` on every
+row after cleaning, and check it before uploading: a wrong value here is the difference between a row only
+staff and the proposer can see and a published one.
 
 **The descriptions almost certainly need rewriting first.** `projectInputSchema`
-caps `description` at 5,000 characters, and the importer writes raw SQL, so it
-bypasses that. A longer row imports cleanly and then cannot be saved from the
-editor at all: the proposer changes a word, presses save, and zod rejects the
-whole form. For a cohort meant to be edited here, getting under the cap is a
-precondition rather than tidying. Split the result, with the proposal text in
-`description` and the operational detail in `notes`, which only staff and the
-proposer can read.
+in `src/server/projects.ts` caps every text field, and the importer writes raw
+SQL, so it bypasses all of them. A longer row imports cleanly and then cannot
+be saved from the editor at all: the proposer changes a word, presses save, and
+zod rejects the whole form. For a cohort meant to be edited here, getting under
+the caps is a precondition rather than tidying.
+
+The caps are 5,000 for `description`, `problemStatement`, `objectives` and
+`notes`, 2,000 for each qualifications field and 1,000 for
+`licenseRestrictions`. Splitting the rewrite, with the proposal text in
+`description` and the operational detail in `notes`, buys room but does not
+escape the limit: `notes` has the same 5,000 and `buildNotes` appends the
+proposer comments, the additional contact addresses and its own `cp_id` line on
+top of whatever you put there. Budget for that, and measure the result rather
+than estimating it.
 
 **The rows arrive with no change request.** Staff reaching `changes_requested`
 through the UI must say what to change (`assertChangesRequestedHasComment`),
@@ -1173,11 +1196,21 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
   --region us-west-2
 ```
 
-Check afterwards that the rows landed `changes_requested` and not `approved`,
-because the two fail differently and only one of them is visible from the
-listing.
+Check afterwards that every row landed `changes_requested`. Two wrong values
+here are public and one is merely wrong. `published` is what the unmodified
+export writes for these rows, since `target_status` is
+`IF(cp_archived = 1, 'archived', 'published')` and rejected rows are not
+archived, so forgetting the fix publishes the whole cohort. `archived` is what
+`statusOf` falls back to when the field is missing altogether, and the archived
+filter is public too, so dropping the field is no safer than setting it wrong.
+`approved` hides the rows like `changes_requested` does but leaves them in a
+status whose only forward move is to publish them.
 
----
+```sql
+SELECT status, count(*) FROM projects
+WHERE notes LIKE '%Imported from the legacy portal%'
+GROUP BY status ORDER BY status;
+```
 
 ---
 
