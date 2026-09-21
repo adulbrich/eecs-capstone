@@ -84,15 +84,11 @@ export const auth = betterAuth({
     // path (#519). Rate limiting is off outside production, so nothing local
     // exercises it; src/lib/__tests__/trusted-proxies.test.ts pins the walk.
     //
-    // The value must stay non-empty whatever it holds, because an empty
-    // trusted list sends Better Auth down `if (forwardedIps.length !== 1)
-    // return null` and collapses every viewer behind their own proxy back
-    // into one bucket. What it does NOT do is name a hop inside the VPC: the
-    // ALB appends the CloudFront edge server's public address, not the VPC
-    // origin ENI, so the last entry today is a CloudFront address and the
-    // limiter keys on it. #535 corrects that at the load balancer.
-    //
-    // See the Better Auth section of docs/QUIRKS.md.
+    // The value must stay non-empty whatever it holds, and it does NOT name a
+    // hop inside the VPC: the ALB appends a CloudFront edge address, so the
+    // limiter keys on an edge server today. Correcting that at the load
+    // balancer is the second half of #535 and has not shipped. Both are
+    // explained once in the Better Auth section of docs/QUIRKS.md.
     ipAddress: { trustedProxies: [...authConfig.trustedProxies] },
   },
   emailAndPassword: {
@@ -107,8 +103,14 @@ export const auth = betterAuth({
     // A refused sign-in on an unverified account mails a fresh link, which is
     // the only way out for a person whose first link expired or went missing:
     // sign-in refuses them and nothing else in the app sends one. Better Auth
-    // runs this after the password check, so a wrong password costs no mail,
-    // and its rate limiter covers the route.
+    // runs this after the password check, so a wrong password costs no mail.
+    //
+    // The rate limiter still covers the route, but loosely: raising
+    // /sign-in/email to 60 per 10 seconds (#535) took the ceiling here from 3
+    // mails per 10 seconds per address to 60. Accepted rather than overlooked,
+    // because reaching it needs the CORRECT password for an unverified
+    // account, so the only inbox anyone can flood this way is one they already
+    // control. If that stops being true, meter the send rather than the route.
     sendOnSignIn: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
