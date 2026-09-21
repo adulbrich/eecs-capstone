@@ -57,7 +57,9 @@ export function signInLimits(
   env: NodeJS.ProcessEnv = process.env
 ): SignInLimits {
   return {
-    windowMinutes: positiveNumber(env.SIGN_IN_ATTEMPT_WINDOW_MINUTES, 15),
+    windowMinutes: Math.round(
+      positiveNumber(env.SIGN_IN_ATTEMPT_WINDOW_MINUTES, 15)
+    ),
     softLimit: positiveNumber(env.SIGN_IN_SOFT_LIMIT, 5),
     softDelaySeconds: positiveNumber(env.SIGN_IN_SOFT_DELAY_SECONDS, 60),
     hardLimit: positiveNumber(env.SIGN_IN_HARD_LIMIT, 10),
@@ -67,7 +69,9 @@ export function signInLimits(
 
 /**
  * Falls back rather than throwing, and rejects zero and negatives as well as
- * NaN. An operator typo in a task definition should not be able to set a limit
+ * NaN. `windowMinutes` is rounded on top of this, because it reaches Postgres
+ * as `make_interval(mins => ...)`, which errors on a fraction, and the swallow
+ * around the counter would turn that error into a silently disabled control. An operator typo in a task definition should not be able to set a limit
  * of 0, which would refuse every sign-in on the app, nor a negative window,
  * which would count nothing and silently disable the control. Both failure
  * directions are worse than the default.
@@ -82,25 +86,54 @@ export type SignInVerdict =
   | { allowed: true }
   | { allowed: false; retryAfterSeconds: number };
 
+/** What a pair's recent history looks like, as the query returns it. */
+export interface RecentFailures {
+  /** Failures inside the window. */
+  count: number;
+  /** When the newest of them happened, or null when there are none. */
+  lastAt: Date | null;
+}
+
 /**
- * Decides on the failure count alone, so the caller owns every query and this
+ * Decides on the failure history alone, so the caller owns every query and this
  * stays testable without one.
  *
- * `recentFailures` counts failures inside the window for one (email, address)
- * pair. Crossing `hardLimit` is checked first, so the longer refusal wins once
- * both apply.
+ * The delay is measured from the NEWEST failure rather than from the oldest, so
+ * `softDelaySeconds` is a real duration that a person waits out. An earlier
+ * version decided on the count alone and left the delay feeding only the
+ * message: a pair was then refused until its failures aged out of the window,
+ * which meant the message said "about 1 minute" while the refusal lasted up to
+ * `windowMinutes`. Telling somebody the wrong number is worse than telling them
+ * nothing, so the two are now the same number by construction.
+ *
+ * A refused attempt never reaches the endpoint, so it writes no row and does
+ * not push `lastAt` forward. Without that, every retry would restart the delay
+ * and the soft limit would be a permanent lockout rather than a throttle.
+ *
+ * Once past the soft limit the effect is one attempt per `softDelaySeconds`,
+ * and past the hard limit one per `hardDelaySeconds`, until the window empties.
  */
 export function signInVerdict(
-  recentFailures: number,
-  limits: SignInLimits = signInLimits()
+  recent: RecentFailures,
+  limits: SignInLimits = signInLimits(),
+  now: Date = new Date()
 ): SignInVerdict {
-  if (recentFailures >= limits.hardLimit) {
-    return { allowed: false, retryAfterSeconds: limits.hardDelaySeconds };
+  if (recent.lastAt === null || recent.count < limits.softLimit) {
+    return { allowed: true };
   }
-  if (recentFailures >= limits.softLimit) {
-    return { allowed: false, retryAfterSeconds: limits.softDelaySeconds };
+  const delaySeconds =
+    recent.count >= limits.hardLimit
+      ? limits.hardDelaySeconds
+      : limits.softDelaySeconds;
+  const remainingMs =
+    recent.lastAt.getTime() + delaySeconds * 1000 - now.getTime();
+  if (remainingMs <= 0) {
+    return { allowed: true };
   }
-  return { allowed: true };
+  return {
+    allowed: false,
+    retryAfterSeconds: Math.ceil(remainingMs / 1000),
+  };
 }
 
 /**

@@ -42,7 +42,13 @@ export async function checkSignInAllowed(
 ): Promise<SignInVerdict> {
   const limits = signInLimits();
   const [row] = await db
-    .select({ failures: sql<string>`count(*)` })
+    .select({
+      failures: sql<string>`count(*)`,
+      // The delay is measured from the newest failure, so the query has to
+      // return it. Counting alone would leave the pair refused until its
+      // failures aged out of the window instead of for the configured delay.
+      lastAt: sql<Date | null>`max(${signInAttempts.createdAt})`,
+    })
     .from(signInAttempts)
     .where(
       and(
@@ -54,7 +60,13 @@ export async function checkSignInAllowed(
         )
       )
     );
-  return signInVerdict(Number(row?.failures ?? 0), limits);
+  return signInVerdict(
+    {
+      count: Number(row?.failures ?? 0),
+      lastAt: row?.lastAt ? new Date(row.lastAt) : null,
+    },
+    limits
+  );
 }
 
 /**

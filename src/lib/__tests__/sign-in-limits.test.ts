@@ -14,36 +14,72 @@ const limits: SignInLimits = {
   hardDelaySeconds: 900,
 };
 
+const NOW = new Date("2026-09-21T12:00:00Z");
+const secondsAgo = (seconds: number) =>
+  new Date(NOW.getTime() - seconds * 1000);
+
 describe("the verdict", () => {
   it("allows everything below the soft limit", () => {
     for (let failures = 0; failures < limits.softLimit; failures += 1) {
-      expect(signInVerdict(failures, limits)).toEqual({ allowed: true });
+      expect(
+        signInVerdict({ count: failures, lastAt: secondsAgo(1) }, limits, NOW)
+      ).toEqual({ allowed: true });
     }
   });
 
-  it("refuses briefly at the soft limit", () => {
-    expect(signInVerdict(limits.softLimit, limits)).toEqual({
-      allowed: false,
-      retryAfterSeconds: limits.softDelaySeconds,
+  it("allows a pair that has never failed", () => {
+    expect(signInVerdict({ count: 0, lastAt: null }, limits, NOW)).toEqual({
+      allowed: true,
     });
   });
 
-  it("refuses for longer at the hard limit", () => {
-    expect(signInVerdict(limits.hardLimit, limits)).toEqual({
+  it("refuses at the soft limit, for the soft delay", () => {
+    expect(
+      signInVerdict({ count: limits.softLimit, lastAt: NOW }, limits, NOW)
+    ).toEqual({ allowed: false, retryAfterSeconds: limits.softDelaySeconds });
+  });
+
+  it("refuses at the hard limit, for the longer delay", () => {
+    expect(
+      signInVerdict({ count: limits.hardLimit, lastAt: NOW }, limits, NOW)
+    ).toEqual({ allowed: false, retryAfterSeconds: limits.hardDelaySeconds });
+  });
+
+  it("keeps the longer delay past the hard limit", () => {
+    expect(
+      signInVerdict({ count: limits.hardLimit * 10, lastAt: NOW }, limits, NOW)
+    ).toEqual({ allowed: false, retryAfterSeconds: limits.hardDelaySeconds });
+  });
+
+  // The regression this shape exists for. Deciding on the count alone left the
+  // delay feeding only the message, so a pair stayed refused until its failures
+  // aged out of the window: the message said "about 1 minute" and the refusal
+  // lasted up to fifteen. These two cases are what make the delay a real
+  // duration rather than a decoration.
+  it("counts the delay down as it elapses", () => {
+    expect(
+      signInVerdict(
+        { count: limits.softLimit, lastAt: secondsAgo(20) },
+        limits,
+        NOW
+      )
+    ).toEqual({
       allowed: false,
-      retryAfterSeconds: limits.hardDelaySeconds,
+      retryAfterSeconds: limits.softDelaySeconds - 20,
     });
   });
 
-  it("keeps refusing for the longer delay past the hard limit", () => {
-    // Not an off-by-one guard for its own sake: the counter is pruned to the
-    // window, so a pair can sit above the hard limit for a while, and dropping
-    // back to the short delay there would hand an attacker a faster retry the
-    // harder they pushed.
-    expect(signInVerdict(limits.hardLimit * 10, limits)).toEqual({
-      allowed: false,
-      retryAfterSeconds: limits.hardDelaySeconds,
-    });
+  it("allows again once the delay has passed, while the count still stands", () => {
+    expect(
+      signInVerdict(
+        {
+          count: limits.softLimit,
+          lastAt: secondsAgo(limits.softDelaySeconds),
+        },
+        limits,
+        NOW
+      )
+    ).toEqual({ allowed: true });
   });
 });
 

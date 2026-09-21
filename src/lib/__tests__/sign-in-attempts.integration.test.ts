@@ -125,6 +125,81 @@ describe("the sign-in attempt counter", () => {
     expect((await signIn(email, WRONG, address)).status).toBe(429);
   });
 
+  it("is not cleared by a request whose body does not parse", async () => {
+    // The bypass this shape exists for, and it was a real one. Two APIError
+    // classes are in play: the one `better-auth/api` exports, thrown by the
+    // sign-in endpoint, and better-call's own, thrown when the body fails its
+    // schema. An earlier version decided "not an instance of the first one,
+    // therefore a success" and cleared the counter, so four wrong passwords
+    // followed by one request with `password` omitted reset it, forever.
+    const email = await aVerifiedUser();
+    const address = anAddress();
+
+    // One short of the limit, so the malformed request below is still served
+    // rather than refused by the counter before its body is ever parsed.
+    for (let attempt = 0; attempt < softLimit - 1; attempt += 1) {
+      await signIn(email, WRONG, address);
+    }
+
+    const malformed = await auth.handler(
+      new Request("http://localhost:3000/api/auth/sign-in/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+          "x-forwarded-for": address,
+        },
+        body: JSON.stringify({ email }),
+      })
+    );
+    expect(malformed.status).toBe(400);
+
+    // The malformed request neither counted nor cleared, so one more failure
+    // reaches the limit and the attempt after it is refused. Against the bug
+    // this replaces, the count would have been reset to one here and this last
+    // attempt would have been a plain 401.
+    expect((await signIn(email, WRONG, address)).status).toBe(401);
+    expect((await signIn(email, WRONG, address)).status).toBe(429);
+  });
+
+  it("does not count a refused sign-in on an unverified account", async () => {
+    // Somebody whose address is unverified signs in with the RIGHT password and
+    // is refused, which is also what mails them a fresh verification link. That
+    // is their only way back in, so counting it would throttle them out of
+    // their own recovery. Only a wrong credential counts.
+    const email = `unverified-${Date.now()}@example.com`;
+    await auth.api.signUpEmail({
+      body: { email, password: PASSWORD, name: "Unverified User" },
+    });
+    const address = anAddress();
+
+    for (let attempt = 0; attempt <= softLimit + 1; attempt += 1) {
+      const refused = await signIn(email, PASSWORD, address);
+      expect(refused.status).not.toBe(429);
+    }
+  });
+
+  it("lets the pair through again once the delay elapses", async () => {
+    // The other half of the delay regression: an earlier version refused until
+    // the failures aged out of the window, so this would have waited fifteen
+    // minutes rather than the second configured here.
+    const previous = process.env.SIGN_IN_SOFT_DELAY_SECONDS;
+    process.env.SIGN_IN_SOFT_DELAY_SECONDS = "1";
+    try {
+      const email = await aVerifiedUser();
+      const address = anAddress();
+      for (let attempt = 0; attempt < softLimit; attempt += 1) {
+        await signIn(email, WRONG, address);
+      }
+      expect((await signIn(email, WRONG, address)).status).toBe(429);
+
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      expect((await signIn(email, PASSWORD, address)).status).toBe(200);
+    } finally {
+      process.env.SIGN_IN_SOFT_DELAY_SECONDS = previous;
+    }
+  });
+
   it("keys on the lowercased address, so case cannot bypass it", async () => {
     // Better Auth looks users up with `email.toLowerCase()`, so a counter that
     // did not would be bypassed by changing one letter.

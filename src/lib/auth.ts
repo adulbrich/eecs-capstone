@@ -1,6 +1,11 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import {
+  APIError,
+  createAuthMiddleware,
+  getIp,
+  isAPIError,
+} from "better-auth/api";
 import { admin, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { db } from "#/db";
@@ -81,30 +86,61 @@ function withVerificationLanding(url: string): string {
 const PASSWORD_SIGN_IN = "/sign-in/email";
 
 /**
- * Resolves the viewer the same way Better Auth's own limiter does, by reading
- * what it already put on the session-bearing request.
+ * The viewer, resolved by the same function Better Auth's own limiter uses.
  *
- * `getIp` is not exported from a stable path, so rather than reimplement the
- * X-Forwarded-For walk this leans on the header directly through the same
- * trusted-proxy list. Keep this in step with `advanced.ipAddress` above.
+ * This used to hand-roll the walk, on a note claiming `getIp` was not exported
+ * from a stable path. That was wrong: it comes from `better-auth/api` alongside
+ * `APIError`. The reimplementation compared entries against `trustedProxies`
+ * with string equality, so `10.0.0.0/16` matched no address and it always took
+ * the rightmost entry. That happens to be the viewer under `preserve`, so it
+ * was right by accident rather than by the logic, and it had quietly dropped
+ * CIDR matching, address validation, and the IPv6 /64 normalisation that keeps
+ * one person on one key.
  */
 function viewerAddress(headers: Headers | undefined): string | null {
-  const forwarded = headers?.get("x-forwarded-for");
-  if (!forwarded) {
+  if (!headers) {
     return null;
   }
-  const entries = forwarded
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-  const trusted = new Set(authConfig.trustedProxies);
-  for (let i = entries.length - 1; i >= 0; i -= 1) {
-    const entry = entries[i];
-    if (entry && !trusted.has(entry)) {
-      return entry;
-    }
-  }
-  return null;
+  return getIp(new Request("http://localhost", { headers }), {
+    advanced: { ipAddress: { trustedProxies: [...authConfig.trustedProxies] } },
+  });
+}
+
+/**
+ * A sign-in that actually produced a session.
+ *
+ * Positive detection on purpose, and the reason is the bypass this replaces.
+ * There are TWO `APIError` classes in play: the one `better-auth/api` exports,
+ * which the sign-in endpoint throws, and better-call's own, thrown when a
+ * request body fails its schema. So `returned instanceof APIError` is FALSE for
+ * a malformed body, and reading that as "not an error, therefore a success"
+ * meant four wrong passwords followed by one request with `password` omitted
+ * cleared the counter, forever. The absence of an error is not a success.
+ * docs/QUIRKS.md carries this under the Better Auth section.
+ */
+function isSuccessfulSignIn(returned: unknown): boolean {
+  return (
+    !isAPIError(returned) &&
+    typeof returned === "object" &&
+    returned !== null &&
+    "user" in returned
+  );
+}
+
+/**
+ * The one outcome that means somebody offered a credential and it was wrong.
+ *
+ * Narrow on purpose. Counting every error would count `EMAIL_NOT_VERIFIED`,
+ * which is what a person with the RIGHT password gets when their address is
+ * unverified, and that refusal is also what mails them a fresh verification
+ * link. Throttling it would lock them out of their own only way back in.
+ */
+function isWrongCredential(returned: unknown): boolean {
+  return (
+    isAPIError(returned) &&
+    (returned as { body?: { code?: string } }).body?.code ===
+      "INVALID_EMAIL_OR_PASSWORD"
+  );
 }
 
 /**
@@ -184,14 +220,18 @@ export const auth = betterAuth({
       if (!email) {
         return;
       }
-      // Better Auth catches the endpoint's APIError and sets `returned` to it
-      // before running after-hooks, so this sees failures as well as successes.
-      // A refusal from the before-hook above never reaches here, so a locked
-      // pair does not count against itself again.
-      const failed = ctx.context.returned instanceof APIError;
-      await swallowing(failed ? "record" : "clear", () =>
-        failed ? recordFailedSignIn(email, ip) : clearSignInAttempts(email, ip)
-      );
+      // Success is detected positively and a failure narrowly; see
+      // `isSuccessfulSignIn` for the bypass that shape exists to prevent.
+      // Anything that is neither, a malformed body or an unverified address,
+      // leaves the count untouched.
+      const returned = ctx.context.returned;
+      if (isSuccessfulSignIn(returned)) {
+        await swallowing("clear", () => clearSignInAttempts(email, ip));
+        return;
+      }
+      if (isWrongCredential(returned)) {
+        await swallowing("record", () => recordFailedSignIn(email, ip));
+      }
     }),
   },
   advanced: {

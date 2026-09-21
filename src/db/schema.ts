@@ -898,10 +898,15 @@ export const aiReviewUsage = pgTable(
  *
  * `ip` is the second half of the key. Counting per address alone would let
  * anyone lock anyone else out by guessing their address a few times; pairing it
- * with the viewer means an attacker on another network cannot. Behind campus
- * NAT the pair degrades to (email, pool address), which is tens of devices
- * rather than the internet. See ADR-0039 for why per-address alone is not a
- * control here.
+ * with the viewer means an attacker on another network cannot.
+ *
+ * What the second half actually holds depends on #556 having been APPLIED, not
+ * merely merged. Until that `terraform apply` happens the ALB hands the task a
+ * CloudFront edge address, so the pair is (email, edge server): still not
+ * lockout-able by a stranger on another network, but diluted roughly five to
+ * one, and two people through the same edge share a bucket. Afterwards it is
+ * (email, viewer), which behind campus NAT is (email, pool address), tens of
+ * devices rather than the internet. See ADR-0039.
  */
 export const signInAttempts = pgTable(
   "sign_in_attempts",
