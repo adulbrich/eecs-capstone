@@ -83,7 +83,7 @@ variable "container_memory" {
 }
 
 variable "app_min_tasks" {
-  description = "Floor for the app service. Three rather than two because the fleet has to be big enough before the students arrive: the #524 load test measured two tasks absorbing 26 requests per second against a term start burst of about 42, and measured the scaler taking 4 minutes 22 seconds from the third breaching minute to new tasks serving, against a burst that lasts about two. Two rather than one was the original floor, so that a task crash is not an outage while ECS takes 60 to 90 seconds to replace it, and that reason still holds underneath. See ADR-0035 and its revision."
+  description = "Floor for the app service. Three rather than two because the fleet has to be big enough before the students arrive: the #524 load test measured two tasks absorbing 26 requests per second against a term start burst of about 42, and measured the scaler taking 3 minutes 22 seconds from the close of the third breaching minute to new tasks serving, against a burst that lasts about two. Two rather than one was the original floor, so that a task crash is not an outage while ECS takes 60 to 90 seconds to replace it, and that reason still holds underneath. See ADR-0035 and its revision."
   type        = number
   default     = 3
 }

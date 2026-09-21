@@ -91,9 +91,10 @@ acted. It did fire. `describe-alarm-history` and `describe-scaling-activities` s
 | 06:45:13, 06:45:22 | the two new tasks log themselves listening |
 | 06:59:08, 07:10:08 | `AlarmLow` winds them back to 3, then to 2 |
 
-So the operational fact, measured rather than predicted: **capacity took 4 minutes 22 seconds
-from the close of the third breaching minute, and arrived three minutes after the last
-request.** The alarm is healthy and the policy sized the jump correctly. Neither helps. The
+The third breaching datapoint is stamped 06:41 and covers the minute ending 06:42, so the
+operational fact, measured rather than predicted, is: **the alarm fired 2 minutes 43 seconds
+after that minute closed, and capacity was serving 3 minutes 22 seconds after it, which is
+three and a half minutes after the last request.** The alarm is healthy and the policy sized the jump correctly. Neither helps. The
 Sunday prediction was that autoscaling could not react inside a two minute burst, and that is
 exactly right; what this run adds is the number.
 

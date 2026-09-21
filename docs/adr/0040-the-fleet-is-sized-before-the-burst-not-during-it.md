@@ -16,10 +16,11 @@ two test phases, and breached again at 06:39, 06:40 and 06:41 at 72.8, 85.9 and
 82.0 percent, which is the first run of three consecutive minutes the alarm's
 three evaluation periods can fire on; `AlarmHigh` went to ALARM at 06:44:43 and
 set the desired count to 4, and the two new tasks logged themselves listening
-at 06:45:13 and 06:45:22. That is 4 minutes 22 seconds from the close of the
-third breaching minute to capacity actually serving, against a term start burst
-that lasts about two, and the load had stopped at 06:42, so the tasks arrived
-three minutes after the last request and the scaler wound them back down at
+at 06:45:13 and 06:45:22. The third breaching datapoint is stamped 06:41 and
+covers the minute ending 06:42, so that is 2 minutes 43 seconds from its close
+to the alarm firing and 3 minutes 22 seconds to capacity actually serving,
+against a term start burst that lasts about two; the load had stopped at 06:42,
+so the tasks arrived three and a half minutes after the last request and the scaler wound them back down at
 06:59 and 07:10. #546 and the load test write-up both record that autoscaling
 "never fired" and that the last scaling activity predated the run; that was an
 artifact of reading `runningCount` and the activity list before 06:44:43, and
