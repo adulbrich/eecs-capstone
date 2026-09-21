@@ -109,7 +109,8 @@ describe("embeddingHash", () => {
  * not about Bedrock; what fails on any
  * change to the number itself is the literal pinned in
  * `src/test/backfill-embeddings-parity.test.ts`. What this catches is a raise
- * that stops being defensible against the densest text the corpus holds.
+ * that stops being defensible against the densest of the legacy rows
+ * tokenised.
  *
  * `WORST_CHARS_PER_TOKEN` is measured on the string that is actually embedded,
  * which is the truncated one: a link-heavy legacy row's first 20,000
