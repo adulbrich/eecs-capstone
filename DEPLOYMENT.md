@@ -1152,8 +1152,10 @@ proposal nobody will touch belongs in the old portal, where it already is.
 rather than all of them, and write the result to its own filename so
 `clean-export.py` derives its outputs from that rather than overwriting the
 live or archived ones. The draft hazard 7a.7 warns about does not apply here:
-rejected rows have been saved at least once, so `cp_date_updated` is populated
-and the null-timestamp check does not fire. Verify that before trusting it.
+a rejected row was submitted before it was rejected, so `cp_date_updated` is
+populated and the null-timestamp check does not fire. That held for all 49
+rejected rows, live and archived, on 2026-09-20. Re-derive it rather than
+trusting the date, the same as every other count in this section.
 
 Then fix the status. `export.sql` derives `target_status` from `cp_archived`
 alone and knows nothing about rejections, so it writes `published` for these,
@@ -1205,6 +1207,11 @@ archived, so forgetting the fix publishes the whole cohort. `archived` is what
 filter is public too, so dropping the field is no safer than setting it wrong.
 `approved` hides the rows like `changes_requested` does but leaves them in a
 status whose only forward move is to publish them.
+
+`buildNotes` ends every imported row's notes with `Imported from the legacy
+portal, cp_id <id>.`, so this counts the whole imported population by status,
+not just the cohort you have just added. Read the `changes_requested` line
+against the number of rows you uploaded:
 
 ```sql
 SELECT status, count(*) FROM projects
