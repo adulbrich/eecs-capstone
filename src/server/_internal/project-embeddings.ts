@@ -29,6 +29,7 @@ import {
   EMBEDDING_MODEL_ID,
   type EmbedFn,
 } from "#/lib/_internal/bedrock-embed";
+import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import {
   buildInterestsEmbeddingSource,
   buildProjectEmbeddingSource,
@@ -134,7 +135,10 @@ export async function refreshProjectEmbedding(
     return "updated";
   } catch (error) {
     // Never surfaced to the caller: the publish or save already succeeded.
-    console.error(`Embedding failed for project ${projectId}`, error);
+    console.error(
+      `Embedding failed for project ${projectId}`,
+      redactQueryError(error)
+    );
     return "failed";
   }
 }
@@ -198,7 +202,10 @@ export async function refreshInterestsEmbedding(
       .where(eq(userInterests.userId, userId));
     return "updated";
   } catch (error) {
-    console.error(`Embedding failed for user interests ${userId}`, error);
+    console.error(
+      `Embedding failed for user interests ${userId}`,
+      redactQueryError(error)
+    );
     return "failed";
   }
 }

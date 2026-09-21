@@ -15,6 +15,10 @@ import {
 } from "#/lib/_internal/auth-config";
 import { authRateLimit } from "#/lib/_internal/auth-rate-limits";
 import { onidProfileFromIdToken } from "#/lib/_internal/onid-profile";
+import {
+  redactingAuthLogger,
+  redactQueryError,
+} from "#/lib/_internal/redact-query-error";
 import { requireUserName } from "#/lib/_internal/user-name";
 import { getEmailSender } from "#/lib/email/sender";
 import { passwordResetEmail, verificationEmail } from "#/lib/email/templates";
@@ -51,7 +55,10 @@ async function claimProjectsFor(userId: string, email: string): Promise<void> {
   try {
     await claimProjectsForVerifiedUser(userId, email);
   } catch (error) {
-    console.error(`Claiming projects failed for user ${userId}`, error);
+    console.error(
+      `Claiming projects failed for user ${userId}`,
+      redactQueryError(error)
+    );
   }
 }
 
@@ -242,6 +249,15 @@ export const auth = betterAuth({
       }
     }),
   },
+  // Better Auth catches an adapter failure and hands the error object to its
+  // logger, whose default writes it through a console method. A Drizzle query
+  // error carries the bound parameters, and the parameter of a session lookup
+  // is the session token, so the default logger put live credentials in
+  // CloudWatch: the 2026-09-21 load test found two. This redacts every
+  // argument rather than disabling the logging, which would have swapped a
+  // leak for a blind spot. `redact-query-error.ts` has the detail, including
+  // why logging `error.message` alone is not the fix it looks like.
+  logger: { log: redactingAuthLogger() },
   advanced: {
     // CloudFront terminates TLS at the edge and forwards to the origin over
     // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in

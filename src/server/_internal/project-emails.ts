@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "#/db";
 import { user } from "#/db/schema";
+import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import {
   buildNotificationConfig,
   type NotificationConfig,
@@ -202,7 +203,10 @@ export async function notifyTransitionByEmail(
       await sendToProposer(project, "draft", comment, url, dispatch);
     }
   } catch (error) {
-    console.error(`Review email failed for project ${project.id}`, error);
+    console.error(
+      `Review email failed for project ${project.id}`,
+      redactQueryError(error)
+    );
   }
 }
 
@@ -285,7 +289,10 @@ export async function notifyCommentByEmail(
       })
     );
   } catch (error) {
-    console.error(`Comment email failed for project ${project.id}`, error);
+    console.error(
+      `Comment email failed for project ${project.id}`,
+      redactQueryError(error)
+    );
   }
 }
 
@@ -323,7 +330,10 @@ export async function notifyHardDeleteByEmail(
     }
     await dispatch(address, projectDeletedEmail({ title: project.title }));
   } catch (error) {
-    console.error(`Delete email failed for project ${project.id}`, error);
+    console.error(
+      `Delete email failed for project ${project.id}`,
+      redactQueryError(error)
+    );
   }
 }
 
@@ -372,7 +382,10 @@ export async function notifyProposerReassignedByEmail(
       })
     );
   } catch (error) {
-    console.error(`Reassignment email failed for project ${project.id}`, error);
+    console.error(
+      `Reassignment email failed for project ${project.id}`,
+      redactQueryError(error)
+    );
   }
 }
 
@@ -407,6 +420,9 @@ export async function notifyMentorNamedByEmail(
       })
     );
   } catch (error) {
-    console.error(`Mentor email failed for project ${project.id}`, error);
+    console.error(
+      `Mentor email failed for project ${project.id}`,
+      redactQueryError(error)
+    );
   }
 }
