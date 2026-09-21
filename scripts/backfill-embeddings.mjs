@@ -67,7 +67,7 @@ import pg from "pg";
 const DELAY_MS = 200;
 
 /** MUST match `EMBEDDING_SOURCE_LIMIT` in `src/lib/embedding-source.ts`. */
-const EMBEDDING_SOURCE_LIMIT = 45_000;
+const EMBEDDING_SOURCE_LIMIT = 20_000;
 
 /** MUST match `DEFAULT_REGION` in `src/lib/_internal/bedrock.ts`. */
 const DEFAULT_REGION = "us-east-1";

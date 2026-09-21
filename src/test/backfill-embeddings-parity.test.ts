@@ -316,7 +316,7 @@ describe("the production backfill's copies of the embedding helpers", () => {
   it("truncate the embedded text at the same length", () => {
     const fromSrc = LIMIT_PATTERN.exec(SOURCE_FILE)?.[1];
     const fromScript = LIMIT_PATTERN.exec(SCRIPT_FILE)?.[1];
-    expect(fromSrc).toBe("45_000");
+    expect(fromSrc).toBe("20_000");
     expect(fromScript).toBe(fromSrc);
   });
 
