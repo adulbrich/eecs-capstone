@@ -910,7 +910,8 @@ reads the raw export: the raw file carries `created_at_pacific` rather than
 
 Each row carries `target_status`. `export.sql` sets it to `archived` or
 `published` from `cp_archived`, and `clean-export.py` then rewrites a live
-hidden row to `approved`. The importer accepts those three and `changes_requested` (7a.8), and nothing is
+hidden row to `approved`. The importer accepts those three and
+`changes_requested` (7a.8), and nothing is
 hardcoded to `archived` except the default it falls back to when the field is
 absent, which only an export made before the field existed can be.
 `export.sql` and `clean-export.py` live beside the data in `$SRC`, not in this
@@ -1138,10 +1139,13 @@ this app's vocabulary, which is why 49 rows sit in the deferred table above.
 `changes_requested` is the closest honest mapping: a proposal staff turned
 down that the proposer may still fix. Staff can edit it and approve it, and
 `search.ts` serves neither it nor `approved`, so nothing about it is public
-while it is being worked on. The proposer can edit and resubmit only once that
-address has an account here at all: `resolveProposers` matches `user` rows by
-email, so until the sponsor signs up the row has no `proposer_id`, nothing
-mounts `OwnerProjectActions`, and staff are doing the editing. It is not in
+while it is being worked on. The proposer can edit and resubmit only once
+the row has an owner, and two separate things decide that. At import time
+`resolveProposers` matches `user` rows by email, verified or not, so a proposer
+with no account here lands unowned and nothing mounts `OwnerProjectActions`.
+After import an unowned row is linked by `claimProjectsForVerifiedUser` when
+someone verifies that address, and by nothing else (ADR-0007). Expect staff to
+be doing the editing either way. It is not in
 `EMBEDDABLE_STATUSES`, so these rows cost no Bedrock call and 7a.5 has nothing
 to do for them.
 
@@ -1158,8 +1162,9 @@ rather than all of them, and write the result to its own filename so
 live or archived ones. The draft hazard 7a.7 warns about does not apply here:
 a rejected row was submitted before it was rejected, so `cp_date_updated` is
 populated and the null-timestamp check does not fire. That held for all 49
-rejected rows, live and archived, on 2026-09-20. Re-derive it rather than
-trusting the date, the same as every other count in this section.
+rejected rows, live and archived, when it was counted on 2026-09-20. Count it
+again rather than trusting that, the same as every other figure in this
+section.
 
 Then fix the status. `export.sql` derives `target_status` from `cp_archived`
 alone and knows nothing about rejections, so it writes `published` for these,
@@ -1204,12 +1209,14 @@ aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARG
 ```
 
 Check afterwards that every row landed `changes_requested`. Two wrong values
-here are public and one is merely wrong. `published` is what the unmodified
-export writes for the rows this WHERE selects, since `target_status` is
-`IF(cp_archived = 1, 'archived', 'published')` and these are the live ones, so
-forgetting the fix publishes the whole cohort. Widen the WHERE to the archived
-rejections and the same omission writes `archived` instead, which the archived
-filter serves publicly, so neither half is safe to leave alone. `archived` is what
+here are public and one is merely wrong. Which wrong value you get depends on
+`cp_is_hidden`, because the export writes `published` for every live row and
+`clean-export.py` then rewrites the hidden ones to `approved`. On 2026-09-20
+that split the 25 live rejections into 19 hidden and 6 not, so forgetting the
+fix would have published those 6 and quietly approved the other 19. Widen the
+WHERE to the 24 archived rejections and the omission writes `archived`, which
+the archived filter serves publicly, so neither half is safe to leave alone.
+Re-derive the split before relying on it. `archived` is what
 `statusOf` falls back to when the field is missing altogether, and the archived
 filter is public too, so dropping the field is no safer than setting it wrong.
 `approved` hides the rows like `changes_requested` does and is recoverable,

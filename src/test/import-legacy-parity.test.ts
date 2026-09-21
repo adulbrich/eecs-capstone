@@ -25,13 +25,13 @@ import { PROJECT_STATUSES } from "#/lib/vocabularies";
  *   as "the image step has not run yet", which is legal, so a drifted name
  *   lands all 547 rows with no image and no error.
  *
+ * Nothing else would catch any of those three: the two scripts run months
+ * apart, by different people.
+ *
  * `IMPORTABLE_STATUSES` is pinned at the bottom of this file for the same
  * reason but across a different boundary: not between the two scripts, but
  * between a plain `.mjs` and the app's TypeScript vocabulary, which it cannot
  * import either.
- *
- * Nothing else would catch any of them: the two run months apart, by
- * different people.
  *
  * Read as text rather than imported, following `env-contract.test.ts`, since
  * importing either module expects a database or object storage.
