@@ -8,7 +8,9 @@ with background traffic at about 0.5 requests per second. Client latency therefo
 roughly 20 ms of Corvallis to `us-west-2` round trip that a request from campus would also pay.
 
 **This run is partial.** Phases 0, 1a and 1b are below. Phases 1c through 2 are not, and the
-reason is in "Why the ramp stopped" at the end. Nothing failed.
+reason is in "Why the ramp stopped" at the end. Nothing failed. When the remaining phases run,
+add their rows to the table in this file and date them in the row, rather than starting a
+second file: it is one run of one issue, interrupted.
 
 ## Configuration under test
 
@@ -87,10 +89,19 @@ credit balance. The five minute series says it plainly: `CPUCreditBalance` had b
 accruing at the same time, which is the instance spending past a balance it does not have.
 
 #524's own abort criteria say to stop when the credit balance falls. It had already fallen to
-zero before the first request. From there it refills at a steady 1.5 credits per five minutes:
-2.1 at 19:35, 5.2 at 19:45, 9.7 at 20:00, 14.2 at 20:15. That is **18 credits per hour**, not
-the nominal 24, and the loaded phases did not slow it: phases 0, 1a and 1b stay under the
-instance's 20% baseline, 7.5% at the worst, so the instance kept earning throughout the run.
+zero before the first request. From there it refills at a flat 1.5 credits per five minute
+datapoint, every datapoint: 0.57 at 19:30, 2.07, 3.63, 5.16, 6.72, 8.20, 9.74, 11.19, 12.65,
+14.22 at 20:15. The first interval is short because the restart lands inside it; every interval
+after it is between 1.45 and 1.57. That is **18 credits per hour**, and the loaded phases did
+not bend it: the last three intervals span phases 1a and 1b and accrue at the same rate as the
+idle ones.
+
+18 rather than the nominal 24 is arithmetic, not a mystery. A burstable instance earns at a
+fixed rate and spends a credit per vCPU minute used, so net accrual is
+`24 - (CPU fraction x 2 vCPU x 60)` per hour. The 20% baseline is exactly where those cancel.
+This instance sat near 5%, which spends 6 and nets 18. The same formula prices the heavy
+phases: nothing is spent on net until average CPU crosses 20%, and 1d and 1e are the only
+phases predicted to cross it.
 
 The heavy phases would not stay under it. Spending past zero costs a surplus charge rather than
 an immediate throttle, and the throttle to baseline arrives only if surplus outruns what 24
@@ -109,6 +120,15 @@ The point is having a balance to spend them from.
 BASE=https://capstone.eecs.oregonstate.edu
 IDS=/path/to/ids.txt RPS=25 DURATION=3m k6 run scripts/loadtest/projects-browse.js
 ```
+
+Order matters for phase 2. Run 1c, 1d and 1e back to back, then **wait for `runningCount` to
+read 2 again before starting phase 2**, which takes at least the 600 s scale in cooldown and in
+practice longer. Phase 2 asks whether autoscaling catches a cold two minute burst; run on the
+warm 3 or 4 task fleet that 1e leaves behind, it answers a different and easier question. Phase
+2 is also two invocations rather than one, `RPS=42 DURATION=2m` and then `RPS=8 DURATION=10m`.
+
+Run it attended. #524 wants the owner told, the abort criteria in front of you and a hand on
+the stop, and the credit threshold is something to read rather than a time to wait until.
 
 `ids.txt` is one project id per line and is deliberately not committed. Rebuild it by pulling
 ids out of the listing and keeping the ones that answer 200, because the listing payload also
