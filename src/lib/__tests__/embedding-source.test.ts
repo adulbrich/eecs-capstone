@@ -105,7 +105,8 @@ describe("embeddingHash", () => {
  * arithmetic the limit was chosen by instead (ADR-0037).
  *
  * This is a floor on the reasoning, not on the limit. Values up to about 21,240
- * would also clear the ceiling, so a small raise passes here; what fails on any
+ * would also pass this assertion, which is a statement about the assertion and
+ * not about Bedrock; what fails on any
  * change to the number itself is the literal pinned in
  * `src/test/backfill-embeddings-parity.test.ts`. What this catches is a raise
  * that stops being defensible against the densest text the corpus holds.
