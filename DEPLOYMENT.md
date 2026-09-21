@@ -1147,9 +1147,8 @@ After import an unowned row is linked either by `claimProjectsForVerifiedUser`,
 when someone verifies that address, or by staff setting the proposer field,
 which `updateProjectProposerAs` resolves to an account without requiring
 verification. That second path is the one to reach for here, since staff are
-doing the editing anyway. It is not in
-`EMBEDDABLE_STATUSES`, so these rows cost no Bedrock call and 7a.5 has nothing
-to do for them.
+doing the editing anyway. It is not in `EMBEDDABLE_STATUSES`, so these rows
+cost no Bedrock call and 7a.5 has nothing to do for them.
 
 Use this only when somebody intends to work on the rows here. A rejected
 proposal nobody will touch belongs in the old portal, where it already is.
