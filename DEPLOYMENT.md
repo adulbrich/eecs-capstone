@@ -1122,6 +1122,63 @@ Five things this import does not settle:
   about who the real contact is, and 47 rows carry additional contact emails in
   their notes to make that judgement from.
 
+### 7a.8 Importing rejected proposals as `changes_requested`
+
+The legacy portal's `Rejected` status (`cp_cps_id = 3`) has no counterpart in
+this app's vocabulary, which is why 49 rows sit in the deferred table above.
+`changes_requested` is the closest honest mapping: a proposal staff turned
+down that the proposer may still fix. The owner can edit it and resubmit, staff
+can edit it and approve it, and `search.ts` serves neither it nor `approved`,
+so nothing about it is public while it is being worked on. It is not in
+`EMBEDDABLE_STATUSES`, so these rows cost no Bedrock call and 7a.5 has nothing
+to do for them.
+
+Use this only when somebody intends to work on the rows here. A rejected
+proposal nobody will touch belongs in the old portal, where it already is.
+
+**Three things differ from every other import in this section.**
+
+**The export needs its own WHERE and its own `target_status`.** `export.sql`
+derives `target_status` from `cp_archived` alone and knows nothing about
+rejections, so it writes `published` for these and `clean-export.py` then reads
+their `cp_is_hidden` and makes it `approved`. Both are wrong. Set
+`target_status` to `changes_requested` on every row after cleaning, and check
+it before uploading: a wrong value here is the difference between a staff-only
+draft and a published project.
+
+**The descriptions almost certainly need rewriting first.** `projectInputSchema`
+caps `description` at 5,000 characters, and the importer writes raw SQL, so it
+bypasses that. A longer row imports cleanly and then cannot be saved from the
+editor at all: the proposer changes a word, presses save, and zod rejects the
+whole form. For a cohort meant to be edited here, getting under the cap is a
+precondition rather than tidying. Split the result, with the proposal text in
+`description` and the operational detail in `notes`, which only staff and the
+proposer can read.
+
+**The rows arrive with no change request.** Staff reaching `changes_requested`
+through the UI must say what to change (`assertChangesRequestedHasComment`),
+and this importer writes no status history for any status, so there is nothing
+for `owner-project-actions.tsx` to show and it renders "No note was left" in
+its place. That is handled, not broken, but it means the reason has to go in
+`notes`, which `buildNotes` carries through.
+
+Otherwise the run is 7a.7's, with its own filename and prefix, and
+`--skip-existing` as always:
+
+```bash
+aws --profile aws-capstone1 ecs run-task --cluster "$CLUSTER" --launch-type FARGATE \
+  --task-definition "$TASKDEF" \
+  --network-configuration "$NETCFG" \
+  --overrides '{"containerOverrides":[{"name":"app","command":["node","scripts/import-legacy.mjs","--skip-existing"],"environment":[{"name":"LEGACY_DATA_S3_URI","value":"s3://'"$OPS_BUCKET"'/legacy-rejected/"},{"name":"LEGACY_DATA_PROJECTS_FILE","value":"rejected-projects-final.jsonl"}]}]}' \
+  --region us-west-2
+```
+
+Check afterwards that the rows landed `changes_requested` and not `approved`,
+because the two fail differently and only one of them is visible from the
+listing.
+
+---
+
 ---
 
 ## 8. Routine operations

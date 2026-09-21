@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { PROJECT_STATUSES } from "#/lib/vocabularies";
 
 /**
  * The legacy import is two scripts, split by responsibility rather than by
@@ -150,5 +151,33 @@ describe("the legacy import's two scripts", () => {
     // in an imported database. If this changes, every imported row is re-keyed
     // and every image object in the bucket is orphaned.
     expect(id).toBe("40eb1fdf-97d2-5b09-92d6-e61e96059deb");
+  });
+});
+
+/**
+ * A fourth thing that crosses a boundary, this one between a plain `.mjs` and
+ * the app's TypeScript vocabulary. The importer cannot import
+ * `PROJECT_STATUSES`: the production image ships `.output` without `src/`
+ * (ADR-0024), so `#/lib/vocabularies` does not resolve there. It spells the
+ * statuses out instead, and a typo in that list is caught only by Postgres
+ * rejecting the enum value partway through the one transaction that writes
+ * every row, which is late and expensive.
+ *
+ * Read as text, like everything else here, because importing the module
+ * expects a database.
+ */
+describe("the importer's status guard", () => {
+  const IMPORTABLE_PATTERN = /const IMPORTABLE_STATUSES = \[([^\]]*)\]/;
+
+  it("names only statuses the project vocabulary defines", () => {
+    const body = IMPORTABLE_PATTERN.exec(IMPORT_SOURCE)?.[1];
+    expect(body).toBeDefined();
+    const statuses = [...(body as string).matchAll(/"([^"]+)"/g)].map(
+      (match) => match[1]
+    );
+    expect(statuses.length).toBeGreaterThan(0);
+    for (const status of statuses) {
+      expect(PROJECT_STATUSES).toContain(status);
+    }
   });
 });
