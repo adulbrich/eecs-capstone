@@ -1,13 +1,14 @@
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { genericOAuth } from "better-auth/plugins";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   authRateLimit,
   CHANGE_PASSWORD_MAX,
   GLOBAL_MAX,
   UNCHECKED_MAX,
   UNRULED_BY_DESIGN,
+  WINDOW_SECONDS,
 } from "../_internal/auth-rate-limits";
 
 // Better Auth turns its rate limiter on only under NODE_ENV=production, so
@@ -68,10 +69,14 @@ function buildAuth() {
   });
 }
 
-type Auth = ReturnType<typeof buildAuth>;
+/** Only `handler` is used, and typing it to one instance's shape would make
+ * every other `betterAuth` in this file unassignable. */
+interface Handler {
+  handler: (request: Request) => Promise<Response>;
+}
 
 function call(
-  auth: Auth,
+  auth: Handler,
   path: string,
   address: string,
   method: "GET" | "POST" = "POST"
@@ -192,7 +197,20 @@ describe("the paths left on Better Auth's default", () => {
     }
   });
 
-  it("still refuses /sign-in/email at Better Auth's 3 per 10 seconds", async () => {
+  it.each(UNRULED_BY_DESIGN)(
+    "is still a mounted route, so the default actually applies to it: %s",
+    async (path) => {
+      // "Nothing calls it" is not "nothing reaches it". `/change-email` in
+      // particular is mounted whatever `user.changeEmail` says, so a direct
+      // call is served and counted, and leaving it on the default is a choice
+      // rather than a non-event.
+      const auth = buildAuth();
+      const response = await call(auth, path, anAddress());
+      expect(response.status).toBe(400);
+    }
+  );
+
+  it("still refuses /sign-in/email at Better Auth's default of 3", async () => {
     const auth = buildAuth();
     const address = anAddress();
     const betterAuthSignInDefault = 3;
@@ -204,6 +222,68 @@ describe("the paths left on Better Auth's default", () => {
 
     const refused = await call(auth, "/sign-in/email", address);
     expect(refused.status).toBe(429);
+  });
+});
+
+describe("what a max actually means", () => {
+  // Better Auth clears a count only after a gap longer than the window with no
+  // ACCEPTED request, and every accepted request pushes that gap out. So a max
+  // is a budget between lulls, not a rate: a trickle far under the nominal rate
+  // still accumulates to the max and is then refused. Every number in
+  // auth-rate-limits.ts has to be read that way, and this case is here so the
+  // next person to write "60 per 10 seconds" in a comment finds out otherwise.
+  it("is a budget between lulls, not a rate", async () => {
+    const max = 10;
+    // Half the rate this rule nominally allows, so a rate-shaped limiter would
+    // never refuse it. Fake timers, because the point is a ten-second window
+    // and nothing here needs to actually wait.
+    const gapMs = (WINDOW_SECONDS / max) * 2 * 1000;
+    const auth = betterAuth({
+      database: memoryAdapter({}),
+      baseURL: BASE_URL,
+      secret: "rate-limit-test-secret-that-is-long-enough",
+      emailAndPassword: { enabled: true },
+      advanced: { ipAddress: { trustedProxies: [TRUSTED_PROXY] } },
+      rateLimit: {
+        enabled: true,
+        window: WINDOW_SECONDS,
+        max,
+        customRules: {
+          "/sign-in/email": { window: WINDOW_SECONDS, max },
+        },
+      },
+    });
+    const address = anAddress();
+    const statuses: number[] = [];
+
+    vi.useFakeTimers();
+    try {
+      for (let sent = 0; sent <= max; sent += 1) {
+        statuses.push((await call(auth, "/sign-in/email", address)).status);
+        vi.setSystemTime(Date.now() + gapMs);
+      }
+
+      expect(statuses.slice(0, max)).not.toContain(429);
+      expect(statuses.at(-1)).toBe(429);
+
+      // Falling quiet for longer than the window clears it.
+      vi.setSystemTime(Date.now() + (WINDOW_SECONDS + 1) * 1000);
+      const afterTheLull = await call(auth, "/sign-in/email", address);
+      expect(afterTheLull.status).not.toBe(429);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("counts against the window the module declares", () => {
+    expect(authRateLimit.window).toBe(WINDOW_SECONDS);
+    for (const rule of Object.values(authRateLimit.customRules ?? {})) {
+      // `false` disables a path and a function resolves per request; neither
+      // carries a window of its own.
+      if (typeof rule === "object") {
+        expect(rule.window).toBe(WINDOW_SECONDS);
+      }
+    }
   });
 });
 

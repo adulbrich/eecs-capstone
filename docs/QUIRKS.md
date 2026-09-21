@@ -271,6 +271,10 @@ Better Auth enables its rate limiter only under `NODE_ENV=production` (`better-a
 
 Two traps when editing `customRules`. Better Auth takes the **first** key that matches (`Object.keys(...).find` in `better-auth/dist/api/rate-limiter/index.mjs`), so a wildcard beside a specific path makes behaviour depend on declaration order. And its glob treats `*` as "not a slash", so `/sign-in*` matches `/sign-in` alone and never `/sign-in/email`. Spell every path out. `customRules` also cannot change the key, because `createRateLimitKey(ip, path)` is fixed: no rule here can count per account (#552), and on `/sign-in/email` the route limit doubles as the ceiling on verification mail aimed at a stranger (#554), which is why that one path is deliberately left on the default.
 
+### A rate limit max is a budget between lulls, not a rate
+
+`decideConsume` in `better-auth/dist/api/rate-limiter/index.mjs` resets a count only when `now - data.lastRequest > windowInMs`, and every ACCEPTED request rewrites `lastRequest`, so the window slides forward on use. A trickle that never leaves a full window of silence therefore accumulates to the max and is refused, even at a fraction of the nominal rate: against a rule of 5 per 2 seconds, one request every 0.8 seconds (1.25/s, half what the rule nominally allows) is refused on the sixth. Denials write nothing, so the memory entry expires a window after the last accepted request and the count then clears. Sustained throughput does match the label, but the refusal pattern does not, and "N per 10 seconds" is the wrong mental model for sizing a number: read it as "N accepted requests since the last lull". `src/lib/__tests__/auth-rate-limits.test.ts` pins this under fake timers.
+
 ### Session role typing
 
 `session.user.role` is typed as `string | null | undefined`, because `user.role` is a `text` column Better Auth's admin plugin owns and no enum narrows it. Ask `isStaff` or `isAdmin` from `src/lib/viewer.ts` rather than comparing the string:

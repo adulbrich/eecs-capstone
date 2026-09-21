@@ -11,11 +11,19 @@ import type { BetterAuthRateLimitOptions } from "better-auth";
  * without importing `#/db`, which throws at import time when DATABASE_URL is
  * unset. See the Vitest section of docs/QUIRKS.md.
  *
- * The one fact worth repeating, because every number below depends on it:
+ * Two facts every number below depends on.
+ *
  * `createRateLimitKey(ip, path)` takes no configuration, so a bucket is one
  * viewer address and a path, and OSU wireless NATs students into a pool of
- * shared addresses. A number here is a cap on scripted volume from one
- * address. It is not, and cannot be, protection for a credential (#552).
+ * shared addresses. A number here is a cap on volume from one address. It is
+ * not, and cannot be, protection for a credential (#552).
+ *
+ * And a max is NOT a rate. `decideConsume` clears the count only after a gap
+ * longer than the window with no ACCEPTED request, and every accepted request
+ * pushes that gap out, so a steady trickle well under the nominal rate still
+ * accumulates to the max and is then refused until it falls quiet. Read every
+ * number below as "this many accepted requests since the last lull", never as
+ * "this many per ten seconds". See the Better Auth section of docs/QUIRKS.md.
  */
 
 /**
@@ -41,25 +49,41 @@ const GLOBAL_MAX = 100;
  *
  * `/sign-in/oauth2` (ONID) and `/sign-in/social` (GitHub) mint an OAuth state
  * and redirect, so the password is typed at Microsoft or GitHub; `/sign-up/email`
- * creates an account. Better Auth's first special rule puts all three on 3 per
- * 10 seconds, which behind a NAT pool address refuses the fourth student in ten
- * seconds and protects nothing in exchange. ADR-0039 has the argument.
+ * creates an account. Better Auth's first special rule puts all three on 3,
+ * which behind a NAT pool address refuses the fourth student since the last
+ * lull and protects nothing in exchange.
+ *
+ * 60 does not make the refusal impossible, because of the accumulation above:
+ * a busy pool address at term start reaches it and then goes quiet for up to a
+ * window before it clears. It makes the refusal twenty times rarer and the
+ * recovery automatic, which is the whole of what a per-address number can buy
+ * here. ADR-0039 has the argument.
  */
 const UNCHECKED_MAX = 60;
 
 /**
  * What one address may spend per window on `/change-password`.
  *
- * Lower than the paths above, and the reason is the legitimate call rate rather
- * than the presence of a credential check. Sign-in and sign-up have to tolerate
- * a lecture hall arriving at once; nobody changes their own password twenty
- * times in ten seconds, so a smaller number costs a real user nothing and still
- * bounds whoever holds a stolen session and is guessing the current password.
+ * Much lower than the paths above, for two reasons that point the same way.
+ *
+ * The legitimate call rate is near zero. Sign-in and sign-up have to tolerate a
+ * lecture hall arriving at once; nobody changes their own password five times
+ * between lulls, so a small number costs a real user nothing.
+ *
+ * And the call is expensive on purpose. `update-user.mjs` hashes the NEW
+ * password BEFORE it verifies the current one, so a wrong guess still pays a
+ * full scrypt hash plus a full scrypt verify, measured at about 118 ms of CPU.
+ * `sensitiveSessionMiddleware` rejects an unauthenticated call before any of
+ * that, so only someone already signed in can spend it, but any student has an
+ * account. At 5 that is roughly 6% of a core per key; at 60 it would be most of
+ * a core per key, on a fleet of three to four tasks with no WAF in front.
  *
  * This is `/change-password`'s standing control, not a stopgap: #552 covers
- * `/sign-in/email` and does not extend here.
+ * `/sign-in/email` and does not extend here. It is also the one number left in
+ * this file that still guards a credential, which is why it is the one that
+ * most wants the shared counter this app does not have (ADR-0039).
  */
-const CHANGE_PASSWORD_MAX = 20;
+const CHANGE_PASSWORD_MAX = 5;
 
 const UNCHECKED_RULE = { window: WINDOW_SECONDS, max: UNCHECKED_MAX };
 
@@ -84,21 +108,26 @@ export const authRateLimit: BetterAuthRateLimitOptions = {
  * Two paths Better Auth's first special rule reaches that are deliberately NOT
  * listed above, so nobody has to re-derive why.
  *
- * `/sign-in/email` keeps the 3-per-10-seconds default. Raising it would be
- * consistent with everything else here, and it was raised and then reverted:
+ * `/sign-in/email` keeps the default of 3. Raising it would be consistent with
+ * everything else here, and it was raised and then reverted:
  * `emailVerification.sendOnSignIn` mails a fresh verification link on every
  * successful sign-in to an unverified account, and anyone can register an
- * address they do not own with a password they choose. So the route limit is
- * also the ceiling on verification mail aimed at a stranger's inbox, and 60
- * per 10 seconds makes that twenty times easier (#554). The campus cost is
+ * address they do not own with a password they choose. So this number is also
+ * what throttles verification mail aimed at a stranger's inbox, and 60 would
+ * make that twenty times easier (#554). It throttles rather than bounds: the
+ * counter is per task and currently per CloudFront edge address, so the real
+ * figure across the fleet is a multiple of 3 and not 3. The campus cost is
  * accepted because password sign-in here is a few dozen staff and mentors
  * rather than a lecture hall, and ONID is what students use. Raise this only
  * once #554 meters the send, and #552 is the control that should carry it.
  *
- * `/change-email` also matches, and has no rule because `user.changeEmail` is
- * not configured, so nothing reaches it. Give it one when that changes. See the
- * comment above `withVerificationLanding` in src/lib/auth.ts.
+ * `/change-email` also matches and also keeps the default. Note that "nothing
+ * reaches it" would be wrong: the endpoint is mounted whatever
+ * `user.changeEmail` says, and a direct call is served and counted. What is
+ * true is that no flow in this app calls it, so the default is left in place
+ * rather than a number nobody can justify. Give it one when a flow appears.
+ * See the comment above `withVerificationLanding` in src/lib/auth.ts.
  */
 export const UNRULED_BY_DESIGN = ["/sign-in/email", "/change-email"] as const;
 
-export { CHANGE_PASSWORD_MAX, GLOBAL_MAX, UNCHECKED_MAX };
+export { CHANGE_PASSWORD_MAX, GLOBAL_MAX, UNCHECKED_MAX, WINDOW_SECONDS };
