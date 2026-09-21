@@ -352,7 +352,7 @@ The cast is the documented Drizzle idiom to avoid a circular initialization erro
 
 ### Pool reuse
 
-`src/db/index.ts` exports a single `db` instance, built as `drizzle({ connection: poolConfig(DATABASE_URL), schema })`. The pool size, the acquisition timeout and the budget behind them live in `src/lib/_internal/db-pool.ts` and its unit test; [ADR-0034](./adr/0034-the-pool-is-sized-against-the-instance.md) says why, and names the one planned exception to "no second `pg.Pool` in app code". Pass `db` to Better Auth's `drizzleAdapter`.
+`src/db/index.ts` exports a single `db` instance, and constructs the `pg.Pool` itself rather than using the connection-string shortcut so that `logPoolErrors` can attach its listener before anything queries the pool; `drizzle({ client: pool, schema })` is the shape that allows it. Why that listener is not optional is in the `logPoolErrors` docblock and in `src/server/__tests__/db-pool.integration.test.ts`, which kills a backend and watches the pool survive (#525). The sizing, the acquisition timeout and the budget behind the numbers are in `src/lib/_internal/db-pool.ts`, with [ADR-0034](./adr/0034-the-pool-is-sized-against-the-instance.md) for why and for the one planned exception to "no second `pg.Pool` in app code". Pass `db` to Better Auth's `drizzleAdapter`.
 
 ### FK rules in this project
 

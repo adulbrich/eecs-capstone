@@ -1,6 +1,12 @@
 import { readFileSync } from "node:fs";
+import { inspect } from "node:util";
+import { Client, Pool } from "pg";
 import { describe, expect, it } from "vitest";
-import { CONNECTION_BUDGET, poolConfig } from "../_internal/db-pool";
+import {
+  CONNECTION_BUDGET,
+  logPoolErrors,
+  poolConfig,
+} from "../_internal/db-pool";
 
 /** A `default = <number>` inside one named block of `infra/variables.tf`. */
 function terraformDefault(name: string): number {
@@ -60,5 +66,55 @@ describe("poolConfig", () => {
     const fleet =
       perTask * CONNECTION_BUDGET.taskCeiling + CONNECTION_BUDGET.oneOffScript;
     expect(fleet).toBeLessThanOrEqual(CONNECTION_BUDGET.rdsUsable);
+  });
+});
+
+describe("surviving a connection the server drops", () => {
+  it("would crash the process without a listener, which is the hazard", () => {
+    // pg-pool's idle listener removes the client and then emits on the pool
+    // (node_modules/pg-pool/index.js, makeIdleListener). An EventEmitter with
+    // no `error` listener throws on that emit, and a throw from a socket
+    // callback is an uncaught exception, so the task exits (#525).
+    const bare = new Pool({ connectionString: URL_WITH_ENCODED_PASSWORD });
+    expect(() =>
+      bare.emit("error", new Error("terminating connection"))
+    ).toThrow("terminating connection");
+  });
+
+  it("logs the error and stays up once the listener is attached", () => {
+    const pool = new Pool({ connectionString: URL_WITH_ENCODED_PASSWORD });
+    const logged: unknown[] = [];
+    logPoolErrors(pool, (message) => logged.push(message));
+
+    expect(() =>
+      pool.emit("error", new Error("terminating connection"))
+    ).not.toThrow();
+    expect(logged).toHaveLength(1);
+    expect(String(logged[0])).toContain("terminating connection");
+  });
+
+  it("says nothing the attached client would expose", () => {
+    // pg-pool sets `err.client = client` before it emits, and inspecting a
+    // client prints its connection parameters. The error therefore has to
+    // carry one for this to be able to fail: with a bare Error there is
+    // nothing to leak and logging the whole object would pass.
+    const pool = new Pool({ connectionString: URL_WITH_ENCODED_PASSWORD });
+    const logged: unknown[] = [];
+    logPoolErrors(pool, (message) => logged.push(message));
+
+    const error = new Error("terminating connection") as Error & {
+      client: Client;
+    };
+    error.client = new Client({ connectionString: URL_WITH_ENCODED_PASSWORD });
+    pool.emit("error", error);
+
+    // `inspect` rather than `String`. An Error's own toString prints only
+    // name and message, so a `String()` assertion would pass on an
+    // implementation that handed the whole error object to the logger and
+    // left the attached client to be rendered downstream.
+    const line = inspect(logged[0]);
+    expect(line).toContain("terminating connection");
+    expect(line).not.toContain("db.internal");
+    expect(line).not.toContain("eecs_capstone");
   });
 });
