@@ -59,8 +59,14 @@ function isQueryError(value: unknown): value is QueryErrorShape {
  * first version of this file made.
  */
 function scrubQueryText(text: string): string {
+  // Keyed on the separator alone rather than also requiring the string to
+  // start with "Failed query:". Anything that wraps the message in a prefix,
+  // `new Error(`Adapter: ${error.message}`)`, would otherwise pass through
+  // whole. Nothing in this codebase or in Better Auth does that today, but the
+  // cost of covering it is one dropped condition, and the failure mode of the
+  // looser test is a truncated log line rather than a leaked one.
   const marker = text.indexOf("\nparams:");
-  if (marker === -1 || !text.startsWith("Failed query:")) {
+  if (marker === -1) {
     return text;
   }
   return `${text.slice(0, marker)} [params redacted]`;
@@ -121,15 +127,19 @@ export function redactQueryError(value: unknown): string {
  * The `log` half of Better Auth's `logger` option, which is one of the two
  * ways a query error reaches a console method from the auth stack.
  *
- * The message is redacted as well as the arguments, which is not belt and
- * braces. Better Auth inspects a failed error's message for "column",
- * "relation", "table" or "does not exist" and, on a match, logs the whole
- * message as the message rather than attaching the error
- * (`better-auth/dist/api/index.mjs`). The message of a query error is the one
- * with the parameters interpolated into it, and the substring test matches
- * more than it looks: an address like `alice.consTABLEe@oregonstate.edu`
- * carries "table" inside a word. So the message slot is a leak path in its own
- * right and is treated as untrusted here.
+ * The message is redacted as well as the arguments, because Better Auth's own
+ * endpoints call `ctx.logger.error(...)` directly and are free to put anything
+ * in that slot, including a message they took off an error. The message of a
+ * query error is the one with the parameters interpolated into it, so the
+ * message slot is untrusted here on the same footing as the arguments.
+ *
+ * Better Auth's router has a second branch that would put a whole query
+ * message there, when the text contains "column", "relation", "table" or
+ * "does not exist" (`better-auth/dist/api/index.mjs`), and it matches inside a
+ * word, so an address like `alice.consTABLEe@` reaches it. On this
+ * configuration `onAPIError: { throw: true }` makes that branch unreachable.
+ * It is recorded because it is what the substring test costs if the throw is
+ * ever removed, not as the reason this redaction exists.
  *
  * Do not add `level` to the `logger` option beside this. Better Auth reads
  * `options.logger.level` to decide whether to also hand the message to its own

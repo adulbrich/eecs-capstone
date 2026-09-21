@@ -32,10 +32,19 @@ an auth failure with nothing written at all. Decided 2026-09-21.
 fix: it asserts against a real `DrizzleQueryError` that the message carries the
 parameters, so if a later drizzle stops doing that the test says so rather than
 quietly making the redaction pointless. The message is scrubbed as well as the
-error, because Better Auth logs `e.message` in the message slot when the text
-contains "column", "relation", "table" or "does not exist", and that substring
-test matches inside a word, so an address such as `alice.consTABLEe@` reaches
-it. Do not add `level` to the `logger` option in `src/lib/auth.ts`: Better Auth
+error, because Better Auth's endpoints call `ctx.logger.error` directly and are
+free to put a message they took off an error in that slot. Its router has a
+second branch that would do the same when the text contains "column",
+"relation", "table" or "does not exist", matching inside a word so that an
+address like `alice.consTABLEe@` reaches it; the throw above makes that branch
+unreachable on this configuration, and it is recorded as what the scrub costs
+if the throw is ever removed rather than as the reason the scrub exists. One
+raw error remains that neither half covers: `@better-auth/core`'s fallback join
+does a bare `console.error(error)` of its own when a join query fails, which on
+this configuration is every session lookup, because `experimental.joins` is
+unset. Its bound parameter is the user id rather than the token, since the
+session row has already loaded by then, so it is left alone rather than fixed
+by turning on an experimental flag in the auth path. Do not add `level` to the `logger` option in `src/lib/auth.ts`: Better Auth
 reads it to decide whether to hand the message to its own global logger as
 well, which routes a copy around the redaction. The cost of the rule is
 diagnostic: a redacted line keeps the SQL and the cause chain but not the

@@ -83,6 +83,15 @@ describe("redactQueryError", () => {
     expect(redactQueryError(rethrown)).not.toContain(SECRET);
   });
 
+  it("scrubs a query message that something else prefixed", () => {
+    // A wrapper that interpolates rather than using `cause` produces a message
+    // that no longer starts with "Failed query:". Nothing does this today.
+    const prefixed = new Error(
+      `Adapter failed: ${sessionLookupFailure().message}`
+    );
+    expect(redactQueryError(prefixed)).not.toContain(SECRET);
+  });
+
   it("leaves an ordinary string alone", () => {
     expect(redactQueryError("params: not a query error")).toBe(
       "params: not a query error"
