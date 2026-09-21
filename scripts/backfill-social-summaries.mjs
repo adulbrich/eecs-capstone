@@ -116,7 +116,7 @@ function socialSummaryHash(source, modelId) {
 function buildSocialSummaryConfig(env = process.env) {
   return {
     modelId: env.BEDROCK_MODEL_ID ?? "openai.gpt-5.6-luna",
-    reasoningEffort: env.BEDROCK_SOCIAL_SUMMARY_REASONING_EFFORT ?? "minimal",
+    reasoningEffort: env.BEDROCK_SOCIAL_SUMMARY_REASONING_EFFORT ?? "medium",
   };
 }
 

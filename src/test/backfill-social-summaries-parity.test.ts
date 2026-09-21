@@ -222,7 +222,11 @@ describe("the social summary backfill script", () => {
     );
   });
 
-  it("reads the same model id default, which is a hash input", () => {
+  // Named for the model id because that is what feeds `socialSummaryHash`,
+  // but `same` compares the whole function body, so the reasoning effort is
+  // pinned here too. A review of #545 read the old name and concluded the
+  // effort was unpinned, which it is not.
+  it("builds the same config, model id and reasoning effort alike", () => {
     same(
       "function buildSocialSummaryConfig(",
       CORE,

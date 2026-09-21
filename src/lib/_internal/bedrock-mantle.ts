@@ -20,6 +20,26 @@ const SIGNING_SERVICE = "bedrock-mantle";
  */
 export const RESPONSES_PATH = "/openai/v1/responses";
 
+/**
+ * The values Mantle accepts for `reasoning.effort`, in the order its own 400
+ * lists them.
+ *
+ * Not the OpenAI set, and the difference has already cost a production
+ * outage: `minimal` is valid against the OpenAI API and rejected here, so the
+ * social summary shipped on 2026-09-21 failing every call. Nothing caught it,
+ * because the unit tests mock this endpoint and the value production actually
+ * uses comes from `infra/variables.tf` rather than from any default in `src`.
+ * `reasoning-effort-contract.test.ts` now checks both against this list.
+ */
+export const MANTLE_REASONING_EFFORTS = [
+  "none",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const;
+
 export function mantleRegion(env: NodeJS.ProcessEnv = process.env): string {
   return env.BEDROCK_REGION ?? DEFAULT_REGION;
 }

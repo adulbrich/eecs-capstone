@@ -20,9 +20,15 @@ import {
  * The cost profile is the opposite of both existing features. The review
  * rewrites prose for a proposer and the scope assessment reasons hard for a
  * verdict; this compresses three fields into one sentence that a stranger
- * reads in a chat client. Minimal reasoning effort and a small token budget
- * are the point, not a saving to revisit later: this is the only one of the
- * three that runs unattended, on every publish and every edit.
+ * reads in a chat client. It is the only one of the three that runs
+ * unattended, on every publish and every edit, so the effort is the lowest
+ * that still reads well rather than the lowest the API accepts.
+ *
+ * The effort must be one of `MANTLE_REASONING_EFFORTS`. This shipped as
+ * `minimal`, which is an OpenAI API value that Mantle's model rejects with a
+ * 400 naming its own six, and no test caught it because the tests mock the
+ * endpoint and production takes the value from `infra/variables.tf` rather
+ * than from the fallback below.
  */
 
 export const SOCIAL_SUMMARY_TOOL_NAME = "write_social_summary";
@@ -37,7 +43,7 @@ export function buildSocialSummaryConfig(
 ): SocialSummaryConfig {
   return {
     modelId: env.BEDROCK_MODEL_ID ?? "openai.gpt-5.6-luna",
-    reasoningEffort: env.BEDROCK_SOCIAL_SUMMARY_REASONING_EFFORT ?? "minimal",
+    reasoningEffort: env.BEDROCK_SOCIAL_SUMMARY_REASONING_EFFORT ?? "medium",
   };
 }
 
