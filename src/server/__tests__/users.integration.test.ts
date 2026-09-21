@@ -72,9 +72,13 @@ describe("AI usage per user (#413)", () => {
     await recordCall(u.id, "scope", { input: 7, reasoning: 0, output: 1 });
 
     const { aiUsage } = await getUserImpl({ id: u.id });
+    // Every feature in AI_FEATURE_NOUN, in its key order, whether or not the
+    // user touched it: the page fills the list out rather than reporting only
+    // what has rows, so a feature nobody used reads as zero rather than absent.
     expect(aiUsage.byFeature).toEqual([
       { feature: "review", calls: 2 },
       { feature: "scope", calls: 1 },
+      { feature: "social-summary", calls: 0 },
     ]);
     expect(aiUsage.inputTokens).toBe(37);
     expect(aiUsage.reasoningTokens).toBe(6);
@@ -90,6 +94,7 @@ describe("AI usage per user (#413)", () => {
     expect(used.aiUsage.byFeature).toEqual([
       { feature: "review", calls: 0 },
       { feature: "scope", calls: 1 },
+      { feature: "social-summary", calls: 0 },
     ]);
 
     const quiet = await makeUser(`nocalls-${Date.now()}@x.com`, "user");
