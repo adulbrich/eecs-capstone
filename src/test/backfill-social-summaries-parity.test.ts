@@ -319,10 +319,26 @@ describe("the social summary backfill script", () => {
   });
 
   it("never claims a generated summary as staff-written", () => {
-    // The update must not touch social_summary_is_manual. If it did, one sweep
+    // The SET must not touch social_summary_is_manual. If it did, one sweep
     // would freeze every project it touched out of the automatic path forever.
+    // Checked on the SET half alone, because the WHERE half must name that
+    // column: see the next test.
     const update = region(SCRIPT, "const UPDATE_SQL =", "template");
-    expect(update).not.toContain("social_summary_is_manual");
+    const [setClause] = update.split("WHERE");
+    expect(setClause).not.toContain("social_summary_is_manual");
+  });
+
+  it("refuses to write over a staff save that landed mid-run", () => {
+    // The flag is read in the loop and the row is written after a model call
+    // that takes seconds, so a sweep of hundreds of projects gives staff a
+    // real window to save into. The guard has to be on the write itself, and
+    // the app's writer carries the same one.
+    const update = region(SCRIPT, "const UPDATE_SQL =", "template");
+    const [, whereClause] = update.split("WHERE");
+    expect(whereClause).toContain("social_summary_is_manual = false");
+    expect(normalize(WRITER)).toContain(
+      "eq(projects.socialSummaryIsManual, false)"
+    );
   });
 
   it("proves the comment strip ran and kept the code", () => {

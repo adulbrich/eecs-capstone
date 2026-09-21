@@ -114,6 +114,23 @@ export function stripMarkdown(text: string): string {
     .trim();
 }
 
+/** A high surrogate with no low surrogate after it, at the end of a string. */
+const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/;
+
+/**
+ * Drops a half-character left by slicing on code units.
+ *
+ * `String.prototype.slice` counts UTF-16 code units, and anything outside the
+ * basic plane, an emoji above all, is two of them. Cutting between the pair
+ * leaves a lone high surrogate, which is not a character at all: encoded to
+ * UTF-8 for the page it becomes a replacement glyph in a tag the whole
+ * internet can see. Only the unbroken-token fallback can produce this, since a
+ * cut that retreats to a space lands between characters by construction.
+ */
+function dropLoneSurrogate(text: string): string {
+  return text.replace(LONE_TRAILING_SURROGATE, "");
+}
+
 /**
  * Three ASCII dots, not U+2026. `button-conventions.test.ts` bans the real
  * ellipsis character anywhere in `src`, and the rule is worth keeping here
@@ -143,7 +160,12 @@ export function truncateOnWordBoundary(
   // for nothing. Only an actual mid-word cut needs to retreat.
   const boundary = text[room] === " " ? cut.length : cut.lastIndexOf(" ");
   const body = boundary > 0 ? cut.slice(0, boundary) : cut;
-  return `${body.replace(TRAILING_PUNCTUATION, "")}${ELLIPSIS}`;
+  const trimmed = dropLoneSurrogate(body);
+  // Stripping the trailing punctuation off a body that is nothing but
+  // punctuation would leave a bare ellipsis, which says less than the fragment
+  // it replaced. Keep the fragment in that case.
+  const stripped = trimmed.replace(TRAILING_PUNCTUATION, "");
+  return `${stripped || trimmed}${ELLIPSIS}`;
 }
 
 /** The fields `socialDescription` reads, named structurally. */

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "#/db";
 import { projects } from "#/db/schema";
 import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
@@ -87,15 +87,29 @@ export async function refreshSocialSummary(
       );
       return "failed";
     }
-    await db
+    // The guard is on the write, not only on the read above, and it is the
+    // read that is insufficient rather than redundant. The manual flag is read
+    // before `runSocialSummary` and the row is written after it, so a staff
+    // save landing in that window would otherwise be overwritten by text the
+    // model had already begun producing, while the flag they set stayed true
+    // and skipped the row out of every later refresh. Losing the race must
+    // mean writing nothing, so the condition belongs in the statement that
+    // does the writing.
+    const written = await db
       .update(projects)
       .set({
         socialSummary: run.result,
         socialSummarySourceHash: hash,
         socialSummaryUpdatedAt: new Date(),
       })
-      .where(eq(projects.id, projectId));
-    return "updated";
+      .where(
+        and(
+          eq(projects.id, projectId),
+          eq(projects.socialSummaryIsManual, false)
+        )
+      )
+      .returning({ id: projects.id });
+    return written.length > 0 ? "updated" : "manual";
   } catch (error) {
     console.error(`Social summary failed for project ${projectId}`, error);
     return "failed";

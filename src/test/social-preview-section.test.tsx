@@ -118,6 +118,23 @@ describe("SocialPreviewSection button states", () => {
 });
 
 describe("SocialPreviewSection actions", () => {
+  it("does not let a response overwrite what staff typed during it", async () => {
+    // The textarea was editable while a request was in flight, so the
+    // setDraft on the response replaced a correction typed during the wait
+    // with the server's text, with nothing to say it had happened.
+    await renderWith(MANUAL);
+    let resolve: (v: SocialSummaryView) => void = () => undefined;
+    server.regenerateSocialSummary.mockReturnValue(
+      new Promise<SocialSummaryView>((r) => {
+        resolve = r;
+      })
+    );
+    fireEvent.click(regenerateButton());
+    await waitFor(() => expect(textarea().disabled).toBe(true));
+    resolve(AUTOMATIC);
+    await waitFor(() => expect(textarea().disabled).toBe(false));
+  });
+
   it("saves the trimmed text and takes the manual mark back from the server", async () => {
     await renderWith(AUTOMATIC);
     server.saveSocialSummary.mockResolvedValue(MANUAL);

@@ -99,6 +99,26 @@ describe("truncateOnWordBoundary", () => {
     );
   });
 
+  it("never splits a surrogate pair at the cut", () => {
+    // Slicing by code unit can cut an emoji in half, leaving a lone high
+    // surrogate that UTF-8 encoding turns into a replacement character in a
+    // public meta tag.
+    // No spaces, so the word-boundary search cannot rescue the cut: this is
+    // the unbroken-token fallback, which slices at the raw code unit.
+    const text = "\u{1F600}".repeat(200);
+    const result = truncateOnWordBoundary(text);
+    expect(result).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+    expect(result).not.toMatch(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+  });
+
+  it("keeps the text when stripping punctuation would empty it", () => {
+    // A description of nothing but punctuation truncated to bare dots says
+    // less than the fragment it replaced.
+    const result = truncateOnWordBoundary("!".repeat(200));
+    expect(result).not.toBe("...");
+    expect(result.length).toBeGreaterThan(10);
+  });
+
   it("cuts a single unbroken token at the limit rather than returning nothing", () => {
     // A token this long is a pasted URL or an accident. A fragment beats an
     // empty description, which would unfurl as a bare title.

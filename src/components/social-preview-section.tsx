@@ -101,8 +101,16 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
         archived project. Saving your own version stops that; Regenerate with AI
         hands it back.
       </p>
+      {/*
+        Disabled while a request is in flight, not merely the buttons. Both
+        handlers set the draft from what comes back, so an edit typed during
+        the wait was replaced by the server's text with nothing to say it had
+        happened. Locking the field is honest about the wait; silently keeping
+        the edit and discarding the response would not be.
+      */}
       <Textarea
         aria-label="Social summary"
+        disabled={busy}
         onChange={(e) => setDraft(e.target.value)}
         placeholder={
           loaded?.summary === null

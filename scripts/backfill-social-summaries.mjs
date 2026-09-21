@@ -302,6 +302,12 @@ const SELECT_SQL = `
  * Writes the same three columns the app writes, and deliberately not
  * `updated_at` or `social_summary_is_manual`: a generated summary is not an
  * edit, and this path never claims wording as staff-written.
+ *
+ * The manual guard is repeated here, having already been tested in the loop,
+ * for the reason `refreshSocialSummary` gives: the flag is read before the
+ * model call and the row is written after it, so a staff save landing in that
+ * window has to lose nothing. A sweep of hundreds of projects runs for long
+ * enough that the window is not theoretical.
  */
 const UPDATE_SQL = `
   UPDATE projects
@@ -309,6 +315,7 @@ const UPDATE_SQL = `
       social_summary_source_hash = $2,
       social_summary_updated_at = now()
   WHERE id = $3
+    AND social_summary_is_manual = false
 `;
 
 async function main() {

@@ -194,6 +194,49 @@ describe("refreshSocialSummary", () => {
     expect(await refreshSocialSummary(id, model)).toBe("manual");
   });
 
+  it("does not clobber a staff save that lands while the model is thinking", async () => {
+    // The window the manual flag alone does not close: the flag is read before
+    // the model call and the write happens after it, so a save landing in
+    // between was overwritten by text the model had already started producing,
+    // while the flag stayed true and froze the row out of every later refresh.
+    const admin = await makeAdmin(nextEmail());
+    const { id } = await createProjectAs(admin, baseProject("Racing"));
+    await publish(admin, id, fakeModel("Original."));
+
+    // A model that performs the staff save while it is "thinking", so the
+    // interleaving is deterministic rather than a matter of timing.
+    const racing: ResponsesFn = async () => {
+      await db
+        .update(projects)
+        .set({
+          socialSummary: "Wording staff chose mid-flight.",
+          socialSummaryIsManual: true,
+        })
+        .where(eq(projects.id, id));
+      return {
+        status: "completed",
+        output: [
+          {
+            type: "function_call",
+            name: SOCIAL_SUMMARY_TOOL_NAME,
+            arguments: JSON.stringify({ summary: "Model text." }),
+          },
+        ],
+      };
+    };
+
+    await updateProjectAs(
+      admin,
+      { ...baseProject("Racing"), id, description: "Changed text." },
+      undefined,
+      racing
+    );
+
+    const row = await readRow(id);
+    expect(row.socialSummary).toBe("Wording staff chose mid-flight.");
+    expect(row.socialSummaryIsManual).toBe(true);
+  });
+
   it("leaves the project published with a null summary when the model fails", async () => {
     const admin = await makeAdmin(nextEmail());
     const { id } = await createProjectAs(admin, baseProject("Outage"));
