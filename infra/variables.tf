@@ -211,6 +211,18 @@ variable "bedrock_social_summary_enabled" {
   default     = "true"
 }
 
+variable "ai_social_summary_limit_per_hour" {
+  description = "Per-user hourly ceiling on staff social summary rewrites. Meters the Regenerate button only; the automatic path is not counted."
+  type        = string
+  default     = "20"
+}
+
+variable "ai_social_summary_limit_per_day" {
+  description = "Per-user daily ceiling on staff social summary rewrites."
+  type        = string
+  default     = "60"
+}
+
 variable "ai_scope_limit_per_hour" {
   description = "Per-user hourly ceiling on scope assessments. Metered apart from AI reviews."
   type        = string

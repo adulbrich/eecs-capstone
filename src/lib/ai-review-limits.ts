@@ -22,17 +22,23 @@ export interface ReviewWindowCounts {
 export type ReviewOutcome = "ok" | "truncated" | "failed";
 
 /**
- * The two paid, user-triggered features, each with its own limit pair and
- * its own rows in `ai_review_usage`. The proposal review is a proposer's
- * writing assistant; the scope assessment is staff judgement support (#61).
- * One limit across both would make every proposer's review pay for
- * reasoning they never see, and attribute spend to the wrong feature.
+ * The paid, user-triggered features, each with its own limit pair and its own
+ * rows in `ai_review_usage`. The proposal review is a proposer's writing
+ * assistant; the scope assessment is staff judgement support (#61); the social
+ * summary rewrite is staff correcting a preview card (#498). One limit across
+ * them would make every proposer's review pay for reasoning they never see,
+ * and attribute spend to the wrong feature.
+ *
+ * Only the staff-pressed Regenerate button meters as `social-summary`. The
+ * automatic generation on publish and on edit has no user to attribute to and
+ * no button to abuse, so it is not counted here at all.
  */
-export type AiFeature = "review" | "scope";
+export type AiFeature = "review" | "scope" | "social-summary";
 
 export const AI_FEATURE_NOUN: Record<AiFeature, string> = {
   review: "AI reviews",
   scope: "scope assessments",
+  "social-summary": "social summary rewrites",
 };
 
 /**
@@ -59,11 +65,29 @@ export function scopeLimits(
   };
 }
 
+export function socialSummaryLimits(
+  env: NodeJS.ProcessEnv = process.env
+): ReviewLimits {
+  return {
+    perHour: Number(env.AI_SOCIAL_SUMMARY_LIMIT_PER_HOUR ?? "20"),
+    perDay: Number(env.AI_SOCIAL_SUMMARY_LIMIT_PER_DAY ?? "60"),
+  };
+}
+
+const LIMIT_READERS: Record<
+  AiFeature,
+  (env: NodeJS.ProcessEnv) => ReviewLimits
+> = {
+  review: reviewLimits,
+  scope: scopeLimits,
+  "social-summary": socialSummaryLimits,
+};
+
 export function limitsFor(
   feature: AiFeature,
   env: NodeJS.ProcessEnv = process.env
 ): ReviewLimits {
-  return feature === "scope" ? scopeLimits(env) : reviewLimits(env);
+  return LIMIT_READERS[feature](env);
 }
 
 function waitPhrase(minutes: number): string {

@@ -28,6 +28,7 @@ import { type EditLogEntry, EditLogList } from "./edit-log-list";
 import { Panel, PanelHeader, PanelNote, PanelSection } from "./panel";
 import { ScopeAssessmentSection } from "./scope-assessment-section";
 import { EMAIL_SKIP_HINT, SendEmailCheckbox } from "./send-email-checkbox";
+import { SocialPreviewSection } from "./social-preview-section";
 import { StaffCategoriesSection } from "./staff-categories-section";
 import { StaffMentorshipSection } from "./staff-mentorship-section";
 import { StaffProgramSection } from "./staff-program-section";
@@ -264,7 +265,8 @@ export function StaffProjectPanel({
       <PanelNote>{STAFF_PANEL_AUDIENCE_HINT}</PanelNote>
 
       {/* Section order is the one #322 asked for: Status, Proposer,
-          Mentorship, Scope assessment, Categories, Edit log, Danger zone. */}
+          Mentorship, Scope assessment, Categories, Social preview, Edit log,
+          Danger zone. */}
       <PanelSection title="Status">
         {/* Status stepper: vertical on mobile, horizontal on md+ */}
         <div className="md:overflow-x-auto md:pb-1">
@@ -476,6 +478,13 @@ export function StaffProjectPanel({
         onChanged={onSectionChanged}
         projectId={project.id}
       />
+
+      {/* Only staff, like the scope assessment above: the text is public as
+          the page's og:description, but who wrote it and when is not, so it is
+          loaded by a staff-gated read rather than from the project payload. */}
+      <PanelSection title="Social preview">
+        <SocialPreviewSection projectId={project.id} />
+      </PanelSection>
 
       <PanelSection title="Edit log">
         <EditLogList rows={editLog} />
