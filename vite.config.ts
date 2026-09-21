@@ -15,6 +15,7 @@ const config = defineConfig({
       compressPublicAssets: true,
       plugins: [
         "./src/nitro/config-check.ts",
+        "./src/nitro/keep-alive-timeouts.ts",
         "./src/nitro/asset-error-headers.ts",
       ],
       rollupConfig: { external: [/^@sentry\//] },

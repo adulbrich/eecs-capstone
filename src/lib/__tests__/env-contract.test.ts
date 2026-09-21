@@ -60,6 +60,14 @@ const SCRIPT_ARGUMENTS = new Set([
   // paid model call per project across the whole catalog (#498).
   "DRY_RUN",
   "LIMIT",
+  // The four knobs of `scripts/loadtest/pooled-connection-reuse.mjs`, which
+  // reproduces #545 against a local build. Prefixed rather than named PORT
+  // and IDLE so that nothing reads them as the task's own configuration:
+  // they only shape one invocation of one reproduction script.
+  "REPRO_IDLE_MS",
+  "REPRO_PATH",
+  "REPRO_PORT",
+  "REPRO_ROUNDS",
   "TARGET_IDS",
 ]);
 
