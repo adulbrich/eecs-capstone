@@ -27,8 +27,11 @@ const IDS = __ENV.IDS || "./ids.txt";
  * the default, but 3000 stops a saturating phase within seconds of the first
  * slow request, which reports that the phase degraded and nothing about how.
  * Raise it for a deliberately short run when the failure shape is the point,
- * which is what phases 1d, 1e and 2 exist for. The error threshold below is
- * not adjustable on purpose: a 5XX aborts at any setting.
+ * which is what phases 1d, 1e and 2 exist for. The error threshold below has
+ * no override, but note what it is: a 1 percent failure rate across the run,
+ * not a trip on the first bad response. On 2026-09-21 two phases finished at
+ * 0.07 and 0.11 percent with 5XX in them and neither aborted. #524 wants a
+ * stop on the first 5XX, and this does not do that yet.
  */
 const P99_ABORT_MS = Number(__ENV.P99_ABORT_MS || 3000);
 

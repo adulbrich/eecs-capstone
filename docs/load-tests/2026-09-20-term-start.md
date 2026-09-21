@@ -12,10 +12,14 @@ second, and stopped early for a reason worth keeping: "Why the Sunday ramp stopp
 below. Monday 06:33 to 06:42 PDT covered phase 2 and phase 1c, from the same laptop, against
 background traffic of 0.07 requests per second.
 
-**The Monday sitting ended on #524's own abort criterion: 5XX appeared.** Seven of them, all
-inside the test window, against zero in the previous 24 hours. Phases 1d and 1e were therefore
-never run and should not be run until the 502 below is understood. Everything the issue set out
-to learn was answered anyway, and the answers are not the ones the extrapolation predicted.
+**The Monday sitting was stopped by hand on #524's abort criterion: 5XX appeared.** Seven of
+them, all inside the test window, against zero in the previous 24 hours. Stopped by hand is the
+accurate phrasing and the distinction matters: both Monday phases ran to completion, and the
+decision to stop came after reading CloudWatch afterwards, not from k6 cutting a run short. Why
+that is, and why it is a flaw in the method rather than a judgement call, is under "What the
+thresholds actually do" below. Phases 1d and 1e were never run and should not be until the 502
+is understood. Everything the issue set out to learn was answered anyway, and the answers are
+not the ones the extrapolation predicted.
 
 ## Configuration under test
 
@@ -44,9 +48,9 @@ it claims.
 | 0. Baseline | 1/s | 70 ms | 179 ms | 266 ms | 370 ms | 0% | 6.5% | 8.8% | 9.8% | 11.1% | 6 | 2 |
 | 1a | 5/s | 62 ms | 154 ms | 243 ms | 605 ms | 0% | 21.9% | 24.9% | 15.2% | 16.1% | 6 | 2 |
 | 1b | 10/s | 61 ms | 173 ms | 389 ms | 771 ms | 0% | 39.8% | 47.6% | 17.8% | 18.0% | 10 | 2 |
-| 1c (Mon) | 25/s | 104 ms | 633 ms | 1.40 s | 3.87 s | 0.11% | 85.9% | 90.3% | 15.0% | 21.1% | 21 | 2 |
+| 1c (Mon) | 25/s | 104 ms | 633 ms | 1.40 s | 3.87 s | 0.11% | 85.9% | 90.3% | 23.0% | 23.2% | 21 | 2 |
 | 2. Burst (Mon) | 42/s | 892 ms | 2.97 s | 4.25 s | 4.37 s | 0% | 12.9% | 55.6% | 14.9% | 17.4% | 40 | 2 |
-| 2. Burst, held (Mon) | 42/s | 4.12 s | 6.19 s | 6.68 s | 8.11 s | 0.07% | 99.7% | 99.6% | 15.0% | 21.1% | 40 | 2 |
+| 2. Burst, held (Mon) | 42/s | 4.12 s | 6.19 s | 6.68 s | 8.11 s | 0.07% | 99.7% | 99.9% | 22.2% | 22.5% | 40 | 2 |
 | 1d | 50/s | not run, stopped on 5XX | | | | | | | | | | |
 | 1e | 75/s | not run, stopped on 5XX | | | | | | | | | | |
 | 2. Tail | 8/s | not run, stopped on 5XX | | | | | | | | | | |
@@ -110,16 +114,34 @@ This is the one result here that is a defect rather than a capacity number. It i
 [#545](https://github.com/adulbrich/eecs-capstone/issues/545), and 1d and 1e should wait for
 it, because they exist to push further into exactly the regime that produces it.
 
-**On the abort criterion, honestly.** #524 says to stop the moment a 5XX appears, and 1c ran
-after the first two had already happened. The sequence was: the held burst ended at 06:38:00,
-ALB 5XX was queried immediately and returned no datapoints, 1c started at 06:38:56, and the
-06:37 datapoint only became visible later. CloudWatch publishes on a lag of a minute or two,
-so "check for 5XX between phases" does not actually give a clean answer between
-back-to-back phases. Anyone repeating this should either leave three minutes between phases or
-watch the ALB access logs, which are written every five minutes and are equally lagged. The
-practical version: treat any k6 `http_req_failed` above zero as the stop signal, because k6
-sees it immediately and CloudWatch does not. Both Monday phases reported it in their own
-summaries, and that was the signal available in real time.
+### What the thresholds actually do
+
+#524 says to stop the moment a 5XX appears. Nothing in this setup does that, and it is worth
+being exact about why, because the script reads as though it does.
+
+The error threshold is `http_req_failed: rate<0.01`, which is **a failure rate across the whole
+run, not a trip on the first bad response**. The held burst finished at 0.07% and 1c at 0.11%.
+Neither came near 1%, so neither aborted, and both ran to completion with 5XX already in them.
+An earlier draft of this document and a comment in the script both claimed a 5XX aborts at any
+setting. That was wrong, and it is corrected in both places.
+
+CloudWatch is no help in real time either. The held burst ended at 06:38:00, ALB 5XX was
+queried immediately and returned no datapoints, 1c started at 06:38:56, and the 06:37 datapoint
+only became visible afterwards. Metrics publish a minute or two late and the access logs are
+written every five minutes, so "check for 5XX between phases" cannot give a clean answer
+between back-to-back phases.
+
+So the run stopped when a human read the numbers, one phase later than #524 intends. What would
+have honoured the rule:
+
+- Set the error threshold to `rate<0.0001` or use `abortOnFail` on a check of the status code,
+  so the first failed request stops the run rather than the hundredth.
+- Failing that, treat any non-zero `http_req_failed` in a k6 summary as the stop signal. k6
+  reports it the moment the run ends, which is the only fast signal available. Both Monday
+  phases carried it in their own summaries.
+- Leave three minutes between phases if CloudWatch is the source of truth.
+
+The first of those is the real fix and belongs in the script before it is run again.
 
 Not to be confused with the 57 `460`s in the same logs. Those are the ALB recording that the
 client went away, and the client was k6 interrupting its own in-flight iterations when the
@@ -169,35 +191,8 @@ total with it, so the sizing above addresses both; ADR-0034's budget has room fo
 
 ### Memory was never close
 
-21.1% of 1024 MB at the worst, against #524's 75% criterion.
-
-CPU is the binding resource. Against the fleet total of 0.5 vCPU, the three phases fit a
-straight line at about **19 ms of vCPU per request**, with an idle floor small enough to be
-noise: the three pairwise fits give 19.6, 18.7 and 19.1 ms and an intercept under 2% of the
-fleet. That is roughly four times the 5 ms per request the issue extrapolated from a month of
-CloudWatch. The likely reason is workload mix rather than arithmetic: a month of production is
-mostly cheap requests, health checks and redirects and small routes, while every request in this
-test is a projects listing render, three queries and 90 to 145 KB of HTML. The expensive path is
-also the one 500 students will be on, so 19 ms is the number to plan with.
-
-What that implies, and it is an extrapolation rather than a measurement:
-
-- The 50% autoscale target trips at about 13 requests per second on 2 tasks. Phase 1b landed
-  just short of it, which is why nothing scaled.
-- 4 tasks is about 52 requests per second at 100% CPU, and about 26 at the 50% target.
-- The phase 2 burst of 42 requests per second needs about 0.80 vCPU. Two tasks have 0.5, so
-  2 tasks cannot serve that burst at all, they saturate. Reaching 4 tasks in time is unlikely:
-  CloudWatch's one minute resolution, the 60 s scale out cooldown and Fargate task start
-  together run past the two minutes the burst lasts. The prediction is that phase 2 saturates
-  on 2 tasks and that the p99 threshold is what aborts it, and that phase 2 rather than 1d is
-  the phase that hurts.
-
-Confirming or killing that prediction is what phases 1c through 2 are for. Do not act on it
-before they run.
-
-Memory never became interesting: 18.0% of 1024 MB at the worst, against #524's 75% criterion.
-The database is nowhere near a constraint. It held 7.5% CPU and 10 connections at 10 requests
-per second, against a pool ceiling of 20 per task and 220 usable on the instance.
+23.2% of 1024 MB at the worst, against #524's 75% criterion. It rose with load and never
+threatened anything.
 
 ## Why the Sunday ramp stopped at 1b
 
@@ -242,8 +237,9 @@ IDS=/path/to/ids.txt RPS=25 DURATION=3m k6 run scripts/loadtest/projects-browse.
 ```
 
 `P99_ABORT_MS` raises the latency abort from #524's 3000 for a deliberately short run when the
-failure shape is the point. The error threshold is not adjustable: a 5XX aborts at any setting,
-which is what ended the Monday sitting.
+failure shape is the point. The error threshold has no override, but read "What the thresholds
+actually do" before relying on it: it is a 1% rate across the run, so it does not stop on the
+first 5XX and did not stop either Monday phase.
 
 **Do not run 1d or 1e until the 502 has an explanation.** They exist to push further into the
 regime that already produces it, on a live site, and a louder version of a failure that is
