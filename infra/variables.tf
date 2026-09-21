@@ -200,9 +200,9 @@ variable "bedrock_scope_reasoning_effort" {
 }
 
 variable "bedrock_social_summary_reasoning_effort" {
-  description = "Reasoning effort for the social summary. Lowest of the three: one sentence, and the only one that runs unattended."
+  description = "Reasoning effort for the social summary. One of none, low, medium, high, xhigh, max; Mantle rejects the OpenAI value minimal outright."
   type        = string
-  default     = "minimal"
+  default     = "medium"
 }
 
 variable "bedrock_social_summary_enabled" {

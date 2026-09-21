@@ -1642,7 +1642,7 @@ this config; delete it manually if you are done with the project.
 - ECR repo: `eecs-capstone`
 - Secrets: `eecs-capstone/database-url`, `eecs-capstone/better-auth-secret`,
   `eecs-capstone/github-client-secret`, `eecs-capstone/onid-client-secret`
-- SSM: `/eecs-capstone/ASSETS_PUBLIC_BASE`
+- SSM: `/eecs-capstone/ASSETS_PUBLIC_BASE`, `/eecs-capstone/SITE_URL`
 - Log group: `/ecs/eecs-capstone`
 - Access logs bucket: `eecs-capstone-access-logs-<account-id>`, ALB under
   `alb/`, CloudFront under `AWSLogs/<account-id>/CloudFront/`, both deleted
@@ -1657,7 +1657,9 @@ this config; delete it manually if you are done with the project.
 `BEDROCK_EMBEDDING_MODEL_ID`, `BEDROCK_EMBEDDING_DIMENSIONS`,
 `AI_REVIEW_LIMIT_PER_HOUR`, `AI_REVIEW_LIMIT_PER_DAY`,
 `BEDROCK_SCOPE_REASONING_EFFORT`, `AI_SCOPE_LIMIT_PER_HOUR`,
-`AI_SCOPE_LIMIT_PER_DAY`, `EMAIL_TRANSPORT=ses`, `EMAIL_FROM`,
+`AI_SCOPE_LIMIT_PER_DAY`, `BEDROCK_SOCIAL_SUMMARY_REASONING_EFFORT`,
+`BEDROCK_SOCIAL_SUMMARY_ENABLED`, `AI_SOCIAL_SUMMARY_LIMIT_PER_HOUR`,
+`AI_SOCIAL_SUMMARY_LIMIT_PER_DAY`, `EMAIL_TRANSPORT=ses`, `EMAIL_FROM`,
 `EMAIL_REPLY_TO`, `EMAIL_STAFF_INBOX`, `SES_REGION`, plus secrets
 `DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`,
 `ONID_CLIENT_SECRET`. In production, S3 and Bedrock use the task role, so no
@@ -1684,6 +1686,27 @@ next task start: the `Rate limiting could not determine a client IP` warning
 no longer appears in `/ecs/eecs-capstone`, and new `session.ipAddress` rows
 hold distinct public addresses. One `10.x` value for everyone means the
 CloudFront VPC origin ENI sits outside `var.vpc_cidr`.
+
+The three reasoning efforts are not free strings. Mantle accepts `none`,
+`low`, `medium`, `high`, `xhigh` and `max`, and rejects anything else with a
+400 that names the six; the OpenAI value `minimal` is the trap, because it is
+valid against that API and was what `bedrock_social_summary_reasoning_effort`
+shipped with on 2026-09-21, so every social summary failed from the moment it
+deployed. Nothing was loud about it: the automatic path swallows its errors, so
+publishes kept working and `og:description` fell back to the description.
+`src/lib/__tests__/reasoning-effort-contract.test.ts` now checks the defaults
+in `infra/variables.tf`, `.env.example` and `src` against the accepted set.
+
+Two values reach the *build* rather than the task, and both come from SSM
+rather than from the task definition: `ASSETS_PUBLIC_BASE` and `SITE_URL`.
+`.github/workflows/deploy.yml` reads them before it builds, because
+`VITE_STORAGE_PUBLIC_BASE` and `VITE_SITE_URL` are baked into the client
+bundle, and `og:image`, `twitter:image` and `rel=canonical` are built from the
+second (#498). `SITE_URL` reaches SSM only through `terraform apply`, the same
+rule as `TRUSTED_PROXY_CIDR` and `EMAIL_TRANSPORT` above, and it fails more
+kindly than either: a deploy before the apply stops at "Resolve config" with a
+bare `ParameterNotFound`, having built nothing, migrated nothing and left the
+old task serving.
 
 This list is written by hand and `infra/ecs.tf` is the source of truth. The
 test in `src/lib/__tests__/env-contract.test.ts` checks the task definition
