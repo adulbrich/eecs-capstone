@@ -3,11 +3,10 @@
  *
  * Drizzle's `DrizzleQueryError` carries the bound parameters of the failed
  * query, and the parameters of a Better Auth session lookup are the session
- * token: a live credential that signs its bearer in until it expires. The
- * 2026-09-21 load test found exactly that in `/ecs/eecs-capstone`, twice, when
- * a burst exhausted the connection pool and the session lookup timed out on
- * acquire. Password reset and email verification tokens travel the same path,
- * and so do addresses.
+ * token: a live credential that signs its bearer in until it expires. A burst that
+ * exhausts the connection pool makes the session lookup time out on acquire,
+ * which is how a query error reaches a logger at all. Password reset and email
+ * verification tokens travel the same path, and so do addresses.
  *
  * The trap, and the reason this returns a string rather than a tidied error:
  * `DrizzleQueryError`'s constructor interpolates the parameters into
@@ -49,6 +48,24 @@ function isQueryError(value: unknown): value is QueryErrorShape {
   );
 }
 
+/**
+ * Strips the parameter tail off a message that already carries one.
+ *
+ * `DrizzleQueryError` builds its message as ``Failed query: ${query}\nparams:
+ * ${params}``, and that string travels on its own: Better Auth logs
+ * `error.message` rather than the error in one branch, and any `catch` that
+ * reaches for `.message` produces the same thing. So a string arriving here is
+ * not automatically safe just because it is a string, which is the mistake the
+ * first version of this file made.
+ */
+function scrubQueryText(text: string): string {
+  const marker = text.indexOf("\nparams:");
+  if (marker === -1 || !text.startsWith("Failed query:")) {
+    return text;
+  }
+  return `${text.slice(0, marker)} [params redacted]`;
+}
+
 function truncate(sql: string): string {
   const collapsed = sql.replace(/\s+/g, " ").trim();
   return collapsed.length > QUERY_LIMIT
@@ -68,10 +85,10 @@ function describe(value: unknown): string {
     return `query failed [params redacted]: ${truncate(value.query)}`;
   }
   if (value instanceof Error) {
-    return `${value.name}: ${value.message}`;
+    return `${value.name}: ${scrubQueryText(value.message)}`;
   }
   if (typeof value === "string") {
-    return value;
+    return scrubQueryText(value);
   }
   return Object.prototype.toString.call(value);
 }
@@ -101,19 +118,32 @@ export function redactQueryError(value: unknown): string {
 }
 
 /**
- * The `log` half of Better Auth's `logger` option, which is where the leak was
- * actually observed: Better Auth catches the query error and hands the object
- * to its own logger, whose default writes it through a console method.
- * Redacting every argument here covers that without turning its logging off,
- * which would have traded one problem for a blind spot.
+ * The `log` half of Better Auth's `logger` option, which is one of the two
+ * ways a query error reaches a console method from the auth stack.
+ *
+ * The message is redacted as well as the arguments, which is not belt and
+ * braces. Better Auth inspects a failed error's message for "column",
+ * "relation", "table" or "does not exist" and, on a match, logs the whole
+ * message as the message rather than attaching the error
+ * (`better-auth/dist/api/index.mjs`). The message of a query error is the one
+ * with the parameters interpolated into it, and the substring test matches
+ * more than it looks: an address like `alice.consTABLEe@oregonstate.edu`
+ * carries "table" inside a word. So the message slot is a leak path in its own
+ * right and is treated as untrusted here.
+ *
+ * Do not add `level` to the `logger` option beside this. Better Auth reads
+ * `options.logger.level` to decide whether to also hand the message to its own
+ * global logger, which is not this one, and setting it routes a copy around
+ * the redaction. Leaving it unset keeps every line going through here.
  */
 export function redactingAuthLogger(
   write: (message: string) => void = console.error
 ) {
   return (level: string, message: string, ...args: unknown[]): void => {
     const extra = args.map((arg) => redactQueryError(arg));
+    const safeMessage = redactQueryError(message);
     write(
-      `[Better Auth] ${level}: ${message}${extra.length > 0 ? ` ${extra.join(" ")}` : ""}`
+      `[Better Auth] ${level}: ${safeMessage}${extra.length > 0 ? ` ${extra.join(" ")}` : ""}`
     );
   };
 }

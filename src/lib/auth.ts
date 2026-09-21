@@ -252,12 +252,22 @@ export const auth = betterAuth({
   // Better Auth catches an adapter failure and hands the error object to its
   // logger, whose default writes it through a console method. A Drizzle query
   // error carries the bound parameters, and the parameter of a session lookup
-  // is the session token, so the default logger put live credentials in
-  // CloudWatch: the 2026-09-21 load test found two. This redacts every
+  // is the session token, so the default logger would put a live credential in
+  // the log group. This redacts every
   // argument rather than disabling the logging, which would have swapped a
   // leak for a blind spot. `redact-query-error.ts` has the detail, including
   // why logging `error.message` alone is not the fix it looks like.
   logger: { log: redactingAuthLogger() },
+  // Rethrow rather than let the router fall through to its own logging. Better
+  // Auth's `onError` returns undefined on every branch, so `better-call`'s
+  // router carries on to `console.error("# SERVER_ERROR: ", error)` with the
+  // raw error (`better-call/dist/router.mjs`), which puts the parameters back
+  // in the log group however careful the logger above is. Throwing instead
+  // hands the error to `src/routes/api/auth/$.ts`, which logs it redacted and
+  // answers 500. A redirect still short circuits first, and an APIError is
+  // still turned into its response by the router's own catch, so this changes
+  // nothing a client sees.
+  onAPIError: { throw: true },
   advanced: {
     // CloudFront terminates TLS at the edge and forwards to the origin over
     // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in

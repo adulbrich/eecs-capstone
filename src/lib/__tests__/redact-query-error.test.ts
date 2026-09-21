@@ -12,7 +12,7 @@ const SECRET = "qwWFNB6KRoIbxasS3zDrfREsB7dGx4Hw";
 const SESSION_SQL =
   'select "id", "expires_at", "token", "user_id" from "session" where "session"."token" = $1';
 
-/** The shape Better Auth handed its logger on 2026-09-21. */
+/** The shape Better Auth hands its logger when a session lookup fails. */
 function sessionLookupFailure(): DrizzleQueryError {
   return new DrizzleQueryError(
     SESSION_SQL,
@@ -71,6 +71,24 @@ describe("redactQueryError", () => {
     expect(redactQueryError(looping)).toBe("Error: outer");
   });
 
+  it("scrubs a query message that arrives as a bare string", () => {
+    // `error.message` travels on its own all over this codebase, through
+    // `errorMessage()` among others. A string is not safe just for being one.
+    const line = redactQueryError(sessionLookupFailure().message);
+    expect(line).not.toContain(SECRET);
+  });
+
+  it("scrubs a query message wrapped in a plain Error", () => {
+    const rethrown = new Error(sessionLookupFailure().message);
+    expect(redactQueryError(rethrown)).not.toContain(SECRET);
+  });
+
+  it("leaves an ordinary string alone", () => {
+    expect(redactQueryError("params: not a query error")).toBe(
+      "params: not a query error"
+    );
+  });
+
   it("handles what a throw can actually be", () => {
     expect(redactQueryError("plain string")).toBe("plain string");
     expect(redactQueryError(undefined)).toBe("");
@@ -101,6 +119,21 @@ describe("redactingAuthLogger", () => {
     expect(lines[0]).toContain(
       "Connection terminated due to connection timeout"
     );
+  });
+
+  it("redacts the message slot, not only the arguments", () => {
+    // Better Auth logs `e.message` as the message, with no error attached,
+    // whenever the message contains "column", "relation", "table" or "does not
+    // exist" (better-auth/dist/api/index.mjs). A query error's message is the
+    // one carrying the parameters, and the substring test matches inside a
+    // word, so an address like alice.consTABLEe@oregonstate.edu reaches it.
+    const lines: string[] = [];
+    const log = redactingAuthLogger((line) => lines.push(line));
+
+    log("error", sessionLookupFailure().message);
+
+    expect(lines[0]).not.toContain(SECRET);
+    expect(lines[0]).toContain("params redacted");
   });
 
   it("still says what level it was", () => {
