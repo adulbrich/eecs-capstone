@@ -7,6 +7,7 @@ import {
   buildAuthConfig,
   warnUnconfiguredProviders,
 } from "#/lib/_internal/auth-config";
+import { authRateLimit } from "#/lib/_internal/auth-rate-limits";
 import { onidProfileFromIdToken } from "#/lib/_internal/onid-profile";
 import { requireUserName } from "#/lib/_internal/user-name";
 import { getEmailSender } from "#/lib/email/sender";
@@ -70,6 +71,9 @@ function withVerificationLanding(url: string): string {
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
   trustHost: authConfig.trustHost,
+  // Numbers and reasons in lib/_internal/auth-rate-limits.ts. Still only
+  // active under NODE_ENV=production, which is Better Auth's own default.
+  rateLimit: authRateLimit,
   advanced: {
     // CloudFront terminates TLS at the edge and forwards to the origin over
     // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in
@@ -79,6 +83,15 @@ export const auth = betterAuth({
     // production request resolved to no address and shared one bucket per
     // path (#519). Rate limiting is off outside production, so nothing local
     // exercises it; src/lib/__tests__/trusted-proxies.test.ts pins the walk.
+    //
+    // The value must stay non-empty whatever it holds, because an empty
+    // trusted list sends Better Auth down `if (forwardedIps.length !== 1)
+    // return null` and collapses every viewer behind their own proxy back
+    // into one bucket. What it does NOT do is name a hop inside the VPC: the
+    // ALB appends the CloudFront edge server's public address, not the VPC
+    // origin ENI, so the last entry today is a CloudFront address and the
+    // limiter keys on it. #535 corrects that at the load balancer.
+    //
     // See the Better Auth section of docs/QUIRKS.md.
     ipAddress: { trustedProxies: [...authConfig.trustedProxies] },
   },
