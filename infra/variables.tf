@@ -83,9 +83,9 @@ variable "container_memory" {
 }
 
 variable "app_min_tasks" {
-  description = "Floor for the app service. Two rather than one so a task crash is not an outage; ECS takes 60 to 90 seconds to replace a task, and with a floor of one nothing serves in the meantime."
+  description = "Floor for the app service. Three because the fleet has to be big enough before the students arrive: the #524 load test measured two tasks absorbing 26 requests per second against a term start burst of about 42, and measured the scaler arriving minutes after a burst that lasts two. Two rather than one was the original floor, so that a task crash is not an outage while ECS replaces it, and that still holds underneath. See ADR-0040."
   type        = number
-  default     = 2
+  default     = 3
 }
 
 variable "app_max_tasks" {

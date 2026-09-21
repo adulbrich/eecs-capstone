@@ -73,26 +73,43 @@ what it moved.
 ## What broke first, and at what rate
 
 Three things, in this order. The headline: **two tasks serve about 26 requests per second, the
-term start burst needs 42, and autoscaling does not arrive.**
+term start burst needs 42, and autoscaling arrives minutes after the burst is over.**
 
-### 1. Autoscaling never fired, and that is the finding to act on
+### 1. Autoscaling fired, and arrived after the load had stopped
 
-`runningCount` held at 2 through every Monday phase. The last scaling activity on this service
-is from Sunday 19:24, before any of this ran. The fleet average CPU during phase 1c was 72.8%,
-85.9% and 82.0% on three consecutive one minute datapoints, against a policy whose `AlarmHigh`
-threshold is 50% over three periods of 60 seconds. It stayed `OK`.
+**Corrected after #546 was diagnosed.** This section first read "autoscaling never fired", on
+the evidence that `runningCount` held at 2 through every Monday phase and the last scaling
+activity on the service was from Sunday 19:24. Both readings were taken before the scaler
+acted. It did fire. `describe-alarm-history` and `describe-scaling-activities` say so:
 
-Whatever the mechanism, and the alarm's evaluation timing against the ECS publication lag is
-the place to look, the operational fact is measured rather than predicted: **three consecutive
-minutes at 72 to 86 percent CPU did not add a task.** The Sunday prediction was that
-autoscaling could not react inside a two minute burst. It is worse than that. It also did not
-react to three minutes of sustained overload.
+| Minute (PDT) | What the console shows |
+| --- | --- |
+| 06:36, 06:37 | first two breaching minutes, 56.9% and 99.7% |
+| 06:38 | 13.6%, the gap between two phases, which breaks the run of three |
+| 06:39, 06:40, 06:41 | 72.8%, 85.9%, 82.0%, the first three consecutive breaching minutes |
+| 06:42 | load stops |
+| 06:44:43 | `AlarmHigh` to ALARM, policy sets the desired count to 4 |
+| 06:45:13, 06:45:22 | the two new tasks log themselves listening |
+| 06:59:08, 07:10:08 | `AlarmLow` winds them back to 3, then to 2 |
 
-Term start is a burst. Autoscaling that needs three minutes to notice, a minute of cooldown and
-a Fargate task start cannot be the plan for it. The fleet has to be big enough before the
-students arrive, which means `app_min_tasks`, not `app_max_tasks`. That is
-[#546](https://github.com/adulbrich/eecs-capstone/issues/546), which also carries why the alarm
-did not fire as a thing to diagnose rather than a thing assumed.
+The third breaching datapoint is stamped 06:41 and covers the minute ending 06:42, so the
+operational fact, measured rather than predicted, is: **the alarm fired 2 minutes 43 seconds
+after that minute closed, and capacity was serving 3 minutes 22 seconds after it.** Against
+the last request rather than the datapoint it is a little under that, because 06:42 still
+read 11.7% and so still carried traffic. The alarm is healthy and the policy sized the jump
+correctly. Neither helps. The
+Sunday prediction was that autoscaling could not react inside a two minute burst, and that is
+exactly right; what this run adds is the number.
+
+Read the 06:38 row twice. A single non-breaching minute resets the three-of-three requirement,
+so the gap between two phases cost about three minutes of alarm progress. A real term start
+has the same texture.
+
+Term start is a burst. Autoscaling that needs three consecutive breaching minutes on a metric
+ECS publishes late, then a task start, cannot be the plan for it. The fleet has to be big
+enough before the students arrive, which means `app_min_tasks`, not `app_max_tasks`. That is
+[#546](https://github.com/adulbrich/eecs-capstone/issues/546), answered by ADR-0040, which
+raises the floor to three.
 
 ### 2. Under saturation the app breaks connections mid-response, as 502
 
