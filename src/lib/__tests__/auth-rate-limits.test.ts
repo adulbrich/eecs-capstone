@@ -7,6 +7,7 @@ import {
   CHANGE_PASSWORD_MAX,
   GLOBAL_MAX,
   UNCHECKED_MAX,
+  UNRULED_BY_DESIGN,
 } from "../_internal/auth-rate-limits";
 
 // Better Auth turns its rate limiter on only under NODE_ENV=production, so
@@ -25,19 +26,23 @@ const BASE_URL = "https://auth.test";
 const TRUSTED_PROXY = "10.0.0.0/16";
 
 /**
- * The paths where no credential is checked, so they share one budget: the three
- * buttons on /sign-in, plus account creation. Better Auth's own default rule
- * covers all four at 3 per 10 seconds, which is the lockout being removed.
+ * The paths where no credential is checked, so they share one budget: the two
+ * OAuth buttons on /sign-in, plus account creation. Better Auth's own default
+ * rule covers all three at 3 per 10 seconds, which is the lockout being
+ * removed.
  */
 const UNCHECKED_PATHS = [
-  "/sign-in/email",
   "/sign-in/oauth2",
   "/sign-in/social",
   "/sign-up/email",
 ] as const;
 
 /** Every path the rules name, for the "is this route real" cases below. */
-const RULED_PATHS = [...UNCHECKED_PATHS, "/change-password"] as const;
+const RULED_PATHS = [
+  ...UNCHECKED_PATHS,
+  "/change-password",
+  "/get-session",
+] as const;
 
 // The memory rate-limit store is a module-level Map keyed on `ip|path`, shared
 // by every auth instance in the process. Each case takes an address of its own
@@ -115,10 +120,11 @@ describe("the budget for paths that check no credential", () => {
 });
 
 describe("the change-password budget", () => {
-  // Its own, lower number, because unlike the paths above this one verifies the
-  // current password and so is a real brute force surface. The case exists to
-  // make the difference deliberate: a later pass that flattens all five paths
-  // onto one budget fails here rather than reviewing cleanly.
+  // Its own, lower number, because the legitimate call rate is near zero:
+  // sign-in and sign-up have to tolerate a lecture hall arriving at once and
+  // this does not. The case exists to make the difference deliberate, so a
+  // later pass that flattens every path onto one budget fails here rather than
+  // reviewing cleanly.
   it("is smaller than the budget for paths that check no credential", () => {
     expect(CHANGE_PASSWORD_MAX).toBeLessThan(UNCHECKED_MAX);
   });
@@ -151,8 +157,17 @@ describe("the paths the rules name", () => {
     "is a route Better Auth actually mounts: %s",
     async (path) => {
       const auth = buildAuth();
-      const response = await call(auth, path, anAddress());
-      expect(response.status).toBe(400);
+      const isRead = path === "/get-session";
+      const response = await call(
+        auth,
+        path,
+        anAddress(),
+        isRead ? "GET" : "POST"
+      );
+      // A mounted POST route rejects the empty body with 400; the session read
+      // is a GET and answers 200 with a null session. Either way, not 404 and
+      // not 429.
+      expect(response.status).toBe(isRead ? 200 : 400);
     }
   );
 
@@ -160,6 +175,35 @@ describe("the paths the rules name", () => {
     const auth = buildAuth();
     const response = await call(auth, "/sign-in/not-a-real-path", anAddress());
     expect(response.status).toBe(404);
+  });
+});
+
+describe("the paths left on Better Auth's default", () => {
+  // `/sign-in/email` is the interesting one. Raising it alongside the others
+  // would be consistent and is wrong, because `emailVerification.sendOnSignIn`
+  // makes the route limit double as the ceiling on verification mail aimed at
+  // a stranger's inbox (#554). This case is what makes that a decision rather
+  // than an oversight: adding a rule for it turns the test red, and whoever
+  // does it has to come here and read why.
+  it("does not quietly gain a rule", () => {
+    const ruled = Object.keys(authRateLimit.customRules ?? {});
+    for (const path of UNRULED_BY_DESIGN) {
+      expect(ruled).not.toContain(path);
+    }
+  });
+
+  it("still refuses /sign-in/email at Better Auth's 3 per 10 seconds", async () => {
+    const auth = buildAuth();
+    const address = anAddress();
+    const betterAuthSignInDefault = 3;
+
+    for (let spent = 0; spent < betterAuthSignInDefault; spent += 1) {
+      const allowed = await call(auth, "/sign-in/email", address);
+      expect(allowed.status).not.toBe(429);
+    }
+
+    const refused = await call(auth, "/sign-in/email", address);
+    expect(refused.status).toBe(429);
   });
 });
 

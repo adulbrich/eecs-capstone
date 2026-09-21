@@ -105,12 +105,14 @@ export const auth = betterAuth({
     // sign-in refuses them and nothing else in the app sends one. Better Auth
     // runs this after the password check, so a wrong password costs no mail.
     //
-    // The rate limiter still covers the route, but loosely: raising
-    // /sign-in/email to 60 per 10 seconds (#535) took the ceiling here from 3
-    // mails per 10 seconds per address to 60. Accepted rather than overlooked,
-    // because reaching it needs the CORRECT password for an unverified
-    // account, so the only inbox anyone can flood this way is one they already
-    // control. If that stops being true, meter the send rather than the route.
+    // A wrong password is the only thing that costs no mail, though. Sign-up is
+    // open, so anyone can register an address they do NOT own with a password
+    // they choose, and then every sign-in mails the real owner a fresh link.
+    // The rate limit on /sign-in/email is therefore also the ceiling on
+    // verification mail aimed at a stranger, which is why #535 left that one
+    // path on Better Auth's 3-per-10-seconds default while raising every other
+    // path around it. #554 is the fix, and it is to meter the send rather than
+    // the route; until it lands, do not raise /sign-in/email.
     sendOnSignIn: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
