@@ -22,6 +22,16 @@ const BASE = __ENV.BASE || "https://capstone.eecs.oregonstate.edu";
 const RPS = Number(__ENV.RPS || 4);
 const IDS = __ENV.IDS || "./ids.txt";
 
+/**
+ * The latency that aborts the run, in milliseconds. #524 sets 3000 and that is
+ * the default, but 3000 stops a saturating phase within seconds of the first
+ * slow request, which reports that the phase degraded and nothing about how.
+ * Raise it for a deliberately short run when the failure shape is the point,
+ * which is what phases 1d, 1e and 2 exist for. The error threshold below is
+ * not adjustable on purpose: a 5XX aborts at any setting.
+ */
+const P99_ABORT_MS = Number(__ENV.P99_ABORT_MS || 3000);
+
 const ids = new SharedArray("ids", () =>
   open(IDS).split("\n").filter(Boolean)
 );
@@ -76,7 +86,9 @@ export const options = {
   thresholds: {
     // These abort the run. They are #524's abort criteria, enforced.
     http_req_failed: [{ threshold: "rate<0.01", abortOnFail: true }],
-    http_req_duration: [{ threshold: "p(99)<3000", abortOnFail: true }],
+    http_req_duration: [
+      { threshold: `p(99)<${P99_ABORT_MS}`, abortOnFail: true },
+    ],
   },
   summaryTrendStats: ["avg", "min", "med", "p(95)", "p(99)", "max"],
 };

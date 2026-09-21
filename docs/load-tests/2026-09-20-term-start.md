@@ -1,4 +1,4 @@
-# Load test: 500 student term start, 2026-09-20
+# Load test: 500 student term start, 2026-09-20 and 2026-09-21
 
 Issue [#524](https://github.com/adulbrich/eecs-capstone/issues/524). Script:
 [`scripts/loadtest/projects-browse.js`](../../scripts/loadtest/projects-browse.js).
@@ -7,10 +7,15 @@ Run from a laptop in Corvallis against production, Sunday 2026-09-20 from 19:58 
 with background traffic at about 0.5 requests per second. Client latency therefore carries
 roughly 20 ms of Corvallis to `us-west-2` round trip that a request from campus would also pay.
 
-**This run is partial.** Phases 0, 1a and 1b are below. Phases 1c through 2 are not, and the
-reason is in "Why the ramp stopped" at the end. Nothing failed. When the remaining phases run,
-add their rows to the table in this file and date them in the row, rather than starting a
-second file: it is one run of one issue, interrupted.
+Run in two sittings. Sunday evening covered phases 0, 1a and 1b at 1, 5 and 10 requests per
+second, and stopped early for a reason worth keeping: "Why the Sunday ramp stopped at 1b",
+below. Monday 06:33 to 06:42 PDT covered phase 2 and phase 1c, from the same laptop, against
+background traffic of 0.07 requests per second.
+
+**The Monday sitting ended on #524's own abort criterion: 5XX appeared.** Seven of them, all
+inside the test window, against zero in the previous 24 hours. Phases 1d and 1e were therefore
+never run and should not be run until the 502 below is understood. Everything the issue set out
+to learn was answered anyway, and the answers are not the ones the extrapolation predicted.
 
 ## Configuration under test
 
@@ -39,18 +44,119 @@ it claims.
 | 0. Baseline | 1/s | 70 ms | 179 ms | 266 ms | 370 ms | 0% | 6.5% | 8.8% | 9.8% | 11.1% | 6 | 2 |
 | 1a | 5/s | 62 ms | 154 ms | 243 ms | 605 ms | 0% | 21.9% | 24.9% | 15.2% | 16.1% | 6 | 2 |
 | 1b | 10/s | 61 ms | 173 ms | 389 ms | 771 ms | 0% | 39.8% | 47.6% | 17.8% | 18.0% | 10 | 2 |
-| 1c | 25/s | not run | | | | | | | | | | |
-| 1d | 50/s | not run | | | | | | | | | | |
-| 1e | 75/s | not run | | | | | | | | | | |
-| 2. Term start | 42/s then 8/s | not run | | | | | | | | | | |
+| 1c (Mon) | 25/s | 104 ms | 633 ms | 1.40 s | 3.87 s | 0.11% | 85.9% | 90.3% | 15.0% | 21.1% | 21 | 2 |
+| 2. Burst (Mon) | 42/s | 892 ms | 2.97 s | 4.25 s | 4.37 s | 0% | 12.9% | 55.6% | 14.9% | 17.4% | 40 | 2 |
+| 2. Burst, held (Mon) | 42/s | 4.12 s | 6.19 s | 6.68 s | 8.11 s | 0.07% | 99.7% | 99.6% | 15.0% | 21.1% | 40 | 2 |
+| 1d | 50/s | not run, stopped on 5XX | | | | | | | | | | |
+| 1e | 75/s | not run, stopped on 5XX | | | | | | | | | | |
+| 2. Tail | 8/s | not run, stopped on 5XX | | | | | | | | | | |
 
-Zero 5XX at the target and zero at the load balancer across all three phases. `runningCount`
-never moved off 2, and no scaling activity fired: the fleet average peaked at 39.8%, under the
-50% target.
+The two burst rows are the same phase twice. The first ran under #524's `p99 < 3s` abort and
+stopped after 8 seconds, which reports that the phase degraded and nothing about how. The second
+raised the latency abort to 10 s for 90 seconds, leaving the zero-error abort untouched, to see
+the shape. Read the first row as the moment of failure and the second as the steady state
+behind it.
 
-## What broke first
+Neither burst row reached 42 requests per second. The first was still ramping in. The second
+absorbed **26.3**, dropping 267 iterations because the site could not take them: at saturation
+k6 cannot offer the target rate through a bounded VU pool, and the gap between offered and
+absorbed is itself the measurement.
 
-Nothing, at the rates reached. The useful measurement is the slope.
+Sunday's three phases produced zero 5XX anywhere and never moved `runningCount` off 2, with the
+fleet average peaking at 39.8%. Monday's did move the needle, and the next three sections are
+what it moved.
+
+## What broke first, and at what rate
+
+Three things, in this order. The headline: **two tasks serve about 26 requests per second, the
+term start burst needs 42, and autoscaling does not arrive.**
+
+### 1. Autoscaling never fired, and that is the finding to act on
+
+`runningCount` held at 2 through every Monday phase. The last scaling activity on this service
+is from Sunday 19:24, before any of this ran. The fleet average CPU during phase 1c was 72.8%,
+85.9% and 82.0% on three consecutive one minute datapoints, against a policy whose `AlarmHigh`
+threshold is 50% over three periods of 60 seconds. It stayed `OK`.
+
+Whatever the mechanism, and the alarm's evaluation timing against the ECS publication lag is
+the place to look, the operational fact is measured rather than predicted: **three consecutive
+minutes at 72 to 86 percent CPU did not add a task.** The Sunday prediction was that
+autoscaling could not react inside a two minute burst. It is worse than that. It also did not
+react to three minutes of sustained overload.
+
+Term start is a burst. Autoscaling that needs three minutes to notice, a minute of cooldown and
+a Fargate task start cannot be the plan for it. The fleet has to be big enough before the
+students arrive, which means `app_min_tasks`, not `app_max_tasks`.
+
+### 2. Under saturation the app breaks connections mid-response, as 502
+
+Seven `HTTPCode_ELB_5XX_Count` inside the test window, zero `HTTPCode_Target_5XX_Count`, and
+zero in the previous 24 hours. The app never returned a 500. The ALB access logs #523 turned on
+say what happened instead, and all four in the retrieved window agree:
+
+```
+elb_status_code 502, target_status_code -, target_processing_time 0.14 to 0.25, response_processing_time -1
+```
+
+The task accepted the request, began responding in about 200 ms, and then the connection broke
+before a complete response came back. That is not a timeout, which would be 504, and not an
+unhealthy target, which would be 503. Both tasks did it, on ordinary listing and detail GETs.
+Seven failures across roughly 7200 requests is 0.1%, and every one of them is a student seeing
+an error page.
+
+This is the one result here that is a defect rather than a capacity number. It wants its own
+issue before 1d and 1e are ever run, because 1d and 1e exist to push further into exactly the
+regime that produces it.
+
+Not to be confused with the 57 `460`s in the same logs. Those are the ALB recording that the
+client went away, and the client was k6 interrupting its own in-flight iterations when the
+first burst aborted. They are all timestamped in that one minute and they are not server
+failures.
+
+### 3. The knee is between 25 and 42 requests per second
+
+25 requests per second is serviceable: p50 104 ms, p95 633 ms, p99 1.40 s, sustained for three
+minutes with 2 dropped iterations out of 1124. It is not comfortable, since #524's phase 2
+criteria are p95 under 500 ms and p99 under 1500 ms and this only just clears the second while
+missing the first, but it works.
+
+42 requests per second is not serviceable on two tasks. The site absorbed 26.3, latency settled
+around a p50 of 4.12 s, and one task sat at 99.6% CPU.
+
+### What that does to the Sunday extrapolation
+
+Sunday's three phases fit a straight line at about 19 ms of vCPU per request and predicted
+about 26 requests per second for two tasks at 100% CPU. Monday measured 26.3. **The model was
+right**, which is worth saying because the rest of this section is about things the model did
+not predict: the scaling policy not engaging, and the 502.
+
+The per request cost stands at about 19 ms, roughly four times the 5 ms #524 extrapolated from
+a month of CloudWatch. The likely reason is workload mix rather than arithmetic: a month of
+production is mostly cheap requests, health checks and redirects and small routes, while every
+request in this test is a projects listing render, three queries and 90 to 145 KB of HTML. The
+expensive path is also the one 500 students will be on.
+
+### Sizing, from the measurement rather than the model
+
+- Two tasks are about 26 requests per second. Four are about 52.
+- The term start burst of 42 requests per second needs at least three tasks, and four to have
+  any margin.
+- Autoscaling will not deliver them in time, so they have to be running beforehand.
+
+### The database was never the constraint
+
+RDS CPU never exceeded 9%, and the credit balance **rose** from 212 to 215 across the whole
+Monday sitting. `DatabaseConnections` is more interesting: it pinned at exactly 40, which is
+two tasks times the pool maximum of 20, through both burst minutes, while sitting at 20 to 21
+under sustained 25 requests per second. ADR-0034 names that number as the signal to watch: "If
+it pins to 20, headroom is gone again." Under a burst it pins. Whether the pool is a binding
+constraint or merely a mirror of requests queued behind a saturated CPU is not separable from
+these runs, because CPU was at its own ceiling at the same time. Raising tasks raises the pool
+total with it, so the sizing above addresses both; ADR-0034's budget has room for eight tasks.
+
+### Memory was never close
+
+21.1% of 1024 MB at the worst, against #524's 75% criterion.
 
 CPU is the binding resource. Against the fleet total of 0.5 vCPU, the three phases fit a
 straight line at about **19 ms of vCPU per request**, with an idle floor small enough to be
@@ -80,7 +186,7 @@ Memory never became interesting: 18.0% of 1024 MB at the worst, against #524's 7
 The database is nowhere near a constraint. It held 7.5% CPU and 10 connections at 10 requests
 per second, against a pool ceiling of 20 per task and 220 usable on the instance.
 
-## Why the ramp stopped at 1b
+## Why the Sunday ramp stopped at 1b
 
 #529 resized the database from `db.t4g.micro` to `db.t4g.small` at 19:23 PDT, 35 minutes before
 this run. A class change restarts the instance, and the restart throws away the accrued burst
@@ -110,9 +216,10 @@ the test. The phases themselves are cheap: at the measured database load they sp
 of credits in total, because only 1d and 1e cross the 20% baseline at all and only for minutes.
 The point is having a balance to spend them from.
 
-**Wait for `CPUCreditBalance` at 100 or more, and read it rather than trusting the clock.** At
-18 per hour from 14.2 at 20:15 PDT, it crosses 100 around 01:00 PDT and reads about 170 by
-05:00. Monday 05:00 to 07:00 PDT is the window to use: quiet, and before term traffic.
+**Wait for `CPUCreditBalance` at 100 or more, and read it rather than trusting the clock.** That
+is what Monday did: the balance read 212 at 06:31 PDT with the surplus repaid to zero, and it
+rose to 215 across the sitting rather than falling. The database was never close to being the
+problem, which the Sunday abort could not have known.
 
 ## Running the rest
 
@@ -121,14 +228,22 @@ BASE=https://capstone.eecs.oregonstate.edu
 IDS=/path/to/ids.txt RPS=25 DURATION=3m k6 run scripts/loadtest/projects-browse.js
 ```
 
-Order matters for phase 2. Run 1c, 1d and 1e back to back, then **wait for `runningCount` to
-read 2 again before starting phase 2**, which takes at least the 600 s scale in cooldown and in
-practice longer. Phase 2 asks whether autoscaling catches a cold two minute burst; run on the
-warm 3 or 4 task fleet that 1e leaves behind, it answers a different and easier question. Phase
-2 is also two invocations rather than one, `RPS=42 DURATION=2m` and then `RPS=8 DURATION=10m`.
+`P99_ABORT_MS` raises the latency abort from #524's 3000 for a deliberately short run when the
+failure shape is the point. The error threshold is not adjustable: a 5XX aborts at any setting,
+which is what ended the Monday sitting.
+
+**Do not run 1d or 1e until the 502 has an explanation.** They exist to push further into the
+regime that already produces it, on a live site, and a louder version of a failure that is
+already understood to be real is not worth a student seeing an error page for.
+
+Phase 2 should run on a cold 2 task fleet, because term start is itself a cold fleet event.
+Monday got that for free by running phase 2 first; after a ladder it means waiting for
+`runningCount` to fall back, which takes at least the 600 s scale in cooldown. The 8 requests
+per second tail was never run and is the least interesting phase left: 1a at 5 and 1b at 10
+bracket it and both were uneventful.
 
 Run it attended. #524 wants the owner told, the abort criteria in front of you and a hand on
-the stop, and the credit threshold is something to read rather than a time to wait until.
+the stop.
 
 `ids.txt` is one project id per line and is deliberately not committed. Rebuild it by pulling
 ids out of the listing and keeping the ones that answer 200, because the listing payload also
