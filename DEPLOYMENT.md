@@ -1530,6 +1530,10 @@ this config; delete it manually if you are done with the project.
   `eecs-capstone/github-client-secret`, `eecs-capstone/onid-client-secret`
 - SSM: `/eecs-capstone/ASSETS_PUBLIC_BASE`
 - Log group: `/ecs/eecs-capstone`
+- Access logs bucket: `eecs-capstone-access-logs-<account-id>`, ALB under
+  `alb/`, CloudFront under `AWSLogs/<account-id>/CloudFront/`, both deleted
+  after `var.access_log_retention_days`. They hold client IP addresses; see
+  [ADR-0036](./docs/adr/0036-access-logs-keep-raw-addresses-for-thirty-days.md).
 
 **Runtime environment (set in the task definition, `infra/ecs.tf`):**
 
@@ -1575,7 +1579,7 @@ cannot be, so read it as a summary and not as the contract.
 **File map:**
 
 - `infra/` Terraform (one file per concern: `vpc`, `security-groups`, `rds`,
-  `s3`, `ecr`, `ecs`, `cloudfront`, `iam`, `secrets`, `outputs`).
+  `s3`, `ecr`, `ecs`, `cloudfront`, `iam`, `logging`, `secrets`, `outputs`).
 - `Dockerfile`, `.dockerignore` multi-stage arm64 image build.
 - `.github/workflows/deploy.yml` manual deploy workflow.
 - `scripts/migrate.mjs` production migration runner.

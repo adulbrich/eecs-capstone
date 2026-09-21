@@ -42,13 +42,24 @@ provider "aws" {
   }
 }
 
-# CloudFront only accepts viewer certificates from us-east-1, regardless of
-# where the rest of the stack lives. Used for a data lookup only, so no
-# default_tags block is needed: this provider creates nothing.
+# CloudFront is global and pins two things to us-east-1: it only accepts
+# viewer certificates from there, and standard logging v2 delivery resources
+# must be created there. So this provider does create resources now, and
+# carries the same default tags as the main one; without them the delivery
+# resources would be invisible to a Cost Explorer filter on `Project`.
 provider "aws" {
   alias   = "us_east_1"
   region  = "us-east-1"
   profile = "aws-capstone1"
+
+  default_tags {
+    tags = {
+      Project     = var.project
+      Environment = var.environment
+      ManagedBy   = "terraform"
+      Repository  = "${var.github_owner}/${var.github_repo}"
+    }
+  }
 }
 
 data "aws_caller_identity" "current" {}
