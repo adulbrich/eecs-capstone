@@ -254,6 +254,19 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/programs.ts:updateProgram": { level: "staff" },
 
+  "server/social-summary.ts:getSocialSummary": {
+    level: "staff",
+    note: "The summary text itself is public through projectDetailView, since it is the page's og:description. What this adds is the bookkeeping beside it: when it was written and whether a human wrote it. Those three columns are absent from projectDetailView (#498).",
+  },
+  "server/social-summary.ts:regenerateSocialSummary": {
+    level: "staff",
+    note: "A paid Bedrock call that overwrites the stored summary and clears the manual mark. Only staff, and metered under its own limit pair. The automatic generation on publish and on edit is not this endpoint and is not metered: it has no user to attribute to (#498).",
+  },
+  "server/social-summary.ts:saveSocialSummary": {
+    level: "staff",
+    note: "Writes staff wording and sets socialSummaryIsManual, which stops the automatic refresh overwriting it. Staff-only because the text is published under the university's name, so correcting it is a review action rather than an owner action.",
+  },
+
   "server/project-review.ts:reviewProject": {
     level: "authenticated",
     note: "Narrows to owner-or-staff only when a project id is supplied: reviewProjectAs runs canEditProject inside `if (input.projectId)`, and the id is optional because the submission page reviews a proposal with no row yet. With no id the gate is requireUser() plus assertWithinLimit under the review feature, which is what bounds spend on a paid endpoint now that ownership no longer does.",

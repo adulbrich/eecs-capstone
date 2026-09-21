@@ -714,6 +714,7 @@ describe("staff-only data and actions are inaccessible to non-staff", () => {
       "problemStatement",
       "programs",
       "requiresNdaIp",
+      "socialSummary",
       "status",
       "studentProposed",
       "teamsSupported",

@@ -92,6 +92,14 @@ vi.mock("#/server/scope-assessment", () => ({
   assessProjectScope: vi.fn(() => Promise.resolve(null)),
   getScopeAssessment: vi.fn(() => Promise.resolve(null)),
 }));
+
+vi.mock("#/server/social-summary", () => ({
+  getSocialSummary: vi.fn(() =>
+    Promise.resolve({ isManual: false, summary: null, updatedAt: null })
+  ),
+  regenerateSocialSummary: vi.fn(),
+  saveSocialSummary: vi.fn(),
+}));
 const PROGRAM_A = "00000000-0000-0000-0000-00000000pg01";
 
 vi.mock("#/server/programs", () => ({
@@ -212,7 +220,7 @@ function confirmDialog(title: string) {
 }
 
 describe("StaffProjectPanel section order", () => {
-  it("shows the eight sections in the order #322 and #450 asked for", async () => {
+  it("shows the nine sections in the order #322, #450 and #498 asked for", async () => {
     renderPanel("submitted");
     await screen.findByLabelText("Proposer email");
     const titles = Array.from(document.querySelectorAll("h3")).map(
@@ -227,6 +235,10 @@ describe("StaffProjectPanel section order", () => {
       "Mentor",
       "Scope assessment",
       "Categories",
+      // After the categories, where #498 put it: the last thing staff check
+      // before a project goes out, and the only section about how the project
+      // looks to someone who never opens the page.
+      "Social preview",
       "Edit log",
       "Danger zone",
     ]);

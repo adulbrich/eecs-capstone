@@ -87,3 +87,16 @@ resource "aws_ssm_parameter" "assets_public_base" {
 
   tags = { Name = "${var.project}-assets-public-base" }
 }
+
+# The site's own origin, needed at image *build* time for the same reason: it
+# is baked into the client bundle via VITE_SITE_URL, which og:image,
+# twitter:image and rel=canonical are built from (#498). The same value as
+# BETTER_AUTH_URL in ecs.tf, which the task reads at run time; the duplication
+# is the build/run boundary, not a second source of truth.
+resource "aws_ssm_parameter" "site_url" {
+  name  = "/${var.project}/SITE_URL"
+  type  = "String"
+  value = "https://${var.domain_name}"
+
+  tags = { Name = "${var.project}-site-url" }
+}

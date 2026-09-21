@@ -1,5 +1,6 @@
 import { beforeEach } from "vitest";
 import { embeddingsEnabled } from "#/lib/_internal/embeddings-flag";
+import { socialSummariesEnabled } from "#/lib/_internal/social-summary-flag";
 import { resetDatabase } from "./db-reset";
 
 /**
@@ -17,6 +18,22 @@ import { resetDatabase } from "./db-reset";
 if (embeddingsEnabled()) {
   throw new Error(
     'Embeddings are enabled during the integration run. BEDROCK_EMBEDDINGS_ENABLED must be "false"; anything else, including unset, is on. See the env block in vitest.integration.config.ts.'
+  );
+}
+
+/**
+ * The same refusal for the social summary, which matters more: it runs on
+ * every publish, archive and edit of a live project rather than behind a
+ * button, so a fail-open would reach Bedrock from most of this suite.
+ *
+ * `project-social-summary.integration.test.ts` is the one file that turns it
+ * back on, for itself, in a `beforeAll`. That file injects a fake
+ * `ResponsesFn` into every path it exercises, including the `summarize` seam
+ * on `performTransitionAs`, so it still reaches no network.
+ */
+if (socialSummariesEnabled()) {
+  throw new Error(
+    'Social summaries are enabled during the integration run. BEDROCK_SOCIAL_SUMMARY_ENABLED must be "false"; anything else, including unset, is on. See the env block in vitest.integration.config.ts.'
   );
 }
 

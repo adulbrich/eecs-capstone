@@ -163,6 +163,7 @@ const DETAIL_KEYS = [
   "problemStatement",
   "programs",
   "requiresNdaIp",
+  "socialSummary",
   "status",
   "studentProposed",
   "teamsSupported",
@@ -195,6 +196,7 @@ function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
     mentorEmail: "mentor@x.test",
     studentProposed: false,
     acceptingApplicants: true,
+    socialSummary: "A one-line summary",
     ...overrides,
   } as ProjectRow;
 }
@@ -256,10 +258,26 @@ describe("projectDetailView", () => {
       "embedding",
       "embeddingSourceHash",
       "embeddingUpdatedAt",
+      // The social summary itself IS public (#498), because it is the
+      // og:description. The three columns that govern it are not: they say
+      // whether staff wrote it by hand and when, which is review bookkeeping.
+      "socialSummarySourceHash",
+      "socialSummaryUpdatedAt",
+      "socialSummaryIsManual",
       "createdAt",
       "updatedAt",
     ]) {
       expect(view).not.toHaveProperty(key);
+    }
+  });
+
+  it("carries the social summary to every viewer, anonymous included", () => {
+    // It is the og:description on a page anyone can fetch, so there is no
+    // audience that may see the project but not its preview text (#498).
+    for (const viewer of [anon, other, owner, admin]) {
+      expect(projectDetailView(withPrivate, viewer).socialSummary).toBe(
+        "A one-line summary"
+      );
     }
   });
 

@@ -199,6 +199,30 @@ variable "bedrock_scope_reasoning_effort" {
   default     = "high"
 }
 
+variable "bedrock_social_summary_reasoning_effort" {
+  description = "Reasoning effort for the social summary. Lowest of the three: one sentence, and the only one that runs unattended."
+  type        = string
+  default     = "minimal"
+}
+
+variable "bedrock_social_summary_enabled" {
+  description = "Kill switch for the social summary. Plumbed, unlike the embeddings one, because this is the only model call that runs without a human pressing anything: it fires on every publish, archive and edit of a live project, so stopping it must not wait on a terraform apply."
+  type        = string
+  default     = "true"
+}
+
+variable "ai_social_summary_limit_per_hour" {
+  description = "Per-user hourly ceiling on staff social summary rewrites. Meters the Regenerate button only; the automatic path is not counted."
+  type        = string
+  default     = "20"
+}
+
+variable "ai_social_summary_limit_per_day" {
+  description = "Per-user daily ceiling on staff social summary rewrites."
+  type        = string
+  default     = "60"
+}
+
 variable "ai_scope_limit_per_hour" {
   description = "Per-user hourly ceiling on scope assessments. Metered apart from AI reviews."
   type        = string

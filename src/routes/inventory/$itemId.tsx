@@ -8,13 +8,16 @@ import { StaffInventoryPanel } from "#/components/staff-inventory-panel";
 import { authClient } from "#/lib/auth-client";
 import { isUuid } from "#/lib/is-uuid";
 import { pageTitle } from "#/lib/page-title";
+import { NOINDEX } from "#/lib/social-meta";
 import { getPublicUrl } from "#/lib/storage";
 import { useHasMounted } from "#/lib/use-has-mounted";
 import type { ItemStatus } from "#/lib/vocabularies";
 import { getInventoryItemDetail } from "#/server/inventory";
 
 export const Route = createFileRoute("/inventory/$itemId")({
-  head: () => ({ meta: [{ title: pageTitle("Inventory Item") }] }),
+  head: () => ({
+    meta: [{ title: pageTitle("Inventory Item") }, NOINDEX],
+  }),
   loader: async ({ params }) => {
     // The server function validates `id` as a UUID and throws a ZodError on
     // anything else, which would surface as a 500. A URL that cannot name an

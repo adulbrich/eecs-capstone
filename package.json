@@ -25,6 +25,7 @@
     "lint": "ultracite check",
     "prepare": "lefthook install || true",
     "preview": "vite preview",
+    "social-summaries:backfill": "tsx --env-file=.env.local scripts/backfill-social-summaries.ts",
     "start": "node .output/server/index.mjs",
     "storage:init": "tsx --env-file=.env.local scripts/storage-init.ts",
     "test": "vitest run --exclude '**/*.integration.test.ts' --exclude '**/*.a11y.test.ts' --exclude '**/*.e2e.test.ts'",

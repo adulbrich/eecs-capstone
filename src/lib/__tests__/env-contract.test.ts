@@ -53,13 +53,25 @@ const PLATFORM_VARS = new Map([
  * invocation rather than configure the app, which is why they are not in
  * `.env.example`.
  */
-const SCRIPT_ARGUMENTS = new Set(["ADMIN_EMAIL", "CONFIRM", "TARGET_IDS"]);
+const SCRIPT_ARGUMENTS = new Set([
+  "ADMIN_EMAIL",
+  "CONFIRM",
+  // The rehearsal and the cap on the social summary backfill, which is one
+  // paid model call per project across the whole catalog (#498).
+  "DRY_RUN",
+  "LIMIT",
+  "TARGET_IDS",
+]);
 
 /** Documented, but never read by this codebase, each for a stated reason. */
 const NOT_READ_HERE = new Map([
   [
     "VITE_STORAGE_PUBLIC_BASE",
     "client-side, reached through import.meta.env at build time (src/lib/storage.ts)",
+  ],
+  [
+    "VITE_SITE_URL",
+    "client-side, reached through import.meta.env at build time (src/lib/site-url.ts)",
   ],
 ]);
 

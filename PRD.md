@@ -556,6 +556,32 @@ catalogue that decided the matrix below; #288 shipped it.
 - [x] Inventory linked from the site header.
 - [ ] Partial: Handbook is currently a separate Astro site; not yet linked or integrated.
 
+## 16a. Link Sharing & Search Visibility
+
+- [x] Open Graph and Twitter card metadata on every page, with brand defaults on
+  the root route and per-project title, description and type on
+  `/projects/$projectId` (#498). Server rendered, since a scraper runs no
+  JavaScript.
+- [x] One static 1200x630 brand card shared by every page, committed rather than
+  built, with `og:image:alt` so the text baked into it is not lost to a screen
+  reader. `scripts/generate-social-card.mjs` regenerates it.
+- [x] `rel=canonical` on the project and inventory detail pages, so a link shared
+  with filter or tracking params unfurls as one page.
+- [x] The catalog is kept out of search results with `noindex, follow` while
+  `robots.txt` stays permissive, which is what keeps previews working
+  ([ADR-0038](./docs/adr/0038-the-catalog-is-shareable-but-not-indexed.md)).
+  The landing and privacy pages stay indexable.
+- [x] A model-written one-line social summary per project, generated from the
+  title, description and problem statement at the same two call sites as the
+  embedding, with its own kill switch and its own usage limit pair.
+- [x] Staff read and correct that summary in a Social preview panel section, and
+  a corrected one is never overwritten by the automatic path.
+- [x] `og:description` falls back through the summary, the description, the
+  problem statement and a site sentence, so a page unfurls correctly with no
+  model involved at all.
+- [ ] Per-project card images, so two project links do not unfurl with the same
+  picture (#533).
+
 ## 17. Project Bidding & Assignment (Stretch)
 
 - [ ] Partial: Schema scaffolded (`project_bids`, `project_assignments`) but no UI or

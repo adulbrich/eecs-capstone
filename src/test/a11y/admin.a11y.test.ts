@@ -162,6 +162,12 @@ test("project detail (staff panel, scope assessment)", async ({ page }) => {
   // regression that drops the section fails here rather than passing a scan
   // of a page that no longer has the control on it.
   await expect(page.getByRole("checkbox", { name: /A11Y-101/ })).toBeChecked();
+  // The Social preview section (#498) is a staff-gated read like the three
+  // above and renders a "Loading..." paragraph until it resolves, so scanning
+  // before it settles would scan that paragraph instead of the textarea and
+  // the two buttons. Waiting on the textarea rather than the heading, since
+  // the heading is in the panel from the first render.
+  await expect(page.getByLabel("Social summary")).toBeVisible();
   await checkA11y(page);
 });
 

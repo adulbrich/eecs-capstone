@@ -50,9 +50,13 @@ jobs:
           ASSETS_BASE=$(aws ssm get-parameter \
             --name "/${PROJECT}/ASSETS_PUBLIC_BASE" \
             --query 'Parameter.Value' --output text)
+          SITE_URL=$(aws ssm get-parameter \
+            --name "/${PROJECT}/SITE_URL" \
+            --query 'Parameter.Value' --output text)
           {
             echo "image=${ECR_REPO}:${GITHUB_SHA::12}"
             echo "assets_base=${ASSETS_BASE}"
+            echo "site_url=${SITE_URL}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Set up Buildx
@@ -67,6 +71,7 @@ jobs:
           tags: ${{ steps.cfg.outputs.image }}
           build-args: |
             VITE_STORAGE_PUBLIC_BASE=${{ steps.cfg.outputs.assets_base }}
+            VITE_SITE_URL=${{ steps.cfg.outputs.site_url }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

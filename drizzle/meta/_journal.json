@@ -232,6 +232,13 @@
       "when": 1789782391076,
       "tag": "0032_add_comment_edited_at",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1789965590799,
+      "tag": "0033_add_social_summary_columns",
+      "breakpoints": true
     }
   ]
 }

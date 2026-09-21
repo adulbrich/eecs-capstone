@@ -122,8 +122,12 @@ resource "aws_ecs_task_definition" "app" {
         { name = "AI_REVIEW_LIMIT_PER_HOUR", value = var.ai_review_limit_per_hour },
         { name = "AI_REVIEW_LIMIT_PER_DAY", value = var.ai_review_limit_per_day },
         { name = "BEDROCK_SCOPE_REASONING_EFFORT", value = var.bedrock_scope_reasoning_effort },
+        { name = "BEDROCK_SOCIAL_SUMMARY_REASONING_EFFORT", value = var.bedrock_social_summary_reasoning_effort },
+        { name = "BEDROCK_SOCIAL_SUMMARY_ENABLED", value = var.bedrock_social_summary_enabled },
         { name = "AI_SCOPE_LIMIT_PER_HOUR", value = var.ai_scope_limit_per_hour },
         { name = "AI_SCOPE_LIMIT_PER_DAY", value = var.ai_scope_limit_per_day },
+        { name = "AI_SOCIAL_SUMMARY_LIMIT_PER_HOUR", value = var.ai_social_summary_limit_per_hour },
+        { name = "AI_SOCIAL_SUMMARY_LIMIT_PER_DAY", value = var.ai_social_summary_limit_per_day },
         { name = "BEDROCK_EMBEDDING_MODEL_ID", value = var.bedrock_embedding_model_id },
         { name = "BEDROCK_EMBEDDING_DIMENSIONS", value = var.bedrock_embedding_dimensions },
         # Real outbound mail through SES. Both preconditions are met: the

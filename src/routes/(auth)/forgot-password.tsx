@@ -6,9 +6,10 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
 import { pageTitle } from "#/lib/page-title";
+import { NOINDEX } from "#/lib/social-meta";
 
 export const Route = createFileRoute("/(auth)/forgot-password")({
-  head: () => ({ meta: [{ title: pageTitle("Forgot Password") }] }),
+  head: () => ({ meta: [{ title: pageTitle("Forgot Password") }, NOINDEX] }),
   component: ForgotPassword,
 });
 

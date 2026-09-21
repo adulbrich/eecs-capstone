@@ -17,6 +17,9 @@ export default defineConfig({
     fileParallelism: false,
     // Embeddings must never reach AWS from a test. Tests that need a vector
     // inject their own EmbedFn; everything else fails fast and locally.
-    env: { BEDROCK_EMBEDDINGS_ENABLED: "false" },
+    env: {
+      BEDROCK_EMBEDDINGS_ENABLED: "false",
+      BEDROCK_SOCIAL_SUMMARY_ENABLED: "false",
+    },
   },
 });

@@ -15,6 +15,7 @@ import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { NOINDEX } from "#/lib/social-meta";
 
 const searchSchema = z.object({
   redirect: z.string().optional(),
@@ -25,7 +26,7 @@ const searchSchema = z.object({
 });
 
 export const Route = createFileRoute("/(auth)/sign-in")({
-  head: () => ({ meta: [{ title: pageTitle("Sign In") }] }),
+  head: () => ({ meta: [{ title: pageTitle("Sign In") }, NOINDEX] }),
   validateSearch: searchSchema,
   beforeLoad: async () => {
     const session = await getSession();

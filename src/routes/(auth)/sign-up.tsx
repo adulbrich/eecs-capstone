@@ -7,9 +7,10 @@ import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { NOINDEX } from "#/lib/social-meta";
 
 export const Route = createFileRoute("/(auth)/sign-up")({
-  head: () => ({ meta: [{ title: pageTitle("Sign Up") }] }),
+  head: () => ({ meta: [{ title: pageTitle("Sign Up") }, NOINDEX] }),
   beforeLoad: async () => {
     const session = await getSession();
     if (session?.user) {
