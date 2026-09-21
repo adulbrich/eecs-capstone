@@ -214,12 +214,25 @@ const PROGRAMS = {
  * app keeps approval separate from publication. DEPLOYMENT.md's live-import
  * section has that mapping in full, and why it exposes nothing.
  *
- * What an `approved` row does NOT get:
+ * `changes_requested` is here for the legacy portal's rejected proposals,
+ * which have no counterpart in this vocabulary. ADR-0038 is the decision and
+ * what follows from it, including why an imported row of that status carries
+ * no change-request comment and what to do instead.
+ *
+ * What an `approved` or `changes_requested` row does NOT get:
  * `EMBEDDABLE_STATUSES` is `published` and `archived` only, so neither
  * `refreshProjectEmbedding` nor `scripts/backfill-embeddings.mjs` will ever
  * embed it. Publishing it later goes through `commitTransition`, which does.
+ *
+ * `src/test/import-legacy-parity.test.ts` pins this list against
+ * `PROJECT_STATUSES`, which this file cannot import (ADR-0024).
  */
-const IMPORTABLE_STATUSES = ["approved", "archived", "published"];
+const IMPORTABLE_STATUSES = [
+  "approved",
+  "archived",
+  "changes_requested",
+  "published",
+];
 
 function statusOf(row) {
   // Absent means an export made before `target_status` existed, and every one
