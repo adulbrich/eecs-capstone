@@ -29,8 +29,8 @@ const TRUSTED_PROXY = "10.0.0.0/16";
 /**
  * The paths where no credential is checked, so they share one budget: the two
  * OAuth buttons on /sign-in, plus account creation. Better Auth's own default
- * rule covers all three at 3 per 10 seconds, which is the lockout being
- * removed.
+ * rule covers all three at 3, which is the refusal being removed. Not "3 per 10
+ * seconds": see "what a max actually means" below.
  */
 const UNCHECKED_PATHS = [
   "/sign-in/oauth2",

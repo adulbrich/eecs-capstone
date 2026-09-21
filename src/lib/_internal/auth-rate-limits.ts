@@ -73,10 +73,17 @@ const UNCHECKED_MAX = 60;
  * And the call is expensive on purpose. `update-user.mjs` hashes the NEW
  * password BEFORE it verifies the current one, so a wrong guess still pays a
  * full scrypt hash plus a full scrypt verify, measured at about 118 ms of CPU.
- * `sensitiveSessionMiddleware` rejects an unauthenticated call before any of
- * that, so only someone already signed in can spend it, but any student has an
- * account. At 5 that is roughly 6% of a core per key; at 60 it would be most of
- * a core per key, on a fleet of three to four tasks with no WAF in front.
+ * At 5 that is roughly 6% of a core per key; at 60 it would be most of a core
+ * per key, on a fleet of three to four tasks with no WAF in front.
+ *
+ * Two halves of that, and they do not have the same reach.
+ * `sensitiveSessionMiddleware` rejects an unauthenticated call before any
+ * hashing, so only someone already signed in can spend the CPU, though any
+ * student has an account. The BUDGET has no such protection: the limiter runs
+ * in the router's `onRequest`, ahead of routing and middleware, so five
+ * anonymous 401s from one pool address refuse `/change-password` for everyone
+ * behind it until a lull. That is accepted over the CPU: changing a password
+ * is rare and the refusal clears itself, while a core per task does not.
  *
  * This is `/change-password`'s standing control, not a stopgap: #552 covers
  * `/sign-in/email` and does not extend here. It is also the one number left in
