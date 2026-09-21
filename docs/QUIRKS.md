@@ -426,6 +426,10 @@ Every timestamp column uses `timestamp("col", { withTimezone: true })`. Stored a
 
 The integration test setup (`src/test/setup.integration.ts`) calls `TRUNCATE TABLE ... CASCADE` on every table before each test, against the same `DATABASE_URL` as dev. **Running `npm run test:integration` deletes your dev data.** If your project disappears after running tests, that is why; `npm run db:seed:dev` puts it back. [ADR-0011](./adr/0011-integration-tests-truncate-the-dev-database.md) says why there is no separate test database yet.
 
+### Resizing the RDS instance zeroes its burst credits
+
+The database is a burstable class (`db.t4g.small`). Changing the instance class restarts it ([ADR-0035](./adr/0035-scale-the-service-and-let-it-pick-the-instance.md) says why that is immediate rather than deferred to a maintenance window), and the restart throws away the accrued `CPUCreditBalance`: it read 288.0 five minutes before #529 resized `micro` to `small` and 0.0 five minutes after, and `CPUSurplusCreditBalance` started accruing immediately, which is the instance spending past a balance it does not have. Credits come back at a measured 18 per hour under this app's idle load, so a useful balance is hours away and a full one is most of a day. Nothing breaks at idle, because the app sits far under the 20% baseline the credits are measured against, but anything that drives real database CPU in the hours after a resize is spending surplus. Plan a resize away from anything heavy, and read the balance rather than the clock before a load test: [`load-tests/2026-09-20-term-start.md`](./load-tests/2026-09-20-term-start.md) is the run that hit this.
+
 ---
 
 ## Vitest test infrastructure
