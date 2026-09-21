@@ -181,6 +181,42 @@ variable "bedrock_reasoning_effort" {
   default     = "medium"
 }
 
+# The sign-in attempt counter (#552, ADR-0039). Per (account, viewer address)
+# pair, not per address alone: per address cannot protect a credential behind
+# campus NAT, and per account alone would let anyone lock a stranger out.
+# Retunable without a deploy, which is why these are variables rather than
+# literals in src/lib/sign-in-limits.ts. A value of 0, a negative or a typo
+# falls back to the code default rather than refusing every sign-in.
+variable "sign_in_attempt_window_minutes" {
+  description = "How far back failed sign-ins are counted, in minutes."
+  type        = string
+  default     = "15"
+}
+
+variable "sign_in_soft_limit" {
+  description = "Failures in the window before the short refusal."
+  type        = string
+  default     = "5"
+}
+
+variable "sign_in_soft_delay_seconds" {
+  description = "How long the short refusal lasts, in seconds."
+  type        = string
+  default     = "60"
+}
+
+variable "sign_in_hard_limit" {
+  description = "Failures in the window before the longer refusal."
+  type        = string
+  default     = "10"
+}
+
+variable "sign_in_hard_delay_seconds" {
+  description = "How long the longer refusal lasts, in seconds."
+  type        = string
+  default     = "900"
+}
+
 variable "ai_review_limit_per_hour" {
   description = "Per-user hourly ceiling on AI project reviews."
   type        = string

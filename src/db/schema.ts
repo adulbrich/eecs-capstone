@@ -883,3 +883,43 @@ export const aiReviewUsage = pgTable(
   // The only shape the limiter queries: this user, within a time window.
   (t) => [index("ai_review_usage_user_idx").on(t.userId, t.createdAt)]
 );
+
+/**
+ * One row per failed `/sign-in/email` attempt, which is what brute force
+ * protection is keyed on here (#552).
+ *
+ * Deliberately NOT a foreign key to `user`. The counter has to work for an
+ * address that has no account, so that a refusal reveals nothing about whether
+ * one exists: the attacker already knows how many times they tried, and that is
+ * all a refusal tells them. An `email` text column is therefore the key, always
+ * lowercased by the writer, because Better Auth looks users up with
+ * `email.toLowerCase()` and a counter that did not would be bypassed by
+ * changing one letter's case.
+ *
+ * `ip` is the second half of the key. Counting per address alone would let
+ * anyone lock anyone else out by guessing their address a few times; pairing it
+ * with the viewer means an attacker on another network cannot. Behind campus
+ * NAT the pair degrades to (email, pool address), which is tens of devices
+ * rather than the internet. See ADR-0039 for why per-address alone is not a
+ * control here.
+ */
+export const signInAttempts = pgTable(
+  "sign_in_attempts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    /** Lowercased by `recordFailedSignIn`, never by the database. */
+    email: text("email").notNull(),
+    /**
+     * The resolved viewer address, or `unresolved` when Better Auth could not
+     * read one. A sentinel rather than null so those attempts still count
+     * together instead of escaping the limit entirely; in production the
+     * address resolves, because CloudFront always sets the header.
+     */
+    ip: text("ip").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  // The only shape the limiter queries: this pair, within a time window.
+  (t) => [index("sign_in_attempts_pair_idx").on(t.email, t.ip, t.createdAt)]
+);

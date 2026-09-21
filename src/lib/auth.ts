@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { db } from "#/db";
@@ -12,8 +13,15 @@ import { onidProfileFromIdToken } from "#/lib/_internal/onid-profile";
 import { requireUserName } from "#/lib/_internal/user-name";
 import { getEmailSender } from "#/lib/email/sender";
 import { passwordResetEmail, verificationEmail } from "#/lib/email/templates";
+import { tooManyAttemptsMessage } from "#/lib/sign-in-limits";
 import type { UserRole } from "#/lib/vocabularies";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
+import {
+  attemptKey,
+  checkSignInAllowed,
+  clearSignInAttempts,
+  recordFailedSignIn,
+} from "#/server/_internal/sign-in-attempts";
 
 const emailSender = getEmailSender();
 
@@ -68,12 +76,124 @@ function withVerificationLanding(url: string): string {
   return link.toString();
 }
 
+/** The one path the attempt counter guards. ONID and GitHub are authenticated
+ * elsewhere, so there is no credential here to protect on those. */
+const PASSWORD_SIGN_IN = "/sign-in/email";
+
+/**
+ * Resolves the viewer the same way Better Auth's own limiter does, by reading
+ * what it already put on the session-bearing request.
+ *
+ * `getIp` is not exported from a stable path, so rather than reimplement the
+ * X-Forwarded-For walk this leans on the header directly through the same
+ * trusted-proxy list. Keep this in step with `advanced.ipAddress` above.
+ */
+function viewerAddress(headers: Headers | undefined): string | null {
+  const forwarded = headers?.get("x-forwarded-for");
+  if (!forwarded) {
+    return null;
+  }
+  const entries = forwarded
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const trusted = new Set(authConfig.trustedProxies);
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    const entry = entries[i];
+    if (entry && !trusted.has(entry)) {
+      return entry;
+    }
+  }
+  return null;
+}
+
+/**
+ * Swallows a counter failure rather than refusing the sign-in.
+ *
+ * Deliberate, and the opposite of how the rest of this file fails. If the
+ * database is unreachable the counter cannot answer, and the choice is between
+ * letting sign-ins through unguarded and refusing everyone. Better Auth's own
+ * per-address limit still applies either way, and a brute force window during a
+ * database outage is a smaller problem than an auth outage on top of it. The
+ * error is logged so the gap is visible rather than silent.
+ */
+async function swallowing(what: string, run: () => Promise<void>) {
+  try {
+    await run();
+  } catch (error) {
+    console.error(`Sign-in attempt counter failed (${what})`, error);
+  }
+}
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
   trustHost: authConfig.trustHost,
   // Numbers and reasons in lib/_internal/auth-rate-limits.ts. Still only
   // active under NODE_ENV=production, which is Better Auth's own default.
   rateLimit: authRateLimit,
+  // Per-account brute force protection (#552). Better Auth's own limiter keys
+  // on the viewer address and nothing else, and OSU wireless NATs students into
+  // a pool of shared addresses, so no per-address number protects a credential
+  // here (ADR-0039). This counts failures per (account, address) pair instead:
+  // per account because that is the thing being attacked, and paired with the
+  // address so nobody can lock a stranger out of their own account by guessing
+  // it a few times.
+  //
+  // It deliberately does NOT raise the Better Auth limit on /sign-in/email.
+  // That number is currently doing double duty as a cap on verification mail
+  // aimed at an address the sender does not own, and raising it before #554
+  // meters the send would reopen that. Adding this counter is purely additive.
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== PASSWORD_SIGN_IN) {
+        return;
+      }
+      const { email, ip } = attemptKey(
+        ctx.body?.email,
+        viewerAddress(ctx.headers)
+      );
+      if (!email) {
+        return;
+      }
+      // Refuses before the password is checked, which also means a locked pair
+      // costs no scrypt. If the counter itself fails, `checkSignInAllowed`
+      // throws and this hook lets it through rather than refusing the person;
+      // see `swallowing` for why that direction.
+      let verdict: Awaited<ReturnType<typeof checkSignInAllowed>>;
+      try {
+        verdict = await checkSignInAllowed(email, ip);
+      } catch (error) {
+        console.error("Sign-in attempt counter failed (check)", error);
+        return;
+      }
+      if (!verdict.allowed) {
+        throw new APIError("TOO_MANY_REQUESTS", {
+          code: "TOO_MANY_SIGN_IN_ATTEMPTS",
+          message: tooManyAttemptsMessage(verdict.retryAfterSeconds),
+        });
+      }
+    }),
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== PASSWORD_SIGN_IN) {
+        return;
+      }
+      const { email, ip } = attemptKey(
+        ctx.body?.email,
+        viewerAddress(ctx.headers)
+      );
+      if (!email) {
+        return;
+      }
+      // Better Auth catches the endpoint's APIError and sets `returned` to it
+      // before running after-hooks, so this sees failures as well as successes.
+      // A refusal from the before-hook above never reaches here, so a locked
+      // pair does not count against itself again.
+      const failed = ctx.context.returned instanceof APIError;
+      await swallowing(failed ? "record" : "clear", () =>
+        failed ? recordFailedSignIn(email, ip) : clearSignInAttempts(email, ip)
+      );
+    }),
+  },
   advanced: {
     // CloudFront terminates TLS at the edge and forwards to the origin over
     // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in

@@ -162,6 +162,14 @@ resource "aws_ecs_task_definition" "app" {
         { name = "BEDROCK_MODEL_ID", value = var.bedrock_model_id },
         { name = "BEDROCK_REASONING_EFFORT", value = var.bedrock_reasoning_effort },
         { name = "AI_REVIEW_LIMIT_PER_HOUR", value = var.ai_review_limit_per_hour },
+        # The sign-in attempt counter (#552). Unset falls back to the code
+        # defaults in src/lib/sign-in-limits.ts, so these exist to be retuned
+        # without a deploy rather than to make the control work.
+        { name = "SIGN_IN_ATTEMPT_WINDOW_MINUTES", value = var.sign_in_attempt_window_minutes },
+        { name = "SIGN_IN_SOFT_LIMIT", value = var.sign_in_soft_limit },
+        { name = "SIGN_IN_SOFT_DELAY_SECONDS", value = var.sign_in_soft_delay_seconds },
+        { name = "SIGN_IN_HARD_LIMIT", value = var.sign_in_hard_limit },
+        { name = "SIGN_IN_HARD_DELAY_SECONDS", value = var.sign_in_hard_delay_seconds },
         { name = "AI_REVIEW_LIMIT_PER_DAY", value = var.ai_review_limit_per_day },
         { name = "BEDROCK_SCOPE_REASONING_EFFORT", value = var.bedrock_scope_reasoning_effort },
         { name = "BEDROCK_SOCIAL_SUMMARY_REASONING_EFFORT", value = var.bedrock_social_summary_reasoning_effort },
