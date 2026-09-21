@@ -7,7 +7,7 @@ import {
   truncateOnWordBoundary,
 } from "#/lib/social-meta";
 
-const ELLIPSIS = "…";
+const ELLIPSIS = "...";
 
 describe("stripMarkdown", () => {
   it("keeps a link's label and drops its target", () => {
@@ -88,7 +88,7 @@ describe("truncateOnWordBoundary", () => {
     // The body has to be a prefix of the source that stops exactly where a
     // space follows. Asserting the last character is not a word character
     // would be wrong: cutting on a boundary means ending ON a whole word.
-    const body = result.slice(0, -1);
+    const body = result.slice(0, -ELLIPSIS.length);
     expect(text.startsWith(body)).toBe(true);
     expect(text[body.length]).toBe(" ");
   });
@@ -104,7 +104,7 @@ describe("truncateOnWordBoundary", () => {
     // empty description, which would unfurl as a bare title.
     const token = "x".repeat(300);
     const result = truncateOnWordBoundary(token, 20);
-    expect(result).toBe(`${"x".repeat(19)}${ELLIPSIS}`);
+    expect(result).toBe(`${"x".repeat(17)}${ELLIPSIS}`);
     expect(result).toHaveLength(20);
   });
 });

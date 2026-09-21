@@ -87,8 +87,15 @@ export function stripMarkdown(text: string): string {
 }
 
 /**
- * Cuts to at most `max` characters, on a word boundary, with an ellipsis that
- * fits inside the budget rather than pushing past it.
+ * Three ASCII dots, not U+2026. `button-conventions.test.ts` bans the real
+ * ellipsis character anywhere in `src`, and the rule is worth keeping here
+ * even though this is not a button label: one convention beats two.
+ */
+const ELLIPSIS = "...";
+
+/**
+ * Cuts to at most `max` characters, on a word boundary, with the ellipsis
+ * fitting inside the budget rather than pushing past it.
  *
  * A string with no space before the limit is cut at the limit: a single
  * unbroken token that long is a URL or a paste accident, and returning nothing
@@ -101,12 +108,14 @@ export function truncateOnWordBoundary(
   if (text.length <= max) {
     return text;
   }
-  // One character of the budget belongs to the ellipsis.
-  const room = max - 1;
+  const room = max - ELLIPSIS.length;
   const cut = text.slice(0, room);
-  const lastSpace = cut.lastIndexOf(" ");
-  const body = lastSpace > 0 ? cut.slice(0, lastSpace) : cut;
-  return `${body.replace(TRAILING_PUNCTUATION, "")}…`;
+  // When the character just past the cut is a space, the cut already ends on a
+  // whole word and backing up to the previous space would throw that word away
+  // for nothing. Only an actual mid-word cut needs to retreat.
+  const boundary = text[room] === " " ? cut.length : cut.lastIndexOf(" ");
+  const body = boundary > 0 ? cut.slice(0, boundary) : cut;
+  return `${body.replace(TRAILING_PUNCTUATION, "")}${ELLIPSIS}`;
 }
 
 /** The fields `socialDescription` reads, named structurally. */

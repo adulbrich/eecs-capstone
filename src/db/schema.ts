@@ -258,6 +258,36 @@ export const projects = pgTable(
     scopeAssessmentUpdatedAt: timestamp("scope_assessment_updated_at", {
       withTimezone: true,
     }),
+    /**
+     * The one-line summary behind `og:description` on the project's page
+     * (#498), written by a model from the title, description and problem
+     * statement, on the same two call sites and the same hash rule as the
+     * embedding above. Null means "not generated yet", which is every project
+     * until it is next published, archived or edited, and every project at all
+     * if Bedrock is unavailable; `socialDescription` in `src/lib/social-meta.ts`
+     * falls back to the project's own prose rather than emitting nothing.
+     *
+     * Unlike the embedding and the scope assessment, `socialSummary` IS public:
+     * it is named in `projectDetailView`, because a meta tag is public by
+     * construction. The other three columns are not, and stay staff-only
+     * through `src/server/social-summary.ts`.
+     */
+    socialSummary: text("social_summary"),
+    socialSummarySourceHash: text("social_summary_source_hash"),
+    socialSummaryUpdatedAt: timestamp("social_summary_updated_at", {
+      withTimezone: true,
+    }),
+    /**
+     * Set when staff save their own wording, cleared when they regenerate.
+     * The hash alone cannot carry this: it detects that the source text
+     * changed, not that a human deliberately wrote what is stored, so without
+     * this flag an unrelated edit to the description would silently overwrite
+     * a correction. Nothing human writes to `embedding`, which is why that
+     * column needs no equivalent.
+     */
+    socialSummaryIsManual: boolean("social_summary_is_manual")
+      .notNull()
+      .default(false),
     embeddingUpdatedAt: timestamp("embedding_updated_at", {
       withTimezone: true,
     }),

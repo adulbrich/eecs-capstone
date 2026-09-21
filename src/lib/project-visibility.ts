@@ -160,6 +160,7 @@ export interface ProjectRow extends VisibleProject {
    */
   programs: ProjectProgram[];
   requiresNdaIp: boolean;
+  socialSummary: string | null;
   studentProposed: boolean;
   teamsSupported: number;
   title: string;
@@ -191,6 +192,18 @@ export interface ProjectDetailView {
    */
   programs: ProjectProgram[];
   requiresNdaIp: boolean;
+  /**
+   * Public, and public by construction rather than by choice: this is the
+   * text of the `og:description` tag on a page anyone can fetch (#498). Null
+   * until a model has written one, which `socialDescription` handles by
+   * falling back to the project's own prose.
+   *
+   * The three columns beside it in the schema (`socialSummarySourceHash`,
+   * `socialSummaryUpdatedAt`, `socialSummaryIsManual`) are deliberately absent,
+   * the way the scope assessment's three are. Staff read those through
+   * `src/server/social-summary.ts`.
+   */
+  socialSummary: string | null;
   status: ProjectStatus;
   studentProposed: boolean;
   teamsSupported: number;
@@ -264,6 +277,11 @@ export function projectDetailView(
     // publish, and the name follows it (#336). Both stay on the staff read
     // in projects-queries.ts. See #75, #304, #402.
     studentProposed: project.studentProposed,
+    // Public for every viewer, including anonymous ones, because this is the
+    // string the page publishes as its `og:description` (#498). Not
+    // viewer-dependent, unlike `notes` and `isSponsored` above: there is no
+    // audience that may see the project's page but not its preview text.
+    socialSummary: project.socialSummary,
   };
 }
 
