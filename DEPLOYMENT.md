@@ -1143,9 +1143,11 @@ while it is being worked on. The proposer can edit and resubmit only once
 the row has an owner, and two separate things decide that. At import time
 `resolveProposers` matches `user` rows by email, verified or not, so a proposer
 with no account here lands unowned and nothing mounts `OwnerProjectActions`.
-After import an unowned row is linked by `claimProjectsForVerifiedUser` when
-someone verifies that address, and by nothing else (ADR-0007). Expect staff to
-be doing the editing either way. It is not in
+After import an unowned row is linked either by `claimProjectsForVerifiedUser`,
+when someone verifies that address, or by staff setting the proposer field,
+which `updateProjectProposerAs` resolves to an account without requiring
+verification. That second path is the one to reach for here, since staff are
+doing the editing anyway. It is not in
 `EMBEDDABLE_STATUSES`, so these rows cost no Bedrock call and 7a.5 has nothing
 to do for them.
 
