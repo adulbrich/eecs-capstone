@@ -62,6 +62,28 @@ describe("buildProjectEmbeddingSource", () => {
   });
 });
 
+/**
+ * The limit exists to keep the embed call under the model's token ceiling, and
+ * nothing else in the suite can say so: the ceiling is enforced by Bedrock, and
+ * a test that reached Bedrock would be an integration test with a bill. So pin
+ * the arithmetic the limit was chosen by instead.
+ *
+ * `WORST_CHARS_PER_TOKEN` is measured, not assumed: 34,487 characters of the
+ * link-heavy legacy row `gypSbvLEsQellSQA` tokenised to 13,103 tokens on
+ * 2026-09-20. Raising `EMBEDDING_SOURCE_LIMIT` past what that density allows
+ * puts the densest projects back to a null vector no sweep can fill, which is
+ * the failure this pin is here to catch.
+ */
+describe("EMBEDDING_SOURCE_LIMIT", () => {
+  const TITAN_MAX_INPUT_TOKENS = 8192;
+  const WORST_CHARS_PER_TOKEN = 34_487 / 13_103;
+
+  it("stays under the model's token ceiling at the worst measured density", () => {
+    const tokens = EMBEDDING_SOURCE_LIMIT / WORST_CHARS_PER_TOKEN;
+    expect(tokens).toBeLessThan(TITAN_MAX_INPUT_TOKENS);
+  });
+});
+
 describe("buildInterestsEmbeddingSource", () => {
   it("passes the text through and truncates at the limit", () => {
     expect(buildInterestsEmbeddingSource("  robotics  ")).toBe("robotics");

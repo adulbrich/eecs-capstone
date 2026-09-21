@@ -17,7 +17,32 @@ import { createHash } from "node:crypto";
  *   way. The test looks for it to prove the strip kept the code it removed the
  *   comments from, so a rename has to move in both places at once.
  */
-export const EMBEDDING_SOURCE_LIMIT = 45_000;
+/**
+ * The character ceiling on the embedded text.
+ *
+ * Titan Text Embeddings V2 refuses an input over 8,192 tokens, and the embed
+ * call is the only thing that discovers it: `refreshProjectEmbedding` catches
+ * the throw and returns "failed", so an oversized project keeps a null vector
+ * and every sweeper retries it at one wasted call each.
+ *
+ * 20,000 rather than the 45,000 this carried until 2026-09-20. That figure was
+ * sized to the model's character limit, which never binds because the token
+ * limit is reached first. The project form's own caps sum to about 20,300
+ * characters, so this is the ceiling a proposal already has, made explicit.
+ * Only `scripts/import-legacy.mjs` writes rows without those caps, and three
+ * legacy rows at 34,000 to 36,000 characters are what found this.
+ *
+ * Why not higher: the worst token density measured across the imported corpus
+ * is 2.63 characters per token, on a legacy row that is mostly links, which
+ * puts 20,000 characters at roughly 7,600 tokens. Denser text could still
+ * overflow, and a row that does is left exactly as it is today, failed and
+ * retried. This is a bound on the common case, not a proof.
+ *
+ * Changing the number re-embeds every row whose text is longer than it, at one
+ * paid Bedrock call each, because the truncated string is what `embeddingHash`
+ * covers.
+ */
+export const EMBEDDING_SOURCE_LIMIT = 20_000;
 
 export interface EmbeddableProject {
   description: string | null;
