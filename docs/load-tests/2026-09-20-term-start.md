@@ -104,15 +104,23 @@ say what happened instead, and all four in the retrieved window agree:
 elb_status_code 502, target_status_code -, target_processing_time 0.14 to 0.25, response_processing_time -1
 ```
 
-The task accepted the request, began responding in about 200 ms, and then the connection broke
-before a complete response came back. That is not a timeout, which would be 504, and not an
-unhealthy target, which would be 503. Both tasks did it, on ordinary listing and detail GETs.
-Seven failures across roughly 7200 requests is 0.1%, and every one of them is a student seeing
-an error page.
+**Corrected after #545 was diagnosed.** This paragraph first read those fields as the task
+beginning to respond in about 200 ms and then breaking mid-response. They say the opposite.
+AWS records `target_status_code` "only if a connection was established to the target and the
+target sent a response", and sets `response_processing_time` to -1 when "the target closes the
+connection before the idle timeout". No response was ever sent. The task had closed the pooled
+connection the load balancer then dispatched onto: Node closes an idle keep-alive connection
+after 5 seconds by default and the ALB reuses one for 60. Saturation is why it showed up here
+and not in Sunday's phases, because 42 requests per second on two tasks opens far more
+connections than 10 does, but saturation was never the cause. Both tasks did it, on ordinary
+listing and detail GETs. Seven failures across roughly 7200 requests is 0.1%, and every one of
+them is a student seeing an error page.
 
 This is the one result here that is a defect rather than a capacity number. It is
-[#545](https://github.com/adulbrich/eecs-capstone/issues/545), and 1d and 1e should wait for
-it, because they exist to push further into exactly the regime that produces it.
+[#545](https://github.com/adulbrich/eecs-capstone/issues/545). ADR-0039 carries the fix, which is not the same as the issue being closed: that waits on a phase 1c re-run after the deploy showing no ELB 5XX. And
+`scripts/loadtest/pooled-connection-reuse.mjs` reproduces it against a local build in about
+thirty seconds without any load at all. 1d and 1e should still wait for a deploy that carries
+the fix, because they exist to push further into exactly the regime that produced it.
 
 ### What the thresholds actually do
 
@@ -150,7 +158,10 @@ CloudWatch is the only place an `ELB_5XX` with no client-visible failure would s
 Not to be confused with the 57 `460`s in the same logs. Those are the ALB recording that the
 client went away, and the client was k6 interrupting its own in-flight iterations when the
 first burst aborted. They are all timestamped in that one minute and they are not server
-failures.
+failures. The task logs agree and were read while diagnosing #545: `/ecs/eecs-capstone` holds
+46 `Error: aborted` objects with `ECONNRESET` at `abortIncoming`, all inside the half second
+at 13:33:17 UTC, and nothing at all in 13:35 to 13:42 UTC, which is the window holding all
+four retrieved 502s. The task logs a client that goes away and logged nothing for the 502s.
 
 ### 3. The knee is between 25 and 42 requests per second
 
@@ -245,9 +256,11 @@ failure shape is the point. It cannot loosen the error thresholds, which have no
 now stop the run on the first 5XX. "What the thresholds actually do" explains why that took a
 counter rather than a rate.
 
-**Do not run 1d or 1e until the 502 has an explanation.** They exist to push further into the
-regime that already produces it, on a live site, and a louder version of a failure that is
-already understood to be real is not worth a student seeing an error page for.
+**Do not run 1d or 1e until the 502 fix is deployed.** It has an explanation now (#545,
+ADR-0039), but until the deploy carrying it is live these phases push further into the regime
+that produces it, on a live site, and a louder version of a known failure is not worth a
+student seeing an error page for. The first thing to check after that deploy is
+`HTTPCode_ELB_5XX_Count` across a re-run of 1c, which is what actually closes #545.
 
 Phase 2 should run on a cold 2 task fleet, because term start is itself a cold fleet event.
 Monday got that for free by running phase 2 first; after a ladder it means waiting for
