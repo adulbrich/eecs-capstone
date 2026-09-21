@@ -114,9 +114,12 @@ jobs:
 
       - name: Deploy service
         run: |
+          # No --desired-count. Application Auto Scaling owns it (see the
+          # appautoscaling resources in infra/ecs.tf), and pinning it here set
+          # the fleet back to one task on every deploy, which is the outage
+          # window the floor of two exists to remove.
           aws ecs update-service \
             --cluster "$PROJECT" --service "$PROJECT" \
-            --task-definition "${{ steps.taskdef.outputs.arn }}" \
-            --desired-count 1 >/dev/null
+            --task-definition "${{ steps.taskdef.outputs.arn }}" >/dev/null
           aws ecs wait services-stable --cluster "$PROJECT" --service "$PROJECT"
           echo "Deployed ${{ steps.cfg.outputs.image }}"

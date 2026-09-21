@@ -24,7 +24,9 @@ See the full design in `../.claude/plans/` (the approved deployment plan).
 4. `terraform apply`
    - The `aws_cloudfront_vpc_origin` resource takes **15-30+ minutes** to
      create. This is expected, not a hang.
-   - The ECS service comes up at `desired_count = 0` (no image exists yet).
+   - The ECS service comes up at `desired_count = 0`, then Application Auto
+     Scaling raises it to `var.app_min_tasks` with no image yet, so tasks
+     crash-loop until the first deploy. Expected; see DEPLOYMENT.md step 4.
 
 ## After apply
 
@@ -32,7 +34,7 @@ See the full design in `../.claude/plans/` (the approved deployment plan).
   `aws --profile aws-capstone1 secretsmanager put-secret-value --secret-id eecs-capstone/github-client-secret --secret-string '<secret>'`
 - Point the GitHub OAuth app callback at the `app_url` output.
 - Run the **Deploy** GitHub Actions workflow to build/push the first image,
-  migrate, and scale the service to 1.
+  migrate, and roll the service onto it. Scaling owns the task count.
 
 ## Naming and tagging convention
 
@@ -59,6 +61,7 @@ manual `terraform init -migrate-state` to a new bucket, so don't assume renaming
 ## Notes
 
 - `terraform validate` / `plan` are safe; `apply` creates billable resources
-  (ALB, RDS, Fargate, CloudFront). Rough cost ~$40-50/mo.
-- The deploy workflow owns ECS task-definition revisions and `desired_count`
-  (the service `ignore_changes` them), so re-running `apply` won't fight CI.
+  (ALB, RDS, Fargate, CloudFront). Rough cost ~$61-65/mo at the scaling floor.
+- The deploy workflow owns ECS task-definition revisions and Application Auto
+  Scaling owns `desired_count` (the service `ignore_changes` both), so
+  re-running `apply` won't fight CI or the scaler.

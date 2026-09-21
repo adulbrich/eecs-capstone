@@ -1,5 +1,13 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { CONNECTION_BUDGET, poolConfig } from "../_internal/db-pool";
+
+/** A `default = <number>` inside one named block of `infra/variables.tf`. */
+function terraformDefault(name: string): number {
+  const source = readFileSync("infra/variables.tf", "utf8");
+  const block = source.split(`variable "${name}" {`)[1]?.split("\n}")[0];
+  return Number(/default\s*=\s*(\d+)/.exec(block ?? "")?.[1]);
+}
 
 const URL_WITH_ENCODED_PASSWORD =
   "postgresql://app:p%40ss%2Fword@db.internal:5432/eecs_capstone?sslmode=require";
@@ -28,6 +36,18 @@ describe("poolConfig", () => {
     ).connectionTimeoutMillis;
     expect(timeout).toBeGreaterThan(0);
     expect(timeout).toBeLessThan(30_000);
+  });
+
+  it("counts every task a deploy can run, not just the scaling ceiling", () => {
+    // The budget's task count and the Terraform ceiling are two writings of
+    // one number, and nothing but this connects them: raising
+    // `app_max_tasks` without raising `taskCeiling` silently overruns the
+    // instance, which is the failure ADR-0034 exists to prevent. The factor
+    // of two is the deploy, which runs old and new side by side because the
+    // service leaves `maximumPercent` at the AWS default of 200.
+    expect(CONNECTION_BUDGET.taskCeiling).toBe(
+      2 * terraformDefault("app_max_tasks")
+    );
   });
 
   it("keeps the whole fleet inside what the RDS instance can hold", () => {

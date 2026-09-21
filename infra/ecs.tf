@@ -186,7 +186,18 @@ resource "aws_ecs_service" "app" {
     container_port   = var.app_port
   }
 
-  # The deploy workflow owns image rollouts and scaling.
+  # A failed deploy rolls back to the previous task definition instead of
+  # leaving the service trying to place a task that cannot start. Without
+  # this, a bad revision loops until someone notices; the old task keeps
+  # serving throughout either way, so the rollback costs nothing to enable.
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
+  # The deploy workflow owns image rollouts, and Application Auto Scaling
+  # below owns desired_count. Both write it out of band, which is what this
+  # ignore is for.
   lifecycle {
     ignore_changes = [task_definition, desired_count]
   }
@@ -194,4 +205,41 @@ resource "aws_ecs_service" "app" {
   depends_on = [aws_lb_listener.http]
 
   tags = { Name = var.project }
+}
+
+# Application Auto Scaling owns desired_count from here on; the service
+# ignores drift on it. The service-linked role is created by AWS on first
+# use, so no IAM resource is needed. Scaling is free; only the tasks cost.
+resource "aws_appautoscaling_target" "app" {
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.app.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  min_capacity       = var.app_min_tasks
+  max_capacity       = var.app_max_tasks
+
+  tags = { Name = "${var.project}-scaling" }
+}
+
+# CPU rather than memory. A Node process grows its heap to fill what it is
+# given and returns it slowly, so MemoryUtilization ratchets up and makes a
+# poor scale-in signal: the service would add tasks and never remove them.
+# CPU tracks request work directly. The asymmetric cooldowns mean a spike is
+# answered in a minute and the extra tasks linger ten, so a bursty hour does
+# not thrash.
+resource "aws_appautoscaling_policy" "app_cpu" {
+  name               = "${var.project}-cpu-target"
+  policy_type        = "TargetTrackingScaling"
+  service_namespace  = aws_appautoscaling_target.app.service_namespace
+  resource_id        = aws_appautoscaling_target.app.resource_id
+  scalable_dimension = aws_appautoscaling_target.app.scalable_dimension
+
+  target_tracking_scaling_policy_configuration {
+    target_value       = var.app_scale_target_cpu
+    scale_out_cooldown = 60
+    scale_in_cooldown  = 600
+
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+  }
 }
