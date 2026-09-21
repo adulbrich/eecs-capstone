@@ -19,24 +19,17 @@ import { createHash } from "node:crypto";
  */
 /**
  * The character ceiling on the embedded text.
+ * `docs/adr/0037-the-embedding-source-limit-stands-in-for-a-token-ceiling.md`
+ * is why it is this number and not a larger one.
  *
- * Titan Text Embeddings V2 refuses an input over 8,192 tokens, and the embed
- * call is the only thing that discovers it: `refreshProjectEmbedding` catches
- * the throw and returns "failed", so an oversized project keeps a null vector
- * and every sweeper retries it at one wasted call each.
+ * The short version: Titan Text Embeddings V2 refuses an input over 8,192
+ * tokens, no character count can guarantee a token count, and the failure is
+ * silent. `refreshProjectEmbedding` catches the throw and returns "failed", so
+ * the row keeps a null vector and every later sweep retries it at one wasted
+ * call.
  *
- * 20,000 rather than the 45,000 this carried until 2026-09-20. That figure was
- * sized to the model's character limit, which never binds because the token
- * limit is reached first. The project form's own caps sum to about 20,300
- * characters, so this is the ceiling a proposal already has, made explicit.
- * Only `scripts/import-legacy.mjs` writes rows without those caps, and three
- * legacy rows at 34,000 to 36,000 characters are what found this.
- *
- * Why not higher: the worst token density measured across the imported corpus
- * is 2.63 characters per token, on a legacy row that is mostly links, which
- * puts 20,000 characters at roughly 7,600 tokens. Denser text could still
- * overflow, and a row that does is left exactly as it is today, failed and
- * retried. This is a bound on the common case, not a proof.
+ * Shared with `buildInterestsEmbeddingSource` below, where it never bites:
+ * `INTERESTS_MAX_LENGTH` caps that text at 2,000 characters.
  *
  * Changing the number re-embeds every row whose text is longer than it, at one
  * paid Bedrock call each, because the truncated string is what `embeddingHash`

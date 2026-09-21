@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { EMBEDDING_MODEL_ID } from "#/lib/_internal/bedrock-embed";
 import {
   buildInterestsEmbeddingSource,
   buildProjectEmbeddingSource,
@@ -62,28 +63,6 @@ describe("buildProjectEmbeddingSource", () => {
   });
 });
 
-/**
- * The limit exists to keep the embed call under the model's token ceiling, and
- * nothing else in the suite can say so: the ceiling is enforced by Bedrock, and
- * a test that reached Bedrock would be an integration test with a bill. So pin
- * the arithmetic the limit was chosen by instead.
- *
- * `WORST_CHARS_PER_TOKEN` is measured, not assumed: 34,487 characters of the
- * link-heavy legacy row `gypSbvLEsQellSQA` tokenised to 13,103 tokens on
- * 2026-09-20. Raising `EMBEDDING_SOURCE_LIMIT` past what that density allows
- * puts the densest projects back to a null vector no sweep can fill, which is
- * the failure this pin is here to catch.
- */
-describe("EMBEDDING_SOURCE_LIMIT", () => {
-  const TITAN_MAX_INPUT_TOKENS = 8192;
-  const WORST_CHARS_PER_TOKEN = 34_487 / 13_103;
-
-  it("stays under the model's token ceiling at the worst measured density", () => {
-    const tokens = EMBEDDING_SOURCE_LIMIT / WORST_CHARS_PER_TOKEN;
-    expect(tokens).toBeLessThan(TITAN_MAX_INPUT_TOKENS);
-  });
-});
-
 describe("buildInterestsEmbeddingSource", () => {
   it("passes the text through and truncates at the limit", () => {
     expect(buildInterestsEmbeddingSource("  robotics  ")).toBe("robotics");
@@ -116,5 +95,37 @@ describe("embeddingHash", () => {
     expect(embeddingHash("abc", "model-a", 1024)).not.toBe(
       embeddingHash("abc", "model-a", 512)
     );
+  });
+});
+
+/**
+ * The limit exists to keep the embed call under the model's token ceiling, and
+ * nothing else in the suite can say so: the ceiling is enforced by Bedrock, and
+ * a test that reached it would be an integration test with a bill. So pin the
+ * arithmetic the limit was chosen by instead (ADR-0037).
+ *
+ * This is a floor on the reasoning, not on the limit. Values up to about 21,560
+ * would also clear the ceiling, so a small raise passes here; what fails on any
+ * change to the number itself is the literal pinned in
+ * `src/test/backfill-embeddings-parity.test.ts`. What this catches is a raise
+ * that stops being defensible against the densest text the corpus holds.
+ *
+ * `WORST_CHARS_PER_TOKEN` is measured, not assumed: 34,487 characters of a
+ * link-heavy legacy row tokenised to 13,103 tokens on 2026-09-20. The ceiling
+ * belongs to one model, so the model id is asserted too rather than leaving
+ * 8,192 floating free of the thing that enforces it.
+ */
+describe("EMBEDDING_SOURCE_LIMIT", () => {
+  const TITAN_V2 = "amazon.titan-embed-text-v2:0";
+  const TITAN_V2_MAX_INPUT_TOKENS = 8192;
+  const WORST_CHARS_PER_TOKEN = 34_487 / 13_103;
+
+  it("is measured against the model actually configured", () => {
+    expect(EMBEDDING_MODEL_ID).toBe(TITAN_V2);
+  });
+
+  it("clears that model's token ceiling at the worst measured density", () => {
+    const tokens = EMBEDDING_SOURCE_LIMIT / WORST_CHARS_PER_TOKEN;
+    expect(tokens).toBeLessThan(TITAN_V2_MAX_INPUT_TOKENS);
   });
 });

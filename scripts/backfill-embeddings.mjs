@@ -66,11 +66,7 @@ import pg from "pg";
 /** Politeness delay between Bedrock calls, so a 547 row run does not burst. */
 const DELAY_MS = 200;
 
-/**
- * MUST match `EMBEDDING_SOURCE_LIMIT` in `src/lib/embedding-source.ts`, which
- * carries why it is 20,000: Titan refuses an input over 8,192 tokens, and a
- * row that trips it stays at a null vector this sweep can never fill.
- */
+/** MUST match `EMBEDDING_SOURCE_LIMIT` in `src/lib/embedding-source.ts`. */
 const EMBEDDING_SOURCE_LIMIT = 20_000;
 
 /** MUST match `DEFAULT_REGION` in `src/lib/_internal/bedrock.ts`. */
