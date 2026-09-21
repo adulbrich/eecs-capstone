@@ -273,6 +273,11 @@ failure shape is the point. It cannot loosen the error thresholds, which have no
 now stop the run on the first 5XX. "What the thresholds actually do" explains why that took a
 counter rather than a rate.
 
+**Superseded in part by [`2026-09-21-post-fix-verification.md`](./2026-09-21-post-fix-verification.md)**,
+which re-ran phases 1c and 2 against a three task fleet carrying the #545 fix and
+measured zero ELB 5XX. The numbers in this document describe the two task fleet that
+produced the 502 and are kept as the baseline it is compared against.
+
 **Do not run 1d or 1e until the 502 fix is deployed.** It has an explanation now (#545,
 ADR-0041), but until the deploy carrying it is live these phases push further into the regime
 that produces it, on a live site, and a louder version of a known failure is not worth a
