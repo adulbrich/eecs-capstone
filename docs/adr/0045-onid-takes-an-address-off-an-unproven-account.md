@@ -20,7 +20,20 @@ in place, where whoever set that password inherits an account the university has
 now vouched for. Deleting the credential at the same time, in the same
 transaction and before the verified flag is written, removes that entirely: the
 ordering is load-bearing rather than tidiness, because the reverse order failing
-in between would leave a verified account whose password a stranger knows. What
+in between would leave a verified account whose password a stranger knows.
+
+None of that shape is ours to claim, and a later reader should not think it was
+invented here. Better Auth ships `revokeUnprovenAccountAccess` in
+`better-auth/dist/db/revoke-unproven-account-access.mjs`, which no-ops on a
+verified row, deletes every `credential` account, revokes the sessions, and
+argues the same thing in its own docstring: an `emailVerified: false` row
+"carries no proof that the password on it belongs to the mailbox owner", so the
+verified owner must "inherit no password or session that predates the proof".
+The magic link and email OTP plugins both call it. What no plugin covers is this
+path, because `oauth2/link-account.mjs` never calls it, so an OAuth identity
+resolving to an unproven row gets the refusal rather than the cleanup. That gap
+is what B1 fills. Read this as the OAuth-side equivalent of the framework
+helper rather than as an independent design. What
 makes taking the address the right call rather than merely a convenient one is
 that the proof is not close. OSU has interactively authenticated the person
 against the tenant `onid-profile.ts` pins, with whatever MFA the university
@@ -29,7 +42,13 @@ which is more than our own emailed link establishes. Two rows are refused and
 keep today's behaviour: one that another provider is already linked to, because
 somebody has authenticated as that user, and one that is banned, because
 releasing would hand a student an account an admin has shut and clearing the ban
-is a person's decision rather than a sign-in's. Decided 2026-09-21 in #554.
+is a person's decision rather than a sign-in's. Both refusals are deliberately
+stricter than the helper above, which deletes the credential accounts and then
+proceeds regardless of what else is attached, so a squatter who had linked
+GitHub to the unproven row would keep that link on an account the verified owner
+now holds, and which does not look at `banned` at all. If this is ever replaced
+by a call to the helper, those two conditions have to move in front of it rather
+than disappear with it. Decided 2026-09-21 in #554.
 
 ## Consequences
 
