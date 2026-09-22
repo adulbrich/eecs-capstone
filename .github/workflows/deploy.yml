@@ -126,5 +126,17 @@ jobs:
           aws ecs update-service \
             --cluster "$PROJECT" --service "$PROJECT" \
             --task-definition "${{ steps.taskdef.outputs.arn }}" >/dev/null
-          aws ecs wait services-stable --cluster "$PROJECT" --service "$PROJECT"
+          # The waiter gives up after ten minutes, and a deploy replaces
+          # tasks one at a time (ADR-0043), so a three task fleet can take
+          # most of that. Three tries is thirty minutes before this is red.
+          for attempt in 1 2 3; do
+            if aws ecs wait services-stable --cluster "$PROJECT" --service "$PROJECT"; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then
+              echo "::error::Service did not stabilise within thirty minutes"
+              exit 1
+            fi
+            echo "Still rolling out after attempt $attempt, waiting again"
+          done
           echo "Deployed ${{ steps.cfg.outputs.image }}"

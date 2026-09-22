@@ -8,11 +8,36 @@ import {
   poolConfig,
 } from "../_internal/db-pool";
 
-/** A `default = <number>` inside one named block of `infra/variables.tf`. */
+/**
+ * A `<name> = <number>` argument inside one top-level block of a Terraform
+ * file, found by the line that opens the block. NaN when either is missing,
+ * which fails loudly downstream rather than passing on a default.
+ */
+function terraformNumber(file: string, opener: string, name: string): number {
+  const source = readFileSync(file, "utf8");
+  const block = source.split(opener)[1]?.split("\n}")[0];
+  const line = (block ?? "")
+    .split("\n")
+    .find((candidate) => candidate.trim().startsWith(`${name} `));
+  return Number(line?.split("=")[1]);
+}
+
+/** A variable's `default` in `infra/variables.tf`. */
 function terraformDefault(name: string): number {
-  const source = readFileSync("infra/variables.tf", "utf8");
-  const block = source.split(`variable "${name}" {`)[1]?.split("\n}")[0];
-  return Number(/default\s*=\s*(\d+)/.exec(block ?? "")?.[1]);
+  return terraformNumber(
+    "infra/variables.tf",
+    `variable "${name}" {`,
+    "default"
+  );
+}
+
+/** An argument on the app service in `infra/ecs.tf`. */
+function serviceSetting(name: string): number {
+  return terraformNumber(
+    "infra/ecs.tf",
+    'resource "aws_ecs_service" "app" {',
+    name
+  );
 }
 
 const URL_WITH_ENCODED_PASSWORD =
@@ -47,12 +72,17 @@ describe("poolConfig", () => {
   it("counts every task a deploy can run, not just the scaling ceiling", () => {
     // The budget's task count and the Terraform ceiling are two writings of
     // one number, and nothing but this connects them: raising
-    // `app_max_tasks` without raising `taskCeiling` silently overruns the
-    // instance, which is the failure ADR-0034 exists to prevent. The factor
-    // of two is the deploy, which runs old and new side by side because the
-    // service leaves `maximumPercent` at the AWS default of 200.
+    // `app_max_tasks`, or the deploy's `deployment_maximum_percent`, without
+    // raising `taskCeiling` silently overruns the instance, which is the
+    // failure ADR-0034 exists to prevent. At 100 percent a deploy replaces
+    // tasks one at a time and the ceiling is the scaling maximum itself; the
+    // AWS default of 200 would double it (ADR-0043). `ceil` rather than the
+    // floor ECS applies, so a fractional percentage rounds the budget up,
+    // never down.
+    const maximumPercent = serviceSetting("deployment_maximum_percent");
+    expect(maximumPercent).toBeGreaterThan(0);
     expect(CONNECTION_BUDGET.taskCeiling).toBe(
-      2 * terraformDefault("app_max_tasks")
+      Math.ceil((terraformDefault("app_max_tasks") * maximumPercent) / 100)
     );
   });
 

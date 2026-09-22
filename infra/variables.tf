@@ -89,7 +89,7 @@ variable "app_min_tasks" {
 }
 
 variable "app_max_tasks" {
-  description = "Ceiling for the app service. Four is what the database connection budget allows: a deploy runs old and new side by side, so this doubles to eight tasks holding 200 connections, which with the one-off script reservation is 210 of the instance's 220. Raising it means a bigger instance, not just a bigger number, and `src/lib/__tests__/db-pool.test.ts` reads this default and fails if the two disagree. See ADR-0034."
+  description = "Ceiling for the app service. Four is what the database connection budget allows: a deploy replaces tasks one at a time (deployment_maximum_percent 100 in ecs.tf), so four is also the most tasks that ever run at once, holding 200 connections, which with the one-off script reservation is 210 of the instance's 220. Raising it means a bigger instance or a smaller pool, not just a bigger number, and `src/lib/__tests__/db-pool.test.ts` reads this default and the deploy percentage and fails if the budget disagrees with either. See ADR-0034 and ADR-0043."
   type        = number
   default     = 4
 }

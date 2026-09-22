@@ -62,6 +62,18 @@ resource "aws_lb_target_group" "app" {
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
 
+  # How long a task keeps draining in-flight requests after it is taken out
+  # of rotation. The AWS default is 300 s, and at deployment_maximum_percent
+  # 100 a draining task still counts against the ceiling, so ECS could not
+  # start a replacement until the old one had sat through all five minutes:
+  # three sequential replacements would outlast the deploy workflow's ten
+  # minute wait. Sixty seconds is borrowed from the load balancer's
+  # idle_timeout above rather than derived: it is far past any page render
+  # (the load test's slowest response was 4.3 s) and is the whole allowance
+  # for a 10 MB image upload on a slow link, the one request here that can
+  # run long, which a deploy may still cut if it takes longer. ADR-0043.
+  deregistration_delay = 60
+
   health_check {
     path                = "/api/healthz"
     matcher             = "200"
@@ -253,6 +265,24 @@ resource "aws_ecs_service" "app" {
     container_name   = "app"
     container_port   = var.app_port
   }
+
+  # A deploy replaces tasks one at a time instead of doubling the fleet. The
+  # AWS default is maximum 200 percent, which runs old and new side by side
+  # and makes the worst case app_max_tasks times two, all holding a full
+  # connection pool against one RDS instance. That doubling is what capped
+  # the pool at 20 per task (ADR-0034) and what the #524 load test then
+  # exhausted at 59 of 60 while the CPU still had room. Capping at 100
+  # percent makes the worst case app_max_tasks itself, so the pool can be
+  # more than twice as deep. The cost is the other direction: a deploy
+  # stops a task before it starts its replacement, so the fleet dips to
+  # half the desired count while that task drains (deregistration_delay
+  # above), the new one starts, and two health checks pass: about three
+  # minutes per task, three tasks in sequence. Deploys therefore take
+  # longer and should not run during an arrival burst.
+  # src/lib/__tests__/db-pool.test.ts reads this number, so the budget
+  # cannot drift from it. ADR-0043.
+  deployment_minimum_healthy_percent = 50
+  deployment_maximum_percent         = 100
 
   # A failed deploy rolls back to the previous task definition instead of
   # leaving the service trying to place a task that cannot start. Without

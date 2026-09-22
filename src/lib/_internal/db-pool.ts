@@ -11,8 +11,11 @@ import type { Pool, PoolConfig } from "pg";
  * twenty are about 2 MB of the 1024 MB task.
  *
  * `taskCeiling` is the most app tasks the budget allows at once: the
- * autoscaling ceiling of four in `infra/variables.tf`, doubled because a
- * deploy runs old and new side by side at `maximumPercent` 200.
+ * autoscaling ceiling of four in `infra/variables.tf`, times the service's
+ * `deployment_maximum_percent` in `infra/ecs.tf`. That is 100, so a deploy
+ * stops a task before it starts its replacement and the ceiling is four.
+ * It used to be eight, because the AWS default of 200 runs old and new side
+ * by side, and that doubling is what held the pool at 20 (ADR-0043).
  * `oneOffScript` is pg's default pool that `scripts/migrate.mjs` and the
  * other one-off scripts open beside the fleet; `migrate()` uses one session
  * of it, so this is a reservation, not a measurement. `trafficPerTask` is
@@ -22,7 +25,7 @@ import type { Pool, PoolConfig } from "pg";
  */
 export const CONNECTION_BUDGET = {
   rdsUsable: 220,
-  taskCeiling: 8,
+  taskCeiling: 4,
   oneOffScript: 10,
   trafficPerTask: 5,
 } as const;
@@ -30,12 +33,15 @@ export const CONNECTION_BUDGET = {
 /**
  * Connections one app task holds at most. pg-pool defaulted to 10, and RDS
  * `DatabaseConnections` sat at exactly 10 for a week under a handful of
- * staff (#521): no headroom before requests queue. 20 doubles it and, with
- * the traffic writer's 5, fits eight tasks plus a one-off script inside
- * `rdsUsable`. A cap, not a floor: pg-pool opens lazily and closes clients
- * idle for 10 s, so a quiet task holds far fewer.
+ * staff (#521). 20 was the most eight tasks could hold, and the #524 load
+ * test pinned three tasks at 59 of 60 during a term start burst while CPU
+ * still had room, with session lookups failing on the acquire timeout
+ * (#558). With the ceiling at four, 45 fits: (45 + 5) * 4 + 10 = 210 of
+ * 220, leaving ten for a second one-off script or a hand-held psql. A cap,
+ * not a floor: pg-pool opens lazily and closes clients idle for 10 s, so a
+ * quiet task holds far fewer.
  */
-const POOL_MAX = 20;
+const POOL_MAX = 45;
 
 /**
  * How long a request waits for a connection before failing. pg-pool applies

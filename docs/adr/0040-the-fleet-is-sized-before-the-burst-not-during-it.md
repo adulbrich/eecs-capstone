@@ -46,7 +46,9 @@ to a new floor immediately, which is what it did on 2026-09-20 at 19:24. The
 connection budget is untouched: `CONNECTION_BUDGET.taskCeiling` is twice
 `app_max_tasks` and the ceiling did not move, so `src/lib/__tests__/db-pool.test.ts`
 still holds, and three tasks at the pool maximum of 20 are 60 of the instance's
-220 rather than the 40 the load test watched pin. The scaling signal stays CPU, which settles
+220 rather than the 40 the load test watched pin. That sentence describes the
+budget as it stood on 2026-09-21; [ADR-0043](./0043-a-deploy-dips-rather-than-doubles.md)
+then dropped the doubling and the ceiling is `app_max_tasks` itself. The scaling signal stays CPU, which settles
 the question ADR-0035 left open: it asked whether memory would turn out to lead
 CPU under real concurrency, in which case the CPU policy would not fire when it
 mattered. It does not. Across the loaded phases the fleet average CPU
