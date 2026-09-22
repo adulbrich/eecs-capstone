@@ -163,22 +163,24 @@ resource "aws_cloudwatch_metric_alarm" "db_connections" {
 #
 # Read the deploy interaction before retuning this. `deployment_maximum_percent`
 # is 100 and `deployment_minimum_healthy_percent` is 50 (ADR-0043), so a rolling
-# deploy stops a task before starting its replacement and the fleet sits at two
-# of three for about three minutes per task, three tasks in sequence. Three
-# consecutive minutes below the floor is therefore met by every ordinary deploy,
-# and this will mail on each one. That is the threshold #571 specified and it is
-# left as specified: the alternatives all cost something real. Raising
-# `datapoints_to_alarm` past about nine minutes stops the deploy mail and also
-# stops this catching a fleet that is down for eight. Alarming on 0 rather than
-# the floor catches only a total outage and not the case where two of three
-# tasks are crash-looping. Suppressing during a deploy needs a second mechanism
-# nobody would maintain. A deploy is a thing an operator starts, so the mail
-# arrives while they are watching; if that turns out to be the wrong trade,
-# `evaluation_periods` and `datapoints_to_alarm` are the two numbers to move.
-# ADR-0044 is the decision and the alternatives it rules out.
+# deploy stops a task before starting its replacement and the fleet reads two of
+# three while that happens, three times in sequence. Whether that reaches three
+# CONSECUTIVE one-minute samples is not known and has not been watched: ADR-0043
+# measures a drain, a start and two health checks in wall clock, while this
+# counts tasks in RUNNING, which a replacement enters before it is healthy and a
+# draining task leaves as soon as it is stopping. So a deploy may trip this, may
+# not, or may oscillate across the sampling boundary and send several pairs. It
+# is left at the threshold #571 specified because the alternatives cost coverage
+# even against the worst of those: raising `datapoints_to_alarm` past the dip
+# also stops this catching a fleet that is down for the same minutes, alarming
+# on 0 misses two of three tasks crash-looping, and suppressing during a deploy
+# needs a second mechanism nobody would maintain. The first few deploys after
+# this applies are the measurement. If it mails every time, `evaluation_periods`
+# and `datapoints_to_alarm` are the two numbers to move, and ADR-0044 is what
+# says what moving them costs.
 resource "aws_cloudwatch_metric_alarm" "fleet_below_floor" {
   alarm_name        = "${var.project}-fleet-below-floor"
-  alarm_description = "The app service ran fewer than ${var.app_min_tasks} tasks for three minutes running. Expected during a rolling deploy; an outage otherwise."
+  alarm_description = "The app service ran fewer than ${var.app_min_tasks} tasks for three minutes running. A rolling deploy can cause this; an outage otherwise."
 
   namespace   = "ECS/ContainerInsights"
   metric_name = "RunningTaskCount"
