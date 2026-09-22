@@ -11,3 +11,4 @@ github_repo  = "cs-capstone"
 # bedrock_reasoning_effort = "medium"
 # ai_review_limit_per_hour = "10"
 # ai_review_limit_per_day  = "40"
+# alarm_email      = "eecs-capstone@oregonstate.edu"  # CloudWatch alarm mail
