@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
+import { EmailCodeForm } from "#/components/email-code-form";
 import { OAuthErrorBanner } from "#/components/oauth-error-banner";
 import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
@@ -79,7 +80,16 @@ function SignIn() {
       <div className="island-shell w-full max-w-sm rounded-xl p-8">
         <h1 className="font-semibold text-2xl">Sign in</h1>
         {oauthError && <OAuthErrorBanner code={oauthError} />}
-        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+        {/* The emailed code comes first because it is what this page will be
+            once #576 removes the password. Both are live for one release so
+            people meet the new door before the old one closes. */}
+        <EmailCodeForm redirectTo={redirectTo} />
+        <div className="mt-8 border-border border-t pt-6">
+          <h2 className="font-medium text-muted-foreground text-sm">
+            Or sign in with a password
+          </h2>
+        </div>
+        <form className="mt-4 space-y-4" onSubmit={onSubmit}>
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input

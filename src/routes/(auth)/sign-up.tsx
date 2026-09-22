@@ -1,5 +1,6 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
+import { EmailCodeForm } from "#/components/email-code-form";
 import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
@@ -61,7 +62,17 @@ function SignUp() {
     <div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">
       <div className="island-shell w-full max-w-sm rounded-xl p-8">
         <h1 className="font-semibold text-2xl">Create an account</h1>
-        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+        {/* The same component the sign-in page renders, behaving identically.
+            Two pages that answered one address differently would together say
+            whether it has an account, which is the enumeration the send
+            endpoint is careful not to leak. */}
+        <EmailCodeForm />
+        <div className="mt-8 border-border border-t pt-6">
+          <h2 className="font-medium text-muted-foreground text-sm">
+            Or create one with a password
+          </h2>
+        </div>
+        <form className="mt-4 space-y-4" onSubmit={onSubmit}>
           <div className="space-y-1.5">
             <Label htmlFor="name">Name</Label>
             <Input
