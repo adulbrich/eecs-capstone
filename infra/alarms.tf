@@ -38,22 +38,31 @@ resource "aws_sns_topic_subscription" "alarm_email" {
   endpoint  = var.alarm_email
 }
 
-# Every alarm below sets `ok_actions` as well as `alarm_actions`, so a recovery
-# is mailed too. Without it the only signal is the opening mail, and an alarm
-# that has quietly gone back to OK reads exactly like one nobody has fixed.
+# Every alarm below notifies on the way in and on the way out, so a recovery is
+# mailed too. Without the second one the only signal is the opening mail, and an
+# alarm that has quietly gone back to OK reads exactly like one nobody has
+# fixed. Named once rather than eight times so that "both ways, one topic" is a
+# single fact rather than four copies to keep in step.
+locals {
+  alarm_notifications = [aws_sns_topic.alarms.arn]
+}
 
 # Requests the load balancer itself failed: no target answered, the target
 # closed the connection, or the request never reached the app. Distinct from
 # the next alarm, which is the app answering 5XX on its own.
 #
-# `treat_missing_data` is "notBreaching", which the issue did not ask for and
-# which is load-bearing. ALB publishes the HTTPCode counters only when they are
-# nonzero, so on a healthy fleet this metric has no datapoints at all. Under
-# the default ("missing") the alarm would sit in INSUFFICIENT_DATA forever, and
-# the first stray 5XX would publish a 1, which is below the threshold, which
-# transitions the alarm to OK and fires `ok_actions`. That is a recovery mail
-# for an alarm that never alarmed, once per stray error. "notBreaching" starts
-# it in OK and keeps it there, so the only transition is a real one.
+# `treat_missing_data` is "notBreaching" on both 5XX alarms, which the issue did
+# not ask for and which is load-bearing. Two AWS reporting rules put this metric
+# in CloudWatch's "missing" state most of the time. The narrow one is this
+# metric's own criterion, "There is a nonzero value", so a healthy fleet
+# publishes nothing here at all. The broad one covers the alarm below as well:
+# "If there are no requests flowing through the load balancer or no data for a
+# metric, the metric is not reported", which is every quiet night. Under the
+# default ("missing") the alarm sits in INSUFFICIENT_DATA, and the first stray
+# 5XX publishes a 1, which is below the threshold, which transitions it to OK
+# and fires `ok_actions`. That is a recovery mail for an alarm that never
+# alarmed, once per stray error. "notBreaching" starts it in OK and keeps it
+# there, so the only transition is a real one.
 resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
   alarm_name        = "${var.project}-alb-5xx"
   alarm_description = "The load balancer returned more than 5 5XX responses in five minutes, which means it could not get an answer out of the fleet."
@@ -76,8 +85,8 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
   # replaced without anybody noticing the alarm stopped measuring anything.
   dimensions = { LoadBalancer = aws_lb.app.arn_suffix }
 
-  alarm_actions = [aws_sns_topic.alarms.arn]
-  ok_actions    = [aws_sns_topic.alarms.arn]
+  alarm_actions = local.alarm_notifications
+  ok_actions    = local.alarm_notifications
 
   tags = { Name = "${var.project}-alb-5xx" }
 }
@@ -97,14 +106,19 @@ resource "aws_cloudwatch_metric_alarm" "app_5xx" {
   period              = 300
   evaluation_periods  = 1
   datapoints_to_alarm = 1
-  # Same reason as the alarm above: the counter is not published when it is
-  # zero, so the default would mail a recovery for the first single 5XX.
+  # Set for the same reason as the alarm above, but not for the same rule, and
+  # the difference is worth writing down because it looks like a copy. This
+  # metric is "Reported if there are registered targets", so it does publish a
+  # zero on a fleet that is up and idle. What it stops publishing is a fleet
+  # with no registered targets, and a quiet load balancer with no requests at
+  # all. Either gap would otherwise be an INSUFFICIENT_DATA the next single 5XX
+  # resolves into an OK mail.
   treat_missing_data = "notBreaching"
 
   dimensions = { LoadBalancer = aws_lb.app.arn_suffix, TargetGroup = aws_lb_target_group.app.arn_suffix }
 
-  alarm_actions = [aws_sns_topic.alarms.arn]
-  ok_actions    = [aws_sns_topic.alarms.arn]
+  alarm_actions = local.alarm_notifications
+  ok_actions    = local.alarm_notifications
 
   tags = { Name = "${var.project}-app-5xx" }
 }
@@ -133,8 +147,8 @@ resource "aws_cloudwatch_metric_alarm" "db_connections" {
 
   dimensions = { DBInstanceIdentifier = aws_db_instance.main.identifier }
 
-  alarm_actions = [aws_sns_topic.alarms.arn]
-  ok_actions    = [aws_sns_topic.alarms.arn]
+  alarm_actions = local.alarm_notifications
+  ok_actions    = local.alarm_notifications
 
   tags = { Name = "${var.project}-db-connections" }
 }
@@ -161,6 +175,7 @@ resource "aws_cloudwatch_metric_alarm" "db_connections" {
 # nobody would maintain. A deploy is a thing an operator starts, so the mail
 # arrives while they are watching; if that turns out to be the wrong trade,
 # `evaluation_periods` and `datapoints_to_alarm` are the two numbers to move.
+# ADR-0044 is the decision and the alternatives it rules out.
 resource "aws_cloudwatch_metric_alarm" "fleet_below_floor" {
   alarm_name        = "${var.project}-fleet-below-floor"
   alarm_description = "The app service ran fewer than ${var.app_min_tasks} tasks for three minutes running. Expected during a rolling deploy; an outage otherwise."
@@ -181,8 +196,8 @@ resource "aws_cloudwatch_metric_alarm" "fleet_below_floor" {
     ServiceName = aws_ecs_service.app.name
   }
 
-  alarm_actions = [aws_sns_topic.alarms.arn]
-  ok_actions    = [aws_sns_topic.alarms.arn]
+  alarm_actions = local.alarm_notifications
+  ok_actions    = local.alarm_notifications
 
   tags = { Name = "${var.project}-fleet-below-floor" }
 }
