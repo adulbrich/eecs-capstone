@@ -35,6 +35,19 @@ import { authClient } from "#/lib/auth-client";
 
 type Step = "address" | "code" | "name";
 
+/**
+ * Each step's form carries a `key`, and it is load-bearing rather than the
+ * usual list-rendering habit.
+ *
+ * The three branches return the same shape in the same position, so React
+ * reconciles them as one element and REUSES the `<input>` DOM node. These
+ * inputs are uncontrolled, so the node keeps whatever was typed into it: the
+ * code step arrived pre-filled with the address from the step before, under a
+ * label reading "Code". A distinct key forces a remount and an empty field.
+ * Nothing but looking at the rendered page showed it, because `fill()` in a
+ * test overwrites the value either way.
+ */
+
 const CODE_LENGTH = 6;
 
 export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
@@ -115,7 +128,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
 
   if (step === "address") {
     return (
-      <form className="mt-6 space-y-4" onSubmit={sendCode}>
+      <form className="mt-6 space-y-4" key="address" onSubmit={sendCode}>
         <div className="space-y-1.5">
           <Label htmlFor="code-email">Email</Label>
           <Input
@@ -137,7 +150,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
 
   if (step === "code") {
     return (
-      <form className="mt-6 space-y-4" onSubmit={checkCode}>
+      <form className="mt-6 space-y-4" key="code" onSubmit={checkCode}>
         <div className="space-y-1.5">
           <Label htmlFor="code-otp">Code</Label>
           <Input
@@ -176,7 +189,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
   }
 
   return (
-    <form className="mt-6 space-y-4" onSubmit={submitName}>
+    <form className="mt-6 space-y-4" key="name" onSubmit={submitName}>
       <div className="space-y-1.5">
         <Label htmlFor="code-name">Your name</Label>
         <Input

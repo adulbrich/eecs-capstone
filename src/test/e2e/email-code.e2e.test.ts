@@ -35,6 +35,10 @@ test.describe("@smoke signing in with an emailed code", () => {
       await page.getByRole("button", { name: "Email me a code" }).click();
 
       const code = await emailCode(email, sentAt);
+      // Empty, not carrying the address typed one step earlier. The three
+      // steps render the same shape in the same position, so without a `key`
+      // React reuses the input node and its uncontrolled value comes with it.
+      await expect(page.getByLabel("Code", { exact: true })).toHaveValue("");
       await page.getByLabel("Code", { exact: true }).fill(code);
       await page.getByRole("button", { name: "Confirm code" }).click();
 
