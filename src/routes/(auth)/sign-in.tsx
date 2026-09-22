@@ -85,22 +85,6 @@ function SignIn() {
       <div className="island-shell w-full max-w-sm rounded-xl p-8">
         <h1 className="font-semibold text-2xl">Sign in</h1>
         {oauthError && <OAuthErrorBanner code={oauthError} />}
-        {/* Both doors are live for one release so people meet the new one
-            before #576 closes the old. The button is above the password form
-            rather than below it because discovery is the point of the release;
-            when the password goes, this page is the code form and nothing
-            else. */}
-        <Button
-          className="mt-6 w-full"
-          onClick={() => {
-            setError(null);
-            setUseCode((on) => !on);
-          }}
-          type="button"
-          variant={useCode ? "outline" : "default"}
-        >
-          {useCode ? "Use a password instead" : "Email me a code instead"}
-        </Button>
         {useCode && <EmailCodeForm redirectTo={redirectTo} />}
         {!useCode && (
           <form className="mt-6 space-y-4" onSubmit={onSubmit}>
@@ -160,10 +144,32 @@ function SignIn() {
         >
           Continue with GitHub
         </Button>
-        <p className="mt-6 flex flex-wrap gap-x-4 text-muted-foreground text-sm">
-          <Link className="text-brand-dark underline" to="/forgot-password">
-            Forgot password?
-          </Link>
+        {/* Both doors are live for one release so people meet the new one
+            before #576 closes the old. The switch sits down here with the other
+            secondary choices rather than above the form, because a button that
+            changes which field is on screen reads as an instruction when it is
+            the first thing above that field. When the password goes, this page
+            is the code form and this line goes with it. */}
+        <p className="mt-6 flex flex-wrap items-center gap-x-4 text-muted-foreground text-sm">
+          <Button
+            className="underline"
+            onClick={() => {
+              setError(null);
+              setUseCode((on) => !on);
+            }}
+            size="bare"
+            type="button"
+            variant="link"
+          >
+            {useCode ? "Use a password instead" : "Email me a code instead"}
+          </Button>
+          {/* Only reachable from the password door. A password reset means
+              nothing to somebody signing in with a code. */}
+          {!useCode && (
+            <Link className="text-brand-dark underline" to="/forgot-password">
+              Forgot password?
+            </Link>
+          )}
           {/* Deliberately not the sign-up sentence: nobody is creating an
               account on this page, so "you agree" would be false here. */}
           <Link className="text-brand-dark underline" to="/privacy">

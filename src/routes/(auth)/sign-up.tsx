@@ -68,14 +68,6 @@ function SignUp() {
             whether it has an account, which is the enumeration the send
             endpoint is careful not to leak. One at a time, for the reason the
             sign-in page gives. */}
-        <Button
-          className="mt-6 w-full"
-          onClick={() => setUseCode((on) => !on)}
-          type="button"
-          variant={useCode ? "outline" : "default"}
-        >
-          {useCode ? "Use a password instead" : "Email me a code instead"}
-        </Button>
         {useCode && <EmailCodeForm />}
         {!useCode && (
           <form className="mt-6 space-y-4" onSubmit={onSubmit}>
@@ -144,7 +136,20 @@ function SignUp() {
         >
           Continue with GitHub
         </Button>
+        {/* The switch sits with the other secondary choices, the same as on
+            the sign-in page and for the same reason. */}
         <p className="mt-6 text-muted-foreground text-sm">
+          <Button
+            className="underline"
+            onClick={() => setUseCode((on) => !on)}
+            size="bare"
+            type="button"
+            variant="link"
+          >
+            {useCode ? "Use a password instead" : "Email me a code instead"}
+          </Button>
+        </p>
+        <p className="mt-2 text-muted-foreground text-sm">
           Already have an account?{" "}
           <Link className="text-brand-dark underline" to="/sign-in">
             Sign in
