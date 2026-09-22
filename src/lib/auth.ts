@@ -172,7 +172,10 @@ async function swallowing(what: string, run: () => Promise<void>) {
   try {
     await run();
   } catch (error) {
-    console.error(`Sign-in attempt counter failed (${what})`, error);
+    console.error(
+      `Sign-in attempt counter failed (${what})`,
+      redactQueryError(error)
+    );
   }
 }
 
@@ -214,7 +217,10 @@ export const auth = betterAuth({
       try {
         verdict = await checkSignInAllowed(email, ip);
       } catch (error) {
-        console.error("Sign-in attempt counter failed (check)", error);
+        console.error(
+          "Sign-in attempt counter failed (check)",
+          redactQueryError(error)
+        );
         return;
       }
       if (!verdict.allowed) {
@@ -253,10 +259,10 @@ export const auth = betterAuth({
   // logger, whose default writes it through a console method. A Drizzle query
   // error carries the bound parameters, and the parameter of a session lookup
   // is the session token, so the default logger would put a live credential in
-  // the log group. This redacts every
-  // argument rather than disabling the logging, which would have swapped a
-  // leak for a blind spot. `redact-query-error.ts` has the detail, including
-  // why logging `error.message` alone is not the fix it looks like.
+  // the log group. This redacts every argument rather than disabling the
+  // logging, which would have swapped a leak for a blind spot.
+  // `redact-query-error.ts` has the detail, including why logging
+  // `error.message` alone is not the fix it looks like.
   logger: { log: redactingAuthLogger() },
   // Rethrow rather than let the router fall through to its own logging. Better
   // Auth's `onError` returns undefined on every branch, so `better-call`'s
