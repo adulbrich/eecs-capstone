@@ -33,6 +33,7 @@ import {
 } from "#/lib/email/templates";
 import {
   OTP_CLAIM_COOKIE,
+  OTP_CLAIM_READABLE_COOKIE,
   otpClaimMatches,
   otpClaimToken,
 } from "#/lib/otp-claim";
@@ -564,6 +565,15 @@ export const auth = betterAuth({
           if (claim) {
             ctx.setCookie(OTP_CLAIM_COOKIE, claim, {
               httpOnly: true,
+              maxAge: CLAIM_COOKIE_SECONDS,
+              path: "/",
+              sameSite: "lax",
+              secure: authConfig.isProduction,
+            });
+            // Readable, so the page can tell whether this browser kept either
+            // of them. See OTP_CLAIM_READABLE_COOKIE for why that matters.
+            ctx.setCookie(OTP_CLAIM_READABLE_COOKIE, "1", {
+              httpOnly: false,
               maxAge: CLAIM_COOKIE_SECONDS,
               path: "/",
               sameSite: "lax",

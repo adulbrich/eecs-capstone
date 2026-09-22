@@ -282,6 +282,81 @@ describe("the two rows Better Auth's own helper does not refuse", () => {
   });
 });
 
+describe("a row a provider already owns", () => {
+  /**
+   * A verified row with a provider account and no credential, which is what
+   * GitHub or ONID sign-up leaves behind. Inserted rather than driven, because
+   * neither provider can be exercised from a test: `account.e2e.test.ts` says
+   * the same about both.
+   */
+  async function aProviderRow(email: string, providerId: string) {
+    const id = `otp-provider-${Date.now()}-${nextAddress}`;
+    await db.insert(user).values({
+      createdAt: new Date(),
+      email,
+      emailVerified: true,
+      id,
+      name: "Provider Owner",
+      updatedAt: new Date(),
+    });
+    await db.insert(account).values({
+      accountId: `${providerId}-${id}`,
+      createdAt: new Date(),
+      id: `acct-${id}`,
+      providerId,
+      updatedAt: new Date(),
+      userId: id,
+    });
+    return id;
+  }
+
+  // The ordinary case, and the one nothing covered: somebody who signed up with
+  // ONID or GitHub uses the code door at the same address later. It must work,
+  // because they hold the inbox and the row is verified, and it must leave the
+  // provider account alone. `revokeUnprovenAccountAccess` no-ops on a verified
+  // row, so nothing is deleted today; this pins that, because the guard sits
+  // right beside it and a change there could reach this row.
+  it.each(["onid", "github"])(
+    "signs in by code and leaves the %s account in place",
+    async (providerId) => {
+      const email = anAddress(`verified-${providerId}`);
+      const id = await aProviderRow(email, providerId);
+
+      const code = await sendCode(email);
+      const response = await auth.api.signInEmailOTP({
+        asResponse: true,
+        body: { email, otp: code },
+        headers: claimHeaders(email),
+      });
+
+      expect(response.headers.get("set-cookie")).toBeTruthy();
+      expect(await providersOn(id)).toEqual([providerId]);
+      const after = await rowFor(email);
+      expect(after?.id).toBe(id);
+      expect(after?.name).toBe("Provider Owner");
+    }
+  );
+
+  // The unverified counterpart is refused, and that pair is the point: proving
+  // the address proves the address. On a verified row it adds nothing anyone
+  // did not already have; on an unverified one it would hand a second person a
+  // session on a row the provider identity still opens.
+  it("still refuses the unverified counterpart", async () => {
+    const email = anAddress("unverified-provider");
+    const id = await aProviderRow(email, "github");
+    await db.update(user).set({ emailVerified: false }).where(eq(user.id, id));
+
+    const code = await sendCode(email);
+
+    await expect(
+      auth.api.signInEmailOTP({
+        body: { email, otp: code },
+        headers: claimHeaders(email),
+      })
+    ).rejects.toMatchObject({ body: { code: "INVALID_OTP" } });
+  });
+});
+
 describe("the email-otp paths this app does not serve", () => {
   // `/email-otp/verify-email` is the one that matters: it flips emailVerified
   // without calling `revokeUnprovenAccountAccess`, so serving it would let the

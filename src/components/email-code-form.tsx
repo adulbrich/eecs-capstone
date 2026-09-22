@@ -5,6 +5,7 @@ import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
+import { OTP_CLAIM_READABLE_COOKIE } from "#/lib/otp-claim";
 
 /**
  * Sign in, or create an account, with a code mailed to the address (#576).
@@ -80,8 +81,34 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
       setError(sendError.message ?? "Could not send a code. Try again.");
       return;
     }
+    if (!keptTheClaim()) {
+      // Stopping here rather than sending them to their inbox for a code
+      // that cannot work. The server cannot say this: a browser that
+      // dropped the claim and a stranger who never had one look identical
+      // to it, and both have to get the same answer.
+      setError(
+        "Your browser is not keeping cookies for this site, and signing in with a code needs one. Allow cookies for this site and try again, or sign in with ONID."
+      );
+      return;
+    }
     setEmail(address);
     setStep("code");
+  }
+
+  /**
+   * Whether the browser kept the claim the send just issued.
+   *
+   * Reads the readable companion rather than the claim itself, which is
+   * `HttpOnly` and so invisible here by design. Fails OPEN on a document
+   * that will not answer at all, because refusing a browser this cannot
+   * measure would be worse than the refusal it exists to prevent.
+   */
+  function keptTheClaim(): boolean {
+    try {
+      return document.cookie.includes(`${OTP_CLAIM_READABLE_COOKIE}=`);
+    } catch {
+      return true;
+    }
   }
 
   async function checkCode(e: React.FormEvent<HTMLFormElement>) {

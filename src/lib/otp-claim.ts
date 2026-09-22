@@ -49,6 +49,22 @@
 /** Sent to the browser that asked for a code, returned when it redeems one. */
 export const OTP_CLAIM_COOKIE = "capstone_otp_claim";
 
+/**
+ * A readable companion to the claim, set beside it and carrying nothing.
+ *
+ * The claim itself is `HttpOnly`, so the page cannot tell whether the browser
+ * kept it, and the server cannot tell a browser that dropped it from a stranger
+ * who never had one: neither presents a claim, and both must get the same
+ * answer. So a browser that refuses cookies for this site would send somebody to
+ * their inbox, bring back the RIGHT code, and be told "Invalid OTP" with no way
+ * forward and nothing to act on.
+ *
+ * This is how the page finds that out at the send, before the trip to the
+ * inbox. It is readable on purpose and says only that a code was asked for from
+ * this browser, which that browser already knows.
+ */
+export const OTP_CLAIM_READABLE_COOKIE = "capstone_otp_claim_set";
+
 const encoder = new TextEncoder();
 
 const BASE64_PLUS = /\+/g;
