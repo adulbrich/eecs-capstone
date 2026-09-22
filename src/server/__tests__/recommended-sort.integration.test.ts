@@ -15,8 +15,8 @@ function unitVector(axis: number) {
 }
 
 async function makeAdmin(email: string) {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: email },
+  await auth.api.createUser({
+    body: { email, name: email },
   });
   await db
     .update(user)

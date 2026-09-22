@@ -11,8 +11,8 @@ import {
 import { listProjectCommentsAs } from "#/server/_internal/projects-queries";
 
 async function makeUser(email: string, role: "user" | "admin") {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: email },
+  await auth.api.createUser({
+    body: { email, name: email },
   });
   await db
     .update(user)

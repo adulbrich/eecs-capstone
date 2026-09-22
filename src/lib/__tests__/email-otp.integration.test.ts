@@ -3,10 +3,7 @@ import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { account, session, user, verification } from "#/db/auth-schema";
 import { auth } from "#/lib/auth";
-import {
-  captureConsoleCode,
-  captureConsoleEmail,
-} from "#/test/shared/console-email";
+import { captureConsoleCode } from "#/test/shared/console-email";
 
 // #576: the emailed sign-in code, and the four properties it exists for.
 //
@@ -109,12 +106,15 @@ async function providersOn(userId: string): Promise<string[]> {
   return rows.map((row) => row.providerId);
 }
 
-/** Signs up and leaves the account unverified, which is what a squatter has. */
+/**
+ * An unverified row with a password behind it, which is what a squatter left.
+ * Nobody can make one any more (#576), but production still holds the ones
+ * made before, so the admin plugin's create stands in for the sign-up that
+ * wrote them.
+ */
 async function aSquattedAddress(email: string): Promise<void> {
-  await captureConsoleEmail("Verify your email", async () => {
-    await auth.api.signUpEmail({
-      body: { email, password: PASSWORD, name: "Squatter Name" },
-    });
+  await auth.api.createUser({
+    body: { email, password: PASSWORD, name: "Squatter Name" },
   });
 }
 
@@ -230,16 +230,13 @@ describe("redeeming a code against a row that already exists", () => {
 
   it("leaves a verified password account alone", async () => {
     const email = anAddress("verified");
-    const verifyUrl = await captureConsoleEmail(
-      "Verify your email",
-      async () => {
-        await auth.api.signUpEmail({
-          body: { email, name: "Verified Owner", password: PASSWORD },
-        });
-      }
-    );
-    await auth.api.verifyEmail({
-      query: { token: new URL(verifyUrl).searchParams.get("token") as string },
+    await auth.api.createUser({
+      body: {
+        email,
+        name: "Verified Owner",
+        password: PASSWORD,
+        data: { emailVerified: true },
+      },
     });
     const before = await rowFor(email);
 

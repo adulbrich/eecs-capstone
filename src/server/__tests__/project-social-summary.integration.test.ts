@@ -34,8 +34,8 @@ function fakeModel(summary: string): ResponsesFn {
 const failing: ResponsesFn = () => Promise.reject(new Error("Bedrock is down"));
 
 async function makeAdmin(email: string) {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: email },
+  await auth.api.createUser({
+    body: { email, name: email },
   });
   await db
     .update(user)

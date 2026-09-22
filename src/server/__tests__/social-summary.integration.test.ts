@@ -52,8 +52,8 @@ const nextEmail = () => `sss-${Date.now()}-${seq++}@x.com`;
 
 async function makeUser(role: "user" | "admin") {
   const email = nextEmail();
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: email },
+  await auth.api.createUser({
+    body: { email, name: email },
   });
   await db
     .update(user)

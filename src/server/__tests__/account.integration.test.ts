@@ -39,8 +39,8 @@ import {
 } from "#/server/_internal/projects-queries";
 
 async function makeUser(email: string, role: UserRole) {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: `Name of ${email}` },
+  await auth.api.createUser({
+    body: { email, name: `Name of ${email}` },
   });
   await db
     .update(user)
@@ -259,6 +259,16 @@ describe("deleteAccountAs", () => {
       token: `t-${u.id}`,
       userId: u.id,
       expiresAt: new Date(Date.now() + 60_000),
+    });
+    // A linked identity, which is what an account has now that a code sign-in
+    // writes no `account` row of its own (#576).
+    await db.insert(account).values({
+      id: `a-${u.id}`,
+      accountId: `github-${u.id}`,
+      providerId: "github",
+      userId: u.id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
     await db
       .insert(userInterests)

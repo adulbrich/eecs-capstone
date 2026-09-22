@@ -6,8 +6,8 @@ import { auth } from "#/lib/auth";
 import { listAdminInventoryAs } from "#/server/_internal/inventory-catalog";
 
 async function makeAdmin(email: string) {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: email },
+  await auth.api.createUser({
+    body: { email, name: email },
   });
   await db
     .update(user)
@@ -18,8 +18,8 @@ async function makeAdmin(email: string) {
 }
 
 async function makeHolder(email: string, name: string) {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name },
+  await auth.api.createUser({
+    body: { email, name },
   });
   const [u] = await db.select().from(user).where(eq(user.email, email));
   return u.id;

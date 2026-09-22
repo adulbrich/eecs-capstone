@@ -50,8 +50,8 @@ function s3Client() {
 }
 
 async function makeUser(email: string, role: "user" | "admin" = "user") {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: email },
+  await auth.api.createUser({
+    body: { email, name: email },
   });
   await db
     .update(user)
