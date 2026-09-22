@@ -49,6 +49,21 @@ function isQueryError(value: unknown): value is QueryErrorShape {
 }
 
 /**
+ * The two shapes a parameter tail arrives in.
+ *
+ * The first is `DrizzleQueryError`'s own message template. The second is what
+ * `JSON.stringify` of that error produces, because it sets `query` and
+ * `params` as own enumerable properties, so a serialized copy carries the
+ * parameters with no newline in front of them. Nothing here serializes a
+ * caught value today, and `handleAuthRequest` answers with an empty body, so
+ * the second marker covers a shape this codebase does not currently produce.
+ * It is here because a structured logger is the obvious next change to a
+ * service that writes to a log group, and that change would otherwise reopen
+ * this silently.
+ */
+const PARAM_MARKERS = ["\nparams:", '"params":'];
+
+/**
  * Strips the parameter tail off a message that already carries one.
  *
  * `DrizzleQueryError` builds its message as ``Failed query: ${query}\nparams:
@@ -65,8 +80,11 @@ function scrubQueryText(text: string): string {
   // whole. Nothing in this codebase or in Better Auth does that today, but the
   // cost of covering it is one dropped condition, and the failure mode of the
   // looser test is a truncated log line rather than a leaked one.
-  const marker = text.indexOf("\nparams:");
-  if (marker === -1) {
+  const marker = PARAM_MARKERS.reduce((earliest, candidate) => {
+    const at = text.indexOf(candidate);
+    return at !== -1 && at < earliest ? at : earliest;
+  }, Number.POSITIVE_INFINITY);
+  if (marker === Number.POSITIVE_INFINITY) {
     return text;
   }
   return `${text.slice(0, marker)} [params redacted]`;

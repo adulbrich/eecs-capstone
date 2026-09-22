@@ -92,6 +92,16 @@ describe("redactQueryError", () => {
     expect(redactQueryError(prefixed)).not.toContain(SECRET);
   });
 
+  it("scrubs the parameters out of a serialized query error", () => {
+    // `DrizzleQueryError` sets `query` and `params` as own enumerable
+    // properties, so `JSON.stringify` writes the token out in full with no
+    // newline in front of it. Nothing serializes a caught value today; this
+    // pins the shape so a structured logger cannot reopen the leak quietly.
+    const serialized = JSON.stringify(sessionLookupFailure());
+    expect(serialized).toContain(SECRET);
+    expect(redactQueryError(serialized)).not.toContain(SECRET);
+  });
+
   it("leaves an ordinary string alone", () => {
     expect(redactQueryError("params: not a query error")).toBe(
       "params: not a query error"
