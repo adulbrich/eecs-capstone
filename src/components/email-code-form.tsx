@@ -53,6 +53,9 @@ const CODE_LENGTH = 6;
 /** Written and read back to find out whether this browser keeps cookies. */
 const COOKIE_PROBE = "capstone_cookie_probe";
 
+/** Trailing full stops on a message this form is about to extend. */
+const TRAILING_STOPS = /\.+$/;
+
 /**
  * Better Auth's refusal, plus the way out of it.
  *
@@ -63,9 +66,16 @@ const COOKIE_PROBE = "capstone_cookie_probe";
  * sentences and one action. The refusals are deliberately indistinguishable to
  * the server (see `otp-claim.ts`), so the copy cannot be more specific than
  * this without guessing.
+ *
+ * The trailing stop is stripped from the incoming message rather than repaired
+ * afterwards. `.replace("..", ".")` on the joined string did the same job and
+ * was wrong twice over: `String.replace` with a string pattern rewrites only
+ * the first match, and CodeQL reads that shape as an incomplete sanitizer
+ * whatever it is actually doing. Deciding once, on the one value that varies,
+ * needs no repair.
  */
 function withRecovery(message: string): string {
-  return `${message}. Ask for a new code and try again.`.replace("..", ".");
+  return `${message.replace(TRAILING_STOPS, "")}. Ask for a new code and try again.`;
 }
 
 /** One named field out of a submitted form, as a string rather than a FormDataEntryValue. */
