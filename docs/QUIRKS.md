@@ -367,6 +367,15 @@ Three layers, applied in order: Better Auth's own special rules, then each plugi
 
 The helper in `better-auth/dist/db/revoke-unproven-account-access.mjs` is called from `/sign-in/email-otp` and from magic-link, and NOT from `/email-otp/verify-email` or the OTP password reset, both of which flip `emailVerified` without it. That asymmetry is why `src/lib/auth.ts` disables those two rather than leaving them mounted. Where it does run it deletes `credential` accounts and sessions and no-ops on a verified row, but unlike `releaseUnverifiedAddress` ([ADR-0045](./adr/0045-onid-takes-an-address-off-an-unproven-account.md)) it refuses neither a banned row nor a row another provider is linked to. `src/server/_internal/otp-sign-in-guard.ts` adds both refusals ahead of it; removing it turns two cases in `email-otp.integration.test.ts` red.
 
+### `resolveOTP` rotates the record BEFORE `sendVerificationOTP` runs
+
+So a decision not to mail, taken inside the sender, is taken after the damage. The per-recipient cap lived there first and the symptom was subtle: a sixth request in an hour did not merely fail to mail, it replaced the live record with a code nobody had been told, so the person lost the working code they were already holding. Anything that can refuse a send belongs in the `hooks.before` on `/email-otp/send-verification-otp`, where the record has not moved yet. `src/lib/auth.ts` spends the cap there for exactly this reason, and `email-otp.integration.test.ts` fails if it moves back.
+
+### `throw new APIError("OK", ...)` short-circuits a hook, but only over the router
+
+better-call's `statusCodes` includes `OK: 200`, so a `hooks.before` can answer a request without letting the handler run by throwing one. That is how the send guard returns `{success: true}` for a request it refuses to act on, which it must, because any other answer turns the send endpoint into an account enumerator. The catch that converts it lives in the ROUTER: `auth.handler` gives a real 200, and `auth.api.*` rethrows the `APIError` instead. A test written against `auth.api` therefore fails on exactly the path it means to check, which is why the send cases in `email-otp.integration.test.ts` build a `Request` and go through `auth.handler`.
+
+
 ---
 
 ## Drizzle ORM + Postgres

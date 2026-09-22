@@ -55,16 +55,38 @@ high enough that a shared campus address can type a code.
 
 A magic link has no equivalent, because a 32 character token needs no attempt
 counter, which is a point for the link that the comparison above does not make.
-It is not enough to reverse the choice: the cross-device failure is certain and
-affects everyone, while this needs a motivated attacker who knows an address, and
-today every non-ONID person still has a password to fall back on. That last
-clause is what stops this being a blocker, and it expires when password sign-in
-is removed, so it is recorded as the thing to resolve before that happens rather
-than as an accepted risk. Binding the code to the browser that asked for it, with
-a cookie set at send and required at redeem, is the option that fits the design
-without giving up the cross-device property; nothing in the plugin does it today.
-[#581](https://github.com/adulbrich/eecs-capstone/issues/581) carries the
-options and has to close before password sign-in does.
+It was not enough to reverse the choice, because the cross-device failure is
+certain and affects everyone while this needs a motivated attacker, and the class
+is closed instead by a claim: `src/lib/otp-claim.ts` and the two guards in
+`src/lib/auth.ts` (#581).
+
+The obvious form of that claim does not work, and it is worth writing down
+because it is what anyone would reach for first. Handing the requesting browser a
+cookie and demanding it back at redeem closes nothing on its own: the attacker
+asks for a code themselves, which both mints them a cookie AND rotates the single
+per-address record, so the code they can then spend is the one the owner was just
+mailed. What closes it is the second rule, that **a live code belongs to the
+browser that asked for it and another browser asking does not replace it**. With
+that, a stranger's send moves nothing and earns nothing, and their guesses are
+refused before Better Auth counts one.
+
+The claim is an HMAC over the address and the record's expiry under the Better
+Auth secret, so nothing is stored and a rotation invalidates the previous
+browser's claim by moving the expiry. The secret is not in the database, so
+reading `verification` yields no claim to the code in it.
+
+Two costs, both accepted. A second device cannot ask for its own code while one
+is live, so somebody who starts on a laptop and wants to continue on a phone
+waits out the five minutes or finishes on the laptop; the alternative, letting
+any browser take over a live code, is the attack. And a browser that loses the
+cookie cannot redeem the code it was sent, which is the same wait.
+
+One implementation note that is easy to get backwards. The per-recipient cap is
+spent in the `hooks.before` on the send, NOT inside `sendVerificationOTP`,
+because `resolveOTP` writes the rotated record before the sender runs. Refusing
+in the sender left the record holding a code nobody had been told, so a sixth
+request in an hour did not merely fail to mail: it killed the code the person was
+already holding.
 
 Six of the nine paths the plugin mounts are refused through `disabledPaths`, and
 one of them had to be. `/email-otp/verify-email` flips `emailVerified` on an
