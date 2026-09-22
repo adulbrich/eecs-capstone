@@ -95,13 +95,14 @@ const CHANGE_PASSWORD_MAX = 5;
 /**
  * What one address may spend per window on `/email-otp/send-verification-otp`.
  *
- * This is the one OTP path that mails somebody, so it is the one that carries
- * the argument ADR-0039 makes for leaving `/sign-in/email` at 3: a number here
- * is also a cap on mail aimed at an inbox the sender does not own. It is no
- * longer the ONLY such cap, which is why it is 10 rather than 3. The
- * per-recipient budget in `verification-mail-limits.ts` bounds what any one
- * inbox can be made to receive whatever this number says, so this one only has
- * to make bulk mailing from a single address slow.
+ * This is the one OTP path that mails somebody, so it inherits ADR-0039's
+ * REASON for holding `/sign-in/email` down, that a number here is also a cap on
+ * mail aimed at an inbox the sender does not own. It does not inherit the
+ * number. ADR-0039 is at 3 because that limit was the only thing bounding the
+ * mail at all; the per-recipient budget in `verification-mail-limits.ts` now
+ * bounds what any one inbox can be made to receive whatever this says, which
+ * leaves this one job only: making bulk mail to MANY addresses from a single
+ * source slow, which a per-recipient cap cannot do.
  *
  * Ten rather than 60 because the population is not a lecture hall. ONID carries
  * about three quarters of sign-in traffic already, and once password sign-in is

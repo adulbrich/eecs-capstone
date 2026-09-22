@@ -367,7 +367,6 @@ Three layers, applied in order: Better Auth's own special rules, then each plugi
 
 The helper in `better-auth/dist/db/revoke-unproven-account-access.mjs` is called from `/sign-in/email-otp` and from magic-link, and NOT from `/email-otp/verify-email` or the OTP password reset, both of which flip `emailVerified` without it. That asymmetry is why `src/lib/auth.ts` disables those two rather than leaving them mounted. Where it does run it deletes `credential` accounts and sessions and no-ops on a verified row, but unlike `releaseUnverifiedAddress` ([ADR-0045](./adr/0045-onid-takes-an-address-off-an-unproven-account.md)) it refuses neither a banned row nor a row another provider is linked to. `src/server/_internal/otp-sign-in-guard.ts` adds both refusals ahead of it; removing it turns two cases in `email-otp.integration.test.ts` red.
 
-
 ---
 
 ## Drizzle ORM + Postgres

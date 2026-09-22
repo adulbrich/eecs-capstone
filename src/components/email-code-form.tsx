@@ -50,6 +50,11 @@ type Step = "address" | "code" | "name";
 
 const CODE_LENGTH = 6;
 
+/** One named field out of a submitted form, as a string rather than a FormDataEntryValue. */
+function formValue(e: React.FormEvent<HTMLFormElement>, field: string): string {
+  return String(new FormData(e.currentTarget).get(field) ?? "");
+}
+
 export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>("address");
@@ -62,7 +67,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const address = String(new FormData(e.currentTarget).get("email") ?? "");
+    const address = formValue(e, "email");
     const { error: sendError } = await authClient.emailOtp.sendVerificationOtp({
       email: address,
       type: "sign-in",
@@ -83,7 +88,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const entered = String(new FormData(e.currentTarget).get("code") ?? "");
+    const entered = formValue(e, "code");
     const { error: checkError } =
       await authClient.emailOtp.checkVerificationOtp({
         email,
@@ -109,7 +114,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    await redeem(code, String(new FormData(e.currentTarget).get("name") ?? ""));
+    await redeem(code, formValue(e, "name"));
   }
 
   async function redeem(otp: string, name: string | undefined) {
