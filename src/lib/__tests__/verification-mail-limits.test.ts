@@ -10,20 +10,33 @@ import {
 // `sign-in-limits.test.ts`.
 
 describe("verificationMailLimits", () => {
-  it("defaults to three an hour", () => {
-    expect(verificationMailLimits({})).toEqual({
+  it("defaults a verification link to three an hour", () => {
+    expect(verificationMailLimits("verification", {})).toEqual({
       limit: 3,
+      windowMinutes: 60,
+    });
+  });
+
+  it("gives the duplicate notice its own, smaller budget", () => {
+    // Metered apart so a squatter cannot spend the owner's warning: they can
+    // empty the verification budget at will through sendOnSignIn, and sharing
+    // one budget silenced the notice the owner's own sign-up should trigger.
+    expect(verificationMailLimits("duplicate", {})).toEqual({
+      limit: 2,
       windowMinutes: 60,
     });
   });
 
   it("takes both numbers from the environment", () => {
     expect(
-      verificationMailLimits({
+      verificationMailLimits("verification", {
         VERIFICATION_MAIL_LIMIT: "5",
         VERIFICATION_MAIL_WINDOW_MINUTES: "30",
       })
     ).toEqual({ limit: 5, windowMinutes: 30 });
+    expect(
+      verificationMailLimits("duplicate", { DUPLICATE_NOTICE_LIMIT: "4" }).limit
+    ).toBe(4);
   });
 
   it.each([
@@ -37,7 +50,7 @@ describe("verificationMailLimits", () => {
     // ignored. A window of 0 reaches Postgres as make_interval and would
     // count nothing, silently disabling the cap.
     expect(
-      verificationMailLimits({
+      verificationMailLimits("verification", {
         VERIFICATION_MAIL_LIMIT: value,
         VERIFICATION_MAIL_WINDOW_MINUTES: value,
       })
@@ -46,8 +59,9 @@ describe("verificationMailLimits", () => {
 
   it("rounds a fractional window, because make_interval errors on one", () => {
     expect(
-      verificationMailLimits({ VERIFICATION_MAIL_WINDOW_MINUTES: "59.6" })
-        .windowMinutes
+      verificationMailLimits("verification", {
+        VERIFICATION_MAIL_WINDOW_MINUTES: "59.6",
+      }).windowMinutes
     ).toBe(60);
   });
 });

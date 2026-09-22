@@ -1,5 +1,5 @@
 {
-  "id": "0a349868-d15a-4715-8963-6ecb06e49788",
+  "id": "0ae6e56a-10e7-4199-ac28-ac36ab9d208b",
   "prevId": "ff14c011-af74-48dc-a4fe-cc57263d1f69",
   "version": "7",
   "dialect": "postgresql",
@@ -2923,6 +2923,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2937,6 +2943,12 @@
           "columns": [
             {
               "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kind",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

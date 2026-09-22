@@ -22,33 +22,63 @@
  * in the same inbox and an attacker can trigger either.
  */
 export interface VerificationMailLimits {
-  /** Messages allowed to one address inside the window. */
+  /** Messages of this kind allowed to one address inside the window. */
   limit: number;
   /** How far back sends are counted, in minutes. */
   windowMinutes: number;
 }
 
 /**
+ * The two messages this app sends about an address nobody has proved they own,
+ * metered SEPARATELY, which is the whole reason this union exists.
+ *
+ * Sharing one allowance was the first design and it was wrong in the attacker's
+ * favour. `verification` is the kind a squatter can spend at will, because
+ * `sendOnSignIn` mails a fresh link every time they sign in with the password
+ * they chose, and that path is deliberately outside the #552 attempt counter
+ * (see `isWrongCredential`) because refusing it would lock a real person out of
+ * their own way back in. So one sign-up and two sign-ins emptied the hour, and
+ * the `duplicate` notice that the real owner's own sign-up should have
+ * triggered was silently dropped: the owner saw Better Auth's synthetic success
+ * and heard nothing, which is exactly the failure B2 exists to fix.
+ *
+ * Split, the suppression stops being free. To silence the notice an attacker
+ * has to spend the NOTICE budget, and the only way to spend it is to attempt
+ * duplicate sign-ups on that address, each of which mails the owner the notice
+ * until the budget is gone. They cannot silence it without first sending it.
+ */
+export type VerificationMailKind = "duplicate" | "verification";
+
+/**
  * Read on every call rather than captured at import, so a test can set a low
  * limit and an operator can retune without a deploy. Both variables are plumbed
  * through `infra/ecs.tf`, the same as `SIGN_IN_SOFT_LIMIT`.
  *
- * Three an hour is sized against what the honest person actually does, because
- * this cap is the one control here that can lock somebody out of their own
- * account. Their worst legitimate hour is three messages: the link sign-up
+ * Three an hour, for a verification link, is sized against what the honest
+ * person actually does, because this cap is the one control here that can lock
+ * somebody out of their own account. Their worst legitimate hour is three messages: the link sign-up
  * mailed them, a second from the sign-in that refuses them once the first has
  * expired, and a third from trying again after mistyping something. A fourth in
  * the same hour means the link is not arriving at all, which is a delivery
  * problem that a fourth copy does not fix.
  */
 export function verificationMailLimits(
+  kind: VerificationMailKind,
   env: NodeJS.ProcessEnv = process.env
 ): VerificationMailLimits {
   return {
     windowMinutes: Math.round(
       positiveNumber(env.VERIFICATION_MAIL_WINDOW_MINUTES, 60)
     ),
-    limit: Math.round(positiveNumber(env.VERIFICATION_MAIL_LIMIT, 3)),
+    limit:
+      kind === "verification"
+        ? Math.round(positiveNumber(env.VERIFICATION_MAIL_LIMIT, 3))
+        : // Two rather than three, because the honest case needs far fewer: a
+          // person signs up once, and a second attempt after they find nothing
+          // in their inbox is the most anybody does before giving up. It is
+          // also the budget an attacker has to burn to silence the notice, and
+          // burning it sends it.
+          Math.round(positiveNumber(env.DUPLICATE_NOTICE_LIMIT, 2)),
   };
 }
 
@@ -68,7 +98,7 @@ function positiveNumber(value: string | undefined, fallback: number): number {
 /** Whether one more message may go to an address with this much recent history. */
 export function verificationMailAllowed(
   sendsInWindow: number,
-  limits: VerificationMailLimits = verificationMailLimits()
+  limits: VerificationMailLimits
 ): boolean {
   return sendsInWindow < limits.limit;
 }

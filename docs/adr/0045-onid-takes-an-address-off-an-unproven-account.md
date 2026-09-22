@@ -50,3 +50,20 @@ register an address they do not own, and #554's "considered and not chosen"
 section names the clean fix, which is to hold a pending sign-up and create no
 row until the address is proved. That remains the right answer and remains more
 work than this.
+
+One hazard is left open and is worse than it was, which is the reason to write
+it here rather than let a later reader find it. `emailVerification.sendOnSignIn`
+still mails a live verification link to the address on every sign-in the
+squatter makes with the password they chose, and `autoSignInAfterVerification`
+is true, so an owner who clicks that link confirms the squatter's row and is
+signed into it. Nothing in this change closes that: B1 runs only on the ONID
+callback, the notice in B2 is a different, tokenless message, and the cap bounds
+how often the link is sent rather than what it grants. What this change adds is
+a second cost to the same click, because a row that has been verified is exactly
+the row `releaseUnverifiedAddress` refuses, so clicking it also forfeits the
+ONID route that would otherwise have worked. The mitigation shipped here is
+copy: `verificationEmail` now tells the reader plainly not to use the link if
+they did not create the account, and names ONID and a password reset as the two
+safe doors. That is a warning rather than a control, and it is proportionate
+only because the clean fix is the pending sign-up rewrite, which is out of scope
+for #554 by the issue's own words.

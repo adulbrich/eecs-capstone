@@ -11,7 +11,7 @@ import {
 // `auth` object and a real database. The numbers themselves are pinned without
 // one in `verification-mail-limits.test.ts`.
 
-const { limit } = verificationMailLimits();
+const { limit } = verificationMailLimits("verification");
 const PASSWORD = "Password1!";
 
 /** A fresh address per case, so one case cannot spend another's allowance. */
@@ -25,9 +25,9 @@ describe("reserveVerificationMail", () => {
   it("allows up to the limit and refuses after it", async () => {
     const email = anAddress("allowance");
     for (let i = 0; i < limit; i += 1) {
-      expect(await reserveVerificationMail(email)).toBe(true);
+      expect(await reserveVerificationMail(email, "verification")).toBe(true);
     }
-    expect(await reserveVerificationMail(email)).toBe(false);
+    expect(await reserveVerificationMail(email, "verification")).toBe(false);
   });
 
   it("counts a recipient under one key whatever case it arrives in", async () => {
@@ -36,18 +36,22 @@ describe("reserveVerificationMail", () => {
     // not a cap.
     const email = anAddress("folded");
     for (let i = 0; i < limit; i += 1) {
-      expect(await reserveVerificationMail(email.toUpperCase())).toBe(true);
+      expect(
+        await reserveVerificationMail(email.toUpperCase(), "verification")
+      ).toBe(true);
     }
-    expect(await reserveVerificationMail(email)).toBe(false);
+    expect(await reserveVerificationMail(email, "verification")).toBe(false);
   });
 
   it("keeps one recipient's allowance away from another's", async () => {
     const spent = anAddress("spent");
     for (let i = 0; i < limit; i += 1) {
-      await reserveVerificationMail(spent);
+      await reserveVerificationMail(spent, "verification");
     }
-    expect(await reserveVerificationMail(spent)).toBe(false);
-    expect(await reserveVerificationMail(anAddress("untouched"))).toBe(true);
+    expect(await reserveVerificationMail(spent, "verification")).toBe(false);
+    expect(
+      await reserveVerificationMail(anAddress("untouched"), "verification")
+    ).toBe(true);
   });
 });
 
@@ -126,6 +130,46 @@ describe("the cap, through auth", () => {
     // No token: one for this row would confirm the SQUATTER's account and, with
     // autoSignInAfterVerification, sign the owner into it.
     expect(new URL(url).search).toBe("");
+  });
+
+  it("cannot be silenced by a squatter spending the verification budget", async () => {
+    // Found in review. With one shared allowance, a squatter emptied the hour
+    // with a sign-up and two sign-ins, and the real owner's own sign-up then
+    // produced nothing at all: Better Auth answers a duplicate with a synthetic
+    // success, so they saw "account created" and heard nothing. The two kinds
+    // are metered apart so that cannot happen.
+    const victim = anAddress("suppression");
+    await captureConsoleEmail("Verify your email", async () => {
+      await auth.api.signUpEmail({
+        body: { email: victim, password: PASSWORD, name: "Squatter" },
+      });
+    });
+    // `sendOnSignIn` mails a fresh link on every sign-in with the password the
+    // squatter chose, and that path is deliberately outside the #552 attempt
+    // counter, so it costs them nothing. Empty the verification allowance.
+    for (let i = 0; i < limit; i += 1) {
+      await auth.api
+        .signInEmail({ body: { email: victim, password: PASSWORD } })
+        .catch(() => {
+          // Refused as unverified every time; the mail is the point.
+        });
+    }
+    expect(await reserveVerificationMail(victim, "verification")).toBe(false);
+
+    // The owner signs up, and still hears about it.
+    const url = await captureConsoleEmail(
+      "Someone signed up with your email address",
+      async () => {
+        await auth.api.signUpEmail({
+          body: {
+            email: victim,
+            password: "DifferentPass1!",
+            name: "Real Owner",
+          },
+        });
+      }
+    );
+    expect(new URL(url).pathname).toBe("/forgot-password");
   });
 
   it("says nothing when the duplicate hits a verified row", async () => {

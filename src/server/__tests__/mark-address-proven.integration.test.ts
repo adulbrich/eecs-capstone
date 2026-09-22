@@ -11,7 +11,7 @@ import { captureConsoleEmail } from "#/test/shared/console-email";
 // refuses the real owner the one message they need, which is the opposite of
 // what the cap is for. The last case here is that whole path end to end.
 
-const { limit } = verificationMailLimits();
+const { limit } = verificationMailLimits("verification");
 const PASSWORD = "Password1!";
 const NEW_PASSWORD = "BrandNewPass1!";
 

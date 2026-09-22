@@ -1,9 +1,9 @@
 # Mail about an unproven address is capped per recipient, and fails open
 
 `reserveVerificationMail` in `src/server/_internal/verification-sends.ts` allows
-three messages an hour to one address, counted in a new `verification_sends`
-table, and both `emailVerification.sendVerificationEmail` and the
-duplicate-sign-up notice spend the same allowance. It replaces a control that
+three verification links an hour to one address and, in a budget of its own, two
+duplicate-sign-up notices, counted in a new `verification_sends` table keyed on
+the recipient and the kind. It replaces a control that
 was never meant to be one: the Better Auth rate limit on `/sign-in/email`, which
 [ADR-0039](./0039-sign-in-limits-are-sized-for-a-shared-address.md) left at the
 framework default purely because `emailVerification.sendOnSignIn` turned that
@@ -25,6 +25,21 @@ a transient blip rather than a database that is down; refusing mail through one
 would lock out every new account for its duration, and letting an amplifier run
 for that window is the smaller harm. The same argument `swallowing` makes for
 the sign-in counter. Decided 2026-09-21 in #554.
+
+The two kinds are metered apart, and sharing one budget was the first design and
+was wrong in the attacker's favour. A squatter can spend the verification
+allowance at will, because `sendOnSignIn` mails a fresh link every time they
+sign in with the password they chose, and that path sits outside the #552
+attempt counter on purpose, since refusing it would lock a real person out of
+their own way back in. So one sign-up and two sign-ins emptied the hour, and the
+notice that the real owner's own sign-up should then have produced was dropped
+in silence: they saw Better Auth's synthetic duplicate success and heard
+nothing, which is the exact failure the notice exists to fix, now purchased by
+the attacker for three unthrottled requests. Split, the suppression is no longer
+free, and the property that makes it acceptable is that spending the notice
+budget requires attempting duplicate sign-ups, each of which mails the owner the
+notice until the budget is gone. An attacker cannot silence it without first
+sending it.
 
 ## Consequences
 

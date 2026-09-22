@@ -31,6 +31,7 @@ import {
   verificationEmail,
 } from "#/lib/email/templates";
 import { tooManyAttemptsMessage } from "#/lib/sign-in-limits";
+import type { VerificationMailKind } from "#/lib/verification-mail-limits";
 import type { UserRole } from "#/lib/vocabularies";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
 import { markAddressProven } from "#/server/_internal/mark-address-proven";
@@ -274,9 +275,12 @@ function forgotPasswordUrl(): string | null {
  * lock out every new account for the length of it; letting an amplifier run for
  * that window is the smaller harm. Same reasoning as `swallowing` above.
  */
-async function mayMail(email: string): Promise<boolean> {
+async function mayMail(
+  email: string,
+  kind: VerificationMailKind
+): Promise<boolean> {
   try {
-    return await reserveVerificationMail(email);
+    return await reserveVerificationMail(email, kind);
   } catch (error) {
     console.error("Verification mail counter failed", redactQueryError(error));
     return true;
@@ -421,7 +425,7 @@ export const auth = betterAuth({
       }
       try {
         const recovery = forgotPasswordUrl();
-        if (!(recovery && (await mayMail(existing.email)))) {
+        if (!(recovery && (await mayMail(existing.email, "duplicate")))) {
           return;
         }
         await emailSender.send(
@@ -482,7 +486,7 @@ export const auth = betterAuth({
       // anything about whose inbox is filling up. A refusal here is a silent
       // skip and never an error, because the caller is a sign-up or a refused
       // sign-in and neither should fail over a message that was not sent.
-      if (!(await mayMail(user.email))) {
+      if (!(await mayMail(user.email, "verification"))) {
         // No address in the line; `sign_in_attempts`'s sibling table holds the
         // identifiers for anyone with database access (#559).
         console.warn("Verification mail capped for a recipient");

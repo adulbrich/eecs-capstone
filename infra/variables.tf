@@ -223,6 +223,12 @@ variable "verification_mail_window_minutes" {
   default     = "60"
 }
 
+variable "duplicate_notice_limit" {
+  description = "Duplicate-sign-up notices allowed to one recipient in the same window. Metered apart from verification links so a squatter cannot spend the owner's warning; see src/lib/verification-mail-limits.ts."
+  type        = string
+  default     = "2"
+}
+
 variable "verification_mail_limit" {
   description = "Messages allowed to one recipient inside that window. Above what a person whose link expired would legitimately ask for; see src/lib/verification-mail-limits.ts."
   type        = string

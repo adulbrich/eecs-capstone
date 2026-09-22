@@ -951,10 +951,19 @@ export const verificationSends = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     /** Lowercased by `reserveVerificationMail`, never by the database. */
     email: text("email").notNull(),
+    /**
+     * Which message, from `VerificationMailKind`. The two are metered apart on
+     * purpose: a squatter can spend the `verification` allowance at will
+     * through `sendOnSignIn`, and sharing one budget let them silence the
+     * `duplicate` notice the real owner's own sign-up should have triggered.
+     */
+    kind: text("kind").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  // The only shape the cap queries: one recipient, within a time window.
-  (t) => [index("verification_sends_recipient_idx").on(t.email, t.createdAt)]
+  // The only shape the cap queries: one recipient and one kind, in a window.
+  (t) => [
+    index("verification_sends_recipient_idx").on(t.email, t.kind, t.createdAt),
+  ]
 );
