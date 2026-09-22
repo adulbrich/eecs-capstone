@@ -119,6 +119,65 @@ describe("truncateOnWordBoundary", () => {
     expect(result.length).toBeGreaterThan(10);
   });
 
+  it("does not collapse to one word when the only space is early", () => {
+    // The defect (#566): a short word then a long unbroken token put the only
+    // space at offset 3, `lastIndexOf` found it, and the retreat threw away
+    // 157 of the 160 characters. `"abc..."` unfurled as the preview for a
+    // whole project.
+    const text = `abc ${"x".repeat(200)}`;
+    const result = truncateOnWordBoundary(text);
+    expect(result.length).toBeLessThanOrEqual(SOCIAL_DESCRIPTION_MAX_LENGTH);
+    expect(result).not.toBe(`abc${ELLIPSIS}`);
+    // More than one word of content: the fragment of the long token survives.
+    const body = result.slice(0, -ELLIPSIS.length);
+    expect(body.split(" ").filter(Boolean).length).toBeGreaterThan(1);
+    expect(body.length).toBeGreaterThan(SOCIAL_DESCRIPTION_MAX_LENGTH / 2);
+    expect(text.startsWith(body)).toBe(true);
+  });
+
+  it("still retreats to a space that falls late enough to be worth it", () => {
+    // The boundary rule has to keep working for ordinary prose, which is every
+    // description that is not a paste accident.
+    const text = `${"word ".repeat(40)}tail`;
+    const result = truncateOnWordBoundary(text);
+    const body = result.slice(0, -ELLIPSIS.length);
+    expect(text[body.length]).toBe(" ");
+  });
+
+  it("keeps a whole character when the early-space fallback cuts emoji", () => {
+    // The fallback is the only path that slices on a raw code unit, so it is
+    // the only one that can halve a surrogate pair. An early space now reaches
+    // it where it used to reach the first word instead.
+    const result = truncateOnWordBoundary(`ab ${"\u{1F600}".repeat(200)}`);
+    expect(result).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+    expect(result).not.toMatch(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+  });
+
+  it("never returns more than the budget, even below the ellipsis", () => {
+    // `max - ELLIPSIS.length` goes negative here, and `slice` reads a negative
+    // end as an offset from the end of the string, so the function returned
+    // 131 characters under a budget of 0. Latent rather than live, since the
+    // only caller in this file passes the default, but the contract is the
+    // whole point of the function.
+    const text = "hello world this is a long string with spaces".repeat(3);
+    for (const max of [0, 1, 2, 3]) {
+      expect(truncateOnWordBoundary(text, max).length).toBeLessThanOrEqual(max);
+    }
+  });
+
+  it("keeps a whole character when the budget is below the ellipsis", () => {
+    // The tiny-budget path slices on a code unit like the other fallback, so
+    // it needs the same surrogate guard.
+    const result = truncateOnWordBoundary("\u{1F600}".repeat(5), 1);
+    expect(result).toBe("");
+    expect(truncateOnWordBoundary("\u{1F600}".repeat(5), 2)).toBe("\u{1F600}");
+  });
+
+  it("returns nothing for a budget of zero or less", () => {
+    expect(truncateOnWordBoundary("anything at all", 0)).toBe("");
+    expect(truncateOnWordBoundary("anything at all", -5)).toBe("");
+  });
+
   it("cuts a single unbroken token at the limit rather than returning nothing", () => {
     // A token this long is a pasted URL or an accident. A fragment beats an
     // empty description, which would unfurl as a bare title.

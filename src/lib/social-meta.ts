@@ -124,7 +124,7 @@ const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/;
  * basic plane, an emoji above all, is two of them. Cutting between the pair
  * leaves a lone high surrogate, which is not a character at all: encoded to
  * UTF-8 for the page it becomes a replacement glyph in a tag the whole
- * internet can see. Only the unbroken-token fallback can produce this, since a
+ * internet can see. Only the hard-cut fallback can produce this, since a
  * cut that retreats to a space lands between characters by construction.
  */
 function dropLoneSurrogate(text: string): string {
@@ -139,12 +139,32 @@ function dropLoneSurrogate(text: string): string {
 const ELLIPSIS = "...";
 
 /**
+ * How much of the budget the word-boundary retreat may give up.
+ *
+ * Below this, the nearest space is so early that honouring it throws away most
+ * of the description. `"abc " + a 200 character URL` has its only space at
+ * offset 3, and the retreat returned `"abc..."`: one word, under a cap of 160,
+ * as the preview for a whole project (#566). A third is the point at which a
+ * fragment of the long token says more than the short word in front of it.
+ */
+const MIN_WORD_BOUNDARY_FRACTION = 1 / 3;
+
+/**
  * Cuts to at most `max` characters, on a word boundary, with the ellipsis
  * fitting inside the budget rather than pushing past it.
  *
- * A string with no space before the limit is cut at the limit: a single
- * unbroken token that long is a URL or a paste accident, and returning nothing
- * would be worse than returning a fragment.
+ * A string with no space before the limit, or whose only space falls in the
+ * first third of it, is cut at the limit instead: text like that is a URL or a
+ * paste accident with a word in front of it, and a fragment of the token beats
+ * the word on its own.
+ *
+ * The one promise is that the result is never longer than `max`. A budget too
+ * small to hold the ellipsis cannot also say that text was dropped, so it does
+ * the half it can and returns a bare cut. Without that guard `max - 3` goes
+ * negative, `slice` reads it as an offset from the END of the string, and the
+ * function returns most of its input under a budget of zero. No caller passes
+ * a `max` that small today; an exported function that breaks its own contract
+ * on an input nobody has tried yet is how a caller gets added tomorrow.
  */
 export function truncateOnWordBoundary(
   text: string,
@@ -153,13 +173,21 @@ export function truncateOnWordBoundary(
   if (text.length <= max) {
     return text;
   }
+  if (max < ELLIPSIS.length) {
+    return dropLoneSurrogate(text.slice(0, Math.max(max, 0)));
+  }
   const room = max - ELLIPSIS.length;
   const cut = text.slice(0, room);
   // When the character just past the cut is a space, the cut already ends on a
   // whole word and backing up to the previous space would throw that word away
   // for nothing. Only an actual mid-word cut needs to retreat.
   const boundary = text[room] === " " ? cut.length : cut.lastIndexOf(" ");
-  const body = boundary > 0 ? cut.slice(0, boundary) : cut;
+  // A `lastIndexOf` miss returns -1, which fails this test too, so the
+  // no-space case the fallback always covered still lands on the hard cut.
+  const body =
+    boundary >= room * MIN_WORD_BOUNDARY_FRACTION
+      ? cut.slice(0, boundary)
+      : cut;
   const trimmed = dropLoneSurrogate(body);
   // Stripping the trailing punctuation off a body that is nothing but
   // punctuation would leave a bare ellipsis, which says less than the fragment

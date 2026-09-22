@@ -17,7 +17,10 @@ const server = vi.hoisted(() => ({
 vi.mock("#/server/social-summary", () => server);
 
 import { SocialPreviewSection } from "#/components/social-preview-section";
-import type { SocialSummaryView } from "#/lib/social-summary";
+import type {
+  RegenerateSocialSummaryResult,
+  SocialSummaryView,
+} from "#/lib/social-summary";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -40,6 +43,21 @@ const NONE: SocialSummaryView = {
   isManual: false,
   summary: null,
   updatedAt: null,
+};
+/** What Regenerate returns when its write landed. */
+const REWRITTEN: RegenerateSocialSummaryResult = {
+  ...AUTOMATIC,
+  outcome: "rewritten",
+};
+/**
+ * What it returns when the row moved under it: the model's text was thrown
+ * away and this is what is stored instead (#564).
+ */
+const RACED: RegenerateSocialSummaryResult = {
+  isManual: true,
+  summary: "Wording a colleague saved mid-flight.",
+  updatedAt: new Date("2026-09-03T10:00:00Z"),
+  outcome: "changed",
 };
 
 async function renderWith(view: SocialSummaryView) {
@@ -116,6 +134,25 @@ describe("SocialPreviewSection button states", () => {
     expect(screen.getByText(/at most 300 characters/)).toBeDefined();
     expect(server.saveSocialSummary).not.toHaveBeenCalled();
   });
+
+  it("counts an emoji as one character, the way the server does", async () => {
+    // 151 emoji is 151 code points and 302 UTF-16 code units. The counter read
+    // `.length`, so it showed 302 against a cap of 300 and disabled Save on
+    // text the schema and the server would both have accepted (#565). The
+    // panel is the third of the three sites that had to agree.
+    await renderWith(NONE);
+    type("\u{1F600}".repeat(151));
+    expect(screen.getByText("151 / 300")).toBeDefined();
+    expect(saveButton().hasAttribute("disabled")).toBe(false);
+    expect(screen.queryByText(/at most 300 characters/)).toBeNull();
+  });
+
+  it("still refuses 301 code points of emoji", async () => {
+    await renderWith(NONE);
+    type("\u{1F600}".repeat(301));
+    expect(screen.getByText("301 / 300")).toBeDefined();
+    expect(saveButton().hasAttribute("disabled")).toBe(true);
+  });
 });
 
 describe("SocialPreviewSection actions", () => {
@@ -124,9 +161,9 @@ describe("SocialPreviewSection actions", () => {
     // setDraft on the response replaced a correction typed during the wait
     // with the server's text, with nothing to say it had happened.
     await renderWith(MANUAL);
-    let resolve: (v: SocialSummaryView) => void = () => undefined;
+    let resolve: (v: RegenerateSocialSummaryResult) => void = () => undefined;
     server.regenerateSocialSummary.mockReturnValue(
-      new Promise<SocialSummaryView>((r) => {
+      new Promise<RegenerateSocialSummaryResult>((r) => {
         resolve = r;
       })
     );
@@ -144,7 +181,7 @@ describe("SocialPreviewSection actions", () => {
     await userEvent.type(textarea(), " typed while waiting");
     expect(textarea().value).toBe(typed);
 
-    resolve(AUTOMATIC);
+    resolve(REWRITTEN);
     await waitFor(() => expect(textarea().disabled).toBe(false));
     expect(textarea().value).toBe(AUTOMATIC.summary);
   });
@@ -169,11 +206,31 @@ describe("SocialPreviewSection actions", () => {
 
   it("puts the regenerated text in the box and hands the row back to the model", async () => {
     await renderWith(MANUAL);
-    server.regenerateSocialSummary.mockResolvedValue(AUTOMATIC);
+    server.regenerateSocialSummary.mockResolvedValue(REWRITTEN);
     fireEvent.click(regenerateButton());
 
     await waitFor(() => expect(textarea().value).toBe(AUTOMATIC.summary));
     expect(regenerateButton().hasAttribute("disabled")).toBe(true);
+    expect(screen.queryByText(/changed while the rewrite/)).toBeNull();
+  });
+
+  it("says so when the rewrite lost a race, and shows what is stored", async () => {
+    // The server refused to overwrite a row that moved between the read that
+    // fed the model and the write that would have stored its answer, so the
+    // box is about to show wording nobody in this tab typed (#564).
+    await renderWith(MANUAL);
+    server.regenerateSocialSummary.mockResolvedValue(RACED);
+    fireEvent.click(regenerateButton());
+
+    const notice = await screen.findByText(
+      /changed while the rewrite was running/
+    );
+    // Announced, not merely printed: a reader who cannot see the textarea
+    // change is otherwise told nothing about text they did not ask for.
+    expect(notice.getAttribute("role")).toBe("alert");
+    expect(textarea().value).toBe(RACED.summary);
+    // Still manual, so Regenerate is offered again rather than left dead.
+    expect(regenerateButton().hasAttribute("disabled")).toBe(false);
   });
 
   it("reports a failed rewrite and keeps the stored wording", async () => {
@@ -188,11 +245,35 @@ describe("SocialPreviewSection actions", () => {
     expect(textarea().value).toBe(MANUAL.summary);
   });
 
-  it("treats a failed load as nothing stored rather than breaking the panel", async () => {
+  it("offers no button at all when the load fails", async () => {
+    // The panel used to map a rejected load to `{ isManual: false, summary:
+    // null }`, which is the shape of an empty row, and Regenerate turns on for
+    // an empty row. So a transient read failure offered the one button that
+    // clears a summary staff wrote by hand, on a project whose real summary
+    // the panel had never seen (#564).
     server.getSocialSummary.mockRejectedValue(new Error("Forbidden"));
     render(<SocialPreviewSection projectId="p1" />);
     await screen.findByLabelText("Social summary");
-    expect(textarea().value).toBe("");
+
+    expect(screen.getByText(/Could not load the stored summary/)).toBeDefined();
+    expect(saveButton().hasAttribute("disabled")).toBe(true);
+    expect(regenerateButton().hasAttribute("disabled")).toBe(true);
+    expect(textarea().disabled).toBe(true);
+    expect(server.regenerateSocialSummary).not.toHaveBeenCalled();
+  });
+
+  it("comes back to life on a retry that succeeds", async () => {
+    server.getSocialSummary.mockRejectedValueOnce(new Error("Forbidden"));
+    server.getSocialSummary.mockResolvedValue(MANUAL);
+    render(<SocialPreviewSection projectId="p1" />);
+    const retry = await screen.findByRole("button", { name: "Try again" });
+
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(textarea().value).toBe(MANUAL.summary));
+    expect(textarea().disabled).toBe(false);
     expect(regenerateButton().hasAttribute("disabled")).toBe(false);
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(screen.queryByText(/Could not load the stored summary/)).toBeNull();
   });
 });

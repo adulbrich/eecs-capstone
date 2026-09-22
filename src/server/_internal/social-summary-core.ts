@@ -103,22 +103,31 @@ export function parseSocialSummaryResponse(response: MantleResponse): string {
   let parsed: z.infer<typeof socialSummarySchema>;
   try {
     // The schema is the enforcement: a summary over the cap is a failed
-    // generation, not a clipped sentence stored as if it were fine. Function
-    // call arguments arrive as a JSON string.
+    // generation, not a clipped sentence stored as if it were fine, and a
+    // summary of nothing but whitespace is a failed generation rather than an
+    // empty string reported as ok (#565). Both rules live in the schema, which
+    // trims before it judges, so what comes back here is already trimmed and
+    // already known to be non-empty. Function call arguments arrive as a JSON
+    // string.
     parsed = socialSummarySchema.parse(JSON.parse(toolCall.arguments));
   } catch (error) {
     throw new Error(FAILED, { cause: error });
   }
-  return parsed.summary.trim();
+  return parsed.summary;
 }
 
 /**
  * What one attempt did, for metering, as opposed to what the caller stores. A
  * failure is reported rather than thrown so the automatic path can swallow it
  * and the staff path can record the spend before surfacing it.
+ *
+ * No `called` flag, unlike `ProjectReviewRun`, because every path out of
+ * `runSocialSummary` has already reached the endpoint: there is no cached
+ * result and no precondition it can refuse on. A flag that is always true
+ * reads as a branch and tests as nothing (#568). The review's flag is real,
+ * and stays.
  */
 export interface SocialSummaryRun {
-  called: boolean;
   error?: string;
   model: string;
   outcome: ReviewOutcome;
@@ -136,7 +145,6 @@ export async function runSocialSummary(
   invoke: ResponsesFn = mantleResponses
 ): Promise<SocialSummaryRun> {
   const base = {
-    called: true,
     model: MODEL_ID,
     reasoningEffort: REASONING_EFFORT,
   };
