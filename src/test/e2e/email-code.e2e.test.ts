@@ -160,8 +160,11 @@ test.describe("refusals on the emailed code", () => {
       await page.getByLabel("Code", { exact: true }).fill("000000");
       await page.getByRole("button", { name: "Confirm code" }).click();
 
-      await expect(page.getByRole("alert")).toBeVisible();
-      await expect(page.getByRole("alert")).not.toBeEmpty();
+      const alert = page.getByRole("alert");
+      await expect(alert).toBeVisible();
+      // Says what to do, not only that something went wrong. Every refusal on
+      // this step has the same answer, and the server cannot tell them apart.
+      await expect(alert).toContainText(/ask for a new code/i);
       // Still on the code step rather than thrown back to the address, which
       // is what makes a mistyped digit recoverable.
       await expect(page.getByLabel("Code", { exact: true })).toBeVisible();

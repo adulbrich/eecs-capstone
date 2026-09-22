@@ -1,7 +1,7 @@
 import { eq, like } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
-import { account, user, verification } from "#/db/auth-schema";
+import { account, session, user, verification } from "#/db/auth-schema";
 import { auth } from "#/lib/auth";
 import {
   captureConsoleCode,
@@ -93,6 +93,14 @@ async function rowFor(email: string) {
   return row;
 }
 
+async function sessionTokensOn(userId: string): Promise<string[]> {
+  const rows = await db
+    .select({ token: session.token })
+    .from(session)
+    .where(eq(session.userId, userId));
+  return rows.map((row) => row.token);
+}
+
 async function providersOn(userId: string): Promise<string[]> {
   const rows = await db
     .select({ providerId: account.providerId })
@@ -178,6 +186,23 @@ describe("redeeming a code against a row that already exists", () => {
     expect(before?.emailVerified).toBe(false);
     expect(await providersOn(before?.id as string)).toEqual(["credential"]);
 
+    // A live session on the squatted row, which the ordinary flow cannot make
+    // (`requireEmailVerification` refuses the sign-in that would mint one). It
+    // is inserted so the revocation has something to revoke: asserting zero
+    // sessions on a row that never had one proves nothing, and the criterion
+    // names sessions as well as the password.
+    await db.insert(session).values({
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 86_400_000),
+      id: `sess-${before?.id}`,
+      token: `tok-${before?.id}`,
+      updatedAt: new Date(),
+      userId: before?.id as string,
+    });
+    expect(await sessionTokensOn(before?.id as string)).toEqual([
+      `tok-${before?.id}`,
+    ]);
+
     const code = await sendCode(email);
     await auth.api.signInEmailOTP({
       body: { email, name: "Real Owner", otp: code },
@@ -190,6 +215,14 @@ describe("redeeming a code against a row that already exists", () => {
     // The squatter's password is gone, which is what makes the row safe to
     // hand over rather than merely verified.
     expect(await providersOn(after?.id as string)).toEqual([]);
+    // And the squatter's session with it. Counting sessions would be the wrong
+    // assertion in both directions: the row starts with none because
+    // `requireEmailVerification` refuses the sign-in that would mint one, and
+    // it ends with one because this sign-in mints the OWNER's. The token is
+    // what says whose.
+    expect(await sessionTokensOn(after?.id as string)).not.toContain(
+      `tok-${before?.id}`
+    );
     await expect(
       auth.api.signInEmail({ body: { email, password: PASSWORD } })
     ).rejects.toMatchObject({ body: {} });
@@ -351,6 +384,142 @@ describe("a row a provider already owns", () => {
     await expect(
       auth.api.signInEmailOTP({
         body: { email, otp: code },
+        headers: claimHeaders(email),
+      })
+    ).rejects.toMatchObject({ body: { code: "INVALID_OTP" } });
+  });
+});
+
+describe("what the claim actually guarantees", () => {
+  /**
+   * The honest statement of #581, which is narrower than "the code cannot be
+   * burned" and was written down that way after a correctness pass caught the
+   * overclaim.
+   *
+   * A stranger CAN still burn a code. What they cannot do is burn one for
+   * free: they have to ask for a code first, which is what earns them a claim,
+   * and that ask comes out of the recipient's five an hour. Before this, three
+   * POSTs did it with no send at all and no bound but the per-address rate
+   * limit. Exhausting the send budget already locks somebody out of their own
+   * mail, and ADR-0046 accepted that, so the attack is now no cheaper than a
+   * denial this app had already priced in.
+   */
+  it("makes a stranger spend a send before they can spend a guess", async () => {
+    const email = anAddress("priced");
+
+    // No send, no claim, so the guesses are refused before Better Auth counts
+    // them, and the owner's code survives.
+    const owner = await sendCode(email);
+    for (let guess = 0; guess < 4; guess += 1) {
+      await expect(
+        auth.api.signInEmailOTP({ body: { email, otp: "000000" } })
+      ).rejects.toMatchObject({ body: { code: "INVALID_OTP" } });
+    }
+    const survived = await auth.api.signInEmailOTP({
+      asResponse: true,
+      body: { email, name: "Unburned", otp: owner },
+      headers: claimHeaders(email),
+    });
+    expect(survived.headers.get("set-cookie")).toBeTruthy();
+  });
+
+  it("lets a stranger who does send burn what that send created", async () => {
+    const email = anAddress("burnable");
+
+    // The stranger asks for a code. It goes to the address, not to them, but
+    // the claim goes to them, and that is enough to spend the attempts.
+    const strangerSend = await postSend(email);
+    const strangerClaim = pairFrom(strangerSend.headers.get("set-cookie"));
+    expect(strangerClaim).toContain("capstone_otp_claim=");
+
+    for (let guess = 0; guess < 3; guess += 1) {
+      await expect(
+        auth.api.signInEmailOTP({
+          body: { email, otp: "000000" },
+          headers: new Headers({ cookie: strangerClaim as string }),
+        })
+      ).rejects.toMatchObject({ body: {} });
+    }
+
+    // Exhausted, and consumed. This is the cost the claim does NOT remove, and
+    // the reason ADR-0047 states the guarantee as a price rather than as a
+    // closure.
+    await expect(
+      auth.api.signInEmailOTP({
+        body: { email, otp: "000000" },
+        headers: new Headers({ cookie: strangerClaim as string }),
+      })
+    ).rejects.toMatchObject({ body: { code: "TOO_MANY_ATTEMPTS" } });
+  });
+});
+
+describe("a code type this app does not serve", () => {
+  // `type` is the caller's to choose, and every value but "sign-in" names a
+  // different verification record. The guards key on the sign-in record, so a
+  // handler reading another one was a way to spend guesses they never saw.
+  it("refuses the send without writing a record", async () => {
+    const email = anAddress("othertype");
+
+    const response = await auth.handler(
+      new Request(`${ORIGIN}/api/auth/email-otp/send-verification-otp`, {
+        body: JSON.stringify({ email, type: "email-verification" }),
+        headers: { "content-type": "application/json", origin: ORIGIN },
+        method: "POST",
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const [written] = await db
+      .select({ id: verification.id })
+      .from(verification)
+      .where(like(verification.identifier, `%${email}`))
+      .limit(1);
+    expect(written).toBeUndefined();
+  });
+
+  it("refuses a guess against it", async () => {
+    const email = anAddress("othertypeguess");
+
+    await expect(
+      auth.api.checkVerificationOTP({
+        body: { email, otp: "000000", type: "email-verification" },
+      })
+    ).rejects.toMatchObject({ body: { code: "INVALID_OTP" } });
+  });
+});
+
+describe("the check path refuses the same rows the sign-in path does", () => {
+  // The two have to agree, or the form accepts a code at step 2 and is refused
+  // at step 3, and because the check does not consume, the person can loop
+  // between those screens until the code expires.
+  it.each([
+    ["banned", true],
+    ["provider-linked", false],
+  ])("refuses a %s row", async (kind, banned) => {
+    const email = anAddress(`check-${kind}`);
+    await aSquattedAddress(email);
+    const row = await rowFor(email);
+    if (banned) {
+      await db
+        .update(user)
+        .set({ banned: true })
+        .where(eq(user.id, row?.id as string));
+    } else {
+      await db.insert(account).values({
+        accountId: `gh-${row?.id}`,
+        createdAt: new Date(),
+        id: `acct-check-${row?.id}`,
+        providerId: "github",
+        updatedAt: new Date(),
+        userId: row?.id as string,
+      });
+    }
+
+    const code = await sendCode(email);
+
+    await expect(
+      auth.api.checkVerificationOTP({
+        body: { email, otp: code, type: "sign-in" },
         headers: claimHeaders(email),
       })
     ).rejects.toMatchObject({ body: { code: "INVALID_OTP" } });

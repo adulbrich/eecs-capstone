@@ -12,8 +12,19 @@
  *
  * The browser that asks for a code is handed one of these, and has to present
  * it to redeem one. A guess without it is refused in a `hooks.before`, so it
- * never reaches `atomicVerifyOTP` and never spends an attempt, which is the
- * whole of the fix: spending attempts is what destroyed the code.
+ * never reaches `atomicVerifyOTP` and never spends an attempt.
+ *
+ * ## What that guarantees, exactly
+ *
+ * Less than it first appears, and the narrow statement is the true one: **a
+ * stranger cannot spend a guess without first spending a send.** They can still
+ * burn a code, by asking for one themselves, which hands them a claim on the
+ * record their own ask created. What that costs is one of the recipient's five
+ * sends an hour; what it cost before was three POSTs and nothing else. ADR-0046
+ * already accepted that exhausting those five sends denies somebody their mail,
+ * so the attack is no cheaper than one this app had priced in. Closing it
+ * outright needs one live code per browser rather than one per address, which
+ * Better Auth's single `sign-in-otp-<address>` record cannot express.
  *
  * ## What this deliberately does NOT do, and why
  *
@@ -49,22 +60,6 @@
 /** Sent to the browser that asked for a code, returned when it redeems one. */
 export const OTP_CLAIM_COOKIE = "capstone_otp_claim";
 
-/**
- * A readable companion to the claim, set beside it and carrying nothing.
- *
- * The claim itself is `HttpOnly`, so the page cannot tell whether the browser
- * kept it, and the server cannot tell a browser that dropped it from a stranger
- * who never had one: neither presents a claim, and both must get the same
- * answer. So a browser that refuses cookies for this site would send somebody to
- * their inbox, bring back the RIGHT code, and be told "Invalid OTP" with no way
- * forward and nothing to act on.
- *
- * This is how the page finds that out at the send, before the trip to the
- * inbox. It is readable on purpose and says only that a code was asked for from
- * this browser, which that browser already knows.
- */
-export const OTP_CLAIM_READABLE_COOKIE = "capstone_otp_claim_set";
-
 const encoder = new TextEncoder();
 
 const BASE64_PLUS = /\+/g;
@@ -74,9 +69,11 @@ const BASE64_PADDING = /[=]+$/;
 /**
  * The token for one pending code.
  *
- * The address is folded the way Better Auth folds it on every write path, so a
- * capital letter in the sign-in form cannot produce a token that fails to match
- * the one the send issued.
+ * The address is folded the way Better Auth folds it, which is lowercase and
+ * NOT trimmed: every handler in the plugin does `ctx.body.email.toLowerCase()`
+ * and nothing trims. A capital letter in the form therefore cannot produce a
+ * token that fails to match the one the send issued, and a padded one names the
+ * same record here as it does there.
  */
 export async function otpClaimToken(
   email: string,
@@ -93,7 +90,7 @@ export async function otpClaimToken(
   const signed = await crypto.subtle.sign(
     "HMAC",
     key,
-    encoder.encode(`${email.trim().toLowerCase()}|${expiresAt.getTime()}`)
+    encoder.encode(`${email.toLowerCase()}|${expiresAt.getTime()}`)
   );
   return base64Url(new Uint8Array(signed));
 }

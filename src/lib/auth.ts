@@ -33,7 +33,6 @@ import {
 } from "#/lib/email/templates";
 import {
   OTP_CLAIM_COOKIE,
-  OTP_CLAIM_READABLE_COOKIE,
   otpClaimMatches,
   otpClaimToken,
 } from "#/lib/otp-claim";
@@ -134,7 +133,14 @@ const CLAIM_COOKIE_SECONDS = 300;
 
 /** Better Auth's identifier for a pending sign-in code, from `toOTPIdentifier`. */
 function codeRecordFor(email: string): string {
-  return `sign-in-otp-${email.trim().toLowerCase()}`;
+  // Lowercased and NOT trimmed, which matches `toOTPIdentifier`'s callers
+  // exactly: every handler in `routes.mjs` does `ctx.body.email.toLowerCase()`
+  // and nothing trims. Trimming here looked up a different row than Better
+  // Auth would, so a padded address resolved to the unpadded owner's live
+  // record. `z.email()` rejects the padded form a moment later, so nothing was
+  // spent, but the two must name the same row or this guard is guarding
+  // somebody else's code.
+  return `sign-in-otp-${email.toLowerCase()}`;
 }
 
 /**
@@ -190,9 +196,14 @@ interface CodeRequest {
  * tradeoff and predates all of this.
  */
 async function codeSendAllowed(ctx: CodeRequest): Promise<boolean> {
-  const address = ctx.body?.email;
-  if (typeof address !== "string" || ctx.body?.type !== "sign-in") {
-    return true;
+  const address = signInCodeAddress(ctx);
+  if (address === null) {
+    // Refused rather than passed through. `type` is the caller's to choose,
+    // and every other value names a DIFFERENT verification record that this
+    // app has no flow for: letting those through was an uncapped way to make
+    // Better Auth write rows, outside the per-recipient cap, for a code
+    // `sendVerificationOTP` would then decline to mail.
+    return false;
   }
   // The cap is spent HERE rather than inside `sendVerificationOTP`, because
   // `resolveOTP` writes the rotated record BEFORE the sender runs. Refusing
@@ -211,9 +222,14 @@ async function codeSendAllowed(ctx: CodeRequest): Promise<boolean> {
  * whether a code is outstanding for an address.
  */
 async function codeGuessRefused(ctx: CodeRequest): Promise<boolean> {
-  const address = ctx.body?.email;
-  if (typeof address !== "string") {
-    return false;
+  const address = signInCodeAddress(ctx);
+  if (address === null) {
+    // `/sign-in/email-otp` sends no `type` and is always the sign-in record;
+    // `/email-otp/check-verification-otp` takes one from the caller and keys
+    // its own lookup on it. Guarding only the sign-in record while the handler
+    // reads another was a way to spend guesses this guard never saw, so any
+    // other type is refused outright.
+    return true;
   }
   try {
     const expected = await expectedClaim(ctx, address);
@@ -238,19 +254,34 @@ async function codeGuessRefused(ctx: CodeRequest): Promise<boolean> {
 }
 
 /**
+ * The address this request is about, or null when it is not about a sign-in
+ * code at all.
+ *
+ * One place rather than three, because the two guards and the cookie-issuing
+ * after-hook all have to agree on what counts. They read the RAW body, before
+ * Better Auth validates it, so a value that is not a string is somebody probing
+ * rather than a person signing in.
+ */
+function signInCodeAddress(ctx: CodeRequest): string | null {
+  const address = ctx.body?.email;
+  if (typeof address !== "string") {
+    return null;
+  }
+  // `/sign-in/email-otp` carries no `type`; the other two carry one and only
+  // `"sign-in"` names the record this app serves.
+  const type = ctx.body?.type;
+  if (type !== undefined && type !== "sign-in") {
+    return null;
+  }
+  return address;
+}
+
+/**
  * The token this request would need to claim the live code for an address, or
  * null when there is no live code to claim.
  */
 async function expectedClaim(
-  ctx: {
-    context: {
-      internalAdapter: {
-        findVerificationValue: (
-          id: string
-        ) => Promise<{ expiresAt: Date } | null | undefined>;
-      };
-    };
-  },
+  ctx: CodeRequest,
   email: string
 ): Promise<string | null> {
   const record = await ctx.context.internalAdapter.findVerificationValue(
@@ -556,8 +587,8 @@ export const auth = betterAuth({
       // hands out nothing: a browser that could get a claim without moving the
       // record could spend somebody else's guesses with it.
       if (ctx.path === CODE_SEND) {
-        const address = ctx.body?.email;
-        if (typeof address !== "string" || ctx.body?.type !== "sign-in") {
+        const address = signInCodeAddress(ctx);
+        if (address === null) {
           return;
         }
         try {
@@ -565,15 +596,6 @@ export const auth = betterAuth({
           if (claim) {
             ctx.setCookie(OTP_CLAIM_COOKIE, claim, {
               httpOnly: true,
-              maxAge: CLAIM_COOKIE_SECONDS,
-              path: "/",
-              sameSite: "lax",
-              secure: authConfig.isProduction,
-            });
-            // Readable, so the page can tell whether this browser kept either
-            // of them. See OTP_CLAIM_READABLE_COOKIE for why that matters.
-            ctx.setCookie(OTP_CLAIM_READABLE_COOKIE, "1", {
-              httpOnly: false,
               maxAge: CLAIM_COOKIE_SECONDS,
               path: "/",
               sameSite: "lax",

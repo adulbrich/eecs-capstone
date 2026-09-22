@@ -5,7 +5,6 @@ import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
-import { OTP_CLAIM_READABLE_COOKIE } from "#/lib/otp-claim";
 
 /**
  * Sign in, or create an account, with a code mailed to the address (#576).
@@ -51,6 +50,24 @@ type Step = "address" | "code" | "name";
 
 const CODE_LENGTH = 6;
 
+/** Written and read back to find out whether this browser keeps cookies. */
+const COOKIE_PROBE = "capstone_cookie_probe";
+
+/**
+ * Better Auth's refusal, plus the way out of it.
+ *
+ * Its messages are accurate and say nothing about what to do, and on this form
+ * there is exactly one answer to all of them: ask for another code. That covers
+ * a mistyped digit, a code that expired, a budget of guesses spent by somebody
+ * else, and a browser that lost its claim, which reach here as three different
+ * sentences and one action. The refusals are deliberately indistinguishable to
+ * the server (see `otp-claim.ts`), so the copy cannot be more specific than
+ * this without guessing.
+ */
+function withRecovery(message: string): string {
+  return `${message}. Ask for a new code and try again.`.replace("..", ".");
+}
+
 /** One named field out of a submitted form, as a string rather than a FormDataEntryValue. */
 function formValue(e: React.FormEvent<HTMLFormElement>, field: string): string {
   return String(new FormData(e.currentTarget).get(field) ?? "");
@@ -81,7 +98,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
       setError(sendError.message ?? "Could not send a code. Try again.");
       return;
     }
-    if (!keptTheClaim()) {
+    if (!browserKeepsCookies()) {
       // Stopping here rather than sending them to their inbox for a code
       // that cannot work. The server cannot say this: a browser that
       // dropped the claim and a stranger who never had one look identical
@@ -96,16 +113,32 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
   }
 
   /**
-   * Whether the browser kept the claim the send just issued.
+   * Whether this browser keeps cookies for this site at all.
    *
-   * Reads the readable companion rather than the claim itself, which is
-   * `HttpOnly` and so invisible here by design. Fails OPEN on a document
-   * that will not answer at all, because refusing a browser this cannot
-   * measure would be worse than the refusal it exists to prevent.
+   * A self-test rather than a look for a cookie the server sent, and the
+   * difference matters. The claim is `HttpOnly`, so it is invisible here, and a
+   * readable companion cannot stand in for it: the send answers `{success:
+   * true}` without setting anything whenever it declines to act, so its absence
+   * would also be reported for somebody whose per-recipient budget a stranger
+   * had already spent. That is the wrong cause and the wrong advice.
+   *
+   * Writing one and reading it back asks the only question worth asking, and
+   * asks it of the browser rather than of the server. Fails OPEN on a document
+   * that will not answer, because refusing a browser this cannot measure would
+   * be worse than the refusal it exists to prevent.
    */
-  function keptTheClaim(): boolean {
+  function browserKeepsCookies(): boolean {
     try {
-      return document.cookie.includes(`${OTP_CLAIM_READABLE_COOKIE}=`);
+      // The rule wants the CookieStore API, which is the right default for
+      // reading and writing real cookies. This writes one only to see whether
+      // it comes back, and CookieStore is asynchronous and unavailable in
+      // Safari, so it cannot answer this question here.
+      // biome-ignore lint/suspicious/noDocumentCookie: see above
+      document.cookie = `${COOKIE_PROBE}=1; path=/; max-age=60; samesite=lax`;
+      const kept = document.cookie.includes(`${COOKIE_PROBE}=`);
+      // biome-ignore lint/suspicious/noDocumentCookie: see above
+      document.cookie = `${COOKIE_PROBE}=; path=/; max-age=0; samesite=lax`;
+      return kept;
     } catch {
       return true;
     }
@@ -131,7 +164,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
         setStep("name");
         return;
       }
-      setError(checkError.message ?? "That code did not work.");
+      setError(withRecovery(checkError.message ?? "That code did not work."));
       return;
     }
     await redeem(entered, undefined);
@@ -152,7 +185,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
     });
     setLoading(false);
     if (signInError) {
-      setError(signInError.message ?? "Sign-in failed");
+      setError(withRecovery(signInError.message ?? "Sign-in failed."));
       return;
     }
     navigate({ to: redirectTo ?? "/" });

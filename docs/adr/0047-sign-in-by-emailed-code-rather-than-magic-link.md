@@ -74,10 +74,25 @@ That is cheaper than the three-guess burn it was written to prevent. Review pass
 With the send left open, a stranger asking for a code rotates the record and
 mails the owner the new one, so the owner is never left holding something they
 cannot use: they read the newest message, or they ask again and their own browser
-takes the claim. What they cannot do is outrun the per-recipient cap, which is
-[ADR-0046](./0046-mail-about-an-address-is-capped-per-recipient.md)'s accepted
-tradeoff and predates this entirely. What the stranger cannot do, at any point,
-is spend a guess, and spending guesses is what destroyed the code.
+takes the claim.
+
+**What this buys is a price, not a closure, and the difference is worth stating
+plainly because the first draft of this paragraph got it wrong.** A stranger who
+asks for a code is handed a claim on the record their own ask created, and can
+spend that record's three guesses. So a code can still be burned. What it costs
+them is one of the recipient's five sends an hour, where before it cost three
+POSTs, no send, and nothing from any budget. Exhausting those five sends already
+denies somebody their own mail, and
+[ADR-0046](./0046-mail-about-an-address-is-capped-per-recipient.md) accepted that
+denial before any of this existed, so the attack is now no cheaper than one the
+app had already priced in. That is the whole of the guarantee: **a stranger
+cannot spend a guess without first spending a send.**
+
+Closing it completely needs what this design does not have, one live code per
+browser rather than one per address. Better Auth keys the record on the address
+alone, so that means owning the send and verify paths rather than calling them.
+Not worth it for the margin between "costs a send" and "costs nothing", which is
+the margin left.
 
 The claim is an HMAC over the address and the record's expiry under the Better
 Auth secret, so nothing is stored and a rotation invalidates the previous
