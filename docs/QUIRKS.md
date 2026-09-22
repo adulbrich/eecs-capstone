@@ -486,7 +486,7 @@ One harmless thing every run prints in this repo is `ReferenceError: module is n
 
 ### A scratch script that reaches `src/lib/brand.ts` needs an `.svg` loader stub
 
-A one-off probe under `$TMPDIR` that imports a `src/lib` module by absolute path runs with `node --import tsx/esm probe.mts` (the `.mts` extension matters: a `.ts` entry outside a `type: module` package is loaded as CommonJS and fails to resolve the import). `#/` resolves on its own through `package.json` `imports`. What Node has no loader for is Vite's `.svg?url` asset import in `src/lib/brand.ts`, so any module that reaches it dies with `ERR_UNKNOWN_FILE_EXTENSION`. Register a load hook that answers `.svg` with an empty string, and pass it as a second `--import`:
+A one-off probe under `$TMPDIR` that imports a `src/lib` module by absolute path, extension included (an extensionless specifier from outside the package goes through the CommonJS loader and is not found), runs with `node --import tsx/esm "$TMPDIR/probe.mts"`, from the repository root so that `tsx` resolves. Inside `src/` modules `#/` resolves through `package.json` `imports`; the probe itself is outside the package, so it imports by absolute path. What Node has no loader for is Vite's `.svg?url` asset import in `src/lib/brand.ts`, so any module that reaches it dies with `ERR_UNKNOWN_FILE_EXTENSION`. Register a load hook that answers `.svg` with an empty string, and pass it as a second `--import`:
 
 ```js
 // svg-stub.mjs
@@ -499,7 +499,7 @@ register(
 );
 ```
 
-`node --import tsx/esm --import ./svg-stub.mjs probe.mts` then runs `social-meta.ts` and its neighbours.
+`node --import tsx/esm --import "$TMPDIR/svg-stub.mjs" "$TMPDIR/probe.mts"`, from the repository root, then runs `social-meta.ts` and its neighbours.
 
 ### Vitest 5 and better-auth's optional peer range
 
