@@ -9,14 +9,17 @@
  *   LIMIT=25 npx tsx --env-file=.env.local scripts/backfill-social-summaries.ts
  *   DRY_RUN=1 npx tsx --env-file=.env.local scripts/backfill-social-summaries.ts
  *
- * `DRY_RUN` counts what would be written and calls nothing. `LIMIT` caps the
- * rows attempted. Both exist because this sweep is one paid model call per
- * project and the catalog carries hundreds of legacy imports, unlike the
- * embedding sweep where a re-run is cheap enough not to need a rehearsal.
+ * `BEDROCK_SOCIAL_SUMMARY_ENABLED=false` exits immediately, as it does in the
+ * production sweeper. `DRY_RUN` counts what would be written and calls
+ * nothing. `LIMIT` caps the rows attempted. The last two exist because this
+ * sweep is one paid model call per project and the catalog carries hundreds of
+ * legacy imports, unlike the embedding sweep where a re-run is cheap enough not
+ * to need a rehearsal.
  */
 import { and, inArray, isNull } from "drizzle-orm";
 import { db } from "../src/db";
 import { projects } from "../src/db/schema";
+import { socialSummariesEnabled } from "../src/lib/_internal/social-summary-flag";
 import { EMBEDDABLE_STATUSES } from "../src/server/_internal/project-embeddings";
 import { refreshSocialSummary } from "../src/server/_internal/project-social-summary";
 
@@ -27,6 +30,17 @@ function sleep(ms: number) {
 }
 
 async function main() {
+  // `refreshSocialSummary` already returns "skipped" with the switch off, so
+  // this spends nothing either way. What it saves is the operator reading a
+  // whole catalog of `skipped` lines and wondering what broke, and it keeps
+  // the two sweepers behaving alike (#567).
+  if (!socialSummariesEnabled()) {
+    process.stdout.write(
+      "BEDROCK_SOCIAL_SUMMARY_ENABLED is false. Nothing was generated and nothing was written.\n"
+    );
+    process.exit(0);
+  }
+
   const limit = Number(process.env.LIMIT ?? "0");
   const dryRun = !!process.env.DRY_RUN;
 

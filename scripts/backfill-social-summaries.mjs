@@ -14,6 +14,10 @@
  * across a catalog carrying hundreds of legacy imports, where the embedding
  * sweep it copies is cheap enough per row not to need a rehearsal.
  *
+ * `BEDROCK_SOCIAL_SUMMARY_ENABLED=false` is the kill switch the app honours,
+ * and this honours it too: the run prints one line and exits 0 without
+ * connecting, calling the model or writing anything.
+ *
  * Plain `.mjs` so it runs from the production image, which installs with
  * `--omit=dev` (no `tsx`) and ships `.output` without `src/`, so nothing under
  * `#/lib` resolves. Only `pg` and the three SigV4 packages are used, all
@@ -84,22 +88,41 @@ const SUMMARY_FIELDS = [
   ["problemStatement", "Problem statement"],
 ];
 
+/** MUST match `LONE_TRAILING_SURROGATE` in `src/lib/social-summary-source.ts`. */
+const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/;
+
 /**
  * MUST match `buildSocialSummarySource` in `src/lib/social-summary-source.ts`.
  *
  * The one copy whose drift is both silent and permanent: a summary written
  * from text the app would never produce is stored beside a hash the app then
  * reads as current, so nothing ever recomputes it.
+ *
+ * The budget is spent field by field so a cut always lands inside a value and
+ * never inside a tag, and never between the halves of a surrogate pair (#566).
  */
 function buildSocialSummarySource(project) {
   const parts = [];
+  let remaining = SOCIAL_SUMMARY_SOURCE_LIMIT;
   for (const [key, label] of SUMMARY_FIELDS) {
     const value = project[key]?.trim();
-    if (value) {
-      parts.push(`<${label}>\n${value}\n</${label}>`);
+    if (!value) {
+      continue;
     }
+    const separator = parts.length > 0 ? 2 : 0;
+    const wrapper = label.length * 2 + 7;
+    const room = remaining - separator - wrapper;
+    if (room < 1) {
+      break;
+    }
+    const body =
+      value.length > room
+        ? value.slice(0, room).replace(LONE_TRAILING_SURROGATE, "")
+        : value;
+    parts.push(`<${label}>\n${body}\n</${label}>`);
+    remaining -= separator + wrapper + body.length;
   }
-  return parts.join("\n\n").slice(0, SOCIAL_SUMMARY_SOURCE_LIMIT);
+  return parts.join("\n\n");
 }
 
 /** MUST match `socialSummaryHash` in `src/lib/social-summary-source.ts`. */
@@ -258,7 +281,13 @@ async function summarise(source) {
   // The cap is enforced here as well as in the app's Zod schema, and for the
   // same reason: a summary over it is a failed generation, not a clipped
   // sentence stored as though it were fine.
-  if (!summary || summary.length > SOCIAL_SUMMARY_MAX_LENGTH) {
+  //
+  // Counted in code points, which is what `socialSummaryLength` in
+  // `src/lib/social-summary.ts` counts and what the tool spec's JSON Schema
+  // `maxLength` above counts. `summary.length` counts UTF-16 code units, so it
+  // rejected at 302 what the app accepted at 151 and left the sweeper failing
+  // rows the app was happy with (#565).
+  if (!summary || [...summary].length > SOCIAL_SUMMARY_MAX_LENGTH) {
     throw new Error("The model returned an unusable summary");
   }
   return summary;
@@ -319,6 +348,18 @@ const UPDATE_SQL = `
 `;
 
 async function main() {
+  // MUST match `socialSummariesEnabled` in
+  // `src/lib/_internal/social-summary-flag.ts`, including the exact string:
+  // anything but "false" is on, so an unset variable leaves the sweep enabled.
+  // Checked before the connection, because an operator who turned the feature
+  // off wants this to do nothing at all, not to connect and then decide (#567).
+  if (process.env.BEDROCK_SOCIAL_SUMMARY_ENABLED === "false") {
+    process.stdout.write(
+      "BEDROCK_SOCIAL_SUMMARY_ENABLED is false. Nothing was generated and nothing was written.\n"
+    );
+    process.exit(0);
+  }
+
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error("DATABASE_URL environment variable is not set");
@@ -369,9 +410,18 @@ async function main() {
 
       try {
         const summary = await summarise(source);
-        await db.query(UPDATE_SQL, [summary, hash, project.id]);
-        tally.updated += 1;
-        process.stdout.write(`updated      ${project.title}\n`);
+        // The UPDATE carries the manual guard, so a staff save that landed
+        // during this run matches nothing. Counted from what it matched rather
+        // than from the fact that it ran, or a sweep that correctly refused to
+        // overwrite staff wording reports that it overwrote it (#567).
+        const written = await db.query(UPDATE_SQL, [summary, hash, project.id]);
+        if (written.rowCount === 0) {
+          tally.manual += 1;
+          process.stdout.write(`kept staff   ${project.title}\n`);
+        } else {
+          tally.updated += 1;
+          process.stdout.write(`updated      ${project.title}\n`);
+        }
       } catch (error) {
         tally.failed += 1;
         process.stdout.write(`FAILED       ${project.title}: ${error.message}\n`);

@@ -37,6 +37,13 @@ import { describe, expect, it } from "vitest";
  *   exactly why it needs pinning: half the catalog ends up summarised in one
  *   voice and half in another, with nothing stored to say which is which and
  *   nothing that would ever recompute them.
+ * - The kill switch drifts. An operator who turned the feature off gets a
+ *   sweep that spends a catalog of model calls anyway and writes summaries the
+ *   app would never have generated. Silent, expensive, and the opposite of
+ *   what the switch says it does.
+ * - The cap counting rule drifts. The two sides disagree about which
+ *   summaries are usable, so the sweeper fails rows the app is happy with and
+ *   re-attempts them on every run at one paid call each.
  * - The query drifts from what the builder reads. A status added to
  *   `EMBEDDABLE_STATUSES` alone leaves rows the script never sweeps. A field
  *   added to `SocialSummarySourceProject` alone is worse, because the body
@@ -73,6 +80,7 @@ const EMBEDDINGS = readFileSync(
   "src/server/_internal/project-embeddings.ts",
   "utf8"
 );
+const FLAG = readFileSync("src/lib/_internal/social-summary-flag.ts", "utf8");
 
 const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g;
 const LINE_COMMENT = /(^|\s)\/\/[^\n]*/g;
@@ -232,6 +240,34 @@ describe("the social summary backfill script", () => {
       CORE,
       "export function buildSocialSummaryConfig("
     );
+  });
+
+  it("honours the same kill switch, on the same exact string", () => {
+    // Anything but "false" is on, so an unset variable leaves the sweep
+    // enabled. The app reads the negative and the script reads the positive,
+    // which is why this is pinned on the string rather than on a body (#567).
+    expect(SCRIPT).toContain(
+      'process.env.BEDROCK_SOCIAL_SUMMARY_ENABLED === "false"'
+    );
+    expect(FLAG).toContain(
+      'process.env.BEDROCK_SOCIAL_SUMMARY_ENABLED !== "false"'
+    );
+  });
+
+  it("drops the same half character when it cuts a source", () => {
+    expect(SCRIPT).toContain(
+      "const LONE_TRAILING_SURROGATE = /[\\uD800-\\uDBFF]$/;"
+    );
+    expect(SOURCE).toContain(
+      "const LONE_TRAILING_SURROGATE = /[\\uD800-\\uDBFF]$/;"
+    );
+  });
+
+  it("counts the summary cap in code points, as the app does", () => {
+    // `summary.length` counts UTF-16 code units, so the script rejected at 302
+    // what the app accepted at 151 and failed those rows on every run (#565).
+    expect(SCRIPT).toContain("[...summary].length > SOCIAL_SUMMARY_MAX_LENGTH");
+    expect(SUMMARY).toContain("return [...text].length;");
   });
 
   it("caps the source text at the same length, which the hash covers", () => {
