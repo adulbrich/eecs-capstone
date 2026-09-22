@@ -1,7 +1,9 @@
 # Code review
 
-`mattpocock-skills:code-review` runs on every pull request, as `AGENTS.md` says.
-One local delta from the skill's default brief:
+`mattpocock-skills:code-review` runs on every pull request, as `AGENTS.md` says. It
+checks conformance; `correctness-review` and `app-security-review` under
+`.claude/skills/` are the optional passes that check whether the change is wrong
+(#544). One local delta from the skill's default brief:
 
 - **A UI change carries screenshots, and the reviewer checks both widths.** A
   pull request whose diff touches `src/routes/`, `src/components/` or

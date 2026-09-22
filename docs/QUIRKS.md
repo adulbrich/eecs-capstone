@@ -484,6 +484,23 @@ Running Vitest inside a sandboxed tool call dies with `EMFILE: too many open fil
 
 One harmless thing every run prints in this repo is `ReferenceError: module is not defined`, from the nitro Vite plugin loading under Vitest. The results above it and the exit code are still authoritative. Until 2026-09-10 every run also ended with `close timed out after 10000ms` and `something prevents 2 Vite servers from exiting`: that was the May nitro nightly holding a handle open, found by bisecting `vite.config.ts` plugins against a one-file run, and the September nightly closes cleanly. If it comes back, bisect the plugins again before blaming Vitest.
 
+### A scratch script that reaches `src/lib/brand.ts` needs an `.svg` loader stub
+
+A one-off probe under `$TMPDIR` that imports a `src/lib` module by absolute path, extension included, runs with `node --import tsx/esm "$TMPDIR/probe.mts"`, from the repository root so that `tsx` resolves. `#/` works in the probe too, but only because `tsx` applies the tsconfig paths from the cwd; the absolute path is what survives without it. What Node has no loader for is Vite's `.svg?url` asset import in `src/lib/brand.ts`, so any module that reaches it dies with `ERR_UNKNOWN_FILE_EXTENSION`. Register a load hook that answers `.svg` with an empty string, and pass it as a second `--import`:
+
+```js
+// svg-stub.mjs
+import { register } from "node:module";
+register(
+  "data:text/javascript," +
+    encodeURIComponent(
+      'export async function load(url, context, next) { if (/\\.svg(\\?.*)?$/.test(url)) { return { format: "module", shortCircuit: true, source: "export default \\"\\"" }; } return next(url, context); }'
+    )
+);
+```
+
+`node --import tsx/esm --import "$TMPDIR/svg-stub.mjs" "$TMPDIR/probe.mts"`, from the repository root, then runs `social-meta.ts` and its neighbours.
+
 ### Vitest 5 and better-auth's optional peer range
 
 `better-auth` 1.6 declares an optional peer on `vitest` `^2 || ^3 || ^4`, and 1.7 is the first line that admits 5. Optional or not, npm refuses to place `vitest` 5 next to it with `ERESOLVE`, and the refusal surfaces only on the next `npm install` or `npm update` that re-resolves that edge, so a lockfile can look fine until something unrelated moves. `package.json` carries `"overrides": { "better-auth": { "vitest": "$vitest" } }`, which tells npm the edge is satisfied by whatever `devDependencies.vitest` says. Drop the override when the 1.7 upgrade (#278) lands.
@@ -795,6 +812,7 @@ Radix fires `onOpenChange` for the closes it initiates (Escape, the overlay, a `
 | `scripts/*.ts` | Operational scripts (seeding, one-shot fixes). Not Biome-checked. |
 | `scripts/check-*.mjs` | The rule checks (`check-prose`, `check-commit-message`, `check-compression`) that lefthook, CI and the Claude Code hooks share. Not Biome-checked; tested from `src/test/`. |
 | `.claude/hooks/*.mjs` | Claude Code hooks: refuse the git and `gh` commands and the edits the rules forbid, report Biome and prose on each edit, print session context. Biome-checked; tested from `src/test/claude-hooks.test.ts`. |
+| `.claude/skills/*/SKILL.md` | Repo-local review skills (`correctness-review`, `app-security-review`), portable across harnesses, each with an `agents/openai.yaml`. Optional passes; `AGENTS.md` says when to reach for each. |
 | `docs/agents/*.md` | What the mattpocock engineering skills read about this repo: issue tracker, triage labels, domain docs. |
 | `docs/superpowers/specs/*` | Design docs for the large features that went through the superpowers workflow. Ordinary work is specified in its GitHub issue instead. |
 | `docs/superpowers/plans/*` | Implementation plans for those same specs. |

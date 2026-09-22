@@ -1,0 +1,3 @@
+interface:
+  display_name: "Correctness Review"
+  short_description: "Sweep a diff for known defect classes"
