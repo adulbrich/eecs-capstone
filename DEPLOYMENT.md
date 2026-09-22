@@ -130,7 +130,13 @@ Edit `terraform.tfvars`:
 github_owner     = "your-org-or-user"
 github_repo      = "eecs-capstone"
 github_client_id = "Ov23xxxxxxxxxxxxxxxx"        # from step 3.1 (not secret)
+alarm_email      = "you@oregonstate.edu"         # where CloudWatch alarms mail
 ```
+
+`alarm_email` has no default, so `terraform plan` will prompt for it if it is
+missing. It is the mailbox the alarms in `infra/alarms.tf` write to; AWS mails
+it a confirmation link on the first apply and sends nothing else until somebody
+clicks it. Section 8, "Confirm the alarm subscription", is that step.
 
 ### 3.4 Confirm Postgres 18 is available
 
@@ -1274,6 +1280,53 @@ List revisions with
 - Non-secret env (model ID, email from, etc.): change the value in
   `infra/ecs.tf`, `terraform apply` to register a new task-def revision, then
   run the **Deploy** workflow (which inherits the latest task-def env).
+
+### Confirm the alarm subscription
+
+**Do this once, right after the first `terraform apply` that creates
+`infra/alarms.tf`.** The apply creates an SNS topic and an email subscription
+to `var.alarm_email`, and the subscription is inert until it is confirmed:
+Terraform reports it as created with `pending_confirmation = true` in state, so
+a green apply is not evidence that alarm mail works. AWS sends a
+"AWS Notification - Subscription Confirmation" message to the address. Click
+the link in it.
+
+Then prove delivery end to end, which is the only check that covers the topic,
+the subscription and the alarm action together:
+
+```bash
+aws --profile aws-capstone1 cloudwatch set-alarm-state --region us-west-2 \
+  --alarm-name eecs-capstone-alb-5xx --state-value ALARM \
+  --state-reason "delivery check"
+```
+
+One mail should arrive. Put it back and a second should follow, because every
+alarm sets `ok_actions` as well as `alarm_actions`:
+
+```bash
+aws --profile aws-capstone1 cloudwatch set-alarm-state --region us-west-2 \
+  --alarm-name eecs-capstone-alb-5xx --state-value OK \
+  --state-reason "delivery check over"
+```
+
+`set-alarm-state` is temporary. CloudWatch re-evaluates the alarm against real
+data on its next period and overwrites whatever was set here, so nothing needs
+undoing.
+
+Four alarms exist, all on the one topic:
+
+| Alarm | Fires when |
+| --- | --- |
+| `eecs-capstone-alb-5xx` | The load balancer returned more than 5 5XX in five minutes |
+| `eecs-capstone-app-5xx` | The app returned more than 5 5XX in five minutes |
+| `eecs-capstone-db-connections` | RDS held more than 100 connections for two minutes running |
+| `eecs-capstone-fleet-below-floor` | The service ran fewer than `app_min_tasks` for three minutes running |
+
+**The last one mails on every deploy.** A rolling deploy stops a task before
+starting its replacement (ADR-0043), so the fleet sits at two of three for
+about three minutes per task. That is expected and the mail says so; the
+comment in `infra/alarms.tf` explains why the threshold was left where it is
+and which two numbers to move if the noise is not worth it.
 
 ### Run a migration manually
 

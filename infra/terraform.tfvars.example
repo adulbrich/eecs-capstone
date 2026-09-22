@@ -3,6 +3,10 @@
 github_owner = "your-org-or-user"
 github_repo  = "cs-capstone"
 
+# Where CloudWatch alarm mail goes. AWS sends a confirmation link on the first
+# apply and the subscription delivers nothing until somebody clicks it.
+alarm_email = "you@oregonstate.edu"
+
 # Optional overrides:
 # region           = "us-west-2"
 # github_client_id = "Iv1.xxxxxxxx"

@@ -282,3 +282,8 @@ variable "bedrock_embedding_dimensions" {
   type        = string
   default     = "1024"
 }
+
+variable "alarm_email" {
+  description = "Where CloudWatch alarm mail goes (infra/alarms.tf). Required and deliberately without a default: an alarm topic nobody is subscribed to is worse than no alarm, because the console shows it red and nothing reaches a person. AWS mails a confirmation link on the first apply and delivers nothing until somebody clicks it, so the address has to belong to a mailbox a human reads rather than to a list nobody watches. Not committed: it goes in terraform.tfvars, which is gitignored."
+  type        = string
+}
