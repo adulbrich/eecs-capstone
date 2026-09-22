@@ -355,6 +355,19 @@ There is no hook that fires when an OAuth identity is linked to an existing row,
 
 [ADR-0008](./adr/0008-account-deletion-anonymizes.md) is the decision; `deleteAccountAs` in `src/server/_internal/account.ts` is the code, and `account.integration.test.ts` pins its cascade list against the schema files. Three things that are easy to get wrong when touching it: the avatar object is deleted after the commit through `deleteOwnedObject`, which swallows the failure, because an orphan is a sweep problem and a half-deleted person is a broken promise; two scrubs live outside the FK rule because the columns are addresses (`projects.proposer_email` where the proposer is this user, `projects.mentor_email` wherever it matches), while `contact_*` and `inventory_item_status_history.holder_*` stay, as the privacy page says; and the held-item block reads `heldByViewer` from `inventory-holdings.ts`, the predicate `/my/items` reads, so the page that shows a person their items and the check that refuses to delete their account while they hold one cannot disagree. See #84.
 
+### A plugin mounts every endpoint it has, whatever its options say
+
+`emailOTP()` registers nine paths regardless of `disableSignUp`, `changeEmail` or anything else, the same way `/change-email` is mounted whatever `user.changeEmail` says. An option turns a feature off inside a handler; it does not un-mount the handler, and a direct POST is still served and still counted by the rate limiter. The only way to make one a flat 404 is the top-level `disabledPaths`, which Better Auth checks in the router's `onRequest` against the path with the base path stripped (`/email-otp/verify-email`, not `/api/auth/email-otp/verify-email`). It runs before routing AND before the rate limiter, so a disabled path costs nothing. `src/lib/auth.ts` lists six of the nine there, and `email-otp.integration.test.ts` asserts each one 404s, because "nothing calls it" is not "nothing reaches it".
+
+### Plugin rate-limit rules overwrite the defaults, and a rule naming a path that does not exist is silent
+
+Three layers, applied in order: Better Auth's own special rules, then each plugin's `rateLimit` array (first match wins), then `customRules`, which overrides both. `emailOTP()` ships rules at 3 per 60 seconds for all nine of its paths, which overwrite the framework defaults, including the `startsWith("/sign-in")` rule; `src/lib/_internal/auth-rate-limits.ts` then overrides the three paths this app serves. The trap is the failure mode: a `customRules` key that does not name a mounted path is not an error anywhere. The lookup finds nothing, the rule never applies, and the path silently keeps whatever default it had, so a typo is indistinguishable from a decision until somebody measures the wrong number in production, which is what #520 was. `auth-rate-limits.test.ts` holds every key to a mounted route and fails if a rule is added without being added to that list.
+
+### `revokeUnprovenAccountAccess` runs on one email-otp path, and refuses less than `releaseUnverifiedAddress`
+
+The helper in `better-auth/dist/db/revoke-unproven-account-access.mjs` is called from `/sign-in/email-otp` and from magic-link, and NOT from `/email-otp/verify-email` or the OTP password reset, both of which flip `emailVerified` without it. That asymmetry is why `src/lib/auth.ts` disables those two rather than leaving them mounted. Where it does run it deletes `credential` accounts and sessions and no-ops on a verified row, but unlike `releaseUnverifiedAddress` ([ADR-0045](./adr/0045-onid-takes-an-address-off-an-unproven-account.md)) it refuses neither a banned row nor a row another provider is linked to. `src/server/_internal/otp-sign-in-guard.ts` adds both refusals ahead of it; removing it turns two cases in `email-otp.integration.test.ts` red.
+
+
 ---
 
 ## Drizzle ORM + Postgres

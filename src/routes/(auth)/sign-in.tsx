@@ -45,6 +45,11 @@ function SignIn() {
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // One address field on screen at a time. Rendering both forms together put
+  // two inputs labelled "Email" on the page, which is ambiguous to read out and
+  // ambiguous to automate: it broke `saveStorageState`, the helper that mints
+  // the storage state for the whole browser suite.
+  const [useCode, setUseCode] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -80,45 +85,55 @@ function SignIn() {
       <div className="island-shell w-full max-w-sm rounded-xl p-8">
         <h1 className="font-semibold text-2xl">Sign in</h1>
         {oauthError && <OAuthErrorBanner code={oauthError} />}
-        {/* The emailed code comes first because it is what this page will be
-            once #576 removes the password. Both are live for one release so
-            people meet the new door before the old one closes. */}
-        <EmailCodeForm redirectTo={redirectTo} />
-        <div className="mt-8 border-border border-t pt-6">
-          <h2 className="font-medium text-muted-foreground text-sm">
-            Or sign in with a password
-          </h2>
-        </div>
-        <form className="mt-4 space-y-4" onSubmit={onSubmit}>
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              autoComplete="email"
-              id="email"
-              name="email"
-              placeholder="you@example.com"
-              required
-              type="email"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              autoComplete="current-password"
-              id="password"
-              name="password"
-              placeholder="••••••••"
-              required
-              type="password"
-            />
-          </div>
-          {/* FieldError announces, which matters most here: a sign-in
+        {/* Both doors are live for one release so people meet the new one
+            before #576 closes the old. The button is above the password form
+            rather than below it because discovery is the point of the release;
+            when the password goes, this page is the code form and nothing
+            else. */}
+        <Button
+          className="mt-6 w-full"
+          onClick={() => {
+            setError(null);
+            setUseCode((on) => !on);
+          }}
+          type="button"
+          variant={useCode ? "outline" : "default"}
+        >
+          {useCode ? "Use a password instead" : "Email me a code instead"}
+        </Button>
+        {useCode && <EmailCodeForm redirectTo={redirectTo} />}
+        {!useCode && (
+          <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                autoComplete="email"
+                id="email"
+                name="email"
+                placeholder="you@example.com"
+                required
+                type="email"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                autoComplete="current-password"
+                id="password"
+                name="password"
+                placeholder="••••••••"
+                required
+                type="password"
+              />
+            </div>
+            {/* FieldError announces, which matters most here: a sign-in
               failure is the only announcement this form makes. */}
-          <FieldError message={error} />
-          <Button className="w-full" disabled={loading} type="submit">
-            {loading ? "Signing in..." : "Sign in"}
-          </Button>
-        </form>
+            <FieldError message={error} />
+            <Button className="w-full" disabled={loading} type="submit">
+              {loading ? "Signing in..." : "Sign in"}
+            </Button>
+          </form>
+        )}
         <Button
           className="mt-3 w-full"
           onClick={() =>

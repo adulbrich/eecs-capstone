@@ -158,7 +158,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
         </div>
         <FieldError message={error} />
         <Button className="w-full" disabled={loading} type="submit">
-          {loading ? "Checking..." : "Continue"}
+          {loading ? "Checking..." : "Confirm code"}
         </Button>
         <Button
           className="w-full"

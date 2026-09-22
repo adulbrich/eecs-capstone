@@ -25,6 +25,7 @@ function SignUp() {
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [useCode, setUseCode] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -65,52 +66,58 @@ function SignUp() {
         {/* The same component the sign-in page renders, behaving identically.
             Two pages that answered one address differently would together say
             whether it has an account, which is the enumeration the send
-            endpoint is careful not to leak. */}
-        <EmailCodeForm />
-        <div className="mt-8 border-border border-t pt-6">
-          <h2 className="font-medium text-muted-foreground text-sm">
-            Or create one with a password
-          </h2>
-        </div>
-        <form className="mt-4 space-y-4" onSubmit={onSubmit}>
-          <div className="space-y-1.5">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              autoComplete="name"
-              id="name"
-              name="name"
-              placeholder="Your name"
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              autoComplete="email"
-              id="email"
-              name="email"
-              placeholder="you@example.com"
-              required
-              type="email"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              autoComplete="new-password"
-              id="password"
-              minLength={8}
-              name="password"
-              placeholder="••••••••"
-              required
-              type="password"
-            />
-          </div>
-          <FieldError message={error} />
-          <Button className="w-full" disabled={loading} type="submit">
-            {loading ? "Creating account..." : "Sign up"}
-          </Button>
-        </form>
+            endpoint is careful not to leak. One at a time, for the reason the
+            sign-in page gives. */}
+        <Button
+          className="mt-6 w-full"
+          onClick={() => setUseCode((on) => !on)}
+          type="button"
+          variant={useCode ? "outline" : "default"}
+        >
+          {useCode ? "Use a password instead" : "Email me a code instead"}
+        </Button>
+        {useCode && <EmailCodeForm />}
+        {!useCode && (
+          <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                autoComplete="name"
+                id="name"
+                name="name"
+                placeholder="Your name"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                autoComplete="email"
+                id="email"
+                name="email"
+                placeholder="you@example.com"
+                required
+                type="email"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                autoComplete="new-password"
+                id="password"
+                minLength={8}
+                name="password"
+                placeholder="••••••••"
+                required
+                type="password"
+              />
+            </div>
+            <FieldError message={error} />
+            <Button className="w-full" disabled={loading} type="submit">
+              {loading ? "Creating account..." : "Sign up"}
+            </Button>
+          </form>
+        )}
         <Button
           className="mt-3 w-full"
           onClick={() =>
