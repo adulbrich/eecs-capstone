@@ -102,6 +102,35 @@ for (const code of ["user_info_is_missing", "not_a_known_code"]) {
   });
 }
 
+/**
+ * The emailed code form, at each step (#576).
+ *
+ * The scan above sees only the password form, because the code form is behind
+ * a toggle, and its later steps are behind a real send. Two of the three steps
+ * therefore reach no scan at all unless one drives them, and the code step is
+ * the one most likely to go wrong: it is the only input in the app with
+ * `inputMode="numeric"` and a `maxLength`, and its instruction sits in a
+ * paragraph the label does not point at.
+ */
+test("@smoke sign-in page, the emailed code form", async ({ page }) => {
+  await page.goto("/sign-in");
+  await waitForHydration(page, "form");
+
+  await page.getByRole("button", { name: "Email me a code instead" }).click();
+  await expect(page.getByLabel("Email", { exact: true })).toBeVisible();
+  // One address field on screen, not two. Rendering both forms together put a
+  // second input labelled "Email" on the page, which is ambiguous read aloud.
+  await expect(page.getByLabel("Email", { exact: true })).toHaveCount(1);
+  await expect(page.getByLabel("Password")).toHaveCount(0);
+  await checkA11y(page);
+
+  await page.getByLabel("Email", { exact: true }).fill("nobody@example.com");
+  await page.getByRole("button", { name: "Email me a code" }).click();
+
+  await expect(page.getByLabel("Code", { exact: true })).toBeVisible();
+  await checkA11y(page);
+});
+
 test("@smoke sign-up page", async ({ page }) => {
   await page.goto("/sign-up");
   await checkA11y(page);

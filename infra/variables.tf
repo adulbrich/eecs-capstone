@@ -223,6 +223,12 @@ variable "verification_mail_window_minutes" {
   default     = "60"
 }
 
+variable "sign_in_code_limit" {
+  description = "Emailed sign-in codes allowed to one recipient in the same window. This is the brute force control as well as a mail cap, because Better Auth's per-code attempt count resets on every resend; see src/lib/verification-mail-limits.ts."
+  type        = string
+  default     = "5"
+}
+
 variable "duplicate_notice_limit" {
   description = "Duplicate-sign-up notices allowed to one recipient in the same window. Metered apart from verification links so a squatter cannot spend the owner's warning; see src/lib/verification-mail-limits.ts."
   type        = string

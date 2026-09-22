@@ -26,6 +26,29 @@ export async function captureStderr(
   return captured;
 }
 
+/** The sign-in code arrives inside the sentence, not as a link. */
+const CONSOLE_EMAIL_CODE = /Your sign-in code is (\d{6})\./;
+
+/**
+ * Runs `fn` and pulls the sign-in code out of what the console transport
+ * printed (#576).
+ *
+ * Separate from `captureConsoleEmail` because this message deliberately carries
+ * no link: a link in it would be a magic link, which is the thing ADR-0047
+ * chose not to build. So the link regex above finds nothing here and the
+ * failure would read as "the mail did not send".
+ */
+export async function captureConsoleCode(
+  fn: () => Promise<unknown>
+): Promise<string> {
+  const captured = await captureStderr(fn);
+  const match = captured.match(CONSOLE_EMAIL_CODE);
+  if (!match) {
+    throw new Error(`No sign-in code in what was printed. Got:\n${captured}`);
+  }
+  return match[1];
+}
+
 /**
  * Runs `fn` and pulls the link out of whatever the console transport printed.
  *

@@ -6,7 +6,7 @@ import {
   getIp,
   isAPIError,
 } from "better-auth/api";
-import { admin, genericOAuth } from "better-auth/plugins";
+import { admin, emailOTP, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { db } from "#/db";
 import {
@@ -28,13 +28,20 @@ import { getEmailSender } from "#/lib/email/sender";
 import {
   addressAlreadyRegisteredEmail,
   passwordResetEmail,
+  signInCodeEmail,
   verificationEmail,
 } from "#/lib/email/templates";
+import {
+  OTP_CLAIM_COOKIE,
+  otpClaimMatches,
+  otpClaimToken,
+} from "#/lib/otp-claim";
 import { tooManyAttemptsMessage } from "#/lib/sign-in-limits";
 import type { VerificationMailKind } from "#/lib/verification-mail-limits";
 import type { UserRole } from "#/lib/vocabularies";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
 import { markAddressProven } from "#/server/_internal/mark-address-proven";
+import { otpSignInRefused } from "#/server/_internal/otp-sign-in-guard";
 import { releaseUnverifiedAddress } from "#/server/_internal/release-unverified-address";
 import {
   attemptKey,
@@ -103,6 +110,217 @@ function withVerificationLanding(url: string): string {
 /** The one path the attempt counter guards. ONID and GitHub are authenticated
  * elsewhere, so there is no credential here to protect on those. */
 const PASSWORD_SIGN_IN = "/sign-in/email";
+
+/** Where an emailed code is redeemed (#576). Guarded below, for the two rows
+ * Better Auth's own helper does not refuse; see `otp-sign-in-guard.ts`. */
+const CODE_SIGN_IN = "/sign-in/email-otp";
+
+/** Where a code is asked for, and where the claim cookie is issued (#581). */
+const CODE_SEND = "/email-otp/send-verification-otp";
+
+/**
+ * Where a code is checked without being spent, which the sign-in form uses to
+ * find out it should ask a new address for a name before redeeming.
+ *
+ * It counts a wrong guess against the same record `/sign-in/email-otp` does, so
+ * it is guarded identically. Leaving it out would have left the whole of #581
+ * open through a second door.
+ */
+const CODE_CHECK = "/email-otp/check-verification-otp";
+
+/** As long as a code lives, and no longer: the claim is useless after that. */
+const CLAIM_COOKIE_SECONDS = 300;
+
+/** Better Auth's identifier for a pending sign-in code, from `toOTPIdentifier`. */
+function codeRecordFor(email: string): string {
+  // Lowercased and NOT trimmed, which matches `toOTPIdentifier`'s callers
+  // exactly: every handler in `routes.mjs` does `ctx.body.email.toLowerCase()`
+  // and nothing trims. Trimming here looked up a different row than Better
+  // Auth would, so a padded address resolved to the unpadded owner's live
+  // record. `z.email()` rejects the padded form a moment later, so nothing was
+  // spent, but the two must name the same row or this guard is guarding
+  // somebody else's code.
+  return `sign-in-otp-${email.toLowerCase()}`;
+}
+
+/**
+ * The secret the claim token is signed with.
+ *
+ * `BETTER_AUTH_SECRET` in production, where `src/lib/_internal/startup-config.ts`
+ * refuses to boot without it. A per-process random value otherwise, rather than
+ * a fixed development default: a claim only has to outlive the five minutes its
+ * code does, so losing them all on a restart costs a developer one resend, and
+ * a checked-in default would be a signing key in the repository.
+ */
+const claimSecret =
+  process.env.BETTER_AUTH_SECRET ?? crypto.randomUUID() + crypto.randomUUID();
+
+/**
+ * The shape of the request both code guards read. Structural rather than Better
+ * Auth's own middleware context type, so these stay callable from a test.
+ */
+interface CodeRequest {
+  body?: { email?: unknown; type?: unknown };
+  context: {
+    internalAdapter: {
+      findVerificationValue: (
+        id: string
+      ) => Promise<{ expiresAt: Date } | null | undefined>;
+    };
+  };
+  getCookie: (name: string) => string | null | undefined;
+}
+
+/**
+ * Whether a request for a code may reach Better Auth at all (#581).
+ *
+ * The refusal answers `{success: true}` at the call site, because the send
+ * endpoint has to look the same whatever it decides or it becomes an account
+ * enumerator.
+ *
+ * ## Why the CLAIM is not consulted here, only at redeem
+ *
+ * It was, and that was wrong in a way worth recording, because "a live code
+ * belongs to the browser that asked for it" sounds like the stronger rule.
+ * Nobody can prove they own an address at send time, so a stranger who sends
+ * FIRST takes the claim for a code that is mailed to somebody else: the owner's
+ * correct code was then refused, AND their own resend was swallowed by the same
+ * rule, so one unauthenticated request locked them out for the life of the
+ * code. That is a cheaper denial than the one #581 exists to close.
+ *
+ * Leaving the send open costs nothing the mail cap was not already accepting.
+ * A stranger's send rotates the record and mails the owner the new code, so the
+ * owner is never holding something they cannot use: they read the newest
+ * message, or they ask again and their own browser takes the claim. What they
+ * cannot do is outrun the per-recipient cap, which is ADR-0046's accepted
+ * tradeoff and predates all of this.
+ */
+async function codeSendAllowed(ctx: CodeRequest): Promise<boolean> {
+  const address = signInCodeAddress(ctx);
+  if (address === null) {
+    // Refused rather than passed through. `type` is the caller's to choose,
+    // and every other value names a DIFFERENT verification record that this
+    // app has no flow for: letting those through was an uncapped way to make
+    // Better Auth write rows, outside the per-recipient cap, for a code
+    // `sendVerificationOTP` would then decline to mail.
+    return false;
+  }
+  // The cap is spent HERE rather than inside `sendVerificationOTP`, because
+  // `resolveOTP` writes the rotated record BEFORE the sender runs. Refusing
+  // down there left the record holding a code nobody had been told, so a sixth
+  // request in an hour did not merely fail to mail: it killed the code the
+  // person was already holding.
+  return await mayMail(address, "sign-in-code");
+}
+
+/**
+ * Whether a guess against a code must be refused before Better Auth counts it.
+ *
+ * Two reasons, and the caller gives both the shape of a wrong code.
+ * `otp-sign-in-guard.ts` says why the row guard cannot say more; the claim
+ * guard cannot either, because a distinct refusal would tell a stranger
+ * whether a code is outstanding for an address.
+ */
+async function codeGuessRefused(ctx: CodeRequest): Promise<boolean> {
+  const address = signInCodeAddress(ctx);
+  if (address === null) {
+    // `/sign-in/email-otp` sends no `type` and is always the sign-in record;
+    // `/email-otp/check-verification-otp` takes one from the caller and keys
+    // its own lookup on it. Guarding only the sign-in record while the handler
+    // reads another was a way to spend guesses this guard never saw, so any
+    // other type is refused outright.
+    return true;
+  }
+  try {
+    const expected = await expectedClaim(ctx, address);
+    // No live record means there is nothing to claim, so Better Auth answers
+    // and a missing code and an unclaimed one come from the same place.
+    //
+    // This is the whole of #581: a guess from a browser that does not hold the
+    // claim is refused HERE, before Better Auth counts it against the record.
+    // The count is what a stranger was spending, and an exhausted record is
+    // consumed and not recreated, so spending it destroyed the owner's code.
+    const unclaimed =
+      expected !== null &&
+      !otpClaimMatches(ctx.getCookie(OTP_CLAIM_COOKIE), expected);
+    return unclaimed || (await otpSignInRefused(address));
+  } catch (error) {
+    // Fails open, the same direction as `swallowing` and for the same reason.
+    // What it opens is narrow: the plugin still refuses a wrong code, and the
+    // admin plugin still refuses a banned row a session.
+    console.error("Code sign-in guard failed", redactQueryError(error));
+    return false;
+  }
+}
+
+/**
+ * The address this request is about, or null when it is not about a sign-in
+ * code at all.
+ *
+ * One place rather than three, because the two guards and the cookie-issuing
+ * after-hook all have to agree on what counts. They read the RAW body, before
+ * Better Auth validates it, so a value that is not a string is somebody probing
+ * rather than a person signing in.
+ */
+function signInCodeAddress(ctx: CodeRequest): string | null {
+  const address = ctx.body?.email;
+  if (typeof address !== "string") {
+    return null;
+  }
+  // `/sign-in/email-otp` carries no `type`; the other two carry one and only
+  // `"sign-in"` names the record this app serves.
+  const type = ctx.body?.type;
+  if (type !== undefined && type !== "sign-in") {
+    return null;
+  }
+  return address;
+}
+
+/**
+ * The token this request would need to claim the live code for an address, or
+ * null when there is no live code to claim.
+ */
+async function expectedClaim(
+  ctx: CodeRequest,
+  email: string
+): Promise<string | null> {
+  const record = await ctx.context.internalAdapter.findVerificationValue(
+    codeRecordFor(email)
+  );
+  if (!record || record.expiresAt < new Date()) {
+    return null;
+  }
+  return await otpClaimToken(email, record.expiresAt, claimSecret);
+}
+
+/**
+ * The email-otp endpoints this app does NOT serve.
+ *
+ * `emailOTP()` mounts nine paths whatever its options say, and only three of
+ * them belong to the flow this app runs. Better Auth checks `disabledPaths` in
+ * the router's `onRequest`, ahead of routing and ahead of the rate limiter, so
+ * a listed path is a flat 404 rather than a handler that declines.
+ *
+ * `/email-otp/verify-email` is the one that has to go. It flips `emailVerified`
+ * on an address that presents a valid code WITHOUT calling
+ * `revokeUnprovenAccountAccess` first, which is #575's attack through a new
+ * door: while password sign-up still exists, a squatter registers an address,
+ * the real owner asks for a code and redeems it there, and the owner has now
+ * verified a row whose password the squatter chose. `/sign-in/email-otp` is the
+ * only path that does the revoke, so it is the only one that may verify.
+ *
+ * The password-reset and email-change paths are disabled for a duller reason:
+ * this app has its own flows for both, and a second set of endpoints reaching
+ * the same columns is surface with no caller.
+ */
+const DISABLED_OTP_PATHS = [
+  "/email-otp/verify-email",
+  "/email-otp/request-password-reset",
+  "/email-otp/reset-password",
+  "/forget-password/email-otp",
+  "/email-otp/request-email-change",
+  "/email-otp/change-email",
+];
 
 /**
  * How a viewer address is resolved, in one object because two callers have to
@@ -309,6 +527,29 @@ export const auth = betterAuth({
   // is purely additive.
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      // Asking for a code (#581). Two reasons to answer without letting Better
+      // Auth touch the record, and both have to answer `{success: true}`
+      // anyway, because the send endpoint must look the same whatever it
+      // decides or it becomes an account enumerator.
+      if (ctx.path === CODE_SEND) {
+        if (!(await codeSendAllowed(ctx))) {
+          throw new APIError("OK", { success: true });
+        }
+        return;
+      }
+      // Spending a guess, on either path that spends one. Both refusals wear
+      // the shape of a wrong code: `otp-sign-in-guard.ts` says why the row
+      // guard cannot say more, and the claim guard cannot either, because a
+      // distinct refusal would tell a stranger whether a code is outstanding.
+      if (ctx.path === CODE_SIGN_IN || ctx.path === CODE_CHECK) {
+        if (await codeGuessRefused(ctx)) {
+          throw new APIError("BAD_REQUEST", {
+            code: "INVALID_OTP",
+            message: "Invalid OTP",
+          });
+        }
+        return;
+      }
       if (ctx.path !== PASSWORD_SIGN_IN) {
         return;
       }
@@ -341,6 +582,34 @@ export const auth = betterAuth({
       }
     }),
     after: createAuthMiddleware(async (ctx) => {
+      // The claim for the code that was just written (#581). Issued only where
+      // the record was actually created, so a send that was refused above
+      // hands out nothing: a browser that could get a claim without moving the
+      // record could spend somebody else's guesses with it.
+      if (ctx.path === CODE_SEND) {
+        const address = signInCodeAddress(ctx);
+        if (address === null) {
+          return;
+        }
+        try {
+          const claim = await expectedClaim(ctx, address);
+          if (claim) {
+            ctx.setCookie(OTP_CLAIM_COOKIE, claim, {
+              httpOnly: true,
+              maxAge: CLAIM_COOKIE_SECONDS,
+              path: "/",
+              sameSite: "lax",
+              secure: authConfig.isProduction,
+            });
+          }
+        } catch (error) {
+          // Swallowed rather than refused: the code is already mailed, and a
+          // person holding one they cannot redeem is worse than one more
+          // request. They can ask again, and that send will claim the record.
+          console.error("Issuing a code claim failed", redactQueryError(error));
+        }
+        return;
+      }
       if (ctx.path !== PASSWORD_SIGN_IN) {
         return;
       }
@@ -384,6 +653,9 @@ export const auth = betterAuth({
   // still turned into its response by the router's own catch, so this changes
   // nothing a client sees.
   onAPIError: { throw: true },
+  // See DISABLED_OTP_PATHS. Six of the nine paths `emailOTP()` mounts are 404
+  // rather than served, one of them because serving it would reopen #575.
+  disabledPaths: DISABLED_OTP_PATHS,
   advanced: {
     // CloudFront terminates TLS at the edge and forwards to the origin over
     // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in
@@ -602,6 +874,57 @@ export const auth = betterAuth({
     admin({
       adminRoles: ["admin" satisfies UserRole],
       defaultRole: "user" satisfies UserRole,
+    }),
+    // The emailed sign-in code (#576, ADR-0047). Six of the nine paths it
+    // mounts are 404 through `disabledPaths` above; what is left is asking for
+    // a code, checking one without spending it, and redeeming one.
+    emailOTP({
+      // Three per code, counted on the verification record, after which the
+      // record is deleted. It is NOT the whole brute force story, because
+      // `resendStrategy` defaults to `rotate` and a resend writes a fresh
+      // record with the count back at zero. What bounds the resends is the
+      // per-recipient cap in `sendVerificationOTP` below.
+      allowedAttempts: 3,
+      // Open, deliberately. Industry partners and outside faculty have no ONID
+      // and no office to route through, so closing this would leave them with
+      // GitHub or nothing. `signInEmailOTP` writes `name: name || ""` on a
+      // first sign-in and `requireUserName` throws BAD_REQUEST on a blank one,
+      // which is why the sign-up route asks for a name and sends it: reaching
+      // this path without one burns a code the person then cannot reuse.
+      disableSignUp: false,
+      // Encrypted rather than hashed, which is not the usual preference and is
+      // right here. `storeOTP: "hashed"` is an unsalted SHA-256 over a six
+      // digit space, so a leaked `verification` row is reversed by a table of a
+      // million preimages; a hash is only a one-way function when the input
+      // space is large. `encrypted` is `symmetricEncrypt` under the Better Auth
+      // secret, which is not in the database, and unlike `hashed` it does not
+      // disable `resendStrategy: "reuse"` should we ever want it.
+      storeOTP: "encrypted",
+      sendVerificationOTP: async ({ email, otp, type }) => {
+        // Belt and braces with `disabledPaths`: the only reachable caller is
+        // the sign-in send, and a code of any other type must never be mailed
+        // even if a path is re-enabled without revisiting this.
+        if (type !== "sign-in") {
+          return;
+        }
+        try {
+          // The per-recipient cap is NOT checked here. It is spent in the
+          // `hooks.before` on this path, because `resolveOTP` has already
+          // rotated the record by the time this runs, so refusing here would
+          // leave the record holding a code nobody was told.
+          await emailSender.send(email, signInCodeEmail({ otp }));
+        } catch (error) {
+          // Caught here so the line is ours and carries no address (#559), and
+          // so the endpoint's answer does not depend on whether the send threw.
+          // It must stay `{success: true}` either way: the response is the same
+          // for an address with an account and one without, and that is what
+          // keeps the send endpoint from answering "does this person exist".
+          console.error(
+            "Sending a sign-in code failed",
+            redactQueryError(error)
+          );
+        }
+      },
     }),
     // ONID, via the Oregon State Entra ID tenant. UIT registered the app as an
     // OIDC relying party rather than a SAML SP, which is why this is the

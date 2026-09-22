@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
+import { EmailCodeForm } from "#/components/email-code-form";
 import { OAuthErrorBanner } from "#/components/oauth-error-banner";
 import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
@@ -44,6 +45,11 @@ function SignIn() {
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // One address field on screen at a time. Rendering both forms together put
+  // two inputs labelled "Email" on the page, which is ambiguous to read out and
+  // ambiguous to automate: it broke `saveStorageState`, the helper that mints
+  // the storage state for the whole browser suite.
+  const [useCode, setUseCode] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -79,36 +85,39 @@ function SignIn() {
       <div className="island-shell w-full max-w-sm rounded-xl p-8">
         <h1 className="font-semibold text-2xl">Sign in</h1>
         {oauthError && <OAuthErrorBanner code={oauthError} />}
-        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              autoComplete="email"
-              id="email"
-              name="email"
-              placeholder="you@example.com"
-              required
-              type="email"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              autoComplete="current-password"
-              id="password"
-              name="password"
-              placeholder="••••••••"
-              required
-              type="password"
-            />
-          </div>
-          {/* FieldError announces, which matters most here: a sign-in
+        {useCode && <EmailCodeForm redirectTo={redirectTo} />}
+        {!useCode && (
+          <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                autoComplete="email"
+                id="email"
+                name="email"
+                placeholder="you@example.com"
+                required
+                type="email"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                autoComplete="current-password"
+                id="password"
+                name="password"
+                placeholder="••••••••"
+                required
+                type="password"
+              />
+            </div>
+            {/* FieldError announces, which matters most here: a sign-in
               failure is the only announcement this form makes. */}
-          <FieldError message={error} />
-          <Button className="w-full" disabled={loading} type="submit">
-            {loading ? "Signing in..." : "Sign in"}
-          </Button>
-        </form>
+            <FieldError message={error} />
+            <Button className="w-full" disabled={loading} type="submit">
+              {loading ? "Signing in..." : "Sign in"}
+            </Button>
+          </form>
+        )}
         <Button
           className="mt-3 w-full"
           onClick={() =>
@@ -135,10 +144,39 @@ function SignIn() {
         >
           Continue with GitHub
         </Button>
-        <p className="mt-6 flex flex-wrap gap-x-4 text-muted-foreground text-sm">
-          <Link className="text-brand-dark underline" to="/forgot-password">
-            Forgot password?
-          </Link>
+        {/* Both doors are live for one release so people meet the new one
+            before #576 closes the old. The switch sits down here with the other
+            secondary choices rather than above the form, because a button that
+            changes which field is on screen reads as an instruction when it is
+            the first thing above that field. When the password goes, this page
+            is the code form and this line goes with it.
+
+            No underline at rest, unlike the links beside it. The rule in
+            UI-CONVENTIONS is about anchors in running text, and the `link`
+            Button variant underlines on hover instead because it renders a
+            plain button element as often as an anchor;
+            `brand-link-scan.test.ts` exempts the variant for exactly that
+            reason, and `ClearFiltersButton` is the other call site. Adding the
+            class here turns `button-conventions.test.ts` red instead. */}
+        <p className="mt-6 flex flex-wrap items-center gap-x-4 text-muted-foreground text-sm">
+          <Button
+            onClick={() => {
+              setError(null);
+              setUseCode((on) => !on);
+            }}
+            size="bare"
+            type="button"
+            variant="link"
+          >
+            {useCode ? "Use a password instead" : "Email me a code instead"}
+          </Button>
+          {/* Only reachable from the password door. A password reset means
+              nothing to somebody signing in with a code. */}
+          {!useCode && (
+            <Link className="text-brand-dark underline" to="/forgot-password">
+              Forgot password?
+            </Link>
+          )}
           {/* Deliberately not the sign-up sentence: nobody is creating an
               account on this page, so "you agree" would be false here. */}
           <Link className="text-brand-dark underline" to="/privacy">

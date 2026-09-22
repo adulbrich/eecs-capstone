@@ -1,5 +1,6 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
+import { EmailCodeForm } from "#/components/email-code-form";
 import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
@@ -24,6 +25,7 @@ function SignUp() {
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [useCode, setUseCode] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -61,45 +63,53 @@ function SignUp() {
     <div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">
       <div className="island-shell w-full max-w-sm rounded-xl p-8">
         <h1 className="font-semibold text-2xl">Create an account</h1>
-        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-          <div className="space-y-1.5">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              autoComplete="name"
-              id="name"
-              name="name"
-              placeholder="Your name"
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              autoComplete="email"
-              id="email"
-              name="email"
-              placeholder="you@example.com"
-              required
-              type="email"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              autoComplete="new-password"
-              id="password"
-              minLength={8}
-              name="password"
-              placeholder="••••••••"
-              required
-              type="password"
-            />
-          </div>
-          <FieldError message={error} />
-          <Button className="w-full" disabled={loading} type="submit">
-            {loading ? "Creating account..." : "Sign up"}
-          </Button>
-        </form>
+        {/* The same component the sign-in page renders, behaving identically.
+            Two pages that answered one address differently would together say
+            whether it has an account, which is the enumeration the send
+            endpoint is careful not to leak. One at a time, for the reason the
+            sign-in page gives. */}
+        {useCode && <EmailCodeForm />}
+        {!useCode && (
+          <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                autoComplete="name"
+                id="name"
+                name="name"
+                placeholder="Your name"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                autoComplete="email"
+                id="email"
+                name="email"
+                placeholder="you@example.com"
+                required
+                type="email"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                autoComplete="new-password"
+                id="password"
+                minLength={8}
+                name="password"
+                placeholder="••••••••"
+                required
+                type="password"
+              />
+            </div>
+            <FieldError message={error} />
+            <Button className="w-full" disabled={loading} type="submit">
+              {loading ? "Creating account..." : "Sign up"}
+            </Button>
+          </form>
+        )}
         <Button
           className="mt-3 w-full"
           onClick={() =>
@@ -126,7 +136,19 @@ function SignUp() {
         >
           Continue with GitHub
         </Button>
+        {/* The switch sits with the other secondary choices, the same as on
+            the sign-in page and for the same reason. */}
         <p className="mt-6 text-muted-foreground text-sm">
+          <Button
+            onClick={() => setUseCode((on) => !on)}
+            size="bare"
+            type="button"
+            variant="link"
+          >
+            {useCode ? "Use a password instead" : "Email me a code instead"}
+          </Button>
+        </p>
+        <p className="mt-2 text-muted-foreground text-sm">
           Already have an account?{" "}
           <Link className="text-brand-dark underline" to="/sign-in">
             Sign in
