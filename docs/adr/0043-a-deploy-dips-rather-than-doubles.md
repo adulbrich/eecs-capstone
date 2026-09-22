@@ -28,11 +28,13 @@ would have bound every burst whether or not anyone was deploying. The drain
 is the part that had to move for this to be workable at all: the target
 group's `deregistration_delay` was the AWS default of 300 seconds, which
 would have put three sequential replacements past the deploy workflow's ten
-minute wait, so it is now 60 seconds, the load balancer's own idle timeout:
-far above the slowest response the load test recorded (4.3 s), and sized for
-the one request that can legitimately run long, a 10 MB image upload on a
-slow link, which the anonymous load test never sent. The workflow retries
-its wait rather than calling a slow rollout a failure. Raising the pool in step with the ceiling rather than
+minute wait, so it is now 60 seconds, a number borrowed from the load
+balancer's idle timeout rather than derived: far above the slowest response
+the load test recorded (4.3 s), and the whole allowance for the one request
+that can legitimately run long, a 10 MB image upload on a slow link, which
+the anonymous load test never sent and which a deploy may still cut if it
+takes longer than that. The workflow retries its wait rather than calling a
+slow rollout a failure. Raising the pool in step with the ceiling rather than
 leaving 20 in place is deliberate: the ceiling change buys nothing on its
 own, and the load test measured the pool as the constraint. This is the
 lever #558 called the larger one and left to the maintainer; the bigger

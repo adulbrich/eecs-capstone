@@ -67,10 +67,11 @@ resource "aws_lb_target_group" "app" {
   # 100 a draining task still counts against the ceiling, so ECS could not
   # start a replacement until the old one had sat through all five minutes:
   # three sequential replacements would outlast the deploy workflow's ten
-  # minute wait. Sixty seconds is the load balancer's own idle_timeout and
-  # well past any page render (the load test's slowest response was 4.3 s);
-  # what it exists for is a 10 MB image upload on a slow link, which is the
-  # one request here that can legitimately run long. ADR-0043.
+  # minute wait. Sixty seconds is borrowed from the load balancer's
+  # idle_timeout above rather than derived: it is far past any page render
+  # (the load test's slowest response was 4.3 s) and is the whole allowance
+  # for a 10 MB image upload on a slow link, the one request here that can
+  # run long, which a deploy may still cut if it takes longer. ADR-0043.
   deregistration_delay = 60
 
   health_check {
