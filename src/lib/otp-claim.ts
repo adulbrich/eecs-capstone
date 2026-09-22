@@ -10,16 +10,27 @@
  * recreated, so the code its owner is holding stops working. ADR-0047 records
  * that.
  *
- * Handing the requesting browser a cookie and demanding it back at redeem does
- * not fix that by itself, and it is worth saying why, because it is the obvious
- * design and it fails: the attacker simply asks for a code themselves. That
- * mints them a cookie AND rotates the single record, so the code they can now
- * spend is the one the victim was just mailed.
+ * The browser that asks for a code is handed one of these, and has to present
+ * it to redeem one. A guess without it is refused in a `hooks.before`, so it
+ * never reaches `atomicVerifyOTP` and never spends an attempt, which is the
+ * whole of the fix: spending attempts is what destroyed the code.
  *
- * What closes it is the second rule: **a live code belongs to the browser that
- * asked for it, and another browser asking does not replace it.** With that, an
- * attacker's send neither rotates the record nor earns a claim to it, and their
- * guesses are refused before Better Auth counts one.
+ * ## What this deliberately does NOT do, and why
+ *
+ * It does not gate the SEND. That was the first implementation and it was worse
+ * than doing nothing, so it is worth writing down. Nobody can prove they own an
+ * address at send time, so a stranger who asks FIRST takes the claim on a code
+ * that is mailed to somebody else. With the send gated on the claim as well,
+ * the owner's correct code was refused AND their own resend was swallowed by
+ * the same rule, which turned one unauthenticated request into a lockout for
+ * the life of the code: cheaper than the three-guess burn it was written to
+ * prevent.
+ *
+ * So a stranger CAN still rotate the record and earn a claim to it, and the
+ * owner's first code is wasted when that happens. What the owner does is ask
+ * again, which always works, and their own browser takes the claim. The bound
+ * on how often a stranger can force that is the per-recipient mail cap, which
+ * ADR-0046 already accepted as a denial of service on the recipient.
  *
  * ## What the token is
  *
