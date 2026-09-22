@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   SOCIAL_SUMMARY_MAX_LENGTH,
+  SOCIAL_SUMMARY_TOO_LONG_MESSAGE,
   type SocialSummaryView,
+  socialSummaryLength,
 } from "#/lib/social-summary";
 import { useAction } from "#/lib/use-action";
 import {
@@ -13,6 +15,12 @@ import { LocalTime } from "./local-time";
 import { Button } from "./ui/button";
 import { FieldError } from "./ui/field";
 import { Textarea } from "./ui/textarea";
+
+const LOAD_FAILED =
+  "Could not load the stored summary. Nothing here is safe to act on until it loads.";
+
+const RACE_LOST =
+  "The summary changed while the rewrite was running, so the rewrite was thrown away. The box shows what is stored now.";
 
 /**
  * The staff view of a project's social summary (#498), beside the categories
@@ -34,43 +42,61 @@ import { Textarea } from "./ui/textarea";
  * `project.id`, so one project's wording is never shown over another's.
  */
 export function SocialPreviewSection({ projectId }: { projectId: string }) {
-  const [view, setView] = useState<SocialSummaryView | "loading">("loading");
+  const [view, setView] = useState<SocialSummaryView | "loading" | "failed">(
+    "loading"
+  );
   const [draft, setDraft] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
   // A second activation in the same tick would spend a second model call;
   // `use-action.ts` says why the hook's ref is what stops it (#443).
   const { busy, error, run } = useAction({ fallback: "Social summary failed" });
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const loaded = await getSocialSummary({ data: { projectId } });
-        setView(loaded);
-        setDraft(loaded.summary ?? "");
-      } catch {
-        // Staff-only endpoint. A failure reads as nothing stored; the buttons
-        // below report their own errors if a write is refused too.
-        setView({ isManual: false, summary: null, updatedAt: null });
-        setDraft("");
-      }
-    })();
+  const load = useCallback(async () => {
+    setView("loading");
+    setNotice(null);
+    try {
+      const loaded = await getSocialSummary({ data: { projectId } });
+      setView(loaded);
+      setDraft(loaded.summary ?? "");
+    } catch {
+      // Its own state, not a stand-in for an empty row (#564). Reading a
+      // failed load as "nothing stored" enabled Regenerate, because that
+      // button turns on when the summary is null, and Regenerate is the call
+      // that clears a summary staff wrote by hand. A transient error on a read
+      // must not offer a write.
+      setView("failed");
+      setDraft("");
+    }
   }, [projectId]);
 
-  const loaded = view === "loading" ? null : view;
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const failed = view === "failed";
+  const loaded = view === "loading" || failed ? null : view;
   const stored = loaded?.summary ?? "";
   const trimmed = draft.trim();
   // Edited means "differs from what is stored", not "has been typed in": a
   // round trip back to the original text leaves nothing to save.
   const edited = trimmed !== stored.trim();
-  const tooLong = trimmed.length > SOCIAL_SUMMARY_MAX_LENGTH;
-  const canSave = !!loaded && edited && trimmed.length > 0 && !tooLong;
+  // The cap counted the way the schema and the server count it (#565).
+  // `trimmed.length` counts UTF-16 code units, so 151 emoji showed here as 302
+  // over a cap the server would have accepted.
+  const length = socialSummaryLength(trimmed);
+  const tooLong = length > SOCIAL_SUMMARY_MAX_LENGTH;
+  const canSave = !!loaded && edited && length > 0 && !tooLong;
   // Enabled when staff own the wording, and when there is none at all. The
   // second case is the Bedrock outage: without it the panel would show an
-  // empty box with two dead buttons and no way out.
+  // empty box with two dead buttons and no way out. `loaded` is null while the
+  // load is in flight and after it failed, so neither state offers either
+  // button.
   const canRegenerate =
     !!loaded && (loaded.isManual || loaded.summary === null);
 
   function save() {
     return run(async () => {
+      setNotice(null);
       const saved = await saveSocialSummary({
         data: { projectId, summary: trimmed },
       });
@@ -81,9 +107,14 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
 
   function regenerate() {
     return run(async () => {
+      setNotice(null);
       const next = await regenerateSocialSummary({ data: { projectId } });
       setView(next);
       setDraft(next.summary ?? "");
+      // The server refused to overwrite a row that moved under it. Said out
+      // loud, because the box is about to show wording nobody in this tab
+      // asked for.
+      setNotice(next.outcome === "changed" ? RACE_LOST : null);
     }, "Could not rewrite the summary");
   }
 
@@ -110,7 +141,7 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
       */}
       <Textarea
         aria-label="Social summary"
-        disabled={busy}
+        disabled={busy || failed}
         onChange={(e) => setDraft(e.target.value)}
         placeholder={
           loaded?.summary === null
@@ -122,7 +153,7 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
       />
       <div className="flex items-center justify-between gap-3">
         <p className="text-muted-foreground text-xs">
-          {trimmed.length} / {SOCIAL_SUMMARY_MAX_LENGTH}
+          {length} / {SOCIAL_SUMMARY_MAX_LENGTH}
           {loaded?.updatedAt && (
             <>
               {" "}
@@ -132,12 +163,10 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
           )}
         </p>
       </div>
-      {tooLong && (
-        <FieldError
-          message={`A summary is at most ${SOCIAL_SUMMARY_MAX_LENGTH} characters.`}
-        />
-      )}
+      {tooLong && <FieldError message={SOCIAL_SUMMARY_TOO_LONG_MESSAGE} />}
+      {failed && <FieldError message={LOAD_FAILED} />}
       <FieldError message={error} />
+      {notice && <p className="text-muted-foreground text-sm">{notice}</p>}
       <div className="flex flex-wrap gap-2">
         <Button
           disabled={busy || !canSave}
@@ -157,6 +186,16 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
         >
           {busy ? "Working..." : "Regenerate with AI"}
         </Button>
+        {failed && (
+          <Button
+            onClick={() => void load()}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            Try again
+          </Button>
+        )}
       </div>
     </div>
   );
