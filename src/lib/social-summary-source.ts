@@ -32,25 +32,65 @@ const SUMMARY_FIELDS = [
 ] as const;
 
 /**
- * The character ceiling on what is sent. A capstone description runs to a few
- * thousand characters at most, so this bites only on a paste accident, where
- * truncating beats paying for tokens nobody reads. The truncated string is
- * what the hash covers, so changing this number regenerates every project
+ * The character ceiling on what is sent, in UTF-16 code units, which is what
+ * `String.prototype.length` and `slice` count. A capstone description runs to
+ * a few thousand characters at most, so this bites only on a paste accident,
+ * where truncating beats paying for tokens nobody reads. The truncated string
+ * is what the hash covers, so changing this number regenerates every project
  * longer than the smaller of the old value and the new one.
  */
 export const SOCIAL_SUMMARY_SOURCE_LIMIT = 12_000;
 
+/**
+ * A high surrogate with no low surrogate after it, at the end of a string.
+ * `social-meta.ts` carries its own copy for its own cut; this one is pinned
+ * against the backfill script's, so the two cannot drift.
+ */
+const LONE_TRAILING_SURROGATE = /[\uD800-\uDBFF]$/;
+
+/**
+ * The budget is spent field by field rather than by slicing the joined string,
+ * which is what put the cut inside the closing tag (#566).
+ *
+ * Slicing at the end could land anywhere: on any source over the limit the
+ * text ended mid-`</Description`, and on a run of emoji it ended on half a
+ * character. Both go into `socialSummaryHash`, so the model was handed a
+ * malformed prompt and handed the same malformed prompt on every later sweep,
+ * with nothing in the row to say why it kept failing.
+ *
+ * Here a field's tags are only written once its value is known to fit inside
+ * them, so the cut is always inside a value and a tag is never half-written.
+ * A field that cannot fit at all ends the loop rather than being written
+ * empty, because the fields are in descending order of usefulness and a
+ * `<Problem statement></Problem statement>` says nothing the model can use.
+ *
+ * The seven is the punctuation around a value: `<`, `>`, a newline, a newline,
+ * `<`, `/`, `>`. The label itself is counted twice, once per tag.
+ */
 export function buildSocialSummarySource(
   project: SocialSummarySourceProject
 ): string {
   const parts: string[] = [];
+  let remaining = SOCIAL_SUMMARY_SOURCE_LIMIT;
   for (const [key, label] of SUMMARY_FIELDS) {
     const value = project[key]?.trim();
-    if (value) {
-      parts.push(`<${label}>\n${value}\n</${label}>`);
+    if (!value) {
+      continue;
     }
+    const separator = parts.length > 0 ? 2 : 0;
+    const wrapper = label.length * 2 + 7;
+    const room = remaining - separator - wrapper;
+    if (room < 1) {
+      break;
+    }
+    const body =
+      value.length > room
+        ? value.slice(0, room).replace(LONE_TRAILING_SURROGATE, "")
+        : value;
+    parts.push(`<${label}>\n${body}\n</${label}>`);
+    remaining -= separator + wrapper + body.length;
   }
-  return parts.join("\n\n").slice(0, SOCIAL_SUMMARY_SOURCE_LIMIT);
+  return parts.join("\n\n");
 }
 
 /**
