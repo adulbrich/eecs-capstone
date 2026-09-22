@@ -88,6 +88,14 @@ function layout(
  * chosen", which is to create no row until the address is proved. Until then
  * this sentence is what stands between the owner and that click, so do not
  * trim it for tone.
+ *
+ * It names the two doors and promises nothing about either, which is deliberate
+ * after review caught an earlier draft saying ONID makes the address yours.
+ * `releaseUnverifiedAddress` refuses a banned row and one another provider is
+ * already linked to, so that was a promise the app does not always keep, and a
+ * person who followed it would meet `account not linked` with no idea why. The
+ * reset is the one that always replaces the password, which is why it is the
+ * sentence that describes an outcome.
  */
 export function verificationEmail(input: { url: string }): RenderedEmail {
   return {
@@ -95,7 +103,7 @@ export function verificationEmail(input: { url: string }): RenderedEmail {
     ...layout(
       [
         "Confirm your email address to finish setting up your account.",
-        "If you did not create this account, do not use this link. Somebody else chose its password, and confirming it would hand them a working account carrying your address. At Oregon State, sign in with ONID instead and the address becomes yours. Otherwise reset the password first.",
+        "If you did not create this account, do not use this link. Somebody else chose its password, and confirming it would hand them a working account carrying your address. At Oregon State, sign in with ONID instead. Otherwise reset the password, which replaces theirs with one only you know.",
       ],
       { label: "Verify email", url: input.url }
     ),

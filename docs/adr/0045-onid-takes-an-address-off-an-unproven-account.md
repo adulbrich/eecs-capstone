@@ -64,6 +64,8 @@ the row `releaseUnverifiedAddress` refuses, so clicking it also forfeits the
 ONID route that would otherwise have worked. The mitigation shipped here is
 copy: `verificationEmail` now tells the reader plainly not to use the link if
 they did not create the account, and names ONID and a password reset as the two
-safe doors. That is a warning rather than a control, and it is proportionate
+safe doors. It promises nothing about ONID, because the two refusals above mean
+the app does not always keep that promise, and only the reset is described by
+its outcome. That is a warning rather than a control, and it is proportionate
 only because the clean fix is the pending sign-up rewrite, which is out of scope
 for #554 by the issue's own words.
