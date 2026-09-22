@@ -30,8 +30,11 @@ resource "aws_sns_topic" "alarms" {
 # apply is not evidence that alarm mail works. DEPLOYMENT.md section 8 carries
 # the click and the `set-alarm-state` check that proves delivery end to end.
 #
-# Protocol `email` rather than `email-json` because a person reads it. The
-# address is not committed; it comes from `terraform.tfvars`.
+# Protocol `email` rather than `email-json` because a person reads it. This is
+# SNS email and not SES, despite `infra/ses.tf` sitting next door: the address
+# needs no SES identity and the send does not touch the domain identity or its
+# reputation. It defaults to the shared capstone mailbox, the same one
+# `email_reply_to` and `email_staff_inbox` already default to.
 resource "aws_sns_topic_subscription" "alarm_email" {
   topic_arn = aws_sns_topic.alarms.arn
   protocol  = "email"

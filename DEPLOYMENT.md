@@ -130,13 +130,15 @@ Edit `terraform.tfvars`:
 github_owner     = "your-org-or-user"
 github_repo      = "eecs-capstone"
 github_client_id = "Ov23xxxxxxxxxxxxxxxx"        # from step 3.1 (not secret)
-alarm_email      = "you@oregonstate.edu"         # where CloudWatch alarms mail
 ```
 
-`alarm_email` has no default, so `terraform plan` will prompt for it if it is
-missing. It is the mailbox the alarms in `infra/alarms.tf` write to; AWS mails
-it a confirmation link on the first apply and sends nothing else until somebody
-clicks it. Section 8, "Confirm the alarm subscription", is that step.
+`alarm_email` needs nothing here. It defaults to `eecs-capstone@oregonstate.edu`
+in `infra/variables.tf`, the same shared mailbox `email_reply_to` and
+`email_staff_inbox` default to; set it only to send alarm mail somewhere else.
+AWS mails that address a confirmation link on the first apply and sends nothing
+else until somebody clicks it, which is section 8, "Confirm the alarm
+subscription". It is SNS email rather than SES, so the address needs no SES
+identity.
 
 ### 3.4 Confirm Postgres 18 is available
 

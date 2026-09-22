@@ -284,6 +284,7 @@ variable "bedrock_embedding_dimensions" {
 }
 
 variable "alarm_email" {
-  description = "Where CloudWatch alarm mail goes (infra/alarms.tf). Required and deliberately without a default: an alarm topic nobody is subscribed to is worse than no alarm, because the console shows it red and nothing reaches a person. AWS mails a confirmation link on the first apply and delivers nothing until somebody clicks it, so the address has to belong to a mailbox a human reads rather than to a list nobody watches. Not committed: it goes in terraform.tfvars, which is gitignored."
+  description = "Where CloudWatch alarm mail goes (infra/alarms.tf). The default is the shared capstone mailbox, the same address email_reply_to and email_staff_inbox already default to, and it lives here rather than in terraform.tfvars for the reason DEPLOYMENT.md 9.6 gives about that file: it is gitignored, so a value set there would not reach anyone else's deployment. Defaulted rather than required because an alarm topic nobody is subscribed to is worse than no alarm, and a default that names a mailbox a person actually reads cannot be left unset by accident. Note this is SNS email, not SES: the address needs no SES identity, but AWS does mail it a confirmation link on the first apply and delivers nothing until somebody clicks it."
   type        = string
+  default     = "eecs-capstone@oregonstate.edu"
 }
