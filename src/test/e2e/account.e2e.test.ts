@@ -150,6 +150,11 @@ test.describe("account lifecycle", () => {
  * Opens the code form on `path`, asks for a code for `email` and confirms the
  * one that arrives, leaving the page wherever the form goes next: the name step
  * for an address with no row, or away from the form for one that has one.
+ *
+ * Every call spends one of the address's five sends an hour
+ * (`SIGN_IN_CODE_LIMIT`), and the flow above makes four. A sixth is answered
+ * like a success and mails nothing, so the symptom of one sign-in too many is
+ * `emailCode` finding no code after fifteen seconds.
  */
 async function sendCode(page: Page, path: string, email: string) {
   await page.goto(path);
