@@ -147,11 +147,21 @@ export async function saveSocialSummaryForCurrentUser(
  * saving over staff leaves it true on both sides; it is the stored text that
  * tells those two apart.
  *
- * One case it deliberately does not catch: the automatic refresh rewriting the
- * row with the same text it already held. The predicate matches, Regenerate
- * writes, and nothing is lost, because the wording it would have preserved is
- * the wording it overwrote. A guard that caught it would need a version column
- * this table does not have, for no gain.
+ * Two cases it deliberately does not catch, both benign for the same reason.
+ * The automatic refresh rewriting the row with the same text it already held:
+ * the predicate matches, Regenerate writes, and the wording it would have
+ * preserved is the wording it overwrote. And the ABA, where the row leaves the
+ * read state and comes back to it: Carol saves over Bob, Bob saves his wording
+ * again, and a regenerate that read Bob's wording now writes over Bob's
+ * wording. The predicate is value equality on purpose, because the question it
+ * asks is "is the text I am about to replace still the text I read", not "has
+ * anybody written since". Replacing wording the caller read and chose to
+ * replace is what the button does; the guard exists to stop it replacing
+ * wording the caller never saw.
+ *
+ * What neither case covers, because it is a different bug: two Saves racing
+ * each other. `saveSocialSummaryAs` is last write wins and says nothing, so
+ * Carol's save over Bob's is silent. That is tracked separately.
  *
  * Deliberately not `socialSummaryUpdatedAt`, which looks like the obvious
  * version column and is not one. `scripts/backfill-social-summaries.mjs`
@@ -179,6 +189,16 @@ export async function regenerateSocialSummaryAs(
   // failed or truncated attempt is billed all the same. Unconditional rather
   // than behind a `run.called` flag, which `runSocialSummary` always set and
   // so tested as nothing (#568).
+  //
+  // "Every return" is wider than "every paid call", and deliberately so. The
+  // one `catch` in `runSocialSummary` wraps `invoke`, and `mantleResponses`
+  // throws both when it never reached AWS (no credentials, no route) and when
+  // AWS answered with a 4xx or 5xx, which is a call that may well be billed.
+  // Nothing in the caught error separates the two without matching on its
+  // message. Counting both is the conservative reading: over-metering costs a
+  // staff member one of twenty rewrites an hour during an outage, while
+  // under-metering would let a loop of failing calls run without a limit,
+  // which is the thing the limiter exists to stop.
   await recordReviewUsage({
     feature: "social-summary",
     userId: viewer.id,
