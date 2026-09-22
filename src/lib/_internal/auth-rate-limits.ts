@@ -92,6 +92,25 @@ const UNCHECKED_MAX = 60;
  */
 const CHANGE_PASSWORD_MAX = 5;
 
+/**
+ * What one address may spend per window on `/email-otp/send-verification-otp`.
+ *
+ * This is the one OTP path that mails somebody, so it is the one that carries
+ * the argument ADR-0039 makes for leaving `/sign-in/email` at 3: a number here
+ * is also a cap on mail aimed at an inbox the sender does not own. It is no
+ * longer the ONLY such cap, which is why it is 10 rather than 3. The
+ * per-recipient budget in `verification-mail-limits.ts` bounds what any one
+ * inbox can be made to receive whatever this number says, so this one only has
+ * to make bulk mailing from a single address slow.
+ *
+ * Ten rather than 60 because the population is not a lecture hall. ONID carries
+ * about three quarters of sign-in traffic already, and once password sign-in is
+ * gone every OSU person is steered to ONID, so the addresses reaching this path
+ * are staff, mentors and industry partners. A NAT pool does not fill up with
+ * them at term start the way it fills with students.
+ */
+const SEND_CODE_MAX = 10;
+
 const UNCHECKED_RULE = { window: WINDOW_SECONDS, max: UNCHECKED_MAX };
 
 export const authRateLimit: BetterAuthRateLimitOptions = {
@@ -108,6 +127,24 @@ export const authRateLimit: BetterAuthRateLimitOptions = {
     "/sign-in/oauth2": UNCHECKED_RULE,
     "/sign-in/social": UNCHECKED_RULE,
     "/sign-up/email": UNCHECKED_RULE,
+    // The three email-otp paths (#576). They are listed here rather than left
+    // to the plugin because `emailOTP()` registers its own rules at 3 per 60
+    // seconds keyed on address and path, which is the shape ADR-0039 rejects,
+    // and on the code-entry paths it would refuse the fourth person behind a
+    // NAT pool for typing a code correctly. `customRules` is applied after
+    // plugin rules and wins, so these are the numbers that take effect.
+    "/email-otp/send-verification-otp": {
+      window: WINDOW_SECONDS,
+      max: SEND_CODE_MAX,
+    },
+    // Both code-entry paths get the unchecked number despite checking a
+    // credential, which looks wrong and is not. `allowedAttempts` bounds one
+    // code at three guesses inside the verification record and then deletes it,
+    // so the guess budget does not depend on this number at all; a fresh code
+    // has to clear the per-recipient send cap first. What this number decides
+    // is only whether a shared campus address can still type a code.
+    "/email-otp/check-verification-otp": UNCHECKED_RULE,
+    "/sign-in/email-otp": UNCHECKED_RULE,
   },
 };
 
@@ -137,4 +174,10 @@ export const authRateLimit: BetterAuthRateLimitOptions = {
  */
 export const UNRULED_BY_DESIGN = ["/sign-in/email", "/change-email"] as const;
 
-export { CHANGE_PASSWORD_MAX, GLOBAL_MAX, UNCHECKED_MAX, WINDOW_SECONDS };
+export {
+  CHANGE_PASSWORD_MAX,
+  GLOBAL_MAX,
+  SEND_CODE_MAX,
+  UNCHECKED_MAX,
+  WINDOW_SECONDS,
+};

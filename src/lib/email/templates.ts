@@ -110,6 +110,32 @@ export function verificationEmail(input: { url: string }): RenderedEmail {
   };
 }
 
+/**
+ * The emailed sign-in code (#576).
+ *
+ * No call to action, which is the point rather than an omission. A link in this
+ * message would be a magic link, and the reason ADR-0047 chose a code is that a
+ * link opens in whatever browser the mail client picks, which is not the tab
+ * that started the sign-in. It is also what makes a forwarded message useless
+ * on its own: the reader has to go back to the tab they left open.
+ *
+ * The warning is the same shape as `verificationEmail`'s and exists for the
+ * same reason. A code arriving unbidden means somebody typed this address into
+ * the sign-in form, and the one thing the owner must not do is pass it on.
+ */
+export function signInCodeEmail(input: { otp: string }): RenderedEmail {
+  return {
+    subject: "Your sign-in code",
+    ...layout(
+      [
+        `Your sign-in code is ${input.otp}. Type it into the tab where you started signing in. It expires in five minutes.`,
+        "If you did not ask to sign in, ignore this message and do not give the code to anyone. Nobody from the capstone office will ever ask you for it.",
+      ],
+      null
+    ),
+  };
+}
+
 export function passwordResetEmail(input: { url: string }): RenderedEmail {
   return {
     subject: "Reset your password",

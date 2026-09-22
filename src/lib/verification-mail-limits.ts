@@ -29,8 +29,8 @@ export interface VerificationMailLimits {
 }
 
 /**
- * The two messages this app sends about an address nobody has proved they own,
- * metered SEPARATELY, which is the whole reason this union exists.
+ * The three messages this file meters, metered SEPARATELY, which is the whole
+ * reason this union exists.
  *
  * Sharing one allowance was the first design and it was wrong in the attacker's
  * favour. `verification` is the kind a squatter can spend at will, because
@@ -46,13 +46,30 @@ export interface VerificationMailLimits {
  * has to spend the NOTICE budget, and the only way to spend it is to attempt
  * duplicate sign-ups on that address, each of which mails the owner the notice
  * until the budget is gone. They cannot silence it without first sending it.
+ *
+ * `sign-in-code` (#576) is the odd one out: it is not about an unproven address
+ * at all. It is here rather than in its own module because the counting, the
+ * storage and the failure mode are identical, one row per send in
+ * `verification_sends`, counted per recipient, failing open. Only the budget
+ * differs, and it carries a job the other two do not. With password sign-in
+ * gone there is no scrypt verify to throttle and no `sign_in_attempts` counter,
+ * so this cap IS the per-account brute force control. Better Auth bounds one
+ * code at `allowedAttempts` guesses, but `resendStrategy: "rotate"` resets that
+ * counter on every resend, so without a cap on sends the three-guess bound
+ * means nothing: an attacker asks for another code. Per-address rate limiting
+ * cannot do this job, for the reason ADR-0039 gives, that campus NAT makes the
+ * sender's address meaningless.
  */
-export type VerificationMailKind = "duplicate" | "verification";
+export type VerificationMailKind =
+  | "duplicate"
+  | "sign-in-code"
+  | "verification";
 
 /**
  * Read on every call rather than captured at import, so a test can set a low
- * limit and an operator can retune without a deploy. Both variables are plumbed
- * through `infra/ecs.tf`, the same as `SIGN_IN_SOFT_LIMIT`.
+ * limit and an operator can retune without a deploy. Every variable named in
+ * `limitFor` is plumbed through `infra/ecs.tf`, the same as
+ * `SIGN_IN_SOFT_LIMIT`.
  *
  * Three an hour, for a verification link, is sized against what the honest
  * person actually does, because this cap is the one control here that can lock
@@ -70,16 +87,36 @@ export function verificationMailLimits(
     windowMinutes: Math.round(
       positiveNumber(env.VERIFICATION_MAIL_WINDOW_MINUTES, 60)
     ),
-    limit:
-      kind === "verification"
-        ? Math.round(positiveNumber(env.VERIFICATION_MAIL_LIMIT, 3))
-        : // Two rather than three, because the honest case needs far fewer: a
-          // person signs up once, and a second attempt after they find nothing
-          // in their inbox is the most anybody does before giving up. It is
-          // also the budget an attacker has to burn to silence the notice, and
-          // burning it sends it.
-          Math.round(positiveNumber(env.DUPLICATE_NOTICE_LIMIT, 2)),
+    limit: Math.round(positiveNumber(...limitFor(kind, env))),
   };
+}
+
+/**
+ * The variable and the default for one kind, as the pair `positiveNumber` takes.
+ *
+ * Five for a sign-in code, which is higher than either of the others and is
+ * sized from the opposite direction. The other two cap mail about an address
+ * whose owner has another way in; this one caps the way in itself, so running
+ * out locks somebody out of the app entirely. The honest worst hour is a code
+ * that does not arrive, a second, and a third after mistyping the second past
+ * its three guesses. Five leaves room for that and still bounds an attacker to
+ * fifteen guesses an hour against a six digit space.
+ */
+function limitFor(
+  kind: VerificationMailKind,
+  env: NodeJS.ProcessEnv
+): [string | undefined, number] {
+  if (kind === "verification") {
+    return [env.VERIFICATION_MAIL_LIMIT, 3];
+  }
+  if (kind === "sign-in-code") {
+    return [env.SIGN_IN_CODE_LIMIT, 5];
+  }
+  // Two rather than three, because the honest case needs far fewer: a person
+  // signs up once, and a second attempt after they find nothing in their inbox
+  // is the most anybody does before giving up. It is also the budget an
+  // attacker has to burn to silence the notice, and burning it sends it.
+  return [env.DUPLICATE_NOTICE_LIMIT, 2];
 }
 
 /**

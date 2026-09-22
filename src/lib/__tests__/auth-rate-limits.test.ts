@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { genericOAuth } from "better-auth/plugins";
+import { emailOTP, genericOAuth } from "better-auth/plugins";
 import { describe, expect, it, vi } from "vitest";
 import {
   authRateLimit,
@@ -43,6 +43,9 @@ const RULED_PATHS = [
   ...UNCHECKED_PATHS,
   "/change-password",
   "/get-session",
+  "/email-otp/send-verification-otp",
+  "/email-otp/check-verification-otp",
+  "/sign-in/email-otp",
 ] as const;
 
 // The memory rate-limit store is a module-level Map keyed on `ip|path`, shared
@@ -65,7 +68,13 @@ function buildAuth() {
     // Mounted so `/sign-in/oauth2` is a real route here, the way it is in
     // `src/lib/auth.ts`. The empty config means the handler refuses on an
     // unknown provider before it would fetch anything.
-    plugins: [genericOAuth({ config: [] })],
+    plugins: [
+      genericOAuth({ config: [] }),
+      // Mounted for the same reason, so the three `email-otp` rules name real
+      // routes here. `sendVerificationOTP` is never reached: the limiter
+      // answers in `onRequest`, ahead of the handler.
+      emailOTP({ sendVerificationOTP: () => Promise.resolve() }),
+    ],
   });
 }
 
@@ -180,6 +189,20 @@ describe("the paths the rules name", () => {
     const auth = buildAuth();
     const response = await call(auth, "/sign-in/not-a-real-path", anAddress());
     expect(response.status).toBe(404);
+  });
+
+  // `RULED_PATHS` above is the list that does the real checking, and it is
+  // maintained by hand, so a rule added without touching it is a rule nothing
+  // proves is mounted. That matters because a key naming a path Better Auth
+  // does not mount is not an error anywhere: the lookup finds nothing, the rule
+  // never applies, and the path keeps whatever default it had. A typo is then
+  // indistinguishable from a decision until somebody measures the wrong number
+  // in production, which is what #520 was.
+  it("leaves no rule out of the list that checks them", () => {
+    const ruled: string[] = [...RULED_PATHS];
+    for (const path of Object.keys(authRateLimit.customRules ?? {})) {
+      expect(ruled).toContain(path);
+    }
   });
 });
 

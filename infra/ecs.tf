@@ -185,6 +185,7 @@ resource "aws_ecs_task_definition" "app" {
         { name = "VERIFICATION_MAIL_WINDOW_MINUTES", value = var.verification_mail_window_minutes },
         { name = "VERIFICATION_MAIL_LIMIT", value = var.verification_mail_limit },
         { name = "DUPLICATE_NOTICE_LIMIT", value = var.duplicate_notice_limit },
+        { name = "SIGN_IN_CODE_LIMIT", value = var.sign_in_code_limit },
         { name = "AI_REVIEW_LIMIT_PER_DAY", value = var.ai_review_limit_per_day },
         { name = "BEDROCK_SCOPE_REASONING_EFFORT", value = var.bedrock_scope_reasoning_effort },
         { name = "BEDROCK_SOCIAL_SUMMARY_REASONING_EFFORT", value = var.bedrock_social_summary_reasoning_effort },

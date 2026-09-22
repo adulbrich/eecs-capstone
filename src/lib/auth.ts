@@ -6,7 +6,7 @@ import {
   getIp,
   isAPIError,
 } from "better-auth/api";
-import { admin, genericOAuth } from "better-auth/plugins";
+import { admin, emailOTP, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { db } from "#/db";
 import {
@@ -28,6 +28,7 @@ import { getEmailSender } from "#/lib/email/sender";
 import {
   addressAlreadyRegisteredEmail,
   passwordResetEmail,
+  signInCodeEmail,
   verificationEmail,
 } from "#/lib/email/templates";
 import { tooManyAttemptsMessage } from "#/lib/sign-in-limits";
@@ -35,6 +36,7 @@ import type { VerificationMailKind } from "#/lib/verification-mail-limits";
 import type { UserRole } from "#/lib/vocabularies";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
 import { markAddressProven } from "#/server/_internal/mark-address-proven";
+import { otpSignInRefused } from "#/server/_internal/otp-sign-in-guard";
 import { releaseUnverifiedAddress } from "#/server/_internal/release-unverified-address";
 import {
   attemptKey,
@@ -103,6 +105,39 @@ function withVerificationLanding(url: string): string {
 /** The one path the attempt counter guards. ONID and GitHub are authenticated
  * elsewhere, so there is no credential here to protect on those. */
 const PASSWORD_SIGN_IN = "/sign-in/email";
+
+/** Where an emailed code is redeemed (#576). Guarded below, for the two rows
+ * Better Auth's own helper does not refuse; see `otp-sign-in-guard.ts`. */
+const CODE_SIGN_IN = "/sign-in/email-otp";
+
+/**
+ * The email-otp endpoints this app does NOT serve.
+ *
+ * `emailOTP()` mounts nine paths whatever its options say, and only three of
+ * them belong to the flow this app runs. Better Auth checks `disabledPaths` in
+ * the router's `onRequest`, ahead of routing and ahead of the rate limiter, so
+ * a listed path is a flat 404 rather than a handler that declines.
+ *
+ * `/email-otp/verify-email` is the one that has to go. It flips `emailVerified`
+ * on an address that presents a valid code WITHOUT calling
+ * `revokeUnprovenAccountAccess` first, which is #575's attack through a new
+ * door: while password sign-up still exists, a squatter registers an address,
+ * the real owner asks for a code and redeems it there, and the owner has now
+ * verified a row whose password the squatter chose. `/sign-in/email-otp` is the
+ * only path that does the revoke, so it is the only one that may verify.
+ *
+ * The password-reset and email-change paths are disabled for a duller reason:
+ * this app has its own flows for both, and a second set of endpoints reaching
+ * the same columns is surface with no caller.
+ */
+const DISABLED_OTP_PATHS = [
+  "/email-otp/verify-email",
+  "/email-otp/request-password-reset",
+  "/email-otp/reset-password",
+  "/forget-password/email-otp",
+  "/email-otp/request-email-change",
+  "/email-otp/change-email",
+];
 
 /**
  * How a viewer address is resolved, in one object because two callers have to
@@ -309,6 +344,34 @@ export const auth = betterAuth({
   // is purely additive.
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      // Two rows Better Auth's own `revokeUnprovenAccountAccess` will not
+      // refuse, and `releaseUnverifiedAddress` does. The refusal deliberately
+      // wears the shape of a wrong code; `otp-sign-in-guard.ts` has both the
+      // attacks and the reason it cannot say more.
+      if (ctx.path === CODE_SIGN_IN) {
+        const address = ctx.body?.email;
+        if (typeof address !== "string") {
+          return;
+        }
+        let refused: boolean;
+        try {
+          refused = await otpSignInRefused(address);
+        } catch (error) {
+          // Fails open, the same direction as `swallowing` and for the same
+          // reason: a database blip must not become an auth outage. What it
+          // opens is narrow, because the plugin still refuses a wrong code and
+          // the admin plugin still refuses a banned row a session.
+          console.error("Code sign-in guard failed", redactQueryError(error));
+          return;
+        }
+        if (refused) {
+          throw new APIError("BAD_REQUEST", {
+            code: "INVALID_OTP",
+            message: "Invalid OTP",
+          });
+        }
+        return;
+      }
       if (ctx.path !== PASSWORD_SIGN_IN) {
         return;
       }
@@ -384,6 +447,9 @@ export const auth = betterAuth({
   // still turned into its response by the router's own catch, so this changes
   // nothing a client sees.
   onAPIError: { throw: true },
+  // See DISABLED_OTP_PATHS. Six of the nine paths `emailOTP()` mounts are 404
+  // rather than served, one of them because serving it would reopen #575.
+  disabledPaths: DISABLED_OTP_PATHS,
   advanced: {
     // CloudFront terminates TLS at the edge and forwards to the origin over
     // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in
@@ -602,6 +668,56 @@ export const auth = betterAuth({
     admin({
       adminRoles: ["admin" satisfies UserRole],
       defaultRole: "user" satisfies UserRole,
+    }),
+    // The emailed sign-in code (#576, ADR-0047). Six of the nine paths it
+    // mounts are 404 through `disabledPaths` above; what is left is asking for
+    // a code, checking one without spending it, and redeeming one.
+    emailOTP({
+      // Three per code, counted on the verification record, after which the
+      // record is deleted. It is NOT the whole brute force story, because
+      // `resendStrategy` defaults to `rotate` and a resend writes a fresh
+      // record with the count back at zero. What bounds the resends is the
+      // per-recipient cap in `sendVerificationOTP` below.
+      allowedAttempts: 3,
+      // Open, deliberately. Industry partners and outside faculty have no ONID
+      // and no office to route through, so closing this would leave them with
+      // GitHub or nothing. `signInEmailOTP` writes `name: name || ""` on a
+      // first sign-in and `requireUserName` throws BAD_REQUEST on a blank one,
+      // which is why the sign-up route asks for a name and sends it: reaching
+      // this path without one burns a code the person then cannot reuse.
+      disableSignUp: false,
+      // Encrypted rather than hashed, which is not the usual preference and is
+      // right here. `storeOTP: "hashed"` is an unsalted SHA-256 over a six
+      // digit space, so a leaked `verification` row is reversed by a table of a
+      // million preimages; a hash is only a one-way function when the input
+      // space is large. `encrypted` is `symmetricEncrypt` under the Better Auth
+      // secret, which is not in the database, and unlike `hashed` it does not
+      // disable `resendStrategy: "reuse"` should we ever want it.
+      storeOTP: "encrypted",
+      sendVerificationOTP: async ({ email, otp, type }) => {
+        // Belt and braces with `disabledPaths`: the only reachable caller is
+        // the sign-in send, and a code of any other type must never be mailed
+        // even if a path is re-enabled without revisiting this.
+        if (type !== "sign-in") {
+          return;
+        }
+        try {
+          if (!(await mayMail(email, "sign-in-code"))) {
+            return;
+          }
+          await emailSender.send(email, signInCodeEmail({ otp }));
+        } catch (error) {
+          // Caught here so the line is ours and carries no address (#559), and
+          // so the endpoint's answer does not depend on whether the send threw.
+          // It must stay `{success: true}` either way: the response is the same
+          // for an address with an account and one without, and that is what
+          // keeps the send endpoint from answering "does this person exist".
+          console.error(
+            "Sending a sign-in code failed",
+            redactQueryError(error)
+          );
+        }
+      },
     }),
     // ONID, via the Oregon State Entra ID tenant. UIT registered the app as an
     // OIDC relying party rather than a SAML SP, which is why this is the
