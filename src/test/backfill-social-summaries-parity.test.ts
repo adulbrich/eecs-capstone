@@ -51,6 +51,12 @@ import { describe, expect, it } from "vitest";
  *   selected, and an absent key reads as an empty field that silently vanishes
  *   from every string the script summarises.
  *
+ * Three pins compare strings rather than bodies, because the thing they pin has
+ * no twin to compare against: the manual skip is an early return on one side
+ * and a loop guard on the other, the kill switch is read as a negative on one
+ * side and a positive on the other, and the cap check lives inside the
+ * script's own `summarise`, which the app has no counterpart for.
+ *
  * Copies whose drift is loud instead (`credentialProvider`, `mantleHost`,
  * `callMantle`) are deliberately not pinned: each one ends in a signing
  * rejection or a transport error on the first row, which stops the run rather

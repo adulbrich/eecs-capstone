@@ -147,6 +147,12 @@ export async function saveSocialSummaryForCurrentUser(
  * saving over staff leaves it true on both sides; it is the stored text that
  * tells those two apart.
  *
+ * One case it deliberately does not catch: the automatic refresh rewriting the
+ * row with the same text it already held. The predicate matches, Regenerate
+ * writes, and nothing is lost, because the wording it would have preserved is
+ * the wording it overwrote. A guard that caught it would need a version column
+ * this table does not have, for no gain.
+ *
  * Deliberately not `socialSummaryUpdatedAt`, which looks like the obvious
  * version column and is not one. `scripts/backfill-social-summaries.mjs`
  * writes it with SQL `now()` at microsecond precision while the app writes a
