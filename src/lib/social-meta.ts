@@ -157,6 +157,14 @@ const MIN_WORD_BOUNDARY_FRACTION = 1 / 3;
  * first third of it, is cut at the limit instead: text like that is a URL or a
  * paste accident with a word in front of it, and a fragment of the token beats
  * the word on its own.
+ *
+ * The one promise is that the result is never longer than `max`. A budget too
+ * small to hold the ellipsis cannot also say that text was dropped, so it does
+ * the half it can and returns a bare cut. Without that guard `max - 3` goes
+ * negative, `slice` reads it as an offset from the END of the string, and the
+ * function returns most of its input under a budget of zero. No caller passes
+ * a `max` that small today; an exported function that breaks its own contract
+ * on an input nobody has tried yet is how a caller gets added tomorrow.
  */
 export function truncateOnWordBoundary(
   text: string,
@@ -164,6 +172,9 @@ export function truncateOnWordBoundary(
 ): string {
   if (text.length <= max) {
     return text;
+  }
+  if (max < ELLIPSIS.length) {
+    return dropLoneSurrogate(text.slice(0, Math.max(max, 0)));
   }
   const room = max - ELLIPSIS.length;
   const cut = text.slice(0, room);

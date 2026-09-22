@@ -153,6 +153,31 @@ describe("truncateOnWordBoundary", () => {
     expect(result).not.toMatch(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
   });
 
+  it("never returns more than the budget, even below the ellipsis", () => {
+    // `max - ELLIPSIS.length` goes negative here, and `slice` reads a negative
+    // end as an offset from the end of the string, so the function returned
+    // 131 characters under a budget of 0. Latent rather than live, since the
+    // only caller in this file passes the default, but the contract is the
+    // whole point of the function.
+    const text = "hello world this is a long string with spaces".repeat(3);
+    for (const max of [0, 1, 2, 3]) {
+      expect(truncateOnWordBoundary(text, max).length).toBeLessThanOrEqual(max);
+    }
+  });
+
+  it("keeps a whole character when the budget is below the ellipsis", () => {
+    // The tiny-budget path slices on a code unit like the other fallback, so
+    // it needs the same surrogate guard.
+    const result = truncateOnWordBoundary("\u{1F600}".repeat(5), 1);
+    expect(result).toBe("");
+    expect(truncateOnWordBoundary("\u{1F600}".repeat(5), 2)).toBe("\u{1F600}");
+  });
+
+  it("returns nothing for a budget of zero or less", () => {
+    expect(truncateOnWordBoundary("anything at all", 0)).toBe("");
+    expect(truncateOnWordBoundary("anything at all", -5)).toBe("");
+  });
+
   it("cuts a single unbroken token at the limit rather than returning nothing", () => {
     // A token this long is a pasted URL or an accident. A fragment beats an
     // empty description, which would unfurl as a bare title.
