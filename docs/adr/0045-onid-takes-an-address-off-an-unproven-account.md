@@ -70,6 +70,23 @@ section names the clean fix, which is to hold a pending sign-up and create no
 row until the address is proved. That remains the right answer and remains more
 work than this.
 
+This raises the stakes of a question `onid-profile.ts` currently leaves open, and
+that is worth stating because the answer was not needed before. That file asserts
+`emailVerified: true` on an ONID profile and rests the soundness on the issuer
+pin plus a claim about who the registration is published to, and it notes that a
+guest invited into the OSU tenant would pass the issuer check while carrying a
+home-tenant email, with `idp` differing from `iss` as the discriminator nobody
+has implemented. Until B1, the worst such a guest could do was create or link
+their own account. Now an ONID sign-in can TAKE an address off a password
+account, so if a guest is in scope, and if their home tenant sets a mail
+attribute Entra does not verify, the payoff for the same trick is somebody
+else's row rather than their own. The maintainer confirmed on 2026-09-22 that
+the College of Engineering restriction the comment cites is not real, that all
+ONID works, and that whether guests can reach the registration is not known.
+Implementing the `idp` check blind is its own risk, because no real token from
+this tenant has been seen and refusing on a claim that turns out to be absent
+would lock out everyone, so the answer is to ask UIT rather than to guess.
+
 One hazard is left open and is worse than it was, which is the reason to write
 it here rather than let a later reader find it. `emailVerification.sendOnSignIn`
 still mails a live verification link to the address on every sign-in the
