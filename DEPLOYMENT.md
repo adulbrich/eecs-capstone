@@ -1550,8 +1550,8 @@ the freshly built image, and updates the service. So the cutover is apply
 **then** deploy. This is why `terraform apply` reporting success is not
 evidence that email is on; confirm with a real sign-up instead.
 
-Until then sign-up still works, but verification and reset links reach only
-CloudWatch logs (section 6), not real inboxes.
+Until then sign-in codes reach only CloudWatch logs, not real inboxes, and
+section 6 says what that exposes.
 
 ### 9.6 Reply-To
 

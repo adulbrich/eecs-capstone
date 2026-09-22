@@ -54,8 +54,8 @@ export function verificationMailLimits(
   env: NodeJS.ProcessEnv = process.env
 ): VerificationMailLimits {
   return {
-    windowMinutes: positiveNumber(env.VERIFICATION_MAIL_WINDOW_MINUTES, 60),
-    limit: positiveNumber(env.SIGN_IN_CODE_LIMIT, 5),
+    windowMinutes: positiveInteger(env.VERIFICATION_MAIL_WINDOW_MINUTES, 60),
+    limit: positiveInteger(env.SIGN_IN_CODE_LIMIT, 5),
   };
 }
 
@@ -68,7 +68,7 @@ export function verificationMailLimits(
  * because `windowMinutes` reaches Postgres as `make_interval(mins => ...)`,
  * which errors on a fraction, and a window of 0 would count nothing.
  */
-function positiveNumber(value: string | undefined, fallback: number): number {
+function positiveInteger(value: string | undefined, fallback: number): number {
   const rounded = Math.round(Number(value));
   return Number.isFinite(rounded) && rounded >= 1 ? rounded : fallback;
 }

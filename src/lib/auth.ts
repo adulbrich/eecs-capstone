@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, createAuthMiddleware, isAPIError } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin, emailOTP, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { z } from "zod";
@@ -30,7 +30,10 @@ import type { UserRole } from "#/lib/vocabularies";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
 import { otpSignInRefused } from "#/server/_internal/otp-sign-in-guard";
 import { releaseUnverifiedAddress } from "#/server/_internal/release-unverified-address";
-import { reserveVerificationMail } from "#/server/_internal/verification-sends";
+import {
+  refundVerificationMail,
+  reserveVerificationMail,
+} from "#/server/_internal/verification-sends";
 
 const emailSender = getEmailSender();
 
@@ -112,7 +115,13 @@ const claimSecret =
  * Auth's own middleware context type, so these stay callable from a test.
  */
 interface CodeRequest {
-  body?: { email?: unknown; otp?: unknown; type?: unknown };
+  body?: {
+    email?: unknown;
+    image?: unknown;
+    name?: unknown;
+    otp?: unknown;
+    type?: unknown;
+  };
   context: {
     internalAdapter: {
       findVerificationValue: (
@@ -142,9 +151,9 @@ interface CodeRequest {
  * code. That is a cheaper denial than the one #581 exists to close.
  *
  * Leaving the send open costs nothing the mail cap was not already accepting.
- * A stranger's send rotates the record and mails the owner the new code, so the
- * owner is never holding something they cannot use: they read the newest
- * message, or they ask again and their own browser takes the claim. What they
+ * A stranger's send rotates the record and mails the owner the new code. The
+ * owner cannot redeem that one, because its claim went to the stranger's
+ * browser, but asking again always works and takes the claim back. What they
  * cannot do is outrun the per-recipient cap, which is ADR-0046's accepted
  * tradeoff and predates all of this.
  */
@@ -213,26 +222,27 @@ async function codeGuessRefused(ctx: CodeRequest): Promise<boolean> {
 }
 
 /**
- * Whether Better Auth is about to refuse this body itself, on one of the three
- * code paths.
+ * Whether this is one of the three code paths with a body Better Auth is about
+ * to reject in its own validation: a field its schema types that is missing or
+ * not a string, or, on the send and the check, an address that fails Better
+ * Auth's own lowercase then `z.email()`.
  *
- * The guards run in `hooks.before`, ahead of Better Auth's own validation, so
- * they see bodies it will reject, and acting on one was three holes in the price
- * ADR-0047 records (app-security-review on #576). A send with no `type` spent
- * the owner's budget and, because an after-hook runs even when the handler
- * throws, was handed a claim on the owner's live, unrotated code. A padded
- * address spent the owner's budget, because the cap trims and Better Auth does
- * not, and mailed nothing. And a redeem with no code answered `INVALID_OTP` only
- * when a code was outstanding. So every hook leaves such a body alone: nothing
- * spent, nothing guarded, nothing issued, and Better Auth answers with its own
- * validation error, the same for every address.
- *
- * The address check is Better Auth's own, lowercase then `z.email()`, which the
- * send and the check run and the sign-in does not. A `type` that is a string
- * but not `"sign-in"` is not Better Auth's to refuse here; `signInCodeAddress`
- * turns those away.
+ * The before-hook leaves such a body alone, spending nothing and guarding
+ * nothing, so Better Auth answers with its own validation error, the same for
+ * every address. Acting on one was three holes in the price ADR-0047 records;
+ * docs/QUIRKS.md has them under "`hooks.before` sees a body Better Auth has not
+ * validated yet". A `type` that is a string but not `"sign-in"` is not caught
+ * here, whether or not Better Auth's enum knows it: `signInCodeAddress` turns
+ * those away, as before.
  */
-function refusedByBetterAuth(ctx: CodeRequest): boolean {
+function isMalformedCodeRequest(ctx: CodeRequest): boolean {
+  if (
+    ctx.path !== CODE_SEND &&
+    ctx.path !== CODE_CHECK &&
+    ctx.path !== CODE_SIGN_IN
+  ) {
+    return false;
+  }
   const email = ctx.body?.email;
   if (typeof email !== "string") {
     return true;
@@ -241,7 +251,10 @@ function refusedByBetterAuth(ctx: CodeRequest): boolean {
     return true;
   }
   if (ctx.path === CODE_SIGN_IN) {
-    return false;
+    // The only other fields its schema types; anything else is an open record.
+    return [ctx.body?.name, ctx.body?.image].some(
+      (field) => field !== undefined && typeof field !== "string"
+    );
   }
   return (
     typeof ctx.body?.type !== "string" ||
@@ -422,11 +435,7 @@ export const auth = betterAuth({
   // the browser that asked for it (ADR-0047).
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
-      const onCodePath =
-        ctx.path === CODE_SEND ||
-        ctx.path === CODE_SIGN_IN ||
-        ctx.path === CODE_CHECK;
-      if (onCodePath && refusedByBetterAuth(ctx)) {
+      if (isMalformedCodeRequest(ctx)) {
         return;
       }
       // Asking for a code (#581). Two reasons to answer without letting Better
@@ -457,11 +466,30 @@ export const auth = betterAuth({
       // hands out nothing: a browser that could get a claim without moving the
       // record could spend somebody else's guesses with it.
       if (ctx.path === CODE_SEND) {
-        // Only a send that succeeded moved the record. A refused one still
-        // reaches this hook, because an after-hook runs even when the handler
-        // throws, and the record it would find is the owner's, unrotated.
+        // Only a send that succeeded moved the record, so success is read
+        // positively off the answer. A refused one still reaches this hook,
+        // because an after-hook runs even when the handler throws, and the
+        // record it would find is the owner's, unrotated.
         const address = signInCodeAddress(ctx);
-        if (address === null || isAPIError(ctx.context.returned)) {
+        if (address === null || isMalformedCodeRequest(ctx)) {
+          // The before-hook spent nothing on either, so there is nothing to
+          // give back.
+          return;
+        }
+        const sent =
+          (ctx.context.returned as { success?: unknown } | null)?.success ===
+          true;
+        if (!sent) {
+          // Refused inside the endpoint after the reservation, by a check of
+          // Better Auth's own; see `refundVerificationMail`.
+          try {
+            await refundVerificationMail(address);
+          } catch (error) {
+            console.error(
+              "Refunding a sign-in code send failed",
+              redactQueryError(error)
+            );
+          }
           return;
         }
         try {
@@ -648,7 +676,7 @@ export const auth = betterAuth({
       // record is deleted. It is NOT the whole brute force story, because
       // `resendStrategy` defaults to `rotate` and a resend writes a fresh
       // record with the count back at zero. What bounds the resends is the
-      // per-recipient cap in `sendVerificationOTP` below.
+      // per-recipient cap, spent in the `hooks.before` on the send above.
       allowedAttempts: 3,
       // Open, deliberately. Industry partners and outside faculty have no ONID
       // and no office to route through, so closing this would leave them with

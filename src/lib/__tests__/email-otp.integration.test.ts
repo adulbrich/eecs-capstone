@@ -646,15 +646,8 @@ describe("the per-recipient cap on sends", () => {
 });
 
 /**
- * Requests Better Auth will refuse, from a stranger (app-security-review on #576).
- *
- * The guards run in `hooks.before`, ahead of Better Auth's own body validation,
- * so they see a body the handler is about to reject. Acting on one was three
- * holes in the price ADR-0047 records, and each case here was red before the
- * fix: a send with no `type` spent the owner's budget and was handed a claim on
- * the owner's live, unrotated code; a padded address spent the owner's budget
- * with nothing mailed; and a redeem with no code answered differently depending
- * on whether one was outstanding.
+ * Bodies Better Auth's own validation rejects, from a stranger (#576). Each case
+ * was red before `isMalformedCodeRequest`; docs/QUIRKS.md says why.
  */
 describe("requests Better Auth refuses", () => {
   function postRaw(
@@ -719,6 +712,66 @@ describe("requests Better Auth refuses", () => {
     // handler then mailed nothing: five requests, a silent hour's lockout.
     expect(await sendsSpentBy(email)).toBe(0);
     expect(await sendCode(email)).toHaveLength(6);
+  });
+
+  it("spends nothing on a send Better Auth refuses after the guard has run", async () => {
+    // The endpoint's own cross-site check runs inside it, after every
+    // before-hook, so the budget has already been reserved when it refuses.
+    // Better Auth skips that check under a test runner (`skipOriginCheck`
+    // defaults to true there), so it is switched back on for this one request.
+    const email = anAddress("cross-site");
+    await sendCode(email);
+    const context = await auth.$context;
+    const skipped = context.skipOriginCheck;
+    context.skipOriginCheck = false;
+    let refused: Response;
+    try {
+      refused = await auth.handler(
+        new Request(`${ORIGIN}/api/auth/email-otp/send-verification-otp`, {
+          body: JSON.stringify({ email, type: "sign-in" }),
+          headers: {
+            "content-type": "application/json",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-site": "cross-site",
+          },
+          method: "POST",
+        })
+      );
+    } finally {
+      context.skipOriginCheck = skipped;
+    }
+
+    expect(refused.status).toBe(403);
+    // No claim on the owner's live code, and the owner's one send is all that
+    // is spent.
+    expect(refused.headers.get("set-cookie")).toBeNull();
+    expect(await sendsSpentBy(email)).toBe(1);
+  });
+
+  it("answers a redeem with a malformed name the same whether or not a code is outstanding", async () => {
+    const live = anAddress("named");
+    const idle = anAddress("unnamed");
+    await sendCode(live);
+
+    const withCode = await postRaw("/sign-in/email-otp", {
+      email: live,
+      name: 1,
+      otp: "000000",
+    });
+    const withoutCode = await postRaw("/sign-in/email-otp", {
+      email: idle,
+      name: 1,
+      otp: "000000",
+    });
+
+    const [a, b] = (await Promise.all([
+      withCode.json(),
+      withoutCode.json(),
+    ])) as {
+      code?: string;
+    }[];
+    expect(withCode.status).toBe(withoutCode.status);
+    expect(a.code).toBe(b.code);
   });
 
   it("answers a redeem with no code the same whether or not one is outstanding", async () => {

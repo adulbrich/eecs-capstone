@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import * as schema from "../../db/schema";
 import { waitForHydration } from "../shared/playwright";
 import { fixtureEmail, withDb } from "./fixtures";
-import { emailCode, logSize } from "./mail";
+import { emailCode, enterEmailedCode, logSize } from "./mail";
 
 /**
  * Signing in with an emailed code, driven through the real form (#576).
@@ -64,13 +64,7 @@ test.describe("@smoke signing in with an emailed code", () => {
     try {
       await page.goto("/sign-up");
       await waitForHydration(page);
-      await page.getByLabel("Email", { exact: true }).fill(email);
-      const signUpSend = await logSize();
-      await page.getByRole("button", { name: "Email me a code" }).click();
-      await page
-        .getByLabel("Code", { exact: true })
-        .fill(await emailCode(email, signUpSend));
-      await page.getByRole("button", { name: "Confirm code" }).click();
+      await enterEmailedCode(page, email);
       await page
         .getByLabel("Your name", { exact: true })
         .fill("Returning Person");
@@ -84,13 +78,7 @@ test.describe("@smoke signing in with an emailed code", () => {
 
       await page.goto("/sign-in");
       await waitForHydration(page);
-      await page.getByLabel("Email", { exact: true }).fill(email);
-      const signInSend = await logSize();
-      await page.getByRole("button", { name: "Email me a code" }).click();
-      await page
-        .getByLabel("Code", { exact: true })
-        .fill(await emailCode(email, signInSend));
-      await page.getByRole("button", { name: "Confirm code" }).click();
+      await enterEmailedCode(page, email);
 
       // Straight in. Asking a returning person for their name again would be
       // the bug, and it is the one the check-before-redeem step prevents.

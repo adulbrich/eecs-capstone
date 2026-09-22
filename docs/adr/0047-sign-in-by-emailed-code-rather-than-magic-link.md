@@ -76,9 +76,10 @@ That is cheaper than the three-guess burn it was written to prevent. Review pass
 3 on #580 caught it.
 
 With the send left open, a stranger asking for a code rotates the record and
-mails the owner the new one, so the owner is never left holding something they
-cannot use: they read the newest message, or they ask again and their own browser
-takes the claim.
+mails the owner the new one. The owner cannot redeem that code, because its claim
+went to the stranger's browser; an earlier draft said they could read the newest
+message and was wrong (review pass 2 on #576). What they can always do is ask
+again, which rotates the record once more and hands their own browser the claim.
 
 **What this buys is a price, not a closure, and the difference is worth stating
 plainly because the first draft of this paragraph got it wrong.** A stranger who

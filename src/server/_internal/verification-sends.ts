@@ -1,4 +1,4 @@
-import { and, eq, gt, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, lt, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { verificationSends } from "#/db/schema";
 import {
@@ -13,9 +13,13 @@ import {
  * nothing, so the numbers can be unit tested without a database.
  */
 
-/** Normalised the one way Better Auth normalises an address. */
+/**
+ * Normalised the one way Better Auth normalises an address: lowercased, not
+ * trimmed. A padded address never gets here; the send guard leaves it for
+ * Better Auth to reject.
+ */
 function recipientKey(email: string): string {
-  return email.trim().toLowerCase();
+  return email.toLowerCase();
 }
 
 /** The one kind still written; see `VerificationMailKind`. */
@@ -76,4 +80,38 @@ export async function reserveVerificationMail(email: string): Promise<boolean> {
       )
     );
   return true;
+}
+
+/**
+ * Gives back the allowance `reserveVerificationMail` took, for a send that then
+ * failed.
+ *
+ * The reservation has to come before the send, because the send rotates the
+ * record before it mails and a refusal after that would kill the code the
+ * person already holds. But Better Auth still has checks of its own inside the
+ * endpoint, after the reservation: its cross-site check, for one. A send it
+ * refuses there rotates nothing and mails nothing, so without this, five of
+ * them spent a stranger's whole hour in silence (#576).
+ *
+ * The newest row for the recipient, not necessarily the one this request wrote;
+ * two sends to one address at once can swap which row each gives back, and the
+ * count comes out the same.
+ */
+export async function refundVerificationMail(email: string): Promise<void> {
+  const [newest] = await db
+    .select({ id: verificationSends.id })
+    .from(verificationSends)
+    .where(
+      and(
+        eq(verificationSends.email, recipientKey(email)),
+        eq(verificationSends.kind, KIND)
+      )
+    )
+    .orderBy(desc(verificationSends.createdAt))
+    .limit(1);
+  if (newest) {
+    await db
+      .delete(verificationSends)
+      .where(eq(verificationSends.id, newest.id));
+  }
 }
