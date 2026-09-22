@@ -4,12 +4,12 @@ import { eq } from "drizzle-orm";
 import { db } from "../src/db";
 import { user } from "../src/db/schema";
 import { auth } from "../src/lib/auth";
+import type { UserRole } from "../src/lib/vocabularies";
 
 async function main() {
   const email = process.env.SEED_ADMIN_EMAIL;
-  const password = process.env.SEED_ADMIN_PASSWORD;
-  if (!email || !password) {
-    console.error("SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be set");
+  if (!email) {
+    console.error("SEED_ADMIN_EMAIL must be set");
     process.exit(1);
   }
 
@@ -27,17 +27,16 @@ async function main() {
     return;
   }
 
-  const result = await auth.api.signUpEmail({
-    body: { email, password, name: "Admin" },
+  // No password: sign in with an emailed code (#576). One write, so a failure
+  // cannot leave an admin row that is not yet verified, or the reverse.
+  await auth.api.createUser({
+    body: {
+      email,
+      name: "Admin",
+      role: "admin" satisfies UserRole,
+      data: { emailVerified: true },
+    },
   });
-  if (!result?.user) {
-    console.error("Sign-up did not return a user");
-    process.exit(1);
-  }
-  await db
-    .update(user)
-    .set({ role: "admin", emailVerified: true })
-    .where(eq(user.id, result.user.id));
   console.log(`Created admin ${email}`);
 }
 

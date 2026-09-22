@@ -26,8 +26,8 @@ vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
 describe("deleteAccountAs when the avatar object cannot be deleted", () => {
   it("still scrubs the account: an orphaned object beats a half-deleted person", async () => {
     const email = `dsx-${Date.now()}@x.com`;
-    await auth.api.signUpEmail({
-      body: { email, password: "Password1!", name: "Has Avatar" },
+    await auth.api.createUser({
+      body: { email, name: "Has Avatar" },
     });
     await db
       .update(user)

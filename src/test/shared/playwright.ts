@@ -5,9 +5,7 @@
  */
 import type { Browser, Locator, Page } from "@playwright/test";
 import { chromium, expect } from "@playwright/test";
-
-/** The password scripts/seed-dev.ts sets on every seeded user. */
-export const SEED_PASSWORD = "password";
+import { forgetCodeSends, readSignInCode } from "./sign-in-code";
 
 /**
  * Waits for React to attach its event listeners before a test interacts with
@@ -159,28 +157,39 @@ export async function toggleColumnOn(page: Page, label: string): Promise<void> {
  * Signs in through the real form and writes the resulting cookies to
  * `outputPath`, so tests can start already authenticated instead of paying
  * for a sign-in each time. Driving the real form rather than seeding a
- * session row keeps this honest about Better Auth's cookie handling, at the
- * cost of one browser launch per role during global setup.
+ * session row keeps this honest about Better Auth's cookie handling, and
+ * about the cookie's name and attributes, which differ between the dev server
+ * and the production build, at the cost of one browser launch per role during
+ * global setup.
+ *
+ * The code comes out of the database rather than the mail, for the reason
+ * `sign-in-code.ts` gives. What the person would type is exactly what this
+ * types; only where it was read from differs.
  */
 export async function saveStorageState(options: {
   baseURL: string;
   email: string;
-  password: string;
   outputPath: string;
 }): Promise<void> {
-  const { baseURL, email, password, outputPath } = options;
+  const { baseURL, email, outputPath } = options;
   let browser: Browser | undefined;
 
   try {
+    await forgetCodeSends(email);
     browser = await chromium.launch();
     const context = await browser.newContext();
     const page = await context.newPage();
 
     await page.goto(`${baseURL}/sign-in`, { waitUntil: "load" });
     await waitForHydration(page, "form");
-    await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(password);
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await page.getByLabel("Email", { exact: true }).fill(email);
+    await page.getByRole("button", { name: "Email me a code" }).click();
+    // The code step renders only once the send has answered, and the record is
+    // written before it answers, so the row is there to read by now.
+    const code = page.getByLabel("Code", { exact: true });
+    await code.waitFor();
+    await code.fill(await readSignInCode(email));
+    await page.getByRole("button", { name: "Confirm code" }).click();
     await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"), {
       timeout: 15_000,
     });

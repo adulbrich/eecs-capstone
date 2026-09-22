@@ -21,8 +21,8 @@ import {
 const VECTOR = Array.from({ length: 1024 }, (_, i) => (i === 0 ? 1 : 0));
 
 async function makeAdmin(email: string) {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: email },
+  await auth.api.createUser({
+    body: { email, name: email },
   });
   await db
     .update(user)
@@ -361,8 +361,8 @@ describe("admin projects program filter", () => {
   });
 
   it("still refuses non-staff viewers", async () => {
-    await auth.api.signUpEmail({
-      body: { email: "plain@x.com", password: "Password1!", name: "plain" },
+    await auth.api.createUser({
+      body: { email: "plain@x.com", name: "plain" },
     });
     const [u] = await db
       .select()
@@ -403,8 +403,8 @@ describe("getProjectAs", () => {
 });
 
 async function makeProposer(email: string) {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: email },
+  await auth.api.createUser({
+    body: { email, name: email },
   });
   await db
     .update(user)

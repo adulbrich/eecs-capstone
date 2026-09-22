@@ -174,17 +174,11 @@ resource "aws_ecs_task_definition" "app" {
         { name = "BEDROCK_MODEL_ID", value = var.bedrock_model_id },
         { name = "BEDROCK_REASONING_EFFORT", value = var.bedrock_reasoning_effort },
         { name = "AI_REVIEW_LIMIT_PER_HOUR", value = var.ai_review_limit_per_hour },
-        # The sign-in attempt counter (#552). Unset falls back to the code
-        # defaults in src/lib/sign-in-limits.ts, so these exist to be retuned
-        # without a deploy rather than to make the control work.
-        { name = "SIGN_IN_ATTEMPT_WINDOW_MINUTES", value = var.sign_in_attempt_window_minutes },
-        { name = "SIGN_IN_SOFT_LIMIT", value = var.sign_in_soft_limit },
-        { name = "SIGN_IN_SOFT_DELAY_SECONDS", value = var.sign_in_soft_delay_seconds },
-        { name = "SIGN_IN_HARD_LIMIT", value = var.sign_in_hard_limit },
-        { name = "SIGN_IN_HARD_DELAY_SECONDS", value = var.sign_in_hard_delay_seconds },
+        # The per-recipient cap on sign-in codes (#554, #576). Unset falls
+        # back to the code defaults in src/lib/verification-mail-limits.ts, so
+        # these exist to be retuned without a deploy rather than to make the
+        # control work.
         { name = "VERIFICATION_MAIL_WINDOW_MINUTES", value = var.verification_mail_window_minutes },
-        { name = "VERIFICATION_MAIL_LIMIT", value = var.verification_mail_limit },
-        { name = "DUPLICATE_NOTICE_LIMIT", value = var.duplicate_notice_limit },
         { name = "SIGN_IN_CODE_LIMIT", value = var.sign_in_code_limit },
         { name = "AI_REVIEW_LIMIT_PER_DAY", value = var.ai_review_limit_per_day },
         { name = "BEDROCK_SCOPE_REASONING_EFFORT", value = var.bedrock_scope_reasoning_effort },

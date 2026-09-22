@@ -263,6 +263,7 @@ export async function readUser(db: Db, id: string) {
     .select({
       name: schema.user.name,
       email: schema.user.email,
+      emailVerified: schema.user.emailVerified,
       affiliation: schema.user.affiliation,
       role: schema.user.role,
       banned: schema.user.banned,

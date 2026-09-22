@@ -4,7 +4,6 @@ import { db } from "#/db";
 import { notifications, projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
-import { captureConsoleEmail } from "#/test/shared/console-email";
 
 async function makeProject(fields: {
   proposerEmail: string | null;
@@ -24,9 +23,9 @@ async function makeProject(fields: {
   return row;
 }
 
-async function makeAccount(email: string) {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: email },
+async function makeAccount(email: string, emailVerified = false) {
+  await auth.api.createUser({
+    body: { email, name: email, data: { emailVerified } },
   });
   const [u] = await db.select().from(user).where(eq(user.email, email));
   return u;
@@ -110,35 +109,30 @@ describe("claimProjectsForVerifiedUser", () => {
 });
 
 describe("the verification boundary", () => {
-  it("does not claim on an unverified password sign-up", async () => {
+  it("does not claim for an unverified account", async () => {
     const project = await makeProject({ proposerEmail: "unverified@x.edu" });
 
     const account = await makeAccount("unverified@x.edu");
 
-    // signUpEmail leaves emailVerified false, so the create hook's guard must
-    // decline. This is the whole security property: registering at an address
-    // must not claim its projects.
+    // The create hook's guard must decline. This is the whole security
+    // property: a row holding an address nobody has proved must not claim its
+    // projects. Nothing ordinary makes one any more (#576), but GitHub can, for
+    // an address GitHub has not verified, and production holds the password
+    // rows made before.
     expect(account.emailVerified).toBe(false);
     expect((await statusOf(project.id)).proposerId).toBeNull();
   });
 
-  it("claims the project once auth.api.verifyEmail actually runs, proving afterEmailVerification is wired up and not a silent no-op", async () => {
+  it("claims at creation for a verified account, proving the create hook is wired up and not a silent no-op", async () => {
     const email = "hook-wired@x.edu";
     const project = await makeProject({ proposerEmail: email });
 
-    const verifyUrl = await captureConsoleEmail("Verify your email", () =>
-      auth.api.signUpEmail({
-        body: { email, password: "Password1!", name: email },
-      })
-    );
-    const token = new URL(verifyUrl).searchParams.get("token");
-    expect(token).toBeTruthy();
+    const account = await makeAccount(email, true);
 
-    expect((await statusOf(project.id)).proposerId).toBeNull();
-
-    await auth.api.verifyEmail({ query: { token: token as string } });
-
-    const [account] = await db.select().from(user).where(eq(user.email, email));
+    // A code sign-up and ONID both create verified rows, so this hook is where
+    // their projects are claimed. The unverified row that a code later proves
+    // is claimed by the sign-in instead; `email-otp.integration.test.ts`
+    // covers that one.
     expect((await statusOf(project.id)).proposerId).toBe(account.id);
   });
 });

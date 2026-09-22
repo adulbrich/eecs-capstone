@@ -30,8 +30,8 @@ import {
 } from "#/server/_internal/projects-queries";
 
 async function makeUser(email: string, role: "user" | "admin") {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: email },
+  await auth.api.createUser({
+    body: { email, name: email },
   });
   await db
     .update(user)
@@ -1160,7 +1160,7 @@ describe("review emails", () => {
   // These tests mutate process.env, and vitest.integration.config.ts sets
   // fileParallelism: false, so every integration file shares one process.
   // Without this restore a bogus BETTER_AUTH_URL would leak out of this block
-  // into every later file, where auth.api.signUpEmail reads it.
+  // into every later file, where Better Auth reads it.
   const ORIGINAL_ENV = { ...process.env };
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV };

@@ -61,21 +61,24 @@ test("@smoke sign-in page", async ({ page }) => {
 /**
  * A save that fails announces, through `FieldError` (#411).
  *
- * Sign-in is the form a test can fail on demand without a fixture: wrong
- * credentials, a real refusal from the server, and the message that comes back
- * has to reach a screen reader. Before `FieldError` carried `role="alert"`,
- * all but two of about forty of these paragraphs rendered silently, and the
- * component test can only prove the role is on the element; this proves a real
- * failed submit puts a real message inside it.
+ * Sign-in is the form a test can fail on demand without a fixture: a wrong
+ * code, a real refusal from the server, and the message that comes back has to
+ * reach a screen reader. Before `FieldError` carried `role="alert"`, all but
+ * two of about forty of these paragraphs rendered silently, and the component
+ * test can only prove the role is on the element; this proves a real failed
+ * submit puts a real message inside it. The address needs no account: asking
+ * for a code answers the same either way, and a wrong one is refused either
+ * way.
  */
 test("@smoke a failed sign-in announces its error", async ({ page }) => {
   await page.goto("/sign-in");
   await waitForHydration(page, "form");
   await expect(page.getByRole("alert")).toHaveCount(0);
 
-  await page.getByLabel("Email").fill("nobody@example.com");
-  await page.getByLabel("Password").fill("definitely-not-the-password");
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.getByLabel("Email", { exact: true }).fill("nobody@example.com");
+  await page.getByRole("button", { name: "Email me a code" }).click();
+  await page.getByLabel("Code", { exact: true }).fill("000000");
+  await page.getByRole("button", { name: "Confirm code" }).click();
 
   const alert = page.getByRole("alert");
   await expect(alert).toBeVisible();
@@ -103,26 +106,17 @@ for (const code of ["user_info_is_missing", "not_a_known_code"]) {
 }
 
 /**
- * The emailed code form, at each step (#576).
+ * The emailed code form, past its first step (#576).
  *
- * The scan above sees only the password form, because the code form is behind
- * a toggle, and its later steps are behind a real send. Two of the three steps
- * therefore reach no scan at all unless one drives them, and the code step is
- * the one most likely to go wrong: it is the only input in the app with
- * `inputMode="numeric"` and a `maxLength`, and its instruction sits in a
- * paragraph the label does not point at.
+ * The page scan sees only the address step, because the later ones are behind
+ * a real send. The code step therefore reaches no clean scan unless one drives
+ * it, and it is the one most likely to go wrong: it is the only input in the
+ * app with `inputMode="numeric"` and a `maxLength`, and its instruction sits in
+ * a paragraph the label does not point at.
  */
 test("@smoke sign-in page, the emailed code form", async ({ page }) => {
   await page.goto("/sign-in");
   await waitForHydration(page, "form");
-
-  await page.getByRole("button", { name: "Email me a code instead" }).click();
-  await expect(page.getByLabel("Email", { exact: true })).toBeVisible();
-  // One address field on screen, not two. Rendering both forms together put a
-  // second input labelled "Email" on the page, which is ambiguous read aloud.
-  await expect(page.getByLabel("Email", { exact: true })).toHaveCount(1);
-  await expect(page.getByLabel("Password")).toHaveCount(0);
-  await checkA11y(page);
 
   await page.getByLabel("Email", { exact: true }).fill("nobody@example.com");
   await page.getByRole("button", { name: "Email me a code" }).click();
@@ -138,21 +132,6 @@ test("@smoke sign-up page", async ({ page }) => {
 
 test("@smoke privacy page", async ({ page }) => {
   await page.goto("/privacy");
-  await checkA11y(page);
-});
-
-test("@smoke verify-email page", async ({ page }) => {
-  await page.goto("/verify-email");
-  await checkA11y(page);
-});
-
-test("@smoke forgot-password page", async ({ page }) => {
-  await page.goto("/forgot-password");
-  await checkA11y(page);
-});
-
-test("@smoke reset-password page", async ({ page }) => {
-  await page.goto("/reset-password?token=a11y-test-token");
   await checkA11y(page);
 });
 

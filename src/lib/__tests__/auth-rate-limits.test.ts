@@ -4,7 +4,6 @@ import { emailOTP, genericOAuth } from "better-auth/plugins";
 import { describe, expect, it, vi } from "vitest";
 import {
   authRateLimit,
-  CHANGE_PASSWORD_MAX,
   GLOBAL_MAX,
   UNCHECKED_MAX,
   UNRULED_BY_DESIGN,
@@ -28,20 +27,15 @@ const TRUSTED_PROXY = "10.0.0.0/16";
 
 /**
  * The paths where no credential is checked, so they share one budget: the two
- * OAuth buttons on /sign-in, plus account creation. Better Auth's own default
- * rule covers all three at 3, which is the refusal being removed. Not "3 per 10
- * seconds": see "what a max actually means" below.
+ * OAuth buttons on /sign-in. Better Auth's own default rule covers both at 3,
+ * which is the refusal being removed. Not "3 per 10 seconds": see "what a max
+ * actually means" below.
  */
-const UNCHECKED_PATHS = [
-  "/sign-in/oauth2",
-  "/sign-in/social",
-  "/sign-up/email",
-] as const;
+const UNCHECKED_PATHS = ["/sign-in/oauth2", "/sign-in/social"] as const;
 
 /** Every path the rules name, for the "is this route real" cases below. */
 const RULED_PATHS = [
   ...UNCHECKED_PATHS,
-  "/change-password",
   "/get-session",
   "/email-otp/send-verification-otp",
   "/email-otp/check-verification-otp",
@@ -62,7 +56,6 @@ function buildAuth() {
     database: memoryAdapter({}),
     baseURL: BASE_URL,
     secret: "rate-limit-test-secret-that-is-long-enough",
-    emailAndPassword: { enabled: true },
     rateLimit: { ...authRateLimit, enabled: true },
     advanced: { ipAddress: { trustedProxies: [TRUSTED_PROXY] } },
     // Mounted so `/sign-in/oauth2` is a real route here, the way it is in
@@ -133,30 +126,6 @@ describe("the budget for paths that check no credential", () => {
   });
 });
 
-describe("the change-password budget", () => {
-  // Its own, lower number, because the legitimate call rate is near zero:
-  // sign-in and sign-up have to tolerate a lecture hall arriving at once and
-  // this does not. The case exists to make the difference deliberate, so a
-  // later pass that flattens every path onto one budget fails here rather than
-  // reviewing cleanly.
-  it("is smaller than the budget for paths that check no credential", () => {
-    expect(CHANGE_PASSWORD_MAX).toBeLessThan(UNCHECKED_MAX);
-  });
-
-  it("lets one address spend it and refuses the next call", async () => {
-    const auth = buildAuth();
-    const address = anAddress();
-
-    for (let spent = 0; spent < CHANGE_PASSWORD_MAX; spent += 1) {
-      const allowed = await call(auth, "/change-password", address);
-      expect(allowed.status).not.toBe(429);
-    }
-
-    const refused = await call(auth, "/change-password", address);
-    expect(refused.status).toBe(429);
-  });
-});
-
 describe("the paths the rules name", () => {
   // The rules are strings, and Better Auth matches them against the paths it
   // mounts. A version that renamed one would leave the rule pointing at
@@ -207,12 +176,8 @@ describe("the paths the rules name", () => {
 });
 
 describe("the paths left on Better Auth's default", () => {
-  // `/sign-in/email` is the interesting one. Raising it alongside the others
-  // would be consistent and is wrong, because `emailVerification.sendOnSignIn`
-  // makes the route limit double as the ceiling on verification mail aimed at
-  // a stranger's inbox (#554). This case is what makes that a decision rather
-  // than an oversight: adding a rule for it turns the test red, and whoever
-  // does it has to come here and read why.
+  // Adding a rule for one turns this red, and whoever does it has to come here
+  // and read why it was left alone.
   it("does not quietly gain a rule", () => {
     const ruled = Object.keys(authRateLimit.customRules ?? {});
     for (const path of UNRULED_BY_DESIGN) {
@@ -232,20 +197,6 @@ describe("the paths left on Better Auth's default", () => {
       expect(response.status).toBe(400);
     }
   );
-
-  it("still refuses /sign-in/email at Better Auth's default of 3", async () => {
-    const auth = buildAuth();
-    const address = anAddress();
-    const betterAuthSignInDefault = 3;
-
-    for (let spent = 0; spent < betterAuthSignInDefault; spent += 1) {
-      const allowed = await call(auth, "/sign-in/email", address);
-      expect(allowed.status).not.toBe(429);
-    }
-
-    const refused = await call(auth, "/sign-in/email", address);
-    expect(refused.status).toBe(429);
-  });
 });
 
 describe("what a max actually means", () => {
@@ -265,14 +216,13 @@ describe("what a max actually means", () => {
       database: memoryAdapter({}),
       baseURL: BASE_URL,
       secret: "rate-limit-test-secret-that-is-long-enough",
-      emailAndPassword: { enabled: true },
       advanced: { ipAddress: { trustedProxies: [TRUSTED_PROXY] } },
       rateLimit: {
         enabled: true,
         window: WINDOW_SECONDS,
         max,
         customRules: {
-          "/sign-in/email": { window: WINDOW_SECONDS, max },
+          "/sign-in/social": { window: WINDOW_SECONDS, max },
         },
       },
     });
@@ -282,7 +232,7 @@ describe("what a max actually means", () => {
     vi.useFakeTimers();
     try {
       for (let sent = 0; sent <= max; sent += 1) {
-        statuses.push((await call(auth, "/sign-in/email", address)).status);
+        statuses.push((await call(auth, "/sign-in/social", address)).status);
         vi.setSystemTime(Date.now() + gapMs);
       }
 
@@ -291,7 +241,7 @@ describe("what a max actually means", () => {
 
       // Falling quiet for longer than the window clears it.
       vi.setSystemTime(Date.now() + (WINDOW_SECONDS + 1) * 1000);
-      const afterTheLull = await call(auth, "/sign-in/email", address);
+      const afterTheLull = await call(auth, "/sign-in/social", address);
       expect(afterTheLull.status).not.toBe(429);
     } finally {
       vi.useRealTimers();

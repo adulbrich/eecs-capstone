@@ -188,7 +188,7 @@ export function onidProfileOrRejection(
     // the IdP sends one. The tenant owns oregonstate.edu, controls the mailbox,
     // and has just completed an interactive sign-in with whatever MFA the
     // university enforces. That is stronger proof of address control than the
-    // verification link our own password path mails out.
+    // sign-in code we mail ourselves.
     //
     // What makes it sound is the conjunction of the issuer check above and
     // UIT publishing this registration only to engineering-account holders,

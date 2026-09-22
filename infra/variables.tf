@@ -181,44 +181,12 @@ variable "bedrock_reasoning_effort" {
   default     = "medium"
 }
 
-# The sign-in attempt counter (#552, ADR-0039). Per (account, viewer address)
-# pair, not per address alone: per address cannot protect a credential behind
-# campus NAT, and per account alone would let anyone lock a stranger out.
-# Retunable without a deploy, which is why these are variables rather than
-# literals in src/lib/sign-in-limits.ts. A value of 0, a negative or a typo
-# falls back to the code default rather than refusing every sign-in.
-variable "sign_in_attempt_window_minutes" {
-  description = "How far back failed sign-ins are counted, in minutes."
-  type        = string
-  default     = "15"
-}
-
-variable "sign_in_soft_limit" {
-  description = "Failures in the window before the short refusal."
-  type        = string
-  default     = "5"
-}
-
-variable "sign_in_soft_delay_seconds" {
-  description = "How long the short refusal lasts, in seconds."
-  type        = string
-  default     = "60"
-}
-
-variable "sign_in_hard_limit" {
-  description = "Failures in the window before the longer refusal."
-  type        = string
-  default     = "10"
-}
-
-variable "sign_in_hard_delay_seconds" {
-  description = "How long the longer refusal lasts, in seconds."
-  type        = string
-  default     = "900"
-}
-
+# The per-recipient cap on sign-in codes (#554, #576, ADR-0047). Retunable
+# without a deploy, which is why these are variables rather than literals in
+# src/lib/verification-mail-limits.ts. A value of 0, a negative or a typo falls
+# back to the code default rather than refusing every code.
 variable "verification_mail_window_minutes" {
-  description = "How far back verification and duplicate-sign-up mail is counted per recipient, in minutes."
+  description = "How far back sign-in codes are counted per recipient, in minutes."
   type        = string
   default     = "60"
 }
@@ -227,18 +195,6 @@ variable "sign_in_code_limit" {
   description = "Emailed sign-in codes allowed to one recipient in the same window. This is the brute force control as well as a mail cap, because Better Auth's per-code attempt count resets on every resend; see src/lib/verification-mail-limits.ts."
   type        = string
   default     = "5"
-}
-
-variable "duplicate_notice_limit" {
-  description = "Duplicate-sign-up notices allowed to one recipient in the same window. Metered apart from verification links so a squatter cannot spend the owner's warning; see src/lib/verification-mail-limits.ts."
-  type        = string
-  default     = "2"
-}
-
-variable "verification_mail_limit" {
-  description = "Messages allowed to one recipient inside that window. Above what a person whose link expired would legitimately ask for; see src/lib/verification-mail-limits.ts."
-  type        = string
-  default     = "3"
 }
 
 variable "ai_review_limit_per_hour" {

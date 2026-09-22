@@ -5,20 +5,17 @@ import { user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { updateProfileImpl } from "#/server/_internal/profile";
 import { profileSchema } from "#/server/profile";
+import { sessionHeaders } from "#/test/shared/session";
 
 /** A signed-in session for a fresh account, for the Better Auth own routes. */
 async function signedInHeaders(email: string) {
-  await makeUser(email);
-  const response = await auth.api.signInEmail({
-    body: { email, password: "Password1!" },
-    asResponse: true,
-  });
-  return new Headers({ cookie: response.headers.get("set-cookie") ?? "" });
+  const { id } = await makeUser(email);
+  return await sessionHeaders(id);
 }
 
 async function makeUser(email: string) {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: email },
+  await auth.api.createUser({
+    body: { email, name: email },
   });
   await db
     .update(user)
@@ -69,14 +66,16 @@ describe("profile", () => {
     ).toBe(false);
   });
 
-  // The form marks the field required, so this is the endpoint being called
+  // The form marks the field required, so this is an endpoint being called
   // directly. Better Auth validates `name` with a bare z.string(), which takes
-  // "", and the create hook in src/lib/auth.ts is what refuses it (#433).
-  it("refuses a sign-up with a blank name", async () => {
+  // "", and the create hook in src/lib/auth.ts is what refuses it (#433). The
+  // admin plugin's create goes through the same hook as the code sign-in, so
+  // it stands in for every way an account is made.
+  it("refuses an account with a blank name", async () => {
     const email = `b-${Date.now()}@x.com`;
     await expect(
-      auth.api.signUpEmail({
-        body: { email, password: "Password1!", name: "   " },
+      auth.api.createUser({
+        body: { email, name: "   " },
       })
     ).rejects.toThrow();
     const rows = await db.select().from(user).where(eq(user.email, email));
@@ -116,10 +115,10 @@ describe("profile", () => {
     expect(row.name).toBe(email);
   });
 
-  it("stores a padded sign-up name trimmed", async () => {
+  it("stores a padded account name trimmed", async () => {
     const email = `p-${Date.now()}@x.com`;
-    await auth.api.signUpEmail({
-      body: { email, password: "Password1!", name: "  Ada Lovelace  " },
+    await auth.api.createUser({
+      body: { email, name: "  Ada Lovelace  " },
     });
     const [row] = await db.select().from(user).where(eq(user.email, email));
     expect(row.name).toBe("Ada Lovelace");

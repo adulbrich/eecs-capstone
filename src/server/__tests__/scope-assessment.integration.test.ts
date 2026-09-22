@@ -23,8 +23,8 @@ import {
 import { SCOPE_TOOL_NAME } from "#/server/_internal/scope-assessment-core";
 
 async function makeUser(email: string, role: UserRole) {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: email },
+  await auth.api.createUser({
+    body: { email, name: email },
   });
   await db
     .update(user)

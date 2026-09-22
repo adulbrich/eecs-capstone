@@ -1,10 +1,12 @@
 /**
  * Promote an existing user to admin (production bootstrap).
  *
- * The user must already exist (have signed up through the app), so their
- * password is hashed correctly by Better Auth. This script only flips the
- * role to `admin` and marks the email verified, using nothing but the
- * production `pg` dependency. Run it as a one-off ECS task:
+ * The user must already exist: they sign in once through the app, with an
+ * emailed code or ONID, and Better Auth writes the row. This script writes no
+ * account of its own; it only flips the role to `admin` and marks the email
+ * verified, using nothing but the production `pg` dependency. A code or ONID
+ * sign-up is verified already, so the flag matters only for a row made some
+ * other way. Run it as a one-off ECS task:
  *
  *   ... run-task ... --overrides '{"containerOverrides":[{
  *     "name":"app",
@@ -39,7 +41,7 @@ try {
   );
 
   if (result.rowCount === 0) {
-    console.error(`No user found with email ${email}. Sign up via the app first.`);
+    console.error(`No user found with email ${email}. Sign in through the app first.`);
     process.exit(1);
   }
 

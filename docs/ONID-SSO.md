@@ -101,7 +101,7 @@ that does not include a tenant-custom `username`. The default therefore routes
 the exact case UIT warned about to the one source that cannot answer it.
 
 One case the fallback does not solve, and cannot: a student with a verified
-password account at their ONID *email* address who then signs in with ONID and
+account at their ONID *email* address who then signs in with ONID and
 gets no `email` claim. The fallback hands back their *UPN*, a different address,
 so they get a second account rather than a link. At Oregon State the two usually
 match, so this should be rare. It is inherent to an IdP that does not guarantee
@@ -109,10 +109,9 @@ the email claim, not a bug with a fix on our side.
 
 `emailVerified` is asserted rather than read. The tenant owns the domain and has
 just completed an interactive sign-in with whatever MFA the university enforces,
-which is stronger proof of address control than the verification link our own
-password path mails. It has two intended consequences: it fires the
-project-claim hook in `src/lib/auth.ts`, and it suppresses the sign-up
-verification email that a university-authenticated user must never receive.
+which is stronger proof of address control than a code we mail ourselves. Its
+intended consequence is that it fires the project-claim hook in
+`src/lib/auth.ts`.
 
 ## Why single tenant
 
@@ -144,8 +143,9 @@ publishing this registration only to engineering-account holders. If that ever
 stops being acceptable, `idp` differing from `iss` is the discriminator for a
 guest.
 
-Industry partners and outside faculty do not need any of this. They already have
-email and password sign-in with verification, plus GitHub.
+Industry partners and outside faculty do not need any of this. They sign in
+with an emailed code, or GitHub. Since #576 removed the password, the code is
+the only way in for anybody without ONID or GitHub.
 
 ## Account linking
 
@@ -173,12 +173,11 @@ Two rows are still refused, and `/sign-in` still renders the banner for them. An
 unverified row that some other provider is already linked to belongs to whoever
 holds that identity, and a banned row would hand the student an account an admin
 has shut, which is a worse dead end than the refusal; clearing a ban is a
-person's decision, not a sign-in's. The banner's advice, to verify the password
-account first, cannot be followed in the banned case, because a banned account
-cannot sign in with a password either. That is a support contact rather than a
-self-service remedy, and the copy is left alone because an admin has to have
-banned a row holding somebody else's unverified address for it to arise at
-all.
+person's decision, not a sign-in's. Neither has a self-service remedy: the
+emailed code refuses both rows for the same reasons
+(`src/server/_internal/otp-sign-in-guard.ts`), and the old advice, to sign in
+with the password and verify the address, went with the password in #576. So the
+banner names the capstone office.
 
 ## Rotating the secret
 
@@ -230,7 +229,7 @@ code:
   customizable. We cannot detect that case or explain it in our own UI, because
   the user never reaches our application. Anyone turned away has to be told out
   of band that ONID sign-in requires an active College of Engineering account and
-  that email and password sign-in is the alternative.
+  that an emailed code is the alternative.
 - **UIT have not published to external users before** and cannot confirm in
   advance whether it would work. Moot now that we are staying single tenant.
 
@@ -250,6 +249,6 @@ will only find that out by signing in.
   join on an ONID.
 - **No single logout.** Not requested, and signing out of this app should not
   sign a user out of every Microsoft property in the tenant.
-- **No removal of email/password or GitHub sign-in.** Industry partners and
+- **No removal of the emailed code or GitHub sign-in.** Industry partners and
   outside faculty have no ONID, and open question 6 may narrow the ONID audience
   further.

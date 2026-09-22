@@ -2,11 +2,9 @@ import { eq, like } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { account, session, user, verification } from "#/db/auth-schema";
+import { projects, verificationSends } from "#/db/schema";
 import { auth } from "#/lib/auth";
-import {
-  captureConsoleCode,
-  captureConsoleEmail,
-} from "#/test/shared/console-email";
+import { captureConsoleCode } from "#/test/shared/console-email";
 
 // #576: the emailed sign-in code, and the four properties it exists for.
 //
@@ -109,12 +107,15 @@ async function providersOn(userId: string): Promise<string[]> {
   return rows.map((row) => row.providerId);
 }
 
-/** Signs up and leaves the account unverified, which is what a squatter has. */
+/**
+ * An unverified row with a password behind it, which is what a squatter left.
+ * Nobody can make one any more (#576), but production still holds the ones
+ * made before, so the admin plugin's create stands in for the sign-up that
+ * wrote them.
+ */
 async function aSquattedAddress(email: string): Promise<void> {
-  await captureConsoleEmail("Verify your email", async () => {
-    await auth.api.signUpEmail({
-      body: { email, password: PASSWORD, name: "Squatter Name" },
-    });
+  await auth.api.createUser({
+    body: { email, password: PASSWORD, name: "Squatter Name" },
   });
 }
 
@@ -186,9 +187,8 @@ describe("redeeming a code against a row that already exists", () => {
     expect(before?.emailVerified).toBe(false);
     expect(await providersOn(before?.id as string)).toEqual(["credential"]);
 
-    // A live session on the squatted row, which the ordinary flow cannot make
-    // (`requireEmailVerification` refuses the sign-in that would mint one). It
-    // is inserted so the revocation has something to revoke: asserting zero
+    // A live session on the squatted row, which no flow here makes. It is
+    // inserted so the revocation has something to revoke: asserting zero
     // sessions on a row that never had one proves nothing, and the criterion
     // names sessions as well as the password.
     await db.insert(session).values({
@@ -216,30 +216,47 @@ describe("redeeming a code against a row that already exists", () => {
     // hand over rather than merely verified.
     expect(await providersOn(after?.id as string)).toEqual([]);
     // And the squatter's session with it. Counting sessions would be the wrong
-    // assertion in both directions: the row starts with none because
-    // `requireEmailVerification` refuses the sign-in that would mint one, and
-    // it ends with one because this sign-in mints the OWNER's. The token is
-    // what says whose.
+    // assertion: the row ends with one because this sign-in mints the OWNER's.
+    // The token is what says whose.
     expect(await sessionTokensOn(after?.id as string)).not.toContain(
       `tok-${before?.id}`
     );
-    await expect(
-      auth.api.signInEmail({ body: { email, password: PASSWORD } })
-    ).rejects.toMatchObject({ body: {} });
+  });
+
+  it("links the projects waiting on an unverified row once its code is redeemed", async () => {
+    // A new row is claimed for at creation, but this one already existed, and
+    // Better Auth flips its flag in place without a hook that claims. The
+    // verification link used to be where these were claimed, and it went with
+    // the password, so the redeem has to do it.
+    const email = anAddress("waiting");
+    await aSquattedAddress(email);
+    const [project] = await db
+      .insert(projects)
+      .values({ proposerEmail: email, status: "draft", title: "Waiting" })
+      .returning();
+
+    const code = await sendCode(email);
+    await auth.api.signInEmailOTP({
+      body: { email, otp: code },
+      headers: claimHeaders(email),
+    });
+
+    const [after] = await db
+      .select({ proposerId: projects.proposerId })
+      .from(projects)
+      .where(eq(projects.id, project.id));
+    expect(after.proposerId).toBe((await rowFor(email))?.id);
   });
 
   it("leaves a verified password account alone", async () => {
     const email = anAddress("verified");
-    const verifyUrl = await captureConsoleEmail(
-      "Verify your email",
-      async () => {
-        await auth.api.signUpEmail({
-          body: { email, name: "Verified Owner", password: PASSWORD },
-        });
-      }
-    );
-    await auth.api.verifyEmail({
-      query: { token: new URL(verifyUrl).searchParams.get("token") as string },
+    await auth.api.createUser({
+      body: {
+        email,
+        name: "Verified Owner",
+        password: PASSWORD,
+        data: { emailVerified: true },
+      },
     });
     const before = await rowFor(email);
 
@@ -254,14 +271,10 @@ describe("redeeming a code against a row that already exists", () => {
     const after = await rowFor(email);
     expect(after?.id).toBe(before?.id);
     expect(after?.name).toBe("Verified Owner");
-    // `revokeUnprovenAccountAccess` no-ops on a verified row, so the password
-    // survives the cut-over and this person can still use it.
+    // `revokeUnprovenAccountAccess` no-ops on a verified row, so the
+    // credential row survives. It is inert: the paths that read it are 404
+    // since #576, which `auth.integration.test.ts` covers.
     expect(await providersOn(after?.id as string)).toEqual(["credential"]);
-    const stillWorks = await auth.api.signInEmail({
-      asResponse: true,
-      body: { email, password: PASSWORD },
-    });
-    expect(stillWorks.headers.get("set-cookie")).toBeTruthy();
   });
 });
 
@@ -629,6 +642,146 @@ describe("the per-recipient cap on sends", () => {
     }
 
     expect(await sendCode(other)).toHaveLength(6);
+  });
+});
+
+/**
+ * Requests from a stranger that Better Auth refuses, by its own validation or by
+ * a check inside the endpoint (#576). Each case was red before the fix;
+ * docs/QUIRKS.md says why.
+ */
+describe("requests Better Auth refuses", () => {
+  function postRaw(
+    path: string,
+    body: Record<string, unknown>,
+    headers: Record<string, string> = { origin: ORIGIN }
+  ): Promise<Response> {
+    return auth.handler(
+      new Request(`${ORIGIN}/api/auth${path}`, {
+        body: JSON.stringify(body),
+        headers: { "content-type": "application/json", ...headers },
+        method: "POST",
+      })
+    );
+  }
+
+  async function sendsSpentBy(email: string): Promise<number> {
+    const rows = await db
+      .select({ id: verificationSends.id })
+      .from(verificationSends)
+      .where(eq(verificationSends.email, email.toLowerCase()));
+    return rows.length;
+  }
+
+  it("spends nothing and hands out no claim for a send with no type", async () => {
+    const email = anAddress("untyped");
+    const code = await sendCode(email);
+    expect(await sendsSpentBy(email)).toBe(1);
+
+    const stranger = await postRaw("/email-otp/send-verification-otp", {
+      email,
+    });
+
+    expect(stranger.status).toBe(400);
+    expect(stranger.headers.get("set-cookie")).toBeNull();
+    expect(await sendsSpentBy(email)).toBe(1);
+    // And the owner's code is untouched, so it still signs them in.
+    await auth.api.signInEmailOTP({
+      body: { email, name: "Still Mine", otp: code },
+      headers: claimHeaders(email),
+    });
+    expect((await rowFor(email))?.name).toBe("Still Mine");
+  });
+
+  it("spends none of the owner's budget on an address Better Auth rejects", async () => {
+    const email = anAddress("padded");
+    const limit = Number(process.env.SIGN_IN_CODE_LIMIT ?? 5);
+
+    for (let sent = 0; sent < limit; sent += 1) {
+      const padded = await postRaw("/email-otp/send-verification-otp", {
+        email: ` ${email}`,
+        type: "sign-in",
+      });
+      expect(padded.status).toBe(400);
+    }
+
+    // These used to count against the owner, because the guard spent the
+    // budget before Better Auth refused the address, and nothing was mailed:
+    // five requests, a silent hour's lockout.
+    expect(await sendsSpentBy(email)).toBe(0);
+    expect(await sendCode(email)).toHaveLength(6);
+  });
+
+  it("spends nothing on a send Better Auth refuses after the guard has run", async () => {
+    // The endpoint's own cross-site check runs inside it, after every
+    // before-hook, so the budget has already been reserved when it refuses.
+    // Better Auth skips that check under a test runner (`skipOriginCheck`
+    // defaults to true there), so it is switched back on for this one request.
+    const email = anAddress("cross-site");
+    await sendCode(email);
+    const context = await auth.$context;
+    const skipped = context.skipOriginCheck;
+    context.skipOriginCheck = false;
+    let refused: Response;
+    try {
+      refused = await postRaw(
+        "/email-otp/send-verification-otp",
+        { email, type: "sign-in" },
+        { "sec-fetch-mode": "navigate", "sec-fetch-site": "cross-site" }
+      );
+    } finally {
+      context.skipOriginCheck = skipped;
+    }
+
+    expect(refused.status).toBe(403);
+    // No claim on the owner's live code, and the owner's one send is all that
+    // is spent.
+    expect(refused.headers.get("set-cookie")).toBeNull();
+    expect(await sendsSpentBy(email)).toBe(1);
+  });
+
+  it("answers a redeem with a malformed name the same whether or not a code is outstanding", async () => {
+    const live = anAddress("named");
+    const idle = anAddress("unnamed");
+    await sendCode(live);
+
+    const withCode = await postRaw("/sign-in/email-otp", {
+      email: live,
+      name: 1,
+      otp: "000000",
+    });
+    const withoutCode = await postRaw("/sign-in/email-otp", {
+      email: idle,
+      name: 1,
+      otp: "000000",
+    });
+
+    const [a, b] = (await Promise.all([
+      withCode.json(),
+      withoutCode.json(),
+    ])) as {
+      code?: string;
+    }[];
+    expect(withCode.status).toBe(withoutCode.status);
+    expect(a.code).toBe(b.code);
+  });
+
+  it("answers a redeem with no code the same whether or not one is outstanding", async () => {
+    const live = anAddress("outstanding");
+    const idle = anAddress("idle");
+    await sendCode(live);
+
+    const withCode = await postRaw("/sign-in/email-otp", { email: live });
+    const withoutCode = await postRaw("/sign-in/email-otp", { email: idle });
+
+    expect(withCode.status).toBe(withoutCode.status);
+    const [a, b] = (await Promise.all([
+      withCode.json(),
+      withoutCode.json(),
+    ])) as {
+      code?: string;
+    }[];
+    expect(a.code).toBe(b.code);
   });
 });
 

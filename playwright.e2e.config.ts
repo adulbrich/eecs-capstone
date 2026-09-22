@@ -60,10 +60,10 @@ export default defineConfig({
     // dev server cannot see SSR-only breakage, a broken production chunk, or a
     // VITE_ variable that failed to inline. The build costs a few seconds.
     // Teed rather than piped straight through. The console email transport
-    // writes to stderr and nothing stores its links, so the account-lifecycle
-    // test reads them back out of this file; `tee` truncates on open, so each
-    // run starts from an empty log. Playwright still gets its copy through the
-    // pipe below.
+    // writes to stderr, so the tests that sign in through the form read their
+    // sign-in codes back out of this file (`src/test/e2e/mail.ts`); `tee`
+    // truncates on open, so each run starts from an empty log. Playwright still
+    // gets its copy through the pipe below.
     command: `npm run build && npm run start 2>&1 | tee ${SERVER_LOG_RELATIVE}`,
 
     // /api/healthz, because readiness should not depend on a page rendering:

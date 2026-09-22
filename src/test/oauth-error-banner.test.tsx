@@ -9,7 +9,7 @@ afterEach(cleanup);
 const MAILTO = `mailto:${brand.supportEmail}`;
 
 describe("OAuthErrorBanner", () => {
-  it.each(["email_is_missing", "user_info_is_missing"])(
+  it.each(["account_not_linked", "email_is_missing", "user_info_is_missing"])(
     "names the capstone office as a mailto link for %s",
     (code) => {
       render(<OAuthErrorBanner code={code} />);
@@ -32,11 +32,15 @@ describe("OAuthErrorBanner", () => {
     ).toBeDefined();
   });
 
-  it("leaves account_not_linked alone: the fix is the user's own", () => {
+  // The advice this used to give, sign in with the password and verify the
+  // address, stopped being possible when the password went (#576). Nothing on
+  // the page may still send somebody to it.
+  it("sends nobody to a password", () => {
     render(<OAuthErrorBanner code="account_not_linked" />);
-    const alert = screen.getByRole("alert");
-    expect(alert.textContent).toContain("verify your email first");
-    expect(within(alert).queryByRole("link")).toBeNull();
+    expect(screen.getByRole("alert").textContent).not.toMatch(/password/i);
+    cleanup();
+    render(<OAuthErrorBanner code="something_better_auth_added" />);
+    expect(screen.getByRole("alert").textContent).not.toMatch(/password/i);
   });
 
   it("leaves signup_disabled alone", () => {

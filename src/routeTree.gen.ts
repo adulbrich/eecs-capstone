@@ -12,11 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-password'
-import { Route as authResetPasswordRouteImport } from './routes/(auth)/reset-password'
 import { Route as authSignInRouteImport } from './routes/(auth)/sign-in'
 import { Route as authSignUpRouteImport } from './routes/(auth)/sign-up'
-import { Route as authVerifyEmailRouteImport } from './routes/(auth)/verify-email'
 import { Route as AuthedAdminRouteImport } from './routes/_authed/admin'
 import { Route as AuthedProfileRouteImport } from './routes/_authed/profile'
 import { Route as ApiHealthzRouteImport } from './routes/api/healthz'
@@ -60,16 +57,6 @@ const PrivacyRoute = PrivacyRouteImport.update({
   path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
-const authForgotPasswordRoute = authForgotPasswordRouteImport.update({
-  id: '/(auth)/forgot-password',
-  path: '/forgot-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const authResetPasswordRoute = authResetPasswordRouteImport.update({
-  id: '/(auth)/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const authSignInRoute = authSignInRouteImport.update({
   id: '/(auth)/sign-in',
   path: '/sign-in',
@@ -78,11 +65,6 @@ const authSignInRoute = authSignInRouteImport.update({
 const authSignUpRoute = authSignUpRouteImport.update({
   id: '/(auth)/sign-up',
   path: '/sign-up',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const authVerifyEmailRoute = authVerifyEmailRouteImport.update({
-  id: '/(auth)/verify-email',
-  path: '/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedAdminRoute = AuthedAdminRouteImport.update({
@@ -238,11 +220,8 @@ const AuthedProjectsProjectIdEditRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/privacy': typeof PrivacyRoute
-  '/forgot-password': typeof authForgotPasswordRoute
-  '/reset-password': typeof authResetPasswordRoute
   '/sign-in': typeof authSignInRoute
   '/sign-up': typeof authSignUpRoute
-  '/verify-email': typeof authVerifyEmailRoute
   '/admin': typeof AuthedAdminRouteWithChildren
   '/profile': typeof AuthedProfileRoute
   '/api/healthz': typeof ApiHealthzRoute
@@ -275,11 +254,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/privacy': typeof PrivacyRoute
-  '/forgot-password': typeof authForgotPasswordRoute
-  '/reset-password': typeof authResetPasswordRoute
   '/sign-in': typeof authSignInRoute
   '/sign-up': typeof authSignUpRoute
-  '/verify-email': typeof authVerifyEmailRoute
   '/profile': typeof AuthedProfileRoute
   '/api/healthz': typeof ApiHealthzRoute
   '/inventory/$itemId': typeof InventoryItemIdRoute
@@ -313,11 +289,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authed': typeof AuthedRouteWithChildren
   '/privacy': typeof PrivacyRoute
-  '/(auth)/forgot-password': typeof authForgotPasswordRoute
-  '/(auth)/reset-password': typeof authResetPasswordRoute
   '/(auth)/sign-in': typeof authSignInRoute
   '/(auth)/sign-up': typeof authSignUpRoute
-  '/(auth)/verify-email': typeof authVerifyEmailRoute
   '/_authed/admin': typeof AuthedAdminRouteWithChildren
   '/_authed/profile': typeof AuthedProfileRoute
   '/api/healthz': typeof ApiHealthzRoute
@@ -352,11 +325,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/privacy'
-    | '/forgot-password'
-    | '/reset-password'
     | '/sign-in'
     | '/sign-up'
-    | '/verify-email'
     | '/admin'
     | '/profile'
     | '/api/healthz'
@@ -389,11 +359,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/privacy'
-    | '/forgot-password'
-    | '/reset-password'
     | '/sign-in'
     | '/sign-up'
-    | '/verify-email'
     | '/profile'
     | '/api/healthz'
     | '/inventory/$itemId'
@@ -426,11 +393,8 @@ export interface FileRouteTypes {
     | '/'
     | '/_authed'
     | '/privacy'
-    | '/(auth)/forgot-password'
-    | '/(auth)/reset-password'
     | '/(auth)/sign-in'
     | '/(auth)/sign-up'
-    | '/(auth)/verify-email'
     | '/_authed/admin'
     | '/_authed/profile'
     | '/api/healthz'
@@ -465,11 +429,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthedRoute: typeof AuthedRouteWithChildren
   PrivacyRoute: typeof PrivacyRoute
-  authForgotPasswordRoute: typeof authForgotPasswordRoute
-  authResetPasswordRoute: typeof authResetPasswordRoute
   authSignInRoute: typeof authSignInRoute
   authSignUpRoute: typeof authSignUpRoute
-  authVerifyEmailRoute: typeof authVerifyEmailRoute
   ApiHealthzRoute: typeof ApiHealthzRoute
   InventoryItemIdRoute: typeof InventoryItemIdRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
@@ -501,20 +462,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/(auth)/forgot-password': {
-      id: '/(auth)/forgot-password'
-      path: '/forgot-password'
-      fullPath: '/forgot-password'
-      preLoaderRoute: typeof authForgotPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(auth)/reset-password': {
-      id: '/(auth)/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof authResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/(auth)/sign-in': {
       id: '/(auth)/sign-in'
       path: '/sign-in'
@@ -527,13 +474,6 @@ declare module '@tanstack/react-router' {
       path: '/sign-up'
       fullPath: '/sign-up'
       preLoaderRoute: typeof authSignUpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(auth)/verify-email': {
-      id: '/(auth)/verify-email'
-      path: '/verify-email'
-      fullPath: '/verify-email'
-      preLoaderRoute: typeof authVerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authed/admin': {
@@ -802,11 +742,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
   PrivacyRoute: PrivacyRoute,
-  authForgotPasswordRoute: authForgotPasswordRoute,
-  authResetPasswordRoute: authResetPasswordRoute,
   authSignInRoute: authSignInRoute,
   authSignUpRoute: authSignUpRoute,
-  authVerifyEmailRoute: authVerifyEmailRoute,
   ApiHealthzRoute: ApiHealthzRoute,
   InventoryItemIdRoute: InventoryItemIdRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,

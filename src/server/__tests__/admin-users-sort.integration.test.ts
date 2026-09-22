@@ -8,8 +8,8 @@ import { recordReviewUsage } from "#/server/_internal/ai-review-usage";
 import { exportUsersImpl, listUsersImpl } from "#/server/_internal/users";
 
 async function makeUser(email: string, role: UserRole) {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: email },
+  await auth.api.createUser({
+    body: { email, name: email },
   });
   await db
     .update(user)

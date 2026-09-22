@@ -11,7 +11,7 @@ import { Pool } from "pg";
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
 import { normalizeEmailAddress } from "../../lib/email-address";
-import { SEED_PASSWORD, saveStorageState } from "../shared/playwright";
+import { saveStorageState } from "../shared/playwright";
 
 // Prefixes used by the create-dialog-plus-dropdown coverage in
 // admin.a11y.test.ts. Those rows are deleted by the test itself on success,
@@ -55,13 +55,11 @@ export default async function globalSetup(config: FullConfig) {
     saveStorageState({
       baseURL: BASE_URL,
       email: "user@example.com",
-      password: SEED_PASSWORD,
       outputPath: join(__dirname, ".user-auth.json"),
     }),
     saveStorageState({
       baseURL: BASE_URL,
       email: "admin@example.com",
-      password: SEED_PASSWORD,
       outputPath: join(__dirname, ".admin-auth.json"),
     }),
   ]);

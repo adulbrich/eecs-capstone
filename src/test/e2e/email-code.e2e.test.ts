@@ -1,12 +1,11 @@
-import { readFile } from "node:fs/promises";
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
 import { waitForHydration } from "../shared/playwright";
-import { SERVER_LOG } from "./constants";
 import { fixtureEmail, withDb } from "./fixtures";
+import { emailCode, enterEmailedCode, logSize } from "./mail";
 
 /**
  * Signing in with an emailed code, driven through the real form (#576).
@@ -28,9 +27,6 @@ test.describe("@smoke signing in with an emailed code", () => {
       await page.goto("/sign-up");
       await waitForHydration(page);
 
-      await page
-        .getByRole("button", { name: "Email me a code instead" })
-        .click();
       await page.getByLabel("Email", { exact: true }).fill(email);
       const sentAt = await logSize();
       await page.getByRole("button", { name: "Email me a code" }).click();
@@ -68,16 +64,7 @@ test.describe("@smoke signing in with an emailed code", () => {
     try {
       await page.goto("/sign-up");
       await waitForHydration(page);
-      await page
-        .getByRole("button", { name: "Email me a code instead" })
-        .click();
-      await page.getByLabel("Email", { exact: true }).fill(email);
-      const signUpSend = await logSize();
-      await page.getByRole("button", { name: "Email me a code" }).click();
-      await page
-        .getByLabel("Code", { exact: true })
-        .fill(await emailCode(email, signUpSend));
-      await page.getByRole("button", { name: "Confirm code" }).click();
+      await enterEmailedCode(page, email);
       await page
         .getByLabel("Your name", { exact: true })
         .fill("Returning Person");
@@ -91,16 +78,7 @@ test.describe("@smoke signing in with an emailed code", () => {
 
       await page.goto("/sign-in");
       await waitForHydration(page);
-      await page
-        .getByRole("button", { name: "Email me a code instead" })
-        .click();
-      await page.getByLabel("Email", { exact: true }).fill(email);
-      const signInSend = await logSize();
-      await page.getByRole("button", { name: "Email me a code" }).click();
-      await page
-        .getByLabel("Code", { exact: true })
-        .fill(await emailCode(email, signInSend));
-      await page.getByRole("button", { name: "Confirm code" }).click();
+      await enterEmailedCode(page, email);
 
       // Straight in. Asking a returning person for their name again would be
       // the bug, and it is the one the check-before-redeem step prevents.
@@ -280,9 +258,6 @@ test.describe("refusals on the emailed code", () => {
     try {
       await page.goto("/sign-up");
       await waitForHydration(page);
-      await page
-        .getByRole("button", { name: "Email me a code instead" })
-        .click();
       await page.getByLabel("Email", { exact: true }).fill(email);
       await page.getByRole("button", { name: "Email me a code" }).click();
 
@@ -337,11 +312,10 @@ test.describe("refusals on the emailed code", () => {
 /** `allowedAttempts` in `src/lib/auth.ts`, restated so a change here is loud. */
 const ALLOWED_ATTEMPTS = 3;
 
-/** Opens /sign-up on the code door, asks for a code, and returns it. */
+/** Opens /sign-up, asks for a code, and returns it. */
 async function startCodeStep(page: Page, email: string): Promise<string> {
   await page.goto("/sign-up");
   await waitForHydration(page);
-  await page.getByRole("button", { name: "Email me a code instead" }).click();
   await page.getByLabel("Email", { exact: true }).fill(email);
   return await sendFrom(page, email);
 }
@@ -364,53 +338,4 @@ function expireCode(email: string): Promise<unknown> {
         eq(schema.verification.identifier, `sign-in-otp-${email.toLowerCase()}`)
       )
   );
-}
-
-/** How much of the log has already been written, to read only what comes next. */
-async function logSize(): Promise<number> {
-  return (await readFile(SERVER_LOG, "utf8").catch(() => "")).length;
-}
-
-/**
- * The sign-in code mailed to one address AFTER `since` bytes of log.
- *
- * Polled for the same reason `emailLink` in `account.e2e.test.ts` is: the mail
- * is written while the request that triggered it is still in flight. The offset
- * is what makes it correct rather than merely tidy, and leaving it out was a
- * real failure rather than a precaution. A test that signs up and then signs in
- * mails the same address twice, and a search over the whole log finds the FIRST
- * code, which the sign-up already spent. The symptom is "Invalid OTP" on a code
- * the person read out of their own inbox, which reads like a product bug.
- */
-async function emailCode(to: string, since: number): Promise<string> {
-  const deadline = Date.now() + 15_000;
-  let lastSeen = "";
-
-  while (Date.now() < deadline) {
-    const log = await readFile(SERVER_LOG, "utf8").catch(() => "");
-    lastSeen = log;
-    const code = findCode(log.slice(since), to);
-    if (code) {
-      return code;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-
-  throw new Error(
-    `no sign-in code for ${to} in ${SERVER_LOG} after 15s. The log holds ${lastSeen.length} bytes, ${since} of them already read.`
-  );
-}
-
-/** Split on the sender's banner so a code is never read out of the block above. */
-function findCode(log: string, to: string): string | null {
-  const blocks = log.split("==================== EMAIL");
-  for (const block of blocks.reverse()) {
-    if (block.includes(`to:      ${to}`)) {
-      const match = block.match(/Your sign-in code is (\d{6})\./);
-      if (match) {
-        return match[1];
-      }
-    }
-  }
-  return null;
 }

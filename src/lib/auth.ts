@@ -1,13 +1,9 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import {
-  APIError,
-  createAuthMiddleware,
-  getIp,
-  isAPIError,
-} from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin, emailOTP, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
+import { z } from "zod";
 import { db } from "#/db";
 import {
   buildAuthConfig,
@@ -23,33 +19,21 @@ import {
   redactQueryError,
 } from "#/lib/_internal/redact-query-error";
 import { requireUserName } from "#/lib/_internal/user-name";
-import { buildNotificationConfig } from "#/lib/email/config";
 import { getEmailSender } from "#/lib/email/sender";
-import {
-  addressAlreadyRegisteredEmail,
-  passwordResetEmail,
-  signInCodeEmail,
-  verificationEmail,
-} from "#/lib/email/templates";
+import { signInCodeEmail } from "#/lib/email/templates";
 import {
   OTP_CLAIM_COOKIE,
   otpClaimMatches,
   otpClaimToken,
 } from "#/lib/otp-claim";
-import { tooManyAttemptsMessage } from "#/lib/sign-in-limits";
-import type { VerificationMailKind } from "#/lib/verification-mail-limits";
 import type { UserRole } from "#/lib/vocabularies";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
-import { markAddressProven } from "#/server/_internal/mark-address-proven";
 import { otpSignInRefused } from "#/server/_internal/otp-sign-in-guard";
 import { releaseUnverifiedAddress } from "#/server/_internal/release-unverified-address";
 import {
-  attemptKey,
-  checkSignInAllowed,
-  clearSignInAttempts,
-  recordFailedSignIn,
-} from "#/server/_internal/sign-in-attempts";
-import { reserveVerificationMail } from "#/server/_internal/verification-sends";
+  refundVerificationMail,
+  reserveVerificationMail,
+} from "#/server/_internal/verification-sends";
 
 const emailSender = getEmailSender();
 
@@ -65,10 +49,11 @@ warnUnconfiguredProviders(authConfig.unconfigured);
  * Claims a newly verified user's projects, swallowing any failure.
  *
  * The swallow is load-bearing rather than defensive habit. Better Auth runs
- * `create.after` hooks in a loop with no try/catch of its own, and awaits
- * `afterEmailVerification` unguarded, so an exception escaping here would break
- * account creation and email verification respectively. Claiming is also
- * idempotent, so the next verification or sign-in retries it for free.
+ * `create.after` hooks in a loop with no try/catch of its own, so an exception
+ * escaping here would break account creation. Claiming is also idempotent, so
+ * the next code sign-in retries it for free. An account that only ever signs in
+ * with ONID or GitHub has no such retry: nothing claims after its creation, so
+ * a claim that fails there waits for staff to link the project by hand.
  */
 async function claimProjectsFor(userId: string, email: string): Promise<void> {
   try {
@@ -80,36 +65,6 @@ async function claimProjectsFor(userId: string, email: string): Promise<void> {
     );
   }
 }
-
-/** Where a mailed verification link lands once its token checks out. */
-const VERIFICATION_LANDING = "/verify-email";
-
-/**
- * Rewrites the `callbackURL` Better Auth put in a verification link.
- *
- * It builds `url` from the body of whichever call mailed the link, defaulting
- * to "/", so the obvious place to ask for `/verify-email` is the two callers,
- * and that is where it used to be. It cannot go there: `signIn.email` returns
- * `redirect: true` with the same `callbackURL` on a SUCCESSFUL sign-in, and
- * the client's redirect plugin turns that into a `window.location.href`, which
- * raced sign-in.tsx's own `navigate` and could strand a verified person on
- * /verify-email or drop their `?redirect=` return path (#254). Setting it here
- * keeps the link right without the request body deciding where a sign-in goes.
- *
- * The cost of the hook being the last word is that it is the last word for
- * every flow that mails a verification link. `user.changeEmail` is not
- * configured, so today that is sign-up and the refused sign-in only; enabling
- * it would want this to ask which flow it is serving before overwriting.
- */
-function withVerificationLanding(url: string): string {
-  const link = new URL(url);
-  link.searchParams.set("callbackURL", VERIFICATION_LANDING);
-  return link.toString();
-}
-
-/** The one path the attempt counter guards. ONID and GitHub are authenticated
- * elsewhere, so there is no credential here to protect on those. */
-const PASSWORD_SIGN_IN = "/sign-in/email";
 
 /** Where an emailed code is redeemed (#576). Guarded below, for the two rows
  * Better Auth's own helper does not refuse; see `otp-sign-in-guard.ts`. */
@@ -160,7 +115,13 @@ const claimSecret =
  * Auth's own middleware context type, so these stay callable from a test.
  */
 interface CodeRequest {
-  body?: { email?: unknown; type?: unknown };
+  body?: {
+    email?: unknown;
+    image?: unknown;
+    name?: unknown;
+    otp?: unknown;
+    type?: unknown;
+  };
   context: {
     internalAdapter: {
       findVerificationValue: (
@@ -169,6 +130,7 @@ interface CodeRequest {
     };
   };
   getCookie: (name: string) => string | null | undefined;
+  path: string;
 }
 
 /**
@@ -189,11 +151,11 @@ interface CodeRequest {
  * code. That is a cheaper denial than the one #581 exists to close.
  *
  * Leaving the send open costs nothing the mail cap was not already accepting.
- * A stranger's send rotates the record and mails the owner the new code, so the
- * owner is never holding something they cannot use: they read the newest
- * message, or they ask again and their own browser takes the claim. What they
- * cannot do is outrun the per-recipient cap, which is ADR-0046's accepted
- * tradeoff and predates all of this.
+ * A stranger's send rotates the record and mails the owner the new code. The
+ * owner cannot redeem that one, because its claim went to the stranger's
+ * browser, but asking again works, while they have a send left in the hour, and
+ * takes the claim back. What they cannot do is outrun the per-recipient cap,
+ * which is ADR-0046's accepted tradeoff and predates all of this.
  */
 async function codeSendAllowed(ctx: CodeRequest): Promise<boolean> {
   const address = signInCodeAddress(ctx);
@@ -210,7 +172,7 @@ async function codeSendAllowed(ctx: CodeRequest): Promise<boolean> {
   // down there left the record holding a code nobody had been told, so a sixth
   // request in an hour did not merely fail to mail: it killed the code the
   // person was already holding.
-  return await mayMail(address, "sign-in-code");
+  return await mayMail(address);
 }
 
 /**
@@ -245,12 +207,59 @@ async function codeGuessRefused(ctx: CodeRequest): Promise<boolean> {
       !otpClaimMatches(ctx.getCookie(OTP_CLAIM_COOKIE), expected);
     return unclaimed || (await otpSignInRefused(address));
   } catch (error) {
-    // Fails open, the same direction as `swallowing` and for the same reason.
-    // What it opens is narrow: the plugin still refuses a wrong code, and the
-    // admin plugin still refuses a banned row a session.
+    // Fails open, the same direction as `mayMail` and for the same reason: this
+    // is the only way in for everyone without ONID. What it opens: the plugin
+    // still refuses a wrong code, and the admin plugin still refuses a banned
+    // row a session, but nothing backs up the refusal of an unverified row
+    // another provider is linked to. A redeem that lands during a failure here
+    // verifies that row and leaves the other identity on it, which is the one
+    // row answering to two people that `otp-sign-in-guard.ts` exists to stop.
+    // It needs the database to fail these reads and not the plugin's own,
+    // moments later, on the same request.
     console.error("Code sign-in guard failed", redactQueryError(error));
     return false;
   }
+}
+
+/**
+ * Whether this is one of the three code paths with a body Better Auth is about
+ * to reject in its own validation: a field its schema types that is missing or
+ * not a string, or, on the send and the check, an address that fails Better
+ * Auth's own lowercase then `z.email()`.
+ *
+ * The before-hook leaves such a body alone, spending nothing and guarding
+ * nothing, so Better Auth answers with its own validation error, the same for
+ * every address. Acting on one was three holes in the price ADR-0047 records;
+ * docs/QUIRKS.md has them under "`hooks.before` sees a body Better Auth has not
+ * validated yet". A `type` that is a string but not `"sign-in"` is not caught
+ * here, whether or not Better Auth's enum knows it: `signInCodeAddress` turns
+ * those away, as before.
+ */
+function isMalformedCodeRequest(ctx: CodeRequest): boolean {
+  if (
+    ctx.path !== CODE_SEND &&
+    ctx.path !== CODE_CHECK &&
+    ctx.path !== CODE_SIGN_IN
+  ) {
+    return false;
+  }
+  const email = ctx.body?.email;
+  if (typeof email !== "string") {
+    return true;
+  }
+  if (ctx.path !== CODE_SEND && typeof ctx.body?.otp !== "string") {
+    return true;
+  }
+  if (ctx.path === CODE_SIGN_IN) {
+    // The only other fields its schema types; anything else is an open record.
+    return [ctx.body?.name, ctx.body?.image].some(
+      (field) => field !== undefined && typeof field !== "string"
+    );
+  }
+  return (
+    typeof ctx.body?.type !== "string" ||
+    !z.email().safeParse(email.toLowerCase()).success
+  );
 }
 
 /**
@@ -294,26 +303,48 @@ async function expectedClaim(
 }
 
 /**
- * The email-otp endpoints this app does NOT serve.
+ * The endpoints this app does NOT serve.
  *
- * `emailOTP()` mounts nine paths whatever its options say, and only three of
- * them belong to the flow this app runs. Better Auth checks `disabledPaths` in
- * the router's `onRequest`, ahead of routing and ahead of the rate limiter, so
- * a listed path is a flat 404 rather than a handler that declines.
+ * A plugin, and Better Auth's own core, mounts every endpoint it has whatever
+ * the options say, so turning a feature off does not un-mount it: a direct POST
+ * is still served, still counted by the rate limiter, and still reaches
+ * whatever the handler does before it notices. Better Auth checks
+ * `disabledPaths` in the router's `onRequest`, ahead of routing and ahead of the
+ * rate limiter, so a listed path is a flat 404 rather than a handler that
+ * declines.
  *
- * `/email-otp/verify-email` is the one that has to go. It flips `emailVerified`
- * on an address that presents a valid code WITHOUT calling
- * `revokeUnprovenAccountAccess` first, which is #575's attack through a new
- * door: while password sign-up still exists, a squatter registers an address,
- * the real owner asks for a code and redeems it there, and the owner has now
- * verified a row whose password the squatter chose. `/sign-in/email-otp` is the
- * only path that does the revoke, so it is the only one that may verify.
+ * Two groups, and one path in each is the reason the group is here rather than
+ * left to its handler.
  *
- * The password-reset and email-change paths are disabled for a duller reason:
- * this app has its own flows for both, and a second set of endpoints reaching
- * the same columns is surface with no caller.
+ * The password and its verification link (#576). With `emailAndPassword` off
+ * the sign-in and sign-up handlers refuse on their own, but `/verify-email` does
+ * not check it: it redeems any unexpired link Better Auth ever signed, and it
+ * flips `emailVerified` WITHOUT calling `revokeUnprovenAccountAccess`, so a link
+ * mailed in the hour before this shipped would verify a squatted row and leave
+ * the squatter's session standing. The rest go because nothing here calls them
+ * and "nothing calls it" is not "nothing reaches it". Production still holds
+ * `credential` rows from before; these paths are what would have read them.
+ * One cannot be listed: the match is an exact string against the request path,
+ * so `GET /reset-password/:token` stays mounted. It changes no account: it looks
+ * up a token no longer issued, which only sweeps expired `verification` rows the
+ * way every lookup does, and redirects to a page that no longer exists. The
+ * POST that would have set the password is listed.
+ *
+ * The email-otp paths outside the one flow this app runs. `emailOTP()` mounts
+ * nine and three are served. `/email-otp/verify-email` has the same flaw as
+ * `/verify-email` above, and `/sign-in/email-otp` is the only path that does
+ * the revoke, so it is the only one that may verify. The password-reset and
+ * email-change paths are surface with no caller.
  */
-const DISABLED_OTP_PATHS = [
+const DISABLED_PATHS = [
+  "/sign-in/email",
+  "/sign-up/email",
+  "/request-password-reset",
+  "/reset-password",
+  "/verify-password",
+  "/change-password",
+  "/send-verification-email",
+  "/verify-email",
   "/email-otp/verify-email",
   "/email-otp/request-password-reset",
   "/email-otp/reset-password",
@@ -321,93 +352,6 @@ const DISABLED_OTP_PATHS = [
   "/email-otp/request-email-change",
   "/email-otp/change-email",
 ];
-
-/**
- * How a viewer address is resolved, in one object because two callers have to
- * agree on it: Better Auth's own rate limiter, through the `advanced` block
- * below, and `viewerAddress` for the sign-in counter. Written twice it would
- * drift the day either one gains a field.
- */
-const ipAddressOptions = { trustedProxies: [...authConfig.trustedProxies] };
-
-/**
- * The viewer, resolved by the same function Better Auth's own limiter uses.
- *
- * This used to hand-roll the walk, on a note claiming `getIp` was not exported
- * from a stable path. That was wrong: it comes from `better-auth/api` alongside
- * `APIError`. The reimplementation compared entries against `trustedProxies`
- * with string equality, so `10.0.0.0/16` matched no address and it always took
- * the rightmost entry. That happens to be the viewer under `preserve`, so it
- * was right by accident rather than by the logic, and it had quietly dropped
- * CIDR matching, address validation, and the IPv6 /64 normalisation that keeps
- * one person on one key.
- */
-function viewerAddress(headers: Headers | undefined): string | null {
-  if (!headers) {
-    return null;
-  }
-  return getIp(new Request("http://localhost", { headers }), {
-    advanced: { ipAddress: ipAddressOptions },
-  });
-}
-
-/**
- * A sign-in that actually produced a session.
- *
- * Positive detection on purpose, and the reason is the bypass this replaces.
- * There are TWO `APIError` classes in play: the one `better-auth/api` exports,
- * which the sign-in endpoint throws, and better-call's own, thrown when a
- * request body fails its schema. So `returned instanceof APIError` is FALSE for
- * a malformed body, and reading that as "not an error, therefore a success"
- * meant four wrong passwords followed by one request with `password` omitted
- * cleared the counter, forever. The absence of an error is not a success.
- * docs/QUIRKS.md carries this under the Better Auth section.
- */
-function isSuccessfulSignIn(returned: unknown): boolean {
-  return (
-    !isAPIError(returned) &&
-    typeof returned === "object" &&
-    returned !== null &&
-    "user" in returned
-  );
-}
-
-/**
- * The one outcome that means somebody offered a credential and it was wrong.
- *
- * Narrow on purpose. Counting every error would count `EMAIL_NOT_VERIFIED`,
- * which is what a person with the RIGHT password gets when their address is
- * unverified, and that refusal is also what mails them a fresh verification
- * link. Throttling it would lock them out of their own only way back in.
- */
-function isWrongCredential(returned: unknown): boolean {
-  return (
-    isAPIError(returned) &&
-    (returned as { body?: { code?: string } }).body?.code ===
-      "INVALID_EMAIL_OR_PASSWORD"
-  );
-}
-
-/**
- * Swallows a counter failure rather than refusing the sign-in.
- *
- * Deliberate, and the opposite of how the rest of this file fails. If the
- * database is unreachable the counter cannot answer, and the choice is between
- * letting sign-ins through unguarded and refusing everyone. Better Auth's own
- * per-address limit still applies either way, and a brute force window during a
- * database outage is a smaller problem than an auth outage on top of it. The
- * error is logged so the gap is visible rather than silent.
- */
-async function swallowing(what: string, run: () => Promise<void>) {
-  try {
-    await run();
-  } catch (error) {
-    console.error(
-      `Sign-in attempt counter failed (${what})`,
-      redactQueryError(error)
-    );
-  }
-}
 
 /**
  * The ONID profile, with the one write that has to happen before Better Auth
@@ -444,10 +388,9 @@ async function onidUserInfo(
       profile.name
     );
     if (released) {
-      // Nothing else will. `afterEmailVerification` is not on this path,
-      // `user.create.after` only fires on creation, and the link path's own
-      // `updateUser({ emailVerified: true })` is skipped because the flag is
-      // already true by the time it looks.
+      // Nothing else will. `user.create.after` only fires on creation, and
+      // the link path's own `updateUser({ emailVerified: true })` is skipped
+      // because the flag is already true by the time it looks.
       await claimProjectsFor(released.userId, profile.email);
     }
   } catch (error) {
@@ -460,45 +403,18 @@ async function onidUserInfo(
 }
 
 /**
- * Where the B2 message sends somebody to take their address back.
- *
- * A link to the page, carrying no token. A token for the squatted row would
- * verify THAT row, which is the trap #554's comment identifies: the real owner
- * clicks it, the attacker's account becomes confirmed, and
- * `autoSignInAfterVerification` signs the owner into an account whose password
- * a stranger chose. Sending them to request their own reset costs one extra
- * click and inverts that: the token they end up consuming is one they asked
- * for, and setting a password evicts the squatter's.
- *
- * Built from `BETTER_AUTH_URL` rather than `SITE_ORIGIN`, which is a `VITE_`
- * value inlined at build time for tags that need an absolute URL on the client.
- * This runs on the server only, and every other server-sent link in the app is
- * built from the same config (`lib/email/config.ts`). Null when it is unset,
- * and the caller then sends nothing: a message whose one instruction is a link
- * to `null/forgot-password` is worse than silence.
- */
-function forgotPasswordUrl(): string | null {
-  const base = buildNotificationConfig().appBaseUrl;
-  return base ? `${base}/forgot-password` : null;
-}
-
-/**
- * Whether one more message may go to this address right now (#554, piece D).
+ * Whether one more code may go to this address right now (#554, piece D).
  *
  * Fails OPEN, which is the opposite of how a cap usually fails and is the right
- * direction here. Everything this gates is somebody's only way into their own
- * account, and by the time either caller runs, Better Auth has already read the
- * user out of the database, so a counter that cannot answer means a transient
- * blip rather than a database that is down. Refusing mail through one would
- * lock out every new account for the length of it; letting an amplifier run for
- * that window is the smaller harm. Same reasoning as `swallowing` above.
+ * direction here. What this gates is somebody's only way into their own
+ * account, so a counter that cannot answer, a transient database blip, would
+ * otherwise lock out everyone without ONID for the length of it; letting an
+ * amplifier run for that window is the smaller harm. The code guard above fails
+ * open for the same reason.
  */
-async function mayMail(
-  email: string,
-  kind: VerificationMailKind
-): Promise<boolean> {
+async function mayMail(email: string): Promise<boolean> {
   try {
-    return await reserveVerificationMail(email, kind);
+    return await reserveVerificationMail(email);
   } catch (error) {
     console.error("Verification mail counter failed", redactQueryError(error));
     return true;
@@ -511,22 +427,17 @@ export const auth = betterAuth({
   // Numbers and reasons in lib/_internal/auth-rate-limits.ts. Still only
   // active under NODE_ENV=production, which is Better Auth's own default.
   rateLimit: authRateLimit,
-  // Per-account brute force protection (#552). Better Auth's own limiter keys
-  // on the viewer address and nothing else, and OSU wireless NATs students into
-  // a pool of shared addresses, so no per-address number protects a credential
-  // here (ADR-0039). This counts failures per (account, address) pair instead:
-  // per account because that is the thing being attacked, and paired with the
-  // address so nobody can lock a stranger out of their own account by guessing
-  // it a few times.
-  //
-  // It deliberately does NOT raise the Better Auth limit on /sign-in/email.
-  // That number used to do double duty as a cap on verification mail aimed at
-  // an address the sender does not own; #554 moved that job to a per-recipient
-  // cap on the send itself, so the path is now free to be raised on its own
-  // merits, which is #552's call and not this counter's. Adding this counter
-  // is purely additive.
+  // The emailed code is the only credential this app checks itself (#576).
+  // Better Auth's own limiter keys on the viewer address and nothing else, and
+  // OSU wireless NATs students into a pool of shared addresses, so no
+  // per-address number protects it (ADR-0039). What bounds guessing is the
+  // per-recipient cap on sends, spent below, and the claim that ties a code to
+  // the browser that asked for it (ADR-0047).
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      if (isMalformedCodeRequest(ctx)) {
+        return;
+      }
       // Asking for a code (#581). Two reasons to answer without letting Better
       // Auth touch the record, and both have to answer `{success: true}`
       // anyway, because the send endpoint must look the same whatever it
@@ -541,43 +452,11 @@ export const auth = betterAuth({
       // the shape of a wrong code: `otp-sign-in-guard.ts` says why the row
       // guard cannot say more, and the claim guard cannot either, because a
       // distinct refusal would tell a stranger whether a code is outstanding.
-      if (ctx.path === CODE_SIGN_IN || ctx.path === CODE_CHECK) {
-        if (await codeGuessRefused(ctx)) {
-          throw new APIError("BAD_REQUEST", {
-            code: "INVALID_OTP",
-            message: "Invalid OTP",
-          });
-        }
-        return;
-      }
-      if (ctx.path !== PASSWORD_SIGN_IN) {
-        return;
-      }
-      const { email, ip } = attemptKey(
-        ctx.body?.email,
-        viewerAddress(ctx.headers)
-      );
-      if (!email) {
-        return;
-      }
-      // Refuses before the password is checked, which also means a locked pair
-      // costs no scrypt. If the counter itself fails, `checkSignInAllowed`
-      // throws and this hook lets it through rather than refusing the person;
-      // see `swallowing` for why that direction.
-      let verdict: Awaited<ReturnType<typeof checkSignInAllowed>>;
-      try {
-        verdict = await checkSignInAllowed(email, ip);
-      } catch (error) {
-        console.error(
-          "Sign-in attempt counter failed (check)",
-          redactQueryError(error)
-        );
-        return;
-      }
-      if (!verdict.allowed) {
-        throw new APIError("TOO_MANY_REQUESTS", {
-          code: "TOO_MANY_SIGN_IN_ATTEMPTS",
-          message: tooManyAttemptsMessage(verdict.retryAfterSeconds),
+      const spendsAGuess = ctx.path === CODE_SIGN_IN || ctx.path === CODE_CHECK;
+      if (spendsAGuess && (await codeGuessRefused(ctx))) {
+        throw new APIError("BAD_REQUEST", {
+          code: "INVALID_OTP",
+          message: "Invalid OTP",
         });
       }
     }),
@@ -587,8 +466,30 @@ export const auth = betterAuth({
       // hands out nothing: a browser that could get a claim without moving the
       // record could spend somebody else's guesses with it.
       if (ctx.path === CODE_SEND) {
+        // Only a send that succeeded moved the record, so success is read
+        // positively off the answer. A refused one still reaches this hook,
+        // because an after-hook runs even when the handler throws, and the
+        // record it would find is the owner's, unrotated.
         const address = signInCodeAddress(ctx);
-        if (address === null) {
+        if (address === null || isMalformedCodeRequest(ctx)) {
+          // The before-hook spent nothing on either, so there is nothing to
+          // give back.
+          return;
+        }
+        const sent =
+          (ctx.context.returned as { success?: unknown } | null)?.success ===
+          true;
+        if (!sent) {
+          // Refused inside the endpoint after the reservation, by a check of
+          // Better Auth's own; see `refundVerificationMail`.
+          try {
+            await refundVerificationMail(address);
+          } catch (error) {
+            console.error(
+              "Refunding a sign-in code send failed",
+              redactQueryError(error)
+            );
+          }
           return;
         }
         try {
@@ -610,27 +511,19 @@ export const auth = betterAuth({
         }
         return;
       }
-      if (ctx.path !== PASSWORD_SIGN_IN) {
-        return;
-      }
-      const { email, ip } = attemptKey(
-        ctx.body?.email,
-        viewerAddress(ctx.headers)
-      );
-      if (!email) {
-        return;
-      }
-      // Success is detected positively and a failure narrowly; see
-      // `isSuccessfulSignIn` for the bypass that shape exists to prevent.
-      // Anything that is neither, a malformed body or an unverified address,
-      // leaves the count untouched.
-      const returned = ctx.context.returned;
-      if (isSuccessfulSignIn(returned)) {
-        await swallowing("clear", () => clearSignInAttempts(email, ip));
-        return;
-      }
-      if (isWrongCredential(returned)) {
-        await swallowing("record", () => recordFailedSignIn(email, ip));
+      // A redeemed code proves the address, which is the moment a project may
+      // be linked to its proposer. A new row was claimed for at creation, so
+      // this is for the row that already existed unverified, a password
+      // account from before #576: Better Auth flips its flag in place, and
+      // the only hook of ours that sees the write is the name check. Every
+      // successful redeem runs this, because the session's user is read
+      // before the flip and cannot say which rows were unverified; claiming
+      // is idempotent and a verified row finds nothing.
+      if (ctx.path === CODE_SIGN_IN) {
+        const signedIn = ctx.context.newSession?.user;
+        if (signedIn) {
+          await claimProjectsFor(signedIn.id, signedIn.email);
+        }
       }
     }),
   },
@@ -653,9 +546,9 @@ export const auth = betterAuth({
   // still turned into its response by the router's own catch, so this changes
   // nothing a client sees.
   onAPIError: { throw: true },
-  // See DISABLED_OTP_PATHS. Six of the nine paths `emailOTP()` mounts are 404
-  // rather than served, one of them because serving it would reopen #575.
-  disabledPaths: DISABLED_OTP_PATHS,
+  // See DISABLED_PATHS: the retired password paths, and six of the nine
+  // `emailOTP()` mounts, are 404 rather than served.
+  disabledPaths: DISABLED_PATHS,
   advanced: {
     // CloudFront terminates TLS at the edge and forwards to the origin over
     // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in
@@ -665,6 +558,7 @@ export const auth = betterAuth({
     // production request resolved to no address and shared one bucket per
     // path (#519). Rate limiting is off outside production, so nothing local
     // exercises it; src/lib/__tests__/trusted-proxies.test.ts pins the walk.
+    // Also what `session.ipAddress` is resolved by.
     //
     // The value must stay non-empty whatever it holds, because the walk only
     // happens at all when the trusted list is non-empty. It does NOT name a
@@ -672,108 +566,7 @@ export const auth = betterAuth({
     // `preserve`, so the chain reaching the task is CloudFront's own, whose
     // last entry is the viewer (#535). Explained once in the Better Auth
     // section of docs/QUIRKS.md.
-    ipAddress: ipAddressOptions,
-  },
-  emailAndPassword: {
-    enabled: true,
-    requireEmailVerification: true,
-    sendResetPassword: async ({ user, url }) => {
-      await emailSender.send(user.email, passwordResetEmail({ url }));
-    },
-    // #554, piece B2. Fires in Better Auth's duplicate branch with the EXISTING
-    // row, and only because `requireEmailVerification` is true. It is the one
-    // place the real owner of a squatted address can be told anything at all:
-    // the HTTP response is a synthetic success, by design, so the person who
-    // actually owns the address otherwise sees "account created", receives
-    // nothing, and is refused at sign-in with no explanation. This changes no
-    // response and so gives up none of that enumeration protection; only
-    // whoever holds the inbox learns anything.
-    //
-    // Unverified only. A confirmed account belongs to somebody, and telling
-    // them about every stranger who typed their address is noise, not news.
-    onExistingUserSignUp: async ({ user: existing }) => {
-      if (existing.emailVerified) {
-        return;
-      }
-      try {
-        const recovery = forgotPasswordUrl();
-        if (!(recovery && (await mayMail(existing.email, "duplicate")))) {
-          return;
-        }
-        await emailSender.send(
-          existing.email,
-          addressAlreadyRegisteredEmail({ url: recovery })
-        );
-      } catch (error) {
-        // Better Auth awaits this through `runInBackgroundOrAwait`, which
-        // catches and logs through its own logger. Caught here anyway so the
-        // line is ours and carries no address (#559), and so a sign-up never
-        // depends on that internal staying the way it is.
-        console.error(
-          "Notifying an existing unverified account failed",
-          redactQueryError(error)
-        );
-      }
-    },
-    // A completed reset proves the person holds the inbox, which Better Auth
-    // does not record. See `mark-address-proven.ts` for why that proof is as
-    // good as a verification link, and why leaving it unrecorded would let the
-    // cap in piece D refuse a squatted student the one message they need.
-    onPasswordReset: async ({ user: reset }) => {
-      try {
-        const proven = await markAddressProven(reset.id);
-        if (proven) {
-          await claimProjectsFor(reset.id, proven.email);
-        }
-      } catch (error) {
-        console.error(
-          "Marking an address proven after a reset failed",
-          redactQueryError(error)
-        );
-      }
-    },
-  },
-  emailVerification: {
-    sendOnSignUp: true,
-    // A refused sign-in on an unverified account mails a fresh link, which is
-    // the only way out for a person whose first link expired or went missing:
-    // sign-in refuses them and nothing else in the app sends one. Better Auth
-    // runs this after the password check, so a wrong password costs no mail.
-    //
-    // A wrong password is the only thing that costs no mail, though. Sign-up is
-    // open, so anyone can register an address they do NOT own with a password
-    // they choose, and then every sign-in mails the real owner a fresh link.
-    // The rate limit on /sign-in/email used to be the only ceiling on that,
-    // which is why #535 left that one path on Better Auth's 3-per-10-seconds
-    // default while raising every other path around it. #554 metered the send
-    // instead, below, so that path's number is no longer doing double duty and
-    // #552 may now raise it on its own merits. Raising it is not this change's
-    // to make, and ADR-0039 is where the argument for the number lives.
-    sendOnSignIn: true,
-    autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user, url }) => {
-      // The cap (#554, piece D). Metering the SEND rather than the route is the
-      // whole point: the route is `/sign-in/email`, whose limit keys on the
-      // sender's address, and neither the sender's address nor its rate says
-      // anything about whose inbox is filling up. A refusal here is a silent
-      // skip and never an error, because the caller is a sign-up or a refused
-      // sign-in and neither should fail over a message that was not sent.
-      if (!(await mayMail(user.email, "verification"))) {
-        // No address in the line; `sign_in_attempts`'s sibling table holds the
-        // identifiers for anyone with database access (#559).
-        console.warn("Verification mail capped for a recipient");
-        return;
-      }
-      await emailSender.send(
-        user.email,
-        verificationEmail({ url: withVerificationLanding(url) })
-      );
-    },
-    // The address is proven at exactly this moment, so this is where a project
-    // may be linked to its proposer.
-    afterEmailVerification: async (verified) => {
-      await claimProjectsFor(verified.id, verified.email);
-    },
+    ipAddress: { trustedProxies: [...authConfig.trustedProxies] },
   },
   databaseHooks: {
     user: {
@@ -786,15 +579,15 @@ export const auth = betterAuth({
         before: async (created) => ({
           data: { ...created, name: requireUserName(created.name) },
         }),
-        // Covers OAuth, which never visits the email-verification routes and so
-        // never fires afterEmailVerification. The guard is what keeps this from
-        // claiming for an unverified password sign-up, where emailVerified is
-        // false at creation. GitHub sign-ups arrive here with emailVerified set
-        // to GitHub's own verified flag for the chosen email (see
-        // @better-auth/core/dist/social-providers/github.mjs getUserInfo), so a
-        // GitHub account with a GitHub-verified email is claimed at creation.
-        // ONID sign-ups always arrive with it set, because the university has
-        // already authenticated the person; see lib/_internal/onid-profile.ts.
+        // Every provider creates through here. A code sign-up arrives with
+        // emailVerified set, because the row does not exist until the code is
+        // redeemed. ONID sign-ups always arrive with it set, because the
+        // university has already authenticated the person; see
+        // lib/_internal/onid-profile.ts. GitHub sign-ups arrive with GitHub's
+        // own verified flag for the chosen email (see
+        // @better-auth/core/dist/social-providers/github.mjs getUserInfo), and
+        // the guard is what keeps this from claiming for a GitHub address
+        // GitHub has not verified.
         //
         // One other way in: the admin plugin's create-user takes an open data
         // record, so an admin can set emailVerified directly and claim for an
@@ -883,7 +676,7 @@ export const auth = betterAuth({
       // record is deleted. It is NOT the whole brute force story, because
       // `resendStrategy` defaults to `rotate` and a resend writes a fresh
       // record with the count back at zero. What bounds the resends is the
-      // per-recipient cap in `sendVerificationOTP` below.
+      // per-recipient cap, spent in the `hooks.before` on the send above.
       allowedAttempts: 3,
       // Open, deliberately. Industry partners and outside faculty have no ONID
       // and no office to route through, so closing this would leave them with

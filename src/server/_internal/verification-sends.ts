@@ -1,4 +1,4 @@
-import { and, eq, gt, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { verificationSends } from "#/db/schema";
 import {
@@ -8,20 +8,26 @@ import {
 } from "#/lib/verification-mail-limits";
 
 /**
- * The queries behind the per-recipient cap on verification mail (#554). The
+ * The queries behind the per-recipient cap on sign-in codes (#554, #576). The
  * decision itself is in `src/lib/verification-mail-limits.ts`, which imports
  * nothing, so the numbers can be unit tested without a database.
  */
 
-/** Normalised the one way Better Auth normalises an address. */
+/**
+ * Normalised the one way Better Auth normalises an address: lowercased, not
+ * trimmed. A padded address never gets here; the send guard leaves it for
+ * Better Auth to reject.
+ */
 function recipientKey(email: string): string {
-  return email.trim().toLowerCase();
+  return email.toLowerCase();
 }
 
+/** The one kind still written; see `VerificationMailKind`. */
+const KIND: VerificationMailKind = "sign-in-code";
+
 /**
- * Takes one message of one KIND out of an address's hourly allowance, and says
- * whether there was one to take. The kinds are metered apart; see
- * `VerificationMailKind` for the suppression that sharing one budget allowed.
+ * Takes one sign-in code out of an address's hourly allowance, and says whether
+ * there was one to take.
  *
  * Reads and writes rather than only reading, which is why it is not called
  * `isAllowed`. Every caller is about to send, so counting at the decision is
@@ -35,13 +41,10 @@ function recipientKey(email: string): string {
  * extra message on a race is not the failure it exists to prevent. Making it
  * exact would want a unique index per (address, slot) or a serializable
  * transaction, both of which buy precision nobody needs at the cost of turning
- * a mail send into a retry loop. `sign_in_attempts` has the same shape.
+ * a mail send into a retry loop.
  */
-export async function reserveVerificationMail(
-  email: string,
-  kind: VerificationMailKind
-): Promise<boolean> {
-  const limits = verificationMailLimits(kind);
+export async function reserveVerificationMail(email: string): Promise<boolean> {
+  const limits = verificationMailLimits();
   const recipient = recipientKey(email);
   const [row] = await db
     .select({ sends: sql<string>`count(*)` })
@@ -49,7 +52,7 @@ export async function reserveVerificationMail(
     .where(
       and(
         eq(verificationSends.email, recipient),
-        eq(verificationSends.kind, kind),
+        eq(verificationSends.kind, KIND),
         gt(
           verificationSends.createdAt,
           sql`now() - make_interval(mins => ${limits.windowMinutes})`
@@ -59,18 +62,17 @@ export async function reserveVerificationMail(
   if (!verificationMailAllowed(Number(row?.sends ?? 0), limits)) {
     return false;
   }
-  await db.insert(verificationSends).values({ email: recipient, kind });
+  await db.insert(verificationSends).values({ email: recipient, kind: KIND });
   // Bounded to this recipient rather than the whole table so it stays on the
-  // index and cannot turn a sign-up into a sequential scan. Rows for an address
+  // index and cannot turn a send into a sequential scan. Rows for an address
   // that never appears again are left behind; they are two short columns and
-  // nothing reads them, so a periodic sweep is not worth a scheduler. Same
-  // reasoning as `recordFailedSignIn`.
+  // nothing reads them, so a periodic sweep is not worth a scheduler.
   await db
     .delete(verificationSends)
     .where(
       and(
         eq(verificationSends.email, recipient),
-        eq(verificationSends.kind, kind),
+        eq(verificationSends.kind, KIND),
         lt(
           verificationSends.createdAt,
           sql`now() - make_interval(mins => ${limits.windowMinutes})`
@@ -78,4 +80,42 @@ export async function reserveVerificationMail(
       )
     );
   return true;
+}
+
+/**
+ * Gives back the allowance `reserveVerificationMail` took, for a send that then
+ * failed.
+ *
+ * The reservation has to come before the send, because the send rotates the
+ * record before it mails and a refusal after that would kill the code the
+ * person already holds. But Better Auth still has checks of its own inside the
+ * endpoint, after the reservation: its cross-site check, for one. A send it
+ * refuses there rotates nothing and mails nothing, so without this, five of
+ * them spent the recipient's whole hour in silence (#576).
+ *
+ * One statement, and the row is taken with `SKIP LOCKED`, because refunds
+ * arrive in bursts: every request in a burst Better Auth refuses gives one
+ * back at once. Selecting the newest row and then deleting it let two refunds
+ * pick the same row, give back one reservation between them, and leave the
+ * other counting for the rest of the window. It gives back the newest row
+ * rather than the one this request wrote, which comes to the same count, except
+ * after the caller failed open and wrote nothing: then it gives back a real
+ * send, which is one extra code in an hour and needs a database fault.
+ */
+export async function refundVerificationMail(email: string): Promise<void> {
+  const newest = db
+    .select({ id: verificationSends.id })
+    .from(verificationSends)
+    .where(
+      and(
+        eq(verificationSends.email, recipientKey(email)),
+        eq(verificationSends.kind, KIND)
+      )
+    )
+    .orderBy(desc(verificationSends.createdAt))
+    .limit(1)
+    .for("update", { skipLocked: true });
+  await db
+    .delete(verificationSends)
+    .where(inArray(verificationSends.id, newest));
 }

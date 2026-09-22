@@ -24,13 +24,24 @@ import { getUser } from "#/server/users";
 
 const PROVIDER_LABELS: Record<string, string> = {
   github: "GitHub",
+  onid: "ONID",
   google: "Google",
   linkedin: "LinkedIn",
   discord: "Discord",
-  credential: "Email & password",
 };
 
 const providerLabel = (id: string) => PROVIDER_LABELS[id] ?? id;
+
+/**
+ * How this person can sign in. An emailed code needs no `account` row, so it
+ * is listed for everyone rather than read from one, and a `credential` row is
+ * left out: production still holds the ones written before #576, and none of
+ * them signs anybody in.
+ */
+const signInMethods = (providers: string[]) => [
+  "Emailed code",
+  ...providers.filter((id) => id !== "credential").map(providerLabel),
+];
 
 export const Route = createFileRoute("/_authed/admin/users/$userId")({
   head: () => ({ meta: [{ title: pageTitle("Manage User") }] }),
@@ -134,9 +145,7 @@ function UserDetail() {
       )}
       <p className="text-sm">
         <span className="text-muted-foreground">Sign-in: </span>
-        {providers.length > 0
-          ? providers.map(providerLabel).join(", ")
-          : "No linked account"}
+        {signInMethods(providers).join(", ")}
       </p>
       <p className="text-sm">
         <span className="text-muted-foreground">Joined: </span>

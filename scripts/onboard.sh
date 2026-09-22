@@ -320,7 +320,7 @@ pause
 
 # ── Stage 4: GitHub sign-in, optional ──────────────────────────────────────
 stage "GitHub sign-in (optional)"
-say "Email and password sign-in works with no provider configured, and the"
+say "Sign-in by emailed code works with no provider configured, and the"
 say "seeded accounts use it. Register a GitHub OAuth app only if you want to"
 say "test that button. ONID sign-in needs nothing from you: UIT registered"
 say "the app, the public values are already in .env.local, and the secret"
@@ -350,9 +350,10 @@ pause
 
 # ── Stage 6: seed ──────────────────────────────────────────────────────────
 stage "Seed data"
-say "The dev seed creates accounts, all with the password \"password\", one per"
-say "role among them:"
+say "The dev seed creates accounts, one per role among them:"
 say "  user@example.com, instructor@example.com, admin@example.com"
+say "None has a password. Sign in with an emailed code: the dev server prints"
+say "the message, code included, to its terminal."
 say "plus programs, categories, projects and an inventory with holds in every"
 say "state. It drives the real write path, so what you see is what the app"
 say "does. Safe to re-run."

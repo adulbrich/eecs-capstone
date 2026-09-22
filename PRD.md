@@ -35,14 +35,16 @@ For developer setup, architecture notes, and the active roadmap, see
 ## 2. Authentication & Accounts
 
 - [x] Sign up, log in, log out (Better Auth).
-- [x] Email + password authentication.
-- [x] Email verification required after sign-up (verification link sent on
-  sign-up; auto sign-in after verification).
-- [x] Password reset by email.
+- [x] Sign-in by a six digit code mailed to the address and typed back into the
+  tab that asked for it (#576, ADR-0047). No account row exists until the code
+  is redeemed, so a new account is verified from the start; a new address is
+  asked for a name before its code is spent. There is no password: email and
+  password sign-in, email verification links and password reset were removed
+  in #576.
 - [x] A project proposed for someone before they have an account links to that
-  account once they verify the address. Only verification does this, never
-  sign-up alone, so nobody can claim another person's projects by registering
-  at their address.
+  account once they prove the address, by a code, ONID or a GitHub-verified
+  email. Only proof does this, never a row alone, so nobody can claim another
+  person's projects by registering at their address.
 - [x] GitHub SSO.
 - [ ] Google SSO.
 - [ ] LinkedIn SSO.
@@ -58,7 +60,6 @@ For developer setup, architecture notes, and the active roadmap, see
   "For professionals and faculty, not students") and a teams-to-mentor count
   (1-5, default 1). Opting in requires an affiliation. Staff act on these via
   the mentors admin surface (see §14).
-- [x] Change password from the profile page.
 - [x] Privacy policy at `/privacy`: a short public page, static in the repo,
   stating what the app collects, that published projects stay public, and what
   closing an account removes and keeps. Linked from sign-up (as a notice, not a
@@ -456,8 +457,7 @@ catalogue that decided the matrix below; #288 shipped it.
 
   | Recipient | Event | In-app | Email |
   | --- | --- | --- | --- |
-  | Account | Verify email (sign-up, refused unverified sign-in) | no | yes |
-  | Account | Reset password | no | yes |
+  | Account | Sign-in code (asked for at sign-in or sign-up) | no | yes |
   | Proposer | Changes requested | yes | yes |
   | Proposer | Approved | yes | yes |
   | Proposer | Returned to draft by staff | yes | yes, comment required (the force override is exempt) |
@@ -525,8 +525,9 @@ catalogue that decided the matrix below; #288 shipped it.
 - [x] Admin-only user list at `/admin/users` (instructors are redirected to
   `/admin`).
 - [x] Text search (email + name), role filter, include-banned toggle.
-- [x] User detail at `/admin/users/$id`: profile block, sign-in source (account
-  providers such as GitHub or email/password), a mentor indicator (opt-in state
+- [x] User detail at `/admin/users/$id`: profile block, sign-in methods (the
+  emailed code, which every account has, plus any linked ONID or GitHub
+  identity), a mentor indicator (opt-in state
   and team count), project + bookmark counts, five most recent projects, role
   select, ban form.
 - [x] Mentors page at `/admin/mentors`, open to all staff (admins and

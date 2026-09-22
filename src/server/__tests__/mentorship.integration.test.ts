@@ -24,8 +24,8 @@ import {
 } from "#/server/_internal/projects-queries";
 
 async function makeUser(email: string, role: "user" | "admin") {
-  await auth.api.signUpEmail({
-    body: { email, password: "Password1!", name: `Name of ${email}` },
+  await auth.api.createUser({
+    body: { email, name: `Name of ${email}` },
   });
   await db
     .update(user)

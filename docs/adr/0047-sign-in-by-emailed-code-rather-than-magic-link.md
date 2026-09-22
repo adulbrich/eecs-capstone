@@ -1,5 +1,7 @@
 # Sign-in is proved by an emailed code, not a magic link
 
+Amended on 2026-09-22 by [#576](https://github.com/adulbrich/eecs-capstone/issues/576): password sign-in is gone. The closing paragraph says what that changes about the price below.
+
 Better Auth's `emailOTP` plugin mails a six digit code that the person types
 back into the tab they started in, and `magicLink` mails a URL they click. The
 two have the same security property, that no `user` row exists until the address
@@ -30,9 +32,11 @@ the count back at zero, so an attacker who can ask for unlimited codes has
 unlimited guesses. `SIGN_IN_CODE_LIMIT`, a third kind in
 [ADR-0046](./0046-mail-about-an-address-is-capped-per-recipient.md)'s
 `verification_sends`, is what bounds the resends, at five an hour per recipient.
-It is higher than the other two kinds because it is sized from the opposite
-direction: those cap mail about an address whose owner has another way in, and
-this one caps the way in itself, so running out locks somebody out of the app.
+It was set higher than the other two kinds, verification links and
+duplicate-sign-up notices, because it is sized from the opposite direction:
+those capped mail about an address whose owner had another way in, and this one
+caps the way in itself, so running out locks somebody out of the app. Those two
+kinds went with the password in #576.
 Per-address rate limiting cannot do this job, for the reason
 [ADR-0039](./0039-sign-in-limits-are-sized-for-a-shared-address.md) gives, that
 campus NAT makes the sender's address meaningless. That is also why
@@ -72,9 +76,11 @@ That is cheaper than the three-guess burn it was written to prevent. Review pass
 3 on #580 caught it.
 
 With the send left open, a stranger asking for a code rotates the record and
-mails the owner the new one, so the owner is never left holding something they
-cannot use: they read the newest message, or they ask again and their own browser
-takes the claim.
+mails the owner the new one. The owner cannot redeem that code, because its claim
+went to the stranger's browser; an earlier draft said they could read the newest
+message and was wrong (review pass 2 on #576). What they can do, while they
+have a send left in the hour, is ask again, which rotates the record once more
+and hands their own browser the claim.
 
 **What this buys is a price, not a closure, and the difference is worth stating
 plainly because the first draft of this paragraph got it wrong.** A stranger who
@@ -100,8 +106,8 @@ browser's claim by moving the expiry. The secret is not in the database, so
 reading `verification` yields no claim to the code in it.
 
 One cost, accepted: a browser that loses the cookie cannot redeem the code it was
-sent, and has to ask again. Asking again always works, which is what makes that
-bearable rather than a lockout.
+sent, and has to ask again. Asking again works while a send is left in the hour,
+which is what makes that bearable rather than a lockout.
 
 One implementation note that is easy to get backwards. The per-recipient cap is
 spent in the `hooks.before` on the send, NOT inside `sendVerificationOTP`,
@@ -113,14 +119,15 @@ already holding.
 Six of the nine paths the plugin mounts are refused through `disabledPaths`, and
 one of them had to be. `/email-otp/verify-email` flips `emailVerified` on an
 address that presents a valid code without first calling
-`revokeUnprovenAccountAccess`, so while password sign-up still exists it is
-[#575](https://github.com/adulbrich/eecs-capstone/issues/575) through a new
-door: a squatter registers an address, its real owner asks for a code and
-redeems it there, and the owner has verified a row whose password the squatter
-chose. `/sign-in/email-otp` is the only path that revokes first, so it is the
-only one allowed to verify. The password-reset and email-change paths go for a
-duller reason, that this app has its own flows and a second set of endpoints
-reaching the same columns is surface with no caller.
+`revokeUnprovenAccountAccess`, so on a row a squatter registered with a
+password it is [#575](https://github.com/adulbrich/eecs-capstone/issues/575)
+through a new door: its real owner asks for a code and redeems it there, and the
+owner has verified a row whose password the squatter chose. Nobody can register
+one since #576, but production still holds the rows made before.
+`/sign-in/email-otp` is the only path that revokes first, so it is the only one
+allowed to verify. The password-reset and email-change paths go for a duller
+reason: nothing in this app calls them, and a set of endpoints reaching the
+same columns with no caller is surface for nothing.
 
 Two refusals are added ahead of the plugin, in
 `src/server/_internal/otp-sign-in-guard.ts`, because Better Auth's
@@ -140,11 +147,21 @@ a distinct refusal would answer "is there a banned or socially linked row at
 this address" to anyone who asked. The cost is that the two small populations it
 turns away get no explanation, and both have a person to talk to.
 
-What this accepts is a hard dependency on mail delivery. Today a password works
-even when SES is degraded; after this, and more so once password sign-in is
-removed, an outage in mail is an outage in sign-in for everyone without ONID.
-The exposure grows rather than appears, because every account already passes
-through a mailed verification link, but it grows. ONID is unaffected and carries
+What this accepts is a hard dependency on mail delivery. A password used to work
+even when SES was degraded; since #576 removed it, an outage in mail is an outage
+in sign-in for everyone without ONID or GitHub. The exposure grew rather than
+appeared, because every account already passed through a mailed verification
+link, but it grew. ONID is unaffected and carries
 about three quarters of sign-in traffic already, measured from the ALB access
 logs on 2026-09-22, so the population exposed to it is staff, mentors and
 industry partners rather than students.
+
+Password sign-in was removed on 2026-09-22 in #576, which changes the weight of
+the price above without changing the decision. A stranger who asks for a code
+can still spend its three guesses, at the cost of one of the recipient's sends,
+and that was bearable partly because the person whose code was burned still had
+a password. They no longer do, unless they have ONID or GitHub, so what the
+attack denies is sign-in itself rather than one route to it, for as long as the
+attacker keeps paying sends. The population exposed is the one without ONID:
+staff, mentors and industry partners. Closing it is still the margin described
+above, one live code per browser, and it was left out of #576 deliberately.

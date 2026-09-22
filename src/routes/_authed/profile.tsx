@@ -12,7 +12,6 @@ import { FieldError, SavedNote } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
-import { authClient } from "#/lib/auth-client";
 import { pageTitle } from "#/lib/page-title";
 import { useSignOut } from "#/lib/sign-out";
 import { useAction } from "#/lib/use-action";
@@ -42,12 +41,10 @@ function Profile() {
   const ctx = Route.useRouteContext() as { user: ProfileUser };
   const user = ctx.user;
   // One flight and one result slot per form. These used to be a single shared
-  // pair, which is why saving the profile printed "Saved." underneath the
-  // change-password form at the very bottom of the page.
+  // pair, which is why saving the profile printed "Saved." underneath a form
+  // further down the page.
   const profile = useAction({ fallback: "Save failed" });
   const [profileSaved, setProfileSaved] = useState<string | null>(null);
-  const password = useAction({ fallback: "Password change failed" });
-  const [passwordSaved, setPasswordSaved] = useState<string | null>(null);
   const signingOut = useSignOut();
   const [interests, setInterests] = useState("");
   const savingInterests = useAction({
@@ -110,25 +107,6 @@ function Profile() {
       // a live button beside it.
       await router.invalidate();
       setProfileSaved("Saved.");
-    });
-  }
-
-  function onChangePassword(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setPasswordSaved(null);
-    const form = new FormData(e.currentTarget);
-    void password.run(async () => {
-      // Better Auth returns its failure rather than throwing it, so this is
-      // where it becomes a rejection the hook can report.
-      const { error: cpError } = await authClient.changePassword({
-        currentPassword: String(form.get("current") ?? ""),
-        newPassword: String(form.get("next") ?? ""),
-        revokeOtherSessions: true,
-      });
-      if (cpError) {
-        throw new Error(cpError.message ?? "Password change failed");
-      }
-      setPasswordSaved("Password changed.");
     });
   }
 
@@ -250,40 +228,6 @@ function Profile() {
           </output>
         )}
         <FieldError message={savingInterests.error} />
-      </form>
-
-      <h2 className="mt-8 border-border border-t pt-8 font-semibold text-lg">
-        Change password
-      </h2>
-      <form className="mt-3 space-y-3" onSubmit={onChangePassword}>
-        <div className="space-y-1.5">
-          <Label htmlFor="current">Current password</Label>
-          <Input
-            autoComplete="current-password"
-            id="current"
-            name="current"
-            placeholder="••••••••"
-            required
-            type="password"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="next">New password</Label>
-          <Input
-            autoComplete="new-password"
-            id="next"
-            minLength={8}
-            name="next"
-            placeholder="••••••••"
-            required
-            type="password"
-          />
-        </div>
-        <Button className="w-full" disabled={password.busy} type="submit">
-          {password.busy ? "Changing..." : "Change password"}
-        </Button>
-        <FieldError message={password.error} />
-        <SavedNote message={passwordSaved} />
       </form>
 
       <div className="mt-8 border-border border-t pt-8">

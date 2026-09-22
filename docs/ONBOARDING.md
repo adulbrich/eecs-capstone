@@ -18,8 +18,8 @@ will do in your terminal, and a first week.
   credentials.
 - **ONID sign-in needs nothing from you.** UIT registered the app as a relying
   party on 2026-08-24 and issues the client secret; the discovery URL and client id
-  are public values already in `.env.example`. Locally, sign in with the seeded
-  email and password accounts. `docs/ONID-SSO.md` has the operating notes if you
+  are public values already in `.env.example`. Locally, sign in to the seeded
+  accounts with an emailed code. `docs/ONID-SSO.md` has the operating notes if you
   ever hold the secret.
 - **A GitHub OAuth app** is optional and personal: register one only to exercise
   the GitHub sign-in button locally. The wizard offers the step.
@@ -41,8 +41,9 @@ dev database. Re-running it is safe; it keeps what `.env.local` already holds.
 `README.md` covers the same steps by hand, the port-conflict case, and the email
 transport. Do not read it for the roadmap: that is GitHub Issues.
 
-The seed creates one account per role, among others, all with the password
-`password`:
+The seed creates one account per role, among others. None has a password: sign
+in with an emailed code, which the console transport prints, code included, to
+the terminal running `npm run dev`.
 
 | Address | Role |
 | --- | --- |

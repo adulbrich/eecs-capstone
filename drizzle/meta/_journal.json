@@ -253,6 +253,13 @@
       "when": 1790056828192,
       "tag": "0035_add_verification_sends",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1790111585986,
+      "tag": "0036_drop_sign_in_attempts",
+      "breakpoints": true
     }
   ]
 }

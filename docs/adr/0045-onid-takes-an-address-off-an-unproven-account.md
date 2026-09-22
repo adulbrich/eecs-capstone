@@ -1,5 +1,7 @@
 # ONID takes an address off an unproven account, deleting its password
 
+Amended on 2026-09-22 by [#576](https://github.com/adulbrich/eecs-capstone/issues/576): nobody can make a password account any more, so this now applies only to the rows written before, which production still holds. The hazard in the last paragraphs is closed: the verification link and the password reset it names are gone, and the other door for the owner of a squatted address is an emailed code, which takes the address off the row the same way ([ADR-0047](./0047-sign-in-by-emailed-code-rather-than-magic-link.md)).
+
 `onidUserInfo` in `src/lib/auth.ts` calls `releaseUnverifiedAddress` before
 Better Auth decides whether to link, and when the address is held by a row that
 is unverified, unbanned and has nothing but a `credential` account on it, that

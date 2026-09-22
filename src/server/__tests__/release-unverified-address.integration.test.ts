@@ -4,7 +4,6 @@ import { db } from "#/db";
 import { account, user } from "#/db/auth-schema";
 import { auth } from "#/lib/auth";
 import { releaseUnverifiedAddress } from "#/server/_internal/release-unverified-address";
-import { captureConsoleEmail } from "#/test/shared/console-email";
 
 // B1 of #554: an ONID sign-in takes an address away from a password account
 // nobody has proven owns it. Driven through the extracted function rather than
@@ -21,12 +20,15 @@ function anAddress(prefix: string): string {
   return `${prefix}-${Date.now()}-${nextAddress}@oregonstate.edu`;
 }
 
-/** Signs up and leaves the account unverified, which is what a squatter has. */
+/**
+ * An unverified row with a password behind it, which is what a squatter left.
+ * Nobody can make one any more (#576), but production still holds the ones
+ * made before, so the admin plugin's create stands in for the sign-up that
+ * wrote them.
+ */
 async function aSquattedAddress(email: string): Promise<void> {
-  await captureConsoleEmail("Verify your email", async () => {
-    await auth.api.signUpEmail({
-      body: { email, password: PASSWORD, name: "Squatter Name" },
-    });
+  await auth.api.createUser({
+    body: { email, password: PASSWORD, name: "Squatter Name" },
   });
 }
 
@@ -84,16 +86,14 @@ describe("releaseUnverifiedAddress", () => {
 
   it("leaves a verified row alone", async () => {
     const email = anAddress("verified");
-    const verifyUrl = await captureConsoleEmail(
-      "Verify your email",
-      async () => {
-        await auth.api.signUpEmail({
-          body: { email, password: PASSWORD, name: "Verified Owner" },
-        });
-      }
-    );
-    const token = new URL(verifyUrl).searchParams.get("token") as string;
-    await auth.api.verifyEmail({ query: { token } });
+    await auth.api.createUser({
+      body: {
+        email,
+        password: PASSWORD,
+        name: "Verified Owner",
+        data: { emailVerified: true },
+      },
+    });
 
     const released = await releaseUnverifiedAddress(email, "Somebody Else");
 
