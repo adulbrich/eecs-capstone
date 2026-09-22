@@ -46,8 +46,8 @@ both sub-agent prompts: the sub-agent has no other access to it.
   proposer edits that steers text published under the university's name is a
   finding, whatever a generic review's policy says about prompts.
 - **A secret or an address reaching a log (#559).** An error object, a request, or
-  a URL passed to any console method or logger. Find it: every logging call in the diff,
-  and what the value carries. A Drizzle query error interpolates its bound
+  a URL passed to any console method or logger. Find it: every logging call in the
+  diff, and what the value carries. A Drizzle query error interpolates its bound
   parameters into `message`, so `error.message` leaks the same as `error`; a session
   or reset token, an email address and a viewer IP are all bound parameters
   somewhere. ADR-0042 and the Drizzle section of `docs/QUIRKS.md` carry the rule and
@@ -101,6 +101,6 @@ logged query error carried the session token (#559), the rate limiter keyed on a
 CloudFront edge address until #556 applied `preserve`, and a shared campus address
 was one sign-in bucket until #557 counted per account. Each was a security defect
 the generic review would have filtered, so this skill carries only those classes
-and leaves the shared ones to the tool built for them. A harness with no built-in review covers the generic classes by hand
-against its category list: injection, authentication bypass, secrets in code, XSS
-and deserialization.
+and leaves the shared ones to the tool built for them. A harness with no built-in
+review covers the generic classes by hand against its category list: injection,
+authentication bypass, secrets in code, XSS and deserialization.

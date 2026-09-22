@@ -484,9 +484,22 @@ Running Vitest inside a sandboxed tool call dies with `EMFILE: too many open fil
 
 One harmless thing every run prints in this repo is `ReferenceError: module is not defined`, from the nitro Vite plugin loading under Vitest. The results above it and the exit code are still authoritative. Until 2026-09-10 every run also ended with `close timed out after 10000ms` and `something prevents 2 Vite servers from exiting`: that was the May nitro nightly holding a handle open, found by bisecting `vite.config.ts` plugins against a one-file run, and the September nightly closes cleanly. If it comes back, bisect the plugins again before blaming Vitest.
 
-### A scratch script that imports from `src/` needs the tsx loader and an `.svg` stub
+### A scratch script that reaches `src/lib/brand.ts` needs an `.svg` loader stub
 
-Vite resolves `#/` and the `.svg` import in `src/lib/brand.ts`; plain `tsx` does not. A one-off probe under `$TMPDIR` that imports a `src/lib` module runs with `node --import tsx/esm`, and any module that reaches `brand.ts` also needs a loader stub that returns a string for `.svg`, or it dies with `ERR_UNKNOWN_FILE_EXTENSION`. `correctness-review`'s Boundaries step is the first caller.
+A one-off probe under `$TMPDIR` that imports a `src/lib` module by absolute path runs with `node --import tsx/esm probe.mts` (the `.mts` extension matters: a `.ts` entry outside a `type: module` package is loaded as CommonJS and fails to resolve the import). `#/` resolves on its own through `package.json` `imports`. What Node has no loader for is Vite's `.svg?url` asset import in `src/lib/brand.ts`, so any module that reaches it dies with `ERR_UNKNOWN_FILE_EXTENSION`. Register a load hook that answers `.svg` with an empty string, and pass it as a second `--import`:
+
+```js
+// svg-stub.mjs
+import { register } from "node:module";
+register(
+  "data:text/javascript," +
+    encodeURIComponent(
+      'export async function load(url, context, next) { if (/\\.svg(\\?.*)?$/.test(url)) { return { format: "module", shortCircuit: true, source: "export default \\"\\"" }; } return next(url, context); }'
+    )
+);
+```
+
+`node --import tsx/esm --import ./svg-stub.mjs probe.mts` then runs `social-meta.ts` and its neighbours.
 
 ### Vitest 5 and better-auth's optional peer range
 
