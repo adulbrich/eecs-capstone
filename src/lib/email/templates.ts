@@ -92,6 +92,36 @@ export function passwordResetEmail(input: { url: string }): RenderedEmail {
   };
 }
 
+/**
+ * Mailed to the real owner of an address somebody else has already registered
+ * (#554, piece B2).
+ *
+ * Better Auth answers a duplicate sign-up with a synthetic success, so the
+ * person who actually owns the address gets "account created", receives
+ * nothing, and is then refused at sign-in with no way to find out why. That
+ * enumeration protection is worth keeping, and this does not weaken it: the
+ * HTTP response is unchanged, and only whoever holds the inbox sees this.
+ *
+ * Every word here is static, deliberately. The hook that sends it is handed the
+ * EXISTING row, whose name a squatter chose, so interpolating anything from it
+ * would let an attacker write text into a stranger's inbox.
+ */
+export function addressAlreadyRegisteredEmail(input: {
+  url: string;
+}): RenderedEmail {
+  return {
+    subject: "Someone signed up with your email address",
+    ...layout(
+      [
+        "Somebody tried to create an EECS Capstone account with this email address. An account with this address already exists and has never been confirmed, so it may not be yours.",
+        "At Oregon State, sign in with ONID and the address becomes yours. Otherwise reset the password below, then sign in.",
+        "If none of this was you, nothing needs doing. An unconfirmed account cannot be signed in to until somebody proves they hold this inbox.",
+      ],
+      { label: "Reset the password", url: input.url }
+    ),
+  };
+}
+
 export function projectSubmittedEmail(input: {
   description: string | null;
   proposerEmail: string | null;

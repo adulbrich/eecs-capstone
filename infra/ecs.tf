@@ -182,6 +182,8 @@ resource "aws_ecs_task_definition" "app" {
         { name = "SIGN_IN_SOFT_DELAY_SECONDS", value = var.sign_in_soft_delay_seconds },
         { name = "SIGN_IN_HARD_LIMIT", value = var.sign_in_hard_limit },
         { name = "SIGN_IN_HARD_DELAY_SECONDS", value = var.sign_in_hard_delay_seconds },
+        { name = "VERIFICATION_MAIL_WINDOW_MINUTES", value = var.verification_mail_window_minutes },
+        { name = "VERIFICATION_MAIL_LIMIT", value = var.verification_mail_limit },
         { name = "AI_REVIEW_LIMIT_PER_DAY", value = var.ai_review_limit_per_day },
         { name = "BEDROCK_SCOPE_REASONING_EFFORT", value = var.bedrock_scope_reasoning_effort },
         { name = "BEDROCK_SOCIAL_SUMMARY_REASONING_EFFORT", value = var.bedrock_social_summary_reasoning_effort },
