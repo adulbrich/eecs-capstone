@@ -25,7 +25,7 @@ own success criteria" below before reading this run as a green light for term.
 | Task size | 256 CPU units (0.25 vCPU), 1024 MB, Fargate ARM64 |
 | Database | `db.t4g.small`, `CPUCreditBalance` 371 and rising, surplus 0 |
 | Pool | 20 connections per task, 5 s acquire timeout (ADR-0034) |
-| Keep-alive | 65 s, above the ALB's 60 s `idle_timeout` (ADR-0039) |
+| Keep-alive | 65 s, above the ALB's 60 s `idle_timeout` (ADR-0041) |
 | Baseline | zero ELB 5XX and zero target 5XX in the preceding 3 hours |
 
 Tasks had been running 7 minutes when the first phase started, which matters below.
@@ -102,7 +102,7 @@ morning run logged; `HTTPCode_Target_4XX_Count` was 0.
 ## The 502 is gone, and the task logs agree
 
 Zero ELB 5XX, zero target 5XX, per minute across 21:46 to 21:56. The diagnosis in
-[ADR-0039](../adr/0039-the-task-outlasts-the-load-balancer-idle-timeout.md)
+[ADR-0041](../adr/0041-the-task-outlasts-the-load-balancer-idle-timeout.md)
 predicted this and the logs corroborate it the same way they did before: the only
 `Error: aborted` / `ECONNRESET` clusters in `/ecs/eecs-capstone` are at 21:47:11,
 the second the aborted run cut its own iterations, and at 21:53:38. Both are
