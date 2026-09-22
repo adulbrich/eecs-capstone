@@ -1,19 +1,18 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { SEED_PASSWORD, waitForHydration } from "../shared/playwright";
+import { waitForHydration } from "../shared/playwright";
+import { emailCode, logSize } from "./mail";
 
 /**
  * Every other test in this suite starts from a saved storage state, which means
  * none of them would notice if /sign-in stopped working. This one drives the
- * real form, and it is the reason the suite can trust the others.
+ * real form against a seeded account, reading the code out of the mail the way
+ * the person would, and it is the reason the suite can trust the others.
  */
 test.describe("@smoke authentication", () => {
   test("signs in through the form", async ({ page }) => {
     await page.goto("/sign-in");
-    await waitForHydration(page, "form");
-
-    await page.getByLabel("Email").fill("user@example.com");
-    await page.getByLabel("Password").fill(SEED_PASSWORD);
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await signInWithCode(page, "user@example.com");
 
     await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"), {
       timeout: 15_000,
@@ -27,38 +26,25 @@ test.describe("@smoke authentication", () => {
 
   test("returns to the page that sent it here", async ({ page }) => {
     // The guard sends an anonymous visitor to /sign-in?redirect=<path>, and
-    // signing in has to honour it. A callbackURL in the sign-in body used to
-    // come back as a redirect on the success path and win this race, landing
-    // a verified person on /verify-email instead (#254).
+    // signing in has to honour it. The code form navigates on success itself,
+    // so this is the only thing standing between a person and the page they
+    // were trying to reach.
     await page.goto("/sign-in?redirect=%2Fmy%2Fprojects");
-    await waitForHydration(page, "form");
-
-    await page.getByLabel("Email").fill("user@example.com");
-    await page.getByLabel("Password").fill(SEED_PASSWORD);
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await signInWithCode(page, "user@example.com");
 
     await expect(page).toHaveURL(/\/my\/projects/, { timeout: 15_000 });
-
-    // Reaching it is not the same as staying. The bug was a full-page
-    // navigation arriving after the router's own, so a polling URL assertion
-    // can sample the right address on the way to the wrong one. Waiting for
-    // the navigation that must not happen is what makes this test fail on the
-    // code it was written against.
-    //
-    // The regression this guards against assigns window.location.href inside
-    // the client's onSuccess hook, which better-fetch awaits before signIn
-    // resolves, so the competing navigation is already in flight before the
-    // assertion above starts. What this window bounds is how long that page
-    // load takes to commit on a loaded runner, not how long a response takes.
-    // It is spent on every passing run and only buys detection on a failing
-    // one, which is why it is seconds rather than the 15 above.
-    //
-    // Matched on the message: a bare rejection would also be satisfied by a
-    // closed context or an aborted navigation, neither of which is proof that
-    // nothing navigated.
-    await expect(
-      page.waitForURL(/\/verify-email/, { timeout: 5000 })
-    ).rejects.toThrow(/Timeout/);
-    await expect(page).toHaveURL(/\/my\/projects/);
   });
 });
+
+/** Asks for a code on the page already open, and confirms the one mailed. */
+async function signInWithCode(page: Page, email: string) {
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Email me a code instead" }).click();
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  const sentAt = await logSize();
+  await page.getByRole("button", { name: "Email me a code" }).click();
+  await page
+    .getByLabel("Code", { exact: true })
+    .fill(await emailCode(email, sentAt));
+  await page.getByRole("button", { name: "Confirm code" }).click();
+}
