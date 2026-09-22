@@ -885,65 +885,19 @@ export const aiReviewUsage = pgTable(
 );
 
 /**
- * One row per failed `/sign-in/email` attempt, which is what brute force
- * protection is keyed on here (#552).
+ * One row per sign-in code this app has mailed (#554, #576).
  *
- * Deliberately NOT a foreign key to `user`. The counter has to work for an
- * address that has no account, so that a refusal reveals nothing about whether
- * one exists: the attacker already knows how many times they tried, and that is
- * all a refusal tells them. An `email` text column is therefore the key, always
- * lowercased by the writer, because Better Auth looks users up with
- * `email.toLowerCase()` and a counter that did not would be bypassed by
- * changing one letter's case.
+ * The per-recipient cap on codes, which is the brute force control on the
+ * emailed code (ADR-0047): Better Auth's three guesses reset on every resend,
+ * so what bounds guessing is how many codes an address can be sent. Per
+ * RECIPIENT rather than per sender, because the sender's address says nothing
+ * about whose inbox is being filled and campus NAT makes it meaningless anyway
+ * (ADR-0039). It was built for verification links and a duplicate-sign-up
+ * notice, both gone with the password; ADR-0046 is the decision.
  *
- * `ip` is the second half of the key. Counting per address alone would let
- * anyone lock anyone else out by guessing their address a few times; pairing it
- * with the viewer means an attacker on another network cannot.
- *
- * What the second half actually holds depends on #556 having been APPLIED, not
- * merely merged. Until that `terraform apply` happens the ALB hands the task a
- * CloudFront edge address, so the pair is (email, edge server): still not
- * lockout-able by a stranger on another network, but diluted roughly five to
- * one, and two people through the same edge share a bucket. Afterwards it is
- * (email, viewer), which behind campus NAT is (email, pool address), tens of
- * devices rather than the internet. See ADR-0039.
- */
-export const signInAttempts = pgTable(
-  "sign_in_attempts",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    /** Lowercased by `recordFailedSignIn`, never by the database. */
-    email: text("email").notNull(),
-    /**
-     * The resolved viewer address, or `unresolved` when Better Auth could not
-     * read one. A sentinel rather than null so those attempts still count
-     * together instead of escaping the limit entirely; in production the
-     * address resolves, because CloudFront always sets the header.
-     */
-    ip: text("ip").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  // The only shape the limiter queries: this pair, within a time window.
-  (t) => [index("sign_in_attempts_pair_idx").on(t.email, t.ip, t.createdAt)]
-);
-
-/**
- * One row per message this app has sent about an unproven address (#554).
- *
- * Bounds an amplifier the app builds itself: sign-up is open and
- * `emailVerification.sendOnSignIn` is true, so anyone can register an address
- * they do not own and then mail its real owner a fresh verification link on
- * every sign-in. The cap is per RECIPIENT rather than per sender, because the
- * sender's address says nothing about whose inbox is being filled and campus
- * NAT makes it meaningless anyway (ADR-0039). The duplicate-sign-up notice
- * spends the same allowance, since it lands in the same inbox and an attacker
- * can trigger either.
- *
- * An address and a timestamp, which is the same pair `sign_in_attempts` holds
- * and which ADR-0036 and #513 already cover. Rows are pruned per recipient by
- * `reserveVerificationMail` rather than by a scheduled sweep.
+ * An address and a timestamp, which ADR-0036 and #513 already cover. Rows are
+ * pruned per recipient by `reserveVerificationMail` rather than by a scheduled
+ * sweep.
  */
 export const verificationSends = pgTable(
   "verification_sends",
@@ -952,10 +906,9 @@ export const verificationSends = pgTable(
     /** Lowercased by `reserveVerificationMail`, never by the database. */
     email: text("email").notNull(),
     /**
-     * Which message, from `VerificationMailKind`. The two are metered apart on
-     * purpose: a squatter can spend the `verification` allowance at will
-     * through `sendOnSignIn`, and sharing one budget let them silence the
-     * `duplicate` notice the real owner's own sign-up should have triggered.
+     * Which message, from `VerificationMailKind`. Only `sign-in-code` is
+     * written now; kinds are metered apart, and ADR-0046 records why sharing
+     * one budget between them was wrong.
      */
     kind: text("kind").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })

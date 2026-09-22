@@ -27,9 +27,6 @@ test.describe("@smoke signing in with an emailed code", () => {
       await page.goto("/sign-up");
       await waitForHydration(page);
 
-      await page
-        .getByRole("button", { name: "Email me a code instead" })
-        .click();
       await page.getByLabel("Email", { exact: true }).fill(email);
       const sentAt = await logSize();
       await page.getByRole("button", { name: "Email me a code" }).click();
@@ -67,9 +64,6 @@ test.describe("@smoke signing in with an emailed code", () => {
     try {
       await page.goto("/sign-up");
       await waitForHydration(page);
-      await page
-        .getByRole("button", { name: "Email me a code instead" })
-        .click();
       await page.getByLabel("Email", { exact: true }).fill(email);
       const signUpSend = await logSize();
       await page.getByRole("button", { name: "Email me a code" }).click();
@@ -90,9 +84,6 @@ test.describe("@smoke signing in with an emailed code", () => {
 
       await page.goto("/sign-in");
       await waitForHydration(page);
-      await page
-        .getByRole("button", { name: "Email me a code instead" })
-        .click();
       await page.getByLabel("Email", { exact: true }).fill(email);
       const signInSend = await logSize();
       await page.getByRole("button", { name: "Email me a code" }).click();
@@ -279,9 +270,6 @@ test.describe("refusals on the emailed code", () => {
     try {
       await page.goto("/sign-up");
       await waitForHydration(page);
-      await page
-        .getByRole("button", { name: "Email me a code instead" })
-        .click();
       await page.getByLabel("Email", { exact: true }).fill(email);
       await page.getByRole("button", { name: "Email me a code" }).click();
 
@@ -340,7 +328,6 @@ const ALLOWED_ATTEMPTS = 3;
 async function startCodeStep(page: Page, email: string): Promise<string> {
   await page.goto("/sign-up");
   await waitForHydration(page);
-  await page.getByRole("button", { name: "Email me a code instead" }).click();
   await page.getByLabel("Email", { exact: true }).fill(email);
   return await sendFrom(page, email);
 }

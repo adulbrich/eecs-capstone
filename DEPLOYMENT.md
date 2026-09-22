@@ -370,21 +370,30 @@ HTTPS.
 
 ## 6. Bootstrap the first admins
 
-The app requires email verification and RDS is private, so admins are bootstrapped
-in two steps. Do this for **at least two** people (the app blocks a sole admin
-from demoting or banning themselves).
+Admins are made from accounts that already exist, and RDS is private, so they
+are bootstrapped in two steps. Do this for **at least two** people (the app
+blocks a sole admin from demoting or banning themselves).
 
-With no email provider configured yet (see the callout in section 2),
-`EMAIL_TRANSPORT=console` writes verification links to stderr, which
-CloudWatch captures instead of an inbox. Once the first deploy (section 5)
-has run and someone has signed up, pull their link from the logs:
+There is no password (#576): an account is made by asking for a code at
+`/sign-up` and typing it back into the same tab, and ONID works too for anyone
+with an Oregon State account. With no email provider configured yet (see the
+callout in section 2), `EMAIL_TRANSPORT=console` writes each message to stderr,
+which CloudWatch captures instead of an inbox, so the code is read from the logs.
+Once the first deploy (section 5) has run and someone has asked for a code:
 
 ```bash
-aws --profile aws-capstone1 logs tail /ecs/eecs-capstone --since 5m --region us-west-2 | grep -A2 "VERIFY EMAIL"
+aws --profile aws-capstone1 logs tail /ecs/eecs-capstone --since 5m --region us-west-2 | grep -B4 "Your sign-in code is"
 ```
 
-1. Each future admin signs up through the app UI with email and password.
-   Pull their verification link from the command above and have them open it.
+The `to:` line four above each code says whose it is. A code lasts five minutes
+and only works in the browser tab that asked for it, so read it out to the
+person rather than typing it in somewhere else, and have them ask again if it
+expires. That log group holds working codes for as long as this transport is
+selected, which is one more reason to finish section 9 early.
+
+1. Each future admin creates an account through the app UI, with a code at
+   `/sign-up` (read from the command above, or their inbox once section 9 is
+   done) or with ONID.
 2. Promote each to admin by running the bundled one-off task. This reuses the
    exact network configuration of the running service so it can reach the
    private database:
@@ -414,16 +423,19 @@ Repeat with the second admin's email. Check the task's CloudWatch log for
 - `curl -I https://capstone.eecs.oregonstate.edu/api/healthz` returns `200`.
 - Signing in with GitHub completes the OAuth round trip.
 - The origin check accepts the public hostname. This POST should return
-  `INVALID_EMAIL_OR_PASSWORD`, not `INVALID_ORIGIN`:
+  `INVALID_OTP`, not `INVALID_ORIGIN`. The cookie is what makes Better Auth
+  check the origin at all, and checking a code rather than asking for one keeps
+  the probe from mailing anybody:
 
   ```bash
-  curl -s -X POST https://capstone.eecs.oregonstate.edu/api/auth/sign-in/email \
+  curl -s -X POST https://capstone.eecs.oregonstate.edu/api/auth/email-otp/check-verification-otp \
     -H 'Content-Type: application/json' \
     -H 'Origin: https://capstone.eecs.oregonstate.edu' \
-    -d '{"email":"probe@example.invalid","password":"x"}'
+    -H 'Cookie: probe=1' \
+    -d '{"email":"probe@example.invalid","otp":"000000","type":"sign-in"}'
   ```
-- Email/password sign-up writes a verification link to CloudWatch (section 6)
-  and completes once that link is opened.
+- Signing up at `/sign-up` writes a code to CloudWatch (section 6), or mails it
+  once section 9 is done, and completes once that code is typed in.
 - Uploading a project image works and the image loads from
   `https://<assets-dist>.cloudfront.net/...`.
 - Triggering an AI project review succeeds (Bedrock via the task role).
@@ -1483,9 +1495,9 @@ Request production access from the SES console (Account dashboard → Request
 production access). It goes to AWS Support with roughly a day's turnaround and
 is independent of the DNS work, so file it early. Expect to describe the
 sending use case, volume, and how bounces are handled. For this app the honest
-answers are: transactional only (email verification and password reset, no
+answers are: transactional only (sign-in codes and review notices, no
 marketing), recipients are self-selected users who typed their own address into
-a sign-up form, a few hundred messages per term with bursts at term start, and
+a sign-in form, a few hundred messages per term with bursts at term start, and
 bounces handled by the account-level suppression list, which is adequate at this
 volume. There are no configuration sets, so there is no SNS bounce plumbing to
 describe; do not claim otherwise.
@@ -1652,9 +1664,8 @@ aws --profile aws-capstone1 ecs describe-task-definition --task-definition "$TD"
 
 If it shows the old host, run the deploy workflow.
 
-**Sign-up seems to hang with no verification email.** Expected: no email
-provider is configured yet. Pull the verification link from CloudWatch
-(section 6) instead.
+**A sign-in code never arrives.** Expected while no email provider is
+configured. Pull the code from CloudWatch (section 6) instead.
 
 **CloudFront returns 502/504.** Usually the task is unhealthy. Check the target
 group health and the task logs. The ALB health check path is `/api/healthz`;
@@ -1713,53 +1724,6 @@ this config; delete it manually if you are done with the project.
   after `var.access_log_retention_days`. They hold client IP addresses; see
   [ADR-0036](./docs/adr/0036-access-logs-keep-raw-addresses-for-thirty-days.md).
 
-**Watching for password spraying.** The sign-in attempt counter (#552) is per
-(account, viewer address) pair, so it cannot see one guess made against each of
-ten thousand addresses: no pair ever reaches its limit. What makes that visible
-is the volume of failures across the fleet. Every recorded failure logs the line
-`Failed sign-in recorded`, deliberately carrying no address and no email, so the
-count is one query:
-
-```
-filter @message like /Failed sign-in recorded/
-| stats count(*) as failures by bin(1m)
-```
-
-No `sort` and no `fields`: a binned `stats` is already a time series, and
-`@timestamp` does not survive the aggregation, so sorting on it is an error
-rather than a no-op.
-
-**What the count can and cannot tell you.** It is an alarm, not a diagnosis. A
-volume of failures with no identifiers in it cannot tell a spray across ten
-thousand addresses from one account being hammered from ten thousand addresses,
-and both defeat the per-pair counter in exactly the same way. It also cannot
-tell either of those from an ordinary bad morning: a first week of term with
-everyone mistyping a password looks like volume too. What it does is make any of
-them visible at all, which nothing else here does, because a per-pair counter
-sees only its own pair.
-
-So treat a sustained rise as the signal to go and look, and do the looking in
-`sign_in_attempts`, which holds the attempted address and the viewer address and
-can therefore answer the question the log line cannot:
-
-```sql
-select count(*) as attempts,
-       count(distinct email) as accounts,
-       count(distinct ip) as addresses
-from sign_in_attempts
-where created_at > now() - interval '1 hour';
-```
-
-Many accounts and few addresses is a spray from a small set of hosts. Few
-accounts and many addresses is a distributed attack on those accounts. Roughly
-equal, and low, is a normal week. The identifiers are in the table rather than
-in the log group on purpose: ADR-0042 and #559 exist to keep exactly this class
-of value out of `/ecs/eecs-capstone`.
-
-Either way the response is a decision rather than a setting. The per-pair
-numbers do not help against either shape, and AWS WAF account takeover
-prevention, declined in ADR-0039, is what covers them.
-
 **Runtime environment (set in the task definition, `infra/ecs.tf`):**
 
 `NODE_ENV`, `PORT`, `BETTER_AUTH_URL`, `TRUSTED_PROXY_CIDR`,
@@ -1770,9 +1734,8 @@ prevention, declined in ADR-0039, is what covers them.
 `BEDROCK_SCOPE_REASONING_EFFORT`, `AI_SCOPE_LIMIT_PER_HOUR`,
 `AI_SCOPE_LIMIT_PER_DAY`, `BEDROCK_SOCIAL_SUMMARY_REASONING_EFFORT`,
 `BEDROCK_SOCIAL_SUMMARY_ENABLED`, `AI_SOCIAL_SUMMARY_LIMIT_PER_HOUR`,
-`AI_SOCIAL_SUMMARY_LIMIT_PER_DAY`, `SIGN_IN_ATTEMPT_WINDOW_MINUTES`,
-`SIGN_IN_SOFT_LIMIT`, `SIGN_IN_SOFT_DELAY_SECONDS`, `SIGN_IN_HARD_LIMIT`,
-`SIGN_IN_HARD_DELAY_SECONDS`, `EMAIL_TRANSPORT=ses`, `EMAIL_FROM`,
+`AI_SOCIAL_SUMMARY_LIMIT_PER_DAY`, `VERIFICATION_MAIL_WINDOW_MINUTES`,
+`SIGN_IN_CODE_LIMIT`, `EMAIL_TRANSPORT=ses`, `EMAIL_FROM`,
 `EMAIL_REPLY_TO`, `EMAIL_STAFF_INBOX`, `SES_REGION`, plus secrets
 `DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`,
 `ONID_CLIENT_SECRET`. In production, S3 and Bedrock use the task role, so no

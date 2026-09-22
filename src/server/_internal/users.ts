@@ -351,8 +351,9 @@ export async function getUserImpl(data: { id: string }) {
     .from(projectBookmarks)
     .where(eq(projectBookmarks.userId, data.id));
 
-  // Sign-in sources (Better Auth account providers): "github", "google",
-  // "credential" (email/password), etc. A user usually has one.
+  // Linked sign-in identities (Better Auth account providers): "onid",
+  // "github", and "credential" on rows from before #576, which no longer signs
+  // anybody in. An account made with an emailed code has none.
   const accounts = await db
     .select({ providerId: account.providerId })
     .from(account)

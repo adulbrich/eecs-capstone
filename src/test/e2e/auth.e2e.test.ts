@@ -39,7 +39,6 @@ test.describe("@smoke authentication", () => {
 /** Asks for a code on the page already open, and confirms the one mailed. */
 async function signInWithCode(page: Page, email: string) {
   await waitForHydration(page);
-  await page.getByRole("button", { name: "Email me a code instead" }).click();
   await page.getByLabel("Email", { exact: true }).fill(email);
   const sentAt = await logSize();
   await page.getByRole("button", { name: "Email me a code" }).click();

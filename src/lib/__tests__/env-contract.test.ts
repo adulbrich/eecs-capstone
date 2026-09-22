@@ -221,9 +221,9 @@ describe("the environment contract", () => {
     // .env.example but forgotten in infra/ecs.tf does not fail: it silently
     // takes its default in production, which is worse than failing.
     //
-    // Scoped to the app, not the scripts: SEED_ADMIN_EMAIL and its password
-    // are read only by scripts/seed-admin.ts, which is run from a shell and
-    // never from the task, so their absence there is correct.
+    // Scoped to the app, not the scripts: SEED_ADMIN_EMAIL is read only by
+    // scripts/seed-admin.ts, which is run from a shell and never from the
+    // task, so its absence there is correct.
     expect(missing).toEqual([]);
   });
 

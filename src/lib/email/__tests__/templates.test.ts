@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   escapeHtml,
-  passwordResetEmail,
   projectApprovedEmail,
   projectChangesRequestedEmail,
   projectSubmittedEmail,
-  verificationEmail,
+  signInCodeEmail,
 } from "../templates";
 
 describe("escapeHtml", () => {
@@ -20,20 +19,14 @@ describe("escapeHtml", () => {
   });
 });
 
-describe("verificationEmail", () => {
-  it("keeps the existing subject and carries the url", () => {
-    const email = verificationEmail({ url: "https://x/verify?t=abc" });
-    expect(email.subject).toBe("Verify your email");
-    expect(email.text).toContain("https://x/verify?t=abc");
-    expect(email.html).toContain("https://x/verify?t=abc");
-  });
-});
-
-describe("passwordResetEmail", () => {
-  it("keeps the existing subject and carries the url", () => {
-    const email = passwordResetEmail({ url: "https://x/reset?t=abc" });
-    expect(email.subject).toBe("Reset your password");
-    expect(email.text).toContain("https://x/reset?t=abc");
+describe("signInCodeEmail", () => {
+  it("carries the code and no link", () => {
+    const email = signInCodeEmail({ otp: "123456" });
+    expect(email.subject).toBe("Your sign-in code");
+    expect(email.text).toContain("Your sign-in code is 123456.");
+    // A link here would be a magic link, which is what ADR-0047 declined.
+    expect(email.text).not.toMatch(/https?:\/\//);
+    expect(email.html).not.toContain("<a ");
   });
 });
 

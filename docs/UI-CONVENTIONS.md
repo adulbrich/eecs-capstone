@@ -443,14 +443,13 @@ carries this padding signature, with `max-w-*` chosen per page (see below):
 `px-4 py-6` gives comfortable touch margins; `md:p-8` expands to the desktop-standard
 32px. A bare `p-8` wrapper wastes a third of the width on a phone.
 
-Page width is chosen by content, not fixed. Counting the 19 route roots that carry
+Page width is chosen by content, not fixed. Counting the 18 route roots that carry
 this `px-4 py-6 md:p-8` signature: `max-w-2xl` on the 8 form, dashboard and prose pages
 (`projects/new`, `projects/$projectId/edit`, `admin/index`, `admin/programs/$programId`,
 `admin/users/$userId`, `inventory/new`, `inventory/$itemId/edit`, `privacy`), `max-w-4xl` on 7
 pages that hold a list, a two-column detail layout or a grid of figures, `max-w-3xl` on the one
 long-form page (`projects/$projectId.tsx`), and `max-w-md` on two narrow-content
-pages (`profile.tsx`, `admin/categories/$categoryId.tsx`) plus `max-w-sm` on
-`verify-email.tsx`. Of the seven `max-w-4xl` pages, three hold a single-column
+pages (`profile.tsx`, `admin/categories/$categoryId.tsx`). Of the seven `max-w-4xl` pages, three hold a single-column
 card list (`projects/index.tsx`, `inventory/index.tsx`, `my/projects.tsx`),
 `my/items.tsx` holds an attention region and one grouped table with a filter
 above it, all bounded to the title width since a borrower's list is
@@ -462,7 +461,7 @@ title, the way the admin tables do. `projects/index.tsx` and
 `inventory/index.tsx` used to as well; since #350 and #352 they pass
 `mx-auto max-w-4xl xl:max-w-7xl` to `ListingLayout`, so the table is bounded
 with the cards below `xl` and shares the wider grid with the aside from `xl`.
-`/admin/projects` and `/admin/inventory` pass no width and run full, as before. The sign-in/sign-up/forgot/reset-password cards
+`/admin/projects` and `/admin/inventory` pass no width and run full, as before. The sign-in and sign-up cards
 are narrower still but live inside the separate `island-shell` container below, not
 this padding pattern.
 
@@ -1160,7 +1159,7 @@ Radix `SelectItem` rejects `value=""`, so an unset option needs a sentinel. Use
 
 ### Auth pages
 
-Sign-in, sign-up, forgot-password, and reset-password share an `island-shell` card:
+Sign-in and sign-up share an `island-shell` card:
 
 ```tsx
 <div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">

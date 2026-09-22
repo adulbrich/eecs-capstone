@@ -113,11 +113,11 @@ already holding.
 Six of the nine paths the plugin mounts are refused through `disabledPaths`, and
 one of them had to be. `/email-otp/verify-email` flips `emailVerified` on an
 address that presents a valid code without first calling
-`revokeUnprovenAccountAccess`, so while password sign-up still exists it is
-[#575](https://github.com/adulbrich/eecs-capstone/issues/575) through a new
-door: a squatter registers an address, its real owner asks for a code and
-redeems it there, and the owner has verified a row whose password the squatter
-chose. `/sign-in/email-otp` is the only path that revokes first, so it is the
+`revokeUnprovenAccountAccess`, so on a row a squatter registered with a password
+it is [#575](https://github.com/adulbrich/eecs-capstone/issues/575) through a
+new door: its real owner asks for a code and redeems it there, and the owner has
+verified a row whose password the squatter chose. Nobody can register one since
+#576, but production still holds the rows made before. `/sign-in/email-otp` is the only path that revokes first, so it is the
 only one allowed to verify. The password-reset and email-change paths go for a
 duller reason, that this app has its own flows and a second set of endpoints
 reaching the same columns is surface with no caller.
@@ -140,11 +140,21 @@ a distinct refusal would answer "is there a banned or socially linked row at
 this address" to anyone who asked. The cost is that the two small populations it
 turns away get no explanation, and both have a person to talk to.
 
-What this accepts is a hard dependency on mail delivery. Today a password works
-even when SES is degraded; after this, and more so once password sign-in is
-removed, an outage in mail is an outage in sign-in for everyone without ONID.
-The exposure grows rather than appears, because every account already passes
-through a mailed verification link, but it grows. ONID is unaffected and carries
+What this accepts is a hard dependency on mail delivery. A password used to work
+even when SES was degraded; since #576 removed it, an outage in mail is an outage
+in sign-in for everyone without ONID or GitHub. The exposure grew rather than
+appeared, because every account already passed through a mailed verification
+link, but it grew. ONID is unaffected and carries
 about three quarters of sign-in traffic already, measured from the ALB access
 logs on 2026-09-22, so the population exposed to it is staff, mentors and
 industry partners rather than students.
+
+Password sign-in was removed on 2026-09-22 in #576, which changes the weight of
+the price above without changing the decision. A stranger who asks for a code
+can still spend its three guesses, at the cost of one of the recipient's sends,
+and that was bearable partly because the person whose code was burned still had
+a password. They no longer do, unless they have ONID or GitHub, so what the
+attack denies is sign-in itself rather than one route to it, for as long as the
+attacker keeps paying sends. The population exposed is the one without ONID:
+staff, mentors and industry partners. Closing it is still the margin described
+above, one live code per browser, and it was left out of #576 deliberately.

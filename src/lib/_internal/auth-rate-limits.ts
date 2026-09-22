@@ -32,9 +32,9 @@ import type { BetterAuthRateLimitOptions } from "better-auth";
  *
  * It is NOT the window of every rule Better Auth ships. `getDefaultSpecialRules`
  * has a second rule at 3 per **60** seconds covering `/request-password-reset`,
- * `/send-verification-email` and `/forget-password*`. Those are left alone:
- * they meter outbound email rather than guard a credential, so a shared address
- * is the right thing for them to meter.
+ * `/send-verification-email` and `/forget-password*`. It reaches nothing here:
+ * those paths went with the password (#576) and are 404 through `disabledPaths`
+ * in `src/lib/auth.ts`, which answers before the limiter runs.
  *
  * #535 quotes the global default as 100 per 60 seconds. That is what Better
  * Auth's prose docs say and it is wrong for the installed version, which is 100
@@ -45,13 +45,14 @@ const WINDOW_SECONDS = 10;
 const GLOBAL_MAX = 100;
 
 /**
- * What one address may spend per window on a path that checks no credential.
+ * What one address may spend per window on a path where the number protects
+ * nothing.
  *
  * `/sign-in/oauth2` (ONID) and `/sign-in/social` (GitHub) mint an OAuth state
- * and redirect, so the password is typed at Microsoft or GitHub; `/sign-up/email`
- * creates an account. Better Auth's first special rule puts all three on 3,
- * which behind a NAT pool address refuses the fourth student since the last
- * lull and protects nothing in exchange.
+ * and redirect, so the password is typed at Microsoft or GitHub. Better Auth's
+ * first special rule puts both on 3, which behind a NAT pool address refuses
+ * the fourth student since the last lull and protects nothing in exchange. The
+ * two code-entry paths take it too, for the reason given beside them below.
  *
  * 60 does not make the refusal impossible, because of the accumulation above:
  * a busy pool address at term start reaches it and then goes quiet for up to a
@@ -62,53 +63,22 @@ const GLOBAL_MAX = 100;
 const UNCHECKED_MAX = 60;
 
 /**
- * What one address may spend per window on `/change-password`.
- *
- * Much lower than the paths above, for two reasons that point the same way.
- *
- * The legitimate call rate is near zero. Sign-in and sign-up have to tolerate a
- * lecture hall arriving at once; nobody changes their own password five times
- * between lulls, so a small number costs a real user nothing.
- *
- * And the call is expensive on purpose. `update-user.mjs` hashes the NEW
- * password BEFORE it verifies the current one, so a wrong guess still pays a
- * full scrypt hash plus a full scrypt verify, measured at about 118 ms of CPU.
- * At 5 that is roughly 6% of a core per key; at 60 it would be most of a core
- * per key, on a fleet of three to four tasks with no WAF in front.
- *
- * Two halves of that, and they do not have the same reach.
- * `sensitiveSessionMiddleware` rejects an unauthenticated call before any
- * hashing, so only someone already signed in can spend the CPU, though any
- * student has an account. The BUDGET has no such protection: the limiter runs
- * in the router's `onRequest`, ahead of routing and middleware, so five
- * anonymous 401s from one pool address refuse `/change-password` for everyone
- * behind it until a lull. That is accepted over the CPU: changing a password
- * is rare and the refusal clears itself, while a core per task does not.
- *
- * This is `/change-password`'s standing control, not a stopgap: #552 covers
- * `/sign-in/email` and does not extend here. It is also the one number left in
- * this file that still guards a credential, which is why it is the one that
- * most wants the shared counter this app does not have (ADR-0039).
- */
-const CHANGE_PASSWORD_MAX = 5;
-
-/**
  * What one address may spend per window on `/email-otp/send-verification-otp`.
  *
- * This is the one OTP path that mails somebody, so it inherits ADR-0039's
- * REASON for holding `/sign-in/email` down, that a number here is also a cap on
- * mail aimed at an inbox the sender does not own. It does not inherit the
- * number. ADR-0039 is at 3 because that limit was the only thing bounding the
+ * This is the one path that mails somebody, so it inherits the REASON ADR-0039
+ * gave for holding the old `/sign-in/email` down, that a number here is also a
+ * cap on mail aimed at an inbox the sender does not own. It does not inherit
+ * the number. ADR-0039 set 3 because that limit was the only thing bounding the
  * mail at all; the per-recipient budget in `verification-mail-limits.ts` now
  * bounds what any one inbox can be made to receive whatever this says, which
  * leaves this one job only: making bulk mail to MANY addresses from a single
  * source slow, which a per-recipient cap cannot do.
  *
  * Ten rather than 60 because the population is not a lecture hall. ONID carries
- * about three quarters of sign-in traffic already, and once password sign-in is
- * gone every OSU person is steered to ONID, so the addresses reaching this path
- * are staff, mentors and industry partners. A NAT pool does not fill up with
- * them at term start the way it fills with students.
+ * about three quarters of sign-in traffic, and with password sign-in gone every
+ * OSU person is steered to ONID, so the addresses reaching this path are staff,
+ * mentors and industry partners. A NAT pool does not fill up with them at term
+ * start the way it fills with students.
  */
 const SEND_CODE_MAX = 10;
 
@@ -124,10 +94,8 @@ export const authRateLimit: BetterAuthRateLimitOptions = {
     // limiting it guards nothing and only decides how early a shared campus
     // address stops being able to render a page.
     "/get-session": false,
-    "/change-password": { window: WINDOW_SECONDS, max: CHANGE_PASSWORD_MAX },
     "/sign-in/oauth2": UNCHECKED_RULE,
     "/sign-in/social": UNCHECKED_RULE,
-    "/sign-up/email": UNCHECKED_RULE,
     // The three email-otp paths (#576). They are listed here rather than left
     // to the plugin because `emailOTP()` registers its own rules at 3 per 60
     // seconds keyed on address and path, which is the shape ADR-0039 rejects,
@@ -150,35 +118,19 @@ export const authRateLimit: BetterAuthRateLimitOptions = {
 };
 
 /**
- * Two paths Better Auth's first special rule reaches that are deliberately NOT
+ * A path Better Auth's first special rule reaches that is deliberately NOT
  * listed above, so nobody has to re-derive why.
  *
- * `/sign-in/email` keeps the default of 3. Raising it would be consistent with
- * everything else here, and it was raised and then reverted:
- * `emailVerification.sendOnSignIn` mails a fresh verification link on every
- * successful sign-in to an unverified account, and anyone can register an
- * address they do not own with a password they choose. So this number is also
- * what throttles verification mail aimed at a stranger's inbox, and 60 would
- * make that twenty times easier (#554). It throttles rather than bounds: the
- * counter is per task and currently per CloudFront edge address, so the real
- * figure across the fleet is a multiple of 3 and not 3. The campus cost is
- * accepted because password sign-in here is a few dozen staff and mentors
- * rather than a lecture hall, and ONID is what students use. Raise this only
- * once #554 meters the send, and #552 is the control that should carry it.
+ * `/change-email` keeps the default of 3. Note that "nothing reaches it" would
+ * be wrong: the endpoint is mounted whatever `user.changeEmail` says, and a
+ * direct call is served and counted. What is true is that no flow in this app
+ * calls it, so the default is left in place rather than a number nobody can
+ * justify. Give it one when a flow appears.
  *
- * `/change-email` also matches and also keeps the default. Note that "nothing
- * reaches it" would be wrong: the endpoint is mounted whatever
- * `user.changeEmail` says, and a direct call is served and counted. What is
- * true is that no flow in this app calls it, so the default is left in place
- * rather than a number nobody can justify. Give it one when a flow appears.
- * See the comment above `withVerificationLanding` in src/lib/auth.ts.
+ * The retired password paths need no entry here or above. They are 404 through
+ * `disabledPaths` in `src/lib/auth.ts`, which answers before the limiter runs,
+ * so no rule would ever be consulted for them (#576).
  */
-export const UNRULED_BY_DESIGN = ["/sign-in/email", "/change-email"] as const;
+export const UNRULED_BY_DESIGN = ["/change-email"] as const;
 
-export {
-  CHANGE_PASSWORD_MAX,
-  GLOBAL_MAX,
-  SEND_CODE_MAX,
-  UNCHECKED_MAX,
-  WINDOW_SECONDS,
-};
+export { GLOBAL_MAX, SEND_CODE_MAX, UNCHECKED_MAX, WINDOW_SECONDS };

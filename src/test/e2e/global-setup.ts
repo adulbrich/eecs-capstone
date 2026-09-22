@@ -9,7 +9,7 @@
 import { eq } from "drizzle-orm";
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "../../db/schema";
-import { SEED_PASSWORD, saveStorageState } from "../shared/playwright";
+import { saveStorageState } from "../shared/playwright";
 import {
   ADMIN_AUTH,
   BASE_URL,
@@ -34,13 +34,11 @@ export default async function globalSetup() {
     saveStorageState({
       baseURL: BASE_URL,
       email: "user@example.com",
-      password: SEED_PASSWORD,
       outputPath: USER_AUTH,
     }),
     saveStorageState({
       baseURL: BASE_URL,
       email: "admin@example.com",
-      password: SEED_PASSWORD,
       outputPath: ADMIN_AUTH,
     }),
     // Paid by the smoke run on the pull-request path too, since both suites
@@ -50,7 +48,6 @@ export default async function globalSetup() {
     saveStorageState({
       baseURL: BASE_URL,
       email: OTHER_EMAIL,
-      password: SEED_PASSWORD,
       outputPath: OTHER_AUTH,
     }),
   ]);

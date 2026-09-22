@@ -154,7 +154,6 @@ test.describe("account lifecycle", () => {
 async function sendCode(page: Page, path: string, email: string) {
   await page.goto(path);
   await waitForHydration(page);
-  await page.getByRole("button", { name: "Email me a code instead" }).click();
   await page.getByLabel("Email", { exact: true }).fill(email);
   const sentAt = await logSize();
   await page.getByRole("button", { name: "Email me a code" }).click();

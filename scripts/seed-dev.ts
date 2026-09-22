@@ -42,8 +42,6 @@ import {
   seedProjectVector,
 } from "./seed-recommendations";
 
-const PASSWORD = "password";
-
 // ---------------------------------------------------------------------------
 // Users
 // ---------------------------------------------------------------------------
@@ -128,7 +126,13 @@ const USERS = {
   },
 } satisfies Record<string, SeedUser>;
 
-/** Sign up (or find) a user, then force role + verified state. Returns the row. */
+/**
+ * Create (or find) a user, then force role + verified state. Returns the row.
+ *
+ * No password: there is none to sign in with (#576). Sign in as any of these
+ * with an emailed code, which the console transport prints to the dev server's
+ * terminal.
+ */
 async function ensureUser(seed: SeedUser) {
   const [existing] = await db
     .select()
@@ -147,13 +151,9 @@ async function ensureUser(seed: SeedUser) {
     console.log(`user: ${seed.email} (exists, role=${seed.role})`);
     return { ...existing, role: seed.role };
   }
-  const result = await auth.api.signUpEmail({
-    body: { email: seed.email, password: PASSWORD, name: seed.name },
+  const result = await auth.api.createUser({
+    body: { email: seed.email, name: seed.name },
   });
-  if (!result?.user) {
-    console.error(`sign-up did not return a user for ${seed.email}`);
-    process.exit(1);
-  }
   await db
     .update(user)
     .set({
@@ -163,7 +163,7 @@ async function ensureUser(seed: SeedUser) {
       linkedin: seed.linkedin ?? null,
     })
     .where(eq(user.id, result.user.id));
-  console.log(`user: ${seed.email} (created, password=${PASSWORD})`);
+  console.log(`user: ${seed.email} (created)`);
   const [row] = await db.select().from(user).where(eq(user.id, result.user.id));
   return row;
 }
@@ -1170,7 +1170,7 @@ async function seedInventoryFlows(
 
   console.log("inventory flows: 11 seeded");
   console.log(
-    "  sign in as user@example.com (password) and open /my/items: two overdue"
+    "  sign in as user@example.com (a code) and open /my/items: two overdue"
   );
   console.log(
     "  badges, one healthy hold, and closed requests below. The bell fills on"

@@ -1,5 +1,7 @@
 # A log line takes a string, never an error object
 
+Amended on 2026-09-22 by [#576](https://github.com/adulbrich/eecs-capstone/issues/576): password reset and verification tokens, two of the values named below, no longer exist. The rule is unchanged, because session tokens and addresses still reach a logger by the same route.
+
 Every `catch` in this codebase logs `redactQueryError(error)` from
 `src/lib/_internal/redact-query-error.ts` and never the error itself, because
 an error object carries more than its message and the extra is sometimes a

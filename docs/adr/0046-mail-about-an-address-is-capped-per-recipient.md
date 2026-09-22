@@ -1,5 +1,7 @@
 # Mail about an unproven address is capped per recipient, and fails open
 
+Amended on 2026-09-22 by [#576](https://github.com/adulbrich/eecs-capstone/issues/576): the verification link and the duplicate-sign-up notice went with the password, and so did `VERIFICATION_MAIL_LIMIT` and `DUPLICATE_NOTICE_LIMIT`. `sign-in-code` is the only kind left, and [ADR-0047](./0047-sign-in-by-emailed-code-rather-than-magic-link.md) says why its cap is the brute force control rather than a mail cap. Why kinds are metered apart, and why the counter fails open, both stand.
+
 `reserveVerificationMail` in `src/server/_internal/verification-sends.ts` allows
 three verification links an hour to one address and, in a budget of its own, two
 duplicate-sign-up notices, counted in a new `verification_sends` table keyed on

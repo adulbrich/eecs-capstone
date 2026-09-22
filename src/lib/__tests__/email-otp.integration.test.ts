@@ -2,6 +2,7 @@ import { eq, like } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { account, session, user, verification } from "#/db/auth-schema";
+import { projects } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { captureConsoleCode } from "#/test/shared/console-email";
 
@@ -186,9 +187,8 @@ describe("redeeming a code against a row that already exists", () => {
     expect(before?.emailVerified).toBe(false);
     expect(await providersOn(before?.id as string)).toEqual(["credential"]);
 
-    // A live session on the squatted row, which the ordinary flow cannot make
-    // (`requireEmailVerification` refuses the sign-in that would mint one). It
-    // is inserted so the revocation has something to revoke: asserting zero
+    // A live session on the squatted row, which no flow here makes. It is
+    // inserted so the revocation has something to revoke: asserting zero
     // sessions on a row that never had one proves nothing, and the criterion
     // names sessions as well as the password.
     await db.insert(session).values({
@@ -216,16 +216,36 @@ describe("redeeming a code against a row that already exists", () => {
     // hand over rather than merely verified.
     expect(await providersOn(after?.id as string)).toEqual([]);
     // And the squatter's session with it. Counting sessions would be the wrong
-    // assertion in both directions: the row starts with none because
-    // `requireEmailVerification` refuses the sign-in that would mint one, and
-    // it ends with one because this sign-in mints the OWNER's. The token is
-    // what says whose.
+    // assertion: the row ends with one because this sign-in mints the OWNER's.
+    // The token is what says whose.
     expect(await sessionTokensOn(after?.id as string)).not.toContain(
       `tok-${before?.id}`
     );
-    await expect(
-      auth.api.signInEmail({ body: { email, password: PASSWORD } })
-    ).rejects.toMatchObject({ body: {} });
+  });
+
+  it("links the projects waiting on an unverified row once its code is redeemed", async () => {
+    // A new row is claimed for at creation, but this one already existed, and
+    // Better Auth flips its flag in place without a hook that claims. The
+    // verification link used to be where these were claimed, and it went with
+    // the password, so the redeem has to do it.
+    const email = anAddress("waiting");
+    await aSquattedAddress(email);
+    const [project] = await db
+      .insert(projects)
+      .values({ proposerEmail: email, status: "draft", title: "Waiting" })
+      .returning();
+
+    const code = await sendCode(email);
+    await auth.api.signInEmailOTP({
+      body: { email, otp: code },
+      headers: claimHeaders(email),
+    });
+
+    const [after] = await db
+      .select({ proposerId: projects.proposerId })
+      .from(projects)
+      .where(eq(projects.id, project.id));
+    expect(after.proposerId).toBe((await rowFor(email))?.id);
   });
 
   it("leaves a verified password account alone", async () => {
@@ -251,14 +271,10 @@ describe("redeeming a code against a row that already exists", () => {
     const after = await rowFor(email);
     expect(after?.id).toBe(before?.id);
     expect(after?.name).toBe("Verified Owner");
-    // `revokeUnprovenAccountAccess` no-ops on a verified row, so the password
-    // survives the cut-over and this person can still use it.
+    // `revokeUnprovenAccountAccess` no-ops on a verified row, so the
+    // credential row survives. It is inert: the paths that read it are 404
+    // since #576, which `auth.integration.test.ts` covers.
     expect(await providersOn(after?.id as string)).toEqual(["credential"]);
-    const stillWorks = await auth.api.signInEmail({
-      asResponse: true,
-      body: { email, password: PASSWORD },
-    });
-    expect(stillWorks.headers.get("set-cookie")).toBeTruthy();
   });
 });
 
