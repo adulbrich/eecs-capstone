@@ -13,6 +13,16 @@ import { SupportEmailLink } from "./support-email-link";
  * The copy is unchanged because it is still the right instruction for that
  * case: verify the account, then ONID links. It is a dead end on its own, so
  * the message says which door to go through instead.
+ *
+ * One case it does NOT serve, named here rather than left for somebody to hit:
+ * `releaseUnverifiedAddress` also refuses a BANNED row, and a banned account
+ * cannot sign in with a password either, so "sign in with your password and
+ * verify your email first" is advice that cannot be followed. That is a support
+ * contact, not a self-service remedy, and the string is left alone because the
+ * state needs an admin to have banned the row holding somebody else's
+ * unverified address, which no ordinary sequence produces. Give this code its
+ * own banned-specific clause if that stops being true; `docs/ONID-SSO.md`
+ * carries the same note beside the two refusals.
  */
 const OAUTH_ERRORS: Record<string, ReactNode> = {
   account_not_linked:

@@ -173,7 +173,12 @@ Two rows are still refused, and `/sign-in` still renders the banner for them. An
 unverified row that some other provider is already linked to belongs to whoever
 holds that identity, and a banned row would hand the student an account an admin
 has shut, which is a worse dead end than the refusal; clearing a ban is a
-person's decision, not a sign-in's.
+person's decision, not a sign-in's. The banner's advice, to verify the password
+account first, cannot be followed in the banned case, because a banned account
+cannot sign in with a password either. That is a support contact rather than a
+self-service remedy, and the copy is left alone because an admin has to have
+banned a row holding somebody else's unverified address for it to arise at
+all.
 
 ## Rotating the secret
 

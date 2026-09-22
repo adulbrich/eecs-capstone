@@ -63,3 +63,19 @@ verification link on the app. The cap is what makes recording a completed
 password reset as proof of the address load-bearing rather than tidy: without
 that, the fourth message in an hour to a squatted address is the one the real
 owner needs after resetting, and this would refuse it.
+
+`sendResetPassword` is deliberately NOT metered by this, which review raised and
+which is a decision rather than an omission. Metering it would put a cap back
+across the recovery path, which is the dead end `onPasswordReset` exists to
+remove, and it would let a squatter spend the owner's way back in. The harm
+model is also not the same: a verification link mailed to somebody who did not
+create the account is a trap, because using it confirms a stranger's row, while
+a reset link mailed to the address can only ever give the person holding that
+inbox a password nobody else knows. What is left is nuisance volume, and that is
+already bounded by Better Auth's own second special rule, 3 per 60 seconds,
+which covers `/request-password-reset` and which
+[ADR-0039](./0039-sign-in-limits-are-sized-for-a-shared-address.md) left alone
+on purpose; `src/lib/_internal/auth-rate-limits.ts` says so where the rules are
+set. If that path is ever raised, this paragraph is the reason to meter the send
+here instead, as a third kind with its own budget rather than folded into
+`verification`.
