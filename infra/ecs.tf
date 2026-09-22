@@ -284,6 +284,15 @@ resource "aws_ecs_service" "app" {
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 100
 
+  # Off because ECS refuses a maximum of 100 percent while it is on: the
+  # first apply of the cap above failed with "Availability Zone Rebalancing
+  # does not support maximumPercent <= 100". What it did was move tasks back
+  # into an availability zone after that zone recovered from an outage; with
+  # two zones and a floor of three tasks the fleet is uneven at rest anyway,
+  # and placement still spreads new tasks across zones at launch. The pool
+  # depth the cap buys is worth more than that. ADR-0043.
+  availability_zone_rebalancing = "DISABLED"
+
   # A failed deploy rolls back to the previous task definition instead of
   # leaving the service trying to place a task that cannot start. Without
   # this, a bad revision loops until someone notices; the old task keeps

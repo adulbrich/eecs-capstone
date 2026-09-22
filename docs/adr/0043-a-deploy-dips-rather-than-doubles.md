@@ -49,7 +49,12 @@ out of `infra/ecs.tf` beside `app_max_tasks` out of `infra/variables.tf`, so
 the task ceiling is derived from both writings and a change to either fails
 the test rather than silently overrunning the instance. Do not deploy during
 the first hour of a term start morning, or during any announced arrival; the
-dip is half the fleet, and nothing stops the workflow running. Autoscaling
+dip is half the fleet, and nothing stops the workflow running. ECS refuses a
+maximum of 100 percent while availability zone rebalancing is on, which the
+service had by default, so that is now off: with two zones and three tasks
+the fleet is uneven at rest anyway, placement still spreads new tasks across
+zones at launch, and what is lost is only the automatic move back into a
+zone after it recovers from an outage. Autoscaling
 can still raise the desired count to four during a deploy, and the ceiling
 counts that, so a scale-out mid-deploy is inside the budget. The order of rollout is a human step and nothing in the repo enforces it:
 `terraform apply` first, then the deploy. The apply changes the service in
