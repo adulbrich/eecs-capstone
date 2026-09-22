@@ -99,7 +99,7 @@ export async function reserveVerificationMail(email: string): Promise<boolean> {
  * pick the same row, give back one reservation between them, and leave the
  * other counting for the rest of the window. It gives back the newest row
  * rather than the one this request wrote, which comes to the same count, except
- * after `mayMail` failed open and wrote nothing: then it gives back a real
+ * after the caller failed open and wrote nothing: then it gives back a real
  * send, which is one extra code in an hour and needs a database fault.
  */
 export async function refundVerificationMail(email: string): Promise<void> {

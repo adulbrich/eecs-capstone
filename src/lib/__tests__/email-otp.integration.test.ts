@@ -647,8 +647,8 @@ describe("the per-recipient cap on sends", () => {
 
 /**
  * Requests from a stranger that Better Auth refuses, by its own validation or by
- * a check inside the endpoint (#576). Each case was red before the fix it
- * names; docs/QUIRKS.md says why.
+ * a check inside the endpoint (#576). Each case was red before the fix;
+ * docs/QUIRKS.md says why.
  */
 describe("requests Better Auth refuses", () => {
   function postRaw(

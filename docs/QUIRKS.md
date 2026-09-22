@@ -359,7 +359,7 @@ Better Auth validates the body inside the endpoint, after every before-hook has 
 
 ### Better Auth skips its origin and cross-site checks under a test runner
 
-`advanced.disableOriginCheck` defaults to true when Better Auth detects a test runner (`isTest()` in `better-auth/dist/context/create-context.mjs`), which also skips the cross-site check an endpoint runs through `formCsrfMiddleware`. So an integration test cannot see a refusal those checks make unless it turns them back on: set `(await auth.$context).skipOriginCheck = false` for the one request and restore it in a `finally`, because every integration file shares one process. "spends nothing on a send Better Auth refuses after the guard has run" in `email-otp.integration.test.ts` does it.
+With `advanced.disableOriginCheck` unset, `context.skipOriginCheck` falls back to `isTest()` (`better-auth/dist/context/create-context.mjs`), so under Vitest the origin check is off, and so is the cross-site check an endpoint runs through `formCsrfMiddleware`. An integration test cannot see a refusal those checks make unless it turns them back on: set `(await auth.$context).skipOriginCheck = false` for the one request and restore it in a `finally`, because every later test in the same file shares that context. "spends nothing on a send Better Auth refuses after the guard has run" in `email-otp.integration.test.ts` does it.
 
 ### `throw new APIError("OK", ...)` short-circuits a hook, but only over the router
 

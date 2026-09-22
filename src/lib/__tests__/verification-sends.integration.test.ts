@@ -59,11 +59,14 @@ describe("refundVerificationMail", () => {
       await reserveVerificationMail(email);
     }
 
+    // Two fewer refunds than reservations, so a refund that gave back more
+    // than one row fails this as surely as two that gave back the same one.
+    const refunds = limit - 2;
     await Promise.all(
-      Array.from({ length: limit }, () => refundVerificationMail(email))
+      Array.from({ length: refunds }, () => refundVerificationMail(email))
     );
 
-    for (let i = 0; i < limit; i += 1) {
+    for (let i = 0; i < refunds; i += 1) {
       expect(await reserveVerificationMail(email)).toBe(true);
     }
     expect(await reserveVerificationMail(email)).toBe(false);
