@@ -140,7 +140,6 @@ function SignUp() {
             the sign-in page and for the same reason. */}
         <p className="mt-6 text-muted-foreground text-sm">
           <Button
-            className="underline"
             onClick={() => setUseCode((on) => !on)}
             size="bare"
             type="button"

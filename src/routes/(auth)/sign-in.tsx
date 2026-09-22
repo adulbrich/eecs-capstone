@@ -149,10 +149,17 @@ function SignIn() {
             secondary choices rather than above the form, because a button that
             changes which field is on screen reads as an instruction when it is
             the first thing above that field. When the password goes, this page
-            is the code form and this line goes with it. */}
+            is the code form and this line goes with it.
+
+            No underline at rest, unlike the links beside it. The rule in
+            UI-CONVENTIONS is about anchors in running text, and the `link`
+            Button variant underlines on hover instead because it renders a
+            plain button element as often as an anchor;
+            `brand-link-scan.test.ts` exempts the variant for exactly that
+            reason, and `ClearFiltersButton` is the other call site. Adding the
+            class here turns `button-conventions.test.ts` red instead. */}
         <p className="mt-6 flex flex-wrap items-center gap-x-4 text-muted-foreground text-sm">
           <Button
-            className="underline"
             onClick={() => {
               setError(null);
               setUseCode((on) => !on);
