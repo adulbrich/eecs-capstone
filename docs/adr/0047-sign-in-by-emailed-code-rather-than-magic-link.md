@@ -40,6 +40,32 @@ campus NAT makes the sender's address meaningless. That is also why
 plugin's three: the guess budget does not depend on it, so the only thing the
 number decides is whether a shared campus address can type a code.
 
+The attempt counter that bounds guessing is also a way to lock somebody out, and
+that is the sharpest cost of choosing a code over a link. `atomicVerifyOTP`
+counts attempts on the verification record, which is keyed on the address alone
+and on nothing about who is asking, and its own docstring says a record whose
+attempts are exhausted is "left consumed (no recreate), locking the identifier
+out". So anyone who knows an address can post three wrong codes to
+`/sign-in/email-otp` inside the five minute window and destroy the code its owner
+is holding, repeatedly, faster than `SIGN_IN_CODE_LIMIT` lets the owner ask for
+another. It is not the check endpoint that opens this and disabling that endpoint
+would not close it. Rate limiting does not close it either: three requests is
+cheap from one address and cheaper from several, and the number here has to stay
+high enough that a shared campus address can type a code.
+
+A magic link has no equivalent, because a 32 character token needs no attempt
+counter, which is a point for the link that the comparison above does not make.
+It is not enough to reverse the choice: the cross-device failure is certain and
+affects everyone, while this needs a motivated attacker who knows an address, and
+today every non-ONID person still has a password to fall back on. That last
+clause is what stops this being a blocker, and it expires when password sign-in
+is removed, so it is recorded as the thing to resolve before that happens rather
+than as an accepted risk. Binding the code to the browser that asked for it, with
+a cookie set at send and required at redeem, is the option that fits the design
+without giving up the cross-device property; nothing in the plugin does it today.
+[#581](https://github.com/adulbrich/eecs-capstone/issues/581) carries the
+options and has to close before password sign-in does.
+
 Six of the nine paths the plugin mounts are refused through `disabledPaths`, and
 one of them had to be. `/email-otp/verify-email` flips `emailVerified` on an
 address that presents a valid code without first calling
