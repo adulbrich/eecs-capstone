@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { verificationSends } from "#/db/schema";
 import {
@@ -91,14 +91,19 @@ export async function reserveVerificationMail(email: string): Promise<boolean> {
  * person already holds. But Better Auth still has checks of its own inside the
  * endpoint, after the reservation: its cross-site check, for one. A send it
  * refuses there rotates nothing and mails nothing, so without this, five of
- * them spent a stranger's whole hour in silence (#576).
+ * them spent the recipient's whole hour in silence (#576).
  *
- * The newest row for the recipient, not necessarily the one this request wrote;
- * two sends to one address at once can swap which row each gives back, and the
- * count comes out the same.
+ * One statement, and the row is taken with `SKIP LOCKED`, because refunds
+ * arrive in bursts: every request in a burst Better Auth refuses gives one
+ * back at once. Selecting the newest row and then deleting it let two refunds
+ * pick the same row, give back one reservation between them, and leave the
+ * other counting for the rest of the window. It gives back the newest row
+ * rather than the one this request wrote, which comes to the same count, except
+ * after `mayMail` failed open and wrote nothing: then it gives back a real
+ * send, which is one extra code in an hour and needs a database fault.
  */
 export async function refundVerificationMail(email: string): Promise<void> {
-  const [newest] = await db
+  const newest = db
     .select({ id: verificationSends.id })
     .from(verificationSends)
     .where(
@@ -108,10 +113,9 @@ export async function refundVerificationMail(email: string): Promise<void> {
       )
     )
     .orderBy(desc(verificationSends.createdAt))
-    .limit(1);
-  if (newest) {
-    await db
-      .delete(verificationSends)
-      .where(eq(verificationSends.id, newest.id));
-  }
+    .limit(1)
+    .for("update", { skipLocked: true });
+  await db
+    .delete(verificationSends)
+    .where(inArray(verificationSends.id, newest));
 }

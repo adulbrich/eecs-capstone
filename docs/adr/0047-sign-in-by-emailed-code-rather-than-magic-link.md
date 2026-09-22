@@ -78,8 +78,9 @@ That is cheaper than the three-guess burn it was written to prevent. Review pass
 With the send left open, a stranger asking for a code rotates the record and
 mails the owner the new one. The owner cannot redeem that code, because its claim
 went to the stranger's browser; an earlier draft said they could read the newest
-message and was wrong (review pass 2 on #576). What they can always do is ask
-again, which rotates the record once more and hands their own browser the claim.
+message and was wrong (review pass 2 on #576). What they can do, while they
+have a send left in the hour, is ask again, which rotates the record once more
+and hands their own browser the claim.
 
 **What this buys is a price, not a closure, and the difference is worth stating
 plainly because the first draft of this paragraph got it wrong.** A stranger who
@@ -105,8 +106,8 @@ browser's claim by moving the expiry. The secret is not in the database, so
 reading `verification` yields no claim to the code in it.
 
 One cost, accepted: a browser that loses the cookie cannot redeem the code it was
-sent, and has to ask again. Asking again always works, which is what makes that
-bearable rather than a lockout.
+sent, and has to ask again. Asking again works while a send is left in the hour,
+which is what makes that bearable rather than a lockout.
 
 One implementation note that is easy to get backwards. The per-recipient cap is
 spent in the `hooks.before` on the send, NOT inside `sendVerificationOTP`,

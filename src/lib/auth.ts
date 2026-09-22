@@ -153,7 +153,8 @@ interface CodeRequest {
  * Leaving the send open costs nothing the mail cap was not already accepting.
  * A stranger's send rotates the record and mails the owner the new code. The
  * owner cannot redeem that one, because its claim went to the stranger's
- * browser, but asking again always works and takes the claim back. What they
+ * browser, but asking again works, while they have a send left in the hour, and
+ * takes the claim back. What they
  * cannot do is outrun the per-recipient cap, which is ADR-0046's accepted
  * tradeoff and predates all of this.
  */

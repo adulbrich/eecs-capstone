@@ -646,23 +646,20 @@ describe("the per-recipient cap on sends", () => {
 });
 
 /**
- * Bodies Better Auth's own validation rejects, from a stranger (#576). Each case
- * was red before `isMalformedCodeRequest`; docs/QUIRKS.md says why.
+ * Requests from a stranger that Better Auth refuses, by its own validation or by
+ * a check inside the endpoint (#576). Each case was red before the fix it
+ * names; docs/QUIRKS.md says why.
  */
 describe("requests Better Auth refuses", () => {
   function postRaw(
     path: string,
     body: Record<string, unknown>,
-    cookie?: string
+    headers: Record<string, string> = { origin: ORIGIN }
   ): Promise<Response> {
     return auth.handler(
       new Request(`${ORIGIN}/api/auth${path}`, {
         body: JSON.stringify(body),
-        headers: {
-          "content-type": "application/json",
-          origin: ORIGIN,
-          ...(cookie ? { cookie } : {}),
-        },
+        headers: { "content-type": "application/json", ...headers },
         method: "POST",
       })
     );
@@ -708,8 +705,9 @@ describe("requests Better Auth refuses", () => {
       expect(padded.status).toBe(400);
     }
 
-    // The cap key trims, so these used to count against the owner, and the
-    // handler then mailed nothing: five requests, a silent hour's lockout.
+    // These used to count against the owner, because the guard spent the
+    // budget before Better Auth refused the address, and nothing was mailed:
+    // five requests, a silent hour's lockout.
     expect(await sendsSpentBy(email)).toBe(0);
     expect(await sendCode(email)).toHaveLength(6);
   });
@@ -726,16 +724,10 @@ describe("requests Better Auth refuses", () => {
     context.skipOriginCheck = false;
     let refused: Response;
     try {
-      refused = await auth.handler(
-        new Request(`${ORIGIN}/api/auth/email-otp/send-verification-otp`, {
-          body: JSON.stringify({ email, type: "sign-in" }),
-          headers: {
-            "content-type": "application/json",
-            "sec-fetch-mode": "navigate",
-            "sec-fetch-site": "cross-site",
-          },
-          method: "POST",
-        })
+      refused = await postRaw(
+        "/email-otp/send-verification-otp",
+        { email, type: "sign-in" },
+        { "sec-fetch-mode": "navigate", "sec-fetch-site": "cross-site" }
       );
     } finally {
       context.skipOriginCheck = skipped;

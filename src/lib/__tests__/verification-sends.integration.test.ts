@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { verificationMailLimits } from "#/lib/verification-mail-limits";
-import { reserveVerificationMail } from "#/server/_internal/verification-sends";
+import {
+  refundVerificationMail,
+  reserveVerificationMail,
+} from "#/server/_internal/verification-sends";
 
 // The per-recipient cap on sign-in codes (#554, #576), against a real
 // database. The numbers themselves are pinned without one in
@@ -42,5 +45,27 @@ describe("reserveVerificationMail", () => {
     }
     expect(await reserveVerificationMail(spent)).toBe(false);
     expect(await reserveVerificationMail(anAddress("untouched"))).toBe(true);
+  });
+});
+
+describe("refundVerificationMail", () => {
+  it("gives back one reservation per call, even when the calls race", async () => {
+    // A burst of sends Better Auth refuses after the guard: every one reserves,
+    // then every one refunds at once. Two refunds that picked the same newest
+    // row gave back one reservation between them, and each collision left a
+    // row counting against the recipient for the rest of the window.
+    const email = anAddress("refunded");
+    for (let i = 0; i < limit; i += 1) {
+      await reserveVerificationMail(email);
+    }
+
+    await Promise.all(
+      Array.from({ length: limit }, () => refundVerificationMail(email))
+    );
+
+    for (let i = 0; i < limit; i += 1) {
+      expect(await reserveVerificationMail(email)).toBe(true);
+    }
+    expect(await reserveVerificationMail(email)).toBe(false);
   });
 });
