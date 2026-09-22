@@ -166,7 +166,16 @@ export function SocialPreviewSection({ projectId }: { projectId: string }) {
       {tooLong && <FieldError message={SOCIAL_SUMMARY_TOO_LONG_MESSAGE} />}
       {failed && <FieldError message={LOAD_FAILED} />}
       <FieldError message={error} />
-      {notice && <p className="text-muted-foreground text-sm">{notice}</p>}
+      {/*
+        A FieldError rather than a SavedNote or a paragraph of its own, per
+        "Where the success goes" in docs/UI-CONVENTIONS.md. Regenerate did not
+        fail, but it did not do what was asked either: the text in the box is
+        not the text the model produced, and a reader who cannot see the box
+        change would otherwise be told nothing at all. That is the case
+        `role="alert"` exists for, and a `SavedNote` would announce it politely
+        in the colour reserved for a result the reader asked for.
+      */}
+      <FieldError message={notice} />
       <div className="flex flex-wrap gap-2">
         <Button
           disabled={busy || !canSave}

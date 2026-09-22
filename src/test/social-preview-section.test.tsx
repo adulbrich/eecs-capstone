@@ -222,9 +222,12 @@ describe("SocialPreviewSection actions", () => {
     server.regenerateSocialSummary.mockResolvedValue(RACED);
     fireEvent.click(regenerateButton());
 
-    expect(
-      await screen.findByText(/changed while the rewrite was running/)
-    ).toBeDefined();
+    const notice = await screen.findByText(
+      /changed while the rewrite was running/
+    );
+    // Announced, not merely printed: a reader who cannot see the textarea
+    // change is otherwise told nothing about text they did not ask for.
+    expect(notice.getAttribute("role")).toBe("alert");
     expect(textarea().value).toBe(RACED.summary);
     // Still manual, so Regenerate is offered again rather than left dead.
     expect(regenerateButton().hasAttribute("disabled")).toBe(false);
