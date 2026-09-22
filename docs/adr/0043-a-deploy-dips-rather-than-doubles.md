@@ -19,7 +19,7 @@ at the desired count makes the worst case `app_max_tasks` itself, and
 The trade is deploy-time capacity: at 100 percent ECS stops a task before it
 starts its replacement, and a stopping task counts against the ceiling until
 it has drained, so a fleet of three dips to two while the old task drains,
-the new one starts and two health checks pass, which is two to three minutes
+the new one starts and two health checks pass, which is about three minutes
 per task and three tasks in sequence. Two tasks is what the 2026-09-20 run
 measured at about 26 requests per second against a term start burst of about
 42. That is accepted because a deploy is a thing an operator starts, and the
@@ -28,10 +28,11 @@ would have bound every burst whether or not anyone was deploying. The drain
 is the part that had to move for this to be workable at all: the target
 group's `deregistration_delay` was the AWS default of 300 seconds, which
 would have put three sequential replacements past the deploy workflow's ten
-minute wait, so it is now 30 seconds, above the slowest response the load
-test recorded (4.3 s) and equal to the point at which CloudFront gives up on
-the origin anyway, and the workflow retries its wait rather than calling a
-slow rollout a failure. Raising the pool in step with the ceiling rather than
+minute wait, so it is now 60 seconds, the load balancer's own idle timeout:
+far above the slowest response the load test recorded (4.3 s), and sized for
+the one request that can legitimately run long, a 10 MB image upload on a
+slow link, which the anonymous load test never sent. The workflow retries
+its wait rather than calling a slow rollout a failure. Raising the pool in step with the ceiling rather than
 leaving 20 in place is deliberate: the ceiling change buys nothing on its
 own, and the load test measured the pool as the constraint. This is the
 lever #558 called the larger one and left to the maintainer; the bigger
