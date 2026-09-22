@@ -5,6 +5,7 @@ import {
   S3Client,
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
+import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import { INVALID_IMAGE } from "#/lib/image-upload-policy";
 
 const DEFAULT_REGION = "us-east-1";
@@ -186,7 +187,7 @@ export async function deleteOwnedObject(
   try {
     await getObjectStorage().delete(key);
   } catch (e) {
-    console.warn(`Failed to delete object ${key}:`, e);
+    console.warn(`Failed to delete object ${key}: ${redactQueryError(e)}`);
   }
 }
 

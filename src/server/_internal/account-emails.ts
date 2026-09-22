@@ -1,3 +1,4 @@
+import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import {
   buildNotificationConfig,
   type NotificationConfig,
@@ -27,7 +28,7 @@ export async function notifyRoleChangedByEmail(
       roleChangedEmail({ role: input.role, url: config.appBaseUrl })
     );
   } catch (error) {
-    console.error("Role change email failed", error);
+    console.error("Role change email failed", redactQueryError(error));
   }
 }
 
@@ -45,6 +46,6 @@ export async function notifyBannedByEmail(
       })
     );
   } catch (error) {
-    console.error("Ban email failed", error);
+    console.error("Ban email failed", redactQueryError(error));
   }
 }

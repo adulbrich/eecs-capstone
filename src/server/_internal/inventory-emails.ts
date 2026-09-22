@@ -1,3 +1,4 @@
+import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import {
   buildNotificationConfig,
   type NotificationConfig,
@@ -62,7 +63,10 @@ export async function notifyInventoryByEmail(
       })
     );
   } catch (error) {
-    console.error(`Inventory email failed (${notice.type})`, error);
+    console.error(
+      `Inventory email failed (${notice.type})`,
+      redactQueryError(error)
+    );
   }
 }
 
@@ -109,6 +113,9 @@ export async function notifyRequestSubmittedByEmail(
       })
     );
   } catch (error) {
-    console.error(`Request notice failed for request ${request.id}`, error);
+    console.error(
+      `Request notice failed for request ${request.id}`,
+      redactQueryError(error)
+    );
   }
 }

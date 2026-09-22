@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "#/db";
 import { projects } from "#/db/schema";
 import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
+import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import { socialSummariesEnabled } from "#/lib/_internal/social-summary-flag";
 import {
   buildSocialSummarySource,
@@ -124,7 +125,10 @@ export async function refreshSocialSummary(
       .returning({ id: projects.id });
     return written.length > 0 ? "updated" : "manual";
   } catch (error) {
-    console.error(`Social summary failed for project ${projectId}`, error);
+    console.error(
+      `Social summary failed for project ${projectId}`,
+      redactQueryError(error)
+    );
     return "failed";
   }
 }

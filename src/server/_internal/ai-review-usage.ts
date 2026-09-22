@@ -1,6 +1,7 @@
 import { and, eq, gt, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { aiReviewUsage } from "#/db/schema";
+import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import {
   AI_FEATURE_NOUN,
   type AiFeature,
@@ -103,7 +104,7 @@ export async function recordReviewUsage(row: ReviewUsageRow): Promise<void> {
   } catch (error) {
     console.error(
       `Recording AI review usage failed for user ${row.userId}`,
-      error
+      redactQueryError(error)
     );
   }
 }

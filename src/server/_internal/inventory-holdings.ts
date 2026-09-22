@@ -21,6 +21,7 @@ import {
   user,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
+import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import { holdEmail, holdFromJoinedRow, holdName } from "#/lib/hold";
 import { compareByDeadline } from "#/lib/inventory-deadlines";
 import {
@@ -143,7 +144,7 @@ export async function listMyItemsAs(viewer: Viewer): Promise<MyItemsRow[]> {
   } catch (error) {
     console.error(
       `Overdue notification recording failed for user ${viewer.id}`,
-      error
+      redactQueryError(error)
     );
   }
   // Only a verified address may claim a hold: otherwise anyone could take
