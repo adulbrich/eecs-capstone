@@ -5,11 +5,24 @@ import { SupportEmailLink } from "./support-email-link";
 /**
  * Copy for the OAuth failures a user can actually do something about.
  *
- * `account_not_linked` is the one that matters. A student who signed up with a
- * password and never clicked the verification link hits it on their first ONID
- * sign-in, because Better Auth will not merge an authenticated identity into an
- * address nobody has proven. That is the correct refusal, but on its own it is
- * a dead end, so the message says which door to go through instead.
+ * `account_not_linked` is the one that matters, and since #554 it is rarer than
+ * it was. An unverified password account no longer blocks ONID on its own:
+ * `getUserInfo` in `src/lib/auth.ts` takes the address off a credential-only
+ * row first. What still reaches this code is an unverified row that another
+ * provider is already linked to, which belongs to whoever holds that identity.
+ * The copy is unchanged because it is still the right instruction for that
+ * case: verify the account, then ONID links. It is a dead end on its own, so
+ * the message says which door to go through instead.
+ *
+ * One case it does NOT serve, named here rather than left for somebody to hit:
+ * `releaseUnverifiedAddress` also refuses a BANNED row, and a banned account
+ * cannot sign in with a password either, so "sign in with your password and
+ * verify your email first" is advice that cannot be followed. That is a support
+ * contact, not a self-service remedy, and the string is left alone because the
+ * state needs an admin to have banned the row holding somebody else's
+ * unverified address, which no ordinary sequence produces. Give this code its
+ * own banned-specific clause if that stops being true; `docs/ONID-SSO.md`
+ * carries the same note beside the two refusals.
  */
 const OAUTH_ERRORS: Record<string, ReactNode> = {
   account_not_linked:

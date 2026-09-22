@@ -14,23 +14,35 @@ import {
   warnUnconfiguredProviders,
 } from "#/lib/_internal/auth-config";
 import { authRateLimit } from "#/lib/_internal/auth-rate-limits";
-import { onidProfileFromIdToken } from "#/lib/_internal/onid-profile";
+import {
+  type OnidProfile,
+  onidProfileFromIdToken,
+} from "#/lib/_internal/onid-profile";
 import {
   redactingAuthLogger,
   redactQueryError,
 } from "#/lib/_internal/redact-query-error";
 import { requireUserName } from "#/lib/_internal/user-name";
+import { buildNotificationConfig } from "#/lib/email/config";
 import { getEmailSender } from "#/lib/email/sender";
-import { passwordResetEmail, verificationEmail } from "#/lib/email/templates";
+import {
+  addressAlreadyRegisteredEmail,
+  passwordResetEmail,
+  verificationEmail,
+} from "#/lib/email/templates";
 import { tooManyAttemptsMessage } from "#/lib/sign-in-limits";
+import type { VerificationMailKind } from "#/lib/verification-mail-limits";
 import type { UserRole } from "#/lib/vocabularies";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
+import { markAddressProven } from "#/server/_internal/mark-address-proven";
+import { releaseUnverifiedAddress } from "#/server/_internal/release-unverified-address";
 import {
   attemptKey,
   checkSignInAllowed,
   clearSignInAttempts,
   recordFailedSignIn,
 } from "#/server/_internal/sign-in-attempts";
+import { reserveVerificationMail } from "#/server/_internal/verification-sends";
 
 const emailSender = getEmailSender();
 
@@ -179,6 +191,102 @@ async function swallowing(what: string, run: () => Promise<void>) {
   }
 }
 
+/**
+ * The ONID profile, with the one write that has to happen before Better Auth
+ * decides whether to link (#554, piece B1).
+ *
+ * This is the first point in the callback where ownership of the address is
+ * proved: the ID token is in hand, issued by the pinned tenant, for a person
+ * the university has just interactively authenticated. `handleOAuthUserInfo`
+ * runs straight afterwards and refuses to link into an unverified row, so
+ * anything that wants to change that verdict has to run here.
+ *
+ * It does mean a mapper carries a write, which is worth naming rather than
+ * hiding: `onid-profile.ts` stays pure and this wrapper owns the effect. The
+ * alternative was a `hooks.after` on the callback plus
+ * `accountLinking.requireLocalEmailVerified: false`, which cleans up after the
+ * link instead of before it and relaxes a safe default for every provider
+ * rather than for ONID alone.
+ *
+ * A failure here returns the profile unchanged rather than throwing. Falling
+ * through leaves the student with `account not linked`, which is exactly
+ * today's behaviour; throwing would turn a database blip into a broken ONID
+ * callback for everybody.
+ */
+async function onidUserInfo(
+  idToken: string | null | undefined
+): Promise<OnidProfile | null> {
+  const profile = onidProfileFromIdToken(idToken, authConfig.onid.issuer);
+  if (!profile) {
+    return null;
+  }
+  try {
+    const released = await releaseUnverifiedAddress(
+      profile.email,
+      profile.name
+    );
+    if (released) {
+      // Nothing else will. `afterEmailVerification` is not on this path,
+      // `user.create.after` only fires on creation, and the link path's own
+      // `updateUser({ emailVerified: true })` is skipped because the flag is
+      // already true by the time it looks.
+      await claimProjectsFor(released.userId, profile.email);
+    }
+  } catch (error) {
+    console.error(
+      "Releasing an unverified address failed",
+      redactQueryError(error)
+    );
+  }
+  return profile;
+}
+
+/**
+ * Where the B2 message sends somebody to take their address back.
+ *
+ * A link to the page, carrying no token. A token for the squatted row would
+ * verify THAT row, which is the trap #554's comment identifies: the real owner
+ * clicks it, the attacker's account becomes confirmed, and
+ * `autoSignInAfterVerification` signs the owner into an account whose password
+ * a stranger chose. Sending them to request their own reset costs one extra
+ * click and inverts that: the token they end up consuming is one they asked
+ * for, and setting a password evicts the squatter's.
+ *
+ * Built from `BETTER_AUTH_URL` rather than `SITE_ORIGIN`, which is a `VITE_`
+ * value inlined at build time for tags that need an absolute URL on the client.
+ * This runs on the server only, and every other server-sent link in the app is
+ * built from the same config (`lib/email/config.ts`). Null when it is unset,
+ * and the caller then sends nothing: a message whose one instruction is a link
+ * to `null/forgot-password` is worse than silence.
+ */
+function forgotPasswordUrl(): string | null {
+  const base = buildNotificationConfig().appBaseUrl;
+  return base ? `${base}/forgot-password` : null;
+}
+
+/**
+ * Whether one more message may go to this address right now (#554, piece D).
+ *
+ * Fails OPEN, which is the opposite of how a cap usually fails and is the right
+ * direction here. Everything this gates is somebody's only way into their own
+ * account, and by the time either caller runs, Better Auth has already read the
+ * user out of the database, so a counter that cannot answer means a transient
+ * blip rather than a database that is down. Refusing mail through one would
+ * lock out every new account for the length of it; letting an amplifier run for
+ * that window is the smaller harm. Same reasoning as `swallowing` above.
+ */
+async function mayMail(
+  email: string,
+  kind: VerificationMailKind
+): Promise<boolean> {
+  try {
+    return await reserveVerificationMail(email, kind);
+  } catch (error) {
+    console.error("Verification mail counter failed", redactQueryError(error));
+    return true;
+  }
+}
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
   trustHost: authConfig.trustHost,
@@ -194,9 +302,11 @@ export const auth = betterAuth({
   // it a few times.
   //
   // It deliberately does NOT raise the Better Auth limit on /sign-in/email.
-  // That number is currently doing double duty as a cap on verification mail
-  // aimed at an address the sender does not own, and raising it before #554
-  // meters the send would reopen that. Adding this counter is purely additive.
+  // That number used to do double duty as a cap on verification mail aimed at
+  // an address the sender does not own; #554 moved that job to a per-recipient
+  // cap on the send itself, so the path is now free to be raised on its own
+  // merits, which is #552's call and not this counter's. Adding this counter
+  // is purely additive.
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path !== PASSWORD_SIGN_IN) {
@@ -298,6 +408,58 @@ export const auth = betterAuth({
     sendResetPassword: async ({ user, url }) => {
       await emailSender.send(user.email, passwordResetEmail({ url }));
     },
+    // #554, piece B2. Fires in Better Auth's duplicate branch with the EXISTING
+    // row, and only because `requireEmailVerification` is true. It is the one
+    // place the real owner of a squatted address can be told anything at all:
+    // the HTTP response is a synthetic success, by design, so the person who
+    // actually owns the address otherwise sees "account created", receives
+    // nothing, and is refused at sign-in with no explanation. This changes no
+    // response and so gives up none of that enumeration protection; only
+    // whoever holds the inbox learns anything.
+    //
+    // Unverified only. A confirmed account belongs to somebody, and telling
+    // them about every stranger who typed their address is noise, not news.
+    onExistingUserSignUp: async ({ user: existing }) => {
+      if (existing.emailVerified) {
+        return;
+      }
+      try {
+        const recovery = forgotPasswordUrl();
+        if (!(recovery && (await mayMail(existing.email, "duplicate")))) {
+          return;
+        }
+        await emailSender.send(
+          existing.email,
+          addressAlreadyRegisteredEmail({ url: recovery })
+        );
+      } catch (error) {
+        // Better Auth awaits this through `runInBackgroundOrAwait`, which
+        // catches and logs through its own logger. Caught here anyway so the
+        // line is ours and carries no address (#559), and so a sign-up never
+        // depends on that internal staying the way it is.
+        console.error(
+          "Notifying an existing unverified account failed",
+          redactQueryError(error)
+        );
+      }
+    },
+    // A completed reset proves the person holds the inbox, which Better Auth
+    // does not record. See `mark-address-proven.ts` for why that proof is as
+    // good as a verification link, and why leaving it unrecorded would let the
+    // cap in piece D refuse a squatted student the one message they need.
+    onPasswordReset: async ({ user: reset }) => {
+      try {
+        const proven = await markAddressProven(reset.id);
+        if (proven) {
+          await claimProjectsFor(reset.id, proven.email);
+        }
+      } catch (error) {
+        console.error(
+          "Marking an address proven after a reset failed",
+          redactQueryError(error)
+        );
+      }
+    },
   },
   emailVerification: {
     sendOnSignUp: true,
@@ -309,14 +471,27 @@ export const auth = betterAuth({
     // A wrong password is the only thing that costs no mail, though. Sign-up is
     // open, so anyone can register an address they do NOT own with a password
     // they choose, and then every sign-in mails the real owner a fresh link.
-    // The rate limit on /sign-in/email is therefore also the ceiling on
-    // verification mail aimed at a stranger, which is why #535 left that one
-    // path on Better Auth's 3-per-10-seconds default while raising every other
-    // path around it. #554 is the fix, and it is to meter the send rather than
-    // the route; until it lands, do not raise /sign-in/email.
+    // The rate limit on /sign-in/email used to be the only ceiling on that,
+    // which is why #535 left that one path on Better Auth's 3-per-10-seconds
+    // default while raising every other path around it. #554 metered the send
+    // instead, below, so that path's number is no longer doing double duty and
+    // #552 may now raise it on its own merits. Raising it is not this change's
+    // to make, and ADR-0039 is where the argument for the number lives.
     sendOnSignIn: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
+      // The cap (#554, piece D). Metering the SEND rather than the route is the
+      // whole point: the route is `/sign-in/email`, whose limit keys on the
+      // sender's address, and neither the sender's address nor its rate says
+      // anything about whose inbox is filling up. A refusal here is a silent
+      // skip and never an error, because the caller is a sign-up or a refused
+      // sign-in and neither should fail over a message that was not sent.
+      if (!(await mayMail(user.email, "verification"))) {
+        // No address in the line; `sign_in_attempts`'s sibling table holds the
+        // identifiers for anyone with database access (#559).
+        console.warn("Verification mail capped for a recipient");
+        return;
+      }
       await emailSender.send(
         user.email,
         verificationEmail({ url: withVerificationLanding(url) })
@@ -390,11 +565,18 @@ export const auth = betterAuth({
       // working if emailVerified ever becomes conditional on the claim.
       //
       // It deliberately does NOT relax requireLocalEmailVerified, which
-      // defaults to true. A student who signed up with a password and never
-      // clicked the verification link gets `account not linked` on their first
-      // ONID sign-in rather than a silent merge, because merging an
-      // authenticated ONID identity into an address nobody has proven would let
-      // whoever set that password inherit the real student's account.
+      // defaults to true, because merging an authenticated ONID identity into
+      // an address nobody has proven would let whoever set that password
+      // inherit the real student's account.
+      //
+      // #554 does not contradict that, and the distinction is the whole of why
+      // it is safe. The argument above refuses to LINK INTO an unverified row
+      // and leave the password in place. `onidUserInfo` above does something
+      // else: before the link is considered at all, it deletes the credential
+      // and only then lets the row be linked, so there is no password left for
+      // anyone to inherit. The guard here still stands for the case it was
+      // written for, an unverified row that some OTHER provider is already
+      // linked to, which `releaseUnverifiedAddress` refuses to touch.
       trustedProviders: ["onid"],
     },
   },
@@ -449,10 +631,7 @@ export const auth = betterAuth({
           // the `sub` fallback.
           scopes: ["openid", "profile", "email"],
           pkce: true,
-          getUserInfo: (tokens) =>
-            Promise.resolve(
-              onidProfileFromIdToken(tokens.idToken, authConfig.onid.issuer)
-            ),
+          getUserInfo: (tokens) => onidUserInfo(tokens.idToken),
         },
       ],
     }),

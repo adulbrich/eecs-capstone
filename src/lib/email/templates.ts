@@ -72,11 +72,39 @@ function layout(
   return { html: `${body}${link}`, text };
 }
 
+/**
+ * The second paragraph is a safety warning, not filler, and it is on every
+ * verification message because nothing at send time can tell which reader is
+ * getting this one.
+ *
+ * Sign-up is open, so the account holding an address may have been created by
+ * somebody else, and `emailVerification.sendOnSignIn` means that person signing
+ * in mails this to the real owner. `autoSignInAfterVerification` is true, so an
+ * owner who clicks it confirms a stranger's account AND is signed into it. It
+ * also costs them the ONID route, because `releaseUnverifiedAddress` will not
+ * take an address off a row once it is verified. #554 bounds how often this can
+ * be sent and gives the owner a safe door on a duplicate sign-up; closing the
+ * click itself needs the rewrite that issue lists under "considered and not
+ * chosen", which is to create no row until the address is proved. Until then
+ * this sentence is what stands between the owner and that click, so do not
+ * trim it for tone.
+ *
+ * It names the two doors and promises nothing about either, which is deliberate
+ * after review caught an earlier draft saying ONID makes the address yours.
+ * `releaseUnverifiedAddress` refuses a banned row and one another provider is
+ * already linked to, so that was a promise the app does not always keep, and a
+ * person who followed it would meet `account not linked` with no idea why. The
+ * reset is the one that always replaces the password, which is why it is the
+ * sentence that describes an outcome.
+ */
 export function verificationEmail(input: { url: string }): RenderedEmail {
   return {
     subject: "Verify your email",
     ...layout(
-      ["Confirm your email address to finish setting up your account."],
+      [
+        "Confirm your email address to finish setting up your account.",
+        "If you did not create this account, do not use this link. Somebody else chose its password, and confirming it would hand them a working account carrying your address. At Oregon State, sign in with ONID instead. Otherwise reset the password, which replaces theirs with one only you know.",
+      ],
       { label: "Verify email", url: input.url }
     ),
   };
@@ -89,6 +117,36 @@ export function passwordResetEmail(input: { url: string }): RenderedEmail {
       label: "Reset password",
       url: input.url,
     }),
+  };
+}
+
+/**
+ * Mailed to the real owner of an address somebody else has already registered
+ * (#554, piece B2).
+ *
+ * Better Auth answers a duplicate sign-up with a synthetic success, so the
+ * person who actually owns the address gets "account created", receives
+ * nothing, and is then refused at sign-in with no way to find out why. That
+ * enumeration protection is worth keeping, and this does not weaken it: the
+ * HTTP response is unchanged, and only whoever holds the inbox sees this.
+ *
+ * Every word here is static, deliberately. The hook that sends it is handed the
+ * EXISTING row, whose name a squatter chose, so interpolating anything from it
+ * would let an attacker write text into a stranger's inbox.
+ */
+export function addressAlreadyRegisteredEmail(input: {
+  url: string;
+}): RenderedEmail {
+  return {
+    subject: "Someone signed up with your email address",
+    ...layout(
+      [
+        "Somebody tried to create an EECS Capstone account with this email address. An account with this address already exists and has never been confirmed, so it may not be yours.",
+        "At Oregon State, sign in with ONID and the address becomes yours. Otherwise reset the password below, then sign in.",
+        "If none of this was you, nothing needs doing. An unconfirmed account cannot be signed in to until somebody proves they hold this inbox.",
+      ],
+      { label: "Reset the password", url: input.url }
+    ),
   };
 }
 

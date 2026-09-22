@@ -928,3 +928,42 @@ export const signInAttempts = pgTable(
   // The only shape the limiter queries: this pair, within a time window.
   (t) => [index("sign_in_attempts_pair_idx").on(t.email, t.ip, t.createdAt)]
 );
+
+/**
+ * One row per message this app has sent about an unproven address (#554).
+ *
+ * Bounds an amplifier the app builds itself: sign-up is open and
+ * `emailVerification.sendOnSignIn` is true, so anyone can register an address
+ * they do not own and then mail its real owner a fresh verification link on
+ * every sign-in. The cap is per RECIPIENT rather than per sender, because the
+ * sender's address says nothing about whose inbox is being filled and campus
+ * NAT makes it meaningless anyway (ADR-0039). The duplicate-sign-up notice
+ * spends the same allowance, since it lands in the same inbox and an attacker
+ * can trigger either.
+ *
+ * An address and a timestamp, which is the same pair `sign_in_attempts` holds
+ * and which ADR-0036 and #513 already cover. Rows are pruned per recipient by
+ * `reserveVerificationMail` rather than by a scheduled sweep.
+ */
+export const verificationSends = pgTable(
+  "verification_sends",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    /** Lowercased by `reserveVerificationMail`, never by the database. */
+    email: text("email").notNull(),
+    /**
+     * Which message, from `VerificationMailKind`. The two are metered apart on
+     * purpose: a squatter can spend the `verification` allowance at will
+     * through `sendOnSignIn`, and sharing one budget let them silence the
+     * `duplicate` notice the real owner's own sign-up should have triggered.
+     */
+    kind: text("kind").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  // The only shape the cap queries: one recipient and one kind, in a window.
+  (t) => [
+    index("verification_sends_recipient_idx").on(t.email, t.kind, t.createdAt),
+  ]
+);

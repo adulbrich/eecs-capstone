@@ -217,6 +217,24 @@ variable "sign_in_hard_delay_seconds" {
   default     = "900"
 }
 
+variable "verification_mail_window_minutes" {
+  description = "How far back verification and duplicate-sign-up mail is counted per recipient, in minutes."
+  type        = string
+  default     = "60"
+}
+
+variable "duplicate_notice_limit" {
+  description = "Duplicate-sign-up notices allowed to one recipient in the same window. Metered apart from verification links so a squatter cannot spend the owner's warning; see src/lib/verification-mail-limits.ts."
+  type        = string
+  default     = "2"
+}
+
+variable "verification_mail_limit" {
+  description = "Messages allowed to one recipient inside that window. Above what a person whose link expired would legitimately ask for; see src/lib/verification-mail-limits.ts."
+  type        = string
+  default     = "3"
+}
+
 variable "ai_review_limit_per_hour" {
   description = "Per-user hourly ceiling on AI project reviews."
   type        = string
