@@ -135,7 +135,7 @@ try {
       `\nReproduced: ${broken} of ${REPRO_ROUNDS} reused connections carried no response at all.\n` +
         "Each one is an ALB 502 with target_status_code - and\n" +
         "response_processing_time -1, which is what #545 recorded in production.\n" +
-        "See src/lib/_internal/keep-alive-timeout.ts and ADR-0039."
+        "See src/lib/_internal/keep-alive-timeout.ts and ADR-0041."
     );
   } else {
     console.log(

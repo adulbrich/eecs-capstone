@@ -90,7 +90,7 @@ const INSTALLED = Symbol.for("eecs-capstone.keepAliveTimeout.installed");
  * The alternative is a project copy of Nitro's entry through the `entry`
  * config option, which forks about forty lines of framework internals,
  * imports virtual modules `tsc --noEmit` cannot resolve, and goes stale
- * silently on the next upgrade. See ADR-0039.
+ * silently on the next upgrade. See ADR-0041.
  *
  * The wrapper stays installed rather than restoring itself after the first
  * call. Every HTTP server this process creates should hold the same
