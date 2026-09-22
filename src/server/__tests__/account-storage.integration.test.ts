@@ -44,10 +44,15 @@ describe("deleteAccountAs when the avatar object cannot be deleted", () => {
     expect(row.name).toBe("Deleted user");
     expect(row.image).toBeNull();
     expect(row.deletedAt).not.toBeNull();
+    // One string and nothing else. Passing the error alongside the message is
+    // the habit ADR-0042 forbids, because a console method can walk an error
+    // object back into whatever it carries; `deleteOwnedObject` folds
+    // `redactQueryError(e)` into the line instead. The cause still has to
+    // survive, or the swallow would be silent rather than quiet.
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining(`Failed to delete object ${image}`),
-      expect.any(Error)
+      expect.stringContaining(`Failed to delete object ${image}`)
     );
+    expect(warn.mock.calls[0][0]).toContain("S3 is down");
     warn.mockRestore();
   });
 });
