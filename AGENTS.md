@@ -102,6 +102,16 @@ before the PR, and what each needs running.
   you are an agent that cannot run a Claude Code plugin, say so in the PR and review
   the diff against this file and `docs/QUIRKS.md` yourself. That is a fallback for a
   harness that lacks the tool, not a choice between equals.
+
+  That pass checks conformance, standards and spec, not correctness: code that
+  follows every convention and implements the issue can still be wrong, and #498
+  was. Two repo-local skills under `.claude/skills/` answer the other questions,
+  neither required. `correctness-review` asks what breaks the diff, for any change
+  that touches behaviour; `app-security-review` covers the five security classes
+  this app has shipped fixes for and a generic security review excludes by policy,
+  for a diff under `src/server`, `src/lib`, `infra` or any prompt or logger. Run
+  your harness's generic security review beside it, or cover its categories by hand
+  when the harness has none.
 - **Check the docs for the fast-moving libraries with the context7 MCP server**
   rather than recalling them, for TanStack Start, TanStack Router, Better Auth and
   Drizzle above all: those four are what training data is most likely to be wrong
