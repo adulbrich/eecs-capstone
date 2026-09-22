@@ -31,6 +31,11 @@ import {
   signInCodeEmail,
   verificationEmail,
 } from "#/lib/email/templates";
+import {
+  OTP_CLAIM_COOKIE,
+  otpClaimMatches,
+  otpClaimToken,
+} from "#/lib/otp-claim";
 import { tooManyAttemptsMessage } from "#/lib/sign-in-limits";
 import type { VerificationMailKind } from "#/lib/verification-mail-limits";
 import type { UserRole } from "#/lib/vocabularies";
@@ -109,6 +114,145 @@ const PASSWORD_SIGN_IN = "/sign-in/email";
 /** Where an emailed code is redeemed (#576). Guarded below, for the two rows
  * Better Auth's own helper does not refuse; see `otp-sign-in-guard.ts`. */
 const CODE_SIGN_IN = "/sign-in/email-otp";
+
+/** Where a code is asked for, and where the claim cookie is issued (#581). */
+const CODE_SEND = "/email-otp/send-verification-otp";
+
+/**
+ * Where a code is checked without being spent, which the sign-in form uses to
+ * find out it should ask a new address for a name before redeeming.
+ *
+ * It counts a wrong guess against the same record `/sign-in/email-otp` does, so
+ * it is guarded identically. Leaving it out would have left the whole of #581
+ * open through a second door.
+ */
+const CODE_CHECK = "/email-otp/check-verification-otp";
+
+/** As long as a code lives, and no longer: the claim is useless after that. */
+const CLAIM_COOKIE_SECONDS = 300;
+
+/** Better Auth's identifier for a pending sign-in code, from `toOTPIdentifier`. */
+function codeRecordFor(email: string): string {
+  return `sign-in-otp-${email.trim().toLowerCase()}`;
+}
+
+/**
+ * The secret the claim token is signed with.
+ *
+ * `BETTER_AUTH_SECRET` in production, where `src/lib/_internal/startup-config.ts`
+ * refuses to boot without it. A per-process random value otherwise, rather than
+ * a fixed development default: a claim only has to outlive the five minutes its
+ * code does, so losing them all on a restart costs a developer one resend, and
+ * a checked-in default would be a signing key in the repository.
+ */
+const claimSecret =
+  process.env.BETTER_AUTH_SECRET ?? crypto.randomUUID() + crypto.randomUUID();
+
+/**
+ * The shape of the request both code guards read. Structural rather than Better
+ * Auth's own middleware context type, so these stay callable from a test.
+ */
+interface CodeRequest {
+  body?: { email?: unknown; type?: unknown };
+  context: {
+    internalAdapter: {
+      findVerificationValue: (
+        id: string
+      ) => Promise<{ expiresAt: Date } | null | undefined>;
+    };
+  };
+  getCookie: (name: string) => string | null | undefined;
+}
+
+/**
+ * Whether a request for a code may reach Better Auth at all (#581).
+ *
+ * Both refusals answer `{success: true}` at the call site, because the send
+ * endpoint has to look the same whatever it decides or it becomes an account
+ * enumerator.
+ */
+async function codeSendAllowed(ctx: CodeRequest): Promise<boolean> {
+  const address = ctx.body?.email;
+  if (typeof address !== "string" || ctx.body?.type !== "sign-in") {
+    return true;
+  }
+  try {
+    const expected = await expectedClaim(ctx, address);
+    // A live code belongs to the browser that asked for it. This is the rule
+    // that makes the claim worth anything: without it an attacker asks for a
+    // code themselves, which both mints them a claim AND rotates the record,
+    // so the code they can then spend is the one the owner was just mailed.
+    const mine =
+      expected === null ||
+      otpClaimMatches(ctx.getCookie(OTP_CLAIM_COOKIE), expected);
+    // The cap is spent HERE rather than inside `sendVerificationOTP`, because
+    // `resolveOTP` writes the rotated record BEFORE the sender runs. Refusing
+    // down there left the record holding a code nobody had been told, so a
+    // sixth request in an hour did not merely fail to mail: it killed the code
+    // the person was already holding.
+    return mine && (await mayMail(address, "sign-in-code"));
+  } catch (error) {
+    // Fails open, the same direction as `swallowing`: a database blip must not
+    // become an auth outage.
+    console.error("Sign-in code send guard failed", redactQueryError(error));
+    return true;
+  }
+}
+
+/**
+ * Whether a guess against a code must be refused before Better Auth counts it.
+ *
+ * Two reasons, and the caller gives both the shape of a wrong code.
+ * `otp-sign-in-guard.ts` says why the row guard cannot say more; the claim
+ * guard cannot either, because a distinct refusal would tell a stranger
+ * whether a code is outstanding for an address.
+ */
+async function codeGuessRefused(ctx: CodeRequest): Promise<boolean> {
+  const address = ctx.body?.email;
+  if (typeof address !== "string") {
+    return false;
+  }
+  try {
+    const expected = await expectedClaim(ctx, address);
+    // No live record means there is nothing to claim, so Better Auth answers
+    // and a missing code and an unclaimed one come from the same place.
+    const unclaimed =
+      expected !== null &&
+      !otpClaimMatches(ctx.getCookie(OTP_CLAIM_COOKIE), expected);
+    return unclaimed || (await otpSignInRefused(address));
+  } catch (error) {
+    // Fails open, the same direction as `swallowing` and for the same reason.
+    // What it opens is narrow: the plugin still refuses a wrong code, and the
+    // admin plugin still refuses a banned row a session.
+    console.error("Code sign-in guard failed", redactQueryError(error));
+    return false;
+  }
+}
+
+/**
+ * The token this request would need to claim the live code for an address, or
+ * null when there is no live code to claim.
+ */
+async function expectedClaim(
+  ctx: {
+    context: {
+      internalAdapter: {
+        findVerificationValue: (
+          id: string
+        ) => Promise<{ expiresAt: Date } | null | undefined>;
+      };
+    };
+  },
+  email: string
+): Promise<string | null> {
+  const record = await ctx.context.internalAdapter.findVerificationValue(
+    codeRecordFor(email)
+  );
+  if (!record || record.expiresAt < new Date()) {
+    return null;
+  }
+  return await otpClaimToken(email, record.expiresAt, claimSecret);
+}
 
 /**
  * The email-otp endpoints this app does NOT serve.
@@ -344,27 +488,22 @@ export const auth = betterAuth({
   // is purely additive.
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
-      // Two rows Better Auth's own `revokeUnprovenAccountAccess` will not
-      // refuse, and `releaseUnverifiedAddress` does. The refusal deliberately
-      // wears the shape of a wrong code; `otp-sign-in-guard.ts` has both the
-      // attacks and the reason it cannot say more.
-      if (ctx.path === CODE_SIGN_IN) {
-        const address = ctx.body?.email;
-        if (typeof address !== "string") {
-          return;
+      // Asking for a code (#581). Two reasons to answer without letting Better
+      // Auth touch the record, and both have to answer `{success: true}`
+      // anyway, because the send endpoint must look the same whatever it
+      // decides or it becomes an account enumerator.
+      if (ctx.path === CODE_SEND) {
+        if (!(await codeSendAllowed(ctx))) {
+          throw new APIError("OK", { success: true });
         }
-        let refused: boolean;
-        try {
-          refused = await otpSignInRefused(address);
-        } catch (error) {
-          // Fails open, the same direction as `swallowing` and for the same
-          // reason: a database blip must not become an auth outage. What it
-          // opens is narrow, because the plugin still refuses a wrong code and
-          // the admin plugin still refuses a banned row a session.
-          console.error("Code sign-in guard failed", redactQueryError(error));
-          return;
-        }
-        if (refused) {
+        return;
+      }
+      // Spending a guess, on either path that spends one. Both refusals wear
+      // the shape of a wrong code: `otp-sign-in-guard.ts` says why the row
+      // guard cannot say more, and the claim guard cannot either, because a
+      // distinct refusal would tell a stranger whether a code is outstanding.
+      if (ctx.path === CODE_SIGN_IN || ctx.path === CODE_CHECK) {
+        if (await codeGuessRefused(ctx)) {
           throw new APIError("BAD_REQUEST", {
             code: "INVALID_OTP",
             message: "Invalid OTP",
@@ -404,6 +543,34 @@ export const auth = betterAuth({
       }
     }),
     after: createAuthMiddleware(async (ctx) => {
+      // The claim for the code that was just written (#581). Issued only where
+      // the record was actually created, so a send that was refused above
+      // hands out nothing: a browser that could get a claim without moving the
+      // record could spend somebody else's guesses with it.
+      if (ctx.path === CODE_SEND) {
+        const address = ctx.body?.email;
+        if (typeof address !== "string" || ctx.body?.type !== "sign-in") {
+          return;
+        }
+        try {
+          const claim = await expectedClaim(ctx, address);
+          if (claim) {
+            ctx.setCookie(OTP_CLAIM_COOKIE, claim, {
+              httpOnly: true,
+              maxAge: CLAIM_COOKIE_SECONDS,
+              path: "/",
+              sameSite: "lax",
+              secure: authConfig.isProduction,
+            });
+          }
+        } catch (error) {
+          // Swallowed rather than refused: the code is already mailed, and a
+          // person holding one they cannot redeem is worse than one more
+          // request. They can ask again, and that send will claim the record.
+          console.error("Issuing a code claim failed", redactQueryError(error));
+        }
+        return;
+      }
       if (ctx.path !== PASSWORD_SIGN_IN) {
         return;
       }
@@ -702,9 +869,10 @@ export const auth = betterAuth({
           return;
         }
         try {
-          if (!(await mayMail(email, "sign-in-code"))) {
-            return;
-          }
+          // The per-recipient cap is NOT checked here. It is spent in the
+          // `hooks.before` on this path, because `resolveOTP` has already
+          // rotated the record by the time this runs, so refusing here would
+          // leave the record holding a code nobody was told.
           await emailSender.send(email, signInCodeEmail({ otp }));
         } catch (error) {
           // Caught here so the line is ours and carries no address (#559), and

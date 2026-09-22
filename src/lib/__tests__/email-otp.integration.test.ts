@@ -23,11 +23,59 @@ function anAddress(prefix: string): string {
   return `otp-${prefix}-${Date.now()}-${nextAddress}@example.com`;
 }
 
+/**
+ * The claim cookie the last send handed each address, which is what a browser
+ * would be holding (#581).
+ *
+ * Every redeem below presents it. Without one the claim guard refuses before
+ * Better Auth sees the code, which is the point of #581 and is covered on its
+ * own further down; a case that means to exercise something else should not
+ * accidentally be exercising that.
+ */
+const claims = new Map<string, string>();
+
+/** Just the `name=value` pair, which is what a browser sends back. */
+function pairFrom(setCookie: string | null): string | undefined {
+  return setCookie?.split(";")[0];
+}
+
+/** The headers a browser that asked for this address's code would send. */
+function claimHeaders(email: string): Headers | undefined {
+  const cookie = claims.get(email);
+  return cookie ? new Headers({ cookie }) : undefined;
+}
+
+const ORIGIN = "http://localhost:3000";
+
+/**
+ * A send, driven through the router rather than `auth.api`.
+ *
+ * It has to be the router. The guard short-circuits a send it will not act on
+ * by throwing `APIError("OK", ...)`, which better-call's catch turns into a
+ * 200; `auth.api.*` bypasses that catch and rethrows, so a case written against
+ * it fails on the one path this file most needs to check.
+ */
+function postSend(email: string, cookie?: string): Promise<Response> {
+  return auth.handler(
+    new Request(`${ORIGIN}/api/auth/email-otp/send-verification-otp`, {
+      body: JSON.stringify({ email, type: "sign-in" }),
+      headers: {
+        "content-type": "application/json",
+        origin: ORIGIN,
+        ...(cookie ? { cookie } : {}),
+      },
+      method: "POST",
+    })
+  );
+}
+
 async function sendCode(email: string): Promise<string> {
   return await captureConsoleCode(async () => {
-    await auth.api.sendVerificationOTP({
-      body: { email, type: "sign-in" },
-    });
+    const response = await postSend(email, claims.get(email));
+    const issued = pairFrom(response.headers.get("set-cookie"));
+    if (issued) {
+      claims.set(email, issued);
+    }
   });
 }
 
@@ -82,6 +130,7 @@ describe("asking for a sign-in code", () => {
 
     await auth.api.signInEmailOTP({
       body: { email, name: "Proved Owner", otp: code },
+      headers: claimHeaders(email),
     });
 
     const row = await rowFor(email);
@@ -132,6 +181,7 @@ describe("redeeming a code against a row that already exists", () => {
     const code = await sendCode(email);
     await auth.api.signInEmailOTP({
       body: { email, name: "Real Owner", otp: code },
+      headers: claimHeaders(email),
     });
 
     const after = await rowFor(email);
@@ -164,6 +214,7 @@ describe("redeeming a code against a row that already exists", () => {
     const response = await auth.api.signInEmailOTP({
       asResponse: true,
       body: { email, otp: code },
+      headers: claimHeaders(email),
     });
 
     expect(response.headers.get("set-cookie")).toBeTruthy();
@@ -270,12 +321,14 @@ describe("the email-otp paths this app does not serve", () => {
     await expect(
       auth.api.checkVerificationOTP({
         body: { email, otp: code, type: "sign-in" },
+        headers: claimHeaders(email),
       })
     ).rejects.toMatchObject({ body: { code: "USER_NOT_FOUND" } });
 
     // The same code still works, which is the property the form depends on.
     await auth.api.signInEmailOTP({
       body: { email, name: "Asked For A Name", otp: code },
+      headers: claimHeaders(email),
     });
     expect((await rowFor(email))?.name).toBe("Asked For A Name");
   });
@@ -285,11 +338,13 @@ describe("the email-otp paths this app does not serve", () => {
     const first = await sendCode(email);
     await auth.api.signInEmailOTP({
       body: { email, name: "Returning Person", otp: first },
+      headers: claimHeaders(email),
     });
 
     const second = await sendCode(email);
     const checked = await auth.api.checkVerificationOTP({
       body: { email, otp: second, type: "sign-in" },
+      headers: claimHeaders(email),
     });
 
     expect(checked).toBeDefined();
@@ -298,6 +353,7 @@ describe("the email-otp paths this app does not serve", () => {
     const response = await auth.api.signInEmailOTP({
       asResponse: true,
       body: { email, otp: second },
+      headers: claimHeaders(email),
     });
     expect(response.headers.get("set-cookie")).toBeTruthy();
   });
@@ -312,12 +368,11 @@ describe("the per-recipient cap on sends", () => {
       await sendCode(email);
     }
 
-    // Still `{success: true}`, because saying otherwise would tell a caller
-    // something about the recipient. The mail is what stops.
-    const suppressed = await auth.api.sendVerificationOTP({
-      body: { email, type: "sign-in" },
-    });
-    expect(suppressed).toBeDefined();
+    // Still 200 and still `{success: true}`, because saying otherwise would
+    // tell a caller something about the recipient. The mail is what stops.
+    const suppressed = await postSend(email, claims.get(email));
+    expect(suppressed.status).toBe(200);
+    expect(await suppressed.json()).toEqual({ success: true });
     await expect(sendCode(email)).rejects.toThrow(/No sign-in code/);
   });
 
@@ -330,5 +385,111 @@ describe("the per-recipient cap on sends", () => {
     }
 
     expect(await sendCode(other)).toHaveLength(6);
+  });
+});
+
+describe("the claim that ties a code to the browser that asked for it", () => {
+  /**
+   * The send, keeping whatever cookie came back so a later call can present it.
+   * A plain `auth.api` call drops the response headers, and the cookie IS the
+   * thing under test here, so every case in this block goes through `handler`.
+   */
+  async function sendAs(
+    email: string,
+    cookie?: string
+  ): Promise<{ code: string; cookie: string | null }> {
+    let received: string | null = null;
+    const code = await captureConsoleCode(async () => {
+      const response = await postSend(email, cookie);
+      received = response.headers.get("set-cookie");
+    });
+    return { code, cookie: received };
+  }
+
+  it("refuses a guess from a browser that did not ask for the code", async () => {
+    const email = anAddress("claimed");
+    const { code, cookie } = await sendAs(email);
+    expect(pairFrom(cookie)).toContain("capstone_otp_claim=");
+
+    // A stranger, holding no claim, spends what would have been the three
+    // guesses. Each is refused before Better Auth counts one.
+    for (let guess = 0; guess < 3; guess += 1) {
+      await expect(
+        auth.api.signInEmailOTP({ body: { email, otp: "000000" } })
+      ).rejects.toMatchObject({ body: { code: "INVALID_OTP" } });
+    }
+
+    // The owner's code still works, which is the whole of #581.
+    const response = await auth.api.signInEmailOTP({
+      asResponse: true,
+      body: { email, name: "Claim Holder", otp: code },
+      headers: new Headers({ cookie: pairFrom(cookie) as string }),
+    });
+    expect(response.headers.get("set-cookie")).toBeTruthy();
+  });
+
+  it("does not let a second browser replace a live code", async () => {
+    const email = anAddress("notstolen");
+    const { code, cookie } = await sendAs(email);
+
+    // A stranger asks for a code at the same address. Answered the same way
+    // every send is answered, and it moves nothing.
+    const stranger = await postSend(email);
+    expect(stranger.status).toBe(200);
+    // And no claim, which is the half that matters: a browser that could earn
+    // one without moving the record could spend somebody else's guesses.
+    expect(stranger.headers.get("set-cookie")).toBeNull();
+
+    const response = await auth.api.signInEmailOTP({
+      asResponse: true,
+      body: { email, name: "Still Mine", otp: code },
+      headers: new Headers({ cookie: pairFrom(cookie) as string }),
+    });
+    expect(response.headers.get("set-cookie")).toBeTruthy();
+  });
+
+  it("lets the same browser ask again, and the newer code is the live one", async () => {
+    const email = anAddress("resend");
+    const first = await sendAs(email);
+    const second = await sendAs(email, pairFrom(first.cookie));
+    expect(second.code).not.toBe(first.code);
+
+    // The rotation moved the expiry, so the first claim no longer matches and
+    // the first code is gone with the record that held it.
+    await expect(
+      auth.api.signInEmailOTP({
+        body: { email, otp: first.code },
+        headers: new Headers({ cookie: pairFrom(first.cookie) as string }),
+      })
+    ).rejects.toMatchObject({ body: {} });
+
+    const response = await auth.api.signInEmailOTP({
+      asResponse: true,
+      body: { email, name: "Resent", otp: second.code },
+      headers: new Headers({ cookie: pairFrom(second.cookie) as string }),
+    });
+    expect(response.headers.get("set-cookie")).toBeTruthy();
+  });
+
+  it("keeps a live code alive when the send budget runs out", async () => {
+    const email = anAddress("budget");
+    const limit = Number(process.env.SIGN_IN_CODE_LIMIT ?? 5);
+    let held = await sendAs(email);
+    for (let spent = 1; spent < limit; spent += 1) {
+      held = await sendAs(email, pairFrom(held.cookie));
+    }
+
+    // The budget is gone, so this mails nothing. It must also leave the record
+    // alone: `resolveOTP` rotates BEFORE the sender runs, so checking the cap
+    // inside the sender left the person holding a dead code and no replacement.
+    const refused = await postSend(email, pairFrom(held.cookie));
+    expect(refused.status).toBe(200);
+
+    const response = await auth.api.signInEmailOTP({
+      asResponse: true,
+      body: { email, name: "Budget Spent", otp: held.code },
+      headers: new Headers({ cookie: pairFrom(held.cookie) as string }),
+    });
+    expect(response.headers.get("set-cookie")).toBeTruthy();
   });
 });
