@@ -9,9 +9,8 @@ reading the diff for sequences, executing pure functions at their boundaries, an
 checking what the diff takes on trust. An optional fourth step mutates guards in a
 scratch worktree.
 
-This skill answers a different question from `mattpocock-skills:code-review`. That
-one checks conformance: standards and spec. A change can conform on both and still
-be wrong, and the criterion it was checked against can share the bug. See _Why_.
+It answers a different question from `mattpocock-skills:code-review`, which checks
+conformance; see _Why_.
 
 ## Process
 
@@ -26,10 +25,11 @@ spawning anything. Note whether the user passed `mutate`.
 
 ### 2. Find the spec
 
-The spec is what the "state, not sequence" entry reads. Look in this order: issue
+The spec is what the "State, not sequence" entry reads. Look in this order: issue
 references in the commit messages, fetched by the workflow in
-`docs/agents/issue-tracker.md`; a path the user passed; a file under `docs/` or
-`.scratch/` matching the branch. If none exists, that entry reports "no spec".
+`docs/agents/issue-tracker.md`; a path the user passed; a design doc under
+`docs/superpowers/specs/` matching the branch. If none exists, that entry reports
+"no spec".
 
 ### 3. The checklist
 
@@ -58,7 +58,7 @@ sub-agent prompt: the sub-agent has no other access to it.
   status code or documented behaviour taken on trust. Find it: check each against
   the schema, the SDK's own types, or the vendor's documentation. A test fixture
   that hand-writes the other system's output proves nothing about that system.
-- **State where a sequence was needed.** An acceptance criterion that describes a
+- **State, not sequence.** An acceptance criterion that describes a
   state ("with the flag set, an edit does not overwrite") when the defect lives in
   an ordering. Find it: for each criterion in the spec, ask whether it mentions
   time; one that cannot fail on a race proves nothing about one.
@@ -79,13 +79,15 @@ carries the diff command, the commit list, the full checklist from step 3, and a
 400-word limit on the report.
 
 - **Sequences.** Entries: read-then-write, interrupted write, swallowed failure,
-  state-not-sequence, and comment claims. Also carries the spec from step 2. Brief:
+  state not sequence, and comment claims. Also carries the spec from step 2. Brief:
   "For each entry, walk every hunk it applies to. Report each finding under the
   entry's name with the sequence that triggers it, actor by actor, call by call."
 - **Boundaries.** Entry: boundary conditions. Brief: "List every pure function the
   diff adds or changes. For each, run it with the four inputs from a scratch script
   under `$TMPDIR` that imports from the checkout, and report the output for each
-  input. Read nothing you can run."
+  input. Read nothing you can run." Add the runner this repo needs: `node --import
+  tsx/esm`, and a loader stub for the `.svg` that `src/lib/brand.ts` imports, since
+  a module that reaches it fails under plain `tsx` outside Vite.
 - **Assumptions.** Entries: never-executed code and unvalidated assumptions. Brief:
   "For each script, migration and new branch, say what would run it for the first
   time. For each name, shape or behaviour the diff takes from another system, say
@@ -95,16 +97,20 @@ carries the diff command, the commit list, the full checklist from step 3, and a
 ### 5. Mutate the guards (only with `mutate`)
 
 Guard mutation runs tests against changed code, so it happens in a scratch
-worktree and never in the checkout the user is working in.
+worktree and never in the checkout the user is working in. Both `git worktree add`
+and Vitest need the command sandbox off and the file-descriptor limit raised; the
+Vitest section of `docs/QUIRKS.md` says why.
 
 1. `git worktree add --detach "$TMPDIR/mutate-<sha>" HEAD`, then symlink
-   `node_modules` from the checkout. Run the unit suite once, unchanged, to prove the
-   worktree works before trusting a result from it.
+   `node_modules` from the checkout. Run `npm test -- <a test file>` once, unchanged,
+   to prove the worktree works before trusting a result from it. Always `npm test`,
+   never bare `vitest`: the script carries the excludes that keep the integration
+   suite, which truncates the dev database, out of the run.
 2. List every conditional in the diff that protects something: a permission check, a
    null check before a write, a flag read, a bounds check.
-3. For each guard, remove it (or invert it), run the unit tests related to the files
-   it lives in, and restore it before the next. `git checkout -- <file>` in the
-   worktree restores it.
+3. For each guard, remove it (or invert it), run `npm test -- <the unit test files
+   for the module it lives in>`, and restore it before the next. `git checkout --
+   <file>` in the worktree restores it.
 4. Report each guard with the tests that failed. A guard whose removal fails no
    related test is **unverified here**: say so in those words, and add whether the
    integration, smoke or accessibility suites, which this step cannot run, cover it.

@@ -1,18 +1,15 @@
 ---
 name: app-security-review
-description: Review the changes since a fixed point (commit, branch, tag, or merge-base) for the five security classes this app has actually shipped fixes for and a generic security review filters out by policy: trust of forwarding headers, sign-in and lockout state, user text reaching a Bedrock prompt, secrets or addresses reaching a log, and role checks at the server boundary. Use when a diff touches src/server, src/lib/auth, src/lib/_internal, infra, or any prompt or logger.
+description: Review the changes since a fixed point (commit, branch, tag, or merge-base) for the five security classes this app has actually shipped fixes for and a generic security review filters out by policy: trust of forwarding headers, sign-in and lockout state, user text reaching a Bedrock prompt, secrets or addresses reaching a log, and role checks at the server boundary. Use when a diff touches src/server, src/lib, infra, or any prompt or logger.
 ---
 
 Security review of the diff between `HEAD` and a fixed point the user supplies,
 scoped to what a generic security review does not cover. Two read-only sub-agents
 run in parallel: one on what enters the app, one on what leaves it.
 
-A generic security review (Claude Code's built-in `security-review`, or an
-equivalent) covers injection, authentication bypass, hardcoded secrets, XSS and
-deserialization, and it excludes rate limiting, lockout, logging of URLs, and user
-content in model prompts by written policy. Every security fix in this repo's
-history falls in the excluded set. This skill is that set. Run the generic review
-for the rest; see _Why_.
+It is the complement of a generic security review, not a replacement: the classes
+here are the ones such a review excludes by policy and this repo has shipped fixes
+for. Run the generic review beside it; see _Why_.
 
 ## Process
 
@@ -30,15 +27,15 @@ spawning anything.
 Each entry reads _what it is_, then _how to find it_. Paste the whole list into
 both sub-agent prompts: the sub-agent has no other access to it.
 
-- **Trust of a forwarding header.** Code that reads `X-Forwarded-For`, `Host`, or a
-  proxy list and assumes what each hop wrote there. Find it: for each hop the code
+- **Trust of a forwarding header (#520, #556).** Code that reads `X-Forwarded-For`,
+  `Host`, or a proxy list and assumes what each hop wrote there. Find it: for each hop the code
   or its comments assume (CloudFront, the load balancer, a VPC address), cite the
   vendor's documentation for what that hop appends, and compare it to what the code
   reads as the viewer. A test fixture that hand-writes the chain is not evidence
   about the chain. A wrong assumption here rate-limits strangers and records the
   wrong address on the session; report it even though rate limiting is out of scope
   for a generic review.
-- **Sign-in and lockout state.** A counter, key, window or ban that decides whether
+- **Sign-in and lockout state (#551, #557).** A counter, key, window or ban that decides whether
   a sign-in may proceed. Find it: name what the key resolves to for a shared campus
   address, a NAT, an unresolved IP, and an address that differs only in case, and
   say who gets locked out, or who gets through, in each case.
@@ -48,7 +45,7 @@ both sub-agent prompts: the sub-agent has no other access to it.
   model's output is constrained to a schema, and who reads the output. A field a
   proposer edits that steers text published under the university's name is a
   finding, whatever a generic review's policy says about prompts.
-- **A secret or an address reaching a log.** An error object, a request, or a URL
+- **A secret or an address reaching a log (#559).** An error object, a request, or a URL
   passed to any console method or logger. Find it: every logging call in the diff,
   and what the value carries. A Drizzle query error interpolates its bound
   parameters into `message`, so `error.message` leaks the same as `error`; a session
@@ -63,8 +60,8 @@ both sub-agent prompts: the sub-agent has no other access to it.
 
 Then one technique on top of the list, for every entry point the diff adds or
 changes: name the least privileged actor who can reach it (a signed-out viewer, a
-student, a proposer on someone else's project) and write the request that makes it
-do something for them.
+signed-in user with no role, a proposer on someone else's project) and write the
+request that makes it do something for them.
 
 A finding carries the request or the sequence that triggers it: method, path, role,
 and the input. A description of the exposure is not a finding.
@@ -96,13 +93,14 @@ in it. Name no winner across sections.
 
 ## Why
 
-The built-in security review is tuned for a low false-positive rate on the classes
+A generic security review is tuned for a low false-positive rate on the classes
 every web app shares, and its exclusions are the price: "logging URLs is assumed to
 be safe", "including user-controlled content in AI system prompts is not a
-vulnerability", and rate limiting and lockout are out of scope. In this repo the
-session token leaked through a logged query error, the rate limiter keyed on a
-CloudFront edge address for a month, and a shared campus address locked out a
-building. Each was a security defect the generic review would have filtered, so
+vulnerability", and rate limiting and lockout are out of scope. In this repo a
+logged query error carried the session token (#559), the rate limiter keyed on a
+CloudFront edge address until #556 applied `preserve`, and a shared campus address
+shared one sign-in bucket until #551. Each was a security defect the generic review
+would have filtered, so
 this skill carries only those classes and leaves the shared ones to the tool built
 for them. A harness with no built-in review covers the generic classes by hand
 against its category list: injection, authentication bypass, secrets in code, XSS
