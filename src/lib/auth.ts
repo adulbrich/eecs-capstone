@@ -1,5 +1,11 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import {
+  APIError,
+  createAuthMiddleware,
+  getIp,
+  isAPIError,
+} from "better-auth/api";
 import { admin, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { db } from "#/db";
@@ -12,8 +18,15 @@ import { onidProfileFromIdToken } from "#/lib/_internal/onid-profile";
 import { requireUserName } from "#/lib/_internal/user-name";
 import { getEmailSender } from "#/lib/email/sender";
 import { passwordResetEmail, verificationEmail } from "#/lib/email/templates";
+import { tooManyAttemptsMessage } from "#/lib/sign-in-limits";
 import type { UserRole } from "#/lib/vocabularies";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
+import {
+  attemptKey,
+  checkSignInAllowed,
+  clearSignInAttempts,
+  recordFailedSignIn,
+} from "#/server/_internal/sign-in-attempts";
 
 const emailSender = getEmailSender();
 
@@ -68,12 +81,167 @@ function withVerificationLanding(url: string): string {
   return link.toString();
 }
 
+/** The one path the attempt counter guards. ONID and GitHub are authenticated
+ * elsewhere, so there is no credential here to protect on those. */
+const PASSWORD_SIGN_IN = "/sign-in/email";
+
+/**
+ * How a viewer address is resolved, in one object because two callers have to
+ * agree on it: Better Auth's own rate limiter, through the `advanced` block
+ * below, and `viewerAddress` for the sign-in counter. Written twice it would
+ * drift the day either one gains a field.
+ */
+const ipAddressOptions = { trustedProxies: [...authConfig.trustedProxies] };
+
+/**
+ * The viewer, resolved by the same function Better Auth's own limiter uses.
+ *
+ * This used to hand-roll the walk, on a note claiming `getIp` was not exported
+ * from a stable path. That was wrong: it comes from `better-auth/api` alongside
+ * `APIError`. The reimplementation compared entries against `trustedProxies`
+ * with string equality, so `10.0.0.0/16` matched no address and it always took
+ * the rightmost entry. That happens to be the viewer under `preserve`, so it
+ * was right by accident rather than by the logic, and it had quietly dropped
+ * CIDR matching, address validation, and the IPv6 /64 normalisation that keeps
+ * one person on one key.
+ */
+function viewerAddress(headers: Headers | undefined): string | null {
+  if (!headers) {
+    return null;
+  }
+  return getIp(new Request("http://localhost", { headers }), {
+    advanced: { ipAddress: ipAddressOptions },
+  });
+}
+
+/**
+ * A sign-in that actually produced a session.
+ *
+ * Positive detection on purpose, and the reason is the bypass this replaces.
+ * There are TWO `APIError` classes in play: the one `better-auth/api` exports,
+ * which the sign-in endpoint throws, and better-call's own, thrown when a
+ * request body fails its schema. So `returned instanceof APIError` is FALSE for
+ * a malformed body, and reading that as "not an error, therefore a success"
+ * meant four wrong passwords followed by one request with `password` omitted
+ * cleared the counter, forever. The absence of an error is not a success.
+ * docs/QUIRKS.md carries this under the Better Auth section.
+ */
+function isSuccessfulSignIn(returned: unknown): boolean {
+  return (
+    !isAPIError(returned) &&
+    typeof returned === "object" &&
+    returned !== null &&
+    "user" in returned
+  );
+}
+
+/**
+ * The one outcome that means somebody offered a credential and it was wrong.
+ *
+ * Narrow on purpose. Counting every error would count `EMAIL_NOT_VERIFIED`,
+ * which is what a person with the RIGHT password gets when their address is
+ * unverified, and that refusal is also what mails them a fresh verification
+ * link. Throttling it would lock them out of their own only way back in.
+ */
+function isWrongCredential(returned: unknown): boolean {
+  return (
+    isAPIError(returned) &&
+    (returned as { body?: { code?: string } }).body?.code ===
+      "INVALID_EMAIL_OR_PASSWORD"
+  );
+}
+
+/**
+ * Swallows a counter failure rather than refusing the sign-in.
+ *
+ * Deliberate, and the opposite of how the rest of this file fails. If the
+ * database is unreachable the counter cannot answer, and the choice is between
+ * letting sign-ins through unguarded and refusing everyone. Better Auth's own
+ * per-address limit still applies either way, and a brute force window during a
+ * database outage is a smaller problem than an auth outage on top of it. The
+ * error is logged so the gap is visible rather than silent.
+ */
+async function swallowing(what: string, run: () => Promise<void>) {
+  try {
+    await run();
+  } catch (error) {
+    console.error(`Sign-in attempt counter failed (${what})`, error);
+  }
+}
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
   trustHost: authConfig.trustHost,
   // Numbers and reasons in lib/_internal/auth-rate-limits.ts. Still only
   // active under NODE_ENV=production, which is Better Auth's own default.
   rateLimit: authRateLimit,
+  // Per-account brute force protection (#552). Better Auth's own limiter keys
+  // on the viewer address and nothing else, and OSU wireless NATs students into
+  // a pool of shared addresses, so no per-address number protects a credential
+  // here (ADR-0039). This counts failures per (account, address) pair instead:
+  // per account because that is the thing being attacked, and paired with the
+  // address so nobody can lock a stranger out of their own account by guessing
+  // it a few times.
+  //
+  // It deliberately does NOT raise the Better Auth limit on /sign-in/email.
+  // That number is currently doing double duty as a cap on verification mail
+  // aimed at an address the sender does not own, and raising it before #554
+  // meters the send would reopen that. Adding this counter is purely additive.
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== PASSWORD_SIGN_IN) {
+        return;
+      }
+      const { email, ip } = attemptKey(
+        ctx.body?.email,
+        viewerAddress(ctx.headers)
+      );
+      if (!email) {
+        return;
+      }
+      // Refuses before the password is checked, which also means a locked pair
+      // costs no scrypt. If the counter itself fails, `checkSignInAllowed`
+      // throws and this hook lets it through rather than refusing the person;
+      // see `swallowing` for why that direction.
+      let verdict: Awaited<ReturnType<typeof checkSignInAllowed>>;
+      try {
+        verdict = await checkSignInAllowed(email, ip);
+      } catch (error) {
+        console.error("Sign-in attempt counter failed (check)", error);
+        return;
+      }
+      if (!verdict.allowed) {
+        throw new APIError("TOO_MANY_REQUESTS", {
+          code: "TOO_MANY_SIGN_IN_ATTEMPTS",
+          message: tooManyAttemptsMessage(verdict.retryAfterSeconds),
+        });
+      }
+    }),
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== PASSWORD_SIGN_IN) {
+        return;
+      }
+      const { email, ip } = attemptKey(
+        ctx.body?.email,
+        viewerAddress(ctx.headers)
+      );
+      if (!email) {
+        return;
+      }
+      // Success is detected positively and a failure narrowly; see
+      // `isSuccessfulSignIn` for the bypass that shape exists to prevent.
+      // Anything that is neither, a malformed body or an unverified address,
+      // leaves the count untouched.
+      const returned = ctx.context.returned;
+      if (isSuccessfulSignIn(returned)) {
+        await swallowing("clear", () => clearSignInAttempts(email, ip));
+        return;
+      }
+      if (isWrongCredential(returned)) {
+        await swallowing("record", () => recordFailedSignIn(email, ip));
+      }
+    }),
+  },
   advanced: {
     // CloudFront terminates TLS at the edge and forwards to the origin over
     // HTTP, so the app sees a plain-HTTP request. Pin secure cookies on in
@@ -90,7 +258,7 @@ export const auth = betterAuth({
     // `preserve`, so the chain reaching the task is CloudFront's own, whose
     // last entry is the viewer (#535). Explained once in the Better Auth
     // section of docs/QUIRKS.md.
-    ipAddress: { trustedProxies: [...authConfig.trustedProxies] },
+    ipAddress: ipAddressOptions,
   },
   emailAndPassword: {
     enabled: true,

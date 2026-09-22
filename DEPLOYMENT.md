@@ -1649,6 +1649,53 @@ this config; delete it manually if you are done with the project.
   after `var.access_log_retention_days`. They hold client IP addresses; see
   [ADR-0036](./docs/adr/0036-access-logs-keep-raw-addresses-for-thirty-days.md).
 
+**Watching for password spraying.** The sign-in attempt counter (#552) is per
+(account, viewer address) pair, so it cannot see one guess made against each of
+ten thousand addresses: no pair ever reaches its limit. What makes that visible
+is the volume of failures across the fleet. Every recorded failure logs the line
+`Failed sign-in recorded`, deliberately carrying no address and no email, so the
+count is one query:
+
+```
+filter @message like /Failed sign-in recorded/
+| stats count(*) as failures by bin(1m)
+```
+
+No `sort` and no `fields`: a binned `stats` is already a time series, and
+`@timestamp` does not survive the aggregation, so sorting on it is an error
+rather than a no-op.
+
+**What the count can and cannot tell you.** It is an alarm, not a diagnosis. A
+volume of failures with no identifiers in it cannot tell a spray across ten
+thousand addresses from one account being hammered from ten thousand addresses,
+and both defeat the per-pair counter in exactly the same way. It also cannot
+tell either of those from an ordinary bad morning: a first week of term with
+everyone mistyping a password looks like volume too. What it does is make any of
+them visible at all, which nothing else here does, because a per-pair counter
+sees only its own pair.
+
+So treat a sustained rise as the signal to go and look, and do the looking in
+`sign_in_attempts`, which holds the attempted address and the viewer address and
+can therefore answer the question the log line cannot:
+
+```sql
+select count(*) as attempts,
+       count(distinct email) as accounts,
+       count(distinct ip) as addresses
+from sign_in_attempts
+where created_at > now() - interval '1 hour';
+```
+
+Many accounts and few addresses is a spray from a small set of hosts. Few
+accounts and many addresses is a distributed attack on those accounts. Roughly
+equal, and low, is a normal week. The identifiers are in the table rather than
+in the log group on purpose: ADR-0042 and #559 exist to keep exactly this class
+of value out of `/ecs/eecs-capstone`.
+
+Either way the response is a decision rather than a setting. The per-pair
+numbers do not help against either shape, and AWS WAF account takeover
+prevention, declined in ADR-0039, is what covers them.
+
 **Runtime environment (set in the task definition, `infra/ecs.tf`):**
 
 `NODE_ENV`, `PORT`, `BETTER_AUTH_URL`, `TRUSTED_PROXY_CIDR`,
@@ -1659,7 +1706,9 @@ this config; delete it manually if you are done with the project.
 `BEDROCK_SCOPE_REASONING_EFFORT`, `AI_SCOPE_LIMIT_PER_HOUR`,
 `AI_SCOPE_LIMIT_PER_DAY`, `BEDROCK_SOCIAL_SUMMARY_REASONING_EFFORT`,
 `BEDROCK_SOCIAL_SUMMARY_ENABLED`, `AI_SOCIAL_SUMMARY_LIMIT_PER_HOUR`,
-`AI_SOCIAL_SUMMARY_LIMIT_PER_DAY`, `EMAIL_TRANSPORT=ses`, `EMAIL_FROM`,
+`AI_SOCIAL_SUMMARY_LIMIT_PER_DAY`, `SIGN_IN_ATTEMPT_WINDOW_MINUTES`,
+`SIGN_IN_SOFT_LIMIT`, `SIGN_IN_SOFT_DELAY_SECONDS`, `SIGN_IN_HARD_LIMIT`,
+`SIGN_IN_HARD_DELAY_SECONDS`, `EMAIL_TRANSPORT=ses`, `EMAIL_FROM`,
 `EMAIL_REPLY_TO`, `EMAIL_STAFF_INBOX`, `SES_REGION`, plus secrets
 `DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`,
 `ONID_CLIENT_SECRET`. In production, S3 and Bedrock use the task role, so no

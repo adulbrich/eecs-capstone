@@ -239,6 +239,13 @@
       "when": 1789965590799,
       "tag": "0033_add_social_summary_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1790032580001,
+      "tag": "0034_add_sign_in_attempts",
+      "breakpoints": true
     }
   ]
 }
