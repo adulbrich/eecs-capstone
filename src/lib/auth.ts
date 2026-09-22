@@ -86,6 +86,14 @@ function withVerificationLanding(url: string): string {
 const PASSWORD_SIGN_IN = "/sign-in/email";
 
 /**
+ * How a viewer address is resolved, in one object because two callers have to
+ * agree on it: Better Auth's own rate limiter, through the `advanced` block
+ * below, and `viewerAddress` for the sign-in counter. Written twice it would
+ * drift the day either one gains a field.
+ */
+const ipAddressOptions = { trustedProxies: [...authConfig.trustedProxies] };
+
+/**
  * The viewer, resolved by the same function Better Auth's own limiter uses.
  *
  * This used to hand-roll the walk, on a note claiming `getIp` was not exported
@@ -102,7 +110,7 @@ function viewerAddress(headers: Headers | undefined): string | null {
     return null;
   }
   return getIp(new Request("http://localhost", { headers }), {
-    advanced: { ipAddress: { trustedProxies: [...authConfig.trustedProxies] } },
+    advanced: { ipAddress: ipAddressOptions },
   });
 }
 
@@ -250,7 +258,7 @@ export const auth = betterAuth({
     // `preserve`, so the chain reaching the task is CloudFront's own, whose
     // last entry is the viewer (#535). Explained once in the Better Auth
     // section of docs/QUIRKS.md.
-    ipAddress: { trustedProxies: [...authConfig.trustedProxies] },
+    ipAddress: ipAddressOptions,
   },
   emailAndPassword: {
     enabled: true,

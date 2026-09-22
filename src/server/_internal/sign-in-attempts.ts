@@ -84,6 +84,15 @@ export async function recordFailedSignIn(
 ): Promise<void> {
   const limits = signInLimits();
   await db.insert(signInAttempts).values({ email, ip });
+  // One line per recorded failure, carrying no address and no email, so that a
+  // fleet-wide count per minute is a single Logs Insights query (#552). The
+  // per-pair counter above cannot see password spraying: one guess against
+  // each of ten thousand addresses trips no pair, and under campus NAT a
+  // per-address number cannot see it either. A count can. The identifiers are
+  // left out on purpose rather than forgotten, because #559 exists to keep
+  // this class of value out of the log group; the row above already holds
+  // them for anyone with database access.
+  console.warn("Failed sign-in recorded");
   await db
     .delete(signInAttempts)
     .where(

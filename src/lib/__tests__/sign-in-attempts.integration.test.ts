@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { auth } from "#/lib/auth";
 import { signInLimits } from "#/lib/sign-in-limits";
 import {
@@ -197,6 +197,32 @@ describe("the sign-in attempt counter", () => {
       expect((await signIn(email, PASSWORD, address)).status).toBe(200);
     } finally {
       process.env.SIGN_IN_SOFT_DELAY_SECONDS = previous;
+    }
+  });
+
+  it("logs a countable line per failure, with nothing identifying in it", async () => {
+    // The fleet-wide spray count (#552). A per-pair counter cannot see one
+    // guess made against each of ten thousand addresses, because no pair ever
+    // reaches its limit; the volume of failures across the fleet is the only
+    // thing that can. The line therefore has to exist, and it has to stay free
+    // of the address and the email, which is what #559 is about. DEPLOYMENT.md
+    // carries the Logs Insights query that counts it.
+    const email = await aVerifiedUser();
+    const address = anAddress();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      await signIn(email, WRONG, address);
+      const lines = warn.mock.calls.map((call) => call.join(" "));
+      const failures = lines.filter((line) =>
+        line.includes("Failed sign-in recorded")
+      );
+      expect(failures).toHaveLength(1);
+      for (const line of failures) {
+        expect(line).not.toContain(email);
+        expect(line).not.toContain(address);
+      }
+    } finally {
+      warn.mockRestore();
     }
   });
 
