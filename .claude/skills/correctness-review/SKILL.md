@@ -85,9 +85,8 @@ carries the diff command, the commit list, the full checklist from step 3, and a
 - **Boundaries.** Entry: boundary conditions. Brief: "List every pure function the
   diff adds or changes. For each, run it with the four inputs from a scratch script
   under `$TMPDIR` that imports from the checkout, and report the output for each
-  input. Read nothing you can run." Add the runner this repo needs: `node --import
-  tsx/esm`, and a loader stub for the `.svg` that `src/lib/brand.ts` imports, since
-  a module that reaches it fails under plain `tsx` outside Vite.
+  input. Read nothing you can run." Add the runner this repo needs, from the Vitest
+  section of `docs/QUIRKS.md`: `node --import tsx/esm` and the `.svg` loader stub.
 - **Assumptions.** Entries: never-executed code and unvalidated assumptions. Brief:
   "For each script, migration and new branch, say what would run it for the first
   time. For each name, shape or behaviour the diff takes from another system, say
@@ -98,14 +97,14 @@ carries the diff command, the commit list, the full checklist from step 3, and a
 
 Guard mutation runs tests against changed code, so it happens in a scratch
 worktree and never in the checkout the user is working in. Both `git worktree add`
-and Vitest need the command sandbox off and the file-descriptor limit raised; the
-Vitest section of `docs/QUIRKS.md` says why.
+and Vitest need the command sandbox off; the Vitest section of `docs/QUIRKS.md`
+says why.
 
 1. `git worktree add --detach "$TMPDIR/mutate-<sha>" HEAD`, then symlink
    `node_modules` from the checkout. Run `npm test -- <a test file>` once, unchanged,
    to prove the worktree works before trusting a result from it. Always `npm test`,
    never bare `vitest`: the script carries the excludes that keep the integration
-   suite, which truncates the dev database, out of the run.
+   suite out of the run (`docs/QUIRKS.md`, "TRUNCATE in tests wipes dev data").
 2. List every conditional in the diff that protects something: a permission check, a
    null check before a write, a flag read, a bounds check.
 3. For each guard, remove it (or invert it), run `npm test -- <the unit test files

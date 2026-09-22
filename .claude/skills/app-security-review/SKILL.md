@@ -28,25 +28,25 @@ Each entry reads _what it is_, then _how to find it_. Paste the whole list into
 both sub-agent prompts: the sub-agent has no other access to it.
 
 - **Trust of a forwarding header (#520, #556).** Code that reads `X-Forwarded-For`,
-  `Host`, or a proxy list and assumes what each hop wrote there. Find it: for each hop the code
-  or its comments assume (CloudFront, the load balancer, a VPC address), cite the
-  vendor's documentation for what that hop appends, and compare it to what the code
-  reads as the viewer. A test fixture that hand-writes the chain is not evidence
-  about the chain. A wrong assumption here rate-limits strangers and records the
-  wrong address on the session; report it even though rate limiting is out of scope
-  for a generic review.
-- **Sign-in and lockout state (#551, #557).** A counter, key, window or ban that decides whether
-  a sign-in may proceed. Find it: name what the key resolves to for a shared campus
-  address, a NAT, an unresolved IP, and an address that differs only in case, and
-  say who gets locked out, or who gets through, in each case.
+  `Host`, or a proxy list and assumes what each hop wrote there. Find it: for each
+  hop the code or its comments assume (CloudFront, the load balancer, a VPC
+  address), cite the vendor's documentation for what that hop appends, and compare
+  it to what the code reads as the viewer. A test fixture that hand-writes the chain
+  is not evidence about the chain. A wrong assumption here rate-limits strangers and
+  records the wrong address on the session; report it even though rate limiting is
+  out of scope for a generic review.
+- **Sign-in and lockout state (#551, #557).** A counter, key, window or ban that
+  decides whether a sign-in may proceed. Find it: name what the key resolves to for
+  a shared campus address, a NAT, an unresolved IP, and an address that differs only
+  in case, and say who gets locked out, or who gets through, in each case.
 - **User text reaching a model prompt.** Proposer or staff prose that lands in a
   Bedrock call (project review, scope assessment, social summary, embeddings). Find
   it: for each prompt, list which fields are editable by which role, whether the
   model's output is constrained to a schema, and who reads the output. A field a
   proposer edits that steers text published under the university's name is a
   finding, whatever a generic review's policy says about prompts.
-- **A secret or an address reaching a log (#559).** An error object, a request, or a URL
-  passed to any console method or logger. Find it: every logging call in the diff,
+- **A secret or an address reaching a log (#559).** An error object, a request, or
+  a URL passed to any console method or logger. Find it: every logging call in the diff,
   and what the value carries. A Drizzle query error interpolates its bound
   parameters into `message`, so `error.message` leaks the same as `error`; a session
   or reset token, an email address and a viewer IP are all bound parameters
@@ -60,8 +60,8 @@ both sub-agent prompts: the sub-agent has no other access to it.
 
 Then one technique on top of the list, for every entry point the diff adds or
 changes: name the least privileged actor who can reach it (a signed-out viewer, a
-signed-in user with no role, a proposer on someone else's project) and write the
-request that makes it do something for them.
+user, a proposer on someone else's project) and write the request that makes it do
+something for them.
 
 A finding carries the request or the sequence that triggers it: method, path, role,
 and the input. A description of the exposure is not a finding.
@@ -99,9 +99,8 @@ be safe", "including user-controlled content in AI system prompts is not a
 vulnerability", and rate limiting and lockout are out of scope. In this repo a
 logged query error carried the session token (#559), the rate limiter keyed on a
 CloudFront edge address until #556 applied `preserve`, and a shared campus address
-shared one sign-in bucket until #551. Each was a security defect the generic review
-would have filtered, so
-this skill carries only those classes and leaves the shared ones to the tool built
-for them. A harness with no built-in review covers the generic classes by hand
+was one sign-in bucket until #557 counted per account. Each was a security defect
+the generic review would have filtered, so this skill carries only those classes
+and leaves the shared ones to the tool built for them. A harness with no built-in review covers the generic classes by hand
 against its category list: injection, authentication bypass, secrets in code, XSS
 and deserialization.
