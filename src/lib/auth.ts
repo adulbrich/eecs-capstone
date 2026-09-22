@@ -298,9 +298,11 @@ export const auth = betterAuth({
   // it a few times.
   //
   // It deliberately does NOT raise the Better Auth limit on /sign-in/email.
-  // That number is currently doing double duty as a cap on verification mail
-  // aimed at an address the sender does not own, and raising it before #554
-  // meters the send would reopen that. Adding this counter is purely additive.
+  // That number used to do double duty as a cap on verification mail aimed at
+  // an address the sender does not own; #554 moved that job to a per-recipient
+  // cap on the send itself, so the path is now free to be raised on its own
+  // merits, which is #552's call and not this counter's. Adding this counter
+  // is purely additive.
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path !== PASSWORD_SIGN_IN) {
@@ -465,11 +467,12 @@ export const auth = betterAuth({
     // A wrong password is the only thing that costs no mail, though. Sign-up is
     // open, so anyone can register an address they do NOT own with a password
     // they choose, and then every sign-in mails the real owner a fresh link.
-    // The rate limit on /sign-in/email is therefore also the ceiling on
-    // verification mail aimed at a stranger, which is why #535 left that one
-    // path on Better Auth's 3-per-10-seconds default while raising every other
-    // path around it. #554 is the fix, and it is to meter the send rather than
-    // the route; until it lands, do not raise /sign-in/email.
+    // The rate limit on /sign-in/email used to be the only ceiling on that,
+    // which is why #535 left that one path on Better Auth's 3-per-10-seconds
+    // default while raising every other path around it. #554 metered the send
+    // instead, below, so that path's number is no longer doing double duty and
+    // #552 may now raise it on its own merits. Raising it is not this change's
+    // to make, and ADR-0039 is where the argument for the number lives.
     sendOnSignIn: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
@@ -558,11 +561,18 @@ export const auth = betterAuth({
       // working if emailVerified ever becomes conditional on the claim.
       //
       // It deliberately does NOT relax requireLocalEmailVerified, which
-      // defaults to true. A student who signed up with a password and never
-      // clicked the verification link gets `account not linked` on their first
-      // ONID sign-in rather than a silent merge, because merging an
-      // authenticated ONID identity into an address nobody has proven would let
-      // whoever set that password inherit the real student's account.
+      // defaults to true, because merging an authenticated ONID identity into
+      // an address nobody has proven would let whoever set that password
+      // inherit the real student's account.
+      //
+      // #554 does not contradict that, and the distinction is the whole of why
+      // it is safe. The argument above refuses to LINK INTO an unverified row
+      // and leave the password in place. `onidUserInfo` above does something
+      // else: before the link is considered at all, it deletes the credential
+      // and only then lets the row be linked, so there is no password left for
+      // anyone to inherit. The guard here still stands for the case it was
+      // written for, an unverified row that some OTHER provider is already
+      // linked to, which `releaseUnverifiedAddress` refuses to touch.
       trustedProviders: ["onid"],
     },
   },

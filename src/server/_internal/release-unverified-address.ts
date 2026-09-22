@@ -31,6 +31,8 @@ import { account, session, user } from "#/db/auth-schema";
  * password a stranger knows, which is precisely the takeover this exists to
  * prevent, so the ordering is load-bearing rather than tidiness.
  *
+ * ADR-0045 is the decision, including what it does not fix.
+ *
  * Deliberately narrow. Anything other than a `credential` account on the row
  * means somebody has authenticated as this user through a provider, so the row
  * is not unproven and this returns without writing. The ONID sign-in then fails

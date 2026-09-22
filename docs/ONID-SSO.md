@@ -152,12 +152,28 @@ email and password sign-in with verification, plus GitHub.
 `onid` is in `account.accountLinking.trustedProviders`, so an ONID sign-in links
 to an existing account at the same address rather than forking a second one.
 
-`requireLocalEmailVerified` stays at its default of `true`. A student who signed
-up with a password and never clicked the verification link gets `account not
-linked` on their first ONID sign-in, and `/sign-in` renders copy telling them to
-verify the password account first. That refusal is deliberate. Merging an
+`requireLocalEmailVerified` stays at its default of `true`, because merging an
 authenticated ONID identity into an address nobody has proven would let whoever
 set that password inherit the real student's account.
+
+That default used to mean a student who signed up with a password and never
+clicked the verification link got `account not linked` on their first ONID
+sign-in. Since #554 it usually does not. `getUserInfo` in `src/lib/auth.ts` runs
+before the link decision, holding a verified ID token, and takes the address off
+an unverified row that has nothing but a `credential` account on it: the
+password is deleted, the row is marked verified, and the display name is
+replaced with the one from the token, so a student does not inherit the display
+name whoever squatted the address chose. Deleting the credential is what makes
+this safe rather than the merge the paragraph above refuses; there is no
+password left for anyone to inherit. An ONID identity for somebody else's
+address cannot be obtained, so the university authenticating the person is
+stronger proof than a link we mailed ourselves.
+
+Two rows are still refused, and `/sign-in` still renders the banner for them. An
+unverified row that some other provider is already linked to belongs to whoever
+holds that identity, and a banned row would hand the student an account an admin
+has shut, which is a worse dead end than the refusal; clearing a ban is a
+person's decision, not a sign-in's.
 
 ## Rotating the secret
 
