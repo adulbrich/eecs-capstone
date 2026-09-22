@@ -38,7 +38,7 @@ test.describe("account lifecycle", () => {
     // The address has no row, so the code form asks for a name before it
     // redeems anything, and the row it creates is verified from the start: it
     // did not exist until the address was proved.
-    await sendCode(page, "/sign-up", email);
+    await sendCode(page, "/sign-in", email);
     await expect(page.getByLabel("Your name", { exact: true })).toBeVisible();
     await page.getByLabel("Your name", { exact: true }).fill("End To End");
     await page.getByRole("button", { name: "Create account" }).click();

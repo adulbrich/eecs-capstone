@@ -41,7 +41,7 @@ function SignIn() {
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">
       <div className="island-shell w-full max-w-sm rounded-xl p-8">
-        <h1 className="font-semibold text-2xl">Sign in</h1>
+        <h1 className="font-semibold text-2xl">Sign in or create an account</h1>
         {oauthError && <OAuthErrorBanner code={oauthError} />}
         <EmailCodeForm redirectTo={redirectTo} />
         <Button
@@ -70,18 +70,18 @@ function SignIn() {
         >
           Continue with GitHub
         </Button>
-        {/* Deliberately not the sign-up sentence: nobody is creating an
-            account on this page, so "you agree" would be false here. */}
+        {/* Worded to be true for a returning visitor too, because this page
+            creates accounts: a new address reaches the name step, and a first
+            ONID or GitHub sign-in creates one with no step at all (#586). The
+            name step carries its own notice, which is the one a new person
+            reading only the form will see. */}
         <p className="mt-6 text-muted-foreground text-sm">
+          Signing in for the first time creates an account; by doing so you
+          agree to the{" "}
           <Link className="text-brand-dark underline" to="/privacy">
-            Privacy policy
+            privacy policy
           </Link>
-        </p>
-        <p className="mt-2 text-muted-foreground text-sm">
-          No account?{" "}
-          <Link className="text-brand-dark underline" to="/sign-up">
-            Sign up
-          </Link>
+          .
         </p>
       </div>
     </div>

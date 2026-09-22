@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
@@ -27,10 +27,12 @@ import { authClient } from "#/lib/auth-client";
  *    act on precisely because it is only ever reached by somebody who already
  *    holds the code, and Better Auth's own comment on that branch says so.
  *
- * Both the sign-in and the sign-up page render this same component with the
- * same behaviour. Differing would reintroduce the enumeration by the back door:
- * two pages that answered one address differently would together say whether it
- * has an account.
+ * It renders on one page, `/sign-in`, which is also where accounts are created
+ * (#586). A second page would have had to answer every address exactly as this
+ * one does, or the pair would together say whether an address has an account;
+ * a page that must behave identically is the same page twice. The name step is
+ * therefore the one moment a code creates an account, and it carries the
+ * privacy notice for that reason.
  */
 
 type Step = "address" | "code" | "name";
@@ -280,6 +282,15 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
           anything you propose.
         </p>
       </div>
+      {/* Ahead of the button, so it is read before the action it describes.
+          A notice, not a checkbox: nothing is recorded (PRD section 2). */}
+      <p className="text-muted-foreground text-sm">
+        By creating an account, you agree to the{" "}
+        <Link className="text-brand-dark underline" to="/privacy">
+          privacy policy
+        </Link>
+        .
+      </p>
       <FieldError message={error} />
       <Button className="w-full" disabled={loading} type="submit">
         {loading ? "Creating..." : "Create account"}

@@ -68,8 +68,8 @@ describe("SiteHeader source link", () => {
   });
 
   it("is named so it cannot be confused with the GitHub sign-in button", () => {
-    // /sign-in and /sign-up render "Continue with GitHub". A header link named
-    // just "GitHub" would read as a second route to the same action.
+    // /sign-in renders "Continue with GitHub". A header link named just
+    // "GitHub" would read as a second route to the same action.
     render(<SiteHeader />);
     expect(screen.queryByRole("link", { name: /^GitHub$/ })).toBeNull();
   });
@@ -87,6 +87,31 @@ describe("SiteHeader source link", () => {
     expect(link.getAttribute("href")).toBe(brand.repositoryUrl);
     const items = Array.from(sheet.querySelectorAll("nav a"));
     expect(items.at(-1)).toBe(link);
+  });
+});
+
+// One page signs in and creates accounts (#586), so a second header control
+// would be two buttons to the same form.
+describe("SiteHeader signed-out control", () => {
+  it("is one Sign in link on desktop, with no Sign up", () => {
+    render(<SiteHeader />);
+    const links = screen.getAllByRole("link", { name: "Sign in" });
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute("href")).toBe("/sign-in");
+    expect(screen.queryByRole("link", { name: /sign up/i })).toBeNull();
+  });
+
+  it("is one Sign in link in the mobile sheet, with no Sign up", async () => {
+    render(<SiteHeader />);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Open navigation" })
+    );
+    // Queried inside the Sheet: Radix hides the desktop copy while it is open.
+    const sheet = await screen.findByRole("dialog");
+    const links = within(sheet).getAllByRole("link", { name: "Sign in" });
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute("href")).toBe("/sign-in");
+    expect(within(sheet).queryByRole("link", { name: /sign up/i })).toBeNull();
   });
 });
 

@@ -239,20 +239,18 @@ function SourceLink() {
   );
 }
 
+/**
+ * One control, not a sign-in and a sign-up: `/sign-in` creates accounts too
+ * (#586). Default size for the reason `SignedInMobile`'s Sign out gives, a
+ * full-width action at the foot of the column.
+ */
 function SignedOutMobile({ onClose }: { onClose: () => void }) {
   return (
-    <div className="flex flex-col gap-2">
-      <Button asChild className="w-full" size="sm" variant="outline">
-        <Link onClick={onClose} to="/sign-in">
-          Sign in
-        </Link>
-      </Button>
-      <Button asChild className="w-full" size="sm">
-        <Link onClick={onClose} to="/sign-up">
-          Sign up
-        </Link>
-      </Button>
-    </div>
+    <Button asChild className="w-full">
+      <Link onClick={onClose} to="/sign-in">
+        Sign in
+      </Link>
+    </Button>
   );
 }
 
@@ -321,16 +319,12 @@ function SignedInMobile({
   );
 }
 
+/** A button rather than a nav link, since it is now the only way in. */
 function SignedOut() {
   return (
-    <>
-      <Link className="nav-link text-sm" to="/sign-in">
-        Sign in
-      </Link>
-      <Button asChild size="sm">
-        <Link to="/sign-up">Sign up</Link>
-      </Button>
-    </>
+    <Button asChild size="sm">
+      <Link to="/sign-in">Sign in</Link>
+    </Button>
   );
 }
 

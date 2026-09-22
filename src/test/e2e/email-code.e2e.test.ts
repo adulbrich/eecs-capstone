@@ -24,7 +24,7 @@ test.describe("@smoke signing in with an emailed code", () => {
     const email = fixtureEmail();
 
     try {
-      await page.goto("/sign-up");
+      await page.goto("/sign-in");
       await waitForHydration(page);
 
       await page.getByLabel("Email", { exact: true }).fill(email);
@@ -42,6 +42,13 @@ test.describe("@smoke signing in with an emailed code", () => {
       // The address has no account, so the form asks for a name rather than
       // redeeming the code and failing on the blank one.
       await expect(page.getByLabel("Your name", { exact: true })).toBeVisible();
+      // The one moment a code creates an account, so the notice is here, in
+      // the form, and not only on the page around it (#586).
+      await expect(
+        page
+          .locator("form")
+          .getByRole("link", { name: "privacy policy", exact: true })
+      ).toHaveAttribute("href", "/privacy");
       await page.getByLabel("Your name", { exact: true }).fill("Code Newcomer");
       await page.getByRole("button", { name: "Create account" }).click();
 
@@ -62,7 +69,7 @@ test.describe("@smoke signing in with an emailed code", () => {
     const email = fixtureEmail();
 
     try {
-      await page.goto("/sign-up");
+      await page.goto("/sign-in");
       await waitForHydration(page);
       await enterEmailedCode(page, email);
       await page
@@ -89,6 +96,41 @@ test.describe("@smoke signing in with an emailed code", () => {
     } finally {
       await removeRow(email);
     }
+  });
+});
+
+/**
+ * `/sign-up` is kept as a redirect because the app is in production and links
+ * to it are out in the world (#586). Checked against the production build,
+ * where the redirect is the server's answer to a plain request, which is what a
+ * bookmark or a link in an old message sends.
+ */
+test.describe("@smoke the old sign-up address", () => {
+  test("forwards to /sign-in with nothing added", async ({ page }) => {
+    await page.goto("/sign-up");
+    const url = new URL(page.url());
+    expect(url.pathname).toBe("/sign-in");
+    // An absent `redirect` must not arrive as `?redirect=undefined`, which
+    // the code form would then navigate to after sign-in.
+    expect(url.search).toBe("");
+    await expect(
+      page.getByRole("heading", { name: "Sign in or create an account" })
+    ).toBeVisible();
+  });
+
+  test("keeps ?redirect=, as a server redirect", async ({ page }) => {
+    const response = await page.request.get("/sign-up?redirect=%2Fprojects", {
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(307);
+    // Parsed rather than matched, because the router may percent-encode the
+    // slash in the value.
+    const location = new URL(
+      response.headers().location ?? "",
+      "http://localhost"
+    );
+    expect(location.pathname).toBe("/sign-in");
+    expect(location.searchParams.get("redirect")).toBe("/projects");
   });
 });
 
@@ -256,7 +298,7 @@ test.describe("refusals on the emailed code", () => {
     });
 
     try {
-      await page.goto("/sign-up");
+      await page.goto("/sign-in");
       await waitForHydration(page);
       await page.getByLabel("Email", { exact: true }).fill(email);
       await page.getByRole("button", { name: "Email me a code" }).click();
@@ -312,9 +354,9 @@ test.describe("refusals on the emailed code", () => {
 /** `allowedAttempts` in `src/lib/auth.ts`, restated so a change here is loud. */
 const ALLOWED_ATTEMPTS = 3;
 
-/** Opens /sign-up, asks for a code, and returns it. */
+/** Opens /sign-in, asks for a code, and returns it. */
 async function startCodeStep(page: Page, email: string): Promise<string> {
-  await page.goto("/sign-up");
+  await page.goto("/sign-in");
   await waitForHydration(page);
   await page.getByLabel("Email", { exact: true }).fill(email);
   return await sendFrom(page, email);

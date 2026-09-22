@@ -54,7 +54,7 @@ would turn an implicit form submit into a no-op just as silently. An `asChild`
 
 | Variant | Use when |
 | --- | --- |
-| `default` | Primary CTA (Submit, Save, Create, Sign in, Sign up) |
+| `default` | Primary CTA (Submit, Save, Create, Sign in) |
 | `outline` | Secondary actions (Cancel, Edit, Sign out, Withdraw) |
 | `ghost` | Tertiary / low-emphasis (Reply, Remove in lists) |
 | `destructive` | Irreversible danger (Delete, Ban) |
@@ -521,7 +521,7 @@ and escape-dismissible for free. Four rules keep it correct:
   sits outside the signed-in block because the Sheet renders regardless of
   session. On desktop it is a ghost icon button left of the bell, ahead of both
   session branches. Its accessible name is "Source code on GitHub", never
-  "GitHub": `/sign-in` and `/sign-up` render a "Continue with GitHub" button.
+  "GitHub": `/sign-in` renders a "Continue with GitHub" button.
 
 ```tsx
 <Sheet open={open} onOpenChange={setOpen}>

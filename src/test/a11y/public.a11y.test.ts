@@ -55,6 +55,10 @@ test("@smoke home page", async ({ page }) => {
 
 test("@smoke sign-in page", async ({ page }) => {
   await page.goto("/sign-in");
+  // The page-level privacy notice is a link in muted running text (#586).
+  await expectUnderlinedAtRest(
+    page.getByRole("link", { name: "privacy policy", exact: true })
+  );
   await checkA11y(page);
 });
 
@@ -113,6 +117,13 @@ for (const code of ["user_info_is_missing", "not_a_known_code"]) {
  * it, and it is the one most likely to go wrong: it is the only input in the
  * app with `inputMode="numeric"` and a `maxLength`, and its instruction sits in
  * a paragraph the label does not point at.
+ *
+ * The name step is scanned in the same test rather than its own, because each
+ * test is a real send to one address in light and dark alike, and that address
+ * has a per-recipient mail budget (ADR-0046). It carries the privacy notice's
+ * link (#586). This suite has no mail log to read a code from, so the check is
+ * answered the way the server answers a right code for an address with no
+ * account; the form acts on the error code, which is all the stub has to match.
  */
 test("@smoke sign-in page, the emailed code form", async ({ page }) => {
   await page.goto("/sign-in");
@@ -123,10 +134,26 @@ test("@smoke sign-in page, the emailed code form", async ({ page }) => {
 
   await expect(page.getByLabel("Code", { exact: true })).toBeVisible();
   await checkA11y(page);
-});
 
-test("@smoke sign-up page", async ({ page }) => {
-  await page.goto("/sign-up");
+  await page.route("**/api/auth/email-otp/check-verification-otp", (route) =>
+    route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({
+        code: "USER_NOT_FOUND",
+        message: "User not found",
+      }),
+    })
+  );
+  await page.getByLabel("Code", { exact: true }).fill("123456");
+  await page.getByRole("button", { name: "Confirm code" }).click();
+
+  await expect(page.getByLabel("Your name", { exact: true })).toBeVisible();
+  await expectUnderlinedAtRest(
+    page
+      .locator("form")
+      .getByRole("link", { name: "privacy policy", exact: true })
+  );
   await checkA11y(page);
 });
 
