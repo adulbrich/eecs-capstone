@@ -87,6 +87,17 @@ Implementing the `idp` check blind is its own risk, because no real token from
 this tenant has been seen and refusing on a claim that turns out to be absent
 would lock out everyone, so the answer is to ask UIT rather than to guess.
 
+Restricting this to ONID is scope rather than principle, and #579 carries the
+generalisation. GitHub reports its own `verified` flag for the exact address
+(`social-providers/github.mjs:74`), which is the same proof our verification
+link establishes, so a GitHub sign-in on a verified address is also stronger
+evidence than an unverified row. It hits the same refusal today, and the people
+it hits are the ones with no ONID to fall back on. What stopped it landing here
+is that the hook does not transfer: we write the ONID mapper and do not write
+GitHub's, `mapProfileToUser` never sees the computed `emailVerified`, and
+`socialProviders.github.getUserInfo` replaces the default outright rather than
+wrapping it.
+
 One hazard is left open and is worse than it was, which is the reason to write
 it here rather than let a later reader find it. `emailVerification.sendOnSignIn`
 still mails a live verification link to the address on every sign-in the
