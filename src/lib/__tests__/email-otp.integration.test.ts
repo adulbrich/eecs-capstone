@@ -428,24 +428,34 @@ describe("the claim that ties a code to the browser that asked for it", () => {
     expect(response.headers.get("set-cookie")).toBeTruthy();
   });
 
-  it("does not let a second browser replace a live code", async () => {
-    const email = anAddress("notstolen");
-    const { code, cookie } = await sendAs(email);
+  it("lets the owner recover when a stranger asked for the code first", async () => {
+    const email = anAddress("strangerfirst");
 
-    // A stranger asks for a code at the same address. Answered the same way
-    // every send is answered, and it moves nothing.
-    const stranger = await postSend(email);
-    expect(stranger.status).toBe(200);
-    // And no claim, which is the half that matters: a browser that could earn
-    // one without moving the record could spend somebody else's guesses.
-    expect(stranger.headers.get("set-cookie")).toBeNull();
+    // Nobody can prove they own an address at send time, so a stranger can
+    // always be the one who asks. The code still goes to the address, not to
+    // them; what they hold is a claim on a record whose code they never see.
+    const stranger = await sendAs(email);
 
+    // The owner has the code, in a browser with no claim, and is refused. This
+    // is the cost of the guard, and the next two steps are why it is bearable.
+    await expect(
+      auth.api.signInEmailOTP({ body: { email, otp: stranger.code } })
+    ).rejects.toMatchObject({ body: { code: "INVALID_OTP" } });
+
+    // Asking again is NOT gated on the claim, and that is deliberate. Gating it
+    // was the first design and it turned one unauthenticated request into a
+    // lockout: the owner's correct code was refused and their resend was
+    // swallowed by the same rule.
+    const owner = await sendAs(email);
     const response = await auth.api.signInEmailOTP({
       asResponse: true,
-      body: { email, name: "Still Mine", otp: code },
-      headers: new Headers({ cookie: pairFrom(cookie) as string }),
+      body: { email, name: "Recovered Owner", otp: owner.code },
+      headers: new Headers({ cookie: pairFrom(owner.cookie) as string }),
     });
     expect(response.headers.get("set-cookie")).toBeTruthy();
+
+    // And the stranger's claim died with the record it named.
+    expect(pairFrom(owner.cookie)).not.toBe(pairFrom(stranger.cookie));
   });
 
   it("lets the same browser ask again, and the newer code is the live one", async () => {

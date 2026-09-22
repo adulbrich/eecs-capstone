@@ -167,36 +167,38 @@ interface CodeRequest {
 /**
  * Whether a request for a code may reach Better Auth at all (#581).
  *
- * Both refusals answer `{success: true}` at the call site, because the send
+ * The refusal answers `{success: true}` at the call site, because the send
  * endpoint has to look the same whatever it decides or it becomes an account
  * enumerator.
+ *
+ * ## Why the CLAIM is not consulted here, only at redeem
+ *
+ * It was, and that was wrong in a way worth recording, because "a live code
+ * belongs to the browser that asked for it" sounds like the stronger rule.
+ * Nobody can prove they own an address at send time, so a stranger who sends
+ * FIRST takes the claim for a code that is mailed to somebody else: the owner's
+ * correct code was then refused, AND their own resend was swallowed by the same
+ * rule, so one unauthenticated request locked them out for the life of the
+ * code. That is a cheaper denial than the one #581 exists to close.
+ *
+ * Leaving the send open costs nothing the mail cap was not already accepting.
+ * A stranger's send rotates the record and mails the owner the new code, so the
+ * owner is never holding something they cannot use: they read the newest
+ * message, or they ask again and their own browser takes the claim. What they
+ * cannot do is outrun the per-recipient cap, which is ADR-0046's accepted
+ * tradeoff and predates all of this.
  */
 async function codeSendAllowed(ctx: CodeRequest): Promise<boolean> {
   const address = ctx.body?.email;
   if (typeof address !== "string" || ctx.body?.type !== "sign-in") {
     return true;
   }
-  try {
-    const expected = await expectedClaim(ctx, address);
-    // A live code belongs to the browser that asked for it. This is the rule
-    // that makes the claim worth anything: without it an attacker asks for a
-    // code themselves, which both mints them a claim AND rotates the record,
-    // so the code they can then spend is the one the owner was just mailed.
-    const mine =
-      expected === null ||
-      otpClaimMatches(ctx.getCookie(OTP_CLAIM_COOKIE), expected);
-    // The cap is spent HERE rather than inside `sendVerificationOTP`, because
-    // `resolveOTP` writes the rotated record BEFORE the sender runs. Refusing
-    // down there left the record holding a code nobody had been told, so a
-    // sixth request in an hour did not merely fail to mail: it killed the code
-    // the person was already holding.
-    return mine && (await mayMail(address, "sign-in-code"));
-  } catch (error) {
-    // Fails open, the same direction as `swallowing`: a database blip must not
-    // become an auth outage.
-    console.error("Sign-in code send guard failed", redactQueryError(error));
-    return true;
-  }
+  // The cap is spent HERE rather than inside `sendVerificationOTP`, because
+  // `resolveOTP` writes the rotated record BEFORE the sender runs. Refusing
+  // down there left the record holding a code nobody had been told, so a sixth
+  // request in an hour did not merely fail to mail: it killed the code the
+  // person was already holding.
+  return await mayMail(address, "sign-in-code");
 }
 
 /**
@@ -216,6 +218,11 @@ async function codeGuessRefused(ctx: CodeRequest): Promise<boolean> {
     const expected = await expectedClaim(ctx, address);
     // No live record means there is nothing to claim, so Better Auth answers
     // and a missing code and an unclaimed one come from the same place.
+    //
+    // This is the whole of #581: a guess from a browser that does not hold the
+    // claim is refused HERE, before Better Auth counts it against the record.
+    // The count is what a stranger was spending, and an exhausted record is
+    // consumed and not recreated, so spending it destroyed the owner's code.
     const unclaimed =
       expected !== null &&
       !otpClaimMatches(ctx.getCookie(OTP_CLAIM_COOKIE), expected);

@@ -60,26 +60,33 @@ certain and affects everyone while this needs a motivated attacker, and the clas
 is closed instead by a claim: `src/lib/otp-claim.ts` and the two guards in
 `src/lib/auth.ts` (#581).
 
-The obvious form of that claim does not work, and it is worth writing down
-because it is what anyone would reach for first. Handing the requesting browser a
-cookie and demanding it back at redeem closes nothing on its own: the attacker
-asks for a code themselves, which both mints them a cookie AND rotates the single
-per-address record, so the code they can then spend is the one the owner was just
-mailed. What closes it is the second rule, that **a live code belongs to the
-browser that asked for it and another browser asking does not replace it**. With
-that, a stranger's send moves nothing and earns nothing, and their guesses are
-refused before Better Auth counts one.
+The claim gates the REDEEM and not the send, and the asymmetry is the whole
+design, so it is worth saying why the symmetric version is wrong. Gating the send
+too, on the rule that a live code belongs to the browser that asked for it, reads
+like the stronger rule and was the first implementation. It is worse than doing
+nothing. Nobody can prove they own an address at send time, so a stranger who
+asks FIRST takes the claim on a code that is mailed to somebody else: the owner's
+correct code is then refused, and their own resend is swallowed by the same rule,
+so one unauthenticated request denies them sign-in for the life of the code.
+That is cheaper than the three-guess burn it was written to prevent. Review pass
+3 on #580 caught it.
+
+With the send left open, a stranger asking for a code rotates the record and
+mails the owner the new one, so the owner is never left holding something they
+cannot use: they read the newest message, or they ask again and their own browser
+takes the claim. What they cannot do is outrun the per-recipient cap, which is
+[ADR-0046](./0046-mail-about-an-address-is-capped-per-recipient.md)'s accepted
+tradeoff and predates this entirely. What the stranger cannot do, at any point,
+is spend a guess, and spending guesses is what destroyed the code.
 
 The claim is an HMAC over the address and the record's expiry under the Better
 Auth secret, so nothing is stored and a rotation invalidates the previous
 browser's claim by moving the expiry. The secret is not in the database, so
 reading `verification` yields no claim to the code in it.
 
-Two costs, both accepted. A second device cannot ask for its own code while one
-is live, so somebody who starts on a laptop and wants to continue on a phone
-waits out the five minutes or finishes on the laptop; the alternative, letting
-any browser take over a live code, is the attack. And a browser that loses the
-cookie cannot redeem the code it was sent, which is the same wait.
+One cost, accepted: a browser that loses the cookie cannot redeem the code it was
+sent, and has to ask again. Asking again always works, which is what makes that
+bearable rather than a lockout.
 
 One implementation note that is easy to get backwards. The per-recipient cap is
 spent in the `hooks.before` on the send, NOT inside `sendVerificationOTP`,
