@@ -30,6 +30,8 @@ describe("verificationMailLimits", () => {
     ["a negative", "-1"],
     ["a word", "lots"],
     ["blank", ""],
+    // Rounds to zero, so it must be caught after rounding, not before.
+    ["a fraction under a half", "0.4"],
   ])("falls back rather than accepting %s", (_label, value) => {
     // A limit of 0 would refuse every sign-in code on the app and lock out
     // everyone without ONID, which is worse than an operator's typo being

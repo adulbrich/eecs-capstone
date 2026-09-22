@@ -11,7 +11,7 @@ import {
   userIdByEmail,
   withDb,
 } from "./fixtures";
-import { emailCode, logSize } from "./mail";
+import { enterEmailedCode } from "./mail";
 import { confirmed } from "./waits";
 
 /**
@@ -147,9 +147,8 @@ test.describe("account lifecycle", () => {
 });
 
 /**
- * Opens the code form on `path`, asks for a code for `email` and confirms the
- * one that arrives, leaving the page wherever the form goes next: the name step
- * for an address with no row, or away from the form for one that has one.
+ * Opens the code form on `path` and signs `email` in with a code; see
+ * `enterEmailedCode` for where that leaves the page.
  *
  * Every call spends one of the address's five sends an hour
  * (`SIGN_IN_CODE_LIMIT`), and the flow above makes four. A sixth is answered
@@ -159,13 +158,7 @@ test.describe("account lifecycle", () => {
 async function sendCode(page: Page, path: string, email: string) {
   await page.goto(path);
   await waitForHydration(page);
-  await page.getByLabel("Email", { exact: true }).fill(email);
-  const sentAt = await logSize();
-  await page.getByRole("button", { name: "Email me a code" }).click();
-  await page
-    .getByLabel("Code", { exact: true })
-    .fill(await emailCode(email, sentAt));
-  await page.getByRole("button", { name: "Confirm code" }).click();
+  await enterEmailedCode(page, email);
 }
 
 /** Signs an existing account in with a code, and waits to be let in. */

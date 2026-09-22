@@ -1,12 +1,28 @@
 import { readFile } from "node:fs/promises";
+import type { Page } from "@playwright/test";
 import { SERVER_LOG } from "./constants";
 
 /**
  * Reading a sign-in code back out of the server log, which is the suite's
- * stand-in for the person's inbox. Shared by every test that signs somebody in
- * through the real form, because the offset rule below is easy to get wrong and
- * was got wrong once.
+ * stand-in for the person's inbox, and typing it in. Shared by every test that
+ * signs somebody in through the real form, because the offset rule below is
+ * easy to get wrong and was got wrong once.
  */
+
+/**
+ * Asks for a code for `email` on the code form already open, and confirms the
+ * one that arrives. Leaves the page wherever the form goes next: the name step
+ * for an address with no row, or away from the form for one that has one.
+ */
+export async function enterEmailedCode(page: Page, email: string) {
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  const sentAt = await logSize();
+  await page.getByRole("button", { name: "Email me a code" }).click();
+  await page
+    .getByLabel("Code", { exact: true })
+    .fill(await emailCode(email, sentAt));
+  await page.getByRole("button", { name: "Confirm code" }).click();
+}
 
 /** How much of the log has already been written, to read only what comes next. */
 export async function logSize(): Promise<number> {
@@ -47,7 +63,9 @@ export async function emailCode(to: string, since: number): Promise<string> {
 function findCode(log: string, to: string): string | null {
   const blocks = log.split("==================== EMAIL");
   for (const block of blocks.reverse()) {
-    if (block.includes(`to:      ${to}`)) {
+    // Anchored on the line end, or `a@x.com` would read the code mailed to
+    // `a@x.com.au`.
+    if (block.includes(`to:      ${to}\n`)) {
       const match = block.match(/Your sign-in code is (\d{6})\./);
       if (match) {
         return match[1];

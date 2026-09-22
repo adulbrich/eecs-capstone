@@ -1,7 +1,6 @@
-import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { waitForHydration } from "../shared/playwright";
-import { emailCode, logSize } from "./mail";
+import { enterEmailedCode } from "./mail";
 
 /**
  * Every other test in this suite starts from a saved storage state, which means
@@ -12,7 +11,8 @@ import { emailCode, logSize } from "./mail";
 test.describe("@smoke authentication", () => {
   test("signs in through the form", async ({ page }) => {
     await page.goto("/sign-in");
-    await signInWithCode(page, "user@example.com");
+    await waitForHydration(page);
+    await enterEmailedCode(page, "user@example.com");
 
     await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"), {
       timeout: 15_000,
@@ -30,20 +30,9 @@ test.describe("@smoke authentication", () => {
     // so this is the only thing standing between a person and the page they
     // were trying to reach.
     await page.goto("/sign-in?redirect=%2Fmy%2Fprojects");
-    await signInWithCode(page, "user@example.com");
+    await waitForHydration(page);
+    await enterEmailedCode(page, "user@example.com");
 
     await expect(page).toHaveURL(/\/my\/projects/, { timeout: 15_000 });
   });
 });
-
-/** Asks for a code on the page already open, and confirms the one mailed. */
-async function signInWithCode(page: Page, email: string) {
-  await waitForHydration(page);
-  await page.getByLabel("Email", { exact: true }).fill(email);
-  const sentAt = await logSize();
-  await page.getByRole("button", { name: "Email me a code" }).click();
-  await page
-    .getByLabel("Code", { exact: true })
-    .fill(await emailCode(email, sentAt));
-  await page.getByRole("button", { name: "Confirm code" }).click();
-}

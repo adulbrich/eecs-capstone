@@ -324,7 +324,7 @@ test.describe("refusals on the emailed code", () => {
 /** `allowedAttempts` in `src/lib/auth.ts`, restated so a change here is loud. */
 const ALLOWED_ATTEMPTS = 3;
 
-/** Opens /sign-up on the code door, asks for a code, and returns it. */
+/** Opens /sign-up, asks for a code, and returns it. */
 async function startCodeStep(page: Page, email: string): Promise<string> {
   await page.goto("/sign-up");
   await waitForHydration(page);

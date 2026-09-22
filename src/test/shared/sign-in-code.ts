@@ -24,7 +24,10 @@ export async function readSignInCode(email: string): Promise<string> {
   }
   const row = await withPool((pool) =>
     pool.query<{ value: string }>(
-      "select value from verification where identifier = $1 and expires_at > now()",
+      // Newest first, because a resend inserts a row beside the old one
+      // rather than replacing it, and Better Auth checks a code against the
+      // newest. An unused code from an earlier run would otherwise be read.
+      "select value from verification where identifier = $1 and expires_at > now() order by created_at desc limit 1",
       // Lowercased and not trimmed, which is how Better Auth names the record.
       [`sign-in-otp-${email.toLowerCase()}`]
     )
@@ -35,7 +38,13 @@ export async function readSignInCode(email: string): Promise<string> {
   }
   // `<encrypted>:<attempts>`. The ciphertext is hex, so the last colon is the
   // only one.
-  const encrypted = stored.slice(0, stored.lastIndexOf(":"));
+  const colon = stored.lastIndexOf(":");
+  if (colon < 0) {
+    throw new Error(
+      `the sign-in code for ${email} is not stored as <ciphertext>:<attempts>`
+    );
+  }
+  const encrypted = stored.slice(0, colon);
   return await symmetricDecrypt({ key: secret, data: encrypted });
 }
 

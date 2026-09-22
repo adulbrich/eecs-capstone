@@ -25,7 +25,6 @@ import {
   otpClaimMatches,
   otpClaimToken,
 } from "#/lib/otp-claim";
-import type { VerificationMailKind } from "#/lib/verification-mail-limits";
 import type { UserRole } from "#/lib/vocabularies";
 import { claimProjectsForVerifiedUser } from "#/server/_internal/claim-projects";
 import { otpSignInRefused } from "#/server/_internal/otp-sign-in-guard";
@@ -48,7 +47,9 @@ warnUnconfiguredProviders(authConfig.unconfigured);
  * The swallow is load-bearing rather than defensive habit. Better Auth runs
  * `create.after` hooks in a loop with no try/catch of its own, so an exception
  * escaping here would break account creation. Claiming is also idempotent, so
- * the next sign-in retries it for free.
+ * the next code sign-in retries it for free. An account that only ever signs in
+ * with ONID or GitHub has no such retry: nothing claims after its creation, so
+ * a claim that fails there waits for staff to link the project by hand.
  */
 async function claimProjectsFor(userId: string, email: string): Promise<void> {
   try {
@@ -160,7 +161,7 @@ async function codeSendAllowed(ctx: CodeRequest): Promise<boolean> {
   // down there left the record holding a code nobody had been told, so a sixth
   // request in an hour did not merely fail to mail: it killed the code the
   // person was already holding.
-  return await mayMail(address, "sign-in-code");
+  return await mayMail(address);
 }
 
 /**
@@ -196,9 +197,14 @@ async function codeGuessRefused(ctx: CodeRequest): Promise<boolean> {
     return unclaimed || (await otpSignInRefused(address));
   } catch (error) {
     // Fails open, the same direction as `mayMail` and for the same reason: this
-    // is the only way in for everyone without ONID. What it opens is narrow:
-    // the plugin still refuses a wrong code, and the admin plugin still
-    // refuses a banned row a session.
+    // is the only way in for everyone without ONID. What it opens: the plugin
+    // still refuses a wrong code, and the admin plugin still refuses a banned
+    // row a session, but nothing backs up the refusal of an unverified row
+    // another provider is linked to. A redeem that lands during a failure here
+    // verifies that row and leaves the other identity on it, which is the one
+    // row answering to two people that `otp-sign-in-guard.ts` exists to stop.
+    // It needs the database to fail these reads and not the plugin's own,
+    // moments later, on the same request.
     console.error("Code sign-in guard failed", redactQueryError(error));
     return false;
   }
@@ -267,9 +273,10 @@ async function expectedClaim(
  * and "nothing calls it" is not "nothing reaches it". Production still holds
  * `credential` rows from before; these paths are what would have read them.
  * One cannot be listed: the match is an exact string against the request path,
- * so `GET /reset-password/:token` stays mounted. It writes nothing, only checks
- * a token no longer issued and redirects to a page that no longer exists, and
- * the POST that would have set the password is listed.
+ * so `GET /reset-password/:token` stays mounted. It changes no account: it looks
+ * up a token no longer issued, which only sweeps expired `verification` rows the
+ * way every lookup does, and redirects to a page that no longer exists. The
+ * POST that would have set the password is listed.
  *
  * The email-otp paths outside the one flow this app runs. `emailOTP()` mounts
  * nine and three are served. `/email-otp/verify-email` has the same flaw as
@@ -350,15 +357,12 @@ async function onidUserInfo(
  * direction here. What this gates is somebody's only way into their own
  * account, so a counter that cannot answer, a transient database blip, would
  * otherwise lock out everyone without ONID for the length of it; letting an
- * amplifier run for that window is the smaller harm. The code guard below fails
+ * amplifier run for that window is the smaller harm. The code guard above fails
  * open for the same reason.
  */
-async function mayMail(
-  email: string,
-  kind: VerificationMailKind
-): Promise<boolean> {
+async function mayMail(email: string): Promise<boolean> {
   try {
-    return await reserveVerificationMail(email, kind);
+    return await reserveVerificationMail(email);
   } catch (error) {
     console.error("Verification mail counter failed", redactQueryError(error));
     return true;

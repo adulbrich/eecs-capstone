@@ -6,9 +6,10 @@ import { account, session, user } from "#/db/auth-schema";
  * Takes an address away from a password account nobody has proven owns it, so
  * that ONID can have it (#554, piece B1).
  *
- * The problem this solves is one fact with several symptoms: sign-up is open,
- * so anyone can register `student@oregonstate.edu` with a password of their
- * choosing, and the row they create then owns that address. The expensive
+ * The problem this solves is one fact with several symptoms: until #576 removed
+ * the password, anyone could register `student@oregonstate.edu` with a password
+ * of their choosing, and the row they created then owned that address.
+ * Production still holds the rows made that way. The expensive
  * symptom is ONID. `accountLinking.requireLocalEmailVerified` defaults to true
  * and `src/lib/auth.ts` deliberately leaves it there, so the guard in
  * `better-auth/dist/oauth2/link-account.mjs` refuses to link an authenticated

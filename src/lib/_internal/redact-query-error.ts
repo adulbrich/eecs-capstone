@@ -5,8 +5,8 @@
  * query, and the parameters of a Better Auth session lookup are the session
  * token: a live credential that signs its bearer in until it expires. A burst that
  * exhausts the connection pool makes the session lookup time out on acquire,
- * which is how a query error reaches a logger at all. Password reset and email
- * verification tokens travel the same path, and so do addresses.
+ * which is how a query error reaches a logger at all. Addresses travel the same
+ * path.
  *
  * The trap, and the reason this returns a string rather than a tidied error:
  * `DrizzleQueryError`'s constructor interpolates the parameters into

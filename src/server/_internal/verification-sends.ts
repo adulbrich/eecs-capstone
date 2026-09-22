@@ -18,10 +18,12 @@ function recipientKey(email: string): string {
   return email.trim().toLowerCase();
 }
 
+/** The one kind still written; see `VerificationMailKind`. */
+const KIND: VerificationMailKind = "sign-in-code";
+
 /**
- * Takes one message of one KIND out of an address's hourly allowance, and says
- * whether there was one to take. Kinds are metered apart (ADR-0046), though
- * only `sign-in-code` is left.
+ * Takes one sign-in code out of an address's hourly allowance, and says whether
+ * there was one to take.
  *
  * Reads and writes rather than only reading, which is why it is not called
  * `isAllowed`. Every caller is about to send, so counting at the decision is
@@ -37,10 +39,7 @@ function recipientKey(email: string): string {
  * transaction, both of which buy precision nobody needs at the cost of turning
  * a mail send into a retry loop.
  */
-export async function reserveVerificationMail(
-  email: string,
-  kind: VerificationMailKind
-): Promise<boolean> {
+export async function reserveVerificationMail(email: string): Promise<boolean> {
   const limits = verificationMailLimits();
   const recipient = recipientKey(email);
   const [row] = await db
@@ -49,7 +48,7 @@ export async function reserveVerificationMail(
     .where(
       and(
         eq(verificationSends.email, recipient),
-        eq(verificationSends.kind, kind),
+        eq(verificationSends.kind, KIND),
         gt(
           verificationSends.createdAt,
           sql`now() - make_interval(mins => ${limits.windowMinutes})`
@@ -59,7 +58,7 @@ export async function reserveVerificationMail(
   if (!verificationMailAllowed(Number(row?.sends ?? 0), limits)) {
     return false;
   }
-  await db.insert(verificationSends).values({ email: recipient, kind });
+  await db.insert(verificationSends).values({ email: recipient, kind: KIND });
   // Bounded to this recipient rather than the whole table so it stays on the
   // index and cannot turn a send into a sequential scan. Rows for an address
   // that never appears again are left behind; they are two short columns and
@@ -69,7 +68,7 @@ export async function reserveVerificationMail(
     .where(
       and(
         eq(verificationSends.email, recipient),
-        eq(verificationSends.kind, kind),
+        eq(verificationSends.kind, KIND),
         lt(
           verificationSends.createdAt,
           sql`now() - make_interval(mins => ${limits.windowMinutes})`

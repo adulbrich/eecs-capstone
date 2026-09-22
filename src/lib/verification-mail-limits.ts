@@ -30,10 +30,11 @@ export interface VerificationMailLimits {
 }
 
 /**
- * What a row in `verification_sends` counts. One kind is left; the union and
- * the column stay because kinds are metered apart (ADR-0046), and a second
- * message about an address would be a second kind rather than a share of this
- * one's budget.
+ * What a row in `verification_sends` counts. One kind is left, and nothing takes
+ * a kind as an argument any more. The column stays because kinds are metered
+ * apart (ADR-0046): a second message about an address would be a second kind
+ * with its own limit, which means putting the argument back here and in
+ * `reserveVerificationMail`, not sharing this one's budget.
  */
 export type VerificationMailKind = "sign-in-code";
 
@@ -53,24 +54,23 @@ export function verificationMailLimits(
   env: NodeJS.ProcessEnv = process.env
 ): VerificationMailLimits {
   return {
-    windowMinutes: Math.round(
-      positiveNumber(env.VERIFICATION_MAIL_WINDOW_MINUTES, 60)
-    ),
-    limit: Math.round(positiveNumber(env.SIGN_IN_CODE_LIMIT, 5)),
+    windowMinutes: positiveNumber(env.VERIFICATION_MAIL_WINDOW_MINUTES, 60),
+    limit: positiveNumber(env.SIGN_IN_CODE_LIMIT, 5),
   };
 }
 
 /**
- * Falls back rather than throwing, and rejects zero and negatives as well as
- * NaN. Both values are rounded: `windowMinutes` reaches Postgres as
- * `make_interval(mins => ...)`, which errors on a fraction, and a fractional
- * limit would compare against a count in a way nobody reading the variable
- * would predict. An operator typo should not be able to set a limit of 0, which
- * would stop every sign-in code on the app and lock out everyone without ONID.
+ * A whole number of at least one, or the fallback. Falls back rather than
+ * throwing, and rejects zero and negatives as well as NaN. Rounded BEFORE the
+ * check, not after: `0.4` passed a `> 0` test and then rounded to a limit of 0,
+ * which is exactly the typo this exists to catch, since a limit of 0 stops every
+ * sign-in code on the app and locks out everyone without ONID. Rounded at all
+ * because `windowMinutes` reaches Postgres as `make_interval(mins => ...)`,
+ * which errors on a fraction, and a window of 0 would count nothing.
  */
 function positiveNumber(value: string | undefined, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  const rounded = Math.round(Number(value));
+  return Number.isFinite(rounded) && rounded >= 1 ? rounded : fallback;
 }
 
 /** Whether one more message may go to an address with this much recent history. */

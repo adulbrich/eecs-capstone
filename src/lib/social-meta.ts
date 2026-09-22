@@ -40,7 +40,7 @@ export const SITE_DESCRIPTION = `Propose a capstone project, follow it through s
 export const SOCIAL_CARD_PATH = "/social-card.png";
 
 /**
- * The tag that keeps a page out of search results, spelled once so the nine
+ * The tag that keeps a page out of search results, spelled once so the six
  * routes carrying it cannot drift.
  *
  * Not `robots.txt`, which stays permissive on purpose. A `Disallow` bans the

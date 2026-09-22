@@ -385,7 +385,7 @@ Once the first deploy (section 5) has run and someone has asked for a code:
 aws --profile aws-capstone1 logs tail /ecs/eecs-capstone --since 5m --region us-west-2 | grep -B4 "Your sign-in code is"
 ```
 
-The `to:` line four above each code says whose it is. A code lasts five minutes
+The `to:` line three above each code says whose it is. A code lasts five minutes
 and only works in the browser tab that asked for it, so read it out to the
 person rather than typing it in somewhere else, and have them ask again if it
 expires. That log group holds working codes for as long as this transport is

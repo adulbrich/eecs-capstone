@@ -20,9 +20,9 @@ describe("reserveVerificationMail", () => {
   it("allows up to the limit and refuses after it", async () => {
     const email = anAddress("allowance");
     for (let i = 0; i < limit; i += 1) {
-      expect(await reserveVerificationMail(email, "sign-in-code")).toBe(true);
+      expect(await reserveVerificationMail(email)).toBe(true);
     }
-    expect(await reserveVerificationMail(email, "sign-in-code")).toBe(false);
+    expect(await reserveVerificationMail(email)).toBe(false);
   });
 
   it("counts a recipient under one key whatever case it arrives in", async () => {
@@ -30,21 +30,17 @@ describe("reserveVerificationMail", () => {
     // raw body, and a cap bypassed by one capital letter is not a cap.
     const email = anAddress("folded");
     for (let i = 0; i < limit; i += 1) {
-      expect(
-        await reserveVerificationMail(email.toUpperCase(), "sign-in-code")
-      ).toBe(true);
+      expect(await reserveVerificationMail(email.toUpperCase())).toBe(true);
     }
-    expect(await reserveVerificationMail(email, "sign-in-code")).toBe(false);
+    expect(await reserveVerificationMail(email)).toBe(false);
   });
 
   it("keeps one recipient's allowance away from another's", async () => {
     const spent = anAddress("spent");
     for (let i = 0; i < limit; i += 1) {
-      await reserveVerificationMail(spent, "sign-in-code");
+      await reserveVerificationMail(spent);
     }
-    expect(await reserveVerificationMail(spent, "sign-in-code")).toBe(false);
-    expect(
-      await reserveVerificationMail(anAddress("untouched"), "sign-in-code")
-    ).toBe(true);
+    expect(await reserveVerificationMail(spent)).toBe(false);
+    expect(await reserveVerificationMail(anAddress("untouched"))).toBe(true);
   });
 });
