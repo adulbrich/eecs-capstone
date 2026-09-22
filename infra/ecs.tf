@@ -254,6 +254,22 @@ resource "aws_ecs_service" "app" {
     container_port   = var.app_port
   }
 
+  # A deploy replaces tasks one at a time instead of doubling the fleet. The
+  # AWS default is maximum 200 percent, which runs old and new side by side
+  # and makes the worst case app_max_tasks times two, all holding a full
+  # connection pool against one RDS instance. That doubling is what capped
+  # the pool at 20 per task (ADR-0034) and what the #524 load test then
+  # exhausted at 59 of 60 while the CPU still had room. Capping at 100
+  # percent makes the worst case app_max_tasks itself, so the pool can be
+  # more than twice as deep. The cost is the other direction: a deploy
+  # stops a task before it starts its replacement, so the fleet dips to
+  # half the desired count for the length of a health check per task.
+  # Deploys therefore take longer and should not run during an arrival
+  # burst. src/lib/__tests__/db-pool.test.ts reads this number, so the
+  # budget cannot drift from it. ADR-0043.
+  deployment_minimum_healthy_percent = 50
+  deployment_maximum_percent         = 100
+
   # A failed deploy rolls back to the previous task definition instead of
   # leaving the service trying to place a task that cannot start. Without
   # this, a bad revision loops until someone notices; the old task keeps
