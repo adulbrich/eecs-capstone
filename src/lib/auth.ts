@@ -1,8 +1,9 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware, isAPIError } from "better-auth/api";
 import { admin, emailOTP, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
+import { z } from "zod";
 import { db } from "#/db";
 import {
   buildAuthConfig,
@@ -111,7 +112,7 @@ const claimSecret =
  * Auth's own middleware context type, so these stay callable from a test.
  */
 interface CodeRequest {
-  body?: { email?: unknown; type?: unknown };
+  body?: { email?: unknown; otp?: unknown; type?: unknown };
   context: {
     internalAdapter: {
       findVerificationValue: (
@@ -120,6 +121,7 @@ interface CodeRequest {
     };
   };
   getCookie: (name: string) => string | null | undefined;
+  path: string;
 }
 
 /**
@@ -208,6 +210,43 @@ async function codeGuessRefused(ctx: CodeRequest): Promise<boolean> {
     console.error("Code sign-in guard failed", redactQueryError(error));
     return false;
   }
+}
+
+/**
+ * Whether Better Auth is about to refuse this body itself, on one of the three
+ * code paths.
+ *
+ * The guards run in `hooks.before`, ahead of Better Auth's own validation, so
+ * they see bodies it will reject, and acting on one was three holes in the price
+ * ADR-0047 records (app-security-review on #576). A send with no `type` spent
+ * the owner's budget and, because an after-hook runs even when the handler
+ * throws, was handed a claim on the owner's live, unrotated code. A padded
+ * address spent the owner's budget, because the cap trims and Better Auth does
+ * not, and mailed nothing. And a redeem with no code answered `INVALID_OTP` only
+ * when a code was outstanding. So every hook leaves such a body alone: nothing
+ * spent, nothing guarded, nothing issued, and Better Auth answers with its own
+ * validation error, the same for every address.
+ *
+ * The address check is Better Auth's own, lowercase then `z.email()`, which the
+ * send and the check run and the sign-in does not. A `type` that is a string
+ * but not `"sign-in"` is not Better Auth's to refuse here; `signInCodeAddress`
+ * turns those away.
+ */
+function refusedByBetterAuth(ctx: CodeRequest): boolean {
+  const email = ctx.body?.email;
+  if (typeof email !== "string") {
+    return true;
+  }
+  if (ctx.path !== CODE_SEND && typeof ctx.body?.otp !== "string") {
+    return true;
+  }
+  if (ctx.path === CODE_SIGN_IN) {
+    return false;
+  }
+  return (
+    typeof ctx.body?.type !== "string" ||
+    !z.email().safeParse(email.toLowerCase()).success
+  );
 }
 
 /**
@@ -383,6 +422,13 @@ export const auth = betterAuth({
   // the browser that asked for it (ADR-0047).
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      const onCodePath =
+        ctx.path === CODE_SEND ||
+        ctx.path === CODE_SIGN_IN ||
+        ctx.path === CODE_CHECK;
+      if (onCodePath && refusedByBetterAuth(ctx)) {
+        return;
+      }
       // Asking for a code (#581). Two reasons to answer without letting Better
       // Auth touch the record, and both have to answer `{success: true}`
       // anyway, because the send endpoint must look the same whatever it
@@ -411,8 +457,11 @@ export const auth = betterAuth({
       // hands out nothing: a browser that could get a claim without moving the
       // record could spend somebody else's guesses with it.
       if (ctx.path === CODE_SEND) {
+        // Only a send that succeeded moved the record. A refused one still
+        // reaches this hook, because an after-hook runs even when the handler
+        // throws, and the record it would find is the owner's, unrotated.
         const address = signInCodeAddress(ctx);
-        if (address === null) {
+        if (address === null || isAPIError(ctx.context.returned)) {
           return;
         }
         try {

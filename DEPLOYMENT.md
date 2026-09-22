@@ -60,7 +60,7 @@ Accounts and access:
 > covers the setup and the one ordering rule that matters: apply, then deploy,
 > because `EMAIL_TRANSPORT=ses` without `EMAIL_FROM` fails the app's boot rather
 > than only its email. In local development `EMAIL_TRANSPORT=console` still
-> writes links to stderr instead of sending them.
+> writes each message, sign-in codes included, to stderr instead of sending it.
 
 ---
 
@@ -376,24 +376,26 @@ blocks a sole admin from demoting or banning themselves).
 
 There is no password (#576): an account is made by asking for a code at
 `/sign-up` and typing it back into the same tab, and ONID works too for anyone
-with an Oregon State account. With no email provider configured yet (see the
-callout in section 2), `EMAIL_TRANSPORT=console` writes each message to stderr,
-which CloudWatch captures instead of an inbox, so the code is read from the logs.
-Once the first deploy (section 5) has run and someone has asked for a code:
+with an Oregon State account. `infra/ecs.tf` sets `EMAIL_TRANSPORT=ses`, so the
+code arrives by email. On a fresh AWS account SES is still in its sandbox
+(section 9.4) and mails only verified identities: verify each future admin's
+address in SES first, or have them use ONID.
+
+If a deployment ever runs `EMAIL_TRANSPORT=console` instead, each message, code
+included, goes to stderr and so to CloudWatch, where it can be read:
 
 ```bash
 aws --profile aws-capstone1 logs tail /ecs/eecs-capstone --since 5m --region us-west-2 | grep -B4 "Your sign-in code is"
 ```
 
-The `to:` line three above each code says whose it is. A code lasts five minutes
-and only works in the browser tab that asked for it, so read it out to the
-person rather than typing it in somewhere else, and have them ask again if it
-expires. That log group holds working codes for as long as this transport is
-selected, which is one more reason to finish section 9 early.
+The `to:` line three above each code says whose it is. Treat that window as
+exposed rather than convenient: while the transport is console, anyone who can
+read the log group can sign in as any address, because they can ask for a code
+from their own browser and read it back, and the group keeps what it holds for
+30 days. Switch back to `ses` through Terraform as soon as the admins exist.
 
 1. Each future admin creates an account through the app UI, with a code at
-   `/sign-up` (read from the command above, or their inbox once section 9 is
-   done) or with ONID.
+   `/sign-up` or with ONID.
 2. Promote each to admin by running the bundled one-off task. This reuses the
    exact network configuration of the running service so it can reach the
    private database:
@@ -434,8 +436,8 @@ Repeat with the second admin's email. Check the task's CloudWatch log for
     -H 'Cookie: probe=1' \
     -d '{"email":"probe@example.invalid","otp":"000000","type":"sign-in"}'
   ```
-- Signing up at `/sign-up` writes a code to CloudWatch (section 6), or mails it
-  once section 9 is done, and completes once that code is typed in.
+- Signing up at `/sign-up` mails a code (section 6), and completes once that
+  code is typed in.
 - Uploading a project image works and the image loads from
   `https://<assets-dist>.cloudfront.net/...`.
 - Triggering an AI project review succeeds (Bedrock via the task role).
@@ -1664,8 +1666,10 @@ aws --profile aws-capstone1 ecs describe-task-definition --task-definition "$TD"
 
 If it shows the old host, run the deploy workflow.
 
-**A sign-in code never arrives.** Expected while no email provider is
-configured. Pull the code from CloudWatch (section 6) instead.
+**A sign-in code never arrives.** Check whether SES is still in its sandbox
+(section 9.4), which mails only verified identities, and whether the address is
+on the account-level suppression list. The send answers success either way, so
+the form cannot tell.
 
 **CloudFront returns 502/504.** Usually the task is unhealthy. Check the target
 group health and the task logs. The ALB health check path is `/api/healthz`;

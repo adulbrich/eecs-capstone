@@ -2,7 +2,7 @@ import { eq, like } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { account, session, user, verification } from "#/db/auth-schema";
-import { projects } from "#/db/schema";
+import { projects, verificationSends } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { captureConsoleCode } from "#/test/shared/console-email";
 
@@ -642,6 +642,101 @@ describe("the per-recipient cap on sends", () => {
     }
 
     expect(await sendCode(other)).toHaveLength(6);
+  });
+});
+
+/**
+ * Requests Better Auth will refuse, from a stranger (app-security-review on #576).
+ *
+ * The guards run in `hooks.before`, ahead of Better Auth's own body validation,
+ * so they see a body the handler is about to reject. Acting on one was three
+ * holes in the price ADR-0047 records, and each case here was red before the
+ * fix: a send with no `type` spent the owner's budget and was handed a claim on
+ * the owner's live, unrotated code; a padded address spent the owner's budget
+ * with nothing mailed; and a redeem with no code answered differently depending
+ * on whether one was outstanding.
+ */
+describe("requests Better Auth refuses", () => {
+  function postRaw(
+    path: string,
+    body: Record<string, unknown>,
+    cookie?: string
+  ): Promise<Response> {
+    return auth.handler(
+      new Request(`${ORIGIN}/api/auth${path}`, {
+        body: JSON.stringify(body),
+        headers: {
+          "content-type": "application/json",
+          origin: ORIGIN,
+          ...(cookie ? { cookie } : {}),
+        },
+        method: "POST",
+      })
+    );
+  }
+
+  async function sendsSpentBy(email: string): Promise<number> {
+    const rows = await db
+      .select({ id: verificationSends.id })
+      .from(verificationSends)
+      .where(eq(verificationSends.email, email.toLowerCase()));
+    return rows.length;
+  }
+
+  it("spends nothing and hands out no claim for a send with no type", async () => {
+    const email = anAddress("untyped");
+    const code = await sendCode(email);
+    expect(await sendsSpentBy(email)).toBe(1);
+
+    const stranger = await postRaw("/email-otp/send-verification-otp", {
+      email,
+    });
+
+    expect(stranger.status).toBe(400);
+    expect(stranger.headers.get("set-cookie")).toBeNull();
+    expect(await sendsSpentBy(email)).toBe(1);
+    // And the owner's code is untouched, so it still signs them in.
+    await auth.api.signInEmailOTP({
+      body: { email, name: "Still Mine", otp: code },
+      headers: claimHeaders(email),
+    });
+    expect((await rowFor(email))?.name).toBe("Still Mine");
+  });
+
+  it("spends none of the owner's budget on an address Better Auth rejects", async () => {
+    const email = anAddress("padded");
+    const limit = Number(process.env.SIGN_IN_CODE_LIMIT ?? 5);
+
+    for (let sent = 0; sent < limit; sent += 1) {
+      const padded = await postRaw("/email-otp/send-verification-otp", {
+        email: ` ${email}`,
+        type: "sign-in",
+      });
+      expect(padded.status).toBe(400);
+    }
+
+    // The cap key trims, so these used to count against the owner, and the
+    // handler then mailed nothing: five requests, a silent hour's lockout.
+    expect(await sendsSpentBy(email)).toBe(0);
+    expect(await sendCode(email)).toHaveLength(6);
+  });
+
+  it("answers a redeem with no code the same whether or not one is outstanding", async () => {
+    const live = anAddress("outstanding");
+    const idle = anAddress("idle");
+    await sendCode(live);
+
+    const withCode = await postRaw("/sign-in/email-otp", { email: live });
+    const withoutCode = await postRaw("/sign-in/email-otp", { email: idle });
+
+    expect(withCode.status).toBe(withoutCode.status);
+    const [a, b] = (await Promise.all([
+      withCode.json(),
+      withoutCode.json(),
+    ])) as {
+      code?: string;
+    }[];
+    expect(a.code).toBe(b.code);
   });
 });
 
