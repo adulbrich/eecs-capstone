@@ -2,6 +2,8 @@
 
 Amended on 2026-09-22 by [#576](https://github.com/adulbrich/eecs-capstone/issues/576): password sign-in is gone. The closing paragraph says what that changes about the price below.
 
+Amended on 2026-09-23 by [#584](https://github.com/adulbrich/eecs-capstone/issues/584) and [#605](https://github.com/adulbrich/eecs-capstone/issues/605): the code guard fails CLOSED. If its reads throw, the guess is refused with `INVALID_OTP` and the person asks for a new code. It used to fail open, borrowing the send cap's reasoning from [ADR-0046](./0046-mail-about-an-address-is-capped-per-recipient.md), and that reasoning does not transfer: the cap gates a send, somebody's only way to get a code at all, while the guard gates one guess at a code already sent, and failing open let a redeem verify a row another provider is linked to with nothing behind it. The send cap still fails open. The two row refusals are now `addressProofRefused` in `src/lib/address-proof.ts`, shared with the ONID release and the admin user page, and a banned row is refused only while the ban is active, the same test the admin plugin applies.
+
 Better Auth's `emailOTP` plugin mails a six digit code that the person types
 back into the tab they started in, and `magicLink` mails a URL they click. The
 two have the same security property, that no `user` row exists until the address

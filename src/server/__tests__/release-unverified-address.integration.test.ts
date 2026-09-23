@@ -126,6 +126,35 @@ describe("releaseUnverifiedAddress", () => {
     expect(await accountsFor(row.id)).toHaveLength(2);
   });
 
+  it("leaves a banned row alone", async () => {
+    const email = anAddress("banned");
+    await aSquattedAddress(email);
+    const row = await rowFor(email);
+    await db.update(user).set({ banned: true }).where(eq(user.id, row.id));
+
+    expect(await releaseUnverifiedAddress(email, "Real Student")).toBeNull();
+    expect((await rowFor(email)).emailVerified).toBe(false);
+    expect(await accountsFor(row.id)).toHaveLength(1);
+  });
+
+  it("releases a row whose timed ban has run out", async () => {
+    // The admin plugin clears such a ban at the next session and lets it
+    // through, so refusing the release on it was stricter than the ban (#605).
+    const email = anAddress("ban-expired");
+    await aSquattedAddress(email);
+    const row = await rowFor(email);
+    await db
+      .update(user)
+      .set({ banned: true, banExpires: new Date(Date.now() - 60_000) })
+      .where(eq(user.id, row.id));
+
+    expect(await releaseUnverifiedAddress(email, "Real Student")).toEqual({
+      userId: row.id,
+    });
+    expect((await rowFor(email)).emailVerified).toBe(true);
+    expect(await accountsFor(row.id)).toHaveLength(0);
+  });
+
   it("does nothing for an address no row holds", async () => {
     expect(
       await releaseUnverifiedAddress(anAddress("absent"), "Real Student")

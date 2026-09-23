@@ -2,6 +2,8 @@
 
 Amended on 2026-09-22 by [#576](https://github.com/adulbrich/eecs-capstone/issues/576): nobody can make a password account any more, so this now applies only to the rows written before, which production still holds. The hazard in the last paragraphs is closed: the verification link and the password reset it names are gone, and the other door for the owner of a squatted address is an emailed code, which takes the address off the row the same way ([ADR-0047](./0047-sign-in-by-emailed-code-rather-than-magic-link.md)).
 
+Amended on 2026-09-23 by [#605](https://github.com/adulbrich/eecs-capstone/issues/605) and [#579](https://github.com/adulbrich/eecs-capstone/issues/579): the two refusals below are now `addressProofRefused` in `src/lib/address-proof.ts`, which the emailed code guard and the admin user page read too, and a ban counts only while it is active. A timed ban whose `banExpires` has passed no longer blocks the release, because the admin plugin clears it at the next session and lets that session through, so refusing on it was stricter than the ban. The banner copy is no longer unchanged: it now reads the provider from the error URL, and GitHub's `account_not_linked` points at the emailed code, which is GitHub's release. ONID's copy stays a support contact.
+
 `onidUserInfo` in `src/lib/auth.ts` calls `releaseUnverifiedAddress` before
 Better Auth decides whether to link, and when the address is held by a row that
 is unverified, unbanned and has nothing but a `credential` account on it, that

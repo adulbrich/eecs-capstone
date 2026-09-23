@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "#/db";
 import { account, user } from "#/db/auth-schema";
+import { addressProofRefused } from "#/lib/address-proof";
 
 /**
  * Whether an emailed code must be refused for this address before Better Auth
@@ -13,6 +14,9 @@ import { account, user } from "#/db/auth-schema";
  * linked to. Both gaps are real, and neither is reachable from inside the
  * plugin, so this runs ahead of it.
  *
+ * Both refusals are `addressProofRefused` in `src/lib/address-proof.ts`, the
+ * rule the ONID release and the admin user page read too (#605).
+ *
  * **A banned row.** The ban itself IS enforced, but too late to be harmless.
  * The admin plugin checks it in `databaseHooks.session.create.before`
  * (`better-auth/dist/plugins/admin/admin.mjs`), which runs after the credential
@@ -20,7 +24,9 @@ import { account, user } from "#/db/auth-schema";
  * been flipped. So a code sign-in against a banned unverified row fails, and
  * still strips it. Nothing is granted, but a decision an admin made is quietly
  * rewritten, which is the same argument `releaseUnverifiedAddress` makes for
- * leaving a banned row alone.
+ * leaving a banned row alone. Only an active ban: the same hook clears one
+ * whose `banExpires` has passed and lets the session through, so a code
+ * against that row is let through too.
  *
  * **A row with another provider linked.** This one grants something. A social
  * sign-up whose provider reported the address unverified leaves a row with a
@@ -51,6 +57,7 @@ export async function otpSignInRefused(email: string): Promise<boolean> {
   }
   const [existing] = await db
     .select({
+      banExpires: user.banExpires,
       banned: user.banned,
       emailVerified: user.emailVerified,
       id: user.id,
@@ -60,16 +67,17 @@ export async function otpSignInRefused(email: string): Promise<boolean> {
     .limit(1);
   // No row is the ordinary sign-up case, and a verified row is the ordinary
   // sign-in case. `revokeUnprovenAccountAccess` no-ops on a verified row, so
-  // neither of the two problems above can arise there.
+  // neither of the two problems above can arise there, and the account read
+  // below is skipped.
   if (!existing || existing.emailVerified) {
     return false;
-  }
-  if (existing.banned) {
-    return true;
   }
   const accounts = await db
     .select({ providerId: account.providerId })
     .from(account)
     .where(eq(account.userId, existing.id));
-  return accounts.some((row) => row.providerId !== "credential");
+  return addressProofRefused(
+    existing,
+    accounts.map((row) => row.providerId)
+  );
 }

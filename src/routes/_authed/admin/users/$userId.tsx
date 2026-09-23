@@ -18,30 +18,10 @@ import {
 import { AI_FEATURE_NOUN } from "#/lib/ai-review-limits";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
+import { signInMethods } from "#/lib/sign-in-methods";
 import { isAdmin } from "#/lib/viewer";
 import type { UserRole } from "#/lib/vocabularies";
 import { getUser } from "#/server/users";
-
-const PROVIDER_LABELS: Record<string, string> = {
-  github: "GitHub",
-  onid: "ONID",
-  google: "Google",
-  linkedin: "LinkedIn",
-  discord: "Discord",
-};
-
-const providerLabel = (id: string) => PROVIDER_LABELS[id] ?? id;
-
-/**
- * How this person can sign in. An emailed code needs no `account` row, so it
- * is listed for everyone rather than read from one, and a `credential` row is
- * left out: production still holds the ones written before #576, and none of
- * them signs anybody in.
- */
-const signInMethods = (providers: string[]) => [
-  "Emailed code",
-  ...providers.filter((id) => id !== "credential").map(providerLabel),
-];
 
 export const Route = createFileRoute("/_authed/admin/users/$userId")({
   head: () => ({ meta: [{ title: pageTitle("Manage User") }] }),
@@ -145,7 +125,7 @@ function UserDetail() {
       )}
       <p className="text-sm">
         <span className="text-muted-foreground">Sign-in: </span>
-        {signInMethods(providers).join(", ")}
+        {signInMethods(user, providers).join(", ") || "none"}
       </p>
       <p className="text-sm">
         <span className="text-muted-foreground">Joined: </span>

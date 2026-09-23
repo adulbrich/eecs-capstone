@@ -292,9 +292,13 @@ describe("the two rows Better Auth's own helper does not refuse", () => {
 
     // Indistinguishable from a wrong code on purpose: the caller has offered no
     // code yet when the guard runs, so a distinct refusal would answer "is
-    // there a banned row at this address" to anyone who asked.
+    // there a banned row at this address" to anyone who asked. The claim is
+    // presented, so the row guard is what refuses and not the claim guard.
     await expect(
-      auth.api.signInEmailOTP({ body: { email, otp: code } })
+      auth.api.signInEmailOTP({
+        body: { email, otp: code },
+        headers: claimHeaders(email),
+      })
     ).rejects.toMatchObject({ body: { code: "INVALID_OTP" } });
     const after = await rowFor(email);
     expect(after?.emailVerified).toBe(false);
@@ -319,12 +323,59 @@ describe("the two rows Better Auth's own helper does not refuse", () => {
     const code = await sendCode(email);
 
     await expect(
-      auth.api.signInEmailOTP({ body: { email, otp: code } })
+      auth.api.signInEmailOTP({
+        body: { email, otp: code },
+        headers: claimHeaders(email),
+      })
     ).rejects.toMatchObject({ body: { code: "INVALID_OTP" } });
     // Proving the address proves the address, and nothing about the GitHub
     // identity on the row. Verifying here would leave one row answering to two
     // people, because the provider account survives the strip.
     expect((await rowFor(email))?.emailVerified).toBe(false);
+  });
+
+  it("refuses a row whose timed ban has not run out", async () => {
+    const email = anAddress("ban-live");
+    await aSquattedAddress(email);
+    const before = await rowFor(email);
+    await db
+      .update(user)
+      .set({ banned: true, banExpires: new Date(Date.now() + 3_600_000) })
+      .where(eq(user.id, before?.id as string));
+
+    const code = await sendCode(email);
+
+    await expect(
+      auth.api.signInEmailOTP({
+        body: { email, otp: code },
+        headers: claimHeaders(email),
+      })
+    ).rejects.toMatchObject({ body: { code: "INVALID_OTP" } });
+    expect(await providersOn(before?.id as string)).toEqual(["credential"]);
+  });
+
+  it("lets a row whose timed ban has run out redeem, as the admin plugin would", async () => {
+    // The admin plugin clears a lapsed ban when the session is created and
+    // lets it through, so refusing the code on one was stricter than the ban
+    // itself, and left the row with no way in but GitHub (#605).
+    const email = anAddress("ban-expired");
+    await aSquattedAddress(email);
+    const before = await rowFor(email);
+    await db
+      .update(user)
+      .set({ banned: true, banExpires: new Date(Date.now() - 60_000) })
+      .where(eq(user.id, before?.id as string));
+
+    const code = await sendCode(email);
+    await auth.api.signInEmailOTP({
+      body: { email, otp: code },
+      headers: claimHeaders(email),
+    });
+
+    const after = await rowFor(email);
+    expect(after?.emailVerified).toBe(true);
+    expect(after?.banned).toBe(false);
+    expect(await providersOn(after?.id as string)).toEqual([]);
   });
 });
 
