@@ -119,3 +119,25 @@ export function dayRange(
     end: to ? dayStart(shiftDay(to, 1), timeZone) : null,
   };
 }
+
+/**
+ * A date range and the one before it: the same number of calendar days,
+ * ending the day before `from`. Counted on the calendar rather than in
+ * milliseconds, so a range across a DST change still starts at midnight.
+ * `/admin/analytics` and `/admin/traffic` compare against it.
+ */
+export function comparisonPeriods(from: string, to: string) {
+  const current = dayRange(from, to);
+  const previousTo = shiftDay(from, -1);
+  const days = daysInclusive(from, to);
+  const previousFrom = shiftDay(previousTo, 1 - days);
+  const previous = dayRange(previousFrom, previousTo);
+  return {
+    days,
+    start: current.start as Date,
+    end: current.end as Date,
+    previousStart: previous.start as Date,
+    previousEnd: previous.end as Date,
+    range: { from, to, previousFrom, previousTo },
+  };
+}

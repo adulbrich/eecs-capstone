@@ -8,6 +8,7 @@ const TABLES = [
   "verification_sends",
   "traffic_events",
   "traffic_salt",
+  "traffic_visits",
   "notifications",
   "inventory_requests",
   "inventory_items",
