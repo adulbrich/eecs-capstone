@@ -130,8 +130,8 @@ describe("useDebouncedDraft", () => {
   });
 
   it("does not commit when Back or Forward lands on exactly the pending draft", () => {
-    // The step resyncs to text the draft already holds, so the draft does not
-    // change and nothing re-renders the timer away. It must still stand down:
+    // The step resyncs to text the draft already holds, so `draft` does not
+    // change and this effect never clears its timer. It must still stand down:
     // the callers that reset `page` would push an entry over the step.
     const commit = vi.fn();
     const { result, rerender } = renderHook(
