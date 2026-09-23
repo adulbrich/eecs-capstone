@@ -78,6 +78,33 @@ describe("paging the inventory listing when items tie on every sort key", () => 
   }
 });
 
+/**
+ * The criterion the column sort failed: page two continues page one rather
+ * than restarting the order. 25 names over a page of 20 cross exactly one
+ * boundary, inserted out of order under one `updated_at` so nothing but the
+ * name can put them in sequence. Zero-padded so no collation disagrees with
+ * the expected list.
+ */
+it("continues the name order from one page to the next", async () => {
+  const names = Array.from(
+    { length: 25 },
+    (_, i) => `Item ${String(i + 1).padStart(2, "0")}`
+  );
+  await db
+    .insert(inventoryItems)
+    .values([...names].reverse().map((name) => ({ name, updatedAt: TIED_AT })));
+  const seen: string[] = [];
+  for (const page of [1, 2]) {
+    const { rows } = await listInventoryAs(null, {
+      ...LIST_DEFAULTS,
+      order: "name",
+      page,
+    });
+    seen.push(...rows.map((row) => row.name));
+  }
+  expect(seen).toEqual(names);
+});
+
 describe("the inventory listing's orderings", () => {
   /**
    * Four items whose three orderings all disagree, so each assertion below

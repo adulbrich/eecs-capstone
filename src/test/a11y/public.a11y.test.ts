@@ -486,19 +486,57 @@ test("inventory table interactions", async ({ page }) => {
   await checkA11y(page);
   await closeMenu(page);
 
-  // Not "Name": that is the page's default sort column, so its header
-  // already carries aria-sort before any click.
-  const header = page.getByRole("columnheader", {
-    exact: true,
-    name: "Status",
-  });
-  const before = await header.getAttribute("aria-sort");
-  await page.getByRole("button", { name: "Status", exact: true }).click();
-  await expect(header).toHaveAttribute("aria-sort", /ascending|descending/);
-  expect(await header.getAttribute("aria-sort")).not.toBe(before);
-  await expect(page).toHaveURL(/[?&]sort=status(&|$)/);
-  await expect(page).toHaveURL(/[?&]dir=(asc|desc)(&|$)/);
+  // The headers stopped sorting in #477, as /projects' did in #475: a header
+  // click used to write ?sort=status and reorder only the twenty rows on
+  // screen. Every header, so one left sortable fails here.
+  const headers = page.getByRole("columnheader");
+  const count = await headers.count();
+  expect(count).toBeGreaterThan(0);
+  for (let i = 0; i < count; i++) {
+    const header = headers.nth(i);
+    await expect(header).not.toHaveAttribute("aria-sort", /.*/);
+    await expect(header.getByRole("button")).toHaveCount(0);
+  }
+
+  // The Sort select is the one ordering: it reads the default before any
+  // choice, and a choice goes to the server through the URL, back on page 1.
+  const sort = page.getByRole("combobox", { name: "Sort" });
+  await expect(sort).toHaveText("Available first");
+  await sort.click();
+  await waitForSurfaceSettled(page.getByRole("listbox"));
   await checkA11y(page);
+  await page.getByRole("option", { name: "Name A-Z" }).click();
+  await expect(page).toHaveURL(/[?&]order=name(&|$)/);
+  await expect(page).toHaveURL(/[?&]page=1(&|$)/);
+  await expect(sort).toHaveText("Name A-Z");
+  await checkA11y(page);
+});
+
+test("inventory listing keeps one ordering in both views", async ({ page }) => {
+  // The same URL renders the same items in the same order in either view.
+  // Two orderings, because the table's old page-local default was Name A-Z:
+  // under that one alone, a table still sorting on its own would pass by
+  // agreeing with the server.
+  for (const order of ["name", "updated"]) {
+    await page.goto(`/inventory?order=${order}&view=table`);
+    await waitForHydration(page);
+    const tableNames = await page
+      .locator("tbody tr td:first-child a")
+      .allInnerTexts();
+
+    await page.goto(`/inventory?order=${order}&view=card`);
+    await waitForHydration(page);
+    // `h3` because that is where InventoryCard puts the name.
+    const cardNames = await page
+      .getByRole("heading", { level: 3 })
+      .allInnerTexts();
+
+    expect(tableNames.length, order).toBeGreaterThan(0);
+    expect(
+      cardNames.map((n) => n.trim()),
+      order
+    ).toEqual(tableNames.map((n) => n.trim()));
+  }
 });
 
 test("inventory table shows its description column when toggled on", async ({
