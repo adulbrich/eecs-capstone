@@ -6,8 +6,9 @@ Run from a laptop in Corvallis against production, 2026-09-23 from 07:12 to 07:3
 Method and warnings are in [`2026-09-20-term-start.md`](./2026-09-20-term-start.md). This run
 answers the question [`2026-09-21-post-fix-verification.md`](./2026-09-21-post-fix-verification.md)
 left for [#558](https://github.com/adulbrich/eecs-capstone/issues/558): with the pool at 45
-per task (#570, ADR-0043) and the listing's filter options cached per task (#596,
-ADR-0051), does the pool still run out, and were the phase 2 latency misses the pool?
+per task (#570, [ADR-0043](../adr/0043-a-deploy-dips-rather-than-doubles.md)) and the
+listing's filter options cached per task (#596,
+[ADR-0051](../adr/0051-reference-lists-are-cached-per-task.md)), does the pool still run out, and were the phase 2 latency misses the pool?
 
 **The pool no longer runs out, and the burst's tail latency halved.** `PoolWaiting` read 0 in
 every minute of every phase. `DatabaseConnections` peaked at 25 during the 42 requests per
