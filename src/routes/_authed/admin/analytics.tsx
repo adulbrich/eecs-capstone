@@ -23,6 +23,7 @@ import { slotsHint } from "#/lib/analytics-copy";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
 import { PROJECT_STATUS_LABEL } from "#/lib/project-workflow";
+import { resolveRange } from "#/lib/report-range";
 import { isStaff } from "#/lib/viewer";
 import type {
   InventoryRequestItemStatus,
@@ -40,10 +41,6 @@ type AnalyticsView = Awaited<ReturnType<typeof getAnalytics>>;
 type Flow = AnalyticsView["flows"]["submitted"];
 type Bucket = AnalyticsView["breakdowns"]["projectsByStatus"][number];
 
-function isoDay(offset: number): string {
-  return new Date(Date.now() + offset * DAY_MS).toISOString().slice(0, 10);
-}
-
 /**
  * The two page controls live in the URL so a filtered view is a link staff
  * can share. Defaults: the last thirty days, every program.
@@ -55,14 +52,6 @@ const searchSchema = z.object({
   to: z.string().regex(DATE).optional().catch(undefined),
   program: z.string().uuid().nullable().catch(null).default(null),
 });
-
-type Search = z.infer<typeof searchSchema>;
-
-function resolveRange(search: Search) {
-  const to = search.to ?? isoDay(0);
-  const from = search.from ?? isoDay(-30);
-  return from <= to ? { from, to } : { from: to, to: from };
-}
 
 export const Route = createFileRoute("/_authed/admin/analytics")({
   validateSearch: searchSchema,

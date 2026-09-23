@@ -964,6 +964,17 @@ export const trafficEvents = pgTable(
     occurredAt: timestamp("occurred_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    /**
+     * The office's local date of `occurred_at`, computed by Postgres. A visit
+     * never crosses local midnight, so visits are placed per day, and the
+     * rollup reads one day from the index on it rather than converting
+     * every row (#592). Never written by the traffic writer. The zone is a
+     * literal because a generated column cannot take a parameter;
+     * `traffic-day.test.ts` holds it to `OFFICE_TIME_ZONE`.
+     */
+    day: date("day").generatedAlwaysAs(
+      sql`(occurred_at AT TIME ZONE 'America/Los_Angeles')::date`
+    ),
     kind: trafficEventKindEnum("kind").notNull(),
     visitorHash: text("visitor_hash").notNull(),
     pathname: text("pathname").notNull(),
@@ -977,7 +988,9 @@ export const trafficEvents = pgTable(
   },
   (t) => [
     index("traffic_events_occurred_at_idx").on(t.occurredAt),
-    index("traffic_events_visitor_idx").on(t.visitorHash, t.occurredAt),
+    // The rollup's visit walk (#592): one local day, then each visitor's
+    // events in time order, which is the order its window wants.
+    index("traffic_events_visit_idx").on(t.day, t.visitorHash, t.occurredAt),
     index("traffic_events_pathname_idx").on(t.pathname, t.occurredAt),
   ]
 );
@@ -1000,4 +1013,45 @@ export const trafficSalt = pgTable(
     salt: text("salt").notNull(),
   },
   (t) => [check("traffic_salt_single_row", sql`${t.id} = 1`)]
+);
+
+/**
+ * One row per visit of a closed day, derived from `traffic_events` and
+ * written only by `rollUpTrafficVisits` when `/admin/traffic` loads
+ * (ADR-0050). Deriving 90 days of visits on every load missed the page's
+ * 200 ms budget at a million events; a closed day's events never change, so
+ * its visits are computed once. Today is still derived live.
+ *
+ * Holds no visitor hash and no address: what a report needs about a visit,
+ * and nothing that could join it to another. Safe to truncate at any time,
+ * which is also how a change to the visit definition is applied: the next
+ * load rebuilds every day.
+ */
+export const trafficVisits = pgTable(
+  "traffic_visits",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    day: date("day").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    events: integer("events").notNull(),
+    views: integer("views").notNull(),
+    /** The visitor's first visit of the day: counts distinct visitors. */
+    firstOfDay: boolean("first_of_day").notNull(),
+    /** The pathname of the visit's first `view`, null when it had none. */
+    entryPath: text("entry_path"),
+    entryReferrer: text("entry_referrer"),
+    country: text("country"),
+    browser: text("browser"),
+    device: trafficDeviceEnum("device"),
+    /** Each pathname the visit viewed, beside how many times, in step. */
+    pages: text("pages").array().notNull(),
+    pageViews: integer("page_views").array().notNull(),
+    /** The public listings the visit reached, as pathnames. */
+    listings: text("listings").array().notNull(),
+    /** Each listing filter the visit set at least once, as `listing:key`. */
+    filters: text("filters").array().notNull(),
+  },
+  (t) => [index("traffic_visits_day_idx").on(t.day)]
 );

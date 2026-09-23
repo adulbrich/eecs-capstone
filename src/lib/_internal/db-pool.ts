@@ -1,4 +1,5 @@
 import type { Pool, PoolConfig } from "pg";
+import { TRAFFIC_STATEMENT_TIMEOUT_MS } from "./traffic-timing";
 
 /**
  * How many connections the fleet may hold open at once, and where the number
@@ -51,7 +52,7 @@ const POOL_MAX = 45;
  * here because `/api/healthz` never touches the database on purpose, so
  * nothing would restart the task.
  */
-const ACQUIRE_TIMEOUT_MS = 5000;
+export const ACQUIRE_TIMEOUT_MS = 5000;
 
 export function poolConfig(connectionString: string): PoolConfig {
   return {
@@ -73,6 +74,9 @@ export function trafficPoolConfig(connectionString: string): PoolConfig {
     connectionString,
     max: CONNECTION_BUDGET.trafficPerTask,
     connectionTimeoutMillis: ACQUIRE_TIMEOUT_MS,
+    // Bounds every statement, the salt's lock wait included, so an event
+    // cannot commit after the rollup closes its day (traffic-timing.ts).
+    statement_timeout: TRAFFIC_STATEMENT_TIMEOUT_MS,
   };
 }
 
