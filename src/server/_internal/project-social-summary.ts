@@ -70,13 +70,13 @@ export const SUMMARY_GUARD_COLUMNS = [
  * reads what this read, so once the text has moved it writes nothing and
  * reports "superseded" (ADR-0053), and the edit that moved it runs this
  * function again on its own commit, reads the new text and generates from it.
- * The retry holds
- * because both call sites in `projects.ts` start this after every commit that
+ * The retry holds because `projects.ts` starts this after every commit that
  * leaves the project in an embeddable status, which is every commit that could
- * strand a pairing: the gate below skips the other statuses, so a draft has no
- * stored summary to go stale and gets one when it publishes. A caller that
- * writes project prose WITHOUT calling this afterwards would strand the stale
- * pairing, since nothing else recomputes the hash.
+ * strand a pairing: the gate below skips the other statuses and a deleted row,
+ * so a draft has no stored summary to go stale and gets one when it publishes,
+ * and a restore starts one for whatever changed while the row was deleted. A
+ * caller that writes project prose WITHOUT calling this afterwards would strand
+ * the stale pairing, since nothing else recomputes the hash.
  */
 export async function refreshSocialSummary(
   projectId: string,

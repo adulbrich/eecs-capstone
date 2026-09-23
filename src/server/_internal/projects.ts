@@ -45,7 +45,10 @@ import {
   notifyTransitionByEmail,
 } from "./project-emails";
 import { isEmbeddableStatus } from "./project-embeddings";
-import { refreshProjectInBackground } from "./project-refresh";
+import {
+  type RefreshDeps,
+  refreshProjectInBackground,
+} from "./project-refresh";
 
 export interface AuthUser {
   id: string;
@@ -793,7 +796,8 @@ export async function softDeleteProjectAs(
 
 export async function restoreProjectAs(
   viewer: AuthUser,
-  id: string
+  id: string,
+  deps?: RefreshDeps
 ): Promise<{ id: string }> {
   assertStaff(viewer);
   const project = await loadProjectOr404(id);
@@ -812,6 +816,12 @@ export async function restoreProjectAs(
       viewer.id
     );
   });
+  // Every refresh started while the row was deleted skipped it, so an edit in
+  // that window, or one racing the delete, left nothing current (ADR-0053).
+  // Usually this finds both hashes current and returns "unchanged".
+  if (isEmbeddableStatus(project.status)) {
+    refreshProjectInBackground(id, deps);
+  }
   return { id };
 }
 

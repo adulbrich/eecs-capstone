@@ -148,9 +148,10 @@ export async function saveSocialSummaryForCurrentUser(
  * its main case. Comparing the flag alone is also not enough, because staff
  * saving over staff leaves it true on both sides; it is the stored text that
  * tells those two apart. The project's own text is in the predicate too, by
- * `rowStillReads`: an edit landing during the call has started a background
- * refresh of the newer text (ADR-0053), and a summary of the older one must
- * not beat it.
+ * `rowStillReads`: a summary of text the project no longer has is never
+ * stored. On a published or archived project the edit has started a
+ * background refresh of the newer text (ADR-0053); on any other the panel
+ * says the rewrite was thrown away and staff can press it again.
  *
  * Two cases it deliberately does not catch, both benign for the same reason.
  * The automatic refresh rewriting the row with the same text it already held:

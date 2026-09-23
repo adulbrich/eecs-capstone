@@ -9,6 +9,8 @@ import { refreshSocialSummary } from "#/server/_internal/project-social-summary"
 import {
   createProjectAs,
   performTransitionAs,
+  restoreProjectAs,
+  softDeleteProjectAs,
   updateProjectAs,
 } from "#/server/_internal/projects";
 import { SOCIAL_SUMMARY_TOOL_NAME } from "#/server/_internal/social-summary-core";
@@ -36,20 +38,27 @@ const failing: ResponsesFn = () => Promise.reject(new Error("Bedrock is down"));
 
 /**
  * A model that answers only once `release` is called, standing in for a
- * stalled Bedrock call. Release it in a `finally`, or the drain in the next
- * test waits on it forever.
+ * stalled Bedrock call. `called` resolves when the refresh reaches it, which
+ * is after it has read the row. Release it in a `finally`; if the code under
+ * test awaits the held call, the `try` never finishes, this test times out
+ * and the next test's drain hangs too, so read the first failure.
  */
 function heldModel(summary: string) {
   let release: () => void = () => undefined;
+  let reached: () => void = () => undefined;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
+  const called = new Promise<void>((resolve) => {
+    reached = resolve;
+  });
   const answer = fakeModel(summary);
   const model: ResponsesFn = async (body) => {
+    reached();
     await gate;
     return answer(body);
   };
-  return { model, release };
+  return { model, release, called };
 }
 
 async function makeAdmin(email: string) {
@@ -342,7 +351,7 @@ describe("refreshSocialSummary", () => {
     const { id } = await createProjectAs(admin, baseProject("Overlap"));
     await publish(admin, id, fakeModel("Before."));
 
-    const { model, release } = heldModel("Of the first text.");
+    const { model, release, called } = heldModel("Of the first text.");
     try {
       await updateProjectAs(
         admin,
@@ -350,6 +359,8 @@ describe("refreshSocialSummary", () => {
         undefined,
         model
       );
+      // The first refresh has read "First text." before the second commits.
+      await called;
       await updateProjectAs(
         admin,
         { ...baseProject("Overlap"), id, description: "Second text." },
@@ -407,6 +418,27 @@ describe("refreshSocialSummary", () => {
       "superseded"
     );
     expect((await readRow(id)).socialSummary).toBe("What Regenerate wrote.");
+  });
+
+  it("refreshes a restored project, whose text may have moved while every refresh skipped it", async () => {
+    const admin = await makeAdmin(nextEmail());
+    const { id } = await createProjectAs(admin, baseProject("Restored"));
+    await publish(admin, id, fakeModel("Before."));
+    await softDeleteProjectAs(admin, id);
+    // Stands in for the edit whose refresh found the row deleted and skipped.
+    await db
+      .update(projects)
+      .set({ description: "Text that changed while it was deleted." })
+      .where(eq(projects.id, id));
+
+    await restoreProjectAs(admin, id, {
+      summarize: fakeModel("Of the text it came back with."),
+    });
+    await settleProjectRefreshes();
+
+    expect((await readRow(id)).socialSummary).toBe(
+      "Of the text it came back with."
+    );
   });
 
   it("skips while the kill switch is off", async () => {
