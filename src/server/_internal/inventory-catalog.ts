@@ -145,11 +145,14 @@ const lowerName = sql`lower(${inventoryItems.name})`;
  * listing needs a total ordering" in docs/QUIRKS.md (#477). A `Record` keyed
  * by the union, so a new ordering does not compile until it has keys here.
  *
- * `status` sorts by the enum's declaration order, which is the lifecycle
- * order `INVENTORY_ITEM_STATUSES` lists and `statusRank` reads: available
- * first, retired (staff only) last. Names sort on `lower(name)` so
- * "arduino" does not follow "Zebra board". Both columns are `NOT NULL`, so
- * none of these needs a nulls rule.
+ * `status` sorts by the order Postgres declared the enum in, which today is
+ * the lifecycle order `INVENTORY_ITEM_STATUSES` lists and `statusRank` reads:
+ * available first, maintenance last. It follows the migration, not
+ * the tuple, so reordering the tuple needs a migration that recreates the
+ * enum, or this ordering and `statusRank` part ways;
+ * `inventory-listing-order.integration.test.ts` pins the two together. Names
+ * sort on `lower(name)` so "arduino" does not follow "Zebra board". Both
+ * columns are `NOT NULL`, so none of these needs a nulls rule.
  */
 const INVENTORY_ORDER_BY: Record<InventoryOrder, SQL[]> = {
   available: [asc(inventoryItems.status), asc(lowerName)],

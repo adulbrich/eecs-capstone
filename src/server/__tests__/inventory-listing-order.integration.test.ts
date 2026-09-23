@@ -1,8 +1,10 @@
+import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import { inventoryItems } from "#/db/schema";
+import { INVENTORY_ITEM_STATUSES } from "#/lib/vocabularies";
 import { listInventoryAs } from "#/server/_internal/inventory-catalog";
-import type { InventoryOrder } from "#/server/inventory";
+import { INVENTORY_ORDERS, type InventoryOrder } from "#/server/inventory";
 
 /**
  * The inventory half of `listing-order.integration.test.ts`, and the same
@@ -70,7 +72,9 @@ function expectVisitsEachExactlyOnce(seen: string[], expected: string[]) {
 }
 
 describe("paging the inventory listing when items tie on every sort key", () => {
-  for (const order of ["available", "name", "updated"] as const) {
+  // Every ordering, read from the constant, so one added later is walked
+  // here without anyone remembering to list it.
+  for (const order of INVENTORY_ORDERS) {
     it(`visits each item exactly once under ${order}`, async () => {
       const ids = await insertTiedItems();
       expectVisitsEachExactlyOnce(await pageThrough(order), ids);
@@ -154,6 +158,20 @@ describe("the inventory listing's orderings", () => {
       "Zebra board",
       "arduino",
       "Bench supply",
+    ]);
+  });
+
+  /**
+   * Available first reads the enum Postgres declared, while `statusRank` and
+   * the filters read `INVENTORY_ITEM_STATUSES`. Reordering the tuple without
+   * a migration that recreates the enum would part them silently.
+   */
+  it("sorts status in the order the vocabulary lists it", async () => {
+    const result = await db.execute<{ status: string }>(
+      sql`SELECT unnest(enum_range(NULL::inventory_item_status))::text AS status`
+    );
+    expect(result.rows.map((row) => row.status)).toEqual([
+      ...INVENTORY_ITEM_STATUSES,
     ]);
   });
 

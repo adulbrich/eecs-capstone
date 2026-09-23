@@ -3454,8 +3454,8 @@ describe("retired visibility", () => {
     // second, independent guard, so both would have to fail for a leak.
     const { student, retired, active } = await retiredAndActiveItems();
     const { rows } = await listInventoryAs(student, {
-      order: "available",
       ...LIST_DEFAULTS(),
+      order: "available",
       page: 1,
       pageSize: 50,
       retiredOnly: true,

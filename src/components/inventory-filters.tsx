@@ -75,8 +75,8 @@ interface SearchProps {
 /**
  * The top of the listing at every width: the search, the server order and
  * the card/table toggle. None of these narrows the list, which is why they
- * stay beside the Filters button rather than inside the aside. The route passes a stable
- * `onQChange`: the debounce keys its timer on it.
+ * stay beside the Filters button rather than inside the aside. The route
+ * passes a stable `onQChange`: the debounce keys its timer on it.
  */
 export function InventorySearchBar({
   onOrderChange,

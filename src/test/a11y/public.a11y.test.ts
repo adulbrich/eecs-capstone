@@ -502,9 +502,11 @@ test("inventory table interactions", async ({ page }) => {
   // choice, and a choice goes to the server through the URL, back on page 1.
   const sort = page.getByRole("combobox", { name: "Sort" });
   await expect(sort).toHaveText("Available first");
+  // Not scanned open: Radix Select hides the rest of the page with
+  // aria-hidden while its listbox is up, which axe reports as
+  // aria-hidden-focus on every focusable thing behind it. No Select in this
+  // suite is scanned open, /projects' Sort select included.
   await sort.click();
-  await waitForSurfaceSettled(page.getByRole("listbox"));
-  await checkA11y(page);
   await page.getByRole("option", { name: "Name A-Z" }).click();
   await expect(page).toHaveURL(/[?&]order=name(&|$)/);
   await expect(page).toHaveURL(/[?&]page=1(&|$)/);

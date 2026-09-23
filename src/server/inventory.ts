@@ -39,7 +39,7 @@ export const INVENTORY_ORDERS = ["available", "name", "updated"] as const;
 
 export type InventoryOrder = (typeof INVENTORY_ORDERS)[number];
 
-/** What borrowers want on top: what they can take out now. */
+/** What a reader browsing the catalog wants on top: what they can take out now. */
 export const INVENTORY_ORDER_DEFAULT: InventoryOrder = "available";
 
 const listInventorySchema = z.object({
