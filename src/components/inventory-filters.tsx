@@ -94,7 +94,10 @@ export function InventorySearchBar({
       <Input
         aria-describedby={hintId}
         aria-label="Search inventory"
-        className="min-w-0 flex-1 basis-64"
+        // basis-40 rather than the basis-64 the other inputs carry, for the
+        // reason `ProjectsSearchBar` gives: with the Sort select in the row,
+        // basis-64 wrapped Columns onto a line of its own at 768 in table view.
+        className="min-w-0 flex-1 basis-40"
         onChange={(e) => setLocalQ(e.target.value)}
         placeholder="Search inventory"
         type="search"
