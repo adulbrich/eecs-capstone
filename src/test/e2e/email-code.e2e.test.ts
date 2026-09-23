@@ -265,17 +265,19 @@ test.describe("refusals on the emailed code", () => {
           body: JSON.stringify({ success: true }),
         })
       );
+      // With an empty message, which the form's own words stand in for
+      // rather than leaving ". Ask for a new code" on its own.
       await page.route(redeem, (route) =>
         route.fulfill({
           status: 400,
           contentType: "application/json",
-          body: JSON.stringify({ code: "INVALID_OTP", message: "Invalid OTP" }),
+          body: JSON.stringify({ code: "INVALID_OTP", message: "" }),
         })
       );
       await field.fill("123456");
       await page.getByRole("button", { name: "Confirm code" }).click();
       await expect(page.getByRole("alert")).toContainText(
-        /ask for a new code/i
+        "Sign-in failed. Ask for a new code and try again."
       );
       await expect(field).toHaveValue("");
       await expect(field).toBeFocused();
