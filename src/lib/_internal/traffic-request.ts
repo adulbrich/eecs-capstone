@@ -26,7 +26,10 @@ const MAX_ARRAY = 20;
 /**
  * A lone UTF-16 surrogate. `JSON.stringify` writes one as a `\u` escape and
  * Postgres refuses that escape in `jsonb`, so a search holding one would fail
- * its insert.
+ * its insert. The event is refused instead. A browser never sends one, since
+ * decoding a URL turns invalid bytes into U+FFFD, so only a crafted request
+ * loses anything. The text columns need no such check: node-postgres encodes
+ * a lone surrogate as U+FFFD and the insert succeeds.
  */
 const LONE_SURROGATE =
   /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
@@ -53,10 +56,10 @@ export const trafficBodySchema = z.object({
   search: z
     .record(z.string().max(64), searchValue)
     .refine((s) => Object.keys(s).length <= MAX_SEARCH_KEYS)
-    // The typed search is the one free-text field. It is trimmed and cut
-    // rather than refused, so a long query still counts as a search. Cut by
-    // code point, not code unit, so an emoji at the cut is kept or dropped
-    // whole rather than split into a lone surrogate.
+    // The typed search is the one free-text field. A long one is trimmed and
+    // cut rather than refused, so it still counts as a search. Cut by code
+    // point, not code unit, so an emoji at the cut is kept or dropped whole
+    // rather than split into a lone surrogate.
     .transform((s) =>
       typeof s.q === "string"
         ? { ...s, q: Array.from(s.q.trim()).slice(0, MAX_QUERY).join("") }
