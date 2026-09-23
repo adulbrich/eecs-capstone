@@ -1,6 +1,7 @@
 import { beforeEach } from "vitest";
 import { embeddingsEnabled } from "#/lib/_internal/embeddings-flag";
 import { socialSummariesEnabled } from "#/lib/_internal/social-summary-flag";
+import { settleProjectRefreshes } from "#/server/_internal/project-refresh";
 import { resetDatabase } from "./db-reset";
 
 /**
@@ -38,5 +39,8 @@ if (socialSummariesEnabled()) {
 }
 
 beforeEach(async () => {
+  // A save or publish returns before its embedding and summary refresh does,
+  // so let the last test's refresh land before truncating under it.
+  await settleProjectRefreshes();
   await resetDatabase();
 });

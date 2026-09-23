@@ -4,6 +4,7 @@ import { db } from "#/db";
 import { projects, user } from "#/db/schema";
 import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
 import { auth } from "#/lib/auth";
+import { settleProjectRefreshes } from "#/server/_internal/project-refresh";
 import { refreshSocialSummary } from "#/server/_internal/project-social-summary";
 import {
   createProjectAs,
@@ -32,6 +33,24 @@ function fakeModel(summary: string): ResponsesFn {
 }
 
 const failing: ResponsesFn = () => Promise.reject(new Error("Bedrock is down"));
+
+/**
+ * A model that answers only once `release` is called, standing in for a
+ * stalled Bedrock call. Release it in a `finally`, or the drain in the next
+ * test waits on it forever.
+ */
+function heldModel(summary: string) {
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const answer = fakeModel(summary);
+  const model: ResponsesFn = async (body) => {
+    await gate;
+    return answer(body);
+  };
+  return { model, release };
+}
 
 async function makeAdmin(email: string) {
   await auth.api.createUser({
@@ -76,6 +95,7 @@ async function publish(
   await performTransitionAs(admin, id, "submitted", undefined, { summarize });
   await performTransitionAs(admin, id, "approved", undefined, { summarize });
   await performTransitionAs(admin, id, "published", undefined, { summarize });
+  await settleProjectRefreshes();
 }
 
 async function readRow(id: string) {
@@ -147,6 +167,7 @@ describe("refreshSocialSummary", () => {
       undefined,
       fakeModel("After.")
     );
+    await settleProjectRefreshes();
     expect((await readRow(id)).socialSummary).toBe("After.");
   });
 
@@ -164,6 +185,7 @@ describe("refreshSocialSummary", () => {
       undefined,
       model
     );
+    await settleProjectRefreshes();
     expect(model).not.toHaveBeenCalled();
     expect((await readRow(id)).socialSummary).toBe("Original wording.");
   });
@@ -189,6 +211,7 @@ describe("refreshSocialSummary", () => {
       undefined,
       model
     );
+    await settleProjectRefreshes();
     expect(model).not.toHaveBeenCalled();
     expect((await readRow(id)).socialSummary).toBe("Wording staff chose.");
     expect(await refreshSocialSummary(id, model)).toBe("manual");
@@ -231,6 +254,7 @@ describe("refreshSocialSummary", () => {
       undefined,
       racing
     );
+    await settleProjectRefreshes();
 
     const row = await readRow(id);
     expect(row.socialSummary).toBe("Wording staff chose mid-flight.");
@@ -267,6 +291,50 @@ describe("refreshSocialSummary", () => {
     await publish(admin, id, fakeModel("x".repeat(400)));
 
     expect((await readRow(id)).socialSummary).toBeNull();
+  });
+
+  it("answers a save before the model does, then applies the summary", async () => {
+    // Production held a save's response for 301 s on a stalled Mantle call,
+    // with the row already committed, so the button never left "Saving...".
+    const admin = await makeAdmin(nextEmail());
+    const { id } = await createProjectAs(admin, baseProject("Stalled edit"));
+    await publish(admin, id, fakeModel("Before."));
+
+    const { model, release } = heldModel("After.");
+    try {
+      expect(
+        await updateProjectAs(
+          admin,
+          { ...baseProject("Stalled edit"), id, description: "New text." },
+          undefined,
+          model
+        )
+      ).toEqual({ id, updated: true });
+      expect((await readRow(id)).socialSummary).toBe("Before.");
+    } finally {
+      release();
+    }
+    await settleProjectRefreshes();
+    expect((await readRow(id)).socialSummary).toBe("After.");
+  });
+
+  it("answers a publish before the model does, then applies the summary", async () => {
+    const admin = await makeAdmin(nextEmail());
+    const { id } = await createProjectAs(admin, baseProject("Stalled publish"));
+    await performTransitionAs(admin, id, "submitted");
+    await performTransitionAs(admin, id, "approved");
+
+    const { model, release } = heldModel("Published late.");
+    try {
+      await performTransitionAs(admin, id, "published", undefined, {
+        summarize: model,
+      });
+      expect((await readRow(id)).socialSummary).toBeNull();
+    } finally {
+      release();
+    }
+    await settleProjectRefreshes();
+    expect((await readRow(id)).socialSummary).toBe("Published late.");
   });
 
   it("skips while the kill switch is off", async () => {

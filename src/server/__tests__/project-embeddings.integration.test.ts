@@ -4,6 +4,7 @@ import { db } from "#/db";
 import { programs, projectPrograms, projects, user } from "#/db/schema";
 import { auth } from "#/lib/auth";
 import { refreshProjectEmbedding } from "#/server/_internal/project-embeddings";
+import { settleProjectRefreshes } from "#/server/_internal/project-refresh";
 import {
   createProjectAs,
   forceTransitionAs,
@@ -47,6 +48,7 @@ async function publish(admin: { id: string; role: string | null }, id: string) {
   await performTransitionAs(admin, id, "submitted");
   await performTransitionAs(admin, id, "approved");
   await performTransitionAs(admin, id, "published");
+  await settleProjectRefreshes();
 }
 
 async function readRow(id: string) {
@@ -213,10 +215,12 @@ describe("embedding triggers", () => {
     const embed = vi.fn().mockResolvedValue(VECTOR);
 
     await performTransitionAs(admin, id, "submitted", undefined, { embed });
+    await settleProjectRefreshes();
     expect(embed).not.toHaveBeenCalled();
 
     await performTransitionAs(admin, id, "approved", undefined, { embed });
     await performTransitionAs(admin, id, "published", undefined, { embed });
+    await settleProjectRefreshes();
 
     expect(embed).toHaveBeenCalledTimes(1);
     expect((await readRow(id)).embedding?.length).toBe(1024);
@@ -231,6 +235,7 @@ describe("embedding triggers", () => {
       embed,
       sendEmail: false,
     });
+    await settleProjectRefreshes();
 
     expect(embed).toHaveBeenCalledTimes(1);
     expect((await readRow(id)).embedding?.length).toBe(1024);
@@ -246,6 +251,7 @@ describe("embedding triggers", () => {
     await expect(
       performTransitionAs(admin, id, "published", undefined, { embed })
     ).resolves.toMatchObject({ status: "published" });
+    await settleProjectRefreshes();
 
     const row = await readRow(id);
     expect(row.status).toBe("published");
@@ -265,6 +271,7 @@ describe("embedding triggers", () => {
       { ...baseProject("Live"), id, description: "Greenhouses now." },
       embed
     );
+    await settleProjectRefreshes();
 
     expect(embed).toHaveBeenCalledTimes(1);
   });
@@ -279,6 +286,7 @@ describe("embedding triggers", () => {
       { ...baseProject("Draft"), id, description: "Changed." },
       embed
     );
+    await settleProjectRefreshes();
 
     expect(embed).not.toHaveBeenCalled();
   });
@@ -293,6 +301,7 @@ describe("embedding triggers", () => {
     embed.mockClear();
 
     await performTransitionAs(admin, id, "archived", undefined, { embed });
+    await settleProjectRefreshes();
 
     // The refresh runs and finds the hash still matches, so it returns
     // "unchanged" and writes nothing. Archiving never clears a vector.
@@ -310,6 +319,7 @@ describe("embedding triggers", () => {
     await publish(admin, id);
     await refreshProjectEmbedding(id, embed);
     await performTransitionAs(admin, id, "archived", undefined, { embed });
+    await settleProjectRefreshes();
     embed.mockClear();
 
     await updateProjectAs(
@@ -317,6 +327,7 @@ describe("embedding triggers", () => {
       { ...baseProject("Live"), id, description: "Greenhouses now." },
       embed
     );
+    await settleProjectRefreshes();
 
     expect(embed).toHaveBeenCalledTimes(1);
   });
@@ -328,6 +339,7 @@ describe("embedding triggers", () => {
     await publish(admin, id);
     await refreshProjectEmbedding(id, embed);
     await performTransitionAs(admin, id, "archived", undefined, { embed });
+    await settleProjectRefreshes();
     embed.mockClear();
 
     await updateProjectAs(
@@ -335,6 +347,7 @@ describe("embedding triggers", () => {
       { ...baseProject("Live"), id, notes: "internal only" },
       embed
     );
+    await settleProjectRefreshes();
 
     expect(embed).not.toHaveBeenCalled();
   });
@@ -352,6 +365,7 @@ describe("embedding triggers", () => {
       { ...baseProject("Live"), id, notes: "internal only" },
       embed
     );
+    await settleProjectRefreshes();
 
     expect(embed).not.toHaveBeenCalled();
   });

@@ -50,8 +50,9 @@ export type SocialSummaryOutcome =
  * text's hash. It self-corrects, but only because the edit that raced runs
  * this function again on its own commit, reads the new text, finds the stored
  * hash does not match it and regenerates. That holds because both call sites
- * in `projects.ts` run it after every commit that leaves the project in an
- * embeddable status, which is every commit that could strand a pairing: the
+ * in `projects.ts` start it, through `refreshProjectInBackground`, after every
+ * commit that leaves the project in an embeddable status, which is every
+ * commit that could strand a pairing: the
  * gate below skips the other statuses, so a draft has no stored summary to go
  * stale and gets one when it publishes. A caller that writes project prose
  * WITHOUT calling this afterwards would strand the stale pairing, since

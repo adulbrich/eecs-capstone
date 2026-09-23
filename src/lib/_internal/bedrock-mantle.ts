@@ -135,6 +135,14 @@ function getSigner(): SignatureV4 {
 }
 
 /**
+ * Without it a stalled call waits out undici's 300 s header timeout, which is
+ * how a save once sat on "Saving..." (ADR-0053). The slowest save that ran
+ * both model calls in the week before took 2.3 s, so this cuts a stall
+ * rather than a slow answer.
+ */
+const MANTLE_TIMEOUT_MS = 60_000;
+
+/**
  * Calls the OpenAI-compatible Responses API on the bedrock-mantle endpoint.
  *
  * There is no AWS SDK client for this endpoint, so this signs a plain fetch.
@@ -159,6 +167,7 @@ export const mantleResponses: ResponsesFn = async (body) => {
     body: payload,
     headers: signed.headers,
     method: "POST",
+    signal: AbortSignal.timeout(MANTLE_TIMEOUT_MS),
   });
   if (!response.ok) {
     throw new Error(

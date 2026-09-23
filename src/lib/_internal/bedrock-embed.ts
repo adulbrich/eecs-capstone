@@ -61,6 +61,12 @@ export function parseEmbedResponse(payload: Uint8Array): number[] {
   return parsed.embedding;
 }
 
+/**
+ * The SDK sets no request timeout of its own. Bounds the whole call, retries
+ * included, the way `MANTLE_TIMEOUT_MS` bounds the summary (ADR-0053).
+ */
+const EMBED_TIMEOUT_MS = 30_000;
+
 export const bedrockEmbed: EmbedFn = async (text) => {
   if (!embeddingsEnabled()) {
     throw new Error("Embeddings are disabled (BEDROCK_EMBEDDINGS_ENABLED)");
@@ -71,7 +77,8 @@ export const bedrockEmbed: EmbedFn = async (text) => {
       contentType: "application/json",
       accept: "application/json",
       body: buildEmbedRequestBody(text),
-    })
+    }),
+    { abortSignal: AbortSignal.timeout(EMBED_TIMEOUT_MS) }
   );
   return parseEmbedResponse(response.body);
 };
