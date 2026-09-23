@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "#/db";
 import { account, session, user } from "#/db/auth-schema";
+import { addressProofRefused } from "#/lib/address-proof";
 
 /**
  * Takes an address away from a password account nobody has proven owns it, so
@@ -56,6 +57,7 @@ export async function releaseUnverifiedAddress(
   return await db.transaction(async (tx) => {
     const [existing] = await tx
       .select({
+        banExpires: user.banExpires,
         banned: user.banned,
         emailVerified: user.emailVerified,
         id: user.id,
@@ -66,21 +68,29 @@ export async function releaseUnverifiedAddress(
     if (!existing || existing.emailVerified) {
       return null;
     }
-    // A banned row is left alone, and this is the one refusal that costs a real
-    // student something. Releasing would hand them an account an admin has shut,
-    // which is a worse dead end than `account not linked`, and clearing the ban
-    // here would silently overturn a decision a person made without that person
-    // ever seeing it happen. Neither is this function's call. The student gets
-    // today's behaviour and an admin can unban or delete the row; nothing else
-    // in the app resolves a ban automatically either.
-    if (existing.banned) {
-      return null;
-    }
     const accounts = await tx
       .select({ providerId: account.providerId })
       .from(account)
       .where(eq(account.userId, existing.id));
-    if (accounts.some((row) => row.providerId !== "credential")) {
+    // `addressProofRefused` is the rule the code guard and the admin user page
+    // read too (#605). It refuses two rows here.
+    //
+    // A banned row, and this is the one refusal that costs a real student
+    // something. Releasing would hand them an account an admin has shut, which
+    // is a worse dead end than `account not linked`, and clearing the ban here
+    // would silently overturn a decision a person made without that person ever
+    // seeing it happen. Neither is this function's call. The student gets
+    // today's behaviour and an admin can unban or delete the row. A timed ban
+    // that has run out is not refused: the admin plugin clears it at the next
+    // session anyway, so refusing on it was stricter than the ban.
+    //
+    // A row another provider is linked to, which the docblock above covers.
+    if (
+      addressProofRefused(
+        existing,
+        accounts.map((row) => row.providerId)
+      )
+    ) {
       return null;
     }
     await tx.delete(account).where(eq(account.userId, existing.id));

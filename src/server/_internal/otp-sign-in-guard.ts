@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "#/db";
 import { account, user } from "#/db/auth-schema";
+import { addressProofRefused } from "#/lib/address-proof";
 
 /**
  * Whether an emailed code must be refused for this address before Better Auth
@@ -12,6 +13,9 @@ import { account, user } from "#/db/auth-schema";
  * path: it refuses neither a banned row nor a row another provider is already
  * linked to. Both gaps are real, and neither is reachable from inside the
  * plugin, so this runs ahead of it.
+ *
+ * Both refusals are `addressProofRefused` in `src/lib/address-proof.ts`, the
+ * rule the ONID release and the admin user page read too (#605).
  *
  * **A banned row.** The ban itself IS enforced, but too late to be harmless.
  * The admin plugin checks it in `databaseHooks.session.create.before`
@@ -51,6 +55,7 @@ export async function otpSignInRefused(email: string): Promise<boolean> {
   }
   const [existing] = await db
     .select({
+      banExpires: user.banExpires,
       banned: user.banned,
       emailVerified: user.emailVerified,
       id: user.id,
@@ -60,16 +65,17 @@ export async function otpSignInRefused(email: string): Promise<boolean> {
     .limit(1);
   // No row is the ordinary sign-up case, and a verified row is the ordinary
   // sign-in case. `revokeUnprovenAccountAccess` no-ops on a verified row, so
-  // neither of the two problems above can arise there.
+  // neither of the two problems above can arise there, and the account read
+  // below is skipped.
   if (!existing || existing.emailVerified) {
     return false;
-  }
-  if (existing.banned) {
-    return true;
   }
   const accounts = await db
     .select({ providerId: account.providerId })
     .from(account)
     .where(eq(account.userId, existing.id));
-  return accounts.some((row) => row.providerId !== "credential");
+  return addressProofRefused(
+    existing,
+    accounts.map((row) => row.providerId)
+  );
 }
