@@ -44,7 +44,7 @@ async function main() {
   for (const row of rows) {
     const outcome = await refreshProjectEmbedding(row.id);
     tally[outcome] += 1;
-    process.stdout.write(`${outcome.padEnd(9)} ${row.title}\n`);
+    process.stdout.write(`${outcome.padEnd(10)} ${row.title}\n`);
     // "failed" as well as "updated". A throttled Bedrock call fails in
     // milliseconds, so sleeping only on success lets exactly the run that is
     // being throttled burst through every row. "failed" also covers errors

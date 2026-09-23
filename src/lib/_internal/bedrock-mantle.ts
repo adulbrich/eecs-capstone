@@ -215,6 +215,8 @@ export function fetchFailureReason(error: unknown): string {
   const code = (cause as { code?: unknown }).code;
   const detail =
     cause.message ||
-    (cause instanceof AggregateError ? errorMessage(cause.errors[0], "") : "");
+    (cause instanceof AggregateError
+      ? errorMessage(cause.errors?.[0], "")
+      : "");
   return `${message} (${typeof code === "string" ? code : cause.name}: ${detail})`;
 }

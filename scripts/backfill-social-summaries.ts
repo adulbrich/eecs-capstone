@@ -78,7 +78,7 @@ async function main() {
   for (const row of targets) {
     const outcome = await refreshSocialSummary(row.id);
     tally[outcome] += 1;
-    process.stdout.write(`${outcome.padEnd(9)} ${row.title}\n`);
+    process.stdout.write(`${outcome.padEnd(10)} ${row.title}\n`);
     // The same rule the embedding sweeper uses, and for the same reason: a
     // throttled call fails in milliseconds, so sleeping only on success lets
     // exactly the run being throttled burst through every row. The other three

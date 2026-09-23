@@ -28,15 +28,16 @@ export type SocialSummaryOutcome =
 /**
  * Every field `buildSocialSummarySource` reads, plus the summary itself, so a
  * Regenerate that lands during the model call wins over the background
- * refresh. A `Record` so a new source field fails to compile until it is
- * guarded here.
+ * refresh. Regenerate guards its own write on the same columns, so of the two
+ * the one that read the current text is the one that lands. A `Record` so a
+ * new source field fails to compile until it is guarded here.
  */
 const SUMMARY_TEXT: Record<keyof SocialSummarySourceProject, true> = {
   title: true,
   description: true,
   problemStatement: true,
 };
-const SUMMARY_GUARD_COLUMNS = [
+export const SUMMARY_GUARD_COLUMNS = [
   ...(Object.keys(SUMMARY_TEXT) as (keyof SocialSummarySourceProject)[]),
   "socialSummary",
 ] as const;
@@ -65,12 +66,11 @@ const SUMMARY_GUARD_COLUMNS = [
  * One property this leans on rather than enforces: the summary is written from
  * the text read at the top, so an edit landing during the model call leaves a
  * summary describing text that has already changed, paired with that older
- * text's hash. On one task it self-corrects, because the edit that raced runs
- * this function again on its own commit, queued behind the first by
- * `refreshProjectInBackground`, reads the new text, finds the stored hash does
- * not match it and regenerates. On two tasks the write below cannot land at
- * all once the text has moved, because it holds only while the row still reads
- * what this read (ADR-0053). The retry holds
+ * text's hash. It cannot land: the write below holds only while the row still
+ * reads what this read, so once the text has moved it writes nothing and
+ * reports "superseded" (ADR-0053), and the edit that moved it runs this
+ * function again on its own commit, reads the new text and generates from it.
+ * The retry holds
  * because both call sites in `projects.ts` start this after every commit that
  * leaves the project in an embeddable status, which is every commit that could
  * strand a pairing: the gate below skips the other statuses, so a draft has no
