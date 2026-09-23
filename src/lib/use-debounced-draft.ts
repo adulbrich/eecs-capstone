@@ -54,7 +54,14 @@ export function useDebouncedDraft(
     if (draft === expected.current) {
       return;
     }
+    // A Back or Forward before this fires moves `expected`, and the draft it
+    // was armed for is stale, even when the step landed on exactly that text
+    // and so re-rendered nothing.
+    const armedAt = expected.current;
     const t = setTimeout(() => {
+      if (expected.current !== armedAt) {
+        return;
+      }
       expected.current = draft;
       commit(draft);
     }, delayMs);

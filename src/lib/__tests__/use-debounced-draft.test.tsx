@@ -129,6 +129,23 @@ describe("useDebouncedDraft", () => {
     expect(commit).toHaveBeenCalledTimes(2);
   });
 
+  it("does not commit when Back or Forward lands on exactly the pending draft", () => {
+    // The step resyncs to text the draft already holds, so the draft does not
+    // change and nothing re-renders the timer away. It must still stand down:
+    // the callers that reset `page` would push an entry over the step.
+    const commit = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ v }) => useDebouncedDraft(v, commit),
+      { initialProps: { v: "ard" } }
+    );
+
+    act(() => result.current[1]("ardu"));
+    rerender({ v: "ardu" });
+    act(() => vi.advanceTimersByTime(500));
+    expect(result.current[0]).toBe("ardu");
+    expect(commit).not.toHaveBeenCalled();
+  });
+
   it("does not commit when the draft already equals the value", () => {
     const commit = vi.fn();
     const { result } = renderHook(() => useDebouncedDraft("same", commit));
