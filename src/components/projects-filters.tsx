@@ -243,11 +243,12 @@ export function ProjectsSearchBar({
       <Input
         aria-describedby={hintId}
         aria-label="Search projects"
-        // basis-40 where the other three inputs carry basis-64: this is the
-        // one row with a sort select, a view toggle, Filters and Columns
-        // beside the input, and at 768 in table view it is 767px of basis
-        // in a 704px row with basis-64, so Columns wrapped. At 160px the
-        // row fits with room to spare, and flex-1 grows the input back.
+        // basis-40 where the two admin inputs carry basis-64: this row and
+        // /inventory's are the ones with a sort select, a view toggle,
+        // Filters and Columns beside the input, and at 768 in table view it
+        // is 767px of basis in a 704px row with basis-64, so Columns
+        // wrapped. At 160px the row fits with room to spare, and flex-1
+        // grows the input back.
         className="min-w-0 flex-1 basis-40"
         onChange={(e) => setQueryDraft(e.target.value)}
         // A name for the box, not its documentation: the row gives it about

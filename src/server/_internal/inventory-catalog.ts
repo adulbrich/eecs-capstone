@@ -147,7 +147,8 @@ const lowerName = sql`lower(${inventoryItems.name})`;
  *
  * `status` sorts by the order Postgres declared the enum in, which today is
  * the lifecycle order `INVENTORY_ITEM_STATUSES` lists and `statusRank` reads:
- * available first, maintenance last. It follows the migration, not
+ * available first, retired last, though `visibleStatuses` keeps retired off
+ * this listing unless `retiredOnly` is set. It follows the migration, not
  * the tuple, so reordering the tuple needs a migration that recreates the
  * enum, or this ordering and `statusRank` part ways;
  * `inventory-listing-order.integration.test.ts` pins the two together. Names
