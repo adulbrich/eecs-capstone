@@ -114,7 +114,6 @@ interface AuthAnswer {
 
 /** What `reach` answers with when the call threw rather than answering. */
 const UNREACHABLE = {
-  code: "UNREACHABLE",
   message: "Could not reach the server. Check your connection and try again.",
 };
 
@@ -178,7 +177,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
       // The endpoint answers the same for a known and an unknown address, so
       // anything that reaches here is a real failure (a malformed address, a
       // rate limit) rather than "no such account".
-      setError(sendError.message ?? "Could not send a code. Try again.");
+      setError(sendError.message || "Could not send a code. Try again.");
       return;
     }
     if (!browserKeepsCookies()) {
@@ -265,18 +264,24 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
    *
    * Nothing typed is lost by it: the field is disabled from the submit until
    * the answer arrives, so the draft this empties is the one that was sent.
+   *
+   * Emptied when no answer arrived, too. Kept, the six digits put the caret
+   * on the last slot once the field is focused again, and pasting the same
+   * code back gave `123451`, which then spent a guess. The advice differs: the
+   * request may never have reached the server and the code may still be good,
+   * so "ask for a new code" is not the first thing to say.
    */
   function refuse(
     refusal: { code?: string; message?: string },
     fallback: string
   ) {
-    if (refusal.code === UNREACHABLE.code) {
-      // The code was never judged and may still be good, so it stays for a
-      // retry, and "ask for a new code" would be the wrong advice.
-      setError(UNREACHABLE.message);
-      return;
-    }
-    setError(withRecovery(refusal.message ?? fallback));
+    setError(
+      // By identity, not by a code string the server could one day send too.
+      refusal === UNREACHABLE
+        ? UNREACHABLE.message
+        : // `||`, not `??`: an empty message would read ". Ask for a new code".
+          withRecovery(refusal.message || fallback)
+    );
     setDraft("");
   }
 

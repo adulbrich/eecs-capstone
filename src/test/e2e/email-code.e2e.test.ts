@@ -265,17 +265,19 @@ test.describe("refusals on the emailed code", () => {
           body: JSON.stringify({ success: true }),
         })
       );
+      // With an empty message, which the form's own words stand in for
+      // rather than leaving ". Ask for a new code" on its own.
       await page.route(redeem, (route) =>
         route.fulfill({
           status: 400,
           contentType: "application/json",
-          body: JSON.stringify({ code: "INVALID_OTP", message: "Invalid OTP" }),
+          body: JSON.stringify({ code: "INVALID_OTP", message: "" }),
         })
       );
       await field.fill("123456");
       await page.getByRole("button", { name: "Confirm code" }).click();
       await expect(page.getByRole("alert")).toContainText(
-        /ask for a new code/i
+        "Sign-in failed. Ask for a new code and try again."
       );
       await expect(field).toHaveValue("");
       await expect(field).toBeFocused();
@@ -284,17 +286,44 @@ test.describe("refusals on the emailed code", () => {
       await page.unroute(redeem);
 
       // A check that never reaches the server rejects rather than answering.
-      // The step has to come back rather than stay locked, and the code, which
-      // nobody judged, stays for a retry.
+      // The step has to come back rather than stay locked, empty like after a
+      // refusal: kept, the digits put the caret on the last slot, and pasting
+      // the same code back gave `123451`.
       await page.route(check, (route) => route.abort("internetdisconnected"));
       await field.fill("123456");
       await page.getByRole("button", { name: "Confirm code" }).click();
       await expect(page.getByRole("alert")).toContainText(
         /could not reach the server/i
       );
+      await expect(page.getByRole("alert")).not.toContainText(
+        /ask for a new code/i
+      );
       await expect(field).toBeEnabled();
-      await expect(field).toHaveValue("123456");
+      await expect(field).toHaveValue("");
+      await expect(field).toBeFocused();
       await expect(back).toBeEnabled();
+      await pasteInto(field, "123456");
+      await expect(field).toHaveValue("123456");
+      await page.unroute(check);
+
+      // The same when the check answers and the redeem after it never does.
+      await page.route(check, (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ success: true }),
+        })
+      );
+      await page.route(redeem, (route) => route.abort("internetdisconnected"));
+      await page.getByRole("button", { name: "Confirm code" }).click();
+      await expect(page.getByRole("alert")).toContainText(
+        /could not reach the server/i
+      );
+      await expect(page.getByRole("alert")).not.toContainText(
+        /ask for a new code/i
+      );
+      await expect(field).toHaveValue("");
+      await expect(field).toBeFocused();
     } finally {
       await removeRow(email);
     }
