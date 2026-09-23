@@ -257,15 +257,22 @@ export function entriesQuery(visits: SQL): SQL {
     GROUP BY GROUPING SETS ((entry_path), (entry_referrer), (country), (device), (browser))`;
 }
 
-/** Visits per listing reached, and per listing filter set. */
+/**
+ * Visits per listing reached, and per listing filter set. One pass, and
+ * only over visits that reached a listing, since no other visit can have
+ * set a filter.
+ */
 export function filterUseQuery(visits: SQL): SQL {
   return sql`
-    WITH v AS MATERIALIZED (${visits})
-    SELECT 'listing' AS kind, tag, count(*)::int AS visits
-    FROM v, unnest(v.listings) AS tag GROUP BY tag
-    UNION ALL
-    SELECT 'filter' AS kind, tag, count(*)::int AS visits
-    FROM v, unnest(v.filters) AS tag GROUP BY tag`;
+    SELECT t.kind, t.tag, count(*)::int AS visits
+    FROM (${visits}) v,
+      LATERAL (
+        SELECT 'listing' AS kind, unnest(v.listings) AS tag
+        UNION ALL
+        SELECT 'filter' AS kind, unnest(v.filters) AS tag
+      ) t
+    WHERE cardinality(v.listings) > 0
+    GROUP BY t.kind, t.tag`;
 }
 
 export interface TrafficFigure {
