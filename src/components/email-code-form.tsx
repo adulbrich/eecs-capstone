@@ -107,33 +107,34 @@ function withRecovery(message: string): string {
   return `${message.replace(TRAILING_STOPS, "")}. Ask for a new code and try again.`;
 }
 
-/** What a request that never reached the server answers with, through `reach`. */
+/** The part of an auth client answer this form reads. */
+interface AuthAnswer {
+  error: { code?: string; message?: string } | null;
+}
+
+/** What `reach` answers with when the call threw rather than answering. */
 const UNREACHABLE = {
   code: "UNREACHABLE",
   message: "Could not reach the server. Check your connection and try again.",
 };
 
 /**
- * An auth client call, with a request that never left the browser answered
- * as a refusal rather than thrown.
+ * An auth client call, answered as a refusal when it throws.
  *
  * The client returns a refusal as `{ error }`, but `fetch` rejects on a
  * network failure and better-fetch passes that rejection through. Thrown, it
  * would skip `setLoading(false)` and leave the step locked for good, because
  * the code step disables its field and its way back while a request is in
- * flight.
+ * flight. The catch also takes the rarer throw after a real answer, such as a
+ * body that will not parse; the message is then about the connection when it
+ * was not, and a retry either works or meets the usual refusal.
  */
-async function reach(call: Promise<Answer>): Promise<Answer> {
+async function reach(call: Promise<AuthAnswer>): Promise<AuthAnswer> {
   try {
     return await call;
   } catch {
     return { error: UNREACHABLE };
   }
-}
-
-/** The part of an auth client answer this form reads. */
-interface Answer {
-  error: { code?: string; message?: string } | null;
 }
 
 /** One named field out of a submitted form, as a string rather than a FormDataEntryValue. */
