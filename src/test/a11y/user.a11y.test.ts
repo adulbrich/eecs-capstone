@@ -424,3 +424,12 @@ test("delete confirmation dialog", async ({ page }) => {
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
 });
+
+test("the traffic reports refuse a signed-in user who is not staff", async ({
+  page,
+}) => {
+  // Staff only, the same guard as /admin/analytics: a user is sent home.
+  await page.goto("/admin/traffic");
+  await page.waitForURL((url) => url.pathname === "/");
+  await expect(page.getByRole("heading", { name: "Traffic" })).toHaveCount(0);
+});

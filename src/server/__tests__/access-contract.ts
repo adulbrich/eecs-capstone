@@ -375,6 +375,11 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     note: "The public listing. The viewer id picks the ordering when no sort is sent (#424), and the order decides which page a row lands on, so a member with a vector and a visitor see the same set paginated differently. It still hides and reveals nothing: no row turns on who is asking.",
   },
 
+  "server/traffic.ts:getTraffic": {
+    level: "staff",
+    note: "The site traffic reports (#592): aggregates only, never a visitor hash or one visitor's events. Also fills traffic_visits for any day that has closed, so a staff load is what advances the rollup (ADR-0050).",
+  },
+
   "server/uploads.ts:clearAvatar": { level: "authenticated" },
   "server/uploads.ts:uploadAvatar": {
     level: "authenticated",

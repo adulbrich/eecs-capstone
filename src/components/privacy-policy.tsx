@@ -4,7 +4,8 @@ import { SupportEmailLink } from "./support-email-link";
 /**
  * The privacy page's body. Static, in the repo, and only a developer changes
  * it. The account-closure paragraph and the deletion dialog in #84 promise
- * the same things and move together; docs/QUIRKS.md says why.
+ * the same things and move together, and the page-view paragraph moves with
+ * the traffic writer (#591); docs/QUIRKS.md says why.
  */
 export function PrivacyPolicy() {
   return (
@@ -31,6 +32,20 @@ export function PrivacyPolicy() {
         remove records of departmental equipment you borrowed, which are
         institutional property records. Closing an account cannot be undone, and
         a new account cannot be linked back to old projects.
+      </p>
+      <p>
+        <strong>Page views are counted, without cookies.</strong> When a public
+        page is opened, such as a project or the project listing, we record the
+        page, the site that linked to it, any filters or search words used on
+        it, and the country, browser, operating system and kind of device it was
+        opened from. Nothing is stored in your browser, and the record is never
+        connected to your account, even when you are signed in. It does not
+        include your IP address. Instead, the address and your browser details
+        are combined with a random value that is replaced every day and then
+        discarded, so page views can be grouped into visits within one day but
+        never connected across days, by us or anyone else. Pages that require
+        signing in are not counted. Separately, the servers keep ordinary
+        request logs, which do include IP addresses, for 30 days.
       </p>
       <p>
         Questions about any of this go to <SupportEmailLink />.

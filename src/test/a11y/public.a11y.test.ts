@@ -522,3 +522,10 @@ test("@smoke inventory item detail", async ({ page }) => {
   await expect(page.getByText("Staff panel")).toHaveCount(0);
   await checkA11y(page);
 });
+
+test("the traffic reports send a signed-out visitor to sign in", async ({
+  page,
+}) => {
+  await page.goto("/admin/traffic");
+  await page.waitForURL((url) => url.pathname === "/sign-in");
+});

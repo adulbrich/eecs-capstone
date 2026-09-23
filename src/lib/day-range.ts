@@ -64,6 +64,16 @@ function parseDay(day: string): [number, number, number] {
   return [Number(m[1]), Number(m[2]), Number(m[3])];
 }
 
+/** The calendar day `instant` falls on in `timeZone`, as `YYYY-MM-DD`. */
+export function localDay(instant: Date, timeZone = OFFICE_TIME_ZONE): string {
+  const parts = Object.fromEntries(
+    formatter(timeZone)
+      .formatToParts(instant)
+      .map((p) => [p.type, p.value])
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 /** Midnight at the start of `day` in `timeZone`, as an instant. */
 export function dayStart(day: string, timeZone = OFFICE_TIME_ZONE): Date {
   const [y, m, d] = parseDay(day);
@@ -107,5 +117,27 @@ export function dayRange(
   return {
     start: from ? dayStart(from, timeZone) : null,
     end: to ? dayStart(shiftDay(to, 1), timeZone) : null,
+  };
+}
+
+/**
+ * A date range and the one before it: the same number of calendar days,
+ * ending the day before `from`. Counted on the calendar rather than in
+ * milliseconds, so a range across a DST change still starts at midnight.
+ * `/admin/analytics` and `/admin/traffic` compare against it.
+ */
+export function comparisonPeriods(from: string, to: string) {
+  const current = dayRange(from, to);
+  const previousTo = shiftDay(from, -1);
+  const days = daysInclusive(from, to);
+  const previousFrom = shiftDay(previousTo, 1 - days);
+  const previous = dayRange(previousFrom, previousTo);
+  return {
+    days,
+    start: current.start as Date,
+    end: current.end as Date,
+    previousStart: previous.start as Date,
+    previousEnd: previous.end as Date,
+    range: { from, to, previousFrom, previousTo },
   };
 }

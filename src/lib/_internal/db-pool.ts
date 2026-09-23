@@ -1,4 +1,5 @@
 import type { Pool, PoolConfig } from "pg";
+import { TRAFFIC_STATEMENT_TIMEOUT_MS } from "./traffic-timing";
 
 /**
  * How many connections the fleet may hold open at once, and where the number
@@ -51,13 +52,31 @@ const POOL_MAX = 45;
  * here because `/api/healthz` never touches the database on purpose, so
  * nothing would restart the task.
  */
-const ACQUIRE_TIMEOUT_MS = 5000;
+export const ACQUIRE_TIMEOUT_MS = 5000;
 
 export function poolConfig(connectionString: string): PoolConfig {
   return {
     connectionString,
     max: POOL_MAX,
     connectionTimeoutMillis: ACQUIRE_TIMEOUT_MS,
+  };
+}
+
+/**
+ * The traffic writer's own pool (ADR-0034): `trafficPerTask` connections and
+ * no more, apart from the app pool so a flood of anonymous writes cannot
+ * starve page rendering. The writer drops an event rather than wait once that
+ * many are in flight, so the acquire timeout here only bounds a stalled
+ * connect.
+ */
+export function trafficPoolConfig(connectionString: string): PoolConfig {
+  return {
+    connectionString,
+    max: CONNECTION_BUDGET.trafficPerTask,
+    connectionTimeoutMillis: ACQUIRE_TIMEOUT_MS,
+    // Bounds every statement, the salt's lock wait included, so an event
+    // cannot commit after the rollup closes its day (traffic-timing.ts).
+    statement_timeout: TRAFFIC_STATEMENT_TIMEOUT_MS,
   };
 }
 
