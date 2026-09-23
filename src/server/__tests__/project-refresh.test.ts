@@ -9,6 +9,9 @@ let releaseFirst: () => void = () => undefined;
 
 vi.mock("#/server/_internal/project-embeddings", () => ({
   refreshProjectEmbedding: async (id: string) => {
+    if (id === "throws") {
+      throw new Error("escaped the refresh's own catch");
+    }
     calls.push(`embed ${id}`);
     return "updated";
   },
@@ -68,5 +71,21 @@ describe("refreshProjectInBackground", () => {
       "summary p2 start",
       "summary p2 end",
     ]);
+  });
+
+  it("logs a rejection that escapes both refreshes instead of leaving it unhandled", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const error = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    refreshProjectInBackground("throws");
+    await settleProjectRefreshes();
+
+    expect(log).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(
+      "Project refresh failed for throws",
+      expect.stringContaining("escaped the refresh's own catch")
+    );
   });
 });

@@ -37,7 +37,7 @@ describe("mantleResponses", () => {
     vi.stubEnv("BEDROCK_ACCESS_KEY", "AKIDEXAMPLE");
     vi.stubEnv("BEDROCK_SECRET_KEY", "secret");
     const timeout = vi.spyOn(AbortSignal, "timeout");
-    const fetchSpy = vi.fn(() =>
+    const fetchSpy = vi.fn((_url: string, _init: RequestInit) =>
       Promise.resolve(Response.json({ status: "completed" }))
     );
     vi.stubGlobal("fetch", fetchSpy);
@@ -45,7 +45,8 @@ describe("mantleResponses", () => {
     await mantleResponses({ model: "m" });
 
     expect(timeout).toHaveBeenCalledWith(60_000);
-    const init = fetchSpy.mock.calls[0]?.at(1) as RequestInit;
-    expect(init.signal).toBe(timeout.mock.results[0]?.value);
+    expect(fetchSpy.mock.calls[0]?.[1].signal).toBe(
+      timeout.mock.results[0]?.value
+    );
   });
 });

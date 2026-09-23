@@ -136,9 +136,9 @@ function getSigner(): SignatureV4 {
 
 /**
  * Without it a stalled call waits out undici's 300 s header timeout, which is
- * how a save once sat on "Saving..." (ADR-0053). The slowest save that ran
- * both model calls in the week before took 2.3 s, so this cuts a stall
- * rather than a slow answer.
+ * how a save once sat on "Saving..." (ADR-0053). It caps every caller: the
+ * slowest save, AI review and scope assessment in the week before took 2.3 s,
+ * 4.5 s and 5.3 s, so this cuts a stall rather than a slow answer.
  */
 const MANTLE_TIMEOUT_MS = 60_000;
 

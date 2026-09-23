@@ -47,16 +47,17 @@ export type SocialSummaryOutcome =
  * One property this leans on rather than enforces: the summary is written from
  * the text read at the top, so an edit landing during the model call leaves a
  * summary describing text that has already changed, paired with that older
- * text's hash. It self-corrects, but only because the edit that raced runs
- * this function again on its own commit, reads the new text, finds the stored
- * hash does not match it and regenerates. That holds because both call sites
- * in `projects.ts` start it, through `refreshProjectInBackground`, after every
- * commit that leaves the project in an embeddable status, which is every
- * commit that could strand a pairing: the
- * gate below skips the other statuses, so a draft has no stored summary to go
- * stale and gets one when it publishes. A caller that writes project prose
- * WITHOUT calling this afterwards would strand the stale pairing, since
- * nothing else recomputes the hash.
+ * text's hash. On one task it self-corrects, because the edit that raced runs
+ * this function again on its own commit, queued behind the first by
+ * `refreshProjectInBackground`, reads the new text, finds the stored hash does
+ * not match it and regenerates. Refreshes on two tasks can still finish out of
+ * order, and that pairing waits for the backfill (ADR-0053). The retry holds
+ * because both call sites in `projects.ts` start this after every commit that
+ * leaves the project in an embeddable status, which is every commit that could
+ * strand a pairing: the gate below skips the other statuses, so a draft has no
+ * stored summary to go stale and gets one when it publishes. A caller that
+ * writes project prose WITHOUT calling this afterwards would strand the stale
+ * pairing, since nothing else recomputes the hash.
  */
 export async function refreshSocialSummary(
   projectId: string,

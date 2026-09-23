@@ -26,12 +26,13 @@ export function refreshProjectInBackground(
   projectId: string,
   deps: RefreshDeps = {}
 ): void {
+  const queuedAt = Date.now();
   const previous = latestByProject.get(projectId) ?? Promise.resolve();
   // Both refreshes catch their own errors; this catch is for anything that
   // slips past them, since nobody awaits `run` and an unhandled rejection
   // would take the task down.
   const run = previous
-    .then(() => refreshAndLog(projectId, deps))
+    .then(() => refreshAndLog(projectId, deps, queuedAt))
     .catch((error: unknown) => {
       console.error(
         `Project refresh failed for ${projectId}`,
@@ -48,12 +49,21 @@ export function refreshProjectInBackground(
   });
 }
 
-async function refreshAndLog(projectId: string, deps: RefreshDeps) {
-  const started = Date.now();
+/**
+ * Two calls, not one, because the two are separate models with separate kill
+ * switches: an embeddings outage must not cost the project its preview text,
+ * and the reverse. The duration runs from the commit, so it includes any wait
+ * behind this project's previous refresh.
+ */
+async function refreshAndLog(
+  projectId: string,
+  deps: RefreshDeps,
+  queuedAt: number
+) {
   const embedding = await refreshProjectEmbedding(projectId, deps.embed);
   const summary = await refreshSocialSummary(projectId, deps.summarize);
   console.log(
-    `Project refresh for ${projectId}: embedding ${embedding}, social summary ${summary}, ${Date.now() - started} ms`
+    `Project refresh for ${projectId}: embedding ${embedding}, social summary ${summary}, ${Date.now() - queuedAt} ms`
   );
 }
 
