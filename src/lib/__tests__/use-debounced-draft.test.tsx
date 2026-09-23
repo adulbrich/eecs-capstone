@@ -107,6 +107,28 @@ describe("useDebouncedDraft", () => {
     expect(commit).toHaveBeenCalledTimes(2);
   });
 
+  it("resyncs on Forward to a commit that Back cancelled before it landed", () => {
+    // Back while the loader runs aborts the commit, and `value` never moves,
+    // so the hook sees nothing. Clearing the box must still reach the URL, or
+    // Forward reads as the cancelled commit coming back and gets overwritten.
+    const commit = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ v }) => useDebouncedDraft(v, commit),
+      { initialProps: { v: "" } }
+    );
+
+    act(() => result.current[1]("arduino"));
+    act(() => vi.advanceTimersByTime(300));
+    act(() => result.current[1](""));
+    act(() => vi.advanceTimersByTime(300));
+    expect(commit).toHaveBeenLastCalledWith("");
+
+    rerender({ v: "arduino" });
+    expect(result.current[0]).toBe("arduino");
+    act(() => vi.advanceTimersByTime(500));
+    expect(commit).toHaveBeenCalledTimes(2);
+  });
+
   it("does not commit when the draft already equals the value", () => {
     const commit = vi.fn();
     const { result } = renderHook(() => useDebouncedDraft("same", commit));
