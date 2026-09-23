@@ -41,7 +41,7 @@ export const CONNECTION_BUDGET = {
  * (#558). With the ceiling at four, 45 fits: (45 + 5) * 4 + 10 = 210 of
  * 220, leaving ten for a second one-off script or a hand-held psql. A cap:
  * pg-pool opens lazily and closes clients idle for 10 s, so a quiet task
- * holds `POOL_MIN` and no more.
+ * holds no more than `POOL_MIN` in production and none elsewhere.
  */
 const POOL_MAX = 45;
 
@@ -90,8 +90,8 @@ export function poolConfig(
 }
 
 /**
- * Opens `count` clients at once and hands them back, so the pool holds that
- * many idle and `min` keeps them. At once rather than in a loop: a
+ * Opens `count` clients at once, `POOL_MIN` unless a test says otherwise, and
+ * hands them back, so the pool holds that many idle and `min` keeps them. At once rather than in a loop: a
  * connect-then-release loop gets the same idle client back every time and
  * leaves one open. Never throws, because a task that cannot reach the
  * database at boot should still come up and answer `/api/healthz`; a failed
@@ -100,7 +100,7 @@ export function poolConfig(
  */
 export async function warmPool(
   pool: { connect: () => Promise<{ release: () => void }> },
-  count: number,
+  count: number = POOL_MIN,
   log: (message: string) => void = console.error
 ): Promise<void> {
   // Each connect goes through `then` so that one throwing before it returns

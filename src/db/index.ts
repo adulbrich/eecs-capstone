@@ -2,7 +2,6 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import {
   logPoolErrors,
-  POOL_MIN,
   poolConfig,
   startPoolMetrics,
   warmPool,
@@ -30,12 +29,11 @@ const pool = new Pool(poolConfig(databaseUrl, { keepWarm: production }));
 logPoolErrors(pool);
 
 // The metric line lands in CloudWatch in production, and in a dev console it
-// would be one line of noise a minute (#558). The warm-up opens the floor
-// `keepWarm` holds; `src/server.ts` imports this module so that it runs on
-// the load balancer's first health check rather than inside a burst (#601).
+// would be one line of noise a minute (#558). The warm-up and the floor are
+// ADR-0052's (#601).
 if (production) {
   startPoolMetrics(pool);
-  warmPool(pool, POOL_MIN);
+  warmPool(pool);
 }
 
 export const db = drizzle({ client: pool, schema });

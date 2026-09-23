@@ -113,6 +113,29 @@ describe("poolConfig", () => {
       perTask * CONNECTION_BUDGET.taskCeiling + CONNECTION_BUDGET.oneOffScript;
     expect(fleet).toBeLessThanOrEqual(CONNECTION_BUDGET.rdsUsable);
   });
+
+  it("holds a floor inside the cap when asked to keep warm", () => {
+    // A floor below `max` leaves the budget test above unchanged: `min` only
+    // exempts clients from the idle timeout, it never opens past `max` (#601).
+    const { min, max } = poolConfig(URL_WITH_ENCODED_PASSWORD, {
+      keepWarm: true,
+    });
+    expect(min).toBe(POOL_MIN);
+    expect(POOL_MIN).toBeGreaterThan(0);
+    expect(POOL_MIN).toBeLessThan(max ?? 0);
+  });
+
+  it("lets a process exit with the floor still open", () => {
+    // A client under `min` never times out, so without this a script that
+    // imports `#/db` with the floor on would hold the event loop forever.
+    expect(
+      poolConfig(URL_WITH_ENCODED_PASSWORD, { keepWarm: true }).allowExitOnIdle
+    ).toBe(true);
+  });
+
+  it("keeps no floor by default, for dev, tests and scripts", () => {
+    expect(poolConfig(URL_WITH_ENCODED_PASSWORD).min ?? 0).toBe(0);
+  });
 });
 
 describe("surviving a connection the server drops", () => {
@@ -273,31 +296,6 @@ describe("pool metrics", () => {
     // alarm that stays OK forever.
     expect(poolAlarmSetting("namespace")).toBe(POOL_METRICS.namespace);
     expect(poolAlarmSetting("metric_name")).toBe(POOL_METRICS.waiting);
-  });
-});
-
-describe("keeping connections warm", () => {
-  it("holds a floor inside the cap when asked to keep warm", () => {
-    // A floor below `max` leaves the budget test above unchanged: `min` only
-    // exempts clients from the idle timeout, it never opens past `max` (#601).
-    const { min, max } = poolConfig(URL_WITH_ENCODED_PASSWORD, {
-      keepWarm: true,
-    });
-    expect(min).toBe(POOL_MIN);
-    expect(POOL_MIN).toBeGreaterThan(0);
-    expect(POOL_MIN).toBeLessThan(max ?? 0);
-  });
-
-  it("lets a process exit with the floor still open", () => {
-    // A client under `min` never times out, so without this a script that
-    // imports `#/db` with the floor on would hold the event loop forever.
-    expect(
-      poolConfig(URL_WITH_ENCODED_PASSWORD, { keepWarm: true }).allowExitOnIdle
-    ).toBe(true);
-  });
-
-  it("keeps no floor by default, for dev, tests and scripts", () => {
-    expect(poolConfig(URL_WITH_ENCODED_PASSWORD).min ?? 0).toBe(0);
   });
 });
 
