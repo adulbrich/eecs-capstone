@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * A local draft of a value that lives somewhere slower, committed back after a
@@ -27,8 +27,18 @@ export function useDebouncedDraft(
   delayMs = 300
 ): [string, (next: string) => void] {
   const [draft, setDraft] = useState(value);
+  // The value this hook last committed or synced to. The router hands `value`
+  // back only once the loader resolves, so a commit lands a round trip late;
+  // by then the draft may have moved on, and resyncing to our own echo would
+  // drop every key typed in between (#501). Back and Forward move `value` off
+  // whatever this holds, so they still resync.
+  const settled = useRef<string | null>(null);
 
   useEffect(() => {
+    if (value === settled.current) {
+      return;
+    }
+    settled.current = value;
     setDraft(value);
   }, [value]);
 
@@ -39,7 +49,10 @@ export function useDebouncedDraft(
     if (draft === value) {
       return;
     }
-    const t = setTimeout(() => commit(draft), delayMs);
+    const t = setTimeout(() => {
+      settled.current = draft;
+      commit(draft);
+    }, delayMs);
     return () => clearTimeout(t);
   }, [draft, value, commit, delayMs]);
 

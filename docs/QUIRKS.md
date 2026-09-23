@@ -170,6 +170,10 @@ Navigating from `/projects/A` to `/projects/B` re-runs the loader and re-renders
 
 The gotcha it leaves behind outlives that decision: a `useState` initializer does not re-run when props change, so an input seeded from loader data keeps whatever frame it mounted on while everything rendering that data directly re-renders around it. The breadcrumb and the input on the same page can therefore disagree, reading the same field from the same source. Key the child holding the seeds on the record; ADR-0029's Consequences say which two routes are keyed and on what. Staying on the page after `await router.invalidate()` needs none of this, because the component stays mounted and no seed is involved.
 
+### `Route.useSearch()` lags `navigate()` by the loader round trip
+
+The URL changes at once; `useSearch` reads the rendered match, and a search change that alters `loaderDeps` is a new match, which renders only once its loader resolves (or at the 1s pending default). That holds whatever `defaultStaleReloadMode` says, because a new match has no data to paint in the background. So code that writes a search param and watches it for outside changes sees its own write come back a round trip late. `useDebouncedDraft` did, and resynced the search box to its own previous commit, dropping every key typed in between (#501); it now skips a `value` equal to the one it last committed or synced to. Anything else that writes a search param on a timer and watches it needs the same allowance.
+
 ---
 
 ## TanStack Form
