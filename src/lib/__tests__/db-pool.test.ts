@@ -6,9 +6,11 @@ import {
   CONNECTION_BUDGET,
   logPoolErrors,
   POOL_METRICS,
+  POOL_MIN,
   poolConfig,
   poolMetricsLine,
   startPoolMetrics,
+  warmPool,
 } from "../_internal/db-pool";
 
 const QUOTES = /^"|"$/g;
@@ -271,5 +273,84 @@ describe("pool metrics", () => {
     // alarm that stays OK forever.
     expect(poolAlarmSetting("namespace")).toBe(POOL_METRICS.namespace);
     expect(poolAlarmSetting("metric_name")).toBe(POOL_METRICS.waiting);
+  });
+});
+
+describe("keeping connections warm", () => {
+  it("holds a floor inside the cap when asked to keep warm", () => {
+    // A floor below `max` leaves the budget test above unchanged: `min` only
+    // exempts clients from the idle timeout, it never opens past `max` (#601).
+    const { min, max } = poolConfig(URL_WITH_ENCODED_PASSWORD, {
+      keepWarm: true,
+    });
+    expect(min).toBe(POOL_MIN);
+    expect(POOL_MIN).toBeGreaterThan(0);
+    expect(POOL_MIN).toBeLessThan(max ?? 0);
+  });
+
+  it("lets a process exit with the floor still open", () => {
+    // A client under `min` never times out, so without this a script that
+    // imports `#/db` with the floor on would hold the event loop forever.
+    expect(
+      poolConfig(URL_WITH_ENCODED_PASSWORD, { keepWarm: true }).allowExitOnIdle
+    ).toBe(true);
+  });
+
+  it("keeps no floor by default, for dev, tests and scripts", () => {
+    expect(poolConfig(URL_WITH_ENCODED_PASSWORD).min ?? 0).toBe(0);
+  });
+});
+
+/** A pool that counts how many connects are in flight at once. */
+function countingPool(fail = 0) {
+  let inFlight = 0;
+  let peak = 0;
+  let released = 0;
+  let remainingFailures = fail;
+  return {
+    stats: () => ({ peak, released }),
+    connect: async () => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      inFlight--;
+      if (remainingFailures > 0) {
+        remainingFailures--;
+        throw new Error("connect ECONNREFUSED 10.0.0.5:5432");
+      }
+      return {
+        release: () => {
+          released++;
+        },
+      };
+    },
+  };
+}
+
+describe("warmPool", () => {
+  it("opens every client at once rather than reusing one", async () => {
+    // A connect-then-release loop would hand the same idle client back each
+    // time and leave the pool holding one.
+    const pool = countingPool();
+    await warmPool(pool, 5, () => undefined);
+    expect(pool.stats()).toEqual({ peak: 5, released: 5 });
+  });
+
+  it("logs one redacted line and does not throw when a connect fails", async () => {
+    const pool = countingPool(2);
+    const logged: string[] = [];
+    await expect(
+      warmPool(pool, 5, (line) => logged.push(line))
+    ).resolves.toBeUndefined();
+    expect(pool.stats().released).toBe(3);
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toContain("3 of 5");
+    expect(logged[0]).toContain("ECONNREFUSED");
+  });
+
+  it("says nothing when every client opened", async () => {
+    const logged: string[] = [];
+    await warmPool(countingPool(), 5, (line) => logged.push(line));
+    expect(logged).toEqual([]);
   });
 });
