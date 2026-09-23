@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { db } from "#/db";
 import {
   programInstructors,
+  programs,
   projectPrograms,
   projects,
   user,
@@ -356,5 +357,42 @@ describe("programs", () => {
       .from(programInstructors)
       .where(eq(programInstructors.programId, programId));
     expect(after.length).toBe(0);
+  });
+});
+
+describe("the cached public list (#558)", () => {
+  // `vitest.integration.config.ts` turns the cache on, so the first list
+  // below is cached and each later one reads stale unless the write cleared it.
+  it("shows a staff create, edit and delete on the task that made it", async () => {
+    const admin = await makeUser(`pcache-${Date.now()}@x.com`, "admin");
+    const courseIds = async () =>
+      (await listProgramsImpl()).rows.map((r) => r.courseId);
+    expect(await courseIds()).toEqual([]);
+
+    const { id } = await createProgramAs(admin, {
+      courseId: "CS461",
+      courseName: "Capstone",
+      description: null,
+    });
+    expect(await courseIds()).toEqual(["CS461"]);
+
+    await updateProgramAs(admin, {
+      id,
+      courseId: "CS462",
+      courseName: "Capstone",
+      description: null,
+    });
+    expect(await courseIds()).toEqual(["CS462"]);
+
+    await deleteProgramAs(admin, id);
+    expect(await courseIds()).toEqual([]);
+  });
+
+  it("serves a write made behind its back from the cache, which is the trade", async () => {
+    expect((await listProgramsImpl()).rows).toEqual([]);
+    await db
+      .insert(programs)
+      .values({ courseId: "ELSEWHERE", courseName: "Elsewhere" });
+    expect((await listProgramsImpl()).rows).toEqual([]);
   });
 });

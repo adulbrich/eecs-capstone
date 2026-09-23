@@ -9,6 +9,7 @@ import {
   projects,
 } from "#/db/schema";
 import { readSession, requireUser } from "#/lib/_internal/auth-guards";
+import { createReferenceListCache } from "#/lib/_internal/reference-list-cache";
 import { canSeeProject } from "#/lib/project-visibility";
 import { assertStaff, type Viewer } from "#/lib/viewer";
 import type {
@@ -54,7 +55,15 @@ async function rethrowNameCollision(
   throw new Error(`A category named "${name}" already exists${where}.`);
 }
 
-export async function listCategoriesImpl(data: {
+export function listCategoriesImpl(data: {
+  domain?: CategoryDomain | null;
+  type?: string | null;
+}) {
+  const key = `${data.domain ?? ""}|${data.type ?? ""}`;
+  return categoryLists.get(key, () => loadCategories(data));
+}
+
+async function loadCategories(data: {
   domain?: CategoryDomain | null;
   type?: string | null;
 }) {
@@ -74,6 +83,13 @@ export async function listCategoriesImpl(data: {
     .orderBy(categories.type, categories.name);
   return { rows };
 }
+
+/**
+ * The public lists, cached per task (#558, ADR-0048). The three writers below
+ * clear it, so staff see their own edit on the task that made it.
+ */
+const categoryLists =
+  createReferenceListCache<Awaited<ReturnType<typeof loadCategories>>>();
 
 export async function listCategoryTypesImpl() {
   const rows = await db
@@ -122,6 +138,7 @@ export async function createCategoryAs(viewer: AuthUser, data: CategoryInput) {
       .insert(categories)
       .values({ name: data.name, domain: data.domain, type: data.type })
       .returning();
+    categoryLists.clear();
     return { id: row.id };
   } catch (error) {
     return rethrowNameCollision(error, data);
@@ -163,6 +180,7 @@ export async function updateCategoryAs(
   } catch (error) {
     return rethrowNameCollision(error, data);
   }
+  categoryLists.clear();
   return { id: data.id };
 }
 
@@ -174,6 +192,7 @@ export async function updateCategoryForCurrentUser(data: CategoryUpdateInput) {
 export async function deleteCategoryAs(viewer: AuthUser, id: string) {
   assertStaff(viewer);
   await db.delete(categories).where(eq(categories.id, id));
+  categoryLists.clear();
   return { id };
 }
 

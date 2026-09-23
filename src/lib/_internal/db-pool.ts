@@ -86,3 +86,106 @@ export function logPoolErrors(
     log(`Database pool dropped a connection: ${error.message}`);
   });
 }
+
+/**
+ * Where the pool metrics land in CloudWatch. `infra/alarms.tf` alarms on
+ * `waiting` by these names, and `db-pool.test.ts` holds the two together.
+ */
+export const POOL_METRICS = {
+  namespace: "eecs-capstone/db-pool",
+  waiting: "PoolWaiting",
+  total: "PoolTotal",
+  idle: "PoolIdle",
+} as const;
+
+type PoolCounts = Pick<Pool, "totalCount" | "idleCount" | "waitingCount">;
+
+interface PoolSamples {
+  idle: number[];
+  total: number[];
+  waiting: number[];
+}
+
+/**
+ * One CloudWatch Embedded Metric Format document, as the single line the log
+ * event must be: CloudWatch extracts the metrics from any JSON log event that
+ * carries `_aws`, so stdout through the task's `awslogs` driver is enough and
+ * the task needs no SDK client and no `cloudwatch:PutMetricData`.
+ *
+ * Each metric is an array of samples rather than a pre-computed maximum, so
+ * CloudWatch keeps the distribution and `Maximum`, `Average` and the
+ * percentiles all mean what they say. No dimensions, on purpose: a task id
+ * would be a new custom metric on every deploy, and the question is whether
+ * any task had a queue, which the fleet-wide `Maximum` answers. Counts only,
+ * never a query or its parameters (ADR-0041).
+ */
+export function poolMetricsLine(
+  samples: PoolSamples,
+  timestamp: number
+): string {
+  const metric = (name: string) => ({ Name: name, Unit: "Count" });
+  return JSON.stringify({
+    _aws: {
+      Timestamp: timestamp,
+      CloudWatchMetrics: [
+        {
+          Namespace: POOL_METRICS.namespace,
+          Dimensions: [[]],
+          Metrics: [
+            metric(POOL_METRICS.waiting),
+            metric(POOL_METRICS.total),
+            metric(POOL_METRICS.idle),
+          ],
+        },
+      ],
+    },
+    [POOL_METRICS.waiting]: samples.waiting,
+    [POOL_METRICS.total]: samples.total,
+    [POOL_METRICS.idle]: samples.idle,
+  });
+}
+
+/**
+ * Samples the pool's three counts every `sampleMs` and emits them as one EMF
+ * line per `samplesPerLine` samples, a minute by default (#558). Returns the
+ * stop function.
+ *
+ * `waitingCount` is the number that matters: a request queued for a
+ * connection is a request that is slow for that reason, and past the
+ * acquire timeout it fails. The session lookups that failed that way in the
+ * #524 load test were the only signal the pool had run out, and ADR-0042's
+ * redaction makes that line far harder to spot, so this is its deliberate
+ * replacement. Sampled rather than timed per acquire, because timing needs a
+ * wrapper on `pool.connect` that relies on pg-pool calling its own `connect`
+ * from `query`.
+ *
+ * The interval is unref'd so a script that imports `#/db` still exits when
+ * its work is done. 60 samples fits EMF's cap of 100 values per metric.
+ */
+export function startPoolMetrics(
+  pool: PoolCounts,
+  {
+    emit = (line: string) => console.log(line),
+    now = Date.now,
+    sampleMs = 1000,
+    samplesPerLine = 60,
+  }: {
+    emit?: (line: string) => void;
+    now?: () => number;
+    sampleMs?: number;
+    samplesPerLine?: number;
+  } = {}
+): () => void {
+  let samples: PoolSamples = { idle: [], total: [], waiting: [] };
+  const timer = setInterval(() => {
+    samples.waiting.push(pool.waitingCount);
+    samples.total.push(pool.totalCount);
+    samples.idle.push(pool.idleCount);
+    if (samples.waiting.length >= samplesPerLine) {
+      emit(poolMetricsLine(samples, now()));
+      samples = { idle: [], total: [], waiting: [] };
+    }
+  }, sampleMs);
+  timer.unref();
+  return () => clearInterval(timer);
+}

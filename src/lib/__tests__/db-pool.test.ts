@@ -1,11 +1,14 @@
 import { readFileSync } from "node:fs";
 import { inspect } from "node:util";
 import { Client, Pool } from "pg";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CONNECTION_BUDGET,
   logPoolErrors,
+  POOL_METRICS,
   poolConfig,
+  poolMetricsLine,
+  startPoolMetrics,
 } from "../_internal/db-pool";
 
 /**
@@ -146,5 +149,117 @@ describe("surviving a connection the server drops", () => {
     expect(line).toContain("terminating connection");
     expect(line).not.toContain("db.internal");
     expect(line).not.toContain("eecs_capstone");
+  });
+});
+
+/** A quoted `<name> = "<value>"` argument on the pool alarm in `infra/alarms.tf`. */
+function poolAlarmSetting(name: string): string | undefined {
+  const block = readFileSync("infra/alarms.tf", "utf8")
+    .split('resource "aws_cloudwatch_metric_alarm" "db_pool_waiting" {')[1]
+    ?.split("\n}")[0];
+  const line = (block ?? "")
+    .split("\n")
+    .find((candidate) => candidate.trim().startsWith(`${name} `));
+  return line?.split("=")[1]?.trim().replace(/^"|"$/g, "");
+}
+
+describe("pool metrics", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function fakePool(counts: { waiting: number; total: number; idle: number }) {
+    return {
+      get waitingCount() {
+        return counts.waiting;
+      },
+      get totalCount() {
+        return counts.total;
+      },
+      get idleCount() {
+        return counts.idle;
+      },
+    };
+  }
+
+  it("writes one Embedded Metric Format document with the samples as arrays", () => {
+    const line = poolMetricsLine(
+      { waiting: [0, 3], total: [45, 45], idle: [2, 0] },
+      1_700_000_000_000
+    );
+    // One line: CloudWatch reads the whole log event as the document, so
+    // anything before or after the JSON, a newline included, breaks it.
+    expect(line).not.toContain("\n");
+    const doc = JSON.parse(line);
+    expect(doc._aws.Timestamp).toBe(1_700_000_000_000);
+    const [directive] = doc._aws.CloudWatchMetrics;
+    expect(directive.Namespace).toBe(POOL_METRICS.namespace);
+    // An empty dimension set: fleet-wide, one metric however many tasks.
+    expect(directive.Dimensions).toEqual([[]]);
+    expect(directive.Metrics.map((m: { Name: string }) => m.Name)).toEqual([
+      POOL_METRICS.waiting,
+      POOL_METRICS.total,
+      POOL_METRICS.idle,
+    ]);
+    // Every metric named in the directive must be a member of the root.
+    expect(doc[POOL_METRICS.waiting]).toEqual([0, 3]);
+    expect(doc[POOL_METRICS.total]).toEqual([45, 45]);
+    expect(doc[POOL_METRICS.idle]).toEqual([2, 0]);
+  });
+
+  it("samples on each tick and emits once per full window", () => {
+    vi.useFakeTimers();
+    const counts = { waiting: 0, total: 10, idle: 10 };
+    const lines: string[] = [];
+    const stop = startPoolMetrics(fakePool(counts), {
+      emit: (line) => lines.push(line),
+      now: () => 42,
+      sampleMs: 1000,
+      samplesPerLine: 3,
+    });
+
+    vi.advanceTimersByTime(1000);
+    counts.waiting = 7;
+    counts.idle = 0;
+    vi.advanceTimersByTime(1000);
+    expect(lines).toHaveLength(0);
+    counts.waiting = 2;
+    vi.advanceTimersByTime(1000);
+    expect(lines).toHaveLength(1);
+
+    const doc = JSON.parse(lines[0]);
+    expect(doc[POOL_METRICS.waiting]).toEqual([0, 7, 2]);
+    expect(doc[POOL_METRICS.idle]).toEqual([10, 0, 0]);
+    expect(doc._aws.Timestamp).toBe(42);
+
+    // The next window starts empty rather than carrying the last one.
+    vi.advanceTimersByTime(3000);
+    expect(lines).toHaveLength(2);
+    expect(JSON.parse(lines[1])[POOL_METRICS.waiting]).toEqual([2, 2, 2]);
+
+    stop();
+    vi.advanceTimersByTime(10_000);
+    expect(lines).toHaveLength(2);
+  });
+
+  it("keeps each metric inside EMF's hundred values by default", () => {
+    vi.useFakeTimers();
+    const lines: string[] = [];
+    const stop = startPoolMetrics(fakePool({ waiting: 0, total: 1, idle: 1 }), {
+      emit: (line) => lines.push(line),
+    });
+    vi.advanceTimersByTime(60_000);
+    stop();
+    expect(lines).toHaveLength(1);
+    const samples = JSON.parse(lines[0])[POOL_METRICS.waiting];
+    expect(samples).toHaveLength(60);
+  });
+
+  it("names the metric the alarm in infra/alarms.tf watches", () => {
+    // The alarm is the only reader. A rename on either side would leave it
+    // watching a metric nothing publishes, which under `notBreaching` is an
+    // alarm that stays OK forever.
+    expect(poolAlarmSetting("namespace")).toBe(POOL_METRICS.namespace);
+    expect(poolAlarmSetting("metric_name")).toBe(POOL_METRICS.waiting);
   });
 });
