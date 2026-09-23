@@ -8,7 +8,7 @@ import {
   user,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
-import { createReferenceListCache } from "#/lib/_internal/reference-list-cache";
+import { clearAllReferenceListCaches } from "#/lib/_internal/reference-list-cache";
 import { assertStaff, isStaff, STAFF_ROLES } from "#/lib/viewer";
 import type { ProgramInput, ProgramUpdateInput } from "../programs";
 import { findUniqueViolation } from "./pg-errors";
@@ -26,11 +26,7 @@ interface AuthUser {
  * is what stops the next staff-only column riding a public read, and
  * `programs.integration.test.ts` pins the key set.
  */
-export function listProgramsImpl() {
-  return programLists.get("", loadPrograms);
-}
-
-async function loadPrograms() {
+export async function listProgramsImpl() {
   const rows = await db
     .select({
       id: programs.id,
@@ -44,13 +40,6 @@ async function loadPrograms() {
     .orderBy(programs.courseId);
   return { rows };
 }
-
-/**
- * Cached per task (#558, ADR-0048). The three program writers clear it; an
- * instructor change does not, because the public list carries no instructors.
- */
-const programLists =
-  createReferenceListCache<Awaited<ReturnType<typeof loadPrograms>>>();
 
 /**
  * Every program with the names of who teaches it, for the admin index.
@@ -175,7 +164,8 @@ export async function createProgramAs(viewer: AuthUser, data: ProgramInput) {
         expectedTeams: data.expectedTeams ?? null,
       })
       .returning();
-    programLists.clear();
+    // The listing's filter options are cached per task (ADR-0048).
+    clearAllReferenceListCaches();
     return { id: row.id };
   } catch (error) {
     return rethrowCourseIdCollision(error, data.courseId);
@@ -204,7 +194,7 @@ export async function updateProgramAs(
         updatedAt: new Date(),
       })
       .where(eq(programs.id, data.id));
-    programLists.clear();
+    clearAllReferenceListCaches();
     return { id: data.id };
   } catch (error) {
     // An edit that leaves the course id alone does not reach here: the row
@@ -232,7 +222,7 @@ export async function deleteProgramAs(viewer: AuthUser, id: string) {
     .from(projectPrograms)
     .where(eq(projectPrograms.programId, id));
   await db.delete(programs).where(eq(programs.id, id));
-  programLists.clear();
+  clearAllReferenceListCaches();
   return { id, affectedProjectCount: count };
 }
 

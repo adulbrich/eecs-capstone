@@ -220,10 +220,13 @@ resource "aws_cloudwatch_metric_alarm" "fleet_below_floor" {
 # queue in front of it, which fills before the instance does whenever one task
 # holds all 45 of its own connections.
 #
-# Any queue at all, for two minutes running. A single second of queueing during
-# a burst reads as a one-minute maximum of 1 and does not mail; two minutes
-# with a queue means requests were slow because of the pool, and past the 5 s
-# acquire timeout they fail. A starting point like the others; retune it once
+# A queue seen in two consecutive calendar minutes. Each line holds one minute
+# of one-second samples, stamped with that minute, so a burst that queues
+# within one minute does not mail. Two seconds of queueing that straddle a
+# minute boundary do, which is the floor of what this can mean: the rest of
+# the range is two full minutes of requests slowed by the pool, failing past
+# the 5 s acquire timeout. A queue that forms and drains between two samples is
+# not seen at all. A starting point like the others; retune it once
 # a term start has been watched. `notBreaching` because a fleet at zero tasks
 # publishes nothing here, and `fleet_below_floor` is the alarm for that.
 resource "aws_cloudwatch_metric_alarm" "db_pool_waiting" {

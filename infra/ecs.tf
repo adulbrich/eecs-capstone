@@ -190,7 +190,7 @@ resource "aws_ecs_task_definition" "app" {
         { name = "AI_SOCIAL_SUMMARY_LIMIT_PER_DAY", value = var.ai_social_summary_limit_per_day },
         { name = "BEDROCK_EMBEDDING_MODEL_ID", value = var.bedrock_embedding_model_id },
         { name = "BEDROCK_EMBEDDING_DIMENSIONS", value = var.bedrock_embedding_dimensions },
-        # How long each task keeps the public category and program lists
+        # How long each task keeps the project listing's filter options
         # before reading them again (#558, ADR-0048). Unset means no cache,
         # which is what dev and the browser suites run with.
         { name = "REFERENCE_LIST_CACHE_TTL_MS", value = "60000" },

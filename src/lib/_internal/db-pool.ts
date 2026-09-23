@@ -117,7 +117,7 @@ interface PoolSamples {
  * percentiles all mean what they say. No dimensions, on purpose: a task id
  * would be a new custom metric on every deploy, and the question is whether
  * any task had a queue, which the fleet-wide `Maximum` answers. Counts only,
- * never a query or its parameters (ADR-0041).
+ * never a query or its parameters (ADR-0042).
  */
 export function poolMetricsLine(
   samples: PoolSamples,
@@ -145,10 +145,12 @@ export function poolMetricsLine(
   });
 }
 
+/** EMF refuses more than this many values for one metric in one document. */
+const EMF_MAX_VALUES = 100;
+
 /**
  * Samples the pool's three counts every `sampleMs` and emits them as one EMF
- * line per `samplesPerLine` samples, a minute by default (#558). Returns the
- * stop function.
+ * line per calendar minute (#558). Returns the stop function.
  *
  * `waitingCount` is the number that matters: a request queued for a
  * connection is a request that is slow for that reason, and past the
@@ -157,10 +159,18 @@ export function poolMetricsLine(
  * redaction makes that line far harder to spot, so this is its deliberate
  * replacement. Sampled rather than timed per acquire, because timing needs a
  * wrapper on `pool.connect` that relies on pg-pool calling its own `connect`
- * from `query`.
+ * from `query`. A queue that forms and drains between two samples is missed.
+ *
+ * A line holds the samples of one calendar minute and is stamped with that
+ * minute's start, so every minute a task was up gets exactly one datapoint in
+ * the minute it describes. Emitting every sixtieth tick instead let timer drift
+ * skip a minute, and under `notBreaching` a skipped minute resets the alarm's
+ * two-in-a-row count; it also split one short queue across two lines, which
+ * read as two minutes of queueing. The line for a minute goes out on the first
+ * tick of the next, and a document that would pass EMF's cap goes out early.
  *
  * The interval is unref'd so a script that imports `#/db` still exits when
- * its work is done. 60 samples fits EMF's cap of 100 values per metric.
+ * its work is done.
  */
 export function startPoolMetrics(
   pool: PoolCounts,
@@ -168,23 +178,32 @@ export function startPoolMetrics(
     emit = (line: string) => console.log(line),
     now = Date.now,
     sampleMs = 1000,
-    samplesPerLine = 60,
+    windowMs = 60_000,
   }: {
     emit?: (line: string) => void;
     now?: () => number;
     sampleMs?: number;
-    samplesPerLine?: number;
+    windowMs?: number;
   } = {}
 ): () => void {
-  let samples: PoolSamples = { idle: [], total: [], waiting: [] };
+  const empty = (): PoolSamples => ({ idle: [], total: [], waiting: [] });
+  let samples = empty();
+  let windowStart = Math.floor(now() / windowMs) * windowMs;
+  const flush = () => {
+    if (samples.waiting.length > 0) {
+      emit(poolMetricsLine(samples, windowStart));
+    }
+    samples = empty();
+  };
   const timer = setInterval(() => {
+    const start = Math.floor(now() / windowMs) * windowMs;
+    if (start !== windowStart || samples.waiting.length >= EMF_MAX_VALUES) {
+      flush();
+      windowStart = start;
+    }
     samples.waiting.push(pool.waitingCount);
     samples.total.push(pool.totalCount);
     samples.idle.push(pool.idleCount);
-    if (samples.waiting.length >= samplesPerLine) {
-      emit(poolMetricsLine(samples, now()));
-      samples = { idle: [], total: [], waiting: [] };
-    }
   }, sampleMs);
   timer.unref();
   return () => clearInterval(timer);

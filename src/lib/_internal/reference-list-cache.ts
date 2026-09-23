@@ -1,10 +1,11 @@
 /**
- * An in-process cache for the small public reference lists, categories and
- * programs, that the project listing reads on every visit (#558).
+ * An in-process cache for reads that change rarely and are read on every
+ * visit. Its one user is the project listing's filter options (#558,
+ * `src/server/_internal/project-filter-options.ts`).
  *
  * Per task and time-bounded, not invalidated fleet-wide: a writer clears the
  * cache on the task that handled the write, and every other task serves the
- * old list until its entry expires. ADR-0048 has the trade.
+ * old value until its entry expires. ADR-0048 has the trade.
  *
  * The TTL comes from `REFERENCE_LIST_CACHE_TTL_MS`, read on every lookup, and
  * unset or anything but a positive integer means no caching at all. Off by
@@ -13,8 +14,8 @@
  * "other task" case, and would read a stale list if the server cached.
  * `infra/ecs.tf` turns it on in production.
  *
- * Caches the promise rather than the rows, so a burst of cold misses on one
- * task shares one query instead of each taking a connection. A rejected load
+ * Caches the promise rather than the value, so a burst of cold misses on one
+ * task shares one read instead of each taking a connection. A rejected load
  * is dropped at once, so a failed query is never served from the cache.
  */
 
@@ -79,9 +80,9 @@ export function createReferenceListCache<T>(
 }
 
 /**
- * Empties every cache this module has made. For `resetDatabase()` in the
- * integration setup, which truncates under a cache that would otherwise
- * outlive the rows it holds.
+ * Empties every cache this module has made. The category and program writers
+ * call it, and so does `resetDatabase()` in the integration setup, which
+ * truncates under a cache that would otherwise outlive the rows it holds.
  */
 export function clearAllReferenceListCaches(): void {
   for (const cache of registry) {

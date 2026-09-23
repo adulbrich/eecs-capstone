@@ -20,9 +20,9 @@ export default defineConfig({
     env: {
       BEDROCK_EMBEDDINGS_ENABLED: "false",
       BEDROCK_SOCIAL_SUMMARY_ENABLED: "false",
-      // On, as in production, so every lister test that writes through a
-      // `*As` function and then lists is also a test that the write cleared
-      // the cache (#558). `resetDatabase()` clears it between tests.
+      // On, as in production, so project-filter-options.integration.test.ts
+      // can show a staff write clearing the listing's cache (#558).
+      // `resetDatabase()` clears it between tests.
       REFERENCE_LIST_CACHE_TTL_MS: "60000",
     },
   },

@@ -11,18 +11,29 @@ import {
   startPoolMetrics,
 } from "../_internal/db-pool";
 
+const QUOTES = /^"|"$/g;
+
 /**
- * A `<name> = <number>` argument inside one top-level block of a Terraform
- * file, found by the line that opens the block. NaN when either is missing,
- * which fails loudly downstream rather than passing on a default.
+ * A `<name> = <value>` argument inside one top-level block of a Terraform
+ * file, found by the line that opens the block, with any quotes stripped.
+ * Undefined when either is missing.
  */
-function terraformNumber(file: string, opener: string, name: string): number {
+function terraformArgument(
+  file: string,
+  opener: string,
+  name: string
+): string | undefined {
   const source = readFileSync(file, "utf8");
   const block = source.split(opener)[1]?.split("\n}")[0];
   const line = (block ?? "")
     .split("\n")
     .find((candidate) => candidate.trim().startsWith(`${name} `));
-  return Number(line?.split("=")[1]);
+  return line?.split("=")[1]?.trim().replace(QUOTES, "");
+}
+
+/** The same, as a number: NaN when missing, which fails loudly downstream. */
+function terraformNumber(file: string, opener: string, name: string): number {
+  return Number(terraformArgument(file, opener, name));
 }
 
 /** A variable's `default` in `infra/variables.tf`. */
@@ -152,15 +163,13 @@ describe("surviving a connection the server drops", () => {
   });
 });
 
-/** A quoted `<name> = "<value>"` argument on the pool alarm in `infra/alarms.tf`. */
+/** An argument on the pool alarm in `infra/alarms.tf`. */
 function poolAlarmSetting(name: string): string | undefined {
-  const block = readFileSync("infra/alarms.tf", "utf8")
-    .split('resource "aws_cloudwatch_metric_alarm" "db_pool_waiting" {')[1]
-    ?.split("\n}")[0];
-  const line = (block ?? "")
-    .split("\n")
-    .find((candidate) => candidate.trim().startsWith(`${name} `));
-  return line?.split("=")[1]?.trim().replace(/^"|"$/g, "");
+  return terraformArgument(
+    "infra/alarms.tf",
+    'resource "aws_cloudwatch_metric_alarm" "db_pool_waiting" {',
+    name
+  );
 }
 
 describe("pool metrics", () => {
@@ -207,52 +216,53 @@ describe("pool metrics", () => {
     expect(doc[POOL_METRICS.idle]).toEqual([2, 0]);
   });
 
-  it("samples on each tick and emits once per full window", () => {
+  it("emits one line per calendar minute, stamped with the minute it holds", () => {
+    // Started mid-minute, as a task is: the first line is a partial minute,
+    // and every line lands in the minute its samples came from, so the
+    // alarm's two-in-a-row count sees each minute exactly once.
     vi.useFakeTimers();
+    vi.setSystemTime(30_000);
     const counts = { waiting: 0, total: 10, idle: 10 };
     const lines: string[] = [];
     const stop = startPoolMetrics(fakePool(counts), {
       emit: (line) => lines.push(line),
-      now: () => 42,
-      sampleMs: 1000,
-      samplesPerLine: 3,
     });
 
-    vi.advanceTimersByTime(1000);
-    counts.waiting = 7;
-    counts.idle = 0;
-    vi.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(29_000);
     expect(lines).toHaveLength(0);
-    counts.waiting = 2;
+    counts.waiting = 7;
     vi.advanceTimersByTime(1000);
     expect(lines).toHaveLength(1);
+    const first = JSON.parse(lines[0]);
+    expect(first._aws.Timestamp).toBe(0);
+    expect(first[POOL_METRICS.waiting]).toEqual(new Array(29).fill(0));
 
-    const doc = JSON.parse(lines[0]);
-    expect(doc[POOL_METRICS.waiting]).toEqual([0, 7, 2]);
-    expect(doc[POOL_METRICS.idle]).toEqual([10, 0, 0]);
-    expect(doc._aws.Timestamp).toBe(42);
-
-    // The next window starts empty rather than carrying the last one.
-    vi.advanceTimersByTime(3000);
+    vi.advanceTimersByTime(60_000);
     expect(lines).toHaveLength(2);
-    expect(JSON.parse(lines[1])[POOL_METRICS.waiting]).toEqual([2, 2, 2]);
+    const second = JSON.parse(lines[1]);
+    expect(second._aws.Timestamp).toBe(60_000);
+    expect(second[POOL_METRICS.waiting]).toEqual(new Array(60).fill(7));
 
     stop();
-    vi.advanceTimersByTime(10_000);
+    vi.advanceTimersByTime(120_000);
     expect(lines).toHaveLength(2);
   });
 
-  it("keeps each metric inside EMF's hundred values by default", () => {
+  it("never puts more than EMF's hundred values in one line", () => {
     vi.useFakeTimers();
+    vi.setSystemTime(0);
     const lines: string[] = [];
     const stop = startPoolMetrics(fakePool({ waiting: 0, total: 1, idle: 1 }), {
       emit: (line) => lines.push(line),
+      sampleMs: 1,
+      windowMs: 1_000_000,
     });
-    vi.advanceTimersByTime(60_000);
+    vi.advanceTimersByTime(250);
     stop();
-    expect(lines).toHaveLength(1);
-    const samples = JSON.parse(lines[0])[POOL_METRICS.waiting];
-    expect(samples).toHaveLength(60);
+    expect(lines).toHaveLength(2);
+    for (const line of lines) {
+      expect(JSON.parse(line)[POOL_METRICS.waiting]).toHaveLength(100);
+    }
   });
 
   it("names the metric the alarm in infra/alarms.tf watches", () => {

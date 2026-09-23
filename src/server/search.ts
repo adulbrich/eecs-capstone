@@ -53,3 +53,17 @@ export const searchProjects = createServerFn({ method: "GET" })
     const { searchProjectsForRequest } = await import("./_internal/search");
     return searchProjectsForRequest(data);
   });
+
+/**
+ * The listing's category and program filter options in one call, cached per
+ * task (#558, ADR-0048). Public for the same reasons `listCategories` and
+ * `listPrograms` are: it returns exactly what they return.
+ */
+export const listProjectFilterOptions = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const { listProjectFilterOptionsImpl } = await import(
+    "./_internal/project-filter-options"
+  );
+  return listProjectFilterOptionsImpl();
+});

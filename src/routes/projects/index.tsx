@@ -38,9 +38,7 @@ import { useAdminTable } from "#/lib/use-admin-table";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
 import { useSignedIn } from "#/lib/use-signed-in";
 import type { ViewMode } from "#/lib/view-preference";
-import { listCategories } from "#/server/categories";
-import { listPrograms } from "#/server/programs";
-import { searchProjects } from "#/server/search";
+import { listProjectFilterOptions, searchProjects } from "#/server/search";
 
 export const searchSchema = z.object({
   // Uncapped on purpose. The server clamps a long query to
@@ -110,27 +108,26 @@ export const Route = createFileRoute("/projects/")({
   }),
   // The two option lists load with the rows rather than in a mount effect,
   // so the filters aside paints complete and the sheet does not grow after
-  // it opens. Both are small tables read on every visit anyway.
+  // it opens. They come cached from one call, because this page is the
+  // busiest read in the app and the lists change a few times a term (#558).
   loader: async ({ deps }) => {
-    const [result, { rows: categories }, { rows: programs }] =
-      await Promise.all([
-        searchProjects({
-          data: {
-            query: deps.q,
-            categoryIds: deps.categories,
-            programId: deps.program,
-            archivedOnly: deps.archivedOnly,
-            acceptingOnly: deps.acceptingOnly,
-            studentProposedOnly: deps.studentProposedOnly,
-            requiresNdaOnly: deps.requiresNdaOnly,
-            page: deps.page,
-            pageSize: PAGE_SIZE_DEFAULT,
-            sort: deps.order,
-          },
-        }),
-        listCategories({ data: { domain: "project" } }),
-        listPrograms(),
-      ]);
+    const [result, { categories, programs }] = await Promise.all([
+      searchProjects({
+        data: {
+          query: deps.q,
+          categoryIds: deps.categories,
+          programId: deps.program,
+          archivedOnly: deps.archivedOnly,
+          acceptingOnly: deps.acceptingOnly,
+          studentProposedOnly: deps.studentProposedOnly,
+          requiresNdaOnly: deps.requiresNdaOnly,
+          page: deps.page,
+          pageSize: PAGE_SIZE_DEFAULT,
+          sort: deps.order,
+        },
+      }),
+      listProjectFilterOptions(),
+    ]);
     return {
       ...result,
       categories: categories as FilterCategory[],
