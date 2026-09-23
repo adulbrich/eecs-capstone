@@ -63,6 +63,10 @@ const SLOTS = Array.from({ length: CODE_LENGTH }, (_, index) => index);
 
 const NON_DIGITS = /\D/g;
 
+/** What the code input's `aria-describedby` names, and the elements it names. */
+const CODE_HINT_ID = "code-otp-hint";
+const CODE_ERROR_ID = "code-otp-error";
+
 /**
  * A pasted `482 193` or `482-193`, as `482193`.
  *
@@ -275,7 +279,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
               nobody saw, and changes context on input (WCAG 3.2.2). */}
           <InputOTP
             aria-describedby={
-              invalid ? "code-otp-hint code-otp-error" : "code-otp-hint"
+              invalid ? `${CODE_HINT_ID} ${CODE_ERROR_ID}` : CODE_HINT_ID
             }
             aria-invalid={invalid}
             // `one-time-code` is what lets a phone offer the code from the
@@ -302,11 +306,11 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
               ))}
             </InputOTPGroup>
           </InputOTP>
-          <p className="text-muted-foreground text-sm" id="code-otp-hint">
+          <p className="text-muted-foreground text-sm" id={CODE_HINT_ID}>
             We sent a code to {email}. It expires in five minutes.
           </p>
         </div>
-        <FieldError id="code-otp-error" message={error} />
+        <FieldError id={CODE_ERROR_ID} message={error} />
         <Button className="w-full" disabled={loading} type="submit">
           {loading ? "Checking..." : "Confirm code"}
         </Button>
