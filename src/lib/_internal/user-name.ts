@@ -21,8 +21,8 @@ import { APIError } from "better-auth/api";
  * put a shape rule out of scope.
  *
  * Refusing rather than substituting something, because every way in that this
- * repo actually drives already carries a name: the profile form and the
- * sign-up form both mark the field required, `onid-profile.ts` falls back to
+ * repo actually drives already carries a name: the profile form and the code
+ * form's name step both mark the field required, `onid-profile.ts` falls back to
  * the address local part before Better Auth ever sees the profile, and the
  * GitHub provider falls back to the login. What is left is a direct call to
  * the sign-up endpoint, where a blank name is a caller's mistake worth

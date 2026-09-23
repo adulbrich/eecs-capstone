@@ -375,7 +375,7 @@ are bootstrapped in two steps. Do this for **at least two** people (the app
 blocks a sole admin from demoting or banning themselves).
 
 There is no password (#576): an account is made by asking for a code at
-`/sign-up` and typing it back into the same tab, and ONID works too for anyone
+`/sign-in` and typing it back into the same tab, and ONID works too for anyone
 with an Oregon State account. `infra/ecs.tf` sets `EMAIL_TRANSPORT=ses`, so the
 code arrives by email. On a fresh AWS account SES is still in its sandbox
 (section 9.4) and mails only verified identities: verify each future admin's
@@ -395,7 +395,7 @@ from their own browser and read it back, and the group keeps what it holds for
 30 days. Switch back to `ses` through Terraform as soon as the admins exist.
 
 1. Each future admin creates an account through the app UI, with a code at
-   `/sign-up` or with ONID.
+   `/sign-in` or with ONID.
 2. Promote each to admin by running the bundled one-off task. This reuses the
    exact network configuration of the running service so it can reach the
    private database:
@@ -436,8 +436,8 @@ Repeat with the second admin's email. Check the task's CloudWatch log for
     -H 'Cookie: probe=1' \
     -d '{"email":"probe@example.invalid","otp":"000000","type":"sign-in"}'
   ```
-- Signing up at `/sign-up` mails a code (section 6), and completes once that
-  code is typed in.
+- Creating an account at `/sign-in` mails a code (section 6), and completes
+  once that code and a name are typed in. `/sign-up` redirects there.
 - Uploading a project image works and the image loads from
   `https://<assets-dist>.cloudfront.net/...`.
 - Triggering an AI project review succeeds (Bedrock via the task role).

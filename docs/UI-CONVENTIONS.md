@@ -54,7 +54,7 @@ would turn an implicit form submit into a no-op just as silently. An `asChild`
 
 | Variant | Use when |
 | --- | --- |
-| `default` | Primary CTA (Submit, Save, Create, Sign in, Sign up) |
+| `default` | Primary CTA (Submit, Save, Create, Sign in) |
 | `outline` | Secondary actions (Cancel, Edit, Sign out, Withdraw) |
 | `ghost` | Tertiary / low-emphasis (Reply, Remove in lists) |
 | `destructive` | Irreversible danger (Delete, Ban) |
@@ -461,8 +461,8 @@ title, the way the admin tables do. `projects/index.tsx` and
 `inventory/index.tsx` used to as well; since #350 and #352 they pass
 `mx-auto max-w-4xl xl:max-w-7xl` to `ListingLayout`, so the table is bounded
 with the cards below `xl` and shares the wider grid with the aside from `xl`.
-`/admin/projects` and `/admin/inventory` pass no width and run full, as before. The sign-in and sign-up cards
-are narrower still but live inside the separate `island-shell` container below, not
+`/admin/projects` and `/admin/inventory` pass no width and run full, as before. The sign-in card
+is narrower still but lives inside the separate `island-shell` container below, not
 this padding pattern.
 
 Pick the narrowest that fits the content; a form at `max-w-4xl` has an
@@ -521,7 +521,7 @@ and escape-dismissible for free. Four rules keep it correct:
   sits outside the signed-in block because the Sheet renders regardless of
   session. On desktop it is a ghost icon button left of the bell, ahead of both
   session branches. Its accessible name is "Source code on GitHub", never
-  "GitHub": `/sign-in` and `/sign-up` render a "Continue with GitHub" button.
+  "GitHub": `/sign-in` renders a "Continue with GitHub" button.
 
 ```tsx
 <Sheet open={open} onOpenChange={setOpen}>
@@ -1159,7 +1159,7 @@ Radix `SelectItem` rejects `value=""`, so an unset option needs a sentinel. Use
 
 ### Auth pages
 
-Sign-in and sign-up share an `island-shell` card:
+`/sign-in`, the one auth page, uses an `island-shell` card:
 
 ```tsx
 <div className="flex min-h-[calc(100vh-3.5rem)] items-start justify-center px-4 pt-12 pb-20">

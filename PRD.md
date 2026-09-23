@@ -62,9 +62,9 @@ For developer setup, architecture notes, and the active roadmap, see
   the mentors admin surface (see §14).
 - [x] Privacy policy at `/privacy`: a short public page, static in the repo,
   stating what the app collects, that published projects stay public, and what
-  closing an account removes and keeps. Linked from sign-up (as a notice, not a
-  checkbox; nothing is recorded), sign-in, and the profile page. No footer and
-  no separate terms document. (#91)
+  closing an account removes and keeps. Linked from `/sign-in` and its code
+  form's name step (as a notice, not a checkbox; nothing is recorded), and the
+  profile page. No footer and no separate terms document. (#91, #586)
 - [x] Self-service account deletion from the profile page, behind a dialog that
   states what stays and requires the person to type their own email. The `user`
   row is anonymized in place rather than deleted, because authorship and audit
@@ -457,7 +457,7 @@ catalogue that decided the matrix below; #288 shipped it.
 
   | Recipient | Event | In-app | Email |
   | --- | --- | --- | --- |
-  | Account | Sign-in code (asked for at sign-in or sign-up) | no | yes |
+  | Account | Sign-in code (asked for at `/sign-in`) | no | yes |
   | Proposer | Changes requested | yes | yes |
   | Proposer | Approved | yes | yes |
   | Proposer | Returned to draft by staff | yes | yes, comment required (the force override is exempt) |

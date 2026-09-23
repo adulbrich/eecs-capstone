@@ -682,8 +682,9 @@ export const auth = betterAuth({
       // and no office to route through, so closing this would leave them with
       // GitHub or nothing. `signInEmailOTP` writes `name: name || ""` on a
       // first sign-in and `requireUserName` throws BAD_REQUEST on a blank one,
-      // which is why the sign-up route asks for a name and sends it: reaching
-      // this path without one burns a code the person then cannot reuse.
+      // which is why the code form's name step asks for one and sends it:
+      // reaching this path without one burns a code the person then cannot
+      // reuse.
       disableSignUp: false,
       // Encrypted rather than hashed, which is not the usual preference and is
       // right here. `storeOTP: "hashed"` is an unsalted SHA-256 over a six

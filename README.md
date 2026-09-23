@@ -182,7 +182,7 @@ for its recipient; there are no notification preferences (ADR-0019).
 
 | Email | Trigger | Recipient |
 |---|---|---|
-| Your sign-in code | Somebody asks for a code at `/sign-in` or `/sign-up` | The address typed |
+| Your sign-in code | Somebody asks for a code at `/sign-in` | The address typed |
 | New project submitted | A project moves to `submitted` | `EMAIL_STAFF_INBOX` |
 | Approved / Changes requested / Returned to draft | Staff review a project | The proposer |
 | New comment on your project | Staff comment, not internal | The proposer |
