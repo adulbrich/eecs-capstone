@@ -6,6 +6,8 @@ const TABLES = [
   // rows from the test before it and block a call it expected to allow.
   "ai_review_usage",
   "verification_sends",
+  "traffic_events",
+  "traffic_salt",
   "notifications",
   "inventory_requests",
   "inventory_items",

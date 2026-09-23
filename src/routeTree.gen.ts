@@ -9,18 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthedRouteImport } from './routes/_authed'
-import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as PublicRouteImport } from './routes/_public'
 import { Route as authSignInRouteImport } from './routes/(auth)/sign-in'
 import { Route as authSignUpRouteImport } from './routes/(auth)/sign-up'
 import { Route as AuthedAdminRouteImport } from './routes/_authed/admin'
 import { Route as AuthedProfileRouteImport } from './routes/_authed/profile'
+import { Route as PublicIndexRouteImport } from './routes/_public/index'
+import { Route as PublicPrivacyRouteImport } from './routes/_public/privacy'
 import { Route as ApiHealthzRouteImport } from './routes/api/healthz'
-import { Route as InventoryIndexRouteImport } from './routes/inventory/index'
-import { Route as InventoryItemIdRouteImport } from './routes/inventory/$itemId'
-import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
-import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
+import { Route as ApiTrafficRouteImport } from './routes/api/traffic'
 import { Route as AuthedAdminIndexRouteImport } from './routes/_authed/admin/index'
 import { Route as AuthedAdminAnalyticsRouteImport } from './routes/_authed/admin/analytics'
 import { Route as AuthedInventoryNewRouteImport } from './routes/_authed/inventory/new'
@@ -29,6 +27,10 @@ import { Route as AuthedMyBookmarksRouteImport } from './routes/_authed/my/bookm
 import { Route as AuthedMyItemsRouteImport } from './routes/_authed/my/items'
 import { Route as AuthedMyProjectsRouteImport } from './routes/_authed/my/projects'
 import { Route as AuthedProjectsNewRouteImport } from './routes/_authed/projects/new'
+import { Route as PublicInventoryIndexRouteImport } from './routes/_public/inventory/index'
+import { Route as PublicInventoryItemIdRouteImport } from './routes/_public/inventory/$itemId'
+import { Route as PublicProjectsIndexRouteImport } from './routes/_public/projects/index'
+import { Route as PublicProjectsProjectIdRouteImport } from './routes/_public/projects/$projectId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AuthedAdminCategoriesIndexRouteImport } from './routes/_authed/admin/categories/index'
 import { Route as AuthedAdminCategoriesCategoryIdRouteImport } from './routes/_authed/admin/categories/$categoryId'
@@ -43,18 +45,12 @@ import { Route as AuthedAdminUsersUserIdRouteImport } from './routes/_authed/adm
 import { Route as AuthedInventoryItemIdEditRouteImport } from './routes/_authed/inventory/$itemId/edit'
 import { Route as AuthedProjectsProjectIdEditRouteImport } from './routes/_authed/projects/$projectId/edit'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
+const PublicRoute = PublicRouteImport.update({
+  id: '/_public',
   getParentRoute: () => rootRouteImport,
 } as any)
 const authSignInRoute = authSignInRouteImport.update({
@@ -77,29 +73,24 @@ const AuthedProfileRoute = AuthedProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AuthedRoute,
 } as any)
+const PublicIndexRoute = PublicIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PublicRoute,
+} as any)
+const PublicPrivacyRoute = PublicPrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => PublicRoute,
+} as any)
 const ApiHealthzRoute = ApiHealthzRouteImport.update({
   id: '/api/healthz',
   path: '/api/healthz',
   getParentRoute: () => rootRouteImport,
 } as any)
-const InventoryIndexRoute = InventoryIndexRouteImport.update({
-  id: '/inventory/',
-  path: '/inventory/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InventoryItemIdRoute = InventoryItemIdRouteImport.update({
-  id: '/inventory/$itemId',
-  path: '/inventory/$itemId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
-  id: '/projects/',
-  path: '/projects/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
-  id: '/projects/$projectId',
-  path: '/projects/$projectId',
+const ApiTrafficRoute = ApiTrafficRouteImport.update({
+  id: '/api/traffic',
+  path: '/api/traffic',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedAdminIndexRoute = AuthedAdminIndexRouteImport.update({
@@ -141,6 +132,26 @@ const AuthedProjectsNewRoute = AuthedProjectsNewRouteImport.update({
   id: '/projects/new',
   path: '/projects/new',
   getParentRoute: () => AuthedRoute,
+} as any)
+const PublicInventoryIndexRoute = PublicInventoryIndexRouteImport.update({
+  id: '/inventory/',
+  path: '/inventory/',
+  getParentRoute: () => PublicRoute,
+} as any)
+const PublicInventoryItemIdRoute = PublicInventoryItemIdRouteImport.update({
+  id: '/inventory/$itemId',
+  path: '/inventory/$itemId',
+  getParentRoute: () => PublicRoute,
+} as any)
+const PublicProjectsIndexRoute = PublicProjectsIndexRouteImport.update({
+  id: '/projects/',
+  path: '/projects/',
+  getParentRoute: () => PublicRoute,
+} as any)
+const PublicProjectsProjectIdRoute = PublicProjectsProjectIdRouteImport.update({
+  id: '/projects/$projectId',
+  path: '/projects/$projectId',
+  getParentRoute: () => PublicRoute,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
@@ -218,17 +229,14 @@ const AuthedProjectsProjectIdEditRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/privacy': typeof PrivacyRoute
+  '/': typeof PublicIndexRoute
   '/sign-in': typeof authSignInRoute
   '/sign-up': typeof authSignUpRoute
   '/admin': typeof AuthedAdminRouteWithChildren
   '/profile': typeof AuthedProfileRoute
+  '/privacy': typeof PublicPrivacyRoute
   '/api/healthz': typeof ApiHealthzRoute
-  '/inventory/$itemId': typeof InventoryItemIdRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRoute
-  '/inventory/': typeof InventoryIndexRoute
-  '/projects/': typeof ProjectsIndexRoute
+  '/api/traffic': typeof ApiTrafficRoute
   '/admin/analytics': typeof AuthedAdminAnalyticsRoute
   '/inventory/new': typeof AuthedInventoryNewRoute
   '/inventory/request': typeof AuthedInventoryRequestRoute
@@ -236,8 +244,12 @@ export interface FileRoutesByFullPath {
   '/my/items': typeof AuthedMyItemsRoute
   '/my/projects': typeof AuthedMyProjectsRoute
   '/projects/new': typeof AuthedProjectsNewRoute
+  '/inventory/$itemId': typeof PublicInventoryItemIdRoute
+  '/projects/$projectId': typeof PublicProjectsProjectIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin/': typeof AuthedAdminIndexRoute
+  '/inventory/': typeof PublicInventoryIndexRoute
+  '/projects/': typeof PublicProjectsIndexRoute
   '/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
   '/admin/inventory/requests': typeof AuthedAdminInventoryRequestsRoute
   '/admin/programs/$programId': typeof AuthedAdminProgramsProgramIdRoute
@@ -252,16 +264,13 @@ export interface FileRoutesByFullPath {
   '/admin/users/': typeof AuthedAdminUsersIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/privacy': typeof PrivacyRoute
+  '/': typeof PublicIndexRoute
   '/sign-in': typeof authSignInRoute
   '/sign-up': typeof authSignUpRoute
   '/profile': typeof AuthedProfileRoute
+  '/privacy': typeof PublicPrivacyRoute
   '/api/healthz': typeof ApiHealthzRoute
-  '/inventory/$itemId': typeof InventoryItemIdRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRoute
-  '/inventory': typeof InventoryIndexRoute
-  '/projects': typeof ProjectsIndexRoute
+  '/api/traffic': typeof ApiTrafficRoute
   '/admin/analytics': typeof AuthedAdminAnalyticsRoute
   '/inventory/new': typeof AuthedInventoryNewRoute
   '/inventory/request': typeof AuthedInventoryRequestRoute
@@ -269,8 +278,12 @@ export interface FileRoutesByTo {
   '/my/items': typeof AuthedMyItemsRoute
   '/my/projects': typeof AuthedMyProjectsRoute
   '/projects/new': typeof AuthedProjectsNewRoute
+  '/inventory/$itemId': typeof PublicInventoryItemIdRoute
+  '/projects/$projectId': typeof PublicProjectsProjectIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin': typeof AuthedAdminIndexRoute
+  '/inventory': typeof PublicInventoryIndexRoute
+  '/projects': typeof PublicProjectsIndexRoute
   '/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
   '/admin/inventory/requests': typeof AuthedAdminInventoryRequestsRoute
   '/admin/programs/$programId': typeof AuthedAdminProgramsProgramIdRoute
@@ -286,18 +299,16 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
   '/_authed': typeof AuthedRouteWithChildren
-  '/privacy': typeof PrivacyRoute
+  '/_public': typeof PublicRouteWithChildren
   '/(auth)/sign-in': typeof authSignInRoute
   '/(auth)/sign-up': typeof authSignUpRoute
   '/_authed/admin': typeof AuthedAdminRouteWithChildren
   '/_authed/profile': typeof AuthedProfileRoute
+  '/_public/privacy': typeof PublicPrivacyRoute
   '/api/healthz': typeof ApiHealthzRoute
-  '/inventory/$itemId': typeof InventoryItemIdRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRoute
-  '/inventory/': typeof InventoryIndexRoute
-  '/projects/': typeof ProjectsIndexRoute
+  '/api/traffic': typeof ApiTrafficRoute
+  '/_public/': typeof PublicIndexRoute
   '/_authed/admin/analytics': typeof AuthedAdminAnalyticsRoute
   '/_authed/inventory/new': typeof AuthedInventoryNewRoute
   '/_authed/inventory/request': typeof AuthedInventoryRequestRoute
@@ -305,8 +316,12 @@ export interface FileRoutesById {
   '/_authed/my/items': typeof AuthedMyItemsRoute
   '/_authed/my/projects': typeof AuthedMyProjectsRoute
   '/_authed/projects/new': typeof AuthedProjectsNewRoute
+  '/_public/inventory/$itemId': typeof PublicInventoryItemIdRoute
+  '/_public/projects/$projectId': typeof PublicProjectsProjectIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_authed/admin/': typeof AuthedAdminIndexRoute
+  '/_public/inventory/': typeof PublicInventoryIndexRoute
+  '/_public/projects/': typeof PublicProjectsIndexRoute
   '/_authed/admin/categories/$categoryId': typeof AuthedAdminCategoriesCategoryIdRoute
   '/_authed/admin/inventory/requests': typeof AuthedAdminInventoryRequestsRoute
   '/_authed/admin/programs/$programId': typeof AuthedAdminProgramsProgramIdRoute
@@ -324,16 +339,13 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/privacy'
     | '/sign-in'
     | '/sign-up'
     | '/admin'
     | '/profile'
+    | '/privacy'
     | '/api/healthz'
-    | '/inventory/$itemId'
-    | '/projects/$projectId'
-    | '/inventory/'
-    | '/projects/'
+    | '/api/traffic'
     | '/admin/analytics'
     | '/inventory/new'
     | '/inventory/request'
@@ -341,8 +353,12 @@ export interface FileRouteTypes {
     | '/my/items'
     | '/my/projects'
     | '/projects/new'
+    | '/inventory/$itemId'
+    | '/projects/$projectId'
     | '/api/auth/$'
     | '/admin/'
+    | '/inventory/'
+    | '/projects/'
     | '/admin/categories/$categoryId'
     | '/admin/inventory/requests'
     | '/admin/programs/$programId'
@@ -358,15 +374,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/privacy'
     | '/sign-in'
     | '/sign-up'
     | '/profile'
+    | '/privacy'
     | '/api/healthz'
-    | '/inventory/$itemId'
-    | '/projects/$projectId'
-    | '/inventory'
-    | '/projects'
+    | '/api/traffic'
     | '/admin/analytics'
     | '/inventory/new'
     | '/inventory/request'
@@ -374,8 +387,12 @@ export interface FileRouteTypes {
     | '/my/items'
     | '/my/projects'
     | '/projects/new'
+    | '/inventory/$itemId'
+    | '/projects/$projectId'
     | '/api/auth/$'
     | '/admin'
+    | '/inventory'
+    | '/projects'
     | '/admin/categories/$categoryId'
     | '/admin/inventory/requests'
     | '/admin/programs/$programId'
@@ -390,18 +407,16 @@ export interface FileRouteTypes {
     | '/admin/users'
   id:
     | '__root__'
-    | '/'
     | '/_authed'
-    | '/privacy'
+    | '/_public'
     | '/(auth)/sign-in'
     | '/(auth)/sign-up'
     | '/_authed/admin'
     | '/_authed/profile'
+    | '/_public/privacy'
     | '/api/healthz'
-    | '/inventory/$itemId'
-    | '/projects/$projectId'
-    | '/inventory/'
-    | '/projects/'
+    | '/api/traffic'
+    | '/_public/'
     | '/_authed/admin/analytics'
     | '/_authed/inventory/new'
     | '/_authed/inventory/request'
@@ -409,8 +424,12 @@ export interface FileRouteTypes {
     | '/_authed/my/items'
     | '/_authed/my/projects'
     | '/_authed/projects/new'
+    | '/_public/inventory/$itemId'
+    | '/_public/projects/$projectId'
     | '/api/auth/$'
     | '/_authed/admin/'
+    | '/_public/inventory/'
+    | '/_public/projects/'
     | '/_authed/admin/categories/$categoryId'
     | '/_authed/admin/inventory/requests'
     | '/_authed/admin/programs/$programId'
@@ -426,28 +445,17 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
   AuthedRoute: typeof AuthedRouteWithChildren
-  PrivacyRoute: typeof PrivacyRoute
+  PublicRoute: typeof PublicRouteWithChildren
   authSignInRoute: typeof authSignInRoute
   authSignUpRoute: typeof authSignUpRoute
   ApiHealthzRoute: typeof ApiHealthzRoute
-  InventoryItemIdRoute: typeof InventoryItemIdRoute
-  ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
-  InventoryIndexRoute: typeof InventoryIndexRoute
-  ProjectsIndexRoute: typeof ProjectsIndexRoute
+  ApiTrafficRoute: typeof ApiTrafficRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_authed': {
       id: '/_authed'
       path: ''
@@ -455,11 +463,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
+    '/_public': {
+      id: '/_public'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof PublicRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(auth)/sign-in': {
@@ -490,6 +498,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProfileRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_public/': {
+      id: '/_public/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof PublicIndexRouteImport
+      parentRoute: typeof PublicRoute
+    }
+    '/_public/privacy': {
+      id: '/_public/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PublicPrivacyRouteImport
+      parentRoute: typeof PublicRoute
+    }
     '/api/healthz': {
       id: '/api/healthz'
       path: '/api/healthz'
@@ -497,32 +519,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthzRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/inventory/': {
-      id: '/inventory/'
-      path: '/inventory'
-      fullPath: '/inventory/'
-      preLoaderRoute: typeof InventoryIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/inventory/$itemId': {
-      id: '/inventory/$itemId'
-      path: '/inventory/$itemId'
-      fullPath: '/inventory/$itemId'
-      preLoaderRoute: typeof InventoryItemIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/projects/': {
-      id: '/projects/'
-      path: '/projects'
-      fullPath: '/projects/'
-      preLoaderRoute: typeof ProjectsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/projects/$projectId': {
-      id: '/projects/$projectId'
-      path: '/projects/$projectId'
-      fullPath: '/projects/$projectId'
-      preLoaderRoute: typeof ProjectsProjectIdRouteImport
+    '/api/traffic': {
+      id: '/api/traffic'
+      path: '/api/traffic'
+      fullPath: '/api/traffic'
+      preLoaderRoute: typeof ApiTrafficRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authed/admin/': {
@@ -580,6 +581,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/projects/new'
       preLoaderRoute: typeof AuthedProjectsNewRouteImport
       parentRoute: typeof AuthedRoute
+    }
+    '/_public/inventory/': {
+      id: '/_public/inventory/'
+      path: '/inventory'
+      fullPath: '/inventory/'
+      preLoaderRoute: typeof PublicInventoryIndexRouteImport
+      parentRoute: typeof PublicRoute
+    }
+    '/_public/inventory/$itemId': {
+      id: '/_public/inventory/$itemId'
+      path: '/inventory/$itemId'
+      fullPath: '/inventory/$itemId'
+      preLoaderRoute: typeof PublicInventoryItemIdRouteImport
+      parentRoute: typeof PublicRoute
+    }
+    '/_public/projects/': {
+      id: '/_public/projects/'
+      path: '/projects'
+      fullPath: '/projects/'
+      preLoaderRoute: typeof PublicProjectsIndexRouteImport
+      parentRoute: typeof PublicRoute
+    }
+    '/_public/projects/$projectId': {
+      id: '/_public/projects/$projectId'
+      path: '/projects/$projectId'
+      fullPath: '/projects/$projectId'
+      preLoaderRoute: typeof PublicProjectsProjectIdRouteImport
+      parentRoute: typeof PublicRoute
     }
     '/api/auth/$': {
       id: '/api/auth/$'
@@ -738,17 +767,34 @@ const AuthedRouteChildren: AuthedRouteChildren = {
 const AuthedRouteWithChildren =
   AuthedRoute._addFileChildren(AuthedRouteChildren)
 
+interface PublicRouteChildren {
+  PublicPrivacyRoute: typeof PublicPrivacyRoute
+  PublicIndexRoute: typeof PublicIndexRoute
+  PublicInventoryItemIdRoute: typeof PublicInventoryItemIdRoute
+  PublicProjectsProjectIdRoute: typeof PublicProjectsProjectIdRoute
+  PublicInventoryIndexRoute: typeof PublicInventoryIndexRoute
+  PublicProjectsIndexRoute: typeof PublicProjectsIndexRoute
+}
+
+const PublicRouteChildren: PublicRouteChildren = {
+  PublicPrivacyRoute: PublicPrivacyRoute,
+  PublicIndexRoute: PublicIndexRoute,
+  PublicInventoryItemIdRoute: PublicInventoryItemIdRoute,
+  PublicProjectsProjectIdRoute: PublicProjectsProjectIdRoute,
+  PublicInventoryIndexRoute: PublicInventoryIndexRoute,
+  PublicProjectsIndexRoute: PublicProjectsIndexRoute,
+}
+
+const PublicRouteWithChildren =
+  PublicRoute._addFileChildren(PublicRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
-  PrivacyRoute: PrivacyRoute,
+  PublicRoute: PublicRouteWithChildren,
   authSignInRoute: authSignInRoute,
   authSignUpRoute: authSignUpRoute,
   ApiHealthzRoute: ApiHealthzRoute,
-  InventoryItemIdRoute: InventoryItemIdRoute,
-  ProjectsProjectIdRoute: ProjectsProjectIdRoute,
-  InventoryIndexRoute: InventoryIndexRoute,
-  ProjectsIndexRoute: ProjectsIndexRoute,
+  ApiTrafficRoute: ApiTrafficRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

@@ -1,13 +1,17 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
+  check,
   customType,
+  date,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -919,4 +923,81 @@ export const verificationSends = pgTable(
   (t) => [
     index("verification_sends_recipient_idx").on(t.email, t.kind, t.createdAt),
   ]
+);
+
+/**
+ * The public search params a traffic event recorded: the matched public
+ * route's validated search, so only keys its schema defines. Values are what
+ * those schemas produce, strings, numbers, booleans, null and string arrays.
+ */
+export type TrafficSearch = Record<
+  string,
+  string | number | boolean | null | string[]
+>;
+
+export const trafficEventKindEnum = pgEnum("traffic_event_kind", [
+  "view",
+  "search",
+]);
+export const trafficDeviceEnum = pgEnum("traffic_device", [
+  "desktop",
+  "mobile",
+  "tablet",
+]);
+
+/**
+ * One row per page view or search change on a public route, written by the
+ * traffic writer (#591) and read only as aggregates on `/admin/traffic`.
+ *
+ * No user id, no address, no raw user agent: the visitor hash is the only
+ * identity, and its daily salt is discarded (ADR-0048). No foreign keys,
+ * because nothing references these rows and a project's views join on
+ * `pathname` at query time. Visits are derived at query time, never stored.
+ * No retention limit yet (#18).
+ */
+export const trafficEvents = pgTable(
+  "traffic_events",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    kind: trafficEventKindEnum("kind").notNull(),
+    visitorHash: text("visitor_hash").notNull(),
+    pathname: text("pathname").notNull(),
+    search: jsonb("search").$type<TrafficSearch>(),
+    referrerHost: text("referrer_host"),
+    previousPath: text("previous_path"),
+    country: text("country"),
+    browser: text("browser"),
+    os: text("os"),
+    device: trafficDeviceEnum("device"),
+  },
+  (t) => [
+    index("traffic_events_occurred_at_idx").on(t.occurredAt),
+    index("traffic_events_visitor_idx").on(t.visitorHash, t.occurredAt),
+    index("traffic_events_pathname_idx").on(t.pathname, t.occurredAt),
+  ]
+);
+
+/**
+ * The visitor hash's daily salt: one row, replaced on the first traffic
+ * event of each local day and never archived (ADR-0048).
+ *
+ * UNLOGGED, which Drizzle cannot declare, so migration 0037 says
+ * `CREATE UNLOGGED TABLE` by hand. Postgres never
+ * writes an unlogged table to the WAL, so RDS backups and point-in-time
+ * restores bring it back empty, and `TRUNCATE` unlinks the old data file.
+ * A crash or failover also empties it, which starts a new salt mid-day.
+ */
+export const trafficSalt = pgTable(
+  "traffic_salt",
+  {
+    id: smallint("id").primaryKey(),
+    day: date("day").notNull(),
+    salt: text("salt").notNull(),
+  },
+  (t) => [check("traffic_salt_single_row", sql`${t.id} = 1`)]
 );

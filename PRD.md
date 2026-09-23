@@ -609,6 +609,11 @@ catalogue that decided the matrix below; #288 shipped it.
 - [ ] Second pass: conversion from submitted to published, stale drafts,
   repeat proposers, category demand against bookmarks, median review latency.
 - [ ] Site traffic (#18) is separate: this counts what is in the database.
+  - [x] Cookieless traffic writer on the public routes (#591): one
+    `traffic_events` row per page view or search change, keyed by a visitor
+    hash whose salt is replaced daily; no cookie, no browser storage, no
+    account link, no stored address. Described on `/privacy`.
+  - [ ] Traffic reports for staff on `/admin/traffic` (#592).
 - [ ] Projects published per academic year; projects submitted per period.
 - [ ] Customizable date ranges (academic year definition; recruitment starting
   before the academic year).

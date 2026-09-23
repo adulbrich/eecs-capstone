@@ -90,7 +90,7 @@ export const searchSchema = z.object({
   cols: z.string().optional(),
 });
 
-export const Route = createFileRoute("/projects/")({
+export const Route = createFileRoute("/_public/projects/")({
   validateSearch: searchSchema,
   head: () => ({
     meta: [{ title: pageTitle("Projects") }, NOINDEX],
