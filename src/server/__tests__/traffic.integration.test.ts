@@ -73,6 +73,16 @@ describe("POST /api/traffic against the database", () => {
     expect(stored[0].visitorHash).toMatch(/^[A-Za-z0-9_-]{22}$/);
   });
 
+  it("stores a typed search whose emoji sits on the 100-character cut", async () => {
+    // Postgres refuses a lone surrogate in jsonb; a code-unit cut made one.
+    const q = `${"a".repeat(99)}\u{1F600}${"b".repeat(10)}`;
+    await writer()(
+      post({ kind: "search", pathname: "/projects", search: { q } })
+    );
+    const [row] = await rows();
+    expect(row?.search).toEqual({ q: `${"a".repeat(99)}\u{1F600}` });
+  });
+
   it("never stores the request's address", async () => {
     await writer()(post());
     const [row] = await rows();

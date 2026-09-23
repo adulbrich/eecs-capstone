@@ -99,7 +99,13 @@ describe("describeAgent", () => {
     expect(describeAgent(CHROME_ANDROID_TABLET).device).toBe("tablet");
   });
 
-  it("returns nulls for what it cannot read", () => {
+  it("returns nulls for what it cannot read, an empty string included", () => {
+    expect(describeAgent("")).toEqual({
+      browser: null,
+      browserMajor: null,
+      device: null,
+      os: null,
+    });
     expect(describeAgent("x")).toEqual({
       browser: null,
       browserMajor: null,
@@ -151,6 +157,26 @@ describe("trafficBodySchema", () => {
       search: { q: `  ${"a".repeat(150)}  ` },
     });
     expect(parsed.search?.q).toBe("a".repeat(100));
+  });
+
+  it("cuts the typed search by code point, never splitting an emoji", () => {
+    // 99 letters then an emoji: code units 99 and 100 are its two halves.
+    const parsed = trafficBodySchema.parse({
+      kind: "search",
+      pathname: "/projects",
+      search: { q: `${"a".repeat(99)}\u{1F600}b` },
+    });
+    expect(parsed.search?.q).toBe(`${"a".repeat(99)}\u{1F600}`);
+  });
+
+  it("refuses a search value holding a lone surrogate", () => {
+    expect(
+      trafficBodySchema.safeParse({
+        kind: "search",
+        pathname: "/projects",
+        search: { q: "robot\uD83D" },
+      }).success
+    ).toBe(false);
   });
 
   it("refuses a pathname that is relative or too long", () => {

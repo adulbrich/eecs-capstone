@@ -23,7 +23,18 @@ const MAX_REFERRER = 2048;
 const MAX_SEARCH_KEYS = 30;
 const MAX_ARRAY = 20;
 
-const searchString = z.string().max(MAX_STRING);
+/**
+ * A lone UTF-16 surrogate. `JSON.stringify` writes one as a `\u` escape and
+ * Postgres refuses that escape in `jsonb`, so a search holding one would fail
+ * its insert.
+ */
+const LONE_SURROGATE =
+  /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+const searchString = z
+  .string()
+  .max(MAX_STRING)
+  .refine((value) => !LONE_SURROGATE.test(value));
 const searchValue = z.union([
   searchString,
   z.number(),
@@ -43,9 +54,13 @@ export const trafficBodySchema = z.object({
     .record(z.string().max(64), searchValue)
     .refine((s) => Object.keys(s).length <= MAX_SEARCH_KEYS)
     // The typed search is the one free-text field. It is trimmed and cut
-    // rather than refused, so a long query still counts as a search.
+    // rather than refused, so a long query still counts as a search. Cut by
+    // code point, not code unit, so an emoji at the cut is kept or dropped
+    // whole rather than split into a lone surrogate.
     .transform((s) =>
-      typeof s.q === "string" ? { ...s, q: s.q.trim().slice(0, MAX_QUERY) } : s
+      typeof s.q === "string"
+        ? { ...s, q: Array.from(s.q.trim()).slice(0, MAX_QUERY).join("") }
+        : s
     )
     .optional(),
 });
@@ -159,6 +174,10 @@ const DEVICES: readonly string[] = ["desktop", "mobile", "tablet"];
  * is never stored. An iPad reads as a macOS desktop; accepted (#508).
  */
 export function describeAgent(userAgent: string): AgentDescription {
+  if (!userAgent) {
+    // `bowser` throws on an empty string rather than returning nothing.
+    return { browser: null, browserMajor: null, device: null, os: null };
+  }
   const parsed = Bowser.parse(userAgent);
   const type = parsed.platform.type ?? "";
   return {
