@@ -462,7 +462,7 @@ title, the way the admin tables do. `projects/index.tsx` and
 `mx-auto max-w-4xl xl:max-w-7xl` to `ListingLayout`, so the table is bounded
 with the cards below `xl` and shares the wider grid with the aside from `xl`.
 `/admin/projects` and `/admin/inventory` pass no width and run full, as before. The sign-in card
-is narrower still but live inside the separate `island-shell` container below, not
+is narrower still but lives inside the separate `island-shell` container below, not
 this padding pattern.
 
 Pick the narrowest that fits the content; a form at `max-w-4xl` has an
