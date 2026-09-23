@@ -66,6 +66,7 @@ const NON_DIGITS = /\D/g;
 /** What the code input's `aria-describedby` names, and the elements it names. */
 const CODE_HINT_ID = "code-otp-hint";
 const CODE_ERROR_ID = "code-otp-error";
+const CODE_EXPIRY_ID = "code-otp-expiry";
 
 /**
  * A pasted `482 193` or `482-193`, as `482193`.
@@ -271,20 +272,34 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
 
   if (step === "code") {
     const invalid = error !== null;
+    const describedBy = invalid
+      ? `${CODE_HINT_ID} ${CODE_ERROR_ID} ${CODE_EXPIRY_ID}`
+      : `${CODE_HINT_ID} ${CODE_EXPIRY_ID}`;
+    // Centered, with the address above the slots (#600): the address is what
+    // to check when no code arrives, so it sits where the eye lands, and the
+    // error sits under the slots it is about. The sentence is the visible
+    // instruction; "Code" stays as the field's name for a screen reader.
     return (
       <form className="mt-6 space-y-4" key="code" onSubmit={checkCode}>
-        <div className="space-y-1.5">
-          <Label htmlFor="code-otp">Code</Label>
+        <div className="space-y-3 text-center">
+          <p className="text-muted-foreground text-sm" id={CODE_HINT_ID}>
+            Enter the code we sent to
+            <span className="wrap-anywhere block font-medium text-foreground">
+              {email}
+            </span>
+          </p>
+          <Label className="sr-only" htmlFor="code-otp">
+            Code
+          </Label>
           {/* No `onComplete` submit: that would spend a guess on a typo
               nobody saw, and changes context on input (WCAG 3.2.2). */}
           <InputOTP
-            aria-describedby={
-              invalid ? `${CODE_HINT_ID} ${CODE_ERROR_ID}` : CODE_HINT_ID
-            }
+            aria-describedby={describedBy}
             aria-invalid={invalid}
             // `one-time-code` is what lets a phone offer the code from the
             // message rather than making the person retype it.
             autoComplete="one-time-code"
+            containerClassName="justify-center"
             id="code-otp"
             inputMode="numeric"
             maxLength={CODE_LENGTH}
@@ -300,17 +315,18 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
               {SLOTS.map((index) => (
                 <InputOTPSlot
                   aria-invalid={invalid}
+                  className="h-10 w-10 text-base"
                   index={index}
                   key={index}
                 />
               ))}
             </InputOTPGroup>
           </InputOTP>
-          <p className="text-muted-foreground text-sm" id={CODE_HINT_ID}>
-            We sent a code to {email}. It expires in five minutes.
+          <FieldError id={CODE_ERROR_ID} message={error} />
+          <p className="text-muted-foreground text-sm" id={CODE_EXPIRY_ID}>
+            It expires in five minutes.
           </p>
         </div>
-        <FieldError id={CODE_ERROR_ID} message={error} />
         <Button className="w-full" disabled={loading} type="submit">
           {loading ? "Checking..." : "Confirm code"}
         </Button>

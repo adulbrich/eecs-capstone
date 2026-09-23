@@ -249,7 +249,8 @@ every input an `id` that the `Label`'s `htmlFor` matches, and render errors with
 `InputOTP`, which hands them to the one real input under the slots, and pass
 `aria-invalid` to each `InputOTPSlot` as well, since the slots are what shows
 the red border. Keep a submit button: no `onComplete` auto-submit, which spends
-a guess on a typo nobody saw and changes context on input (WCAG 3.2.2).
+a guess on a typo nobody saw and changes context on input (WCAG 3.2.2). Center
+it, with what the code was sent to above the slots and the error under them.
 
 **On the project and inventory forms, field labels are Title Case; nothing
 else is.** "Problem Statement", "Contact Email", "Private Notes". A checkbox
