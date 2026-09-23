@@ -20,13 +20,11 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { getSession } from "#/lib/auth-guards";
 import { pageTitle } from "#/lib/page-title";
-import { resolveRange } from "#/lib/report-range";
+import { DAY_PATTERN, resolveRange } from "#/lib/report-range";
 import type { SortState } from "#/lib/table-state";
 import { useAdminTable } from "#/lib/use-admin-table";
 import { isStaff } from "#/lib/viewer";
 import { getTraffic } from "#/server/traffic";
-
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * The date range and the per-project table's sort live in the URL, so a view
@@ -34,8 +32,8 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
  * first. The other tables sort in place and forget it on reload.
  */
 const searchSchema = z.object({
-  from: z.string().regex(DATE).optional().catch(undefined),
-  to: z.string().regex(DATE).optional().catch(undefined),
+  from: z.string().regex(DAY_PATTERN).optional().catch(undefined),
+  to: z.string().regex(DAY_PATTERN).optional().catch(undefined),
   sort: z.string().optional(),
   dir: z.enum(["asc", "desc"]).optional(),
   cols: z.string().optional(),
@@ -199,37 +197,73 @@ interface KeyedRow {
   visits: number;
 }
 
-function countColumn(id: "views" | "visits", header: string) {
-  return {
-    accessorFn: (row: KeyedRow) => row[id] ?? 0,
-    cell: ({ row }: { row: { original: KeyedRow } }) =>
-      COUNT.format(row.original[id] ?? 0),
-    enableHiding: false,
-    header,
-    id,
-    sortFn: "basic" as const,
-  };
+function LabelCell({ row }: { row: KeyedRow }) {
+  return row.pathname === undefined ? (
+    row.label
+  ) : (
+    <PageLabel pathname={row.pathname} title={row.title ?? null} />
+  );
 }
 
-const LABEL_COLUMN = {
-  accessorFn: (row: KeyedRow) => row.label,
-  cardHeader: true,
-  cell: ({ row }: { row: { original: KeyedRow } }) =>
-    row.original.pathname === undefined ? (
-      row.original.label
-    ) : (
-      <PageLabel
-        pathname={row.original.pathname}
-        title={row.original.title ?? null}
-      />
-    ),
-  enableHiding: false,
-  id: "label",
-};
+const PAGE_COLUMNS = defineAdminColumns<KeyedRow>()([
+  {
+    accessorFn: (row) => row.label,
+    cardHeader: true,
+    cell: ({ row }) => <LabelCell row={row.original} />,
+    enableHiding: false,
+    header: "Page",
+    id: "label",
+  },
+  {
+    accessorFn: (row) => row.views ?? 0,
+    cell: ({ row }) => COUNT.format(row.original.views ?? 0),
+    enableHiding: false,
+    header: "Page views",
+    id: "views",
+    sortFn: "basic",
+  },
+  {
+    accessorFn: (row) => row.visits,
+    cell: ({ row }) => COUNT.format(row.original.visits),
+    enableHiding: false,
+    header: "Visits",
+    id: "visits",
+    sortFn: "basic",
+  },
+]);
+
+/** A label column and a visits column: every other table on the page. */
+function visitsColumns(labelHeader: string) {
+  return defineAdminColumns<KeyedRow>()([
+    {
+      accessorFn: (row) => row.label,
+      cardHeader: true,
+      cell: ({ row }) => <LabelCell row={row.original} />,
+      enableHiding: false,
+      header: labelHeader,
+      id: "label",
+    },
+    {
+      accessorFn: (row) => row.visits,
+      cell: ({ row }) => COUNT.format(row.original.visits),
+      enableHiding: false,
+      header: "Visits",
+      id: "visits",
+      sortFn: "basic",
+    },
+  ]);
+}
+
+const ENTRY_COLUMNS = visitsColumns("Entry page");
+const SITE_COLUMNS = visitsColumns("Site");
+const COUNTRY_COLUMNS = visitsColumns("Country");
+const DEVICE_COLUMNS = visitsColumns("Device");
+const BROWSER_COLUMNS = visitsColumns("Browser");
 
 /**
  * A table that sorts in place: every table on the page but the per-project
- * one, whose sort is in the URL. Nothing to hide, so no Columns menu.
+ * one, whose sort is in the URL. Nothing to hide, so no Columns menu. Sorted
+ * by its last column, the count, most first.
  */
 function LocalTable({
   caption,
@@ -244,7 +278,10 @@ function LocalTable({
   rows: KeyedRow[];
   storageKey: string;
 }) {
-  const defaultSort: SortState = { desc: true, id: columns[1]?.id ?? "label" };
+  const defaultSort: SortState = {
+    desc: true,
+    id: columns.at(-1)?.id ?? "label",
+  };
   const [sort, setSort] = useState(defaultSort);
   return (
     <AdminDataTable
@@ -262,22 +299,6 @@ function LocalTable({
     />
   );
 }
-
-function tableColumns(
-  labelHeader: string,
-  counts: [id: "views" | "visits", header: string][]
-): AdminColumn<KeyedRow>[] {
-  return [
-    { ...LABEL_COLUMN, header: labelHeader },
-    ...counts.map(([id, header]) => countColumn(id, header)),
-  ] as AdminColumn<KeyedRow>[];
-}
-
-const PAGE_COLUMNS = tableColumns("Page", [
-  ["views", "Page views"],
-  ["visits", "Visits"],
-]);
-const ENTRY_COLUMNS = tableColumns("Entry page", [["visits", "Visits"]]);
 
 const DEVICE_LABEL: Record<string, string> = {
   desktop: "Desktop",
@@ -477,7 +498,7 @@ function TrafficPage() {
       <div className="mt-2">
         <LocalTable
           caption="Visits per referring site"
-          columns={tableColumns("Site", [["visits", "Visits"]])}
+          columns={SITE_COLUMNS}
           emptyMessage="No visits in this range."
           rows={buckets(
             view.breakdowns.referrers,
@@ -492,7 +513,7 @@ function TrafficPage() {
       <div className="mt-2 grid gap-6">
         <LocalTable
           caption="Visits per country"
-          columns={tableColumns("Country", [["visits", "Visits"]])}
+          columns={COUNTRY_COLUMNS}
           emptyMessage="No visits in this range."
           rows={buckets(view.breakdowns.countries, countryName, "Unknown")}
           storageKey="traffic-countries"
@@ -500,7 +521,7 @@ function TrafficPage() {
         <div>
           <LocalTable
             caption="Visits per device class"
-            columns={tableColumns("Device", [["visits", "Visits"]])}
+            columns={DEVICE_COLUMNS}
             emptyMessage="No visits in this range."
             rows={buckets(
               view.breakdowns.devices,
@@ -515,7 +536,7 @@ function TrafficPage() {
         </div>
         <LocalTable
           caption="Visits per browser"
-          columns={tableColumns("Browser", [["visits", "Visits"]])}
+          columns={BROWSER_COLUMNS}
           emptyMessage="No visits in this range."
           rows={buckets(view.breakdowns.browsers, (b) => b, "Unknown")}
           storageKey="traffic-browsers"

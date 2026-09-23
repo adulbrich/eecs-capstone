@@ -122,6 +122,34 @@ describe("the traffic writer", () => {
     expect(rows).toHaveLength(0);
   });
 
+  it("drops an event gone stale waiting for its salt, so the rollup cannot miss it", async () => {
+    const { rows, store } = fakeStore();
+    const times = [0, 31_000].map(
+      (ms) => new Date(Date.UTC(2026, 8, 22, 18) + ms)
+    );
+    const handle = createTrafficWriter({
+      now: () => times.shift() ?? new Date(),
+      store,
+      trustedProxies: ["10.0.0.0/16"],
+    });
+    expect((await handle(post())).status).toBe(204);
+    expect(rows).toHaveLength(0);
+  });
+
+  it("keeps an event whose salt arrives within the allowed lag", async () => {
+    const { rows, store } = fakeStore();
+    const times = [0, 29_000].map(
+      (ms) => new Date(Date.UTC(2026, 8, 22, 18) + ms)
+    );
+    const handle = createTrafficWriter({
+      now: () => times.shift() ?? new Date(),
+      store,
+      trustedProxies: ["10.0.0.0/16"],
+    });
+    await handle(post());
+    expect(rows).toHaveLength(1);
+  });
+
   it("answers 204 when the client hangs up mid-body", async () => {
     const { rows, store } = fakeStore();
     const aborted = new Request("http://eecs.example/api/traffic", {

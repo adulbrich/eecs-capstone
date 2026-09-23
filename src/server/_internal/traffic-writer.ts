@@ -15,6 +15,7 @@ import {
   viewerCountry,
   visitorHash,
 } from "#/lib/_internal/traffic-request";
+import { MAX_EVENT_LAG_MS } from "#/lib/_internal/traffic-timing";
 import { localDay } from "#/lib/day-range";
 
 /**
@@ -128,14 +129,18 @@ export function createTrafficWriter({
     try {
       const at = now();
       const agent = describeAgent(userAgent);
+      const hash = visitorHash(await store.salt(localDay(at)), address, agent);
+      // A salt load stuck behind a rotation can take a while. An event this
+      // stale might commit after the rollup has closed its day, where it
+      // would be lost without a trace, so it is dropped here instead
+      // (traffic-timing.ts).
+      if (now().getTime() - at.getTime() > MAX_EVENT_LAG_MS) {
+        return noContent();
+      }
       await store.insert({
         occurredAt: at,
         kind: body.kind,
-        visitorHash: visitorHash(
-          await store.salt(localDay(at)),
-          address,
-          agent
-        ),
+        visitorHash: hash,
         pathname: body.pathname,
         search: body.search ?? null,
         referrerHost: referrerHost(body.referrer, new URL(request.url).host),

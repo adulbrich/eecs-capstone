@@ -1,13 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
+import { DAY_PATTERN } from "#/lib/report-range";
 
 export const trafficInputSchema = z
   .object({
     // Calendar days in the office's zone, inclusive, as the inputs speak them.
-    from: z.string().regex(DATE),
-    to: z.string().regex(DATE),
+    from: z.string().regex(DAY_PATTERN),
+    to: z.string().regex(DAY_PATTERN),
   })
   .refine((v) => v.from <= v.to, { message: "from must not be after to" });
 

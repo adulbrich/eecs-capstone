@@ -1,6 +1,7 @@
 import { type SQL, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { requireUser } from "#/lib/_internal/auth-guards";
+import { ROLLUP_SETTLE_MS } from "#/lib/_internal/traffic-timing";
 import { comparisonPeriods, localDay, shiftDay } from "#/lib/day-range";
 import {
   TRAFFIC_FILTERS,
@@ -29,12 +30,11 @@ import type { TrafficInput } from "../traffic";
 const GAP = sql.raw("interval '30 minutes'");
 
 /**
- * How long after local midnight a day counts as closed. An event's time is
- * taken before its insert commits, so one handled at 23:59:59 can land a
- * moment after midnight; rolling a day up only once this has passed keeps
- * such an event inside its day's rollup.
+ * How long after local midnight a day counts as closed. An event is stamped
+ * before its insert commits, so one handled at 23:59:59 lands a moment after
+ * midnight; `traffic-timing.ts` bounds how long that moment can be.
  */
-const SETTLE_MS = 2 * 60 * 1000;
+const SETTLE_MS = ROLLUP_SETTLE_MS;
 
 /** The first day not yet closed at `now`: every earlier day is final. */
 export function openFrom(now: Date): string {
