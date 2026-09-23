@@ -114,9 +114,9 @@ for (const code of ["user_info_is_missing", "not_a_known_code"]) {
  *
  * The page scan sees only the address step, because the later ones are behind
  * a real send. The code step therefore reaches no clean scan unless one drives
- * it, and it is the one most likely to go wrong: it is the only input in the
- * app with `inputMode="numeric"` and a `maxLength`, and its instruction sits in
- * a paragraph the label does not point at.
+ * it, and it is the one most likely to go wrong: it is the only one-time-code
+ * field in the app, drawn as six slots over one real input (#600), and a wrong
+ * code marks every slot `aria-invalid`. Both states are scanned.
  *
  * The name step is scanned in the same test rather than its own, because each
  * test is a real send to one address in light and dark alike, and that address
@@ -135,7 +135,21 @@ test("@smoke sign-in page, the emailed code form", async ({ page }) => {
   await expect(page.getByLabel("Code", { exact: true })).toBeVisible();
   await checkA11y(page);
 
-  await page.route("**/api/auth/email-otp/check-verification-otp", (route) =>
+  const check = "**/api/auth/email-otp/check-verification-otp";
+  await page.route(check, (route) =>
+    route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "INVALID_OTP", message: "Invalid OTP" }),
+    })
+  );
+  await page.getByLabel("Code", { exact: true }).fill("000000");
+  await page.getByRole("button", { name: "Confirm code" }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  await checkA11y(page);
+  await page.unroute(check);
+
+  await page.route(check, (route) =>
     route.fulfill({
       status: 400,
       contentType: "application/json",

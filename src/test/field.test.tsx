@@ -74,6 +74,12 @@ describe("FieldError", () => {
     expect(screen.getByRole("alert").textContent).toBe("Required");
   });
 
+  // What a field's `aria-describedby` points at, as the sign-in code does.
+  it("carries the id it was given", () => {
+    render(<FieldError id="code-otp-error" message="Could not save" />);
+    expect(screen.getByRole("alert").id).toBe("code-otp-error");
+  });
+
   // An empty alert sitting in the DOM would announce on every later change,
   // which is why nothing renders rather than an empty paragraph.
   it("leaves no empty alert behind when there is nothing to say", () => {

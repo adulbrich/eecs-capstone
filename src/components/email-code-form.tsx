@@ -1,8 +1,14 @@
 import { Link, useNavigate } from "@tanstack/react-router";
+import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { useState } from "react";
 import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "#/components/ui/input-otp";
 import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
 
@@ -51,6 +57,22 @@ type Step = "address" | "code" | "name";
  */
 
 const CODE_LENGTH = 6;
+
+/** One slot per digit, as indexes for `InputOTPSlot`. */
+const SLOTS = Array.from({ length: CODE_LENGTH }, (_, index) => index);
+
+const NON_DIGITS = /\D/g;
+
+/**
+ * A pasted `482 193` or `482-193`, as `482193`.
+ *
+ * Without this the digits-only pattern rejects the whole paste and enters
+ * nothing, and before #600 a plain `maxLength` input kept `482 19` and spent a
+ * guess on it.
+ */
+function digitsOnly(pasted: string): string {
+  return pasted.replace(NON_DIGITS, "");
+}
 
 /** Written and read back to find out whether this browser keeps cookies. */
 const COOKIE_PROBE = "capstone_cookie_probe";
@@ -226,11 +248,20 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
   }
 
   if (step === "code") {
+    // Digits stay after a wrong code: with three guesses per code, somebody
+    // who swapped two digits can fix them rather than retype all six.
+    const invalid = error !== null;
     return (
       <form className="mt-6 space-y-4" key="code" onSubmit={checkCode}>
         <div className="space-y-1.5">
           <Label htmlFor="code-otp">Code</Label>
-          <Input
+          {/* No `onComplete` submit: that would spend a guess on a typo
+              nobody saw, and changes context on input (WCAG 3.2.2). */}
+          <InputOTP
+            aria-describedby={
+              invalid ? "code-otp-hint code-otp-error" : "code-otp-hint"
+            }
+            aria-invalid={invalid}
             // `one-time-code` is what lets a phone offer the code from the
             // message rather than making the person retype it.
             autoComplete="one-time-code"
@@ -238,15 +269,25 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
             inputMode="numeric"
             maxLength={CODE_LENGTH}
             name="code"
-            placeholder="123456"
+            pasteTransformer={digitsOnly}
+            pattern={REGEXP_ONLY_DIGITS}
             required
-            type="text"
-          />
-          <p className="text-muted-foreground text-sm">
+          >
+            <InputOTPGroup>
+              {SLOTS.map((index) => (
+                <InputOTPSlot
+                  aria-invalid={invalid}
+                  index={index}
+                  key={index}
+                />
+              ))}
+            </InputOTPGroup>
+          </InputOTP>
+          <p className="text-muted-foreground text-sm" id="code-otp-hint">
             We sent a code to {email}. It expires in five minutes.
           </p>
         </div>
-        <FieldError message={error} />
+        <FieldError id="code-otp-error" message={error} />
         <Button className="w-full" disabled={loading} type="submit">
           {loading ? "Checking..." : "Confirm code"}
         </Button>

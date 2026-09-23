@@ -46,9 +46,13 @@ function errorText(e: unknown): string {
  * `never` admits `undefined`. That costs nothing at runtime: `??` reads it as
  * absent and `errors` wins, which is the branch such a caller meant.
  */
-type FieldErrorProps =
+type FieldErrorProps = (
   | { errors: readonly unknown[]; message?: never }
-  | { message: unknown; errors?: never };
+  | { message: unknown; errors?: never }
+) & {
+  /** For a field that points `aria-describedby` at its error. */
+  id?: string;
+};
 
 /**
  * What a form says when it worked, under that form's own submit button.
@@ -95,7 +99,7 @@ const SAVED_COLOR = { color: "var(--status-success)" };
  * fifty-nine call sites that replaced a hand-written paragraph turned out to
  * need a different one.
  */
-function FieldError({ errors, message }: FieldErrorProps) {
+function FieldError({ errors, id, message }: FieldErrorProps) {
   const blank = message === null || message === undefined || message === "";
   const items = errors ?? (blank ? [] : [message]);
   if (items.length === 0) {
@@ -105,6 +109,7 @@ function FieldError({ errors, message }: FieldErrorProps) {
     <p
       className="mt-1 text-destructive text-sm"
       data-slot="field-error"
+      id={id}
       role="alert"
     >
       {items.map(errorText).join(", ")}

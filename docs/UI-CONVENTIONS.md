@@ -244,6 +244,13 @@ every input an `id` that the `Label`'s `htmlFor` matches, and render errors with
 </div>
 ```
 
+**A one-time code is `InputOTP`, not `Input`** (`#/components/ui/input-otp`,
+#600). Put the `id`, `name`, `autoComplete="one-time-code"` and `aria-*` on
+`InputOTP`, which hands them to the one real input under the slots, and pass
+`aria-invalid` to each `InputOTPSlot` as well, since the slots are what shows
+the red border. Keep a submit button: no `onComplete` auto-submit, which spends
+a guess on a typo nobody saw and changes context on input (WCAG 3.2.2).
+
 **On the project and inventory forms, field labels are Title Case; nothing
 else is.** "Problem Statement", "Contact Email", "Private Notes". A checkbox
 label is a sentence and stays one. Page headings, section headings, table

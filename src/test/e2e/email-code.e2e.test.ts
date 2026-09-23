@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
@@ -177,8 +177,14 @@ test.describe("refusals on the emailed code", () => {
 
     try {
       const code = await startCodeStep(page, email);
+      const field = page.getByLabel("Code", { exact: true });
 
-      await page.getByLabel("Code", { exact: true }).fill("000000");
+      // Digits only (#600). A letter enters nothing rather than a character
+      // the server will refuse at the cost of a guess.
+      await field.pressSequentially("a");
+      await expect(field).toHaveValue("");
+
+      await field.fill("000000");
       await page.getByRole("button", { name: "Confirm code" }).click();
 
       const alert = page.getByRole("alert");
@@ -187,12 +193,19 @@ test.describe("refusals on the emailed code", () => {
       // this step has the same answer, and the server cannot tell them apart.
       await expect(alert).toContainText(/ask for a new code/i);
       // Still on the code step rather than thrown back to the address, which
-      // is what makes a mistyped digit recoverable.
-      await expect(page.getByLabel("Code", { exact: true })).toBeVisible();
+      // is what makes a mistyped digit recoverable. The digits stay so one
+      // can be fixed, and the field says it was refused.
+      await expect(field).toHaveValue("000000");
+      await expect(field).toHaveAttribute("aria-invalid", "true");
 
       // And the real code still works. One wrong guess must not cost the
-      // person the code they were sent.
-      await page.getByLabel("Code", { exact: true }).fill(code);
+      // person the code they were sent. Pasted with a space in it, through a
+      // real paste event: `fill()` never fires one, so it would pass with the
+      // `pasteTransformer` removed, and without that the digits-only pattern
+      // rejects the whole paste.
+      await field.fill("");
+      await pasteInto(field, `${code.slice(0, 3)} ${code.slice(3)}`);
+      await expect(field).toHaveValue(code);
       await page.getByRole("button", { name: "Confirm code" }).click();
       await page.getByLabel("Your name", { exact: true }).fill("Mistyped Once");
       await page.getByRole("button", { name: "Create account" }).click();
@@ -369,6 +382,25 @@ async function sendFrom(page: Page, email: string): Promise<string> {
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByRole("button", { name: "Email me a code" }).click();
   return await emailCode(email, sentAt);
+}
+
+/**
+ * Pastes `text` into `field` the way a clipboard does, so the field's own
+ * paste handling runs. `fill()` sets the value directly and skips it.
+ */
+async function pasteInto(field: Locator, text: string): Promise<void> {
+  await field.focus();
+  await field.evaluate((element, pasted) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", pasted);
+    element.dispatchEvent(
+      new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: data,
+      })
+    );
+  }, text);
 }
 
 /** Moves a live code's expiry into the past, which no click can do. */
