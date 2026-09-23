@@ -51,7 +51,7 @@ const POOL_MAX = 45;
  * open: its 0.25 vCPU was saturated serving the burst while it opened TLS
  * connections to RDS, and a connect past `ACQUIRE_TIMEOUT_MS` fails the
  * request. `min` exempts the first five from the idle timeout, so a lull no
- * longer closes them; `warmPool` opens them at boot, because `min` alone
+ * longer closes them; `warmPool` opens them on the task's first request, because `min` alone
  * never opens anything. Nothing reopens one that drops (an RDS failover or
  * reboot): pg-pool removes it and the floor refills only as demand opens
  * connections again, so the first burst after a drop can start below five.
@@ -91,12 +91,13 @@ export function poolConfig(
 
 /**
  * Opens `count` clients at once, `POOL_MIN` unless a test says otherwise, and
- * hands them back, so the pool holds that many idle and `min` keeps them. At once rather than in a loop: a
- * connect-then-release loop gets the same idle client back every time and
- * leaves one open. Never throws, because a task that cannot reach the
- * database at boot should still come up and answer `/api/healthz`; a failed
- * connect is one line, redacted (ADR-0042), and the pool opens the missing
- * clients on demand as it did before.
+ * hands them back, so the pool holds that many idle and `min` keeps them.
+ * At once rather than in a loop: a connect-then-release loop gets the same
+ * idle client back every time and leaves one open. Never throws, because a
+ * task that cannot reach the database should still answer `/api/healthz`,
+ * and nothing awaits this call to catch it; a failed connect is one line,
+ * redacted (ADR-0042), and the pool opens the missing clients on demand as it
+ * did before.
  */
 export async function warmPool(
   pool: { connect: () => Promise<{ release: () => void }> },

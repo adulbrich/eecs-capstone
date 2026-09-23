@@ -346,6 +346,12 @@ describe("warmPool", () => {
     expect(logged[0]).toContain("ECONNREFUSED");
   });
 
+  it("opens the floor by default, the count production passes", async () => {
+    const pool = countingPool();
+    await warmPool(pool, undefined, () => undefined);
+    expect(pool.stats()).toEqual({ peak: POOL_MIN, released: POOL_MIN });
+  });
+
   it("says nothing when every client opened", async () => {
     const logged: string[] = [];
     await warmPool(countingPool(), 5, (line) => logged.push(line));
