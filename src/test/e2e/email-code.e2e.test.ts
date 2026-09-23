@@ -105,7 +105,7 @@ test.describe("@smoke signing in with an emailed code", () => {
  * where the redirect is the server's answer to a plain request, which is what a
  * bookmark or a link in an old message sends.
  */
-test.describe("@smoke the old sign-up address", () => {
+test.describe("@smoke the old /sign-up path", () => {
   test("forwards to /sign-in with nothing added", async ({ page }) => {
     await page.goto("/sign-up");
     const url = new URL(page.url());

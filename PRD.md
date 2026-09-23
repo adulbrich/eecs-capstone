@@ -62,12 +62,9 @@ For developer setup, architecture notes, and the active roadmap, see
   the mentors admin surface (see §14).
 - [x] Privacy policy at `/privacy`: a short public page, static in the repo,
   stating what the app collects, that published projects stay public, and what
-  closing an account removes and keeps. Linked, as a notice rather than a
-  checkbox (nothing is recorded), from `/sign-in` in two places: the page, in
-  words true for a returning visitor as well, since a first ONID or GitHub
-  sign-in creates an account; and the code form's name step, the one moment a
-  code creates one. Also linked from the profile page. No footer and no
-  separate terms document. (#91, #586)
+  closing an account removes and keeps. Linked from `/sign-in` and its code
+  form's name step (as a notice, not a checkbox; nothing is recorded), and the
+  profile page. No footer and no separate terms document. (#91, #586)
 - [x] Self-service account deletion from the profile page, behind a dialog that
   states what stays and requires the person to type their own email. The `user`
   row is anonymized in place rather than deleted, because authorship and audit
