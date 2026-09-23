@@ -1,5 +1,6 @@
 import {
   and,
+  asc,
   desc,
   eq,
   ilike,
@@ -41,6 +42,7 @@ import { HARD_DELETE_HISTORY_REFUSAL } from "#/lib/inventory-workflow";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type {
   CreateInventoryItemInput,
+  InventoryOrder,
   ListAdminInventoryInput,
   ListInventoryInput,
   UpdateInventoryItemInput,
@@ -135,6 +137,26 @@ const categoriesForItem = sql<ItemCategory[]>`coalesce((
   WHERE iic.item_id = ${inventoryItems.id}
 ), '[]'::json)`;
 
+const lowerName = sql`lower(${inventoryItems.name})`;
+
+/**
+ * Each ordering's own keys. `listInventoryAs` appends `inventoryItems.id` to
+ * every one, so paging stays total however many items tie: see "Paging a
+ * listing needs a total ordering" in docs/QUIRKS.md (#477). A `Record` keyed
+ * by the union, so a new ordering does not compile until it has keys here.
+ *
+ * `status` sorts by the enum's declaration order, which is the lifecycle
+ * order `INVENTORY_ITEM_STATUSES` lists and `statusRank` reads: available
+ * first, retired (staff only) last. Names sort on `lower(name)` so
+ * "arduino" does not follow "Zebra board". Both columns are `NOT NULL`, so
+ * none of these needs a nulls rule.
+ */
+const INVENTORY_ORDER_BY: Record<InventoryOrder, SQL[]> = {
+  available: [asc(inventoryItems.status), asc(lowerName)],
+  name: [asc(lowerName)],
+  updated: [desc(inventoryItems.updatedAt)],
+};
+
 export async function listInventoryAs(
   viewer: Viewer,
   data: ListInventoryInput
@@ -162,7 +184,7 @@ export async function listInventoryAs(
     .from(inventoryItems)
     .leftJoin(user, eq(inventoryItems.currentHolderId, user.id))
     .where(where)
-    .orderBy(desc(inventoryItems.updatedAt))
+    .orderBy(...INVENTORY_ORDER_BY[data.order], inventoryItems.id)
     .limit(data.pageSize)
     .offset(offset);
 
