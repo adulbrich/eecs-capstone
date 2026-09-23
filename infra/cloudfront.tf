@@ -52,7 +52,7 @@ data "aws_cloudfront_origin_request_policy" "all_viewer_and_cloudfront" {
 # App distribution: dynamic SSR origin (the ALB via VPC origin). On the
 # default behavior, caching is disabled and all viewer headers/cookies/query
 # are forwarded, plus CloudFront's own headers, CloudFront-Viewer-Country
-# among them, which the traffic writer reads (#590). The viewer headers are
+# among them, for the traffic writer (#591). The viewer headers are
 # load-bearing: without a policy that forwards them CloudFront drops Referer
 # and replaces User-Agent, and Better Auth's origin check needs Host, Origin
 # and Referer unchanged. A separate ordered_cache_behavior below caches
