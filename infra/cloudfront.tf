@@ -45,13 +45,17 @@ data "aws_cloudfront_cache_policy" "caching_optimized" {
   name = "Managed-CachingOptimized"
 }
 
-data "aws_cloudfront_origin_request_policy" "all_viewer" {
-  name = "Managed-AllViewer"
+data "aws_cloudfront_origin_request_policy" "all_viewer_and_cloudfront" {
+  name = "Managed-AllViewerAndCloudFrontHeaders-2022-06"
 }
 
 # App distribution: dynamic SSR origin (the ALB via VPC origin). On the
 # default behavior, caching is disabled and all viewer headers/cookies/query
-# are forwarded. A separate ordered_cache_behavior below caches /assets/* on
+# are forwarded, plus CloudFront's own headers, CloudFront-Viewer-Country
+# among them, which the traffic writer reads (#590). The viewer headers are
+# load-bearing: without a policy that forwards them CloudFront drops Referer
+# and replaces User-Agent, and Better Auth's origin check needs Host, Origin
+# and Referer unchanged. A separate ordered_cache_behavior below caches /assets/* on
 # Managed-CachingOptimized; never widen that path_pattern beyond hashed build
 # output, since CachingOptimized's one-second minimum TTL caches even when
 # the origin sends no-cache.
@@ -76,7 +80,7 @@ resource "aws_cloudfront_distribution" "app" {
     allowed_methods          = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
     cached_methods           = ["GET", "HEAD"]
     cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
-    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer.id
+    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_and_cloudfront.id
   }
 
   # Hashed build output only. Managed-CachingOptimized enables gzip and brotli
@@ -89,8 +93,9 @@ resource "aws_cloudfront_distribution" "app" {
   # minimum and rewrites Host to the origin domain, which is safe because the
   # ALB listener (infra/ecs.tf:30) forwards unconditionally to one target group
   # with no host-header conditions and Nitro's static handler never reads Host.
-  # Do not copy Managed-AllViewer from the default behavior: forwarding every
-  # cookie on a behavior whose purpose is to avoid the origin is pure overhead.
+  # Do not copy the default behavior's origin request policy: forwarding every
+  # cookie and header on a behavior whose purpose is to avoid the origin is
+  # pure overhead.
   #
   # Never widen this path_pattern. CachingOptimized has a 1s minimum TTL, which
   # caches even when the origin sends no-cache, no-store, or private. Harmless
