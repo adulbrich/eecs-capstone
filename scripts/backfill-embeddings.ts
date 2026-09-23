@@ -36,6 +36,7 @@ async function main() {
     cleared: 0,
     failed: 0,
     skipped: 0,
+    superseded: 0,
     unchanged: 0,
     updated: 0,
   };
@@ -51,7 +52,7 @@ async function main() {
     // under-sleeps and is the safe direction. "unchanged" and "skipped" never
     // reach Bedrock at all, and delaying those would add two minutes to a
     // sweep that does nothing.
-    if (outcome === "updated" || outcome === "failed") {
+    if (outcome === "updated" || outcome === "failed" || outcome === "superseded") {
       await sleep(DELAY_MS);
     }
   }

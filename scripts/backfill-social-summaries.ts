@@ -70,6 +70,7 @@ async function main() {
     failed: 0,
     manual: 0,
     skipped: 0,
+    superseded: 0,
     unchanged: 0,
     updated: 0,
   };
@@ -82,7 +83,7 @@ async function main() {
     // throttled call fails in milliseconds, so sleeping only on success lets
     // exactly the run being throttled burst through every row. The other three
     // outcomes never reach Bedrock at all.
-    if (outcome === "updated" || outcome === "failed") {
+    if (outcome === "updated" || outcome === "failed" || outcome === "superseded") {
       await sleep(DELAY_MS);
     }
   }

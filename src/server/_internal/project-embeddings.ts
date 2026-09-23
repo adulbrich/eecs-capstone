@@ -20,7 +20,7 @@
  * The statement the pin compares is the skip inside `refreshProjectEmbedding`.
  * Change it and the script has to change with it, in the same commit.
  */
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, type SQL } from "drizzle-orm";
 import { db } from "#/db";
 import { projects, userInterests } from "#/db/schema";
 import {
@@ -33,16 +33,65 @@ import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import {
   buildInterestsEmbeddingSource,
   buildProjectEmbeddingSource,
+  type EmbeddableProject,
   embeddingHash,
 } from "#/lib/embedding-source";
+import type { SocialSummarySourceProject } from "#/lib/social-summary-source";
 import type { ProjectStatus } from "#/lib/vocabularies";
 
 export type RefreshOutcome =
   | "skipped"
   | "unchanged"
   | "updated"
+  | "superseded"
   | "cleared"
   | "failed";
+
+type GuardedColumn =
+  | keyof EmbeddableProject
+  | keyof SocialSummarySourceProject
+  | "socialSummary";
+
+/**
+ * A WHERE clause that holds only while the row still reads what a refresh
+ * read. The refresh runs after the save has answered (ADR-0053), so a second
+ * edit can commit on another task during the model call, and without this the
+ * slower refresh would pair the newer text with a vector or summary of the
+ * older one. The late write matches nothing instead, and the edit that won
+ * has started a refresh of its own.
+ */
+export function rowStillReads(
+  project: typeof projects.$inferSelect,
+  columns: readonly GuardedColumn[]
+): SQL | undefined {
+  return and(
+    eq(projects.id, project.id),
+    ...columns.map((column) => {
+      const value = project[column];
+      return value === null
+        ? isNull(projects[column])
+        : eq(projects[column], value);
+    })
+  );
+}
+
+/**
+ * Every field `buildProjectEmbeddingSource` reads. A `Record` rather than a
+ * list, so a field added to `EmbeddableProject` fails to compile here until
+ * the write guards it too.
+ */
+const EMBEDDED_TEXT: Record<keyof EmbeddableProject, true> = {
+  title: true,
+  description: true,
+  problemStatement: true,
+  objectives: true,
+  minQualifications: true,
+  prefQualifications: true,
+  licenseRestrictions: true,
+};
+const EMBEDDED_TEXT_COLUMNS = Object.keys(
+  EMBEDDED_TEXT
+) as (keyof EmbeddableProject)[];
 
 /**
  * The statuses that carry an embedding. `refreshProjectEmbedding` gates on it,
@@ -124,15 +173,16 @@ export async function refreshProjectEmbedding(
     }
 
     const vector = await embed(source);
-    await db
+    const written = await db
       .update(projects)
       .set({
         embedding: vector,
         embeddingSourceHash: hash,
         embeddingUpdatedAt: new Date(),
       })
-      .where(eq(projects.id, projectId));
-    return "updated";
+      .where(rowStillReads(project, EMBEDDED_TEXT_COLUMNS))
+      .returning({ id: projects.id });
+    return written.length > 0 ? "updated" : "superseded";
   } catch (error) {
     // Never surfaced to the caller: the publish or save already succeeded.
     console.error(

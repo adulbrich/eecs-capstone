@@ -337,6 +337,78 @@ describe("refreshSocialSummary", () => {
     expect((await readRow(id)).socialSummary).toBe("Published late.");
   });
 
+  it("keeps the last save's summary when a second save lands during the first's model call", async () => {
+    const admin = await makeAdmin(nextEmail());
+    const { id } = await createProjectAs(admin, baseProject("Overlap"));
+    await publish(admin, id, fakeModel("Before."));
+
+    const { model, release } = heldModel("Of the first text.");
+    try {
+      await updateProjectAs(
+        admin,
+        { ...baseProject("Overlap"), id, description: "First text." },
+        undefined,
+        model
+      );
+      await updateProjectAs(
+        admin,
+        { ...baseProject("Overlap"), id, description: "Second text." },
+        undefined,
+        fakeModel("Of the second text.")
+      );
+    } finally {
+      release();
+    }
+    await settleProjectRefreshes();
+    expect((await readRow(id)).socialSummary).toBe("Of the second text.");
+  });
+
+  it("writes nothing when the text changes during the model call, as a save on another task would", async () => {
+    // The queue orders refreshes on one task only. On two, the slower refresh
+    // would otherwise pair the newer text with a summary of the older.
+    const admin = await makeAdmin(nextEmail());
+    const { id } = await createProjectAs(admin, baseProject("Two tasks"));
+    await publish(admin, id, fakeModel("Before."));
+    await db
+      .update(projects)
+      .set({ description: "Text the model is shown." })
+      .where(eq(projects.id, id));
+
+    const editsMidCall: ResponsesFn = async (body) => {
+      await db
+        .update(projects)
+        .set({ description: "Text saved during the call." })
+        .where(eq(projects.id, id));
+      return fakeModel("Of the text the model was shown.")(body);
+    };
+
+    expect(await refreshSocialSummary(id, editsMidCall)).toBe("superseded");
+    expect((await readRow(id)).socialSummary).toBe("Before.");
+  });
+
+  it("loses to a Regenerate that lands during the model call", async () => {
+    const admin = await makeAdmin(nextEmail());
+    const { id } = await createProjectAs(admin, baseProject("Regenerated"));
+    await publish(admin, id, fakeModel("Before."));
+    await db
+      .update(projects)
+      .set({ description: "Changed text." })
+      .where(eq(projects.id, id));
+
+    const regeneratesMidCall: ResponsesFn = async (body) => {
+      await db
+        .update(projects)
+        .set({ socialSummary: "What Regenerate wrote." })
+        .where(eq(projects.id, id));
+      return fakeModel("What the background refresh wrote.")(body);
+    };
+
+    expect(await refreshSocialSummary(id, regeneratesMidCall)).toBe(
+      "superseded"
+    );
+    expect((await readRow(id)).socialSummary).toBe("What Regenerate wrote.");
+  });
+
   it("skips while the kill switch is off", async () => {
     const admin = await makeAdmin(nextEmail());
     const { id } = await createProjectAs(admin, baseProject("Switched off"));

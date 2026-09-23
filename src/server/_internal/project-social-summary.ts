@@ -6,9 +6,10 @@ import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import { socialSummariesEnabled } from "#/lib/_internal/social-summary-flag";
 import {
   buildSocialSummarySource,
+  type SocialSummarySourceProject,
   socialSummaryHash,
 } from "#/lib/social-summary-source";
-import { isEmbeddableStatus } from "./project-embeddings";
+import { isEmbeddableStatus, rowStillReads } from "./project-embeddings";
 import {
   buildSocialSummaryConfig,
   runSocialSummary,
@@ -21,7 +22,24 @@ export type SocialSummaryOutcome =
   | "manual"
   | "unchanged"
   | "updated"
+  | "superseded"
   | "failed";
+
+/**
+ * Every field `buildSocialSummarySource` reads, plus the summary itself, so a
+ * Regenerate that lands during the model call wins over the background
+ * refresh. A `Record` so a new source field fails to compile until it is
+ * guarded here.
+ */
+const SUMMARY_TEXT: Record<keyof SocialSummarySourceProject, true> = {
+  title: true,
+  description: true,
+  problemStatement: true,
+};
+const SUMMARY_GUARD_COLUMNS = [
+  ...(Object.keys(SUMMARY_TEXT) as (keyof SocialSummarySourceProject)[]),
+  "socialSummary",
+] as const;
 
 /**
  * The single writer of a project's social summary.
@@ -120,12 +138,12 @@ export async function refreshSocialSummary(
       })
       .where(
         and(
-          eq(projects.id, projectId),
+          rowStillReads(project, SUMMARY_GUARD_COLUMNS),
           eq(projects.socialSummaryIsManual, false)
         )
       )
       .returning({ id: projects.id });
-    return written.length > 0 ? "updated" : "manual";
+    return written.length > 0 ? "updated" : "superseded";
   } catch (error) {
     console.error(
       `Social summary failed for project ${projectId}`,

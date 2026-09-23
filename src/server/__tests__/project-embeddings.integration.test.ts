@@ -126,6 +126,25 @@ describe("refreshProjectEmbedding", () => {
    * hash alone treats the row as up to date and never embeds it. The app and
    * both sweepers test the vector as well as the hash, for this row.
    */
+  it("writes nothing when the text changes during the Bedrock call, as a save on another task would", async () => {
+    const admin = await makeAdmin(`race-${Date.now()}@x.com`);
+    const { id } = await createProjectAs(admin, baseProject("Two tasks"));
+    await publish(admin, id);
+
+    const editsMidCall = vi.fn(async () => {
+      await db
+        .update(projects)
+        .set({ description: "Text saved during the call." })
+        .where(eq(projects.id, id));
+      return VECTOR;
+    });
+
+    expect(await refreshProjectEmbedding(id, editsMidCall)).toBe("superseded");
+    const row = await readRow(id);
+    expect(row.embedding).toBeNull();
+    expect(row.embeddingSourceHash).toBeNull();
+  });
+
   it("re-embeds a row whose hash is current but whose vector is gone", async () => {
     const admin = await makeAdmin(`nv-${Date.now()}@x.com`);
     const { id } = await createProjectAs(admin, baseProject("Live"));
