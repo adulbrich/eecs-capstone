@@ -26,7 +26,10 @@ grow it. Chosen by the maintainer on 2026-09-22.
 
 ## Consequences
 
-The TTL is off unless the variable is set, and only `infra/ecs.tf` sets it. The
+The TTL is off unless the variable is set, and only `infra/ecs.tf` sets it, so
+it reaches production through `terraform apply` followed by a deploy; the
+deploy workflow copies the latest task definition, and a deploy alone leaves
+the cache off without any error. The
 E2E and accessibility suites insert categories and programs straight into the
 database behind a running server, the same "other task" case the trade accepts,
 and would read a stale listing; turning the cache on for them would need a way

@@ -23,8 +23,10 @@ if (!databaseUrl) {
 const pool = new Pool(poolConfig(databaseUrl));
 logPoolErrors(pool);
 
-// Production only: the line lands in CloudWatch as a metric there, and in a
-// dev console it would be one line of noise a minute (#558).
+// Production builds only, `npm run start` and the E2E server included: Nitro
+// inlines NODE_ENV when it builds, so this is decided then, not at runtime.
+// The line lands in CloudWatch as a metric in production, and in a dev console
+// it would be one line of noise a minute (#558).
 if (process.env.NODE_ENV === "production") {
   startPoolMetrics(pool);
 }

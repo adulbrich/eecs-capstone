@@ -15,8 +15,10 @@
  * `infra/ecs.tf` turns it on in production.
  *
  * Caches the promise rather than the value, so a burst of cold misses on one
- * task shares one read instead of each taking a connection. A rejected load
- * is dropped at once, so a failed query is never served from the cache.
+ * task shares one read instead of each taking a connection. The burst shares
+ * the outcome too: if that read fails, every caller waiting on it gets the
+ * same rejection. Once it has failed it is dropped, so the next caller reads
+ * again rather than being handed the failure.
  */
 
 const DIGITS = /^\d+$/;

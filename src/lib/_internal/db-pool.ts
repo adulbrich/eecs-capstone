@@ -162,12 +162,14 @@ const EMF_MAX_VALUES = 100;
  * from `query`. A queue that forms and drains between two samples is missed.
  *
  * A line holds the samples of one calendar minute and is stamped with that
- * minute's start, so every minute a task was up gets exactly one datapoint in
- * the minute it describes. Emitting every sixtieth tick instead let timer drift
- * skip a minute, and under `notBreaching` a skipped minute resets the alarm's
- * two-in-a-row count; it also split one short queue across two lines, which
- * read as two minutes of queueing. The line for a minute goes out on the first
- * tick of the next, and a document that would pass EMF's cap goes out early.
+ * minute's start, so each full minute a task was up gets one datapoint in the
+ * minute it describes. Emitting every sixtieth tick instead stamped a minute of
+ * samples with whichever minute the sixtieth landed in, and let timer drift
+ * leave a minute empty or give it two lines. The line for a minute goes out on
+ * the first tick of the next, and a document that would pass EMF's cap goes
+ * out early. Nothing flushes on shutdown, so a task's last partial minute is
+ * lost; the alarm needs two minutes in a row, so that minute can neither fire
+ * it nor clear it.
  *
  * The interval is unref'd so a script that imports `#/db` still exits when
  * its work is done.
