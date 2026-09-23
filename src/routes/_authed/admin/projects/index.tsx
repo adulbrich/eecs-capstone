@@ -291,6 +291,32 @@ const COLUMNS = defineAdminColumns<Row>()([
     sortUndefined: "last",
   },
   {
+    // Drawn like Proposer and sorted like it, on the name alone. An address
+    // with no account is what a mentor recorded before signing up looks
+    // like, and the bare address under no name is the only marker it needs.
+    accessorFn: (row) => row.mentorName ?? undefined,
+    cell: ({ row }) => {
+      const { mentorEmail, mentorName } = row.original;
+      if (!mentorEmail) {
+        return "-";
+      }
+      if (!mentorName) {
+        return mentorEmail;
+      }
+      return (
+        <div className="leading-tight">
+          <span className="block">{mentorName}</span>
+          <span className="block text-muted-foreground text-xs">
+            {mentorEmail}
+          </span>
+        </div>
+      );
+    },
+    header: "Mentor",
+    id: "mentor",
+    sortUndefined: "last",
+  },
+  {
     // The same course ids the public table and the card meta line show, so
     // the two listings read alike (#462).
     accessorFn: (row) => programCourseIds(row) ?? undefined,
@@ -458,9 +484,14 @@ const EXPORT_COLUMNS = defineCsvColumns<ExportRow>()([
     key: "studentProposed",
     value: (row) => row.studentProposed,
   },
-  // The resolved name, not the address: the export reads the same projection
-  // the public listing does, and mentorEmail is not in it. See #75.
+  // The resolved name and the stored address, as the Mentor column shows
+  // them. The name alone left a mentor with no account blank (#75, #617).
   { header: "Mentor", key: "mentorName", value: (row) => row.mentorName },
+  {
+    header: "Mentor email",
+    key: "mentorEmail",
+    value: (row) => row.mentorEmail,
+  },
   { header: "Created", key: "createdAt", value: (row) => row.createdAt },
   { header: "Published", key: "publishedAt", value: (row) => row.publishedAt },
   { header: "Archived", key: "archivedAt", value: (row) => row.archivedAt },
@@ -872,7 +903,7 @@ function AdminProjects() {
             value={queryDraft}
           />
           <SearchHint
-            fields="titles, descriptions, problem statements, objectives, qualifications, contacts and proposers"
+            fields="titles, descriptions, problem statements, objectives, qualifications, contacts, proposers and mentors"
             id={SEARCH_HINT_ID}
             query={q}
           />

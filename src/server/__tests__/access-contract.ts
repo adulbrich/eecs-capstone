@@ -274,7 +274,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
 
   "server/projects-queries.ts:exportAdminProjects": {
     level: "staff",
-    note: "Reads adminProjectSummarySelect, which carries proposer identity and contactEmail, and then adds `notes` in its own select rather than through the shared one. `notes` is the staff-only field this gate exists for, and adding it here is what keeps it out of the listing that shares the projection.",
+    note: "Reads adminProjectSummarySelect, which carries proposer identity, the mentor address and name, and contactEmail, and then adds `notes` in its own select rather than through the shared one. `notes` is the staff-only field this gate exists for, and adding it here is what keeps it out of the listing that shares the projection.",
   },
   "server/projects-queries.ts:getProject": {
     level: "public",
@@ -290,7 +290,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
   },
   "server/projects-queries.ts:listAdminProjects": {
     level: "staff",
-    note: "Reads adminProjectSummarySelect, so it carries proposerEmail and contactEmail both. Staff is what keeps the first out of a public read.",
+    note: "Reads adminProjectSummarySelect, so it carries proposerEmail, mentorEmail and contactEmail. Staff is what keeps the first two out of a public read; the search matches both addresses and the mentor's resolved name, so a public caller could not have them by inference either.",
   },
   "server/projects-queries.ts:listMentoredProjects": {
     level: "authenticated",
