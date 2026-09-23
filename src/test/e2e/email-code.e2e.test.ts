@@ -299,6 +299,23 @@ test.describe("refusals on the emailed code", () => {
       await expect(back).toBeEnabled();
       await pasteInto(field, "123456");
       await expect(field).toHaveValue("123456");
+      await page.unroute(check);
+
+      // The same when the check answers and the redeem after it never does.
+      await page.route(check, (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ success: true }),
+        })
+      );
+      await page.route(redeem, (route) => route.abort("internetdisconnected"));
+      await page.getByRole("button", { name: "Confirm code" }).click();
+      await expect(page.getByRole("alert")).toContainText(
+        /could not reach the server/i
+      );
+      await expect(field).toHaveValue("");
+      await expect(field).toBeFocused();
     } finally {
       await removeRow(email);
     }
