@@ -278,15 +278,26 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
           type="text"
         />
         <p className="text-muted-foreground text-sm">
-          This is a new account. Your name is what staff and mentors see beside
-          anything you propose.
+          {/* Staff only: a mentor sees the public project page, which carries
+              no proposer name (CONTEXT.md, Mentor), and no other user sees
+              it either. */}
+          This is a new account. Staff see this name beside the projects you
+          propose and the items you borrow.
         </p>
       </div>
       {/* Ahead of the button, so it is read before the action it describes.
-          A notice, not a checkbox: nothing is recorded (PRD section 2). */}
+          A notice, not a checkbox: nothing is recorded (PRD section 2). A new
+          tab, because leaving this one unmounts the form and loses the checked
+          code; asking for another spends the address's mail budget
+          (ADR-0046). */}
       <p className="text-muted-foreground text-sm">
         By creating an account, you agree to the{" "}
-        <Link className="text-brand-dark underline" to="/privacy">
+        <Link
+          className="text-brand-dark underline"
+          rel="noopener noreferrer"
+          target="_blank"
+          to="/privacy"
+        >
           privacy policy
         </Link>
         .

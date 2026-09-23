@@ -43,12 +43,13 @@ test.describe("@smoke signing in with an emailed code", () => {
       // redeeming the code and failing on the blank one.
       await expect(page.getByLabel("Your name", { exact: true })).toBeVisible();
       // The one moment a code creates an account, so the notice is here, in
-      // the form, and not only on the page around it (#586).
-      await expect(
-        page
-          .locator("form")
-          .getByRole("link", { name: "privacy policy", exact: true })
-      ).toHaveAttribute("href", "/privacy");
+      // the form, and not only on the page around it (#586). In a new tab,
+      // because following it in this one would lose the checked code.
+      const notice = page
+        .locator("form")
+        .getByRole("link", { name: "privacy policy", exact: true });
+      await expect(notice).toHaveAttribute("href", "/privacy");
+      await expect(notice).toHaveAttribute("target", "_blank");
       await page.getByLabel("Your name", { exact: true }).fill("Code Newcomer");
       await page.getByRole("button", { name: "Create account" }).click();
 

@@ -74,11 +74,18 @@ function SignIn() {
             creates accounts: a new address reaches the name step, and a first
             ONID or GitHub sign-in creates one with no step at all (#586). The
             name step carries its own notice, which is the one a new person
-            reading only the form will see. */}
+            reading only the form will see. A new tab for the reason the name
+            step gives: this notice stays on screen through every step of the
+            form, and leaving the tab loses a code in progress. */}
         <p className="mt-6 text-muted-foreground text-sm">
           Signing in for the first time creates an account; by doing so you
           agree to the{" "}
-          <Link className="text-brand-dark underline" to="/privacy">
+          <Link
+            className="text-brand-dark underline"
+            rel="noopener noreferrer"
+            target="_blank"
+            to="/privacy"
+          >
             privacy policy
           </Link>
           .
