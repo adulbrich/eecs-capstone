@@ -260,6 +260,13 @@
       "when": 1790111585986,
       "tag": "0036_drop_sign_in_attempts",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1790131106480,
+      "tag": "0037_add_traffic_events",
+      "breakpoints": true
     }
   ]
 }

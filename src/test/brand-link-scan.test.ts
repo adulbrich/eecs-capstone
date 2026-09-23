@@ -16,7 +16,7 @@ import { classStrings } from "./shared/class-strings";
  */
 const DECORATIVE_USES = new Set([
   // The landing page's icon tile: a lucide glyph on the brand tint, no text.
-  "src/routes/index.tsx",
+  "src/routes/_public/index.tsx",
 ]);
 
 const SRC_DIR = join(process.cwd(), "src");

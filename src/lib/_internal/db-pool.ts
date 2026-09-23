@@ -62,6 +62,21 @@ export function poolConfig(connectionString: string): PoolConfig {
 }
 
 /**
+ * The traffic writer's own pool (ADR-0034): `trafficPerTask` connections and
+ * no more, apart from the app pool so a flood of anonymous writes cannot
+ * starve page rendering. The writer drops an event rather than wait once that
+ * many are in flight, so the acquire timeout here only bounds a stalled
+ * connect.
+ */
+export function trafficPoolConfig(connectionString: string): PoolConfig {
+  return {
+    connectionString,
+    max: CONNECTION_BUDGET.trafficPerTask,
+    connectionTimeoutMillis: ACQUIRE_TIMEOUT_MS,
+  };
+}
+
+/**
  * Keeps a dropped connection from taking the task down with it.
  *
  * When the server closes an idle connection, pg-pool's idle listener removes

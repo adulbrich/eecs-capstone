@@ -58,7 +58,7 @@ const searchSchema = z.object({
   sort: z.string().optional(),
 });
 
-export const Route = createFileRoute("/inventory/")({
+export const Route = createFileRoute("/_public/inventory/")({
   head: () => ({
     meta: [{ title: pageTitle("Inventory") }, NOINDEX],
   }),
