@@ -1,21 +1,28 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  INVENTORY_ORDER_LABEL,
   InventoryFilters,
   InventorySearchBar,
 } from "#/components/inventory-filters";
 
 afterEach(cleanup);
 
+// Radix Select scrolls the checked option into view on open, which jsdom
+// does not implement.
+Element.prototype.scrollIntoView = vi.fn();
+
 function renderSearch(
   overrides: Partial<Parameters<typeof InventorySearchBar>[0]> = {}
 ) {
   return render(
     <InventorySearchBar
+      onOrderChange={() => {}}
       onQChange={() => {}}
       onViewChange={() => {}}
+      order="available"
       q=""
       view="card"
       {...overrides}
@@ -71,10 +78,14 @@ describe("InventorySearchBar", () => {
 
     rerender(
       <InventorySearchBar
+        onOrderChange={() => {
+          // no-op
+        }}
         onQChange={onQChange}
         onViewChange={() => {
           // no-op
         }}
+        order="available"
         q="fromBack"
         view="card"
       />
@@ -92,6 +103,21 @@ describe("InventorySearchBar", () => {
     expect(getByLabelText("Search inventory")).toBeTruthy();
     expect(getByLabelText("Card view")).toBeTruthy();
     expect(getByLabelText("Table view")).toBeTruthy();
+  });
+
+  /**
+   * The listing's one ordering since #477. Radix portals the options only
+   * once the trigger opens, so these read them through the open menu, as
+   * the /projects Sort select's tests do.
+   */
+  it("offers the three orderings, available first, and shows the current one", () => {
+    renderSearch({ order: "name" });
+    const trigger = screen.getByRole("combobox", { name: "Sort" });
+    expect(trigger.textContent).toBe(INVENTORY_ORDER_LABEL.name);
+    fireEvent.click(trigger);
+    expect(
+      screen.getAllByRole("option").map((option) => option.textContent)
+    ).toEqual(["Available first", "Name A-Z", "Recently updated"]);
   });
 });
 

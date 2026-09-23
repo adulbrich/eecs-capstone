@@ -33,7 +33,13 @@ import { useAdminTable } from "#/lib/use-admin-table";
 import { useSeedViewFromStorage } from "#/lib/use-seed-view";
 import { useSignedIn } from "#/lib/use-signed-in";
 import type { ViewMode } from "#/lib/view-preference";
-import { listInventory, listInventoryCategories } from "#/server/inventory";
+import {
+  INVENTORY_ORDER_DEFAULT,
+  INVENTORY_ORDERS,
+  type InventoryOrder,
+  listInventory,
+  listInventoryCategories,
+} from "#/server/inventory";
 
 const searchSchema = z.object({
   // Uncapped on purpose, for the reason `/projects` gives at length: the
@@ -47,15 +53,21 @@ const searchSchema = z.object({
   // but should not 500 the page.
   categories: z.array(z.string().uuid()).max(20).catch([]).default([]),
   page: z.number().int().positive().default(1),
+  // The server's ordering, the listing's only one in either view (#477).
+  // Optional rather than defaulted, as on `/projects`: the router writes
+  // every schema default into the URL, and `listInventory` applies the
+  // default itself. A value the enum does not know reads as absent.
+  order: z.enum(INVENTORY_ORDERS).optional().catch(undefined),
   // Optional so a param-less visit is detectable; the stored preference then
   // seeds it. Absent from the URL defaults to "card" at render. A value the
   // enum no longer knows (`row`, until 2026-09-02) reads as absent rather than
   // as a router error, so a stale link renders the default.
   view: z.enum(["card", "table"]).optional().catch(undefined),
-  // Table mode's column sort and visibility, owned by useAdminTable.
+  // Table mode's column visibility, owned by useAdminTable. `sort` and `dir`
+  // left in #477, as they left `/projects` in #475: no column accepts a
+  // sort, and Zod strips a key the schema does not know, so a stale
+  // `?sort=status&dir=asc` renders the listing rather than an error.
   cols: z.string().optional(),
-  dir: z.enum(["asc", "desc"]).optional(),
-  sort: z.string().optional(),
 });
 
 export const Route = createFileRoute("/inventory/")({
@@ -63,10 +75,11 @@ export const Route = createFileRoute("/inventory/")({
     meta: [{ title: pageTitle("Inventory") }, NOINDEX],
   }),
   validateSearch: searchSchema,
-  // Only the filter fields: the view mode, the column sort and the column
-  // visibility are client state and must not re-run the loader.
+  // The filters and the order: the view mode and the column visibility are
+  // client state and must not re-run the loader.
   loaderDeps: ({ search }) => ({
     categories: search.categories,
+    order: search.order,
     page: search.page,
     q: search.q,
     status: search.status,
@@ -75,6 +88,7 @@ export const Route = createFileRoute("/inventory/")({
     const [data, { categories }] = await Promise.all([
       listInventory({
         data: {
+          order: deps.order,
           q: deps.q,
           status: deps.status,
           categories: deps.categories,
@@ -157,7 +171,9 @@ function InventoryIndex() {
   const data = Route.useLoaderData();
   // In the route, for the same reason as on /projects: the Columns menu is
   // in the search row, and `seedColumns` holds the column seed for table
-  // view. Sorting is local to the page, as there.
+  // view. Nothing here sorts, as there since #475: every column is
+  // `enableSorting: false`, so the table renders the order `listInventory`
+  // returned and the Sort select is the one ordering in both views (#477).
   const { controlsProps, tableProps } = useAdminTable({
     columns: INVENTORY_TABLE_COLUMNS,
     defaultSort: INVENTORY_TABLE_DEFAULT_SORT,
@@ -197,10 +213,16 @@ function InventoryIndex() {
       }
       search={
         <InventorySearchBar
+          onOrderChange={(order: InventoryOrder) =>
+            // Back to page one: the new order puts different items on every
+            // page, so the reader's page number no longer means anything.
+            navigate({ search: (s) => ({ ...s, order, page: 1 }) })
+          }
           onQChange={onQChange}
           onViewChange={(next) =>
             navigate({ search: (s) => ({ ...s, view: next }) })
           }
+          order={search.order ?? INVENTORY_ORDER_DEFAULT}
           q={search.q}
           view={view}
         />

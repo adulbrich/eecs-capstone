@@ -2,6 +2,7 @@ import { useId } from "react";
 import { ACTIVE_STATUSES, type ActiveStatus } from "#/lib/inventory-visibility";
 import { useDebouncedDraft } from "#/lib/use-debounced-draft";
 import type { ViewMode } from "#/lib/view-preference";
+import { INVENTORY_ORDERS, type InventoryOrder } from "#/server/inventory";
 import {
   CategoryCheckboxList,
   type CategoryOption,
@@ -39,6 +40,18 @@ export const INVENTORY_STATUS_OPTIONS = ACTIVE_STATUSES.map((value) => ({
 }));
 
 /**
+ * The Sort select's labels, keyed by the union so a new ordering cannot
+ * reach the select unlabelled. Read as sentences rather than column names,
+ * the way `PROJECT_ORDER_LABEL` does: the table's headers no longer sort,
+ * and this is the listing's one ordering in both views (#477).
+ */
+export const INVENTORY_ORDER_LABEL: Record<InventoryOrder, string> = {
+  available: "Available first",
+  name: "Name A-Z",
+  updated: "Recently updated",
+};
+
+/**
  * How many narrowing filters are on, for the Filters button below `xl`. A
  * category set counts once however many it holds: it is one decision.
  */
@@ -51,21 +64,25 @@ export function countActiveInventoryFilters(state: {
 }
 
 interface SearchProps {
+  onOrderChange: (order: InventoryOrder) => void;
   onQChange: (q: string) => void;
   onViewChange: (view: ViewMode) => void;
+  order: InventoryOrder;
   q: string;
   view: ViewMode;
 }
 
 /**
- * The top of the listing at every width: the search and the card/table
- * toggle. Neither narrows the list, which is why they stay beside the
- * Filters button rather than inside the aside. The route passes a stable
+ * The top of the listing at every width: the search, the server order and
+ * the card/table toggle. None of these narrows the list, which is why they
+ * stay beside the Filters button rather than inside the aside. The route passes a stable
  * `onQChange`: the debounce keys its timer on it.
  */
 export function InventorySearchBar({
+  onOrderChange,
   onQChange,
   onViewChange,
+  order,
   q,
   view,
 }: SearchProps) {
@@ -84,6 +101,23 @@ export function InventorySearchBar({
         value={localQ}
       />
       <SearchHint fields="names and descriptions" id={hintId} query={q} />
+      <Select
+        onValueChange={(v) => onOrderChange(v as InventoryOrder)}
+        value={order}
+      >
+        {/* w-44: "Recently updated", the longest label, fits with room to
+            spare, where /projects needs w-52 for "Recommended for you". */}
+        <SelectTrigger aria-label="Sort" className="w-44" id="inventory-sort">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {INVENTORY_ORDERS.map((value) => (
+            <SelectItem key={value} value={value}>
+              {INVENTORY_ORDER_LABEL[value]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <ViewToggle current={view} onChange={onViewChange} />
     </>
   );
