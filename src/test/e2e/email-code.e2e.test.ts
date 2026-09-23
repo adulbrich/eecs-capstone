@@ -280,6 +280,21 @@ test.describe("refusals on the emailed code", () => {
       await expect(field).toHaveValue("");
       await expect(field).toBeFocused();
       await expect(page).toHaveURL(/\/sign-in/);
+      await page.unroute(check);
+      await page.unroute(redeem);
+
+      // A check that never reaches the server rejects rather than answering.
+      // The step has to come back rather than stay locked, and the code, which
+      // nobody judged, stays for a retry.
+      await page.route(check, (route) => route.abort("internetdisconnected"));
+      await field.fill("123456");
+      await page.getByRole("button", { name: "Confirm code" }).click();
+      await expect(page.getByRole("alert")).toContainText(
+        /could not reach the server/i
+      );
+      await expect(field).toBeEnabled();
+      await expect(field).toHaveValue("123456");
+      await expect(back).toBeEnabled();
     } finally {
       await removeRow(email);
     }

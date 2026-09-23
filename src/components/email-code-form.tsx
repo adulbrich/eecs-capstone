@@ -107,6 +107,35 @@ function withRecovery(message: string): string {
   return `${message.replace(TRAILING_STOPS, "")}. Ask for a new code and try again.`;
 }
 
+/** What a request that never reached the server answers with, through `reach`. */
+const UNREACHABLE = {
+  code: "UNREACHABLE",
+  message: "Could not reach the server. Check your connection and try again.",
+};
+
+/**
+ * An auth client call, with a request that never left the browser answered
+ * as a refusal rather than thrown.
+ *
+ * The client returns a refusal as `{ error }`, but `fetch` rejects on a
+ * network failure and better-fetch passes that rejection through. Thrown, it
+ * would skip `setLoading(false)` and leave the step locked for good, because
+ * the code step disables its field and its way back while a request is in
+ * flight.
+ */
+async function reach(call: Promise<Answer>): Promise<Answer> {
+  try {
+    return await call;
+  } catch {
+    return { error: UNREACHABLE };
+  }
+}
+
+/** The part of an auth client answer this form reads. */
+interface Answer {
+  error: { code?: string; message?: string } | null;
+}
+
 /** One named field out of a submitted form, as a string rather than a FormDataEntryValue. */
 function formValue(e: React.FormEvent<HTMLFormElement>, field: string): string {
   return String(new FormData(e.currentTarget).get(field) ?? "");
@@ -137,10 +166,12 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
     setError(null);
     setLoading(true);
     const address = formValue(e, "email");
-    const { error: sendError } = await authClient.emailOtp.sendVerificationOtp({
-      email: address,
-      type: "sign-in",
-    });
+    const { error: sendError } = await reach(
+      authClient.emailOtp.sendVerificationOtp({
+        email: address,
+        type: "sign-in",
+      })
+    );
     setLoading(false);
     if (sendError) {
       // The endpoint answers the same for a known and an unknown address, so
@@ -201,12 +232,13 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
     setError(null);
     setLoading(true);
     const entered = draft;
-    const { error: checkError } =
-      await authClient.emailOtp.checkVerificationOtp({
+    const { error: checkError } = await reach(
+      authClient.emailOtp.checkVerificationOtp({
         email,
         otp: entered,
         type: "sign-in",
-      });
+      })
+    );
     if (checkError) {
       setLoading(false);
       if (checkError.code === "USER_NOT_FOUND") {
@@ -216,7 +248,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
         setStep("name");
         return;
       }
-      refuse(checkError.message ?? "That code did not work.");
+      refuse(checkError, "That code did not work.");
       return;
     }
     await redeem(entered, undefined);
@@ -233,8 +265,17 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
    * Nothing typed is lost by it: the field is disabled from the submit until
    * the answer arrives, so the draft this empties is the one that was sent.
    */
-  function refuse(message: string) {
-    setError(withRecovery(message));
+  function refuse(
+    refusal: { code?: string; message?: string },
+    fallback: string
+  ) {
+    if (refusal.code === UNREACHABLE.code) {
+      // The code was never judged and may still be good, so it stays for a
+      // retry, and "ask for a new code" would be the wrong advice.
+      setError(UNREACHABLE.message);
+      return;
+    }
+    setError(withRecovery(refusal.message ?? fallback));
     setDraft("");
   }
 
@@ -246,14 +287,16 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
   }
 
   async function redeem(otp: string, name: string | undefined) {
-    const { error: signInError } = await authClient.signIn.emailOtp({
-      email,
-      otp,
-      ...(name === undefined ? {} : { name }),
-    });
+    const { error: signInError } = await reach(
+      authClient.signIn.emailOtp({
+        email,
+        otp,
+        ...(name === undefined ? {} : { name }),
+      })
+    );
     setLoading(false);
     if (signInError) {
-      refuse(signInError.message ?? "Sign-in failed.");
+      refuse(signInError, "Sign-in failed.");
       return;
     }
     navigate({ to: redirectTo ?? "/" });
