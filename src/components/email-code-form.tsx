@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { REGEXP_ONLY_DIGITS } from "input-otp";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
@@ -112,6 +112,9 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
   const [step, setStep] = useState<Step>("address");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  // Controlled, unlike the other two fields, so a refusal can empty it.
+  const [draft, setDraft] = useState("");
+  const codeField = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -143,6 +146,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
       return;
     }
     setEmail(address);
+    setDraft("");
     setStep("code");
   }
 
@@ -182,7 +186,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const entered = formValue(e, "code");
+    const entered = draft;
     const { error: checkError } =
       await authClient.emailOtp.checkVerificationOtp({
         email,
@@ -198,10 +202,24 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
         setStep("name");
         return;
       }
-      setError(withRecovery(checkError.message ?? "That code did not work."));
+      refuse(checkError.message ?? "That code did not work.");
       return;
     }
     await redeem(entered, undefined);
+  }
+
+  /**
+   * Says why, empties the code field and puts the cursor back in it.
+   *
+   * Emptied rather than kept for a one-digit fix (#600). With all six slots
+   * full, input-otp pastes at the caret, which sits on the last slot: pasting
+   * the right code over a wrong `000000` gave `000004`, and phone autofill
+   * lands in the same place. An empty field takes either whole.
+   */
+  function refuse(message: string) {
+    setError(withRecovery(message));
+    setDraft("");
+    codeField.current?.focus();
   }
 
   async function submitName(e: React.FormEvent<HTMLFormElement>) {
@@ -219,7 +237,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
     });
     setLoading(false);
     if (signInError) {
-      setError(withRecovery(signInError.message ?? "Sign-in failed."));
+      refuse(signInError.message ?? "Sign-in failed.");
       return;
     }
     navigate({ to: redirectTo ?? "/" });
@@ -248,8 +266,6 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
   }
 
   if (step === "code") {
-    // Digits stay after a wrong code: with three guesses per code, somebody
-    // who swapped two digits can fix them rather than retype all six.
     const invalid = error !== null;
     return (
       <form className="mt-6 space-y-4" key="code" onSubmit={checkCode}>
@@ -269,9 +285,12 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
             inputMode="numeric"
             maxLength={CODE_LENGTH}
             name="code"
+            onChange={setDraft}
             pasteTransformer={digitsOnly}
             pattern={REGEXP_ONLY_DIGITS}
+            ref={codeField}
             required
+            value={draft}
           >
             <InputOTPGroup>
               {SLOTS.map((index) => (

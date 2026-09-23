@@ -193,17 +193,18 @@ test.describe("refusals on the emailed code", () => {
       // this step has the same answer, and the server cannot tell them apart.
       await expect(alert).toContainText(/ask for a new code/i);
       // Still on the code step rather than thrown back to the address, which
-      // is what makes a mistyped digit recoverable. The digits stay so one
-      // can be fixed, and the field says it was refused.
-      await expect(field).toHaveValue("000000");
+      // is what makes a mistyped digit recoverable. Emptied, marked invalid
+      // and focused, ready for the next paste (#600): a full field pastes at
+      // the caret on its last slot, which turned `000000` into `000004`.
+      await expect(field).toHaveValue("");
       await expect(field).toHaveAttribute("aria-invalid", "true");
+      await expect(field).toBeFocused();
 
       // And the real code still works. One wrong guess must not cost the
       // person the code they were sent. Pasted with a space in it, through a
       // real paste event: `fill()` never fires one, so it would pass with the
       // `pasteTransformer` removed, and without that the digits-only pattern
       // rejects the whole paste.
-      await field.fill("");
       await pasteInto(field, `${code.slice(0, 3)} ${code.slice(3)}`);
       await expect(field).toHaveValue(code);
       await page.getByRole("button", { name: "Confirm code" }).click();
