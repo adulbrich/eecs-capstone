@@ -44,7 +44,7 @@ interface ProjectDetailData {
   viewerIsStaff: GetProjectResult["viewerIsStaff"];
 }
 
-export const Route = createFileRoute("/projects/$projectId")({
+export const Route = createFileRoute("/_public/projects/$projectId")({
   head: ({ loaderData, params }) => {
     const project = (loaderData as ProjectDetailData | undefined)?.project;
     const title = project?.title ?? "Project";

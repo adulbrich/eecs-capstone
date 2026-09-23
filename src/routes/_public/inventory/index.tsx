@@ -41,7 +41,7 @@ import {
   listInventoryCategories,
 } from "#/server/inventory";
 
-const searchSchema = z.object({
+export const searchSchema = z.object({
   // Uncapped on purpose, for the reason `/projects` gives at length: the
   // server clamps, and the note under the box needs the URL to still
   // carry what the reader typed (#478).
@@ -70,7 +70,7 @@ const searchSchema = z.object({
   cols: z.string().optional(),
 });
 
-export const Route = createFileRoute("/inventory/")({
+export const Route = createFileRoute("/_public/inventory/")({
   head: () => ({
     meta: [{ title: pageTitle("Inventory") }, NOINDEX],
   }),

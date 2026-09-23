@@ -1102,6 +1102,21 @@ view's URL never picks up a stored column layout. Growing the table with a filte
 slot was the alternative and was declined, because the grouping mode is meant to
 be that component's one extension.
 
+### Charts
+
+There is one chart in the app, on `/admin/traffic`, and ADR-0049 says why
+the rest of the admin pages use numbers and tables instead. A new chart
+needs the same argument: a shape over time that a column of numbers cannot
+show at a glance.
+
+Draw it with `ChartContainer` from `#/components/ui/chart`, the trimmed
+shadcn component. Give each series a token in its `ChartConfig`, such as
+`var(--chart-1)`, never a hex code; the container sets it as
+`--color-<key>` and the marks read `var(--color-<key>)`. Hide the SVG with
+`aria-hidden` and render the same numbers as a `sr-only` table with a
+caption beside it, as `TrafficChart` does, so nothing the chart says is
+visual only and axe scans the table rather than the SVG.
+
 ### Surfaces are not all cards
 
 `<Card>` is the repeated `rounded-lg border border-border bg-card` surface used

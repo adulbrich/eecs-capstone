@@ -3,6 +3,7 @@ import {
   ArrowRight,
   BarChart3,
   BookOpen,
+  ChartLine,
   FolderKanban,
   Handshake,
   Package,
@@ -154,6 +155,12 @@ function AdminHome() {
             icon={BarChart3}
             label="Analytics"
             to="/admin/analytics"
+          />
+          <NavCard
+            description="Page views and visits on the public pages"
+            icon={ChartLine}
+            label="Traffic"
+            to="/admin/traffic"
           />
           <NavCard
             description="Review, approve, and manage all projects"

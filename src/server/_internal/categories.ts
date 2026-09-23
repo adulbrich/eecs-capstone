@@ -9,6 +9,7 @@ import {
   projects,
 } from "#/db/schema";
 import { readSession, requireUser } from "#/lib/_internal/auth-guards";
+import { clearAllReferenceListCaches } from "#/lib/_internal/reference-list-cache";
 import { canSeeProject } from "#/lib/project-visibility";
 import { assertStaff, type Viewer } from "#/lib/viewer";
 import type {
@@ -122,6 +123,8 @@ export async function createCategoryAs(viewer: AuthUser, data: CategoryInput) {
       .insert(categories)
       .values({ name: data.name, domain: data.domain, type: data.type })
       .returning();
+    // The listing's filter options are cached per task (ADR-0051).
+    clearAllReferenceListCaches();
     return { id: row.id };
   } catch (error) {
     return rethrowNameCollision(error, data);
@@ -163,6 +166,7 @@ export async function updateCategoryAs(
   } catch (error) {
     return rethrowNameCollision(error, data);
   }
+  clearAllReferenceListCaches();
   return { id: data.id };
 }
 
@@ -174,6 +178,7 @@ export async function updateCategoryForCurrentUser(data: CategoryUpdateInput) {
 export async function deleteCategoryAs(viewer: AuthUser, id: string) {
   assertStaff(viewer);
   await db.delete(categories).where(eq(categories.id, id));
+  clearAllReferenceListCaches();
   return { id };
 }
 

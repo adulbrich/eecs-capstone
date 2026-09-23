@@ -366,9 +366,18 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     note: "The only writer of proposerEmail and proposerId after create, and of studentProposed since #336. None of the keys is on ProjectInput, so updateProject cannot reach them; proposerId is derived from the address here, never taken from the client (ADR-0007).",
   },
 
+  "server/search.ts:listProjectFilterOptions": {
+    level: "public",
+    note: "The listing's filter options: project categories through listCategoriesImpl and programs through listProgramsImpl, unchanged, so the key-set pins on those two are its enforcement. Cached per task for up to a minute (ADR-0051); nothing in it depends on the viewer, so one cached value serves everyone.",
+  },
   "server/search.ts:searchProjects": {
     level: "public",
     note: "The public listing. The viewer id picks the ordering when no sort is sent (#424), and the order decides which page a row lands on, so a member with a vector and a visitor see the same set paginated differently. It still hides and reveals nothing: no row turns on who is asking.",
+  },
+
+  "server/traffic.ts:getTraffic": {
+    level: "staff",
+    note: "The site traffic reports (#592): aggregates only, never a visitor hash or one visitor's events. Also fills traffic_visits for any day that has closed, so a staff load is what advances the rollup (ADR-0050).",
   },
 
   "server/uploads.ts:clearAvatar": { level: "authenticated" },

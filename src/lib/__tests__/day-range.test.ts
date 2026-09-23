@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { dayRange, dayStart, daysInclusive, shiftDay } from "#/lib/day-range";
+import {
+  dayRange,
+  dayStart,
+  daysInclusive,
+  localDay,
+  shiftDay,
+} from "#/lib/day-range";
 
 // Pacific is UTC-8 in winter and UTC-7 in summer, so office midnight is
 // 08:00Z or 07:00Z. The DST days are the ones a naive offset gets wrong.
@@ -83,5 +89,22 @@ describe("calendar arithmetic", () => {
     expect(daysInclusive("2026-06-30", "2026-06-30")).toBe(1);
     expect(daysInclusive("2026-06-01", "2026-06-30")).toBe(30);
     expect(daysInclusive("2026-03-01", "2026-03-31")).toBe(31);
+  });
+});
+
+describe("localDay", () => {
+  it("turns over at Pacific Daylight midnight in summer", () => {
+    expect(localDay(new Date("2026-07-05T06:59:00Z"))).toBe("2026-07-04");
+    expect(localDay(new Date("2026-07-05T07:01:00Z"))).toBe("2026-07-05");
+  });
+
+  it("turns over at Pacific Standard midnight in winter", () => {
+    expect(localDay(new Date("2026-01-16T07:59:00Z"))).toBe("2026-01-15");
+    expect(localDay(new Date("2026-01-16T08:01:00Z"))).toBe("2026-01-16");
+  });
+
+  it("is the inverse of dayStart", () => {
+    expect(localDay(dayStart("2026-03-09"))).toBe("2026-03-09");
+    expect(localDay(dayStart("2026-11-01"))).toBe("2026-11-01");
   });
 });

@@ -326,9 +326,11 @@ describe("deleteAccountAs", () => {
     let tablesSeen = 0;
     let tablesDeclared = 0;
     // Every schema module, not a list that a third file would silently miss.
+    // `index.ts` and `traffic.ts` build the two pools and declare no tables.
     const schemaDir = join(process.cwd(), "src", "db");
+    const poolModules = ["index.ts", "traffic.ts"];
     const schemaFiles = readdirSync(schemaDir).filter(
-      (f) => f.endsWith(".ts") && f !== "index.ts"
+      (f) => f.endsWith(".ts") && !poolModules.includes(f)
     );
     expect(schemaFiles.sort()).toEqual(["auth-schema.ts", "schema.ts"]);
     for (const file of schemaFiles) {

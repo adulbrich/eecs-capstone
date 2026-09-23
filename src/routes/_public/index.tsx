@@ -9,7 +9,7 @@ import {
   PROJECT_STATUSES_IN_DISPLAY_ORDER,
 } from "#/lib/project-workflow";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_public/")({
   head: () => ({
     meta: [{ title: `${brand.institutionName} ${brand.programName}` }],
   }),

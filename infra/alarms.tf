@@ -1,4 +1,4 @@
-# Alarms on the four numbers that have gone bad in production, or would have
+# Alarms on the five numbers that have gone bad in production, or would have
 # been the first sign that something had. CloudWatch has recorded every one of
 # them since the account was built and told nobody: before this file the only
 # alarms on the account were the two Application Auto Scaling creates for its
@@ -13,10 +13,9 @@
 # one fires. Retune them in place; nothing else reads these numbers.
 #
 # Not covered here: the AI writer failures (#548), which want a metric filter
-# on the log group before they are a metric at all, and the pool acquire wait
-# (#558), which does not exist yet and deserves an alarm here when it does.
+# on the log group before they are a metric at all.
 
-# One topic for all four. Splitting by severity would be premature: there is
+# One topic for all five. Splitting by severity would be premature: there is
 # one recipient and every alarm below means somebody should look.
 resource "aws_sns_topic" "alarms" {
   name = "${var.project}-alarms"
@@ -44,8 +43,8 @@ resource "aws_sns_topic_subscription" "alarm_email" {
 # Every alarm below notifies on the way in and on the way out, so a recovery is
 # mailed too. Without the second one the only signal is the opening mail, and an
 # alarm that has quietly gone back to OK reads exactly like one nobody has
-# fixed. Named once rather than eight times so that "both ways, one topic" is a
-# single fact rather than four copies to keep in step.
+# fixed. Named once rather than ten times so that "both ways, one topic" is a
+# single fact rather than five copies to keep in step.
 locals {
   alarm_notifications = [aws_sns_topic.alarms.arn]
 }
@@ -205,4 +204,48 @@ resource "aws_cloudwatch_metric_alarm" "fleet_below_floor" {
   ok_actions    = local.alarm_notifications
 
   tags = { Name = "${var.project}-fleet-below-floor" }
+}
+
+# A request queued for a database connection. The app samples pg-pool's
+# `waitingCount` every second and logs a minute of samples as one Embedded
+# Metric Format line (`startPoolMetrics` in `src/lib/_internal/db-pool.ts`),
+# which CloudWatch Logs turns into this metric with no dimensions, so the
+# `Maximum` is the worst second on any task. The namespace and metric name are
+# the `POOL_METRICS` constants there, and `db-pool.test.ts` fails if the two
+# drift apart (#558).
+#
+# The deliberate replacement for the failed session lookups that were the only
+# sign the pool ran out during the #524 load test, which ADR-0042's redaction
+# made hard to spot. `db_connections` above sees the instance; this sees the
+# queue in front of it, which fills before the instance does whenever one task
+# holds all 45 of its own connections.
+#
+# A queue seen in two consecutive calendar minutes. Each line holds one minute
+# of one-second samples, stamped with that minute, so a burst that queues
+# within one minute does not mail. Two seconds of queueing that straddle a
+# minute boundary do, which is the floor of what this can mean: the rest of
+# the range is two full minutes of requests slowed by the pool, failing past
+# the 5 s acquire timeout. A queue that forms and drains between two samples is
+# not seen at all. A starting point like the others; retune it once
+# a term start has been watched. `notBreaching` because a fleet at zero tasks
+# publishes nothing here, and `fleet_below_floor` is the alarm for that.
+resource "aws_cloudwatch_metric_alarm" "db_pool_waiting" {
+  alarm_name        = "${var.project}-db-pool-waiting"
+  alarm_description = "Requests queued for a database connection in each of two consecutive minutes, which is the pool running out on at least one task."
+
+  namespace   = "eecs-capstone/db-pool"
+  metric_name = "PoolWaiting"
+  statistic   = "Maximum"
+
+  comparison_operator = "GreaterThanThreshold"
+  threshold           = 0
+  period              = 60
+  evaluation_periods  = 2
+  datapoints_to_alarm = 2
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = local.alarm_notifications
+  ok_actions    = local.alarm_notifications
+
+  tags = { Name = "${var.project}-db-pool-waiting" }
 }

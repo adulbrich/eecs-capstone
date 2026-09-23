@@ -21,6 +21,7 @@ The stack is fast-moving. TanStack Start, TanStack Router, Better Auth and Drizz
 11. [Inventory](#inventory)
 12. [Projects](#projects)
 13. [Amazon Bedrock](#amazon-bedrock)
+14. [Site traffic](#site-traffic)
 
 ---
 
@@ -112,7 +113,7 @@ Nitro's `node-server` entry calls srvx's `serve()` with a fixed options object a
 
 ### Pathless layouts nested under pathless layouts resolve to `/`
 
-`src/routes/_authed.tsx` is a pathless layout. A child `src/routes/_authed/_admin.tsx` (also pathless) resolves to the same path as `_authed` plus nothing, which is `/`, which conflicts with `src/routes/index.tsx`. We use `src/routes/_authed/admin.tsx` (non-pathless, URL `/admin`) instead.
+`src/routes/_authed.tsx` is a pathless layout. A child `src/routes/_authed/_admin.tsx` (also pathless) resolves to the same path as `_authed` plus nothing, which is `/`, which conflicts with `src/routes/_public/index.tsx`. We use `src/routes/_authed/admin.tsx` (non-pathless, URL `/admin`) instead. `src/routes/_public.tsx` is a pathless layout too, but a sibling of `_authed` rather than a child, so it does not hit this.
 
 If a layout needs a child route to be a meaningful destination, give it at least one URL segment.
 
@@ -409,7 +410,15 @@ The cast is the documented Drizzle idiom to avoid a circular initialization erro
 
 ### Pool reuse
 
-`src/db/index.ts` exports a single `db` instance, and constructs the `pg.Pool` itself rather than using the connection-string shortcut so that `logPoolErrors` can attach its listener before anything queries the pool; `drizzle({ client: pool, schema })` is the shape that allows it. Why that listener is not optional is in the `logPoolErrors` docblock and in `src/server/__tests__/db-pool.integration.test.ts`, which kills a backend and watches the pool survive (#525). The sizing, the acquisition timeout and the budget behind the numbers are in `src/lib/_internal/db-pool.ts`, with [ADR-0034](./adr/0034-the-pool-is-sized-against-the-instance.md) for why and for the one planned exception to "no second `pg.Pool` in app code". Pass `db` to Better Auth's `drizzleAdapter`.
+`src/db/index.ts` exports a single `db` instance, and constructs the `pg.Pool` itself rather than using the connection-string shortcut so that `logPoolErrors` can attach its listener before anything queries the pool; `drizzle({ client: pool, schema })` is the shape that allows it. Why that listener is not optional is in the `logPoolErrors` docblock and in `src/server/__tests__/db-pool.integration.test.ts`, which kills a backend and watches the pool survive (#525). The sizing, the acquisition timeout and the budget behind the numbers are in `src/lib/_internal/db-pool.ts`, with [ADR-0034](./adr/0034-the-pool-is-sized-against-the-instance.md) for why and for the one exception to "no second `pg.Pool` in app code": `src/db/traffic.ts`, the traffic writer's own pool, capped at `CONNECTION_BUDGET.trafficPerTask`. Pass `db` to Better Auth's `drizzleAdapter`.
+
+### The pool reports itself as a CloudWatch metric, through stdout
+
+Under `NODE_ENV=production`, `src/db/index.ts` starts `startPoolMetrics`, which samples `waitingCount`, `totalCount` and `idleCount` every second and prints one JSON line a minute. That line is an Embedded Metric Format document: CloudWatch Logs extracts `PoolWaiting`, `PoolTotal` and `PoolIdle` in the `eecs-capstone/db-pool` namespace from any log event carrying `_aws`, with no header, so the `awslogs` driver is the whole transport and the task has no `cloudwatch:PutMetricData`. Two things break it silently. Anything printed on the same line, a prefix from a wrapped `console` included, makes the event not JSON and the metric stops; and a dimension added to the document makes a new metric, which the `db_pool_waiting` alarm in `infra/alarms.tf` does not watch. `db-pool.test.ts` pins the names to the alarm. A line carries one calendar minute of samples, stamped with that minute, so each minute gets one datapoint; EMF rejects more than 100 values per metric (#558).
+
+### The listing's filter options are cached per task, and a direct insert is missing from them for a minute
+
+`listProjectFilterOptions`, which the `/projects` loader reads, caches when `REFERENCE_LIST_CACHE_TTL_MS` is set; production sets 60000 and dev leaves it at 0. Only the `*As` writers clear it, and only on their own process, so a row inserted by a script, a fixture, `psql` or another task is absent from the listing's filters until the entry expires, while every other read of the two tables sees it at once. A new writer to either table must call `clearAllReferenceListCaches()`. Why, and why it is off in dev: [ADR-0051](./adr/0051-reference-lists-are-cached-per-task.md).
 
 ### FK rules in this project
 
@@ -842,7 +851,7 @@ Radix fires `onOpenChange` for the closes it initiates (Escape, the overlay, a `
 | `src/server/__tests__/*.integration.test.ts` | Integration tests against docker Postgres. |
 | `src/server/__tests__/*.test.ts` | Unit tests over the server layer, including the structural ones (`seam-convention`, `access-contract`) that read source off disk and need no database. `access-contract.ts` and `server-fn-scan.ts` sit beside them and are not test files. |
 | `src/components/*.tsx` | App components built on shadcn/ui + Radix primitives (see `src/components/ui/`). |
-| `src/routes/...` | TanStack file-based routes. `_layout.tsx` are pathless. `routeTree.gen.ts` is auto-generated; do not hand-edit. |
+| `src/routes/...` | TanStack file-based routes. `_layout.tsx` are pathless: `_authed` holds every signed-in page, `_public` the pages the traffic writer records. `routeTree.gen.ts` is auto-generated; do not hand-edit. |
 | `src/db/schema.ts` | Hand-written Drizzle schema for app tables. |
 | `src/db/auth-schema.ts` | Better Auth CLI-generated tables. Do not hand-edit; preserved through regen via `additionalFields`. |
 | `drizzle/*.sql` | Generated migrations. New tsvector / FK-rule changes are HAND-AUTHORED (see Drizzle section). |
@@ -858,7 +867,7 @@ Radix fires `onOpenChange` for the closes it initiates (Escape, the overlay, a `
 
 ### `/privacy` is a promise the deletion flow makes, so its copy and #84 move together
 
-`src/routes/privacy.tsx` is public, outside `_authed`, and static: the body lives in `src/components/privacy-policy.tsx` and only a developer changes it. Its account-closure paragraph names what deletion removes and keeps, because `DeleteAccountDialog` (#84) makes exactly those promises and a policy that said less would leave them backed by nothing. Change one and change the other; [ADR-0008](./adr/0008-account-deletion-anonymizes.md) says what the server actually does. The lines pointing here, on `/sign-in` and on the code form's name step, are notices, not checkboxes; nothing writes to `user`. `brand.supportEmail` reaches the page through `SupportEmailLink` (`src/components/support-email-link.tsx`), which is also what the ONID refusal banner on `/sign-in` renders (#71); grep for the component to find every surface that shows the address. `public.e2e.test.ts` loads it with no cookie, which is the only proof a route outside `_authed` stays outside it. See #91.
+`src/routes/_public/privacy.tsx` is public, outside `_authed`, and static: the body lives in `src/components/privacy-policy.tsx` and only a developer changes it. Its account-closure paragraph names what deletion removes and keeps, because `DeleteAccountDialog` (#84) makes exactly those promises and a policy that said less would leave them backed by nothing. Change one and change the other; [ADR-0008](./adr/0008-account-deletion-anonymizes.md) says what the server actually does. The lines pointing here, on `/sign-in` and on the code form's name step, are notices, not checkboxes; nothing writes to `user`. `brand.supportEmail` reaches the page through `SupportEmailLink` (`src/components/support-email-link.tsx`), which is also what the ONID refusal banner on `/sign-in` renders (#71); grep for the component to find every surface that shows the address. `public.e2e.test.ts` loads it with no cookie, which is the only proof a route outside `_authed` stays outside it. See #91. The page-view paragraph (#591) describes the traffic writer, so it moves with `src/server/_internal/traffic-writer.ts`, `src/lib/use-traffic.ts`, the `traffic_salt` table and `var.access_log_retention_days` in `infra/variables.tf`; `src/test/privacy-policy.test.tsx` asserts each claim and names the test that makes it true, and reads the retention number off the Terraform default.
 
 ### Workflow conventions
 
@@ -1233,3 +1242,32 @@ One row per call that reached Bedrock, token columns included, because without t
 ### Function call arguments arrive as a JSON string
 
 A `function_call` item's `arguments` is a string, not an object: parse it before handing it to Zod. The Responses API spec puts the item at the top level of `output`, while the Bedrock tool-use guide reads it out of an item's `content`, so `findToolCall` looks in both.
+
+## Site traffic
+
+### The traffic writer takes the viewer from the last `X-Forwarded-For` entry
+
+The ALB runs in `preserve` (#556), so it adds nothing and the last entry is CloudFront's append, which is the viewer; anything to its left came from the viewer. `viewerAddress` in `src/lib/_internal/traffic-request.ts` walks from the right past entries inside `TRUSTED_PROXY_CIDR` with `getIPFromHeader` from `@better-auth/core/utils/ip`, the walk Better Auth runs for `session.ipAddress`, so the two can never disagree. The rule recorded on #506, index `length - 2` with `length - 1` inside `var.vpc_cidr`, predates `preserve` and would drop every event. With no `X-Forwarded-For` at all, which is every request to a local dev server and to the smoke and accessibility suites, no address resolves and the event is dropped, so nothing is recorded locally unless a request sets the header; the integration tests do.
+
+### No `CloudFront-*` header is trustworthy before #590 is applied
+
+`Managed-AllViewer` forwards viewer headers and adds none of CloudFront's own, so before the origin request policy changed, any `CloudFront-Viewer-Country` reaching a task was typed by the viewer. #590 records the apply date. `viewerCountry` stores only an exact `^[A-Z]{2}$`, which also refuses a duplicated header that Node joins to `"US, GB"`. The post-deploy check on #591, a forged `AQ` from a real browser outside AWS, is what proves CloudFront overwrites rather than forwards.
+
+### `traffic_salt` is UNLOGGED, and a crash splits the day's visitors
+
+Drizzle cannot declare an unlogged table, so `drizzle/0037_add_traffic_events.sql` says `CREATE UNLOGGED TABLE` by hand and `traffic.integration.test.ts` asserts `relpersistence = 'u'`. A regenerated migration for that table would silently make it logged again. The table is emptied by a crash or failover, which starts a new salt mid-day, and a task that cached the old one keeps it until its next day, so the day's visitors split in two; ADR-0048 accepts that. Rotation reads the row again after `LOCK TABLE`, which is what makes racing tasks agree, and the integration test for the race opens every pooled connection first because a cold pool serializes the four reads and hides a missing re-read.
+
+### The traffic writer records `_public` routes only, and `location` rather than `resolvedLocation` on mount
+
+`src/routes/_public.tsx` renders `useTraffic`, and `isTrafficRoute` refuses any match list with a route outside `_public`, so a route added outside that layout is not recorded, and one added inside it is. `traffic-scope.test.ts` holds the predicate to every id in `routeTree.gen.ts`. On mount the hook reads `router.state.location`: when a client navigation mounts the layout, `resolvedLocation` still names the page being left until `onResolved` fires, which recorded `/admin` against the public matches until `use-traffic.test.tsx` caught it. The search it sends is the leaf match's `_strictSearch`, the keys the route's schema defines; `match.search` also carries any stray key in the URL.
+
+### `/admin/traffic` reads visits from a rollup that a page load fills
+
+Visits for closed days come from `traffic_visits`, filled by `rollUpTrafficVisits` at the top of `getTrafficAs`; today is derived live by the same `visitRowsQuery` (ADR-0050). So the first staff load after a backlog pays for every day since the last rollup at once: about 6 s for a year at a million events, a few milliseconds a day after that. `TRUNCATE traffic_visits` is always safe and is how a change to the visit definition takes effect, since the next load rebuilds everything. A day closes two minutes after local midnight, not at it, so an event timed at 23:59:59 that commits a moment later still lands in its day's rollup. `getTrafficAs` takes `now` so the integration tests can place a day either side of that line; a test that forgets it reads real time and sees every fixture day as closed.
+
+`traffic_events.day` is the office's local date, generated by Postgres from a literal `'America/Los_Angeles'`, because a generated column cannot take a parameter. `src/test/traffic-filters.test.ts` holds the literal to `OFFICE_TIME_ZONE`; changing the zone means a migration that drops and re-adds the column and a truncate of the rollup.
+
+To time the reports locally, `npm run db:seed:traffic` writes a million plausible events (it refuses a database that is not on this machine, and it truncates the traffic tables first) and `npm run db:explain:traffic -- 90` runs `EXPLAIN (ANALYZE, BUFFERS)` over the queries the page actually runs. The seed ends with `VACUUM ANALYZE`: without it the planner has no statistics for the new rows and picks a sort it would otherwise avoid.
+
+`src/lib/traffic-filters.ts` writes the listing filter defaults out by hand, since the project defaults live in a component module the server must not import. A default changed on `/projects` or `/inventory` and not there would count every visit as setting that filter; `traffic-filters.test.ts` fails first.
+

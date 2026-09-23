@@ -1,6 +1,10 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { logPoolErrors, poolConfig } from "#/lib/_internal/db-pool";
+import {
+  logPoolErrors,
+  poolConfig,
+  startPoolMetrics,
+} from "#/lib/_internal/db-pool";
 
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
 import * as schema from "./schema.ts";
@@ -18,5 +22,13 @@ if (!databaseUrl) {
 // process (#525).
 const pool = new Pool(poolConfig(databaseUrl));
 logPoolErrors(pool);
+
+// Production builds only, `npm run start` and the E2E server included: Nitro
+// inlines NODE_ENV when it builds, so this is decided then, not at runtime.
+// The line lands in CloudWatch as a metric in production, and in a dev console
+// it would be one line of noise a minute (#558).
+if (process.env.NODE_ENV === "production") {
+  startPoolMetrics(pool);
+}
 
 export const db = drizzle({ client: pool, schema });

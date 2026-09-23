@@ -457,3 +457,28 @@ Where a custom line is. Exactly one of the five below.
 
 _Avoid_: approved (that hands over a physical thing, which a custom line has none
 of), ordered, on order, delivered, done, returned (a custom line never lends)
+
+## Traffic
+
+**Visitor**:
+A pseudonymous browser, identified for one day only by a salted hash and never by a
+cookie. A visitor is not an account and cannot be connected to one. Two people sharing
+a network address may read as one visitor, and one person on two devices reads as two.
+_Avoid_: session (that is Better Auth's), viewer (that is the permission word), user,
+unique user
+
+**Visit**:
+One visitor's activity with no gap longer than 30 minutes, ending at the daily salt
+rotation whatever else happens.
+_Avoid_: session, engagement
+
+**Traffic**:
+What the site's readers do: pages viewed, where they arrived from, what they read next.
+Distinct from the analytics in #34, which count rows in the app's own tables.
+_Avoid_: analytics (that is #34's word), telemetry, metrics
+
+**Traffic writer**:
+The server route that records one traffic event per page view or search change on a
+public page. Named for what it does to the database, because **collector** is already
+the inventory word for the person picking up an item.
+_Avoid_: collector, tracker, beacon

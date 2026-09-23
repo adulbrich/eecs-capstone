@@ -1,13 +1,17 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
+  check,
   customType,
+  date,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -919,4 +923,135 @@ export const verificationSends = pgTable(
   (t) => [
     index("verification_sends_recipient_idx").on(t.email, t.kind, t.createdAt),
   ]
+);
+
+/**
+ * The public search params a traffic event recorded: the matched public
+ * route's validated search, so only keys its schema defines. Values are what
+ * those schemas produce, strings, numbers, booleans, null and string arrays.
+ */
+export type TrafficSearch = Record<
+  string,
+  string | number | boolean | null | string[]
+>;
+
+export const trafficEventKindEnum = pgEnum("traffic_event_kind", [
+  "view",
+  "search",
+]);
+export const trafficDeviceEnum = pgEnum("traffic_device", [
+  "desktop",
+  "mobile",
+  "tablet",
+]);
+
+/**
+ * One row per page view or search change on a public route, written by the
+ * traffic writer (#591) and read only as aggregates on `/admin/traffic`.
+ *
+ * No user id, no address, no raw user agent: the visitor hash is the only
+ * identity, and its daily salt is discarded (ADR-0048). No foreign keys,
+ * because nothing references these rows and a project's views join on
+ * `pathname` at query time. Visits are derived at query time, never stored.
+ * No retention limit yet (#18).
+ */
+export const trafficEvents = pgTable(
+  "traffic_events",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    /**
+     * The office's local date of `occurred_at`, computed by Postgres. A visit
+     * never crosses local midnight, so visits are placed per day, and the
+     * rollup reads one day from the index on it rather than converting
+     * every row (#592). Never written by the traffic writer. The zone is a
+     * literal because a generated column cannot take a parameter;
+     * `traffic-day.test.ts` holds it to `OFFICE_TIME_ZONE`.
+     */
+    day: date("day").generatedAlwaysAs(
+      sql`(occurred_at AT TIME ZONE 'America/Los_Angeles')::date`
+    ),
+    kind: trafficEventKindEnum("kind").notNull(),
+    visitorHash: text("visitor_hash").notNull(),
+    pathname: text("pathname").notNull(),
+    search: jsonb("search").$type<TrafficSearch>(),
+    referrerHost: text("referrer_host"),
+    previousPath: text("previous_path"),
+    country: text("country"),
+    browser: text("browser"),
+    os: text("os"),
+    device: trafficDeviceEnum("device"),
+  },
+  (t) => [
+    index("traffic_events_occurred_at_idx").on(t.occurredAt),
+    // The rollup's visit walk (#592): one local day, then each visitor's
+    // events in time order, which is the order its window wants.
+    index("traffic_events_visit_idx").on(t.day, t.visitorHash, t.occurredAt),
+    index("traffic_events_pathname_idx").on(t.pathname, t.occurredAt),
+  ]
+);
+
+/**
+ * The visitor hash's daily salt: one row, replaced on the first traffic
+ * event of each local day and never archived (ADR-0048).
+ *
+ * UNLOGGED, which Drizzle cannot declare, so migration 0037 says
+ * `CREATE UNLOGGED TABLE` by hand. Postgres never
+ * writes an unlogged table to the WAL, so RDS backups and point-in-time
+ * restores bring it back empty, and `TRUNCATE` unlinks the old data file.
+ * A crash or failover also empties it, which starts a new salt mid-day.
+ */
+export const trafficSalt = pgTable(
+  "traffic_salt",
+  {
+    id: smallint("id").primaryKey(),
+    day: date("day").notNull(),
+    salt: text("salt").notNull(),
+  },
+  (t) => [check("traffic_salt_single_row", sql`${t.id} = 1`)]
+);
+
+/**
+ * One row per visit of a closed day, derived from `traffic_events` and
+ * written only by `rollUpTrafficVisits` when `/admin/traffic` loads
+ * (ADR-0050). Deriving 90 days of visits on every load missed the page's
+ * 200 ms budget at a million events; a closed day's events never change, so
+ * its visits are computed once. Today is still derived live.
+ *
+ * Holds no visitor hash and no address: what a report needs about a visit,
+ * and nothing that could join it to another. Safe to truncate at any time,
+ * which is also how a change to the visit definition is applied: the next
+ * load rebuilds every day.
+ */
+export const trafficVisits = pgTable(
+  "traffic_visits",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    day: date("day").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    events: integer("events").notNull(),
+    views: integer("views").notNull(),
+    /** The visitor's first visit of the day: counts distinct visitors. */
+    firstOfDay: boolean("first_of_day").notNull(),
+    /** The pathname of the visit's first `view`, null when it had none. */
+    entryPath: text("entry_path"),
+    entryReferrer: text("entry_referrer"),
+    country: text("country"),
+    browser: text("browser"),
+    device: trafficDeviceEnum("device"),
+    /** Each pathname the visit viewed, beside how many times, in step. */
+    pages: text("pages").array().notNull(),
+    pageViews: integer("page_views").array().notNull(),
+    /** The public listings the visit reached, as pathnames. */
+    listings: text("listings").array().notNull(),
+    /** Each listing filter the visit set at least once, as `listing:key`. */
+    filters: text("filters").array().notNull(),
+  },
+  (t) => [index("traffic_visits_day_idx").on(t.day)]
 );

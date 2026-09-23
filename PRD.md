@@ -608,10 +608,21 @@ catalogue that decided the matrix below; #288 shipped it.
   a previous-period comparison (submitted, published, inventory requests,
   and new users for admins), and breakdowns by status, program and category.
   A program selector governs the figures marked per program; every card
-  names its scope. No charting library: numbers and small grouped counts.
+  names its scope. No charting library on this page: numbers and small
+  grouped counts. `/admin/traffic` has the app's one chart (ADR-0049).
 - [ ] Second pass: conversion from submitted to published, stale drafts,
   repeat proposers, category demand against bookmarks, median review latency.
 - [ ] Site traffic (#18) is separate: this counts what is in the database.
+  - [x] Cookieless traffic writer on the public routes (#591): one
+    `traffic_events` row per page view or search change, keyed by a visitor
+    hash whose salt is replaced daily; no cookie, no browser storage, no
+    account link, no stored address. Described on `/privacy`.
+  - [x] Traffic reports for staff on `/admin/traffic` (#592): page views,
+    visits, average daily visitors and bounce rate against the previous
+    period; page views and visits per day as the app's one chart; views per
+    published project with zeros; pages, entry pages, referring sites,
+    countries, devices and browsers; filter use on `/projects` and
+    `/inventory`. Closed days read from a rollup of visits (ADR-0050).
 - [ ] Projects published per academic year; projects submitted per period.
 - [ ] Customizable date ranges (academic year definition; recruitment starting
   before the academic year).

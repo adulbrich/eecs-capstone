@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { searchSchema } from "#/routes/projects/index";
+import { searchSchema } from "#/routes/_public/projects/index";
 
 const UUID = "11111111-1111-4111-8111-111111111111";
 

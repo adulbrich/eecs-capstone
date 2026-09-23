@@ -3,7 +3,7 @@ import { PrivacyPolicy } from "#/components/privacy-policy";
 import { pageTitle } from "#/lib/page-title";
 
 /** Public, outside `_authed`; docs/QUIRKS.md says why and what proves it. */
-export const Route = createFileRoute("/privacy")({
+export const Route = createFileRoute("/_public/privacy")({
   head: () => ({ meta: [{ title: pageTitle("Privacy") }] }),
   component: Privacy,
 });

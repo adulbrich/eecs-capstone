@@ -14,7 +14,7 @@ import { useHasMounted } from "#/lib/use-has-mounted";
 import type { ItemStatus } from "#/lib/vocabularies";
 import { getInventoryItemDetail } from "#/server/inventory";
 
-export const Route = createFileRoute("/inventory/$itemId")({
+export const Route = createFileRoute("/_public/inventory/$itemId")({
   head: () => ({
     meta: [{ title: pageTitle("Inventory Item") }, NOINDEX],
   }),

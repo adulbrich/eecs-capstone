@@ -89,6 +89,20 @@ test("admin analytics dashboard, one program selected", async ({ page }) => {
   await checkA11y(page);
 });
 
+test("admin traffic reports", async ({ page }) => {
+  await page.goto("/admin/traffic");
+  await waitForHydration(page);
+  // The chart's SVG is hidden from assistive technology and its numbers
+  // render as a screen-reader table, so axe scans the table, not the SVG.
+  await expect(page.getByRole("heading", { name: "Traffic" })).toBeVisible();
+  await expect(
+    page.getByRole("table", { name: "Page views and visits per day" })
+  ).toBeAttached();
+  await expect(page.getByText("Views per project")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await checkA11y(page);
+});
+
 test("@smoke admin inventory list", async ({ page }) => {
   // The two switches and the status select live in the filters aside at
   // 1280 and in the filters sheet at 375 (#352).
