@@ -63,6 +63,20 @@ describe("renderFailureLines", () => {
     expect(lines[0]).toContain('"program"');
   });
 
+  it("redacts before it collapses, so a parameter tail is still found", () => {
+    // `redactQueryError` finds the tail by the newline in "\nparams:". The
+    // other order would turn it into " params:" and log the parameter.
+    const [line] = renderFailureLines([
+      {
+        routeId: "/_public/projects/",
+        status: "error",
+        error: new Error(`Failed query: select 1\nparams: ${SECRET}`),
+      },
+    ]);
+    expect(line).not.toContain(SECRET);
+    expect(line).toContain("[params redacted]");
+  });
+
   it("writes nothing for a notFound thrown from a loader", () => {
     // router-core's applyFailure marks the boundary `notFound`, or the root
     // `success` with `_notFound` set, and keeps the thrown value on `error`

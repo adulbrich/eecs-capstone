@@ -116,8 +116,12 @@ export async function warmPool(
   let firstFailure: unknown;
   for (const result of results) {
     if (result.status === "fulfilled") {
-      result.value.release();
-      opened++;
+      try {
+        result.value.release();
+        opened++;
+      } catch (error) {
+        firstFailure ??= error;
+      }
     } else {
       firstFailure ??= result.reason;
     }

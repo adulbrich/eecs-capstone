@@ -354,6 +354,34 @@ describe("warmPool", () => {
     expect(logged).toEqual([]);
   });
 
+  it("does not reject when a release throws", async () => {
+    // pg-pool throws from `release` only on a second release, which this
+    // cannot make, but the call site does not await or catch, so "never
+    // throws" has to hold for every client, and the rest still go back.
+    let released = 0;
+    const pool = {
+      connect: () =>
+        Promise.resolve({
+          release: () => {
+            released++;
+            if (released === 1) {
+              throw new Error(
+                "Release called on client which has already been released to the pool."
+              );
+            }
+          },
+        }),
+    };
+    const logged: string[] = [];
+    await expect(
+      warmPool(pool, 3, (line) => logged.push(line))
+    ).resolves.toBeUndefined();
+    expect(released).toBe(3);
+    expect(logged).toEqual([
+      "Database pool warm-up opened 2 of 3: Error: Release called on client which has already been released to the pool.",
+    ]);
+  });
+
   it("does not reject when connect throws before returning a promise", async () => {
     // pg-pool throws synchronously on a connection string it cannot parse or
     // a missing `sslrootcert`. `src/db/index.ts` does not await the warm-up,
