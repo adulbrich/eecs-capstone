@@ -353,4 +353,28 @@ describe("warmPool", () => {
     await warmPool(countingPool(), 5, (line) => logged.push(line));
     expect(logged).toEqual([]);
   });
+
+  it("does not reject when connect throws before returning a promise", async () => {
+    // pg-pool throws synchronously on a connection string it cannot parse or
+    // a missing `sslrootcert`. `src/db/index.ts` does not await the warm-up,
+    // so a rejection here would be unhandled: the process exits, and Node
+    // prints the raw error rather than the redacted line.
+    let calls = 0;
+    const pool = {
+      connect: () => {
+        calls++;
+        if (calls === 2) {
+          throw new Error("self-signed certificate in certificate chain");
+        }
+        return Promise.resolve({ release: () => undefined });
+      },
+    };
+    const logged: string[] = [];
+    await expect(
+      warmPool(pool, 3, (line) => logged.push(line))
+    ).resolves.toBeUndefined();
+    expect(logged).toEqual([
+      "Database pool warm-up opened 2 of 3: Error: self-signed certificate in certificate chain",
+    ]);
+  });
 });

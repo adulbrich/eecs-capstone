@@ -42,6 +42,27 @@ describe("renderFailureLines", () => {
     ).toEqual([]);
   });
 
+  it("keeps a multi-line cause on one line", () => {
+    // A failed `validateSearch` throws `SearchParamError` with pretty-printed
+    // JSON for a message, and the awslogs driver makes every line of stdout
+    // its own CloudWatch event.
+    const issues = JSON.stringify(
+      [{ code: "invalid_format", path: ["program"] }],
+      null,
+      2
+    );
+    const lines = renderFailureLines([
+      {
+        routeId: "/_public/projects/",
+        status: "error",
+        error: new Error(issues),
+      },
+    ]);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).not.toMatch(/[\r\n]/);
+    expect(lines[0]).toContain('"program"');
+  });
+
   it("writes nothing for a notFound thrown from a loader", () => {
     // router-core's applyFailure marks the boundary `notFound`, or the root
     // `success` with `_notFound` set, and keeps the thrown value on `error`

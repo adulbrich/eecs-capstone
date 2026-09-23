@@ -1,5 +1,7 @@
 import { redactQueryError } from "./redact-query-error";
 
+const WHITESPACE_RUN = /\s+/g;
+
 /** The part of a router match this reads. */
 interface RenderedMatch {
   error?: unknown;
@@ -28,14 +30,21 @@ interface RenderedMatch {
  * which is user text (ADR-0042). The cause goes through `redactQueryError`
  * for the same reason, so a failed search logs its SQL and the pool's
  * "connection timeout" but not the term it was bound to.
+ *
+ * Whitespace is collapsed because the awslogs driver makes each line of
+ * stdout its own CloudWatch event, and a failed `validateSearch` throws
+ * `SearchParamError` with pretty-printed JSON for a message: one failure
+ * would otherwise arrive as a dozen events, most of them a lone bracket.
  */
 export function renderFailureLines(
   matches: readonly RenderedMatch[]
 ): string[] {
   return matches
     .filter((match) => match.status === "error")
-    .map(
-      (match) =>
-        `Server render failed on ${match.routeId} (500): ${redactQueryError(match.error)}`
+    .map((match) =>
+      `Server render failed on ${match.routeId} (500): ${redactQueryError(match.error)}`.replace(
+        WHITESPACE_RUN,
+        " "
+      )
     );
 }

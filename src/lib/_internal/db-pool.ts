@@ -50,10 +50,13 @@ const POOL_MAX = 45;
  * Twice a load-test burst drew one 500 from a task whose pool had nothing
  * open: its 0.25 vCPU was saturated serving the burst while it opened TLS
  * connections to RDS, and a connect past `ACQUIRE_TIMEOUT_MS` fails the
- * request. `min` exempts the first five from the idle timeout, so a task
- * starts every burst with five open rather than none; `warmPool` opens them
- * at boot, because `min` alone never opens anything. Inside `POOL_MAX`, so
- * the budget above is unchanged; the resting count is five per task.
+ * request. `min` exempts the first five from the idle timeout, so a lull no
+ * longer closes them; `warmPool` opens them at boot, because `min` alone
+ * never opens anything. Nothing reopens one that drops (an RDS failover or
+ * reboot): pg-pool removes it and the floor refills only as demand opens
+ * connections again, so the first burst after a drop can start below five.
+ * Inside `POOL_MAX`, so the budget above is unchanged; the resting count is
+ * five per task.
  */
 export const POOL_MIN = 5;
 
@@ -100,8 +103,14 @@ export async function warmPool(
   count: number,
   log: (message: string) => void = console.error
 ): Promise<void> {
+  // Each connect goes through `then` so that one throwing before it returns
+  // a promise (pg-pool does, on a connection string it cannot parse or a
+  // missing `sslrootcert`) settles as a rejection here rather than escaping
+  // `allSettled` as an unhandled one with the raw error attached.
   const results = await Promise.allSettled(
-    Array.from({ length: count }, () => pool.connect())
+    Array.from({ length: count }, () =>
+      Promise.resolve().then(() => pool.connect())
+    )
   );
   let opened = 0;
   let firstFailure: unknown;
