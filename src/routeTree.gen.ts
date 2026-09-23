@@ -21,6 +21,7 @@ import { Route as ApiHealthzRouteImport } from './routes/api/healthz'
 import { Route as ApiTrafficRouteImport } from './routes/api/traffic'
 import { Route as AuthedAdminIndexRouteImport } from './routes/_authed/admin/index'
 import { Route as AuthedAdminAnalyticsRouteImport } from './routes/_authed/admin/analytics'
+import { Route as AuthedAdminTrafficRouteImport } from './routes/_authed/admin/traffic'
 import { Route as AuthedInventoryNewRouteImport } from './routes/_authed/inventory/new'
 import { Route as AuthedInventoryRequestRouteImport } from './routes/_authed/inventory/request'
 import { Route as AuthedMyBookmarksRouteImport } from './routes/_authed/my/bookmarks'
@@ -101,6 +102,11 @@ const AuthedAdminIndexRoute = AuthedAdminIndexRouteImport.update({
 const AuthedAdminAnalyticsRoute = AuthedAdminAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
+  getParentRoute: () => AuthedAdminRoute,
+} as any)
+const AuthedAdminTrafficRoute = AuthedAdminTrafficRouteImport.update({
+  id: '/traffic',
+  path: '/traffic',
   getParentRoute: () => AuthedAdminRoute,
 } as any)
 const AuthedInventoryNewRoute = AuthedInventoryNewRouteImport.update({
@@ -238,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/api/healthz': typeof ApiHealthzRoute
   '/api/traffic': typeof ApiTrafficRoute
   '/admin/analytics': typeof AuthedAdminAnalyticsRoute
+  '/admin/traffic': typeof AuthedAdminTrafficRoute
   '/inventory/new': typeof AuthedInventoryNewRoute
   '/inventory/request': typeof AuthedInventoryRequestRoute
   '/my/bookmarks': typeof AuthedMyBookmarksRoute
@@ -272,6 +279,7 @@ export interface FileRoutesByTo {
   '/api/healthz': typeof ApiHealthzRoute
   '/api/traffic': typeof ApiTrafficRoute
   '/admin/analytics': typeof AuthedAdminAnalyticsRoute
+  '/admin/traffic': typeof AuthedAdminTrafficRoute
   '/inventory/new': typeof AuthedInventoryNewRoute
   '/inventory/request': typeof AuthedInventoryRequestRoute
   '/my/bookmarks': typeof AuthedMyBookmarksRoute
@@ -310,6 +318,7 @@ export interface FileRoutesById {
   '/api/traffic': typeof ApiTrafficRoute
   '/_public/': typeof PublicIndexRoute
   '/_authed/admin/analytics': typeof AuthedAdminAnalyticsRoute
+  '/_authed/admin/traffic': typeof AuthedAdminTrafficRoute
   '/_authed/inventory/new': typeof AuthedInventoryNewRoute
   '/_authed/inventory/request': typeof AuthedInventoryRequestRoute
   '/_authed/my/bookmarks': typeof AuthedMyBookmarksRoute
@@ -347,6 +356,7 @@ export interface FileRouteTypes {
     | '/api/healthz'
     | '/api/traffic'
     | '/admin/analytics'
+    | '/admin/traffic'
     | '/inventory/new'
     | '/inventory/request'
     | '/my/bookmarks'
@@ -381,6 +391,7 @@ export interface FileRouteTypes {
     | '/api/healthz'
     | '/api/traffic'
     | '/admin/analytics'
+    | '/admin/traffic'
     | '/inventory/new'
     | '/inventory/request'
     | '/my/bookmarks'
@@ -418,6 +429,7 @@ export interface FileRouteTypes {
     | '/api/traffic'
     | '/_public/'
     | '/_authed/admin/analytics'
+    | '/_authed/admin/traffic'
     | '/_authed/inventory/new'
     | '/_authed/inventory/request'
     | '/_authed/my/bookmarks'
@@ -538,6 +550,13 @@ declare module '@tanstack/react-router' {
       path: '/analytics'
       fullPath: '/admin/analytics'
       preLoaderRoute: typeof AuthedAdminAnalyticsRouteImport
+      parentRoute: typeof AuthedAdminRoute
+    }
+    '/_authed/admin/traffic': {
+      id: '/_authed/admin/traffic'
+      path: '/traffic'
+      fullPath: '/admin/traffic'
+      preLoaderRoute: typeof AuthedAdminTrafficRouteImport
       parentRoute: typeof AuthedAdminRoute
     }
     '/_authed/inventory/new': {
@@ -706,6 +725,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthedAdminRouteChildren {
   AuthedAdminAnalyticsRoute: typeof AuthedAdminAnalyticsRoute
+  AuthedAdminTrafficRoute: typeof AuthedAdminTrafficRoute
   AuthedAdminIndexRoute: typeof AuthedAdminIndexRoute
   AuthedAdminCategoriesCategoryIdRoute: typeof AuthedAdminCategoriesCategoryIdRoute
   AuthedAdminInventoryRequestsRoute: typeof AuthedAdminInventoryRequestsRoute
@@ -721,6 +741,7 @@ interface AuthedAdminRouteChildren {
 
 const AuthedAdminRouteChildren: AuthedAdminRouteChildren = {
   AuthedAdminAnalyticsRoute: AuthedAdminAnalyticsRoute,
+  AuthedAdminTrafficRoute: AuthedAdminTrafficRoute,
   AuthedAdminIndexRoute: AuthedAdminIndexRoute,
   AuthedAdminCategoriesCategoryIdRoute: AuthedAdminCategoriesCategoryIdRoute,
   AuthedAdminInventoryRequestsRoute: AuthedAdminInventoryRequestsRoute,

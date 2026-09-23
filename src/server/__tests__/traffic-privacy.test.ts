@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { getTableColumns } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { trafficEvents } from "#/db/schema";
+import { trafficEvents, trafficVisits } from "#/db/schema";
 
 /**
  * The privacy page's claims about the traffic writer that source can prove:
@@ -100,7 +100,7 @@ describe("the traffic writer's import graph", () => {
 });
 
 describe("the traffic_events table", () => {
-  it("has exactly the columns #591 specifies, none of them a person or an address", () => {
+  it("has exactly the columns #591 specifies, plus #592's day, none of them a person or an address", () => {
     const columns = Object.values(getTableColumns(trafficEvents)).map(
       (c) => c.name
     );
@@ -108,6 +108,7 @@ describe("the traffic_events table", () => {
       [
         "browser",
         "country",
+        "day",
         "device",
         "id",
         "kind",
@@ -122,6 +123,21 @@ describe("the traffic_events table", () => {
     );
     for (const name of columns) {
       expect(name).not.toMatch(/user|email|^ip$|_ip|address|agent|session/);
+    }
+  });
+});
+
+describe("the traffic_visits rollup", () => {
+  it("holds no visitor hash, no address and nothing about a person", () => {
+    // A rollup row is a visit with its identity removed: nothing in it can
+    // join one visit to another, to an event, or to an account (ADR-0050).
+    const columns = Object.values(getTableColumns(trafficVisits)).map(
+      (c) => c.name
+    );
+    for (const name of columns) {
+      expect(name).not.toMatch(
+        /hash|visitor|user|email|^ip$|_ip|address|agent|session/
+      );
     }
   });
 });
