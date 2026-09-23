@@ -51,10 +51,11 @@ const POOL_MAX = 45;
  * open: its 0.25 vCPU was saturated serving the burst while it opened TLS
  * connections to RDS, and a connect past `ACQUIRE_TIMEOUT_MS` fails the
  * request. `min` exempts the first five from the idle timeout, so a lull no
- * longer closes them; `warmPool` opens them on the task's first request, because `min` alone
- * never opens anything. Nothing reopens one that drops (an RDS failover or
- * reboot): pg-pool removes it and the floor refills only as demand opens
- * connections again, so the first burst after a drop can start below five.
+ * longer closes them; `warmPool` opens them on the task's first request,
+ * because `min` alone never opens anything. Nothing reopens one that drops
+ * (an RDS failover or reboot): pg-pool removes it and the floor refills only
+ * as demand opens connections again, so the first burst after a drop can
+ * start below five.
  * Inside `POOL_MAX`, so the budget above is unchanged; the resting count is
  * five per task.
  */
