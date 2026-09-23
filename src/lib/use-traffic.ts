@@ -42,7 +42,7 @@ function send(body: TrafficBody): void {
  * Records page views and search changes on public routes (#591). Rendered by
  * the `_public` layout, so it runs only while a public route is showing.
  *
- * Sends once on mount for the location already resolved, because hydration
+ * Sends once on mount for the current location, because hydration
  * does not emit `onResolved` and the landing page of every visit would be
  * lost otherwise (#507), then once per `onResolved`. Preloading does not
  * emit, so a hovered link sends nothing. Reads no cookie and writes no
@@ -85,7 +85,11 @@ export function useTraffic(): void {
       send(body);
     };
 
-    record(router.state.resolvedLocation ?? router.state.location);
+    // `location`, not `resolvedLocation`: on hydration the two agree, but
+    // when a client navigation mounts this layout, `resolvedLocation` still
+    // names the page being left until `onResolved` fires, which would record
+    // a signed-in pathname against the public matches.
+    record(router.state.location);
     return router.subscribe("onResolved", ({ toLocation }) =>
       record(toLocation)
     );
