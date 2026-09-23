@@ -207,17 +207,18 @@ async function codeGuessRefused(ctx: CodeRequest): Promise<boolean> {
       !otpClaimMatches(ctx.getCookie(OTP_CLAIM_COOKIE), expected);
     return unclaimed || (await otpSignInRefused(address));
   } catch (error) {
-    // Fails open, the same direction as `mayMail` and for the same reason: this
-    // is the only way in for everyone without ONID. What it opens: the plugin
-    // still refuses a wrong code, and the admin plugin still refuses a banned
-    // row a session, but nothing backs up the refusal of an unverified row
-    // another provider is linked to. A redeem that lands during a failure here
-    // verifies that row and leaves the other identity on it, which is the one
-    // row answering to two people that `otp-sign-in-guard.ts` exists to stop.
-    // It needs the database to fail these reads and not the plugin's own,
-    // moments later, on the same request.
+    // Fails CLOSED, the opposite of `mayMail` (#584). Failing open let a redeem
+    // through with nothing behind it for one of the rows this refuses: the
+    // plugin still refuses a wrong code and the admin plugin a banned row's
+    // session, but an unverified row another provider is linked to would be
+    // verified with that identity still on it, one row answering to two
+    // people. `mayMail`'s reason for opening does not transfer: it gates a
+    // send, somebody's only way to get a code at all, while this gates one
+    // guess at a code already sent. Refusing costs the person that code during
+    // the failure; the form tells them to ask for another, and the plugin's own
+    // reads would most likely have failed on the same blip anyway. ADR-0047.
     console.error("Code sign-in guard failed", redactQueryError(error));
-    return false;
+    return true;
   }
 }
 
@@ -409,8 +410,8 @@ async function onidUserInfo(
  * direction here. What this gates is somebody's only way into their own
  * account, so a counter that cannot answer, a transient database blip, would
  * otherwise lock out everyone without ONID for the length of it; letting an
- * amplifier run for that window is the smaller harm. The code guard above fails
- * open for the same reason.
+ * amplifier run for that window is the smaller harm. The code guard above
+ * fails closed, and its catch says why the reason does not carry over (#584).
  */
 async function mayMail(email: string): Promise<boolean> {
   try {
