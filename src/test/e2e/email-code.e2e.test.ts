@@ -284,8 +284,9 @@ test.describe("refusals on the emailed code", () => {
       await page.unroute(redeem);
 
       // A check that never reaches the server rejects rather than answering.
-      // The step has to come back rather than stay locked, and the code, which
-      // nobody judged, stays for a retry.
+      // The step has to come back rather than stay locked, empty like after a
+      // refusal: kept, the digits put the caret on the last slot, and pasting
+      // the same code back gave `123451`.
       await page.route(check, (route) => route.abort("internetdisconnected"));
       await field.fill("123456");
       await page.getByRole("button", { name: "Confirm code" }).click();
@@ -293,8 +294,11 @@ test.describe("refusals on the emailed code", () => {
         /could not reach the server/i
       );
       await expect(field).toBeEnabled();
-      await expect(field).toHaveValue("123456");
+      await expect(field).toHaveValue("");
+      await expect(field).toBeFocused();
       await expect(back).toBeEnabled();
+      await pasteInto(field, "123456");
+      await expect(field).toHaveValue("123456");
     } finally {
       await removeRow(email);
     }

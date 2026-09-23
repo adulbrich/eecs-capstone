@@ -265,18 +265,21 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
    *
    * Nothing typed is lost by it: the field is disabled from the submit until
    * the answer arrives, so the draft this empties is the one that was sent.
+   *
+   * Emptied when the request never arrived, too. Kept, the six digits put the
+   * caret on the last slot once the field is focused again, and pasting the
+   * same code back gave `123451`, which then spent a guess. The advice differs:
+   * that code was never judged, so "ask for a new code" would be wrong.
    */
   function refuse(
     refusal: { code?: string; message?: string },
     fallback: string
   ) {
-    if (refusal.code === UNREACHABLE.code) {
-      // The code was never judged and may still be good, so it stays for a
-      // retry, and "ask for a new code" would be the wrong advice.
-      setError(UNREACHABLE.message);
-      return;
-    }
-    setError(withRecovery(refusal.message ?? fallback));
+    setError(
+      refusal.code === UNREACHABLE.code
+        ? UNREACHABLE.message
+        : withRecovery(refusal.message ?? fallback)
+    );
     setDraft("");
   }
 
