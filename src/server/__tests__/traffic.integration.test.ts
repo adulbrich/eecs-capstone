@@ -98,7 +98,10 @@ describe("POST /api/traffic against the database", () => {
 
   it("drops rather than waits once the in-flight cap is reached", async () => {
     const real = trafficStore(trafficDb);
-    const { promise: gate, resolve: release } = Promise.withResolvers<void>();
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const gated: TrafficStore = {
       salt: real.salt,
       insert: async (row) => {
