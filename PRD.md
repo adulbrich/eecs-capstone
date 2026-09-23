@@ -323,6 +323,9 @@ Each project carries:
   listing has the same card and table modes as projects (`?view=card|table`,
   one stored preference for both), the table limited to name, status,
   categories and description.
+- [x] One Sort select orders the inventory listing in both modes: available
+  first (the default), name A-Z, or recently updated. The table headers do not
+  sort; see [ADR-0030](./docs/adr/0030-one-ordering-control-on-the-public-listing.md).
 - [x] Users cannot see who has requested/reserved/checked out an item.
 - [x] Staff add, edit, and delete inventory items. Every item-scoped surface
   lives under `/inventory` (`/inventory/new`, `/inventory/$itemId`,
