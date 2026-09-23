@@ -171,13 +171,22 @@ stronger proof than a link we mailed ourselves.
 
 Two rows are still refused, and `/sign-in` still renders the banner for them. An
 unverified row that some other provider is already linked to belongs to whoever
-holds that identity, and a banned row would hand the student an account an admin
-has shut, which is a worse dead end than the refusal; clearing a ban is a
-person's decision, not a sign-in's. Neither has a self-service remedy: the
-emailed code refuses both rows for the same reasons
-(`src/server/_internal/otp-sign-in-guard.ts`), and the old advice, to sign in
-with the password and verify the address, went with the password in #576. So the
-banner names the capstone office.
+holds that identity, and a row under an active ban would hand the student an
+account an admin has shut, which is a worse dead end than the refusal; clearing a
+ban is a person's decision, not a sign-in's. A timed ban that has run out is not
+refused, because the admin plugin clears it at the next session anyway. Neither
+refused row has a self-service remedy: the emailed code refuses both for the same
+reasons, because the release, the code guard and the admin user page all read
+`addressProofRefused` in `src/lib/address-proof.ts` (#605), and the old advice,
+to sign in with the password and verify the address, went with the password in
+#576. So ONID's banner names the capstone office.
+
+The ONID button's error URL is `/sign-in?provider=onid`, and GitHub's is
+`/sign-in?provider=github`, so the banner knows which provider refused (#579).
+GitHub's `account_not_linked` has a self-service remedy that ONID's lacks, and
+its banner says so: GitHub has no release, so it also reaches that code for a
+credential-only row, and for an address GitHub has not verified, and an emailed
+code to the address signs in for both.
 
 ## Rotating the secret
 
