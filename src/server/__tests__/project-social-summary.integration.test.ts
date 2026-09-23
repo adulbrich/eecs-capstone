@@ -4,10 +4,13 @@ import { db } from "#/db";
 import { projects, user } from "#/db/schema";
 import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
 import { auth } from "#/lib/auth";
+import { settleProjectRefreshes } from "#/server/_internal/project-refresh";
 import { refreshSocialSummary } from "#/server/_internal/project-social-summary";
 import {
   createProjectAs,
   performTransitionAs,
+  restoreProjectAs,
+  softDeleteProjectAs,
   updateProjectAs,
 } from "#/server/_internal/projects";
 import { SOCIAL_SUMMARY_TOOL_NAME } from "#/server/_internal/social-summary-core";
@@ -32,6 +35,31 @@ function fakeModel(summary: string): ResponsesFn {
 }
 
 const failing: ResponsesFn = () => Promise.reject(new Error("Bedrock is down"));
+
+/**
+ * A model that answers only once `release` is called, standing in for a
+ * stalled Bedrock call. `called` resolves when the refresh reaches it, which
+ * is after it has read the row. Release it in a `finally`; if the code under
+ * test awaits the held call, the `try` never finishes, this test times out
+ * and the next test's drain hangs too, so read the first failure.
+ */
+function heldModel(summary: string) {
+  let release: () => void = () => undefined;
+  let reached: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const called = new Promise<void>((resolve) => {
+    reached = resolve;
+  });
+  const answer = fakeModel(summary);
+  const model: ResponsesFn = async (body) => {
+    reached();
+    await gate;
+    return answer(body);
+  };
+  return { model, release, called };
+}
 
 async function makeAdmin(email: string) {
   await auth.api.createUser({
@@ -76,6 +104,7 @@ async function publish(
   await performTransitionAs(admin, id, "submitted", undefined, { summarize });
   await performTransitionAs(admin, id, "approved", undefined, { summarize });
   await performTransitionAs(admin, id, "published", undefined, { summarize });
+  await settleProjectRefreshes();
 }
 
 async function readRow(id: string) {
@@ -147,6 +176,7 @@ describe("refreshSocialSummary", () => {
       undefined,
       fakeModel("After.")
     );
+    await settleProjectRefreshes();
     expect((await readRow(id)).socialSummary).toBe("After.");
   });
 
@@ -164,6 +194,7 @@ describe("refreshSocialSummary", () => {
       undefined,
       model
     );
+    await settleProjectRefreshes();
     expect(model).not.toHaveBeenCalled();
     expect((await readRow(id)).socialSummary).toBe("Original wording.");
   });
@@ -189,6 +220,7 @@ describe("refreshSocialSummary", () => {
       undefined,
       model
     );
+    await settleProjectRefreshes();
     expect(model).not.toHaveBeenCalled();
     expect((await readRow(id)).socialSummary).toBe("Wording staff chose.");
     expect(await refreshSocialSummary(id, model)).toBe("manual");
@@ -231,6 +263,7 @@ describe("refreshSocialSummary", () => {
       undefined,
       racing
     );
+    await settleProjectRefreshes();
 
     const row = await readRow(id);
     expect(row.socialSummary).toBe("Wording staff chose mid-flight.");
@@ -267,6 +300,145 @@ describe("refreshSocialSummary", () => {
     await publish(admin, id, fakeModel("x".repeat(400)));
 
     expect((await readRow(id)).socialSummary).toBeNull();
+  });
+
+  it("answers a save before the model does, then applies the summary", async () => {
+    // Production held a save's response for 301 s on a stalled Mantle call,
+    // with the row already committed, so the button never left "Saving...".
+    const admin = await makeAdmin(nextEmail());
+    const { id } = await createProjectAs(admin, baseProject("Stalled edit"));
+    await publish(admin, id, fakeModel("Before."));
+
+    const { model, release } = heldModel("After.");
+    try {
+      expect(
+        await updateProjectAs(
+          admin,
+          { ...baseProject("Stalled edit"), id, description: "New text." },
+          undefined,
+          model
+        )
+      ).toEqual({ id, updated: true });
+      expect((await readRow(id)).socialSummary).toBe("Before.");
+    } finally {
+      release();
+    }
+    await settleProjectRefreshes();
+    expect((await readRow(id)).socialSummary).toBe("After.");
+  });
+
+  it("answers a publish before the model does, then applies the summary", async () => {
+    const admin = await makeAdmin(nextEmail());
+    const { id } = await createProjectAs(admin, baseProject("Stalled publish"));
+    await performTransitionAs(admin, id, "submitted");
+    await performTransitionAs(admin, id, "approved");
+
+    const { model, release } = heldModel("Published late.");
+    try {
+      await performTransitionAs(admin, id, "published", undefined, {
+        summarize: model,
+      });
+      expect((await readRow(id)).socialSummary).toBeNull();
+    } finally {
+      release();
+    }
+    await settleProjectRefreshes();
+    expect((await readRow(id)).socialSummary).toBe("Published late.");
+  });
+
+  it("keeps the last save's summary when a second save lands during the first's model call", async () => {
+    const admin = await makeAdmin(nextEmail());
+    const { id } = await createProjectAs(admin, baseProject("Overlap"));
+    await publish(admin, id, fakeModel("Before."));
+
+    const { model, release, called } = heldModel("Of the first text.");
+    try {
+      await updateProjectAs(
+        admin,
+        { ...baseProject("Overlap"), id, description: "First text." },
+        undefined,
+        model
+      );
+      // The first refresh has read "First text." before the second commits.
+      await called;
+      await updateProjectAs(
+        admin,
+        { ...baseProject("Overlap"), id, description: "Second text." },
+        undefined,
+        fakeModel("Of the second text.")
+      );
+    } finally {
+      release();
+    }
+    await settleProjectRefreshes();
+    expect((await readRow(id)).socialSummary).toBe("Of the second text.");
+  });
+
+  it("writes nothing when the text changes during the model call, as a save on another task would", async () => {
+    // The queue orders refreshes on one task only. On two, the slower refresh
+    // would otherwise pair the newer text with a summary of the older.
+    const admin = await makeAdmin(nextEmail());
+    const { id } = await createProjectAs(admin, baseProject("Two tasks"));
+    await publish(admin, id, fakeModel("Before."));
+    await db
+      .update(projects)
+      .set({ description: "Text the model is shown." })
+      .where(eq(projects.id, id));
+
+    const editsMidCall: ResponsesFn = async (body) => {
+      await db
+        .update(projects)
+        .set({ description: "Text saved during the call." })
+        .where(eq(projects.id, id));
+      return fakeModel("Of the text the model was shown.")(body);
+    };
+
+    expect(await refreshSocialSummary(id, editsMidCall)).toBe("superseded");
+    expect((await readRow(id)).socialSummary).toBe("Before.");
+  });
+
+  it("loses to a Regenerate that lands during the model call", async () => {
+    const admin = await makeAdmin(nextEmail());
+    const { id } = await createProjectAs(admin, baseProject("Regenerated"));
+    await publish(admin, id, fakeModel("Before."));
+    await db
+      .update(projects)
+      .set({ description: "Changed text." })
+      .where(eq(projects.id, id));
+
+    const regeneratesMidCall: ResponsesFn = async (body) => {
+      await db
+        .update(projects)
+        .set({ socialSummary: "What Regenerate wrote." })
+        .where(eq(projects.id, id));
+      return fakeModel("What the background refresh wrote.")(body);
+    };
+
+    expect(await refreshSocialSummary(id, regeneratesMidCall)).toBe(
+      "superseded"
+    );
+    expect((await readRow(id)).socialSummary).toBe("What Regenerate wrote.");
+  });
+
+  it("refreshes a restored project, whose text may have moved while every refresh skipped it", async () => {
+    const admin = await makeAdmin(nextEmail());
+    const { id } = await createProjectAs(admin, baseProject("Restored"));
+    await publish(admin, id, fakeModel("Before."));
+    await softDeleteProjectAs(admin, id);
+    // Stands in for the edit whose refresh found the row deleted and skipped.
+    await db
+      .update(projects)
+      .set({ description: "Text that changed while it was deleted." })
+      .where(eq(projects.id, id));
+
+    await restoreProjectAs(admin, id, {
+      summarize: fakeModel("Of the text it came back with."),
+    });
+    await settleProjectRefreshes();
+
+    expect((await readRow(id)).socialSummary).toBe(
+      "Of the text it came back with."
+    );
   });
 
   it("skips while the kill switch is off", async () => {

@@ -1,6 +1,7 @@
 import { Sha256 } from "@aws-crypto/sha256-js";
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { SignatureV4 } from "@smithy/signature-v4";
+import { errorMessage } from "#/lib/error-message";
 
 const DEFAULT_REGION = "us-east-1";
 
@@ -135,6 +136,14 @@ function getSigner(): SignatureV4 {
 }
 
 /**
+ * Without it a stalled call waits out undici's 300 s header timeout, which is
+ * how a save once sat on "Saving..." (ADR-0053). It caps every caller: the
+ * slowest save, AI review and scope assessment in the week before took 2.3 s,
+ * 4.5 s and 5.3 s, so this cuts a stall rather than a slow answer.
+ */
+const MANTLE_TIMEOUT_MS = 60_000;
+
+/**
  * Calls the OpenAI-compatible Responses API on the bedrock-mantle endpoint.
  *
  * There is no AWS SDK client for this endpoint, so this signs a plain fetch.
@@ -155,15 +164,59 @@ export const mantleResponses: ResponsesFn = async (body) => {
     protocol: "https:",
     query: {},
   });
-  const response = await fetch(`https://${hostname}${RESPONSES_PATH}`, {
-    body: payload,
-    headers: signed.headers,
-    method: "POST",
-  });
-  if (!response.ok) {
+  let response: Response;
+  try {
+    response = await fetch(`https://${hostname}${RESPONSES_PATH}`, {
+      body: payload,
+      headers: signed.headers,
+      method: "POST",
+      signal: AbortSignal.timeout(MANTLE_TIMEOUT_MS),
+    });
+  } catch (error) {
     throw new Error(
-      `Bedrock Mantle returned ${response.status}: ${await response.text()}`
+      `Bedrock Mantle request failed: ${fetchFailureReason(error)}`,
+      { cause: error }
     );
   }
-  return (await response.json()) as MantleResponse;
+  if (!response.ok) {
+    const text = await readResponse(() => response.text());
+    throw new Error(`Bedrock Mantle returned ${response.status}: ${text}`);
+  }
+  return (await readResponse(() => response.json())) as MantleResponse;
 };
+
+/** A body that dies mid-read names its cause the same way a failed fetch does. */
+async function readResponse<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    throw new Error(
+      `Bedrock Mantle response failed: ${fetchFailureReason(error)}`,
+      { cause: error }
+    );
+  }
+}
+
+/**
+ * What a failed fetch actually hit. undici rejects with a bare "fetch failed"
+ * and puts the reason, a code such as `ECONNREFUSED`, `ENOTFOUND` or
+ * `UND_ERR_SOCKET`, on `cause`, which every log line here used to drop: the
+ * stall behind ADR-0053 left nothing but "fetch failed" to diagnose. Our own
+ * timeout is a `TimeoutError` with no cause, and reads as its message alone.
+ * A host whose every address refuses gives an `AggregateError` with an empty
+ * message, so the first of its errors speaks for it.
+ */
+export function fetchFailureReason(error: unknown): string {
+  const message = errorMessage(error, "fetch failed");
+  const cause = error instanceof Error ? error.cause : undefined;
+  if (!(cause instanceof Error)) {
+    return message;
+  }
+  const code = (cause as { code?: unknown }).code;
+  const detail =
+    cause.message ||
+    (cause instanceof AggregateError
+      ? errorMessage(cause.errors?.[0], "")
+      : "");
+  return `${message} (${typeof code === "string" ? code : cause.name}: ${detail})`;
+}

@@ -20,7 +20,7 @@ const LOAD_FAILED =
   "Could not load the stored summary. Nothing here is safe to act on until it loads.";
 
 const RACE_LOST =
-  "The summary changed while the rewrite was running, so the rewrite was thrown away. The box shows what is stored now.";
+  "The project or its summary changed while the rewrite was running, so the rewrite was thrown away. The box shows what is stored now.";
 
 /**
  * The staff view of a project's social summary (#498), beside the categories

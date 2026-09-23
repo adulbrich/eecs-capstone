@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "#/db";
 import { projects } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
@@ -22,6 +22,8 @@ import type {
   SocialSummaryInput,
 } from "../social-summary";
 import { assertWithinLimit, recordReviewUsage } from "./ai-review-usage";
+import { rowStillReads } from "./project-embeddings";
+import { SUMMARY_GUARD_COLUMNS } from "./project-social-summary";
 import {
   buildSocialSummaryConfig,
   runSocialSummary,
@@ -145,7 +147,11 @@ export async function saveSocialSummaryForCurrentUser(
  * true, and a predicate excluding manual rows would make the button a no-op in
  * its main case. Comparing the flag alone is also not enough, because staff
  * saving over staff leaves it true on both sides; it is the stored text that
- * tells those two apart.
+ * tells those two apart. The project's own text is in the predicate too, by
+ * `rowStillReads`: a summary of text the project no longer has is never
+ * stored. On a published or archived project the edit has started a
+ * background refresh of the newer text (ADR-0053); on any other the panel
+ * says the rewrite was thrown away and staff can press it again.
  *
  * Two cases it deliberately does not catch, both benign for the same reason.
  * The automatic refresh rewriting the row with the same text it already held:
@@ -226,11 +232,8 @@ export async function regenerateSocialSummaryAs(
     })
     .where(
       and(
-        eq(projects.id, project.id),
-        eq(projects.socialSummaryIsManual, project.socialSummaryIsManual),
-        project.socialSummary === null
-          ? isNull(projects.socialSummary)
-          : eq(projects.socialSummary, project.socialSummary)
+        rowStillReads(project, SUMMARY_GUARD_COLUMNS),
+        eq(projects.socialSummaryIsManual, project.socialSummaryIsManual)
       )
     )
     .returning({ id: projects.id });

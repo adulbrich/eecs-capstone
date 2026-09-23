@@ -377,6 +377,29 @@ describe("regenerateSocialSummaryAs against a save that lands mid-flight", () =>
     return model;
   }
 
+  it("writes nothing when the project's text changes mid-call, leaving it to the edit's own refresh", async () => {
+    // The edit's background refresh reads the newer text (ADR-0053); a summary
+    // of the older one must not beat it, or nothing would ever redo it.
+    const staff = await makeUser("admin");
+    const project = await makeProject({ socialSummary: "Generated wording." });
+
+    const result = await regenerateSocialSummaryAs(
+      staff,
+      { projectId: project.id },
+      racingModel("A summary of the older text.", () =>
+        db
+          .update(projects)
+          .set({ description: "What the proposer saved mid-call." })
+          .where(eq(projects.id, project.id))
+      )
+    );
+
+    expect(result.outcome).toBe("changed");
+    expect((await readRow(project.id)).socialSummary).toBe(
+      "Generated wording."
+    );
+  });
+
   it("keeps a save that landed on an automatic row, and says the row changed", async () => {
     const alice = await makeUser("admin");
     const bob = await makeUser("admin");

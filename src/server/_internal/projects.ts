@@ -44,11 +44,11 @@ import {
   notifyProposerReassignedByEmail,
   notifyTransitionByEmail,
 } from "./project-emails";
+import { isEmbeddableStatus } from "./project-embeddings";
 import {
-  isEmbeddableStatus,
-  refreshProjectEmbedding,
-} from "./project-embeddings";
-import { refreshSocialSummary } from "./project-social-summary";
+  type RefreshDeps,
+  refreshProjectInBackground,
+} from "./project-refresh";
 
 export interface AuthUser {
   id: string;
@@ -267,13 +267,10 @@ export async function updateProjectAs(
   // Archived counts as well as published, so editing an archived project keeps
   // its vector truthful rather than leaving one computed from text nobody can
   // see any more. `isEmbeddableStatus` is the single spelling of that rule.
+  // Started, not awaited: the response says the edit committed, never that
+  // the refresh applied (ADR-0053).
   if (isEmbeddableStatus(existing.status)) {
-    await refreshProjectEmbedding(existing.id, embed);
-    // Same gate, same placement, same swallowed failure. Separate call
-    // because the two are separate models with separate kill switches: an
-    // embeddings outage must not cost the project its preview text, and the
-    // reverse.
-    await refreshSocialSummary(existing.id, summarize);
+    refreshProjectInBackground(existing.id, { embed, summarize });
   }
 
   return { id: existing.id, updated: true };
@@ -696,6 +693,8 @@ async function commitTransition(
 
   // After the transaction, never inside it: a Bedrock call must not hold a
   // database transaction open, and its failure must not roll back the publish.
+  // Started, not awaited, so the publish answers before the model does
+  // (ADR-0053).
   //
   // Inside the transaction this would not even fail loudly.
   // refreshProjectEmbedding re-reads the row and returns "skipped" unless the
@@ -707,8 +706,10 @@ async function commitTransition(
   // while published stays put. The one case it does work is a project that
   // failed to embed at publish time, which archiving now retries.
   if (isEmbeddableStatus(target)) {
-    await refreshProjectEmbedding(project.id, opts?.embed);
-    await refreshSocialSummary(project.id, opts?.summarize);
+    refreshProjectInBackground(project.id, {
+      embed: opts?.embed,
+      summarize: opts?.summarize,
+    });
   }
 
   // Same reasoning, and it matters more here: a failed email must not undo an
@@ -795,7 +796,8 @@ export async function softDeleteProjectAs(
 
 export async function restoreProjectAs(
   viewer: AuthUser,
-  id: string
+  id: string,
+  deps?: RefreshDeps
 ): Promise<{ id: string }> {
   assertStaff(viewer);
   const project = await loadProjectOr404(id);
@@ -814,6 +816,12 @@ export async function restoreProjectAs(
       viewer.id
     );
   });
+  // Every refresh started while the row was deleted skipped it, so an edit in
+  // that window, or one racing the delete, left nothing current (ADR-0053).
+  // Ungated, because a transition racing the restore makes the status read
+  // above stale; the refresh checks the status itself, and usually finds both
+  // hashes current. The row's own id, not the input's, keys the queue.
+  refreshProjectInBackground(project.id, deps);
   return { id };
 }
 

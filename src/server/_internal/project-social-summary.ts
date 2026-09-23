@@ -6,9 +6,10 @@ import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import { socialSummariesEnabled } from "#/lib/_internal/social-summary-flag";
 import {
   buildSocialSummarySource,
+  type SocialSummarySourceProject,
   socialSummaryHash,
 } from "#/lib/social-summary-source";
-import { isEmbeddableStatus } from "./project-embeddings";
+import { isEmbeddableStatus, rowStillReads } from "./project-embeddings";
 import {
   buildSocialSummaryConfig,
   runSocialSummary,
@@ -21,7 +22,25 @@ export type SocialSummaryOutcome =
   | "manual"
   | "unchanged"
   | "updated"
+  | "superseded"
   | "failed";
+
+/**
+ * Every field `buildSocialSummarySource` reads, plus the summary itself, so a
+ * Regenerate that lands during the model call wins over the background
+ * refresh. Regenerate guards its own write on the same columns, so of the two
+ * the one that read the current text is the one that lands. A `Record` so a
+ * new source field fails to compile until it is guarded here.
+ */
+const SUMMARY_TEXT: Record<keyof SocialSummarySourceProject, true> = {
+  title: true,
+  description: true,
+  problemStatement: true,
+};
+export const SUMMARY_GUARD_COLUMNS = [
+  ...(Object.keys(SUMMARY_TEXT) as (keyof SocialSummarySourceProject)[]),
+  "socialSummary",
+] as const;
 
 /**
  * The single writer of a project's social summary.
@@ -47,15 +66,17 @@ export type SocialSummaryOutcome =
  * One property this leans on rather than enforces: the summary is written from
  * the text read at the top, so an edit landing during the model call leaves a
  * summary describing text that has already changed, paired with that older
- * text's hash. It self-corrects, but only because the edit that raced runs
- * this function again on its own commit, reads the new text, finds the stored
- * hash does not match it and regenerates. That holds because both call sites
- * in `projects.ts` run it after every commit that leaves the project in an
- * embeddable status, which is every commit that could strand a pairing: the
- * gate below skips the other statuses, so a draft has no stored summary to go
- * stale and gets one when it publishes. A caller that writes project prose
- * WITHOUT calling this afterwards would strand the stale pairing, since
- * nothing else recomputes the hash.
+ * text's hash. It cannot land: the write below holds only while the row still
+ * reads what this read, so once the text has moved it writes nothing and
+ * reports "superseded" (ADR-0053), and the edit that moved it runs this
+ * function again on its own commit, reads the new text and generates from it.
+ * The retry holds because `projects.ts` starts this after every commit that
+ * leaves the project in an embeddable status, which is every commit that could
+ * strand a pairing: the gate below skips the other statuses and a deleted row,
+ * so a draft has no stored summary to go stale and gets one when it publishes,
+ * and a restore starts one for whatever changed while the row was deleted. A
+ * caller that writes project prose WITHOUT calling this afterwards would strand
+ * the stale pairing, since nothing else recomputes the hash.
  */
 export async function refreshSocialSummary(
   projectId: string,
@@ -118,12 +139,14 @@ export async function refreshSocialSummary(
       })
       .where(
         and(
-          eq(projects.id, projectId),
+          rowStillReads(project, SUMMARY_GUARD_COLUMNS),
           eq(projects.socialSummaryIsManual, false)
         )
       )
       .returning({ id: projects.id });
-    return written.length > 0 ? "updated" : "manual";
+    // "superseded" whichever part of the predicate failed: the text or the
+    // summary moved, or staff took the field by hand.
+    return written.length > 0 ? "updated" : "superseded";
   } catch (error) {
     console.error(
       `Social summary failed for project ${projectId}`,

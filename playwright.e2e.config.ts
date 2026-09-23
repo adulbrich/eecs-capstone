@@ -95,11 +95,13 @@ export default defineConfig({
       // and a mismatch fails sign-in for a reason that looks nothing like a
       // port problem.
       BETTER_AUTH_URL: BASE_URL,
-      // Publishing a project awaits a Titan embedding call. The flag is the
-      // same one vitest.integration.config.ts sets; what it saves is not model
-      // latency but the AWS credential-chain walk, which probes IMDS with
-      // retries on a runner that has no instance metadata.
+      // Publishing or editing a live project starts a Titan embedding and a
+      // Mantle summary call in the background (ADR-0053). The flags are the
+      // ones vitest.integration.config.ts sets; they keep the run off Bedrock
+      // and off the AWS credential-chain walk, which probes IMDS with retries
+      // on a runner that has no instance metadata.
       BEDROCK_EMBEDDINGS_ENABLED: "false",
+      BEDROCK_SOCIAL_SUMMARY_ENABLED: "false",
     },
   },
 });
