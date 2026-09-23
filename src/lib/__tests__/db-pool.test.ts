@@ -6,9 +6,11 @@ import {
   CONNECTION_BUDGET,
   logPoolErrors,
   POOL_METRICS,
+  POOL_MIN,
   poolConfig,
   poolMetricsLine,
   startPoolMetrics,
+  warmPool,
 } from "../_internal/db-pool";
 
 const QUOTES = /^"|"$/g;
@@ -110,6 +112,29 @@ describe("poolConfig", () => {
     const fleet =
       perTask * CONNECTION_BUDGET.taskCeiling + CONNECTION_BUDGET.oneOffScript;
     expect(fleet).toBeLessThanOrEqual(CONNECTION_BUDGET.rdsUsable);
+  });
+
+  it("holds a floor inside the cap when asked to keep warm", () => {
+    // A floor below `max` leaves the budget test above unchanged: `min` only
+    // exempts clients from the idle timeout, it never opens past `max` (#601).
+    const { min, max } = poolConfig(URL_WITH_ENCODED_PASSWORD, {
+      keepWarm: true,
+    });
+    expect(min).toBe(POOL_MIN);
+    expect(POOL_MIN).toBeGreaterThan(0);
+    expect(POOL_MIN).toBeLessThan(max ?? 0);
+  });
+
+  it("lets a process exit with the floor still open", () => {
+    // A client under `min` never times out, so without this a script that
+    // imports `#/db` with the floor on would hold the event loop forever.
+    expect(
+      poolConfig(URL_WITH_ENCODED_PASSWORD, { keepWarm: true }).allowExitOnIdle
+    ).toBe(true);
+  });
+
+  it("keeps no floor by default, for dev, tests and scripts", () => {
+    expect(poolConfig(URL_WITH_ENCODED_PASSWORD).min ?? 0).toBe(0);
   });
 });
 
@@ -271,5 +296,117 @@ describe("pool metrics", () => {
     // alarm that stays OK forever.
     expect(poolAlarmSetting("namespace")).toBe(POOL_METRICS.namespace);
     expect(poolAlarmSetting("metric_name")).toBe(POOL_METRICS.waiting);
+  });
+});
+
+/** A pool that counts how many connects are in flight at once. */
+function countingPool(fail = 0) {
+  let inFlight = 0;
+  let peak = 0;
+  let released = 0;
+  let remainingFailures = fail;
+  return {
+    stats: () => ({ peak, released }),
+    connect: async () => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      inFlight--;
+      if (remainingFailures > 0) {
+        remainingFailures--;
+        throw new Error("connect ECONNREFUSED 10.0.0.5:5432");
+      }
+      return {
+        release: () => {
+          released++;
+        },
+      };
+    },
+  };
+}
+
+describe("warmPool", () => {
+  it("opens every client at once rather than reusing one", async () => {
+    // A connect-then-release loop would hand the same idle client back each
+    // time and leave the pool holding one.
+    const pool = countingPool();
+    await warmPool(pool, 5, () => undefined);
+    expect(pool.stats()).toEqual({ peak: 5, released: 5 });
+  });
+
+  it("logs one redacted line and does not throw when a connect fails", async () => {
+    const pool = countingPool(2);
+    const logged: string[] = [];
+    await expect(
+      warmPool(pool, 5, (line) => logged.push(line))
+    ).resolves.toBeUndefined();
+    expect(pool.stats().released).toBe(3);
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toContain("3 of 5");
+    expect(logged[0]).toContain("ECONNREFUSED");
+  });
+
+  it("opens the floor by default, the count production passes", async () => {
+    const pool = countingPool();
+    await warmPool(pool, undefined, () => undefined);
+    expect(pool.stats()).toEqual({ peak: POOL_MIN, released: POOL_MIN });
+  });
+
+  it("says nothing when every client opened", async () => {
+    const logged: string[] = [];
+    await warmPool(countingPool(), 5, (line) => logged.push(line));
+    expect(logged).toEqual([]);
+  });
+
+  it("does not reject when a release throws", async () => {
+    // pg-pool throws from `release` only on a second release, which this
+    // cannot make, but the call site does not await or catch, so "never
+    // throws" has to hold for every client, and the rest still go back.
+    let released = 0;
+    const pool = {
+      connect: () =>
+        Promise.resolve({
+          release: () => {
+            released++;
+            if (released === 1) {
+              throw new Error(
+                "Release called on client which has already been released to the pool."
+              );
+            }
+          },
+        }),
+    };
+    const logged: string[] = [];
+    await expect(
+      warmPool(pool, 3, (line) => logged.push(line))
+    ).resolves.toBeUndefined();
+    expect(released).toBe(3);
+    expect(logged).toEqual([
+      "Database pool warm-up opened 2 of 3: Error: Release called on client which has already been released to the pool.",
+    ]);
+  });
+
+  it("does not reject when connect throws before returning a promise", async () => {
+    // pg-pool throws synchronously on a connection string it cannot parse or
+    // a missing `sslrootcert`. `src/db/index.ts` does not await the warm-up,
+    // so a rejection here would be unhandled: the process exits, and Node
+    // prints the raw error rather than the redacted line.
+    let calls = 0;
+    const pool = {
+      connect: () => {
+        calls++;
+        if (calls === 2) {
+          throw new Error("self-signed certificate in certificate chain");
+        }
+        return Promise.resolve({ release: () => undefined });
+      },
+    };
+    const logged: string[] = [];
+    await expect(
+      warmPool(pool, 3, (line) => logged.push(line))
+    ).resolves.toBeUndefined();
+    expect(logged).toEqual([
+      "Database pool warm-up opened 2 of 3: Error: self-signed certificate in certificate chain",
+    ]);
   });
 });

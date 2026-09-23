@@ -1,4 +1,5 @@
 import type { Pool, PoolConfig } from "pg";
+import { redactQueryError } from "./redact-query-error";
 import { TRAFFIC_STATEMENT_TIMEOUT_MS } from "./traffic-timing";
 
 /**
@@ -38,11 +39,27 @@ export const CONNECTION_BUDGET = {
  * test pinned three tasks at 59 of 60 during a term start burst while CPU
  * still had room, with session lookups failing on the acquire timeout
  * (#558). With the ceiling at four, 45 fits: (45 + 5) * 4 + 10 = 210 of
- * 220, leaving ten for a second one-off script or a hand-held psql. A cap,
- * not a floor: pg-pool opens lazily and closes clients idle for 10 s, so a
- * quiet task holds far fewer.
+ * 220, leaving ten for a second one-off script or a hand-held psql. A cap:
+ * pg-pool opens lazily and closes clients idle for 10 s, so a quiet task
+ * holds no more than `POOL_MIN` in production and none elsewhere.
  */
 const POOL_MAX = 45;
+
+/**
+ * Connections a production task keeps open through a lull (#601, ADR-0052).
+ * Twice a load-test burst drew one 500 from a task whose pool had nothing
+ * open: its 0.25 vCPU was saturated serving the burst while it opened TLS
+ * connections to RDS, and a connect past `ACQUIRE_TIMEOUT_MS` fails the
+ * request. `min` exempts the first five from the idle timeout, so a lull no
+ * longer closes them; `warmPool` opens them on the task's first request,
+ * because `min` alone never opens anything. Nothing reopens one that drops
+ * (an RDS failover or reboot): pg-pool removes it and the floor refills only
+ * as demand opens connections again, so the first burst after a drop can
+ * start below five.
+ * Inside `POOL_MAX`, so the budget above is unchanged; the resting count is
+ * five per task.
+ */
+export const POOL_MIN = 5;
 
 /**
  * How long a request waits for a connection before failing. pg-pool applies
@@ -54,12 +71,68 @@ const POOL_MAX = 45;
  */
 export const ACQUIRE_TIMEOUT_MS = 5000;
 
-export function poolConfig(connectionString: string): PoolConfig {
+/**
+ * The app pool. `keepWarm` is for the production server only: a client under
+ * `min` is never closed, so anywhere a module can be evaluated twice (dev
+ * HMR, a test worker) would hold a stale pool's floor open for good.
+ * `allowExitOnIdle` goes with it so that a script run with the floor on can
+ * still exit once its work is done.
+ */
+export function poolConfig(
+  connectionString: string,
+  { keepWarm = false }: { keepWarm?: boolean } = {}
+): PoolConfig {
   return {
     connectionString,
     max: POOL_MAX,
     connectionTimeoutMillis: ACQUIRE_TIMEOUT_MS,
+    ...(keepWarm ? { min: POOL_MIN, allowExitOnIdle: true } : {}),
   };
+}
+
+/**
+ * Opens `count` clients at once, `POOL_MIN` unless a test says otherwise, and
+ * hands them back, so the pool holds that many idle and `min` keeps them.
+ * At once rather than in a loop: a connect-then-release loop gets the same
+ * idle client back every time and leaves one open. Never throws, because a
+ * task that cannot reach the database should still answer `/api/healthz`,
+ * and nothing awaits this call to catch it; a failed connect is one line,
+ * redacted (ADR-0042), and the pool opens the missing clients on demand as it
+ * did before.
+ */
+export async function warmPool(
+  pool: { connect: () => Promise<{ release: () => void }> },
+  count: number = POOL_MIN,
+  log: (message: string) => void = console.error
+): Promise<void> {
+  // Each connect goes through `then` so that one throwing before it returns
+  // a promise (pg-pool does, on a connection string it cannot parse or a
+  // missing `sslrootcert`) settles as a rejection here rather than escaping
+  // `allSettled` as an unhandled one with the raw error attached.
+  const results = await Promise.allSettled(
+    Array.from({ length: count }, () =>
+      Promise.resolve().then(() => pool.connect())
+    )
+  );
+  let opened = 0;
+  let firstFailure: unknown;
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      try {
+        result.value.release();
+        opened++;
+      } catch (error) {
+        firstFailure ??= error;
+      }
+    } else {
+      firstFailure ??= result.reason;
+    }
+  }
+  if (opened < count) {
+    log(
+      `Database pool warm-up opened ${opened} of ${count}: ${redactQueryError(firstFailure)}`
+    );
+  }
 }
 
 /**
