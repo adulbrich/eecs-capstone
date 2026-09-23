@@ -818,10 +818,10 @@ export async function restoreProjectAs(
   });
   // Every refresh started while the row was deleted skipped it, so an edit in
   // that window, or one racing the delete, left nothing current (ADR-0053).
-  // Usually this finds both hashes current and returns "unchanged".
-  if (isEmbeddableStatus(project.status)) {
-    refreshProjectInBackground(id, deps);
-  }
+  // Ungated, because a transition racing the restore makes the status read
+  // above stale; the refresh checks the status itself, and usually finds both
+  // hashes current. The row's own id, not the input's, keys the queue.
+  refreshProjectInBackground(project.id, deps);
   return { id };
 }
 

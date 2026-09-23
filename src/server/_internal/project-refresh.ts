@@ -18,7 +18,8 @@ const latestByProject = new Map<string, Promise<void>>();
  * its response must not wait on Bedrock: a stalled Mantle call once held a
  * save for 301 s with the row already written (ADR-0053).
  *
- * Refreshes for one project run one after another, in commit order, so the
+ * Refreshes for one project run one after another, in the order they are
+ * started just after each commit, and each reads the row when it runs, so the
  * last one reads the last committed text. Each logs one line with both
  * outcomes, which is the only record that a refresh applied.
  */

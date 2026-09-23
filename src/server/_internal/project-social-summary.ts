@@ -144,6 +144,8 @@ export async function refreshSocialSummary(
         )
       )
       .returning({ id: projects.id });
+    // "superseded" whichever part of the predicate failed: the text or the
+    // summary moved, or staff took the field by hand.
     return written.length > 0 ? "updated" : "superseded";
   } catch (error) {
     console.error(
