@@ -55,10 +55,10 @@ data "aws_cloudfront_origin_request_policy" "all_viewer_and_cloudfront" {
 # among them, which the traffic writer reads (#590). The viewer headers are
 # load-bearing: without a policy that forwards them CloudFront drops Referer
 # and replaces User-Agent, and Better Auth's origin check needs Host, Origin
-# and Referer unchanged. A separate ordered_cache_behavior below caches /assets/* on
-# Managed-CachingOptimized; never widen that path_pattern beyond hashed build
-# output, since CachingOptimized's one-second minimum TTL caches even when
-# the origin sends no-cache.
+# and Referer unchanged. A separate ordered_cache_behavior below caches
+# /assets/* on Managed-CachingOptimized; never widen that path_pattern beyond
+# hashed build output, since CachingOptimized's one-second minimum TTL caches
+# even when the origin sends no-cache.
 resource "aws_cloudfront_distribution" "app" {
   enabled         = true
   comment         = "${var.project} app"
