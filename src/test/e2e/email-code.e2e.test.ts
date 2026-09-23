@@ -216,6 +216,75 @@ test.describe("refusals on the emailed code", () => {
     }
   });
 
+  // The answers are stubbed: what is under test is the form while a request
+  // is in flight and after the redeem refuses, which no real code can be made
+  // to do on cue. A refusal empties the field, so anything typed during the
+  // check would be lost; the field is locked until the answer arrives instead.
+  test("the code step is locked mid-check, and a refused redeem empties it", async ({
+    page,
+  }) => {
+    const email = fixtureEmail();
+    const check = "**/api/auth/email-otp/check-verification-otp";
+    const redeem = "**/api/auth/sign-in/email-otp";
+
+    try {
+      await startCodeStep(page, email);
+      const field = page.getByLabel("Code", { exact: true });
+      const back = page.getByRole("button", {
+        name: "Use a different address",
+      });
+
+      let answer: () => void = () => undefined;
+      const answered = new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+      await page.route(check, async (route) => {
+        await answered;
+        await route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({ code: "INVALID_OTP", message: "Invalid OTP" }),
+        });
+      });
+      await field.fill("000000");
+      await page.getByRole("button", { name: "Confirm code" }).click();
+      await expect(field).toBeDisabled();
+      await expect(back).toBeDisabled();
+      answer();
+      await expect(page.getByRole("alert")).toBeVisible();
+      await expect(field).toHaveValue("");
+      await expect(field).toBeFocused();
+      await page.unroute(check);
+
+      // A code the check accepts for an existing account goes straight to the
+      // redeem, whose refusal takes the same way out as the check's.
+      await page.route(check, (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ success: true }),
+        })
+      );
+      await page.route(redeem, (route) =>
+        route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({ code: "INVALID_OTP", message: "Invalid OTP" }),
+        })
+      );
+      await field.fill("123456");
+      await page.getByRole("button", { name: "Confirm code" }).click();
+      await expect(page.getByRole("alert")).toContainText(
+        /ask for a new code/i
+      );
+      await expect(field).toHaveValue("");
+      await expect(field).toBeFocused();
+      await expect(page).toHaveURL(/\/sign-in/);
+    } finally {
+      await removeRow(email);
+    }
+  });
+
   test("an expired code is refused, and asking again recovers", async ({
     page,
   }) => {

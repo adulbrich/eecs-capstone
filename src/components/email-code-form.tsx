@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { REGEXP_ONLY_DIGITS } from "input-otp";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
@@ -123,6 +123,15 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Focus after the render that re-enables the field, not inside `refuse`:
+  // the field is disabled while its check is in flight, and a disabled input
+  // takes no focus. On any other step the ref is empty and this does nothing.
+  useEffect(() => {
+    if (error !== null) {
+      codeField.current?.focus();
+    }
+  }, [error]);
+
   async function sendCode(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
@@ -220,11 +229,13 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
    * full, input-otp pastes at the caret, which sits on the last slot: pasting
    * the right code over a wrong `000000` gave `000004`, and phone autofill
    * lands in the same place. An empty field takes either whole.
+   *
+   * Nothing typed is lost by it: the field is disabled from the submit until
+   * the answer arrives, so the draft this empties is the one that was sent.
    */
   function refuse(message: string) {
     setError(withRecovery(message));
     setDraft("");
-    codeField.current?.focus();
   }
 
   async function submitName(e: React.FormEvent<HTMLFormElement>) {
@@ -300,6 +311,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
             // message rather than making the person retype it.
             autoComplete="one-time-code"
             containerClassName="justify-center"
+            disabled={loading}
             id="code-otp"
             inputMode="numeric"
             maxLength={CODE_LENGTH}
@@ -330,8 +342,11 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
         <Button className="w-full" disabled={loading} type="submit">
           {loading ? "Checking..." : "Confirm code"}
         </Button>
+        {/* Disabled mid-check as well, so an answer about this address cannot
+            land on the next one's step. */}
         <Button
           className="w-full"
+          disabled={loading}
           onClick={() => {
             setError(null);
             setStep("address");
