@@ -665,6 +665,77 @@ describe("admin project search reaches people, not just text", () => {
   });
 });
 
+describe("admin project search reaches the mentor (#617)", () => {
+  /** A mentor account named apart from its address, as `makeAdmin` does not. */
+  async function makeMentor(email: string, name: string) {
+    const mentor = await makeProposer(email);
+    await db.update(user).set({ name }).where(eq(user.id, mentor.id));
+    return mentor;
+  }
+
+  it("carries the mentor address beside the resolved name, so an address with no account still shows", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    await makeMentor("kpark@example.edu", "Kim Park");
+    const linked = await makeProject(admin, "Linked mentor");
+    await flag(linked.id, { mentorEmail: "kpark@example.edu" });
+    const unlinked = await makeProject(admin, "Unlinked mentor");
+    await flag(unlinked.id, { mentorEmail: "new.mentor@example.edu" });
+    const none = await makeProject(admin, "No mentor");
+
+    const { rows } = await listAdminProjectsAs(admin, filter());
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    expect(byId.get(linked.id)).toMatchObject({
+      mentorEmail: "kpark@example.edu",
+      mentorName: "Kim Park",
+    });
+    expect(byId.get(unlinked.id)).toMatchObject({
+      mentorEmail: "new.mentor@example.edu",
+      mentorName: null,
+    });
+    expect(byId.get(none.id)).toMatchObject({
+      mentorEmail: null,
+      mentorName: null,
+    });
+  });
+
+  it("finds a project by its mentor account's name", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    await makeMentor("kpark@example.edu", "Kim Park");
+    const mentored = await makeProject(admin, "Tide Gauge");
+    await flag(mentored.id, { mentorEmail: "kpark@example.edu" });
+    await makeProject(admin, "Weather Station");
+
+    const { rows } = await listAdminProjectsAs(admin, filter({ q: "Kim Pa" }));
+    expect(rows.map((r) => r.id)).toEqual([mentored.id]);
+  });
+
+  it("finds a project by a fragment of a mentor address with no account", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    const mentored = await makeProject(admin, "Trail Mapper");
+    await flag(mentored.id, { mentorEmail: "new.mentor@example.edu" });
+    await makeProject(admin, "Orchard Robot");
+
+    const { rows } = await listAdminProjectsAs(
+      admin,
+      filter({ q: "new.mentor" })
+    );
+    expect(rows.map((r) => r.id)).toEqual([mentored.id]);
+  });
+
+  it("is followed by the CSV export, which carries the mentor address", async () => {
+    const admin = await makeAdmin("staff@example.edu");
+    const mentored = await makeProject(admin, "Trail Mapper");
+    await flag(mentored.id, { mentorEmail: "new.mentor@example.edu" });
+    await makeProject(admin, "Orchard Robot");
+    const search = filter({ q: "new.mentor" });
+
+    const table = await listAdminProjectsAs(admin, search);
+    const exported = await exportAdminProjectsAs(admin, search);
+    expect(exported.rows.map((r) => r.id)).toEqual(table.rows.map((r) => r.id));
+    expect(exported.rows[0]?.mentorEmail).toBe("new.mentor@example.edu");
+  });
+});
+
 async function publish(admin: { id: string; role: string }, id: string) {
   await performTransitionAs(admin, id, "submitted");
   await performTransitionAs(admin, id, "approved");

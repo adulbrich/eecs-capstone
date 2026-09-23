@@ -190,8 +190,12 @@ export const projectSummarySelect = {
  */
 export const adminProjectSummarySelect = {
   ...projectSummarySelect,
-  // Staff only: the resolved mentor name, for the staff list and the CSV
-  // export. It left the public projection in #336.
+  // Staff only: the mentor address and the name it resolves to, for the
+  // staff list, its search and the CSV export. The name left the public
+  // projection in #336; the address joined it here in #617, because a
+  // mentor recorded before they have an account resolves to no name and
+  // would otherwise read the same as no mentor at all.
+  mentorEmail: projects.mentorEmail,
   mentorName: mentorNameSql,
   createdAt: projects.createdAt,
   deletedAt: projects.deletedAt,

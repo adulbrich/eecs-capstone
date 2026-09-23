@@ -214,8 +214,8 @@ function buildAdminProjectListConditions(data: AdminProjectsFilter): SQL[] {
     // partial word still matches what staff hunting for a half-remembered
     // title actually type. True since #476, which gave the public listing
     // the ILIKEs this comment had been claiming for it. Extended with
-    // proposer fields, which stay staff-only: matching a public search
-    // against one would leak it by inference.
+    // proposer and mentor fields, which stay staff-only: matching a public
+    // search against one would leak it by inference.
     //
     // The pattern is raw, so `%` and `_` in a staff query behave as
     // wildcards. The public path escapes them in `escapeLikePattern`
@@ -235,7 +235,12 @@ function buildAdminProjectListConditions(data: AdminProjectsFilter): SQL[] {
       // the stored column, as does one whose account was deleted. Matching
       // the join alone put an address on the page that the search box above
       // it could not find (#451).
-      ilike(projects.proposerEmail, like)
+      ilike(projects.proposerEmail, like),
+      // The mentor, by both strings the Mentor column shows: the stored
+      // address, which is all an unlinked mentor has, and the name it
+      // resolves to (#617).
+      ilike(projects.mentorEmail, like),
+      ilike(mentorNameSql, like)
     );
     if (match) {
       listConditions.push(match);
