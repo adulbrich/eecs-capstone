@@ -52,7 +52,7 @@ const POOL_MAX = 45;
  * here because `/api/healthz` never touches the database on purpose, so
  * nothing would restart the task.
  */
-const ACQUIRE_TIMEOUT_MS = 5000;
+export const ACQUIRE_TIMEOUT_MS = 5000;
 
 export function poolConfig(connectionString: string): PoolConfig {
   return {

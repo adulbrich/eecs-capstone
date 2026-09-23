@@ -6,10 +6,13 @@
  * it holds a later one, so an event must never commit more than
  * `ROLLUP_SETTLE_MS` after the time it is stamped with. The writer
  * guarantees that: it drops an event already `MAX_EVENT_LAG_MS` old by the
- * time it would insert, and every statement on its pool, the salt lock wait
- * included, is cut off at `TRAFFIC_STATEMENT_TIMEOUT_MS`. The sum stays
- * well under the settle margin, which also absorbs clock skew between
- * tasks. `traffic-timing.test.ts` holds the inequality.
+ * time it would insert, the insert waits at most the pool's acquire timeout
+ * for a connection, and every statement on its pool, the salt lock wait
+ * included, is cut off at `TRAFFIC_STATEMENT_TIMEOUT_MS`. The sum stays at
+ * most half the settle margin; `traffic-timing.test.ts` holds that. The
+ * other half covers clock skew between the task that stamps an event and
+ * the task that closes the day, which on Fargate is sub-second (Amazon Time
+ * Sync), not arbitrary.
  */
 
 /** How old an event may be, by its own stamp, when its insert starts. */

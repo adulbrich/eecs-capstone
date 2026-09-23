@@ -263,25 +263,24 @@ const BROWSER_COLUMNS = visitsColumns("Browser");
 /**
  * A table that sorts in place: every table on the page but the per-project
  * one, whose sort is in the URL. Nothing to hide, so no Columns menu. Sorted
- * by its last column, the count, most first.
+ * by `sortBy`, most first: visits unless the table says otherwise.
  */
 function LocalTable({
   caption,
   columns,
   emptyMessage,
   rows,
+  sortBy = "visits",
   storageKey,
 }: {
   caption: string;
   columns: AdminColumn<KeyedRow>[];
   emptyMessage: string;
   rows: KeyedRow[];
+  sortBy?: "views" | "visits";
   storageKey: string;
 }) {
-  const defaultSort: SortState = {
-    desc: true,
-    id: columns.at(-1)?.id ?? "label",
-  };
+  const defaultSort: SortState = { desc: true, id: sortBy };
   const [sort, setSort] = useState(defaultSort);
   return (
     <AdminDataTable
@@ -467,6 +466,7 @@ function TrafficPage() {
             views: page.views,
             visits: page.visits,
           }))}
+          sortBy="views"
           storageKey="traffic-pages"
         />
       </div>
