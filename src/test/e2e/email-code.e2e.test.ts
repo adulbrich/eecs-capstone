@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
 // biome-ignore lint/performance/noNamespaceImport: drizzle needs the schema namespace object
@@ -177,8 +177,14 @@ test.describe("refusals on the emailed code", () => {
 
     try {
       const code = await startCodeStep(page, email);
+      const field = page.getByLabel("Code", { exact: true });
 
-      await page.getByLabel("Code", { exact: true }).fill("000000");
+      // Digits only (#600). A letter enters nothing rather than a character
+      // the server will refuse at the cost of a guess.
+      await field.pressSequentially("a");
+      await expect(field).toHaveValue("");
+
+      await field.fill("000000");
       await page.getByRole("button", { name: "Confirm code" }).click();
 
       const alert = page.getByRole("alert");
@@ -187,16 +193,108 @@ test.describe("refusals on the emailed code", () => {
       // this step has the same answer, and the server cannot tell them apart.
       await expect(alert).toContainText(/ask for a new code/i);
       // Still on the code step rather than thrown back to the address, which
-      // is what makes a mistyped digit recoverable.
-      await expect(page.getByLabel("Code", { exact: true })).toBeVisible();
+      // is what makes a mistyped digit recoverable. Emptied, marked invalid
+      // and focused, ready for the next paste (#600): a full field pastes at
+      // the caret on its last slot, which turned `000000` into `000004`.
+      await expect(field).toHaveValue("");
+      await expect(field).toHaveAttribute("aria-invalid", "true");
+      await expect(field).toBeFocused();
 
       // And the real code still works. One wrong guess must not cost the
-      // person the code they were sent.
-      await page.getByLabel("Code", { exact: true }).fill(code);
+      // person the code they were sent. Pasted with a space in it, through a
+      // real paste event: `fill()` never fires one, so it would pass with the
+      // `pasteTransformer` removed, and without that the digits-only pattern
+      // rejects the whole paste.
+      await pasteInto(field, `${code.slice(0, 3)} ${code.slice(3)}`);
+      await expect(field).toHaveValue(code);
       await page.getByRole("button", { name: "Confirm code" }).click();
       await page.getByLabel("Your name", { exact: true }).fill("Mistyped Once");
       await page.getByRole("button", { name: "Create account" }).click();
       await expect(page).toHaveURL("/");
+    } finally {
+      await removeRow(email);
+    }
+  });
+
+  // The answers are stubbed: what is under test is the form while a request
+  // is in flight and after the redeem refuses, which no real code can be made
+  // to do on cue. A refusal empties the field, so anything typed during the
+  // check would be lost; the field is locked until the answer arrives instead.
+  test("the code step is locked mid-check, and a refused redeem empties it", async ({
+    page,
+  }) => {
+    const email = fixtureEmail();
+    const check = "**/api/auth/email-otp/check-verification-otp";
+    const redeem = "**/api/auth/sign-in/email-otp";
+
+    try {
+      await startCodeStep(page, email);
+      const field = page.getByLabel("Code", { exact: true });
+      const back = page.getByRole("button", {
+        name: "Use a different address",
+      });
+
+      let answer: () => void = () => undefined;
+      const answered = new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+      await page.route(check, async (route) => {
+        await answered;
+        await route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({ code: "INVALID_OTP", message: "Invalid OTP" }),
+        });
+      });
+      await field.fill("000000");
+      await page.getByRole("button", { name: "Confirm code" }).click();
+      await expect(field).toBeDisabled();
+      await expect(back).toBeDisabled();
+      answer();
+      await expect(page.getByRole("alert")).toBeVisible();
+      await expect(field).toHaveValue("");
+      await expect(field).toBeFocused();
+      await page.unroute(check);
+
+      // A code the check accepts for an existing account goes straight to the
+      // redeem, whose refusal takes the same way out as the check's.
+      await page.route(check, (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ success: true }),
+        })
+      );
+      await page.route(redeem, (route) =>
+        route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({ code: "INVALID_OTP", message: "Invalid OTP" }),
+        })
+      );
+      await field.fill("123456");
+      await page.getByRole("button", { name: "Confirm code" }).click();
+      await expect(page.getByRole("alert")).toContainText(
+        /ask for a new code/i
+      );
+      await expect(field).toHaveValue("");
+      await expect(field).toBeFocused();
+      await expect(page).toHaveURL(/\/sign-in/);
+      await page.unroute(check);
+      await page.unroute(redeem);
+
+      // A check that never reaches the server rejects rather than answering.
+      // The step has to come back rather than stay locked, and the code, which
+      // nobody judged, stays for a retry.
+      await page.route(check, (route) => route.abort("internetdisconnected"));
+      await field.fill("123456");
+      await page.getByRole("button", { name: "Confirm code" }).click();
+      await expect(page.getByRole("alert")).toContainText(
+        /could not reach the server/i
+      );
+      await expect(field).toBeEnabled();
+      await expect(field).toHaveValue("123456");
+      await expect(back).toBeEnabled();
     } finally {
       await removeRow(email);
     }
@@ -369,6 +467,25 @@ async function sendFrom(page: Page, email: string): Promise<string> {
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByRole("button", { name: "Email me a code" }).click();
   return await emailCode(email, sentAt);
+}
+
+/**
+ * Pastes `text` into `field` the way a clipboard does, so the field's own
+ * paste handling runs. `fill()` sets the value directly and skips it.
+ */
+async function pasteInto(field: Locator, text: string): Promise<void> {
+  await field.focus();
+  await field.evaluate((element, pasted) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", pasted);
+    element.dispatchEvent(
+      new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: data,
+      })
+    );
+  }, text);
 }
 
 /** Moves a live code's expiry into the past, which no click can do. */

@@ -1,8 +1,14 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { REGEXP_ONLY_DIGITS } from "input-otp";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { FieldError } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "#/components/ui/input-otp";
 import { Label } from "#/components/ui/label";
 import { authClient } from "#/lib/auth-client";
 
@@ -52,6 +58,27 @@ type Step = "address" | "code" | "name";
 
 const CODE_LENGTH = 6;
 
+/** One slot per digit, as indexes for `InputOTPSlot`. */
+const SLOTS = Array.from({ length: CODE_LENGTH }, (_, index) => index);
+
+const NON_DIGITS = /\D/g;
+
+/** What the code input's `aria-describedby` names, and the elements it names. */
+const CODE_HINT_ID = "code-otp-hint";
+const CODE_ERROR_ID = "code-otp-error";
+const CODE_EXPIRY_ID = "code-otp-expiry";
+
+/**
+ * A pasted `482 193` or `482-193`, as `482193`.
+ *
+ * Without this the digits-only pattern rejects the whole paste and enters
+ * nothing, and before #600 a plain `maxLength` input kept `482 19` and spent a
+ * guess on it.
+ */
+function digitsOnly(pasted: string): string {
+  return pasted.replace(NON_DIGITS, "");
+}
+
 /** Written and read back to find out whether this browser keeps cookies. */
 const COOKIE_PROBE = "capstone_cookie_probe";
 
@@ -80,6 +107,36 @@ function withRecovery(message: string): string {
   return `${message.replace(TRAILING_STOPS, "")}. Ask for a new code and try again.`;
 }
 
+/** The part of an auth client answer this form reads. */
+interface AuthAnswer {
+  error: { code?: string; message?: string } | null;
+}
+
+/** What `reach` answers with when the call threw rather than answering. */
+const UNREACHABLE = {
+  code: "UNREACHABLE",
+  message: "Could not reach the server. Check your connection and try again.",
+};
+
+/**
+ * An auth client call, answered as a refusal when it throws.
+ *
+ * The client returns a refusal as `{ error }`, but `fetch` rejects on a
+ * network failure and better-fetch passes that rejection through. Thrown, it
+ * would skip `setLoading(false)` and leave the step locked for good, because
+ * the code step disables its field and its way back while a request is in
+ * flight. The catch also takes the rarer throw after a real answer, such as a
+ * body that will not parse; the message is then about the connection when it
+ * was not, and a retry either works or meets the usual refusal.
+ */
+async function reach(call: Promise<AuthAnswer>): Promise<AuthAnswer> {
+  try {
+    return await call;
+  } catch {
+    return { error: UNREACHABLE };
+  }
+}
+
 /** One named field out of a submitted form, as a string rather than a FormDataEntryValue. */
 function formValue(e: React.FormEvent<HTMLFormElement>, field: string): string {
   return String(new FormData(e.currentTarget).get(field) ?? "");
@@ -90,18 +147,32 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
   const [step, setStep] = useState<Step>("address");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  // Controlled, unlike the other two fields, so a refusal can empty it.
+  const [draft, setDraft] = useState("");
+  const codeField = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Focus after the render that re-enables the field, not inside `refuse`:
+  // the field is disabled while its check is in flight, and a disabled input
+  // takes no focus. On any other step the ref is empty and this does nothing.
+  useEffect(() => {
+    if (error !== null) {
+      codeField.current?.focus();
+    }
+  }, [error]);
 
   async function sendCode(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     const address = formValue(e, "email");
-    const { error: sendError } = await authClient.emailOtp.sendVerificationOtp({
-      email: address,
-      type: "sign-in",
-    });
+    const { error: sendError } = await reach(
+      authClient.emailOtp.sendVerificationOtp({
+        email: address,
+        type: "sign-in",
+      })
+    );
     setLoading(false);
     if (sendError) {
       // The endpoint answers the same for a known and an unknown address, so
@@ -121,6 +192,7 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
       return;
     }
     setEmail(address);
+    setDraft("");
     setStep("code");
   }
 
@@ -160,13 +232,14 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const entered = formValue(e, "code");
-    const { error: checkError } =
-      await authClient.emailOtp.checkVerificationOtp({
+    const entered = draft;
+    const { error: checkError } = await reach(
+      authClient.emailOtp.checkVerificationOtp({
         email,
         otp: entered,
         type: "sign-in",
-      });
+      })
+    );
     if (checkError) {
       setLoading(false);
       if (checkError.code === "USER_NOT_FOUND") {
@@ -176,10 +249,35 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
         setStep("name");
         return;
       }
-      setError(withRecovery(checkError.message ?? "That code did not work."));
+      refuse(checkError, "That code did not work.");
       return;
     }
     await redeem(entered, undefined);
+  }
+
+  /**
+   * Says why, empties the code field and puts the cursor back in it.
+   *
+   * Emptied rather than kept for a one-digit fix (#600). With all six slots
+   * full, input-otp pastes at the caret, which sits on the last slot: pasting
+   * the right code over a wrong `000000` gave `000004`, and phone autofill
+   * lands in the same place. An empty field takes either whole.
+   *
+   * Nothing typed is lost by it: the field is disabled from the submit until
+   * the answer arrives, so the draft this empties is the one that was sent.
+   */
+  function refuse(
+    refusal: { code?: string; message?: string },
+    fallback: string
+  ) {
+    if (refusal.code === UNREACHABLE.code) {
+      // The code was never judged and may still be good, so it stays for a
+      // retry, and "ask for a new code" would be the wrong advice.
+      setError(UNREACHABLE.message);
+      return;
+    }
+    setError(withRecovery(refusal.message ?? fallback));
+    setDraft("");
   }
 
   async function submitName(e: React.FormEvent<HTMLFormElement>) {
@@ -190,14 +288,16 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
   }
 
   async function redeem(otp: string, name: string | undefined) {
-    const { error: signInError } = await authClient.signIn.emailOtp({
-      email,
-      otp,
-      ...(name === undefined ? {} : { name }),
-    });
+    const { error: signInError } = await reach(
+      authClient.signIn.emailOtp({
+        email,
+        otp,
+        ...(name === undefined ? {} : { name }),
+      })
+    );
     setLoading(false);
     if (signInError) {
-      setError(withRecovery(signInError.message ?? "Sign-in failed."));
+      refuse(signInError, "Sign-in failed.");
       return;
     }
     navigate({ to: redirectTo ?? "/" });
@@ -226,32 +326,71 @@ export function EmailCodeForm({ redirectTo }: { redirectTo?: string }) {
   }
 
   if (step === "code") {
+    const invalid = error !== null;
+    const describedBy = invalid
+      ? `${CODE_HINT_ID} ${CODE_ERROR_ID} ${CODE_EXPIRY_ID}`
+      : `${CODE_HINT_ID} ${CODE_EXPIRY_ID}`;
+    // Centered, with the address above the slots (#600): the address is what
+    // to check when no code arrives, so it sits where the eye lands, and the
+    // error sits under the slots it is about. The sentence is the visible
+    // instruction; "Code" stays as the field's name for a screen reader.
     return (
       <form className="mt-6 space-y-4" key="code" onSubmit={checkCode}>
-        <div className="space-y-1.5">
-          <Label htmlFor="code-otp">Code</Label>
-          <Input
+        <div className="space-y-3 text-center">
+          <p className="text-muted-foreground text-sm" id={CODE_HINT_ID}>
+            Enter the code we sent to
+            <span className="wrap-anywhere block font-medium text-foreground">
+              {email}
+            </span>
+          </p>
+          <Label className="sr-only" htmlFor="code-otp">
+            Code
+          </Label>
+          {/* No `onComplete` submit: that would spend a guess on a typo
+              nobody saw, and changes context on input (WCAG 3.2.2). */}
+          <InputOTP
+            aria-describedby={describedBy}
+            aria-invalid={invalid}
             // `one-time-code` is what lets a phone offer the code from the
             // message rather than making the person retype it.
             autoComplete="one-time-code"
+            containerClassName="justify-center"
+            disabled={loading}
             id="code-otp"
             inputMode="numeric"
             maxLength={CODE_LENGTH}
             name="code"
-            placeholder="123456"
+            onChange={setDraft}
+            pasteTransformer={digitsOnly}
+            pattern={REGEXP_ONLY_DIGITS}
+            ref={codeField}
             required
-            type="text"
-          />
-          <p className="text-muted-foreground text-sm">
-            We sent a code to {email}. It expires in five minutes.
+            value={draft}
+          >
+            <InputOTPGroup>
+              {SLOTS.map((index) => (
+                <InputOTPSlot
+                  aria-invalid={invalid}
+                  className="h-10 w-10 text-base"
+                  index={index}
+                  key={index}
+                />
+              ))}
+            </InputOTPGroup>
+          </InputOTP>
+          <FieldError id={CODE_ERROR_ID} message={error} />
+          <p className="text-muted-foreground text-sm" id={CODE_EXPIRY_ID}>
+            It expires in five minutes.
           </p>
         </div>
-        <FieldError message={error} />
         <Button className="w-full" disabled={loading} type="submit">
           {loading ? "Checking..." : "Confirm code"}
         </Button>
+        {/* Disabled mid-check as well, so an answer about this address cannot
+            land on the next one's step. */}
         <Button
           className="w-full"
+          disabled={loading}
           onClick={() => {
             setError(null);
             setStep("address");
