@@ -129,16 +129,21 @@ function PageLabel({
   pathname: string;
   title: string | null;
 }) {
-  if (!title) {
-    return <span className="break-all font-mono text-xs">{pathname}</span>;
-  }
+  // Bounded and clamped like any free-text title cell, so the counts stay
+  // on screen beside a long title or a long pathname.
   return (
-    <span>
-      {title}
-      <span className="block break-all font-mono text-muted-foreground text-xs">
+    <div className="md:min-w-xs md:max-w-md" title={title ?? pathname}>
+      {title && (
+        <span className="block min-w-0 md:line-clamp-2 md:whitespace-normal">
+          {title}
+        </span>
+      )}
+      <span
+        className={`block min-w-0 break-all font-mono text-xs md:whitespace-normal ${title ? "text-muted-foreground md:line-clamp-1" : ""}`}
+      >
         {pathname}
       </span>
-    </span>
+    </div>
   );
 }
 
@@ -146,14 +151,20 @@ const PROJECT_COLUMNS = defineAdminColumns<ProjectRow>()([
   {
     accessorFn: (row) => row.title,
     cardHeader: true,
+    // The free-text title recipe (docs/UI-CONVENTIONS.md, "A free-text
+    // column is bounded and clamped"), so a long title cannot push the
+    // counts off the table.
     cell: ({ row }) => (
-      <Link
-        className="text-brand-dark underline"
-        params={{ projectId: row.original.id }}
-        to="/projects/$projectId"
-      >
-        {row.original.title}
-      </Link>
+      <div className="flex md:min-w-xs md:max-w-md">
+        <Link
+          className="min-w-0 text-brand-dark underline md:line-clamp-2 md:whitespace-normal"
+          params={{ projectId: row.original.id }}
+          title={row.original.title}
+          to="/projects/$projectId"
+        >
+          {row.original.title}
+        </Link>
+      </div>
     ),
     enableHiding: false,
     header: "Project",
@@ -273,6 +284,9 @@ const DEVICE_LABEL: Record<string, string> = {
   mobile: "Mobile",
   tablet: "Tablet",
 };
+
+/** How many pages the page and entry-page tables show, most visited first. */
+const TOP = 25;
 
 const COUNTRY = new Intl.DisplayNames(["en"], { type: "region" });
 
@@ -414,13 +428,17 @@ function TrafficPage() {
         />
       </div>
 
-      <SectionHeading>Pages</SectionHeading>
+      <SectionHeading
+        note={`The ${TOP} most viewed of ${COUNT.format(view.pages.length)}`}
+      >
+        Pages
+      </SectionHeading>
       <div className="mt-2">
         <LocalTable
           caption="Page views and visits per page"
           columns={PAGE_COLUMNS}
           emptyMessage="No page views in this range."
-          rows={view.pages.map((page) => ({
+          rows={view.pages.slice(0, TOP).map((page) => ({
             key: page.pathname,
             label: page.title ?? page.pathname,
             pathname: page.pathname,
@@ -432,7 +450,9 @@ function TrafficPage() {
         />
       </div>
 
-      <SectionHeading note="The first page a visit viewed">
+      <SectionHeading
+        note={`The first page a visit viewed, the ${TOP} most common`}
+      >
         Entry pages
       </SectionHeading>
       <div className="mt-2">
@@ -440,7 +460,7 @@ function TrafficPage() {
           caption="Visits per entry page"
           columns={ENTRY_COLUMNS}
           emptyMessage="No visits in this range."
-          rows={view.breakdowns.entryPages.map((page) => ({
+          rows={view.breakdowns.entryPages.slice(0, TOP).map((page) => ({
             key: page.pathname,
             label: page.title ?? page.pathname,
             pathname: page.pathname,

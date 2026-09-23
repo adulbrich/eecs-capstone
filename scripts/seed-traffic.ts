@@ -88,7 +88,8 @@ await db.execute(sql`
         'categories', '[]'::jsonb,
         'program', NULL,
         'archivedOnly', random() < 0.05,
-        'acceptingOnly', random() < 0.2,
+        -- On by default on /projects, so most searches leave it on.
+        'acceptingOnly', random() < 0.85,
         'studentProposedOnly', random() < 0.1,
         'requiresNdaOnly', false,
         'page', 1 + floor(power(random(), 4) * 4)::int,
