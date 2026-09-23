@@ -74,6 +74,16 @@ describe("mantleResponses", () => {
     await expect(mantleResponses({ model: "m" })).rejects.toThrow(
       "Bedrock Mantle response failed: terminated (UND_ERR_SOCKET: other side closed)"
     );
+
+    const errorCutOff = {
+      ok: false,
+      status: 500,
+      text: () => Promise.reject(closed),
+    };
+    vi.stubGlobal("fetch", () => Promise.resolve(errorCutOff));
+    await expect(mantleResponses({ model: "m" })).rejects.toThrow(
+      "Bedrock Mantle response failed: terminated (UND_ERR_SOCKET: other side closed)"
+    );
   });
 });
 
