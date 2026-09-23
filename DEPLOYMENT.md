@@ -1329,7 +1329,7 @@ aws --profile aws-capstone1 cloudwatch set-alarm-state --region us-west-2 \
 data on its next period and overwrites whatever was set here, so nothing needs
 undoing.
 
-Four alarms exist, all on the one topic:
+Five alarms exist, all on the one topic:
 
 | Alarm | Fires when |
 | --- | --- |
@@ -1337,12 +1337,13 @@ Four alarms exist, all on the one topic:
 | `eecs-capstone-app-5xx` | The app returned more than 5 5XX in five minutes |
 | `eecs-capstone-db-connections` | RDS held more than 100 connections for two minutes running |
 | `eecs-capstone-fleet-below-floor` | The service ran fewer than `app_min_tasks` for three minutes running |
+| `eecs-capstone-db-pool-waiting` | A request queued for a database connection in each of two consecutive minutes |
 
 **Expect some mail that is not an incident.**
 
 Each alarm sends on its first transition into OK, and on the first apply all
-four start in INSUFFICIENT_DATA, so confirming the subscription is likely to be
-followed by up to four "OK" messages within a few minutes. Nothing is wrong;
+five start in INSUFFICIENT_DATA, so confirming the subscription is likely to be
+followed by up to five "OK" messages within a few minutes. Nothing is wrong;
 that is the alarms reaching a state for the first time.
 
 **A deploy may also mail.** A rolling deploy stops a task before starting its
@@ -1739,6 +1740,7 @@ this config; delete it manually if you are done with the project.
 `AI_SCOPE_LIMIT_PER_DAY`, `BEDROCK_SOCIAL_SUMMARY_REASONING_EFFORT`,
 `BEDROCK_SOCIAL_SUMMARY_ENABLED`, `AI_SOCIAL_SUMMARY_LIMIT_PER_HOUR`,
 `AI_SOCIAL_SUMMARY_LIMIT_PER_DAY`, `VERIFICATION_MAIL_WINDOW_MINUTES`,
+`REFERENCE_LIST_CACHE_TTL_MS`,
 `SIGN_IN_CODE_LIMIT`, `EMAIL_TRANSPORT=ses`, `EMAIL_FROM`,
 `EMAIL_REPLY_TO`, `EMAIL_STAFF_INBOX`, `SES_REGION`, plus secrets
 `DATABASE_URL`, `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_SECRET`,

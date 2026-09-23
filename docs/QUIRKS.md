@@ -412,6 +412,14 @@ The cast is the documented Drizzle idiom to avoid a circular initialization erro
 
 `src/db/index.ts` exports a single `db` instance, and constructs the `pg.Pool` itself rather than using the connection-string shortcut so that `logPoolErrors` can attach its listener before anything queries the pool; `drizzle({ client: pool, schema })` is the shape that allows it. Why that listener is not optional is in the `logPoolErrors` docblock and in `src/server/__tests__/db-pool.integration.test.ts`, which kills a backend and watches the pool survive (#525). The sizing, the acquisition timeout and the budget behind the numbers are in `src/lib/_internal/db-pool.ts`, with [ADR-0034](./adr/0034-the-pool-is-sized-against-the-instance.md) for why and for the one exception to "no second `pg.Pool` in app code": `src/db/traffic.ts`, the traffic writer's own pool, capped at `CONNECTION_BUDGET.trafficPerTask`. Pass `db` to Better Auth's `drizzleAdapter`.
 
+### The pool reports itself as a CloudWatch metric, through stdout
+
+Under `NODE_ENV=production`, `src/db/index.ts` starts `startPoolMetrics`, which samples `waitingCount`, `totalCount` and `idleCount` every second and prints one JSON line a minute. That line is an Embedded Metric Format document: CloudWatch Logs extracts `PoolWaiting`, `PoolTotal` and `PoolIdle` in the `eecs-capstone/db-pool` namespace from any log event carrying `_aws`, with no header, so the `awslogs` driver is the whole transport and the task has no `cloudwatch:PutMetricData`. Two things break it silently. Anything printed on the same line, a prefix from a wrapped `console` included, makes the event not JSON and the metric stops; and a dimension added to the document makes a new metric, which the `db_pool_waiting` alarm in `infra/alarms.tf` does not watch. `db-pool.test.ts` pins the names to the alarm. A line carries one calendar minute of samples, stamped with that minute, so each minute gets one datapoint; EMF rejects more than 100 values per metric (#558).
+
+### The listing's filter options are cached per task, and a direct insert is missing from them for a minute
+
+`listProjectFilterOptions`, which the `/projects` loader reads, caches when `REFERENCE_LIST_CACHE_TTL_MS` is set; production sets 60000 and dev leaves it at 0. Only the `*As` writers clear it, and only on their own process, so a row inserted by a script, a fixture, `psql` or another task is absent from the listing's filters until the entry expires, while every other read of the two tables sees it at once. A new writer to either table must call `clearAllReferenceListCaches()`. Why, and why it is off in dev: [ADR-0051](./adr/0051-reference-lists-are-cached-per-task.md).
+
 ### FK rules in this project
 
 Cascade rules are encoded in the schema, not in application code. Never recompute them at runtime.

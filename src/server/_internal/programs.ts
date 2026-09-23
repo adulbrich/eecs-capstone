@@ -8,6 +8,7 @@ import {
   user,
 } from "#/db/schema";
 import { requireUser } from "#/lib/_internal/auth-guards";
+import { clearAllReferenceListCaches } from "#/lib/_internal/reference-list-cache";
 import { assertStaff, isStaff, STAFF_ROLES } from "#/lib/viewer";
 import type { ProgramInput, ProgramUpdateInput } from "../programs";
 import { findUniqueViolation } from "./pg-errors";
@@ -163,6 +164,8 @@ export async function createProgramAs(viewer: AuthUser, data: ProgramInput) {
         expectedTeams: data.expectedTeams ?? null,
       })
       .returning();
+    // The listing's filter options are cached per task (ADR-0051).
+    clearAllReferenceListCaches();
     return { id: row.id };
   } catch (error) {
     return rethrowCourseIdCollision(error, data.courseId);
@@ -191,6 +194,7 @@ export async function updateProgramAs(
         updatedAt: new Date(),
       })
       .where(eq(programs.id, data.id));
+    clearAllReferenceListCaches();
     return { id: data.id };
   } catch (error) {
     // An edit that leaves the course id alone does not reach here: the row
@@ -218,6 +222,7 @@ export async function deleteProgramAs(viewer: AuthUser, id: string) {
     .from(projectPrograms)
     .where(eq(projectPrograms.programId, id));
   await db.delete(programs).where(eq(programs.id, id));
+  clearAllReferenceListCaches();
   return { id, affectedProjectCount: count };
 }
 

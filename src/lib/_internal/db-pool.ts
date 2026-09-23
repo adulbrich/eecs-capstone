@@ -105,3 +105,127 @@ export function logPoolErrors(
     log(`Database pool dropped a connection: ${error.message}`);
   });
 }
+
+/**
+ * Where the pool metrics land in CloudWatch. `infra/alarms.tf` alarms on
+ * `waiting` by these names, and `db-pool.test.ts` holds the two together.
+ */
+export const POOL_METRICS = {
+  namespace: "eecs-capstone/db-pool",
+  waiting: "PoolWaiting",
+  total: "PoolTotal",
+  idle: "PoolIdle",
+} as const;
+
+type PoolCounts = Pick<Pool, "totalCount" | "idleCount" | "waitingCount">;
+
+interface PoolSamples {
+  idle: number[];
+  total: number[];
+  waiting: number[];
+}
+
+/**
+ * One CloudWatch Embedded Metric Format document, as the single line the log
+ * event must be: CloudWatch extracts the metrics from any JSON log event that
+ * carries `_aws`, so stdout through the task's `awslogs` driver is enough and
+ * the task needs no SDK client and no `cloudwatch:PutMetricData`.
+ *
+ * Each metric is an array of samples rather than a pre-computed maximum, so
+ * CloudWatch keeps the distribution and `Maximum`, `Average` and the
+ * percentiles all mean what they say. No dimensions, on purpose: a task id
+ * would be a new custom metric on every deploy, and the question is whether
+ * any task had a queue, which the fleet-wide `Maximum` answers. Counts only,
+ * never a query or its parameters (ADR-0042).
+ */
+export function poolMetricsLine(
+  samples: PoolSamples,
+  timestamp: number
+): string {
+  const metric = (name: string) => ({ Name: name, Unit: "Count" });
+  return JSON.stringify({
+    _aws: {
+      Timestamp: timestamp,
+      CloudWatchMetrics: [
+        {
+          Namespace: POOL_METRICS.namespace,
+          Dimensions: [[]],
+          Metrics: [
+            metric(POOL_METRICS.waiting),
+            metric(POOL_METRICS.total),
+            metric(POOL_METRICS.idle),
+          ],
+        },
+      ],
+    },
+    [POOL_METRICS.waiting]: samples.waiting,
+    [POOL_METRICS.total]: samples.total,
+    [POOL_METRICS.idle]: samples.idle,
+  });
+}
+
+/** EMF refuses more than this many values for one metric in one document. */
+const EMF_MAX_VALUES = 100;
+
+/**
+ * Samples the pool's three counts every `sampleMs` and emits them as one EMF
+ * line per calendar minute (#558). Returns the stop function.
+ *
+ * `waitingCount` is the number that matters: a request queued for a
+ * connection is a request that is slow for that reason, and past the
+ * acquire timeout it fails. The session lookups that failed that way in the
+ * #524 load test were the only signal the pool had run out, and ADR-0042's
+ * redaction makes that line far harder to spot, so this is its deliberate
+ * replacement. Sampled rather than timed per acquire, because timing needs a
+ * wrapper on `pool.connect` that relies on pg-pool calling its own `connect`
+ * from `query`. A queue that forms and drains between two samples is missed.
+ *
+ * A line holds the samples of one calendar minute and is stamped with that
+ * minute's start, so each full minute a task was up gets one datapoint in the
+ * minute it describes. Emitting every sixtieth tick instead stamped a minute of
+ * samples with whichever minute the sixtieth landed in, and let timer drift
+ * leave a minute empty or give it two lines. The line for a minute goes out on
+ * the first tick of the next, and a document that would pass EMF's cap goes
+ * out early. Nothing flushes on shutdown, so a task's last partial minute is
+ * lost; the alarm needs two minutes in a row, so that minute can neither fire
+ * it nor clear it.
+ *
+ * The interval is unref'd so a script that imports `#/db` still exits when
+ * its work is done.
+ */
+export function startPoolMetrics(
+  pool: PoolCounts,
+  {
+    emit = (line: string) => console.log(line),
+    now = Date.now,
+    sampleMs = 1000,
+    windowMs = 60_000,
+  }: {
+    emit?: (line: string) => void;
+    now?: () => number;
+    sampleMs?: number;
+    windowMs?: number;
+  } = {}
+): () => void {
+  const empty = (): PoolSamples => ({ idle: [], total: [], waiting: [] });
+  let samples = empty();
+  let windowStart = Math.floor(now() / windowMs) * windowMs;
+  const flush = () => {
+    if (samples.waiting.length > 0) {
+      emit(poolMetricsLine(samples, windowStart));
+    }
+    samples = empty();
+  };
+  const timer = setInterval(() => {
+    const start = Math.floor(now() / windowMs) * windowMs;
+    if (start !== windowStart || samples.waiting.length >= EMF_MAX_VALUES) {
+      flush();
+      windowStart = start;
+    }
+    samples.waiting.push(pool.waitingCount);
+    samples.total.push(pool.totalCount);
+    samples.idle.push(pool.idleCount);
+  }, sampleMs);
+  timer.unref();
+  return () => clearInterval(timer);
+}

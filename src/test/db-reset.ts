@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "#/db";
+import { clearAllReferenceListCaches } from "#/lib/_internal/reference-list-cache";
 
 const TABLES = [
   // Rate-limit counters leak across tests otherwise: a limiter test would see
@@ -35,4 +36,7 @@ export async function resetDatabase() {
   for (const t of TABLES) {
     await db.execute(sql.raw(`TRUNCATE TABLE "${t}" CASCADE;`));
   }
+  // The integration config turns the reference list cache on, and a cached
+  // list would outlive the rows this just truncated.
+  clearAllReferenceListCaches();
 }
