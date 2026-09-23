@@ -62,7 +62,13 @@ async function acceptedBody(
   if (request.headers.get("sec-fetch-site") !== "same-origin") {
     return null;
   }
-  const text = await readCappedBody(request);
+  let text: string | null;
+  try {
+    text = await readCappedBody(request);
+  } catch {
+    // A client that hangs up mid-body errors the stream. Still a 204.
+    return null;
+  }
   if (text === null) {
     return null;
   }
@@ -78,7 +84,8 @@ async function acceptedBody(
 
 /**
  * The handler. Each check drops the event and still answers 204, in the
- * order #510 settled: same-origin, body cap, schema, bot, in-flight cap.
+ * order #510 settled: same-origin, body cap, JSON and schema, bot, in-flight
+ * cap, then a viewer address that resolves.
  *
  * The cap counts events, not connections. On the first request of a day
  * the salt rotation holds one connection while other events insert, so the

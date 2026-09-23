@@ -122,6 +122,22 @@ describe("the traffic writer", () => {
     expect(rows).toHaveLength(0);
   });
 
+  it("answers 204 when the client hangs up mid-body", async () => {
+    const { rows, store } = fakeStore();
+    const aborted = new Request("http://eecs.example/api/traffic", {
+      method: "POST",
+      body: new ReadableStream({
+        start(controller) {
+          controller.error(new Error("client went away"));
+        },
+      }),
+      duplex: "half",
+      headers: { "sec-fetch-site": "same-origin", "user-agent": BROWSER },
+    } as RequestInit);
+    expect((await writer(store)(aborted)).status).toBe(204);
+    expect(rows).toHaveLength(0);
+  });
+
   it("drops rather than waits once the in-flight cap is reached", async () => {
     let started = 0;
     const never = new Promise<void>(() => undefined);
