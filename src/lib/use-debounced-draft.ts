@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * A local draft of a value that lives somewhere slower, committed back after a
@@ -12,6 +12,13 @@ import { useEffect, useState } from "react";
  * survived, and 300ms later it was written straight back over the top. Owning
  * all three makes that unrepresentable at a call site.
  *
+ * Its own commits come back late: `Route.useSearch()` moves only once the
+ * loader resolves, so a commit returns a round trip after it fires, and
+ * resyncing to it dropped every key typed in between (#501). So both effects
+ * compare against `expected`, what this last committed or synced to, rather
+ * than against `value`. A `value` equal to it is the echo; anything else is a
+ * change underneath.
+ *
  * `commit` must be referentially stable, the same contract `useAdminTableState`
  * places on `setSearch` and `replaceSearch`: an unstable callback re-arms the
  * timer on every render instead of on every change. That was the second bug in
@@ -19,7 +26,10 @@ import { useEffect, useState } from "react";
  *
  * Router-agnostic on purpose, taking a value and a callback rather than
  * reaching for `useNavigate`, which is what keeps it unit-testable and lets it
- * serve a caller whose value arrives as a prop.
+ * serve a caller whose value arrives as a prop. What it needs from the source
+ * instead: `value` comes back exactly as committed (a `.trim()` on a `q` schema
+ * brings #501 back), and a commit overtaken by a later one never comes back at
+ * all, which holds because the router drops a superseded load.
  */
 export function useDebouncedDraft(
   value: string,
@@ -27,21 +37,36 @@ export function useDebouncedDraft(
   delayMs = 300
 ): [string, (next: string) => void] {
   const [draft, setDraft] = useState(value);
+  const expected = useRef(value);
 
   useEffect(() => {
+    if (value === expected.current) {
+      return;
+    }
+    expected.current = value;
     setDraft(value);
   }, [value]);
 
   useEffect(() => {
-    // Also what makes the mount tick a no-op, and what stops a value that
-    // changed underneath from being overwritten: the sync above has already
-    // set the draft to match by the time this runs.
-    if (draft === value) {
+    // Against `expected`, not `value`: when Back cancels a commit before it
+    // lands, `value` never moves, and a draft cleared back to it must still
+    // be committed, or Forward to the cancelled value reads as its echo.
+    if (draft === expected.current) {
       return;
     }
-    const t = setTimeout(() => commit(draft), delayMs);
+    // A Back or Forward before this fires moves `expected`, and the draft it
+    // was armed for is stale, even when the step landed on exactly that text
+    // and so left `draft`, and this effect, where they were.
+    const expectedWhenArmed = expected.current;
+    const t = setTimeout(() => {
+      if (expected.current !== expectedWhenArmed) {
+        return;
+      }
+      expected.current = draft;
+      commit(draft);
+    }, delayMs);
     return () => clearTimeout(t);
-  }, [draft, value, commit, delayMs]);
+  }, [draft, commit, delayMs]);
 
   return [draft, setDraft];
 }
