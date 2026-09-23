@@ -1,6 +1,7 @@
 import { Sha256 } from "@aws-crypto/sha256-js";
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { SignatureV4 } from "@smithy/signature-v4";
+import { errorMessage } from "#/lib/error-message";
 
 const DEFAULT_REGION = "us-east-1";
 
@@ -163,16 +164,47 @@ export const mantleResponses: ResponsesFn = async (body) => {
     protocol: "https:",
     query: {},
   });
-  const response = await fetch(`https://${hostname}${RESPONSES_PATH}`, {
-    body: payload,
-    headers: signed.headers,
-    method: "POST",
-    signal: AbortSignal.timeout(MANTLE_TIMEOUT_MS),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`https://${hostname}${RESPONSES_PATH}`, {
+      body: payload,
+      headers: signed.headers,
+      method: "POST",
+      signal: AbortSignal.timeout(MANTLE_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw new Error(
+      `Bedrock Mantle request failed: ${fetchFailureReason(error)}`,
+      { cause: error }
+    );
+  }
   if (!response.ok) {
     throw new Error(
       `Bedrock Mantle returned ${response.status}: ${await response.text()}`
     );
   }
-  return (await response.json()) as MantleResponse;
+  try {
+    return (await response.json()) as MantleResponse;
+  } catch (error) {
+    throw new Error(
+      `Bedrock Mantle response failed: ${fetchFailureReason(error)}`,
+      { cause: error }
+    );
+  }
 };
+
+/**
+ * What a failed fetch actually hit. undici rejects with a bare "fetch failed"
+ * and puts the reason, a code such as `UND_ERR_HEADERS_TIMEOUT` or
+ * `ECONNRESET`, on `cause`, which every log line here used to drop: the stall
+ * behind ADR-0053 left nothing but "fetch failed" to diagnose.
+ */
+export function fetchFailureReason(error: unknown): string {
+  const message = errorMessage(error, "fetch failed");
+  const cause = error instanceof Error ? error.cause : undefined;
+  if (!(cause instanceof Error)) {
+    return message;
+  }
+  const code = (cause as { code?: unknown }).code;
+  return `${message} (${typeof code === "string" ? code : cause.name}: ${cause.message})`;
+}

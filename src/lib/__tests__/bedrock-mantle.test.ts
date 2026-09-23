@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  fetchFailureReason,
   mantleHost,
   mantleRegion,
   mantleResponses,
@@ -47,6 +48,27 @@ describe("mantleResponses", () => {
     expect(timeout).toHaveBeenCalledWith(60_000);
     expect(fetchSpy.mock.calls[0]?.[1].signal).toBe(
       timeout.mock.results[0]?.value
+    );
+  });
+});
+
+describe("fetchFailureReason", () => {
+  it("names the undici code a bare 'fetch failed' hides on its cause", () => {
+    const cause = Object.assign(new Error("Headers Timeout Error"), {
+      code: "UND_ERR_HEADERS_TIMEOUT",
+    });
+    expect(fetchFailureReason(new TypeError("fetch failed", { cause }))).toBe(
+      "fetch failed (UND_ERR_HEADERS_TIMEOUT: Headers Timeout Error)"
+    );
+  });
+
+  it("keeps the message alone when there is no cause, as for our own timeout", () => {
+    const timeout = new DOMException(
+      "The operation was aborted due to timeout",
+      "TimeoutError"
+    );
+    expect(fetchFailureReason(timeout)).toBe(
+      "The operation was aborted due to timeout"
     );
   });
 });
