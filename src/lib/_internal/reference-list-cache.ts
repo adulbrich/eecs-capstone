@@ -5,7 +5,7 @@
  *
  * Per task and time-bounded, not invalidated fleet-wide: a writer clears the
  * cache on the task that handled the write, and every other task serves the
- * old value until its entry expires. ADR-0048 has the trade.
+ * old value until its entry expires. ADR-0051 has the trade.
  *
  * The TTL comes from `REFERENCE_LIST_CACHE_TTL_MS`, read on every lookup, and
  * unset or anything but a positive integer means no caching at all. Off by

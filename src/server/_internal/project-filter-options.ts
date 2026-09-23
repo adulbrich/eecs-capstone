@@ -16,7 +16,7 @@ const cache =
 
 /**
  * The project listing's two filter option lists, cached per task (#558,
- * ADR-0048). The listing reads them beside the search on every visit, and
+ * ADR-0051). The listing reads them beside the search on every visit, and
  * they change a few times a term. Only the listing reads through here: the
  * staff pickers and admin pages call `listCategoriesImpl` and
  * `listProgramsImpl` directly, so an edit form never shows a stale list. One

@@ -368,7 +368,7 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
 
   "server/search.ts:listProjectFilterOptions": {
     level: "public",
-    note: "The listing's filter options: project categories through listCategoriesImpl and programs through listProgramsImpl, unchanged, so the key-set pins on those two are its enforcement. Cached per task for up to a minute (ADR-0048); nothing in it depends on the viewer, so one cached value serves everyone.",
+    note: "The listing's filter options: project categories through listCategoriesImpl and programs through listProgramsImpl, unchanged, so the key-set pins on those two are its enforcement. Cached per task for up to a minute (ADR-0051); nothing in it depends on the viewer, so one cached value serves everyone.",
   },
   "server/search.ts:searchProjects": {
     level: "public",

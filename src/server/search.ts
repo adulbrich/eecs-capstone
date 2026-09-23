@@ -56,7 +56,7 @@ export const searchProjects = createServerFn({ method: "GET" })
 
 /**
  * The listing's category and program filter options in one call, cached per
- * task (#558, ADR-0048). Public for the same reasons `listCategories` and
+ * task (#558, ADR-0051). Public for the same reasons `listCategories` and
  * `listPrograms` are: it returns exactly what they return.
  */
 export const listProjectFilterOptions = createServerFn({

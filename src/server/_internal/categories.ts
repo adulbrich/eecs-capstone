@@ -123,7 +123,7 @@ export async function createCategoryAs(viewer: AuthUser, data: CategoryInput) {
       .insert(categories)
       .values({ name: data.name, domain: data.domain, type: data.type })
       .returning();
-    // The listing's filter options are cached per task (ADR-0048).
+    // The listing's filter options are cached per task (ADR-0051).
     clearAllReferenceListCaches();
     return { id: row.id };
   } catch (error) {

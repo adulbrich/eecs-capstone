@@ -19,7 +19,7 @@ import { listProjectFilterOptionsImpl } from "#/server/_internal/project-filter-
 
 // `vitest.integration.config.ts` turns the cache on, so the first read in each
 // test below is cached, and every later one reads stale unless something
-// cleared it (#558, ADR-0048).
+// cleared it (#558, ADR-0051).
 
 async function makeAdmin(email: string) {
   await auth.api.createUser({ body: { email, name: email } });
@@ -105,7 +105,7 @@ describe("the listing's cached filter options", () => {
   });
 
   it("serves a write made behind its back from the cache, and only here", async () => {
-    // The trade ADR-0048 accepts: a row written by another task, or here
+    // The trade ADR-0051 accepts: a row written by another task, or here
     // straight to the database, is missing from the listing until the entry
     // expires. The staff reads underneath are not cached, which is what keeps
     // an edit form's picker current.

@@ -418,7 +418,7 @@ Under `NODE_ENV=production`, `src/db/index.ts` starts `startPoolMetrics`, which 
 
 ### The listing's filter options are cached per task, and a direct insert is missing from them for a minute
 
-`listProjectFilterOptions`, which the `/projects` loader reads, caches when `REFERENCE_LIST_CACHE_TTL_MS` is set; production sets 60000 and dev leaves it at 0. Only the `*As` writers clear it, and only on their own process, so a row inserted by a script, a fixture, `psql` or another task is absent from the listing's filters until the entry expires, while every other read of the two tables sees it at once. A new writer to either table must call `clearAllReferenceListCaches()`. Why, and why it is off in dev: [ADR-0048](./adr/0048-reference-lists-are-cached-per-task.md).
+`listProjectFilterOptions`, which the `/projects` loader reads, caches when `REFERENCE_LIST_CACHE_TTL_MS` is set; production sets 60000 and dev leaves it at 0. Only the `*As` writers clear it, and only on their own process, so a row inserted by a script, a fixture, `psql` or another task is absent from the listing's filters until the entry expires, while every other read of the two tables sees it at once. A new writer to either table must call `clearAllReferenceListCaches()`. Why, and why it is off in dev: [ADR-0051](./adr/0051-reference-lists-are-cached-per-task.md).
 
 ### FK rules in this project
 
