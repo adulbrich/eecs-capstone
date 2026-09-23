@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { getBedrockClient } from "#/lib/_internal/bedrock";
 import {
+  bedrockEmbed,
   buildEmbedConfig,
   buildEmbedRequestBody,
   EMBEDDING_DIMENSIONS,
@@ -101,5 +103,27 @@ describe("buildEmbedConfig", () => {
     expect(
       embeddingHash("robot arm", config.modelId, config.dimensions)
     ).not.toBe(embeddingHash("robot arm", config.modelId, 256));
+  });
+});
+
+describe("bedrockEmbed", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("gives up after 30 s, since the SDK sets no request timeout", async () => {
+    vi.stubEnv("BEDROCK_EMBEDDINGS_ENABLED", "true");
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    const send = vi.spyOn(getBedrockClient(), "send").mockResolvedValue({
+      body: new TextEncoder().encode(JSON.stringify({ embedding: [1] })),
+    } as never);
+
+    await bedrockEmbed("text");
+
+    expect(timeout).toHaveBeenCalledWith(30_000);
+    expect(send.mock.calls[0]?.at(1)).toEqual({
+      abortSignal: timeout.mock.results[0]?.value,
+    });
   });
 });

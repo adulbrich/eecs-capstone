@@ -1,5 +1,6 @@
 import type { EmbedFn } from "#/lib/_internal/bedrock-embed";
 import type { ResponsesFn } from "#/lib/_internal/bedrock-mantle";
+import { redactQueryError } from "#/lib/_internal/redact-query-error";
 import { refreshProjectEmbedding } from "./project-embeddings";
 import { refreshSocialSummary } from "./project-social-summary";
 
@@ -26,7 +27,17 @@ export function refreshProjectInBackground(
   deps: RefreshDeps = {}
 ): void {
   const previous = latestByProject.get(projectId) ?? Promise.resolve();
-  const run = previous.then(() => refreshAndLog(projectId, deps));
+  // Both refreshes catch their own errors; this catch is for anything that
+  // slips past them, since nobody awaits `run` and an unhandled rejection
+  // would take the task down.
+  const run = previous
+    .then(() => refreshAndLog(projectId, deps))
+    .catch((error: unknown) => {
+      console.error(
+        `Project refresh failed for ${projectId}`,
+        redactQueryError(error)
+      );
+    });
   latestByProject.set(projectId, run);
   inFlight.add(run);
   run.finally(() => {
@@ -39,7 +50,6 @@ export function refreshProjectInBackground(
 
 async function refreshAndLog(projectId: string, deps: RefreshDeps) {
   const started = Date.now();
-  // Both refreshes catch their own errors, so this never rejects.
   const embedding = await refreshProjectEmbedding(projectId, deps.embed);
   const summary = await refreshSocialSummary(projectId, deps.summarize);
   console.log(

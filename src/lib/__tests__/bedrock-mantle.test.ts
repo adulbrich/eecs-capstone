@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   mantleHost,
   mantleRegion,
+  mantleResponses,
   RESPONSES_PATH,
 } from "../_internal/bedrock-mantle";
 
@@ -21,5 +22,30 @@ describe("mantleHost", () => {
 describe("RESPONSES_PATH", () => {
   it("uses the /openai/v1 prefix the GPT models are served under", () => {
     expect(RESPONSES_PATH).toBe("/openai/v1/responses");
+  });
+});
+
+describe("mantleResponses", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("gives up after 60 s rather than waiting out undici's 300 s", async () => {
+    // Static keys, so the signer never walks the credential chain.
+    vi.stubEnv("BEDROCK_ACCESS_KEY", "AKIDEXAMPLE");
+    vi.stubEnv("BEDROCK_SECRET_KEY", "secret");
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve(Response.json({ status: "completed" }))
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await mantleResponses({ model: "m" });
+
+    expect(timeout).toHaveBeenCalledWith(60_000);
+    const init = fetchSpy.mock.calls[0]?.at(1) as RequestInit;
+    expect(init.signal).toBe(timeout.mock.results[0]?.value);
   });
 });
