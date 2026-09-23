@@ -50,15 +50,51 @@ describe("mantleResponses", () => {
       timeout.mock.results[0]?.value
     );
   });
+
+  it("names the cause when the request fails and when the body dies mid-read", async () => {
+    vi.stubEnv("BEDROCK_ACCESS_KEY", "AKIDEXAMPLE");
+    vi.stubEnv("BEDROCK_SECRET_KEY", "secret");
+    const refused = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("connect ECONNREFUSED 10.0.0.1:443"), {
+        code: "ECONNREFUSED",
+      }),
+    });
+    vi.stubGlobal("fetch", () => Promise.reject(refused));
+    await expect(mantleResponses({ model: "m" })).rejects.toThrow(
+      "Bedrock Mantle request failed: fetch failed (ECONNREFUSED: connect ECONNREFUSED 10.0.0.1:443)"
+    );
+
+    const closed = new TypeError("terminated", {
+      cause: Object.assign(new Error("other side closed"), {
+        code: "UND_ERR_SOCKET",
+      }),
+    });
+    const cutOff = { ok: true, json: () => Promise.reject(closed) };
+    vi.stubGlobal("fetch", () => Promise.resolve(cutOff));
+    await expect(mantleResponses({ model: "m" })).rejects.toThrow(
+      "Bedrock Mantle response failed: terminated (UND_ERR_SOCKET: other side closed)"
+    );
+  });
 });
 
 describe("fetchFailureReason", () => {
   it("names the undici code a bare 'fetch failed' hides on its cause", () => {
-    const cause = Object.assign(new Error("Headers Timeout Error"), {
-      code: "UND_ERR_HEADERS_TIMEOUT",
+    const cause = Object.assign(new Error("getaddrinfo ENOTFOUND host"), {
+      code: "ENOTFOUND",
     });
     expect(fetchFailureReason(new TypeError("fetch failed", { cause }))).toBe(
-      "fetch failed (UND_ERR_HEADERS_TIMEOUT: Headers Timeout Error)"
+      "fetch failed (ENOTFOUND: getaddrinfo ENOTFOUND host)"
+    );
+  });
+
+  it("reads the first address's error when every address refused", () => {
+    const cause = Object.assign(
+      // biome-ignore lint/suspicious/useErrorMessage: undici builds it with an empty message, which is the case under test
+      new AggregateError([new Error("connect ECONNREFUSED ::1:443")], ""),
+      { code: "ECONNREFUSED" }
+    );
+    expect(fetchFailureReason(new TypeError("fetch failed", { cause }))).toBe(
+      "fetch failed (ECONNREFUSED: connect ECONNREFUSED ::1:443)"
     );
   });
 

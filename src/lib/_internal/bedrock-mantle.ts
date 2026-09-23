@@ -179,25 +179,32 @@ export const mantleResponses: ResponsesFn = async (body) => {
     );
   }
   if (!response.ok) {
-    throw new Error(
-      `Bedrock Mantle returned ${response.status}: ${await response.text()}`
-    );
+    const text = await readResponse(() => response.text());
+    throw new Error(`Bedrock Mantle returned ${response.status}: ${text}`);
   }
+  return (await readResponse(() => response.json())) as MantleResponse;
+};
+
+/** A body that dies mid-read names its cause the same way a failed fetch does. */
+async function readResponse<T>(read: () => Promise<T>): Promise<T> {
   try {
-    return (await response.json()) as MantleResponse;
+    return await read();
   } catch (error) {
     throw new Error(
       `Bedrock Mantle response failed: ${fetchFailureReason(error)}`,
       { cause: error }
     );
   }
-};
+}
 
 /**
  * What a failed fetch actually hit. undici rejects with a bare "fetch failed"
- * and puts the reason, a code such as `UND_ERR_HEADERS_TIMEOUT` or
- * `ECONNRESET`, on `cause`, which every log line here used to drop: the stall
- * behind ADR-0053 left nothing but "fetch failed" to diagnose.
+ * and puts the reason, a code such as `ECONNREFUSED`, `ENOTFOUND` or
+ * `UND_ERR_SOCKET`, on `cause`, which every log line here used to drop: the
+ * stall behind ADR-0053 left nothing but "fetch failed" to diagnose. Our own
+ * timeout is a `TimeoutError` with no cause, and reads as its message alone.
+ * A host whose every address refuses gives an `AggregateError` with an empty
+ * message, so the first of its errors speaks for it.
  */
 export function fetchFailureReason(error: unknown): string {
   const message = errorMessage(error, "fetch failed");
@@ -206,5 +213,8 @@ export function fetchFailureReason(error: unknown): string {
     return message;
   }
   const code = (cause as { code?: unknown }).code;
-  return `${message} (${typeof code === "string" ? code : cause.name}: ${cause.message})`;
+  const detail =
+    cause.message ||
+    (cause instanceof AggregateError ? errorMessage(cause.errors[0], "") : "");
+  return `${message} (${typeof code === "string" ? code : cause.name}: ${detail})`;
 }

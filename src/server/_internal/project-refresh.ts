@@ -29,8 +29,9 @@ export function refreshProjectInBackground(
   const queuedAt = Date.now();
   const previous = latestByProject.get(projectId) ?? Promise.resolve();
   // Both refreshes catch their own errors; this catch is for anything that
-  // slips past them, since nobody awaits `run` and an unhandled rejection
-  // would take the task down.
+  // slips past them, since nobody awaits `run`. Nitro would log an unhandled
+  // rejection and carry on, but a Vitest run fails on one, and this keeps the
+  // line redacted either way.
   const run = previous
     .then(() => refreshAndLog(projectId, deps, queuedAt))
     .catch((error: unknown) => {
