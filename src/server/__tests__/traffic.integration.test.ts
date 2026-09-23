@@ -158,6 +158,15 @@ describe("the traffic salt", () => {
 
   it("agrees across tasks that race to rotate it", async () => {
     await createSaltStore(trafficDb)("2026-09-22");
+    // Open every pooled connection first, so the four reads below run side by
+    // side and each sees yesterday's row before any rotation commits. Without
+    // that, the first store can finish before the others connect and the
+    // race never happens.
+    await Promise.all(
+      Array.from({ length: 5 }, () =>
+        trafficDb.execute(sql`SELECT pg_sleep(0.05)`)
+      )
+    );
     // Separate stores stand in for separate tasks, each with its own cache.
     const salts = await Promise.all(
       Array.from({ length: 4 }, () => createSaltStore(trafficDb)("2026-09-23"))
