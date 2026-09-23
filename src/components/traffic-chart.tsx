@@ -40,7 +40,14 @@ export function TrafficChart({
     <>
       <div aria-hidden="true">
         <ChartContainer className="aspect-auto h-64 w-full" config={CONFIG}>
-          <LineChart data={daily} margin={{ left: 0, right: 8, top: 8 }}>
+          {/* No accessibility layer: it makes the SVG focusable, which
+              axe refuses inside `aria-hidden` (aria-hidden-focus). The
+              table below is how the numbers reach assistive technology. */}
+          <LineChart
+            accessibilityLayer={false}
+            data={daily}
+            margin={{ left: 0, right: 8, top: 8 }}
+          >
             <CartesianGrid vertical={false} />
             <XAxis
               axisLine={false}
