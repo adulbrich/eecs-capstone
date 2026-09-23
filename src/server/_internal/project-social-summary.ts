@@ -68,8 +68,9 @@ const SUMMARY_GUARD_COLUMNS = [
  * text's hash. On one task it self-corrects, because the edit that raced runs
  * this function again on its own commit, queued behind the first by
  * `refreshProjectInBackground`, reads the new text, finds the stored hash does
- * not match it and regenerates. Refreshes on two tasks can still finish out of
- * order, and that pairing waits for the backfill (ADR-0053). The retry holds
+ * not match it and regenerates. On two tasks the write below cannot land at
+ * all once the text has moved, because it holds only while the row still reads
+ * what this read (ADR-0053). The retry holds
  * because both call sites in `projects.ts` start this after every commit that
  * leaves the project in an embeddable status, which is every commit that could
  * strand a pairing: the gate below skips the other statuses, so a draft has no
