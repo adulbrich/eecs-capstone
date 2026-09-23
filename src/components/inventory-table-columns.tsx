@@ -1,9 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { defineAdminColumns } from "#/components/admin-data-table";
-import {
-  type InventoryItemPublic,
-  statusRank,
-} from "#/lib/inventory-visibility";
+import type { InventoryItemPublic } from "#/lib/inventory-visibility";
 import { getPublicUrl } from "#/lib/storage";
 import type { SortState } from "#/lib/table-state";
 import type { ItemStatus } from "#/lib/vocabularies";
@@ -20,8 +17,13 @@ import { InventoryStatusBadge } from "./inventory-status-badge";
 export type InventoryListRow = InventoryItemPublic;
 
 /**
- * Name, ascending. The server orders the listing by `updatedAt`, which is a
- * staff column, and the table must sort by one it shows.
+ * Required by `useAdminTable` and inert: every column below is
+ * `enableSorting: false` since #477, so `parseSort` returns this whatever the
+ * URL says and the table renders the order `listInventory` returned. It used
+ * to be a real `name asc` applied to the twenty rows on screen, so page two
+ * restarted the alphabet and card and table view ordered the same URL
+ * differently. The Sort select is the listing's one ordering. See
+ * [ADR-0030](../../docs/adr/0030-one-ordering-control-on-the-public-listing.md).
  */
 export const INVENTORY_TABLE_DEFAULT_SORT: SortState = {
   desc: false,
@@ -63,18 +65,17 @@ export const INVENTORY_TABLE_COLUMNS = defineAdminColumns<InventoryListRow>()([
     ),
     cardHeader: true,
     enableHiding: false,
+    enableSorting: false,
     header: "Name",
     id: "name",
   },
   {
-    accessorFn: (row) => statusRank(row.status),
     cell: ({ row }) => (
       <InventoryStatusBadge status={row.original.status as ItemStatus} />
     ),
+    enableSorting: false,
     header: "Status",
     id: "status",
-    // Numeric, not text: the locale-compare default would compare String(n).
-    sortFn: "basic",
   },
   {
     cell: ({ row }) =>

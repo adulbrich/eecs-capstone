@@ -30,8 +30,21 @@ export const uploadInventoryImage = createServerFn({ method: "POST" })
 // writing "retired" into a listing filter.
 const itemStatusEnum = z.enum(ACTIVE_STATUSES);
 
+/**
+ * The public listing's orderings, in the order its Sort select offers them.
+ * The one ordering control on `/inventory`: the table's headers do not sort,
+ * so card and table view render the same rows in the same order (#477).
+ */
+export const INVENTORY_ORDERS = ["available", "name", "updated"] as const;
+
+export type InventoryOrder = (typeof INVENTORY_ORDERS)[number];
+
+/** What a reader browsing the catalog wants on top: what they can take out now. */
+export const INVENTORY_ORDER_DEFAULT: InventoryOrder = "available";
+
 const listInventorySchema = z.object({
   q: searchQuerySchema,
+  order: z.enum(INVENTORY_ORDERS).default(INVENTORY_ORDER_DEFAULT),
   status: itemStatusEnum.nullable().default(null),
   categories: z.array(z.string().uuid()).max(20).default([]),
   page: z.number().int().positive().default(1),

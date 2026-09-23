@@ -129,6 +129,7 @@ describe("public inventory search stays narrow", () => {
       .insert(inventoryItems)
       .values([{ name: "Oscilloscope", serial: "SN-99812" }]);
     const { rows } = await listInventoryAs(null, {
+      order: "available",
       categories: [],
       page: 1,
       pageSize: 24,

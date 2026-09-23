@@ -392,6 +392,7 @@ describe("listInventoryAs privacy", () => {
       pickupBy: new Date(Date.now() + 86_400_000),
     });
     const result = await listInventoryAs(null, {
+      order: "available",
       q: "",
       status: null,
       categories: [],
@@ -409,6 +410,7 @@ describe("listInventoryAs privacy", () => {
     const admin = await makeUser(`a-${Date.now()}@x.com`, "admin");
     const item = await makeItem({ notes: "internal" });
     const result = await listInventoryAs(admin, {
+      order: "available",
       q: "",
       status: null,
       categories: [],
@@ -426,6 +428,7 @@ describe("listInventoryAs privacy", () => {
     const holder = await makeUser(holderEmail, "user");
     const item = await makeItem({ currentHolderId: holder.id });
     const result = await listInventoryAs(admin, {
+      order: "available",
       q: "",
       status: null,
       categories: [],
@@ -470,6 +473,7 @@ describe("listInventoryAs privacy", () => {
     const item = await makeItem({ notes: "Locker B4, code ZQXNOTES." });
 
     const result = await listInventoryAs(student, {
+      order: "available",
       q: "",
       status: null,
       categories: [],
@@ -536,6 +540,7 @@ describe("listInventoryAs privacy", () => {
     const item = await makeItem();
     await transitionItem(admin, { itemId: item.id, nextStatus: "retired" });
     const anonList = await listInventoryAs(null, {
+      order: "available",
       q: "",
       status: null,
       categories: [],
@@ -1015,6 +1020,7 @@ describe("category read path: correlated subquery and all-match filter", () => {
     const uncategorized = await makeItem({ name: "Loose Bot" });
 
     const result = await listInventoryAs(null, {
+      order: "available",
       q: "",
       status: null,
       categories: [],
@@ -1048,6 +1054,7 @@ describe("category read path: correlated subquery and all-match filter", () => {
     await makeItem({ name: "Unfiltered Bot" });
 
     const result = await listInventoryAs(null, {
+      order: "available",
       q: "",
       status: null,
       categories: [category.id],
@@ -1213,6 +1220,7 @@ describe("inventory item categories", () => {
     });
 
     const result = await listInventoryAs(admin, {
+      order: "available",
       categories: [a.id, b.id],
       page: 1,
       pageSize: 24,
@@ -3447,6 +3455,7 @@ describe("retired visibility", () => {
     const { student, retired, active } = await retiredAndActiveItems();
     const { rows } = await listInventoryAs(student, {
       ...LIST_DEFAULTS(),
+      order: "available",
       page: 1,
       pageSize: 50,
       retiredOnly: true,

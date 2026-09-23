@@ -113,13 +113,38 @@ describe("the public inventory table", () => {
     expect(ids).not.toContain("pickupBy");
   });
 
-  it("sorts by name by default, since updatedAt is a staff column", () => {
-    expect(INVENTORY_TABLE_DEFAULT_SORT).toEqual({ desc: false, id: "name" });
+  /**
+   * Inverted in #477, as `/projects` was in #475: the Sort select is the
+   * listing's one ordering, so no header sorts. Asserted over every column
+   * rather than a list of names, so a column added later with sorting left
+   * on fails here instead of reintroducing a page-local second ordering.
+   */
+  it("makes no column sortable", () => {
+    const sortableIds = INVENTORY_TABLE_COLUMNS.filter(
+      (column) => column.enableSorting !== false
+    ).map((column) => column.id);
+    expect(sortableIds).toEqual([]);
+  });
+
+  /**
+   * The rendered half of the claim above. `INVENTORY_TABLE_DEFAULT_SORT` still
+   * names `name`, and the rows arrive out of name order, so a header that
+   * still sorted would put Drill first.
+   */
+  it("renders the rows in the order the server returned them", () => {
     renderTable(DEFAULT_HIDDEN);
     const names = screen
       .getAllByRole("link")
       .map((link) => link.textContent?.trim());
-    expect(names).toEqual(["Drill", "Oscilloscope"]);
+    expect(names).toEqual(["Oscilloscope", "Drill"]);
+    expect(
+      screen
+        .getAllByRole("columnheader")
+        .map((h) => h.getAttribute("aria-sort"))
+    ).toEqual([null, null, null]);
+    expect(screen.queryAllByRole("button", { name: /Name|Status/ })).toEqual(
+      []
+    );
   });
 
   it("renders the status badge and category chips", () => {
