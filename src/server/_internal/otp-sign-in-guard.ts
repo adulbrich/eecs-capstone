@@ -24,7 +24,9 @@ import { addressProofRefused } from "#/lib/address-proof";
  * been flipped. So a code sign-in against a banned unverified row fails, and
  * still strips it. Nothing is granted, but a decision an admin made is quietly
  * rewritten, which is the same argument `releaseUnverifiedAddress` makes for
- * leaving a banned row alone.
+ * leaving a banned row alone. Only an active ban: the same hook clears one
+ * whose `banExpires` has passed and lets the session through, so a code
+ * against that row is let through too.
  *
  * **A row with another provider linked.** This one grants something. A social
  * sign-up whose provider reported the address unverified leaves a row with a
