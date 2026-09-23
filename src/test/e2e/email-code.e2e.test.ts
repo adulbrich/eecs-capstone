@@ -295,6 +295,9 @@ test.describe("refusals on the emailed code", () => {
       await expect(page.getByRole("alert")).toContainText(
         /could not reach the server/i
       );
+      await expect(page.getByRole("alert")).not.toContainText(
+        /ask for a new code/i
+      );
       await expect(field).toBeEnabled();
       await expect(field).toHaveValue("");
       await expect(field).toBeFocused();
@@ -315,6 +318,9 @@ test.describe("refusals on the emailed code", () => {
       await page.getByRole("button", { name: "Confirm code" }).click();
       await expect(page.getByRole("alert")).toContainText(
         /could not reach the server/i
+      );
+      await expect(page.getByRole("alert")).not.toContainText(
+        /ask for a new code/i
       );
       await expect(field).toHaveValue("");
       await expect(field).toBeFocused();
