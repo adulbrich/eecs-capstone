@@ -20,6 +20,14 @@ updates:
       # new redirect URI first (#278, docs/QUIRKS.md). Stay on the 1.6 line.
       - dependency-name: "better-auth"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # better-auth pins its core to the same exact version, so a second copy
+      # on another line breaks the build (`getIp` missing, #599).
+      - dependency-name: "@better-auth/core"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # Biome 2.5.14 types RegExp exec() as never null, so
+      # noUnnecessaryConditions flags every match guard (#599).
+      - dependency-name: "@biomejs/biome"
+        versions: ["2.5.14"]
       # TypeScript 7 ships no compiler API yet, and the server-function scanner
       # test needs one (#316).
       - dependency-name: "typescript"
