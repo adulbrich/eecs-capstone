@@ -59,15 +59,17 @@ export function ProjectPrivatePanel({
       />
       <PanelNote>{PRIVATE_PANEL_AUDIENCE_HINT}</PanelNote>
 
+      {/* History first, so the notes and the comments, both written to the
+          other party, sit together and read as one conversation (#615). */}
+      <PanelSection title="Status history">
+        <StatusTimeline rows={history} />
+      </PanelSection>
+
       {notes && (
         <PanelSection title={PRIVATE_NOTES_LABEL}>
           <p className="whitespace-pre-wrap text-sm">{notes}</p>
         </PanelSection>
       )}
-
-      <PanelSection title="Status history">
-        <StatusTimeline rows={history} />
-      </PanelSection>
 
       <PanelSection title="Comments">
         <CommentThread
