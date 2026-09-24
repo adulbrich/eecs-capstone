@@ -527,6 +527,10 @@ export async function getSimilarProjectsAs(
           eq(projects.acceptingApplicants, true),
           isNull(projects.deletedAt),
           isNotNull(projects.embedding),
+          // Again, inside this statement: a refresh that failed between the
+          // check above and here nulls the vector, and a NULL distance would
+          // quietly order the list by id instead of nearness.
+          sql`${viewedEmbedding} IS NOT NULL`,
           ne(projects.id, data.projectId),
           sharesAProgramWith(data.projectId)
         )

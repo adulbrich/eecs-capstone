@@ -463,6 +463,11 @@ test("@smoke project detail, similar projects card at 1024px", async ({
   await checkA11y(page);
   await page.reload();
   await expect(pill).toBeVisible();
+  // Reopening clears the remembered collapse, so the next load is open.
+  await pill.click();
+  await expect(hide).toBeVisible();
+  await page.reload();
+  await expect(hide).toBeVisible();
 });
 
 test("@smoke project detail, similar projects sheet at 375px", async ({
