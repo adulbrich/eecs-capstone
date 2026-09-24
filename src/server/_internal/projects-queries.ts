@@ -506,25 +506,34 @@ export async function getSimilarProjectsAs(
   const viewedEmbedding = sql`(
     SELECT viewed.embedding FROM projects viewed WHERE viewed.id = ${data.projectId}
   )`;
-  const rows = await db
-    .select({
-      id: projects.id,
-      title: projects.title,
-      description: projects.description,
-    })
-    .from(projects)
-    .where(
-      and(
-        eq(projects.status, "published"),
-        eq(projects.acceptingApplicants, true),
-        isNull(projects.deletedAt),
-        isNotNull(projects.embedding),
-        ne(projects.id, data.projectId),
-        sharesAProgramWith(data.projectId)
+  // The order is index-eligible, and an HNSW scan returns its nearest
+  // `ef_search` (40) before the WHERE runs: with most of the table archived,
+  // that can leave none of the 40 published. `strict_order` has pgvector
+  // (0.8+) keep scanning until the LIMIT is met, still in distance order.
+  // SET LOCAL needs the transaction, and it ends with it, so the setting
+  // never leaks onto a pooled connection.
+  const rows = await db.transaction(async (tx) => {
+    await tx.execute(sql`SET LOCAL hnsw.iterative_scan = strict_order`);
+    return await tx
+      .select({
+        id: projects.id,
+        title: projects.title,
+        description: projects.description,
+      })
+      .from(projects)
+      .where(
+        and(
+          eq(projects.status, "published"),
+          eq(projects.acceptingApplicants, true),
+          isNull(projects.deletedAt),
+          isNotNull(projects.embedding),
+          ne(projects.id, data.projectId),
+          sharesAProgramWith(data.projectId)
+        )
       )
-    )
-    .orderBy(sql`${projects.embedding} <=> ${viewedEmbedding}`, projects.id)
-    .limit(SIMILAR_PROJECTS_LIMIT);
+      .orderBy(sql`${projects.embedding} <=> ${viewedEmbedding}`, projects.id)
+      .limit(SIMILAR_PROJECTS_LIMIT);
+  });
   return rows.map(
     (row): SimilarProject => ({
       id: row.id,
