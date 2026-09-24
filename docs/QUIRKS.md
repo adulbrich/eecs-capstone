@@ -318,7 +318,7 @@ Two facts collide. Tenant-custom claims ride in the ID token and are absent from
 
 ### The ONID callback path is not the GitHub callback path, and the version pin holds it there
 
-GitHub sits at `/api/auth/callback/github`; ONID sits at `/api/auth/oauth2/callback/onid`. Better Auth 1.6 mounts generic OAuth on the `oauth2` path, 1.7 converges the two, and Entra matches redirect URIs exactly against what UIT allowlisted. `package.json` therefore pins `better-auth` to `~1.6.13`. Under the old caret range a routine `npm update` would break ONID sign-in with no code change and no failing test. Upgrading to 1.7 means getting a new URI allowlisted first, and removing `genericOAuthClient()` from `src/lib/auth-client.ts`, which 1.7 deletes. See `docs/ONID-SSO.md`.
+GitHub sits at `/api/auth/callback/github`; ONID sits at `/api/auth/oauth2/callback/onid`. Better Auth 1.6 mounts generic OAuth on the `oauth2` path, 1.7 converges the two, and Entra matches redirect URIs exactly against what UIT allowlisted. `package.json` therefore holds `better-auth` on the 1.6 line with a tilde range, and `.github/dependabot.yml` skips its minor and major updates. `@better-auth/core` has to follow it: `better-auth` depends on one exact core version, so a direct dependency on another line installs a second copy, and the 1.7 core broke the production build against the 1.6 client (`getIp` is not exported, #599). Under the old caret range a routine `npm update` would break ONID sign-in with no code change and no failing test. Upgrading to 1.7 means getting a new URI allowlisted first, and removing `genericOAuthClient()` from `src/lib/auth-client.ts`, which 1.7 deletes. See `docs/ONID-SSO.md`.
 
 ### `user.name` is trimmed and refused blank in the create hook
 
