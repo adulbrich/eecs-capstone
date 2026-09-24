@@ -280,6 +280,10 @@ export const ACCESS_CONTRACT: Record<string, AccessDeclaration> = {
     level: "public",
     note: "canSeeProject decides, so a draft 404s for a stranger. Status history and staff fields are withheld separately. The projection carries contactEmail, which is manually entered and publicly visible by design, and must never carry proposerEmail.",
   },
+  "server/projects-queries.ts:getSimilarProjects": {
+    level: "public",
+    note: "The project page's similar-projects list (#614). canSeeProject gates the viewed project, so a draft or a soft-deleted id answers an empty list, and every returned row is published, accepting applicants and not deleted. It returns an id, a title and a plain excerpt; the vectors and the distance stay in Postgres.",
+  },
   "server/projects-queries.ts:getProposerForEdit": {
     level: "staff",
     note: "The endpoint that exists to return proposerEmail, the private link key that joins a project to an account which may not exist yet. Staff only, and it must not widen: leaking it exposes the address a proposer was invited by, not one they chose to publish.",

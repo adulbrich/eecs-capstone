@@ -7,6 +7,7 @@ import {
   gte,
   ilike,
   inArray,
+  isNotNull,
   isNull,
   lt,
   ne,
@@ -35,6 +36,8 @@ import {
   filterCommentsForViewer,
   projectDetailView,
 } from "#/lib/project-visibility";
+import { truncateOnWordBoundary } from "#/lib/social-meta";
+import { stripMarkdown } from "#/lib/strip-markdown";
 import { assertStaff, isStaff, type Viewer } from "#/lib/viewer";
 import type { ProjectStatus } from "#/lib/vocabularies";
 import type { AdminProjectsFilter } from "../projects-queries";
@@ -47,7 +50,18 @@ import {
   projectProgramsText,
   projectSummarySelect,
   runsInProgram,
+  sharesAProgramWith,
 } from "./project-summary";
+
+/** How many similar projects a project page lists (#614). */
+const SIMILAR_PROJECTS_LIMIT = 5;
+
+/**
+ * The excerpt's ceiling in characters, ellipsis included. The row clamps to
+ * two lines in CSS; this only keeps the payload from carrying a whole
+ * description to be hidden.
+ */
+const SIMILAR_PROJECT_EXCERPT_LENGTH = 160;
 
 /** The vocabulary plus the sentinel this filter adds for "no filter". */
 type StatusFilter = "all" | ProjectStatus;
@@ -455,6 +469,90 @@ export async function getProjectAs(viewer: Viewer, data: { id: string }) {
 
 export async function getProjectImpl(data: { id: string }) {
   return getProjectAs(await getViewer(), data);
+}
+
+export async function getSimilarProjectsImpl(data: { projectId: string }) {
+  return getSimilarProjectsAs(await getViewer(), data);
+}
+
+/**
+ * The similar-projects list on a project page (#614): published projects that
+ * share a program with the viewed one, nearest to it by embedding. The same
+ * for every viewer.
+ */
+export interface SimilarProject {
+  /** The description as plain text, cut on a word boundary. Empty when there is none. */
+  excerpt: string;
+  id: string;
+  title: string;
+}
+
+export async function getSimilarProjectsAs(
+  viewer: Viewer,
+  data: { projectId: string }
+) {
+  // Whether it has a vector, not the vector: the distance is computed in
+  // Postgres, so the 1024 floats never cross to Node.
+  const [viewed] = await db
+    .select({
+      id: projects.id,
+      proposerId: projects.proposerId,
+      status: projects.status,
+      deletedAt: projects.deletedAt,
+      hasEmbedding: sql<boolean>`${projects.embedding} IS NOT NULL`,
+    })
+    .from(projects)
+    .where(eq(projects.id, data.projectId));
+  // The page's own gate, so a stranger cannot learn the neighbours of a
+  // draft or a soft-deleted project by guessing its id.
+  if (!(viewed?.hasEmbedding && canSeeProject(viewed, viewer))) {
+    return [];
+  }
+  const viewedEmbedding = sql`(
+    SELECT viewed.embedding FROM projects viewed WHERE viewed.id = ${data.projectId}
+  )`;
+  // The order is index-eligible, and an HNSW scan returns its nearest
+  // `ef_search` (40) before the WHERE runs: with most of the table archived,
+  // that can leave none of the 40 published. `strict_order` has pgvector
+  // (0.8+) keep scanning until the LIMIT is met, still in distance order.
+  // SET LOCAL needs the transaction, and it ends with it, so the setting
+  // never leaks onto a pooled connection.
+  const rows = await db.transaction(async (tx) => {
+    await tx.execute(sql`SET LOCAL hnsw.iterative_scan = strict_order`);
+    return await tx
+      .select({
+        id: projects.id,
+        title: projects.title,
+        description: projects.description,
+      })
+      .from(projects)
+      .where(
+        and(
+          eq(projects.status, "published"),
+          eq(projects.acceptingApplicants, true),
+          isNull(projects.deletedAt),
+          isNotNull(projects.embedding),
+          // Again, inside this statement: a refresh that failed between the
+          // check above and here nulls the vector, and a NULL distance would
+          // quietly order the list by id instead of nearness.
+          sql`${viewedEmbedding} IS NOT NULL`,
+          ne(projects.id, data.projectId),
+          sharesAProgramWith(data.projectId)
+        )
+      )
+      .orderBy(sql`${projects.embedding} <=> ${viewedEmbedding}`, projects.id)
+      .limit(SIMILAR_PROJECTS_LIMIT);
+  });
+  return rows.map(
+    (row): SimilarProject => ({
+      id: row.id,
+      title: row.title,
+      excerpt: truncateOnWordBoundary(
+        stripMarkdown(row.description),
+        SIMILAR_PROJECT_EXCERPT_LENGTH
+      ),
+    })
+  );
 }
 
 export interface ProposerForEdit {

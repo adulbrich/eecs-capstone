@@ -109,9 +109,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <SiteHeader />
           {children}
           <Toaster />
+          {/*
+            Bottom left, because the bottom right is the project page's
+            similar-projects control (#614), and a dev-only trigger over it
+            intercepts the click in the accessibility suite.
+          */}
           <TanStackDevtools
             config={{
-              position: "bottom-right",
+              position: "bottom-left",
             }}
             plugins={[
               {

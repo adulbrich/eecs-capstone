@@ -429,6 +429,13 @@ that one component; a route passes at most its width pair through `className`
 (`mx-auto max-w-4xl xl:max-w-7xl` on `/projects` and `/inventory`). Any other `xl:` still needs
 a reason this paragraph does not already give (#350).
 
+The second case is the project page's similar-projects aside (#614,
+[ADR-0054](./adr/0054-similar-projects-float-below-xl-and-sit-beside-from-it.md)):
+768 + 32 + 288 + 64 is 1152, which `lg` cannot hold, so it takes the smallest
+tier above that rather than adding one. Its `xl:` classes live in
+`SimilarProjectsLayout`, and below `xl` it floats; see
+[Floating panel](#floating-panel).
+
 There is no card grid any more. The listing cards (`project-card.tsx`,
 `inventory-card.tsx`) are one component at both widths: image on top at 16:9
 below `md`, image on the left at 3:2 and `w-40` from `md` up, in a single column
@@ -456,7 +463,8 @@ this `px-4 py-6 md:p-8` signature: `max-w-2xl` on the 8 form, dashboard and pros
 (`projects/new`, `projects/$projectId/edit`, `admin/index`, `admin/programs/$programId`,
 `admin/users/$userId`, `inventory/new`, `inventory/$itemId/edit`, `privacy`), `max-w-4xl` on 7
 pages that hold a list, a two-column detail layout or a grid of figures, `max-w-3xl` on the one
-long-form page (`projects/$projectId.tsx`), and `max-w-md` on two narrow-content
+long-form page (`projects/$projectId.tsx`, through `SimilarProjectsLayout`, which
+widens it to `xl:max-w-6xl` for the aside), and `max-w-md` on two narrow-content
 pages (`profile.tsx`, `admin/categories/$categoryId.tsx`). Of the seven `max-w-4xl` pages, three hold a single-column
 card list (`projects/index.tsx`, `inventory/index.tsx`, `my/projects.tsx`),
 `my/items.tsx` holds an attention region and one grouped table with a filter
@@ -1109,6 +1117,31 @@ lives in the route at every view with `seedColumns: view === "table"`, so card
 view's URL never picks up a stored column layout. Growing the table with a filters
 slot was the alternative and was declined, because the grouping mode is meant to
 be that component's one extension.
+
+### Floating panel
+
+One panel floats, the project page's similar projects (`SimilarProjectsLayout`,
+[ADR-0054](./adr/0054-similar-projects-float-below-xl-and-sit-beside-from-it.md)),
+and it has one form per tier:
+
+| Width | Form | Starts |
+| --- | --- | --- |
+| below `md` | `icon-lg` outline Button, fixed bottom right, opening a bottom `Sheet` | collapsed |
+| `md` to `xl` | `Card` fixed bottom right, collapsing to an outline Button with the heading as its label | open, or collapsed if the viewer collapsed it before |
+| `xl` and up | sticky aside in a second grid column, no collapse | open |
+
+The collapse is remembered in `localStorage` under
+`cs-capstone:similar-projects-collapsed`, read and written in try/catch, and
+read only after the list has arrived on the client, so it cannot disagree with
+the server render. A link in the sheet closes it, because the route component
+is reused across project ids. The page's main column takes `pb-16` below `xl`
+while the panel is showing, so the fixed control never sits over the last line.
+The floating controls position themselves and carry `shadow-md` for elevation;
+their radius and size are the Button's own (see
+[`className` on a Button never restyles it](#classname-on-a-button-never-restyles-it)).
+The floating card and the `xl` aside are both labelled `aside` landmarks named
+"Similar projects"; CSS shows one at a time, which is what keeps the name
+unique for a screen reader.
 
 ### Charts
 

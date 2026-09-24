@@ -429,6 +429,67 @@ test("@smoke project detail", async ({ page }) => {
   await checkA11y(page);
 });
 
+// The similar-projects list in each of its three forms (#614). global-setup
+// gives the fixture a vector and one neighbour in its program, so each form
+// has a row. Desktop Chrome is 1280 wide, which is `xl`: the aside.
+test("@smoke project detail, similar projects aside at xl", async ({
+  page,
+}) => {
+  await page.goto(`/projects/${projectId}`);
+  await waitForHydration(page);
+  const aside = page.getByRole("complementary", { name: "Similar projects" });
+  await expect(
+    aside.getByRole("link", { name: "A11Y Similar Project" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Hide similar projects" })
+  ).toBeHidden();
+  await checkA11y(page);
+});
+
+test("@smoke project detail, similar projects card at 1024px", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto(`/projects/${projectId}`);
+  await waitForHydration(page);
+  const hide = page.getByRole("button", { name: "Hide similar projects" });
+  await expect(hide).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await checkA11y(page);
+  await hide.click();
+  const pill = page.getByRole("button", { name: "Similar projects" });
+  await expect(pill).toBeVisible();
+  await checkA11y(page);
+  await page.reload();
+  await expect(pill).toBeVisible();
+  // Reopening clears the remembered collapse, so the next load is open.
+  await pill.click();
+  await expect(hide).toBeVisible();
+  await page.reload();
+  await expect(hide).toBeVisible();
+});
+
+test("@smoke project detail, similar projects sheet at 375px", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto(`/projects/${projectId}`);
+  await waitForHydration(page);
+  await expect(
+    page.getByRole("complementary", { name: "Similar projects" })
+  ).toBeHidden();
+  await page.getByRole("button", { name: "Open similar projects" }).click();
+  const sheet = page.getByRole("dialog", { name: "Similar projects" });
+  await expect(
+    sheet.getByRole("link", { name: "A11Y Similar Project" })
+  ).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await checkA11y(page);
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+});
+
 test("@smoke inventory list", async ({ page }) => {
   await page.goto("/inventory");
   await checkA11y(page);

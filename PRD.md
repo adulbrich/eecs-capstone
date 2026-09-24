@@ -248,6 +248,10 @@ Each project carries:
   still wins. Falls back to relevance ordering when a viewer has no interest
   vector yet, including one whose interests saved but failed to embed; interest
   vectors never leave the server.
+- [x] Similar projects on the project page: up to five published projects that
+  accept applicants and share a program with the one being viewed, nearest by
+  embedding; a sticky aside from `xl`, a collapsible floating card between `md`
+  and `xl`, and a bottom sheet behind an icon button on a phone (#614).
 - [x] Bookmarks: bookmark button on project detail and a toggle on every row of
   the public listing (authed), and a `/my/bookmarks` view.
 
