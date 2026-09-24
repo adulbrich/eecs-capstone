@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Layers, Minus } from "lucide-react";
 import type * as React from "react";
 import { useId, useState } from "react";
+import { cn } from "#/lib/utils.ts";
 import {
   getSimilarProjects,
   type SimilarProject,
@@ -174,7 +175,7 @@ function PhoneSheet({ rows }: { rows: SimilarProject[] }) {
           </Button>
         </SheetTrigger>
         <SheetContent className="max-h-[80vh] overflow-y-auto" side="bottom">
-          <SheetHeader>
+          <SheetHeader className="pb-0">
             <SheetTitle>{HEADING}</SheetTitle>
             <SheetDescription>
               Projects accepting applicants in the same program, closest to this
@@ -182,7 +183,9 @@ function PhoneSheet({ rows }: { rows: SimilarProject[] }) {
             </SheetDescription>
           </SheetHeader>
           <div className="px-4 pb-6">
+            {/* The sheet header already spaces it; no top margin here. */}
             <SimilarProjectsList
+              className=""
               onNavigate={() => setOpen(false)}
               rows={rows}
             />
@@ -194,14 +197,16 @@ function PhoneSheet({ rows }: { rows: SimilarProject[] }) {
 }
 
 function SimilarProjectsList({
+  className = "mt-3",
   onNavigate,
   rows,
 }: {
+  className?: string;
   onNavigate?: () => void;
   rows: SimilarProject[];
 }) {
   return (
-    <ul className="mt-3 space-y-3">
+    <ul className={cn("space-y-3", className)}>
       {rows.map((row) => (
         <li key={row.id}>
           <Link
