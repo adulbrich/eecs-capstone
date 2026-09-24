@@ -272,6 +272,13 @@ async function createFixtures(
     .values({ projectId: project.id, programId: program.id })
     .onConflictDoNothing();
 
+  const similarProjectId = await createSimilarProject(
+    db,
+    project.id,
+    program.id,
+    instructor
+  );
+
   // Inventory item (no unique constraint on name, hence the select-first pattern)
   let [item] = await db
     .select()
@@ -436,6 +443,7 @@ async function createFixtures(
       {
         projectId: project.id,
         bookmarkProjectIds,
+        similarProjectId,
         draftProjectId: draftProject.id,
         itemId: item.id,
         categoryId: category.id,
@@ -534,4 +542,69 @@ async function createBookmarkProjects(
     );
 
   return bookmarkProjectIds;
+}
+
+/**
+ * A vector on the third axis. Bedrock is off in this suite, so the fixture
+ * writes its own, the way `scripts/seed-recommendations.ts` does for the dev
+ * seed. The seed's vectors lie in the plane of the first two axes and the seed
+ * user's interests on the first, so a project here is at the greatest
+ * possible distance from those interests and sorts after every seed title
+ * the recommendations end-to-end test reads off the top of the list.
+ */
+function a11yVector(): number[] {
+  const v = new Array<number>(1024).fill(0);
+  v[2] = 1;
+  return v;
+}
+
+/**
+ * Gives the detail scan's project a similar-projects list (#614): the fixture
+ * gets a vector, and one published neighbour in the same program gets the
+ * same, so the aside, the floating card and the phone sheet all have a row to
+ * render. The neighbour is the instructor's, for the reason
+ * `createBookmarkProjects` gives: `/my/projects` lists a proposer's projects
+ * unpaginated, and the scanning student's list stays as it was. One published
+ * row more on the public catalog, which the seed leaves far short of a
+ * second page.
+ */
+async function createSimilarProject(
+  db: NodePgDatabase<typeof schema>,
+  projectId: string,
+  programId: string,
+  instructor: typeof schema.user.$inferSelect
+): Promise<string> {
+  const title = "A11Y Similar Project";
+  let [similar] = await db
+    .select()
+    .from(schema.projects)
+    .where(eq(schema.projects.title, title));
+  if (!similar) {
+    [similar] = await db
+      .insert(schema.projects)
+      .values({
+        title,
+        description:
+          "A published neighbour of the detail scan's project, so its " +
+          "similar-projects list has a row.",
+        status: "published",
+        publishedAt: new Date(),
+        proposerId: instructor.id,
+        proposerEmail: normalizeEmailAddress(instructor.email),
+      })
+      .returning();
+  }
+  await db
+    .insert(schema.projectPrograms)
+    .values({ projectId: similar.id, programId })
+    .onConflictDoNothing();
+  await db
+    .update(schema.projects)
+    .set({
+      acceptingApplicants: true,
+      embedding: a11yVector(),
+      embeddingSourceHash: "a11y",
+    })
+    .where(inArray(schema.projects.id, [projectId, similar.id]));
+  return similar.id;
 }

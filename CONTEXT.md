@@ -210,6 +210,13 @@ a viewer who has a vector and has not chosen an order, so writing interests is w
 turns it on rather than picking it each visit.
 _Avoid_: suggestion, match, personalization
 
+**Similar projects**:
+The published projects accepting applicants that share a program with the one being
+viewed, ordered by how close their text is to it, at most five. The same for every
+viewer, so not a recommendation, and absent when the viewed project has no
+embedding or no program.
+_Avoid_: related projects, suggested projects, more like this
+
 **Staff inbox**:
 The one staff mailbox every email addressed to staff goes to, set by
 `EMAIL_STAFF_INBOX`: a project submitted or resubmitted, a borrow list or custom

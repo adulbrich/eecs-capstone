@@ -106,6 +106,22 @@ export function runsInProgram(
 }
 
 /**
+ * "This project runs in at least one program that one runs in", the
+ * similar-projects list's scope (#614). A project with no programs shares
+ * none, so it matches nothing and nothing matches it.
+ */
+export function sharesAProgramWith(
+  projectId: string,
+  outerProjectId: SQL = OUTER_PROJECT_ID
+): SQL {
+  return sql`EXISTS (
+    SELECT 1 FROM project_programs pp
+    JOIN project_programs viewed ON viewed.program_id = pp.program_id
+    WHERE pp.project_id = ${outerProjectId} AND viewed.project_id = ${projectId}
+  )`;
+}
+
+/**
  * The admin Program filter's `none` state: a project nobody has filed yet,
  * which is a staff to-do. A project whose only program was deleted lands
  * here too, since the join row is `on delete cascade`.

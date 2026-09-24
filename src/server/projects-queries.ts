@@ -15,6 +15,7 @@ import { PROJECT_STATUSES } from "#/lib/vocabularies";
 export type {
   ProjectMentorship,
   ProposerForEdit,
+  SimilarProject,
 } from "./_internal/projects-queries";
 
 /** The vocabulary plus the sentinel this filter adds for "no filter". */
@@ -115,6 +116,19 @@ export const getProject = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { getProjectImpl } = await import("./_internal/projects-queries");
     return getProjectImpl(data);
+  });
+
+// Public, like `getProject`: the impl applies the same `canSeeProject` gate to
+// the viewed project and returns only published rows (#614).
+export const getSimilarProjects = createServerFn({ method: "GET" })
+  .validator((data: unknown) =>
+    z.object({ projectId: z.string().uuid() }).parse(data)
+  )
+  .handler(async ({ data }) => {
+    const { getSimilarProjectsImpl } = await import(
+      "./_internal/projects-queries"
+    );
+    return getSimilarProjectsImpl(data);
   });
 
 export const getProposerForEdit = createServerFn({ method: "GET" })

@@ -12,6 +12,7 @@ import { OwnerProjectActions } from "#/components/owner-project-actions";
 import { ProjectBadges } from "#/components/project-badges";
 import { ProjectPrivatePanel } from "#/components/project-private-panel";
 import { SectionHeading } from "#/components/section-heading";
+import { SimilarProjectsLayout } from "#/components/similar-projects";
 import { StaffProjectPanel } from "#/components/staff-project-panel";
 import { StatusBadge } from "#/components/status-badge";
 import { TeamFullBadge } from "#/components/team-full-badge";
@@ -148,7 +149,9 @@ function ProjectDetail() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 md:p-8">
+    // The page wrapper, with the similar-projects list beside the text at
+    // `xl` and floating below it (#614).
+    <SimilarProjectsLayout projectId={project.id}>
       {/*
         One header block (#400, UI-CONVENTIONS "Detail page header"): the
         title with the actions right of it, then every badge in one row,
@@ -293,7 +296,7 @@ function ProjectDetail() {
           viewerIsOwner={viewerIsOwner}
         />
       )}
-    </div>
+    </SimilarProjectsLayout>
   );
 }
 
