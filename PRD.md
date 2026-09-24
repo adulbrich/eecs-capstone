@@ -577,7 +577,7 @@ catalogue that decided the matrix below; #288 shipped it.
   with filter or tracking params unfurls as one page.
 - [x] The catalog is kept out of search results with `noindex, follow` while
   `robots.txt` stays permissive, which is what keeps previews working
-  ([ADR-0038](./docs/adr/0038-the-catalog-is-shareable-but-not-indexed.md)).
+  ([ADR-0055](./docs/adr/0055-the-catalog-is-shareable-but-not-indexed.md)).
   The landing and privacy pages stay indexable.
 - [x] A model-written one-line social summary per project, generated from the
   title, description and problem statement at the same two call sites as the
